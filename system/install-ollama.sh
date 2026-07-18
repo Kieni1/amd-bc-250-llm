@@ -56,7 +56,7 @@ systemctl enable ollama.service
 systemctl restart ollama.service
 
 for _ in {1..30}; do
-  if curl --fail --silent --show-error \
+  if curl --fail --silent \
       --connect-timeout 2 http://127.0.0.1:11434/api/tags >/dev/null; then
     ollama --version
     echo "Ollama API is ready at http://127.0.0.1:11434."
