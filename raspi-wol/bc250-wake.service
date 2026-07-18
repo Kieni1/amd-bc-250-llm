@@ -1,0 +1,9 @@
+# Target (on the Pi): /etc/systemd/system/bc250-wake.service
+[Unit]
+Description=Wake the BC-250 LLM server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/wake-bc250.sh

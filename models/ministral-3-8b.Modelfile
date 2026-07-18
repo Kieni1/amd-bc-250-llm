@@ -1,0 +1,15 @@
+# Ollama model: ministral3-8b-unsloth-ud-q5-k-xl
+# Source: unsloth/Ministral-3-8B-Instruct-2512-GGUF @ latest
+# GGUF: Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf
+FROM /var/llm/gguf/Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+PARAMETER num_ctx 32768
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+# Low temperature for translation fidelity.
+PARAMETER temperature 0.15
+PARAMETER top_p 0.95
+
+SYSTEM """You are a precise translation assistant. Preserve meaning, tone, terminology, and formatting; use Swiss High German where applicable; output only the translation unless asked otherwise."""

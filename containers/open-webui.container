@@ -1,0 +1,36 @@
+# Packaged rootful Quadlet. Vendor path: /usr/share/containers/systemd/
+[Unit]
+Description=Open WebUI (BC-250 local LLM front-end)
+After=network-online.target ollama.service tika.service
+Wants=network-online.target tika.service
+
+[Container]
+ContainerName=open-webui
+# v0.10.2, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:9fcea9c6e32ab60b0498f3986c6cdf651ddbe61db48d2213a3d28048ddd673d4
+Network=llm.network
+NetworkAlias=open-webui
+PublishPort=127.0.0.1:3000:8080
+Volume=/var/lib/open-webui:/app/backend/data:Z,U
+AddHost=host.containers.internal:host-gateway
+Memory=2g
+PidsLimit=512
+NoNewPrivileges=true
+DropCapability=all
+Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
+Environment=WEBUI_AUTH=true
+Environment=ENABLE_OPENAI_API=false
+Environment=RAG_EMBEDDING_ENGINE=ollama
+Environment=RAG_EMBEDDING_MODEL=nomic-embed-text
+Environment=CONTENT_EXTRACTION_ENGINE=tika
+Environment=TIKA_SERVER_URL=http://tika:9998
+Environment=SCARF_NO_ANALYTICS=true
+Environment=DO_NOT_TRACK=true
+
+[Service]
+Restart=always
+RestartSec=5
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+# Target on BC-250: /etc/systemd/system/bc250-enable-wol.service
+[Unit]
+Description=Enable Wake-on-LAN on the BC-250 NIC
+After=network.target
+Wants=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/bc250-llm-server/enable-wol.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

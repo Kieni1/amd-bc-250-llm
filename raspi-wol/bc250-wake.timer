@@ -1,0 +1,10 @@
+# Target (on the Pi): /etc/systemd/system/bc250-wake.timer
+[Unit]
+Description=Wake the BC-250 each workday morning
+
+[Timer]
+OnCalendar=Mon..Fri 07:30
+Persistent=false
+
+[Install]
+WantedBy=timers.target

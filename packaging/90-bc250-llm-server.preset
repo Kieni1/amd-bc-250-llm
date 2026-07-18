@@ -1,0 +1,7 @@
+enable cyan-skillfish-governor-smu.service
+disable owui-backup-config.timer
+disable owui-backup-users.timer
+disable owui-prune.timer
+disable owui-warmup.timer
+disable bc250-night-shutdown.timer
+disable bc250-enable-wol.service

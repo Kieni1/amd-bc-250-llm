@@ -1,0 +1,17 @@
+/build/
+/dist/*
+/rpmbuild/
+/sources/*.tar.gz
+/sources/*.tar.xz
+/sources/*.sha256
+/vendor/
+*.rpm
+*.src.rpm
+*.rpmsave
+*.rpmnew
+*.swp
+*~
+.DS_Store
+__pycache__/
+*.pyc
+gitea-pr-*-review.md

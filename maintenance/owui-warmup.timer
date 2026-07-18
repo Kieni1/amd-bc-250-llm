@@ -1,0 +1,10 @@
+[Unit]
+Description=Warm default model on workday mornings
+
+[Timer]
+OnCalendar=Mon..Fri 07:35:00
+Persistent=false
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /usr/libexec/bc250-llm-server/verify-lan.sh "$@"

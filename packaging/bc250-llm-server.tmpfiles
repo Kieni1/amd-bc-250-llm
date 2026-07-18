@@ -1,0 +1,16 @@
+d /var/llm 0750 root ollama -
+d /var/llm/gguf 0750 ollama ollama -
+d /var/llm/gguf-experiments 0750 ollama ollama -
+d /var/llm/ollama 0750 ollama ollama -
+d /var/llm/hf-cache 0750 ollama ollama -
+d /var/llm/modelfiles 0750 root ollama -
+d /var/llm/modelfiles-experiments 0750 root ollama -
+d /var/lib/ollama 0750 ollama ollama -
+d /var/lib/open-webui 0750 root root -
+d /var/backups/bc250-llm-server 0750 root root -
+d /var/backups/bc250-llm-server/config 0750 root root -
+d /var/backups/bc250-llm-server/users 0750 root root -
+d /var/backups/bc250-llm-server/rollback 0750 root root -
+d /var/backups/bc250-llm-server/rollback/config 0750 root root -
+d /var/backups/bc250-llm-server/rollback/users 0750 root root -
+C /etc/bc250-llm-server/maintenance.env 0600 root root - /usr/share/bc250-llm-server/examples/maintenance.env.example

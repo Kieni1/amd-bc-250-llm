@@ -1,0 +1,9 @@
+# Target on BC-250: /etc/systemd/system/bc250-night-shutdown.service
+[Unit]
+Description=Suspend the LLM server only when idle
+After=owui-prune.service owui-backup-users.service owui-backup-config.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/bc250-llm-server/maintenance.env
+ExecStart=/usr/libexec/bc250-llm-server/safe-suspend.sh

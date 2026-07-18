@@ -1,0 +1,14 @@
+# Ollama model: exp-qwen35-9b-unsloth-q6-k
+# Source: unsloth/Qwen3.5-9B-GGUF @ latest
+# GGUF: Qwen3.5-9B-Q6_K.gguf
+FROM /var/llm/gguf-experiments/qwen35-9b-Q6_K/Qwen3.5-9B-Q6_K.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+SYSTEM """You are an experimental general assistant. Answer clearly and directly, distinguish facts from guesses, and use the user's language."""

@@ -1,0 +1,17 @@
+# Ollama model: qwen3-4b-lmstudio-q6-k
+# Source: lmstudio-community/Qwen3-4B-Instruct-2507-GGUF @ latest
+# GGUF: Qwen3-4B-Instruct-2507-Q6_K.gguf
+FROM /var/llm/gguf/Qwen3-4B-Instruct-2507-Q6_K.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Small fast-model slot; raise context only after measuring the workload.
+PARAMETER num_ctx 8192
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+# Qwen non-thinking sampling.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+
+SYSTEM """You are a fast local office assistant. Answer directly, say when unsure, and use the user's language."""

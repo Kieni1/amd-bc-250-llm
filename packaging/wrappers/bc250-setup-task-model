@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+exec /usr/share/bc250-llm-server/examples/task-model/setup-gemma-1b-task.sh "$@"

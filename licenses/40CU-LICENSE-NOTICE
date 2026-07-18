@@ -1,0 +1,16 @@
+BC-250 40-CU unlock source notice
+
+Bundled source:
+  https://github.com/fduraibi/bc250-40cu-unlock
+
+Based on:
+  https://github.com/duggasco/bc250-40cu-unlock
+
+Bundled revision:
+  6c3969ddee40e894297869e6ca30537f274619cb
+
+Upstream declares:
+  GPL-2.0 (same as the Linux kernel)
+
+The upstream helper and patch retain their original copyright, attribution and
+license notices. This package does not relicense them.

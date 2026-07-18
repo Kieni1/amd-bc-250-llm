@@ -1,0 +1,9 @@
+[Unit]
+Description=Warm the default model after morning wake
+After=network-online.target ollama.service
+Wants=network-online.target ollama.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/bc250-llm-server/maintenance.env
+ExecStart=/usr/libexec/bc250-llm-server/warmup.sh

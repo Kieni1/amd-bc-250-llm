@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Open WebUI users backup
+
+[Timer]
+OnCalendar=*-*-* 18:00:00
+Persistent=false
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

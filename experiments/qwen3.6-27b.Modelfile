@@ -1,0 +1,14 @@
+# Ollama model: exp-qwen36-27b-unsloth-ud-q2-k-xl
+# Source: unsloth/Qwen3.6-27B-GGUF @ latest
+# GGUF: Qwen3.6-27B-UD-Q2_K_XL.gguf
+FROM /var/llm/gguf-experiments/qwen3.6-27b-Q2_K_XL/Qwen3.6-27B-UD-Q2_K_XL.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+PARAMETER num_ctx 8192
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+SYSTEM """You are an experimental high-capacity office assistant. Answer clearly, distinguish facts from assumptions, and keep the response proportionate to the task."""

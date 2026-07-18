@@ -1,0 +1,52 @@
+name: Build Fedora RPM
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+
+    steps:
+      - name: Install build tools
+        run: |
+          dnf install -y \
+            bash cargo curl findutils gcc git gzip jq make \
+            libdrm-devel python3 rpm-build rpmdevtools rpmlint rust \
+            systemd systemd-rpm-macros tar xz
+
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate
+        run: make validate
+
+      - name: Prepare pinned sources
+        run: make sources
+
+      - name: Build RPMs
+        run: make rpm
+
+      - name: Run rpmlint
+        run: |
+          set -o pipefail
+          rpmlint dist/*.rpm | tee dist/RPMLINT.txt
+
+      - name: Inspect RPM contents
+        run: |
+          rpm -qpl dist/*.x86_64.rpm | tee dist/RPM-CONTENTS.txt
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: bc250-llm-server-rpms
+          path: |
+            dist/*.rpm
+            dist/SHA256SUMS
+            dist/RPMLINT.txt
+            dist/RPM-CONTENTS.txt

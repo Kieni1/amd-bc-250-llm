@@ -1,0 +1,23 @@
+# Packaged rootful Quadlet. Tika is deliberately not published on the host.
+[Unit]
+Description=Apache Tika (private document text extraction service)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+ContainerName=tika
+# 3.3.1.0-full, pinned OCI index digest.
+Image=docker.io/apache/tika@sha256:d8e6ed96260ad89307a93195a1b856102987a818ac648502f8efbaf313d32470
+Network=llm.network
+NetworkAlias=tika
+Memory=1g
+PidsLimit=256
+NoNewPrivileges=true
+DropCapability=all
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
