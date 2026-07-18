@@ -1,19 +1,7 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-find_manager() {
-  local candidate
-  for candidate in \
-    "$(command -v bc250-cu-live-manager 2>/dev/null || true)" \
-    "$(command -v bc250-cu-live-manager.sh 2>/dev/null || true)" \
-    /usr/local/sbin/bc250-cu-live-manager \
-    /usr/local/bin/bc250-cu-live-manager \
-    /usr/local/sbin/bc250-cu-live-manager.sh \
-    /usr/local/bin/bc250-cu-live-manager.sh; do
-    [[ -n "$candidate" && -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
-  done
-  return 1
-}
+manager="/usr/bin/bc250-cu-live-manager"
 
 read_param() {
   local path="$1"
@@ -29,8 +17,7 @@ else
   echo "  Boot parameter          : not present"
 fi
 
-manager="$(find_manager || true)"
-if [[ -n "$manager" ]]; then
+if [[ -x "$manager" ]]; then
   echo "  Live manager            : $manager"
   if [[ ${EUID} -ne 0 ]]; then
     echo "  Live manager report     : run this command with sudo for register access"
