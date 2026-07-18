@@ -8,6 +8,7 @@ MODELFILE_SOURCE_DIR="${MODELFILE_SOURCE_DIR:-/usr/share/bc250-llm-server/experi
 DEST="${DEST:-/var/llm/gguf-experiments}"
 MODELFILE_DIR="${MODELFILE_DIR:-/var/llm/modelfiles-experiments}"
 HF_HOME="${HF_HOME:-/var/llm/hf-cache}"
+DOWNLOAD_DIR="${DOWNLOAD_DIR:-$HF_HOME/downloads/experiments}"
 OLLAMA_HOST="${OLLAMA_HOST:-127.0.0.1:11434}"
 
 [[ $EUID -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
@@ -82,9 +83,10 @@ done
 [[ "${1:-}" == --list ]] && exit 0
 
 HF_TOKEN="${HF_TOKEN:-}"
-if [[ -z "$HF_TOKEN" && -t 0 ]]; then
-  read -rsp "Hugging Face token (Enter for none): " HF_TOKEN
-  echo
+if [[ -z "$HF_TOKEN" ]] && { exec 3<>/dev/tty; } 2>/dev/null; then
+  read -r -s -u 3 -p "Hugging Face token (Enter for none): " HF_TOKEN || true
+  printf '\n' >&3
+  exec 3>&-
 fi
 if [[ -n "$HF_TOKEN" ]] && ! env HF_TOKEN="$HF_TOKEN" hf auth whoami >/dev/null 2>&1; then
   echo "WARNING: token was not accepted; continuing without it." >&2
@@ -147,7 +149,8 @@ if ((needs_ollama)); then
   OLLAMA_BIN="$(command -v ollama)"
   install -d -o root -g ollama -m 0750 "$MODELFILE_DIR"
 fi
-install -d -o ollama -g ollama -m 0750 "$DEST" "$HF_HOME" "$HF_HOME/hub"
+install -d -o ollama -g ollama -m 0750 \
+  "$DEST" "$HF_HOME" "$HF_HOME/hub" "$HF_HOME/downloads" "$DOWNLOAD_DIR"
 
 failures=()
 for i in "${selected[@]}"; do
@@ -159,6 +162,8 @@ for i in "${selected[@]}"; do
   file="${files[$i]}"
   model_dir="$DEST/$id"
   output="$model_dir/$file"
+  download_model_dir="$DOWNLOAD_DIR/$id"
+  staged="$download_model_dir/$file"
   install -d -o ollama -g ollama -m 0750 "$model_dir"
 
   echo
@@ -177,6 +182,7 @@ for i in "${selected[@]}"; do
   if [[ -s "$output" ]]; then
     echo "    GGUF exists, skipping download"
   else
+    install -d -o ollama -g ollama -m 0750 "$download_model_dir" "$(dirname "$staged")"
     revision_args=()
     [[ "$revision" == latest ]] || revision_args=(--revision "$revision")
     if ! runuser -u ollama -- env \
@@ -185,11 +191,17 @@ for i in "${selected[@]}"; do
       HF_HOME="$HF_HOME" \
       HF_HUB_CACHE="$HF_HOME/hub" \
       HF_HUB_DISABLE_XET=1 \
-      hf download "$repo" "$file" "${revision_args[@]}" --local-dir "$model_dir"; then
+      hf download "$repo" "$file" "${revision_args[@]}" --local-dir "$download_model_dir"; then
       echo "    ERROR: download failed" >&2
       failures+=("$name")
       continue
     fi
+    [[ -s "$staged" ]] || {
+      echo "    ERROR: download completed without $staged" >&2
+      failures+=("$name")
+      continue
+    }
+    mv -f "$staged" "$output"
   fi
 
   chown root:ollama "$output"
