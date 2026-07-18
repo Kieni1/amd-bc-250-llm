@@ -21,6 +21,8 @@ MODEL_REPO="unsloth/gemma-3-1b-it-GGUF"
 MODEL_REVISION="${TASK_MODEL_REVISION:-latest}"
 MODEL_FILE="gemma-3-1b-it-UD-Q4_K_XL.gguf"
 MODEL_SHA256="${TASK_MODEL_SHA256:-}"
+HF_HOME="${HF_HOME:-/var/llm/hf-cache}"
+DOWNLOAD_DIR="$HF_HOME/downloads/task-model"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 MODELFILE="$SCRIPT_DIR/Modelfile"
 
@@ -58,7 +60,8 @@ for group in render video; do
   usermod -aG "$group" ollama
 done
 
-install -d -o ollama -g ollama -m 0750 "$MODEL_DIR" /var/llm/hf-cache
+install -d -o ollama -g ollama -m 0750 \
+  "$MODEL_DIR" "$HF_HOME" "$HF_HOME/hub" "$HF_HOME/downloads" "$DOWNLOAD_DIR"
 MODEL_PATH="$MODEL_DIR/$MODEL_FILE"
 verify_model() {
   [[ -z "$MODEL_SHA256" ]] || printf '%s  %s\n' "$MODEL_SHA256" "$MODEL_PATH" | sha256sum --check --strict -
@@ -69,16 +72,27 @@ if [[ -s "$MODEL_PATH" ]]; then
     exit 1
   }
 else
+  HF_TOKEN="${HF_TOKEN:-}"
+  if [[ -z "$HF_TOKEN" ]] && { exec 3<>/dev/tty; } 2>/dev/null; then
+    read -r -s -u 3 -p "Hugging Face token (Enter for none): " HF_TOKEN || true
+    printf '\n' >&3
+    exec 3>&-
+  fi
   revision_args=()
   [[ "$MODEL_REVISION" == latest ]] || revision_args=(--revision "$MODEL_REVISION")
   runuser -u ollama -- env \
     HOME=/var/lib/ollama \
-    HF_TOKEN="${HF_TOKEN:-}" \
-    HF_HOME=/var/llm/hf-cache \
-    HF_HUB_CACHE=/var/llm/hf-cache/hub \
+    HF_TOKEN="$HF_TOKEN" \
+    HF_HOME="$HF_HOME" \
+    HF_HUB_CACHE="$HF_HOME/hub" \
     HF_HUB_DISABLE_XET=1 \
     hf download "$MODEL_REPO" "$MODEL_FILE" \
-      "${revision_args[@]}" --local-dir "$MODEL_DIR"
+      "${revision_args[@]}" --local-dir "$DOWNLOAD_DIR"
+  [[ -s "$DOWNLOAD_DIR/$MODEL_FILE" ]] || {
+    echo "ERROR: download completed without $DOWNLOAD_DIR/$MODEL_FILE" >&2
+    exit 1
+  }
+  mv -f "$DOWNLOAD_DIR/$MODEL_FILE" "$MODEL_PATH"
   verify_model
 fi
 [[ -n "$MODEL_SHA256" ]] || echo "No checksum configured; using revision '$MODEL_REVISION'."
