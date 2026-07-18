@@ -11,11 +11,14 @@ GOV_VENDOR := sources/cyan-skillfish-governor-vendor-$(GOV_COMMIT).tar.xz
 UNLOCK_COMMIT := 6c3969ddee40e894297869e6ca30537f274619cb
 UNLOCK_SOURCE := sources/bc250-40cu-unlock-$(UNLOCK_COMMIT).tar.gz
 
+LIVE_MANAGER_COMMIT := 8eb45f07810af738f3e4945ea0cc29d399e378a6
+LIVE_MANAGER_SOURCE := sources/bc250-cu-live-manager-$(LIVE_MANAGER_COMMIT).tar.gz
+
 .PHONY: help sources source-tar srpm rpm validate clean
 
 help:
 	@printf '%s\n' \
-	  'make sources    Download pinned governor and 40-CU sources' \
+	  'make sources    Download pinned governor and CU-tool sources' \
 	  'make validate   Run repository checks' \
 	  'make source-tar Create the project source archive' \
 	  'make srpm       Build the source RPM' \
@@ -25,6 +28,7 @@ help:
 sources:
 	./scripts/prepare-governor-sources.sh
 	./scripts/prepare-40cu-source.sh
+	./scripts/prepare-live-manager-source.sh
 
 source-tar:
 	./scripts/make-source-tarball.sh
@@ -35,7 +39,7 @@ validate:
 srpm: sources source-tar validate
 	mkdir -p $(TOPDIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} $(DISTDIR)
 	cp build/$(NAME)-$(VERSION).tar.gz $(TOPDIR)/SOURCES/
-	cp $(GOV_SOURCE) $(GOV_VENDOR) $(UNLOCK_SOURCE) $(TOPDIR)/SOURCES/
+	cp $(GOV_SOURCE) $(GOV_VENDOR) $(UNLOCK_SOURCE) $(LIVE_MANAGER_SOURCE) $(TOPDIR)/SOURCES/
 	cp packaging/$(NAME).spec $(TOPDIR)/SPECS/
 	rpmbuild --define '_topdir $(TOPDIR)' -bs $(TOPDIR)/SPECS/$(NAME).spec
 	cp -f $(TOPDIR)/SRPMS/*.src.rpm $(DISTDIR)/
@@ -43,7 +47,7 @@ srpm: sources source-tar validate
 rpm: sources source-tar validate
 	mkdir -p $(TOPDIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} $(DISTDIR)
 	cp build/$(NAME)-$(VERSION).tar.gz $(TOPDIR)/SOURCES/
-	cp $(GOV_SOURCE) $(GOV_VENDOR) $(UNLOCK_SOURCE) $(TOPDIR)/SOURCES/
+	cp $(GOV_SOURCE) $(GOV_VENDOR) $(UNLOCK_SOURCE) $(LIVE_MANAGER_SOURCE) $(TOPDIR)/SOURCES/
 	cp packaging/$(NAME).spec $(TOPDIR)/SPECS/
 	rpmbuild --define '_topdir $(TOPDIR)' -ba $(TOPDIR)/SPECS/$(NAME).spec
 	find $(TOPDIR)/RPMS $(TOPDIR)/SRPMS -type f -name '*.rpm' -exec cp -f {} $(DISTDIR)/ \;
