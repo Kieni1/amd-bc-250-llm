@@ -39,7 +39,7 @@ throttling = 85
 throttling_recovery = 75
 
 [[safe-points]]
-frequency = 500
+frequency = 350
 voltage = 700
 
 [[safe-points]]
