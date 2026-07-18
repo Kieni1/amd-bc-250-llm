@@ -16,9 +16,11 @@ REVISION="${CODING_AGENT_REVISION:-latest}"
 FILENAME="Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf"
 EXPECTED_SHA256="${CODING_AGENT_SHA256:-}"
 DEST="${CODING_AGENT_GGUF_DIR:-/var/llm/gguf}"
+HF_HOME="${HF_HOME:-/var/llm/hf-cache}"
+DOWNLOAD_DIR="$HF_HOME/downloads/coding-agent"
 MIN_FREE_BYTES="${CODING_AGENT_MIN_FREE_BYTES:-8589934592}"
 
-for cmd in awk curl hf jq ollama sha256sum; do
+for cmd in awk curl getent hf jq ollama runuser sha256sum; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "ERROR: missing command: $cmd" >&2
     exit 1
@@ -35,7 +37,12 @@ getent group ollama >/dev/null || {
   echo "ERROR: the ollama group is missing; run bc250-install-ollama first." >&2
   exit 1
 }
-install -d -o ollama -g ollama -m 0750 "$DEST"
+id ollama >/dev/null 2>&1 || {
+  echo "ERROR: the ollama user is missing; run bc250-install-ollama first." >&2
+  exit 1
+}
+install -d -o ollama -g ollama -m 0750 \
+  "$DEST" "$HF_HOME" "$HF_HOME/hub" "$HF_HOME/downloads" "$DOWNLOAD_DIR"
 
 target="$DEST/$FILENAME"
 if [[ ! -f "$target" ]]; then
@@ -45,11 +52,24 @@ if [[ ! -f "$target" ]]; then
     exit 1
   fi
 
+  HF_TOKEN="${HF_TOKEN:-}"
+  if [[ -z "$HF_TOKEN" ]] && { exec 3<>/dev/tty; } 2>/dev/null; then
+    read -r -s -u 3 -p "Hugging Face token (Enter for none): " HF_TOKEN || true
+    printf '\n' >&3
+    exec 3>&-
+  fi
   args=(download "$REPO" "$FILENAME")
   [[ "$REVISION" == latest ]] || args+=(--revision "$REVISION")
-  args+=(--local-dir "$DEST")
-  [[ -n "${HF_TOKEN:-}" ]] && args+=(--token "$HF_TOKEN")
-  hf "${args[@]}"
+  args+=(--local-dir "$DOWNLOAD_DIR")
+  runuser -u ollama -- env \
+    HOME=/var/lib/ollama HF_TOKEN="$HF_TOKEN" HF_HOME="$HF_HOME" \
+    HF_HUB_CACHE="$HF_HOME/hub" HF_HUB_DISABLE_XET=1 \
+    hf "${args[@]}"
+  [[ -s "$DOWNLOAD_DIR/$FILENAME" ]] || {
+    echo "ERROR: download completed without $DOWNLOAD_DIR/$FILENAME" >&2
+    exit 1
+  }
+  mv -f "$DOWNLOAD_DIR/$FILENAME" "$target"
 fi
 
 if [[ -n "$EXPECTED_SHA256" ]]; then
@@ -57,7 +77,7 @@ if [[ -n "$EXPECTED_SHA256" ]]; then
 else
   echo "No checksum configured; using revision '$REVISION'."
 fi
-chown ollama:ollama "$target"
+chown root:ollama "$target"
 chmod 0640 "$target"
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
