@@ -92,6 +92,9 @@ case "${1:-status}" in
     required_kib=$((SWAP_GIB * 1024 * 1024 + 1024 * 1024))
     if [[ "$available_kib" =~ ^[0-9]+$ ]] && ((available_kib < required_kib)); then
       echo "ERROR: not enough free storage for a ${SWAP_GIB} GiB swap file plus headroom." >&2
+      if [[ "$(findmnt -no FSTYPE --target / 2>/dev/null)" == xfs ]]; then
+        echo "If the root device was already enlarged, run: sudo xfs_growfs /" >&2
+      fi
       exit 1
     fi
     cat <<EOF_WARN
