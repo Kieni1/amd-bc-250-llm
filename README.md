@@ -41,42 +41,47 @@ BIOS configuration, cooling design, power-supply sizing and board repair are
 outside this package.
 
 ## Fast Setup, assumes 40 CU ok
+
 1. Initial setup
+
    ```bash
-sudo lvextend -l +100%FREE /dev/mapper/fedora-root
-sudo xfs_growfs /
-sudo dnf upgrade --refresh -y
-sudo dnf in bc250-llm-server-0.5.0-0.1.testing.fc44.x86_64.rpm -y
-sudo bc250-install-ollama
-sudo systemctl enable --now cyan-skillfish-governor-smu.service
-sudo BC250_ASSUME_YES=1 bc250-memory-profile apply-full
-sudo BC250_ASSUME_YES=1 bc250-swap-profile apply
-sudo bc250-cu-live-manager --yes enable all
-sudo bc250-cu-live-manager --yes write-service-table
-sudo bc250-cu-live-manager --yes install-service
-sudo reboot
+   sudo lvextend -l +100%FREE /dev/mapper/fedora-root
+   sudo xfs_growfs /
+   sudo dnf upgrade --refresh -y
+   sudo dnf in bc250-llm-server-0.5.0-0.1.testing.fc44.x86_64.rpm -y
+   sudo bc250-install-ollama
+   sudo systemctl enable --now cyan-skillfish-governor-smu.service
+   sudo BC250_ASSUME_YES=1 bc250-memory-profile apply-full
+   sudo BC250_ASSUME_YES=1 bc250-swap-profile apply
+   sudo bc250-cu-live-manager --yes enable all
+   sudo bc250-cu-live-manager --yes write-service-table
+   sudo bc250-cu-live-manager --yes install-service
+   sudo reboot
    ```
 
 2. After reconnecting
+   
    ```bash
-sudoedit /etc/bc250-llm-server/model-sources.sh
-sudo bc250-fetch-models all </dev/null
+   sudoedit /etc/bc250-llm-server/model-sources.sh
+   sudo bc250-fetch-models all </dev/null
    ```
 
 3. Fast verification
+
    ```bash
-rpm -q bc250-llm-server
-ollama --version
-ollama list
-grep -E '^(min|max)' /etc/cyan-skillfish-governor-smu/config.toml
-cat /sys/module/ttm/parameters/pages_limit
-cat /sys/module/ttm/parameters/page_pool_size
-sudo cat /sys/module/amdgpu/parameters/gttsize
-sudo bc250-cu-live-manager status
-sudo bc250-cu-status
-sudo systemctl is-active cyan-skillfish-governor-smu ollama tika open-webui nginx bc250-cu-live-manager
-sudo bc250-verify
-sudo llm-run-diagnose --no-load
+   rpm -q bc250-llm-server
+   ollama --version
+   ollama list
+   grep -E '^(min|max)' /etc/cyan-skillfish-governor-smu/config.toml
+   cat /sys/module/ttm/parameters/pages_limit
+   cat /sys/module/ttm/parameters/page_pool_size
+   sudo cat /sys/module/amdgpu/parameters/gttsize
+   sudo bc250-cu-live-manager status
+   sudo bc250-cu-status
+   sudo systemctl is-active cyan-skillfish-governor-smu ollama tika open-webui nginx bc250-cu-live-manager
+   sudo bc250-verify
+   sudo llm-run-diagnose --no-load
+   ```
 
 ## What the main RPM does
 
