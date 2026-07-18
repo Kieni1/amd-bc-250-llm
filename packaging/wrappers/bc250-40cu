@@ -3,24 +3,14 @@ set -Eeuo pipefail
 
 helper="/usr/libexec/bc250-llm-server/40cu/bc250-enable-40cu-fedora.sh"
 status_helper="/usr/bin/bc250-cu-status"
-
-find_live_manager() {
-  local candidate
-  for candidate in \
-    "$(command -v bc250-cu-live-manager 2>/dev/null || true)" \
-    "$(command -v bc250-cu-live-manager.sh 2>/dev/null || true)" \
-    /usr/local/sbin/bc250-cu-live-manager \
-    /usr/local/bin/bc250-cu-live-manager \
-    /usr/local/sbin/bc250-cu-live-manager.sh \
-    /usr/local/bin/bc250-cu-live-manager.sh; do
-    [[ -n "$candidate" && -x "$candidate" ]] && { printf '%s\n' "$candidate"; return 0; }
-  done
-  return 1
-}
+manager="/usr/bin/bc250-cu-live-manager"
 
 usage_extra() {
   cat <<'USAGE'
 Additional package commands:
+  bc250-40cu
+      Open the bundled interactive live CU manager.
+
   bc250-40cu verify
       Show kernel enumeration, RADV information and live-manager CU routing.
 
@@ -31,7 +21,7 @@ Additional package commands:
   bc250-40cu live-status
   bc250-40cu live-full
   bc250-40cu live-stock
-      Call the separately installed pinned live manager.
+      Call the bundled pinned live manager.
 
   bc250-40cu mask WGP_ID [WGP_ID ...]
   bc250-40cu unmask WGP_ID [WGP_ID ...]
@@ -43,10 +33,8 @@ USAGE
 }
 
 require_live_manager() {
-  manager="$(find_live_manager || true)"
-  [[ -n "$manager" ]] || {
-    echo "ERROR: bc250-cu-live-manager is not installed." >&2
-    echo "Install the pinned reviewed copy with bc250-install-cu-manager." >&2
+  [[ -x "$manager" ]] || {
+    echo "ERROR: the packaged CU live manager is missing: $manager" >&2
     exit 1
   }
 }
@@ -80,6 +68,10 @@ health_test() {
 
 command="${1:-}"
 case "$command" in
+  ""|menu)
+    require_live_manager
+    exec "$manager" menu
+    ;;
   verify)
     exec "$status_helper"
     ;;
@@ -121,11 +113,6 @@ case "$command" in
     exec "$helper" "$@"
     ;;
   help-extra)
-    usage_extra
-    ;;
-  "")
-    [[ -x "$helper" ]] && "$helper" --help || true
-    echo
     usage_extra
     ;;
   *)
