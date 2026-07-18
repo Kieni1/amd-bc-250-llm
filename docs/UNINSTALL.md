@@ -2,6 +2,13 @@
 
 Persistent model, Open WebUI and backup data are intentionally retained.
 
+Get the files for comparison after uninstall first, repeat after uninstall for 
+possible leftovers
+
+```bash
+sudo find /usr/local/bin /etc/systemd/system /etc/systemd/zram-generator.conf.d /etc/modprobe.d /var/llm /var/swap /var/lib/open-webui /var/backups/bc250-llm-server \( -type f -o -type l \) -print0 | while IFS= read -r -d '' file; do rpm -qf "$file" >/dev/null 2>&1 || printf '%s\n' "$file"; done
+```
+
 ## Restore 40-CU changes first
 
 When the 40-CU helper has been used, restore the stock state before removing the
