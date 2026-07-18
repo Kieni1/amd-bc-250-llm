@@ -9,7 +9,7 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.4.4
+Version:        0.5.0
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -446,5 +446,7 @@ fi
 %{_datadir}/dbus-1/system.d/com.cyanskillfish.Governor.conf
 
 %changelog
+* Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.5.0-0.1.testing
+- Prepare the 0.5.0 testing release
 * Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.4.4-0.1.testing
 - Publish the cleaned public repository

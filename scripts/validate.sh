@@ -185,7 +185,14 @@ for script in task-model/setup-gemma-1b-task.sh coding-agent/setup-coding-agent.
   grep -Fq 'HF_HOME/downloads' "$ROOT/$script" || bad "$script downloads directly into the protected model tree"
 done
 
-grep -Fq 'expected profile:     ttm.pages_limit=4194304' "$ROOT/monitoring/llm-run-diagnose.sh" || bad "diagnostic script expects an obsolete memory profile"
+grep -Fq 'ttm.pages_limit = 4194304' \
+  "$ROOT/monitoring/llm-run-diagnose.sh" ||
+  bad "diagnostic script does not expect ttm.pages_limit=4194304"
+
+if grep -Eq '3959290|ttm\.page_pool_size=3959290|amdgpu\.gttsize=15258' \
+  "$ROOT/monitoring/llm-run-diagnose.sh"; then
+  bad "diagnostic script contains the obsolete memory profile"
+fi
 
 while IFS= read -r -d '' modelfile; do
   [[ -n "$(awk -F': ' '/^# Ollama model:/ {print $2; exit}' "$modelfile")" ]] || bad "$modelfile lacks an Ollama title"
