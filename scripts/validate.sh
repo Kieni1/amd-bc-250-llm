@@ -11,7 +11,7 @@ bad() {
 }
 
 required=(
-  README.md VERSION Makefile .github/workflows/build-rpm.yml
+  README.md TLDR.md VERSION Makefile .github/workflows/build-rpm.yml
   packaging/bc250-llm-server.spec packaging/bc250-llm-server.tmpfiles
   packaging/wrappers/bc250-40cu licenses/LICENSE
   licenses/THIRD_PARTY_NOTICES.md licenses/40CU-LICENSE-NOTICE
@@ -79,6 +79,7 @@ grep -Fq "SOURCE_SHA256=\"$live_manager_sha\"" "$ROOT/scripts/prepare-live-manag
 grep -Fqx 'License:        GPL-2.0-only AND MIT' "$SPEC" || bad "main RPM license expression differs"
 grep -Fq 'Source3:        bc250-40cu-unlock-%{unlock_commit}.tar.gz' "$SPEC" || bad "pinned 40-CU Source3 is missing"
 grep -Fq 'Source4:        bc250-cu-live-manager-%{live_manager_commit}.tar.gz' "$SPEC" || bad "pinned CU live-manager Source4 is missing"
+grep -Fq 'README.md TLDR.md' "$SPEC" || bad "TLDR.md is not installed by the RPM"
 if grep -qE '^%package 40cu|^%files 40cu' "$SPEC"; then
   bad "obsolete 40-CU subpackage remains"
 fi
