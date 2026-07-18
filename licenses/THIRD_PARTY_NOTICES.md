@@ -22,17 +22,14 @@ The RPM also contains or refers to separately licensed components:
   third-party repositories only. Operators must review each model's current
   license and terms before downloading it.
 - The optional coding-agent setup references
-  `unsloth/Ministral-3-8B-Instruct-2512-GGUF` at revision
-  `c6345448c40d82d11c744037f4b8aed3e1e4c3ad`. The referenced model currently
-  declares Apache-2.0, but the weight is downloaded only after an explicit
-  operator command and is not part of this RPM.
+  `unsloth/Ministral-3-8B-Instruct-2512-GGUF` and defaults to the repository's
+  current revision. The weight is downloaded only after an explicit operator
+  command and is not part of this RPM; review its current license before use.
 
 ## CU live manager
 
-`WinnieLV/bc250-cu-live-manager` is not redistributed because the repository
-did not expose an explicit redistribution license when this package was
-prepared. The helper defaults to reviewed commit
-`8eb45f07810af738f3e4945ea0cc29d399e378a6` and its pinned SHA-256, while still
-permitting an operator-supplied immutable revision and checksum. If upstream
-publishes suitable redistribution terms, it can
-be reconsidered in a later package revision.
+The RPM includes `WinnieLV/bc250-cu-live-manager` at commit
+`8eb45f07810af738f3e4945ea0cc29d399e378a6`. At the time this package was
+prepared, that repository did not contain a license file or other explicit
+redistribution terms. No license is inferred or granted by this notice; the
+upstream copyright and all rights remain with their respective owner.

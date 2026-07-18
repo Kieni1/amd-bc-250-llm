@@ -15,6 +15,13 @@ sudo reboot
 sudo bc250-40cu status
 ```
 
+If the live manager's boot service was enabled, remove its copied service state
+before removing the RPM:
+
+```bash
+sudo bc250-cu-live-manager uninstall-service
+```
+
 
 ## Remove optional host profiles
 

@@ -8,6 +8,7 @@ Primary commands:
 /usr/bin/bc250-benchmark
 /usr/bin/bc250-check-temp
 /usr/bin/bc250-40cu
+/usr/bin/bc250-cu-live-manager
 /usr/bin/bc250-code
 /usr/bin/bc250-code-commit
 /usr/bin/bc250-compare-experiments
@@ -27,6 +28,7 @@ Primary commands:
 /usr/bin/bc250-uninstall-info
 /usr/bin/bc250-verify
 /usr/bin/bc250-verify-lan
+/usr/bin/llm-run-diagnose
 ```
 
 Implementation files:
@@ -47,6 +49,7 @@ Examples and templates:
 /usr/share/bc250-llm-server/examples/raspi-wol/
 /usr/share/bc250-llm-server/ollama-profiles/
 /usr/share/bc250-llm-server/40cu/
+/usr/share/bc250-llm-server/cu-live-manager/
 ```
 
 Configuration:
@@ -71,10 +74,13 @@ Persistent data is outside RPM ownership:
 
 ```text
 /usr/bin/bc250-40cu
+/usr/bin/bc250-cu-live-manager
 /usr/libexec/bc250-llm-server/40cu/bc250-enable-40cu-fedora.sh
 /usr/share/bc250-llm-server/40cu/bc250-40cu-amdgpu.patch
 /usr/share/bc250-llm-server/40cu/README-upstream.md
 /usr/share/bc250-llm-server/40cu/SOURCE-REVISION
+/usr/share/bc250-llm-server/cu-live-manager/README-upstream.md
+/usr/share/bc250-llm-server/cu-live-manager/SOURCE-REVISION
 ```
 
 These files belong to the main package. No RPM scriptlet builds or replaces a

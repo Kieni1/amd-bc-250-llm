@@ -8,6 +8,9 @@ filippor/cyan-skillfish-governor
 
 fduraibi/bc250-40cu-unlock
   6c3969ddee40e894297869e6ca30537f274619cb
+
+WinnieLV/bc250-cu-live-manager
+  8eb45f07810af738f3e4945ea0cc29d399e378a6
 ```
 
 Prepare all archives:
@@ -18,8 +21,8 @@ cat sources/*.sha256
 ```
 
 The governor script downloads the exact source tree and vendors Cargo
-dependencies. The 40-CU script downloads the exact commit archive and verifies
-that the expected Fedora helper and patch are present.
+dependencies. The CU scripts download exact commit archives and verify the
+expected helper, patch and live-manager files.
 
 Do not fetch third-party source during RPM scriptlets.
 
@@ -51,14 +54,13 @@ Do not fetch third-party source during RPM scriptlets.
 
 ## Project URL
 
-The spec currently uses
-`https://github.com/Kieni1/bc250-llm-server`. Change it before publishing
-when the canonical repository is hosted elsewhere.
+The spec uses `https://github.com/Kieni1/amd-bc-250-llm`.
 
 ## Release checklist
 
 - Verify source checksums and licenses.
-- Confirm the main RPM owns `/usr/bin/bc250-40cu` and the pinned 40-CU payload.
+- Confirm the main RPM owns `/usr/bin/bc250-40cu`,
+  `/usr/bin/bc250-cu-live-manager` and both pinned CU payloads.
 - Confirm no RPM scriptlet modifies the kernel or CU routing.
 - Test Ollama startup with an existing `/usr/share/ollama` passwd home.
 - Test Open WebUI on an empty `/var/lib/open-webui`.

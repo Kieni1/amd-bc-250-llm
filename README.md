@@ -69,9 +69,9 @@ make sources
 make rpm
 ```
 
-`make sources` prepares three immutable inputs: the governor source, its Cargo
-vendor archive and the fduraibi 40-CU source archive. Once they exist, repeated
-RPM builds do not need to download third-party source again.
+`make sources` prepares four immutable inputs: the governor source, its Cargo
+vendor archive, the fduraibi 40-CU source and the WinnieLV live manager. Once
+they exist, repeated RPM builds do not need to download third-party source again.
 
 Artifacts and their checksums are written to `dist/`.
 
@@ -166,8 +166,16 @@ See [`coding-agent/README.md`](coding-agent/README.md).
 
 ## Experimental 40-CU unlock
 
-The main RPM contains the pinned fduraibi helper and patch but does not build or
-enable them during package installation:
+The main RPM contains the pinned live manager, requires `umr`, and contains the
+fduraibi helper. The simplest route is the interactive live manager; no separate
+download is needed:
+
+```bash
+sudo bc250-40cu
+```
+
+The replacement-module route remains available but is not run during package
+installation:
 
 ```bash
 sudo dnf install "kernel-devel-$(uname -r)"
@@ -185,11 +193,12 @@ operator; the wrapper imposes no clock limit. Read
 ```bash
 sudo bc250-verify
 sudo bc250-cu-status
+sudo llm-run-diagnose --no-load
 sudo bc250-memory-profile status
 sudo bc250-ollama-profile status
 sudo bc250-swap-profile status
 sudo bc250-install-ollama
-sudo bc250-install-cu-manager
+sudo bc250-40cu
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 sudo bc250-fetch-models
@@ -210,5 +219,6 @@ repackaging details are under `docs/`. Start with
 ## License
 
 The integration project is licensed under GPL-2.0-only. The bundled governor is
-MIT-licensed, and the bundled 40-CU source declares GPL-2.0-only. See
+MIT-licensed, and the bundled 40-CU source declares GPL-2.0-only. The pinned CU
+live-manager repository has no explicit license; see
 `licenses/THIRD_PARTY_NOTICES.md`.
