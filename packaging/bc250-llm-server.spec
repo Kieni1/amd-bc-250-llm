@@ -1,6 +1,7 @@
 %global governor_version 0.4.11
 %global governor_commit 60ab6e5b354f01f287c73d920990dcd618a674cc
 %global unlock_commit 6c3969ddee40e894297869e6ca30537f274619cb
+%global live_manager_commit 8eb45f07810af738f3e4945ea0cc29d399e378a6
 %global source_date_epoch_from_changelog 1
 %global project_libexec %{_libexecdir}/bc250-llm-server
 %global project_share %{_datadir}/bc250-llm-server
@@ -12,13 +13,15 @@ Version:        0.4.4
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
-URL:            https://github.com/Kieni1/bc250-llm-server
+URL:            https://github.com/Kieni1/amd-bc-250-llm
 Source0:        %{name}-%{version}.tar.gz
 # filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.11
 Source1:        cyan-skillfish-governor-%{governor_commit}.tar.gz
 Source2:        cyan-skillfish-governor-vendor-%{governor_commit}.tar.xz
 # fduraibi/bc250-40cu-unlock, pinned Fedora helper revision
 Source3:        bc250-40cu-unlock-%{unlock_commit}.tar.gz
+# WinnieLV/bc250-cu-live-manager, pinned revision; upstream has no license file
+Source4:        bc250-cu-live-manager-%{live_manager_commit}.tar.gz
 
 ExclusiveArch:  x86_64
 
@@ -26,6 +29,7 @@ BuildRequires:  cargo
 BuildRequires:  findutils
 BuildRequires:  gcc
 BuildRequires:  gzip
+BuildRequires:  patch
 BuildRequires:  pkgconfig(libdrm)
 BuildRequires:  python3
 BuildRequires:  rust
@@ -37,6 +41,7 @@ Requires:       btrfs-progs
 Requires:       coreutils
 Requires:       curl
 Requires:       dbus
+Requires:       dracut
 Requires:       ethtool
 Requires:       findutils
 Requires:       firewalld
@@ -63,6 +68,7 @@ Requires:       sqlite
 Requires:       systemd
 Requires:       tar
 Requires:       util-linux
+Requires:       umr
 Requires:       vulkan-loader
 Requires:       vulkan-tools
 Requires:       xz
@@ -78,10 +84,10 @@ A testing-oriented Fedora integration package for using an AMD BC-250 as a
 small local LLM server. It installs the reviewed Cyan Skillfish SMU governor,
 Ollama Vulkan defaults, Open WebUI and Tika Quadlets, an HTTP reverse proxy,
 model and experiment templates, maintenance tools, benchmarks and optional
-local coding-agent helpers. The experimental 40-CU source helper is installed, 
-but the RPM never applies it automatically. Ollama remains an
-external operator-installed prerequisite. Model weights, Open WebUI settings,
-HTTPS and CU changes remain operator-controlled.
+local coding-agent helpers. The live CU manager and experimental 40-CU source
+helper are installed, but the RPM never changes CU routing automatically.
+Ollama remains an external operator-installed prerequisite. Model weights,
+Open WebUI settings, HTTPS and CU changes remain operator-controlled.
 
 %prep
 %setup -q
@@ -90,6 +96,9 @@ tar -xzf %{SOURCE1} -C governor-src --strip-components=1
 tar -xJf %{SOURCE2} -C governor-src
 mkdir unlock-src
 tar -xzf %{SOURCE3} -C unlock-src --strip-components=1
+patch -d unlock-src -p1 < patches/40cu-fedora-helper.patch
+mkdir live-manager-src
+tar -xzf %{SOURCE4} -C live-manager-src --strip-components=1
 
 %pre
 getent group ollama >/dev/null || groupadd -r ollama
@@ -172,6 +181,8 @@ install -pm0755 benchmark/log_sensors.sh \
   %{buildroot}%{project_libexec}/log_sensors.sh
 install -pm0755 monitoring/check-temp.sh \
   %{buildroot}%{project_libexec}/check-temp.sh
+install -Dpm0755 monitoring/llm-run-diagnose.sh \
+  %{buildroot}%{_bindir}/llm-run-diagnose
 install -pm0755 system/install-cu-manager.sh \
   %{buildroot}%{project_libexec}/install-cu-manager.sh
 install -pm0755 system/install-ollama.sh \
@@ -201,6 +212,15 @@ install -pm0755 coding-agent/coding-agent.sh \
 # Stable user-facing commands, including the operator-triggered 40-CU helper.
 install -d %{buildroot}%{_bindir}
 install -pm0755 packaging/wrappers/* %{buildroot}%{_bindir}/
+
+# Pinned live CU manager. It is installed but never invoked by an RPM scriptlet.
+install -pm0755 live-manager-src/bc250-cu-live-manager.sh \
+  %{buildroot}%{_bindir}/bc250-cu-live-manager
+install -d %{buildroot}%{project_share}/cu-live-manager
+install -pm0644 live-manager-src/README.md \
+  %{buildroot}%{project_share}/cu-live-manager/README-upstream.md
+printf '%s\n' '%{live_manager_commit}' > \
+  %{buildroot}%{project_share}/cu-live-manager/SOURCE-REVISION
 
 # Optional 40-CU payload. No module or modprobe changes occur here.
 install -d %{buildroot}%{project_libexec}/40cu %{buildroot}%{project_share}/40cu
@@ -309,7 +329,7 @@ HTTP is unencrypted. Read /usr/share/doc/bc250-llm-server/HTTPS.md before wider 
 No chat model is downloaded until you edit /etc/bc250-llm-server/model-sources.sh.
 Optional helpers: bc250-install-ollama, bc250-ollama-profile,
 bc250-memory-profile, bc250-swap-profile, bc250-setup-task-model and
-bc250-setup-coding-agent.
+bc250-setup-coding-agent. Run llm-run-diagnose for a performance capture.
 EOF_POST
 
 %preun
@@ -346,6 +366,7 @@ fi
 %{_bindir}/bc250-code-commit
 %{_bindir}/bc250-compare-experiments
 %{_bindir}/bc250-40cu
+%{_bindir}/bc250-cu-live-manager
 %{_bindir}/bc250-fetch-experiments
 %{_bindir}/bc250-fetch-models
 %{_bindir}/bc250-gitea-review
@@ -362,6 +383,7 @@ fi
 %{_bindir}/bc250-uninstall-info
 %{_bindir}/bc250-verify
 %{_bindir}/bc250-verify-lan
+%{_bindir}/llm-run-diagnose
 %dir %{project_libexec}
 %{project_libexec}/fetch-models.sh
 %{project_libexec}/pull-embedding-model.sh
@@ -391,6 +413,7 @@ fi
 %{project_libexec}/40cu/
 %dir %{project_share}
 %{project_share}/40cu/
+%{project_share}/cu-live-manager/
 %{project_share}/models/
 %{project_share}/experiments/
 %{project_share}/examples/

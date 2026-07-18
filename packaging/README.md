@@ -9,15 +9,18 @@
 - `scripts/prepare-governor-sources.sh` creates the pinned governor source and
   Cargo vendor archives.
 - `scripts/prepare-40cu-source.sh` creates the pinned fduraibi source archive.
+- `scripts/prepare-live-manager-source.sh` creates the pinned WinnieLV
+  live-manager archive.
 - `sources/` contains generated source archives used by rpmbuild; archives and
   checksums are intentionally ignored by Git.
 
-The main package is `bc250-llm-server`. The experimental
-`bc250-llm-server-40cu` subpackage owns only:
+The main package is `bc250-llm-server`. It owns the experimental CU tools:
 
 - `/usr/bin/bc250-40cu`
+- `/usr/bin/bc250-cu-live-manager`
 - `/usr/libexec/bc250-llm-server/40cu/`
 - `/usr/share/bc250-llm-server/40cu/`
+- `/usr/share/bc250-llm-server/cu-live-manager/`
 
 No RPM scriptlet may replace or restore `amdgpu.ko`, write the 40-CU modprobe
 option, run `depmod` or `dracut`, or reboot the host. Those actions remain
