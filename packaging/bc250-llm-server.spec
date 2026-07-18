@@ -9,7 +9,7 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.5.0
+Version:        0.5.1
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -279,7 +279,7 @@ install -pm0755 raspi-wol/wake-bc250.sh \
 
 # Documentation.
 install -d %{buildroot}%{_docdir}/%{name}
-install -pm0644 README.md licenses/THIRD_PARTY_NOTICES.md \
+install -pm0644 README.md TLDR.md licenses/THIRD_PARTY_NOTICES.md \
   openwebui-settings.md %{buildroot}%{_docdir}/%{name}/
 install -pm0644 docs/*.md %{buildroot}%{_docdir}/%{name}/
 install -pm0644 packaging/README.md \
@@ -446,6 +446,8 @@ fi
 %{_datadir}/dbus-1/system.d/com.cyanskillfish.Governor.conf
 
 %changelog
+* Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.5.1-0.1.testing
+- Add the command-first installation and operations guide
 * Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.5.0-0.1.testing
 - Prepare the 0.5.0 testing release
 * Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.4.4-0.1.testing
