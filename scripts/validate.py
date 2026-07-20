@@ -17,11 +17,29 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging/bc250-llm-server.spec"
 FAILURES: list[str] = []
+SECURITY_SCAN_EXCLUDED_PARTS = frozenset(
+    {
+        ".git",
+        "__pycache__",
+        "build",
+        "dist",
+        "governor-src",
+        "live-manager-src",
+        "rpmbuild",
+        "sources",
+        "unlock-src",
+    }
+)
 
 
 def fail(message: str) -> None:
     FAILURES.append(message)
     print(f"ERROR: {message}", file=sys.stderr)
+
+
+def security_scan_excludes(relative: Path) -> bool:
+    """Return true for generated build trees and prepared third-party sources."""
+    return any(part in SECURITY_SCAN_EXCLUDED_PARTS for part in relative.parts)
 
 
 def require(relative: str, executable: bool = False) -> Path:
@@ -335,7 +353,6 @@ def check_configs() -> None:
 
 
 def check_security_and_stale_paths() -> None:
-    excluded = {".git", "build", "dist", "rpmbuild", "sources", "__pycache__"}
     secret_pattern = re.compile(r"hf_[A-Za-z0-9]{20,}|WEBUI_ADMIN_PASSWORD=|WEBUI_SECRET_KEY=")
     site_pattern = re.compile(r"llm_admin|llm\.office\.local")
     home_pattern = re.compile(r"/home/[^/\s]+")
@@ -347,13 +364,14 @@ def check_security_and_stale_paths() -> None:
         "packaging/wrappers",
     )
     for path in ROOT.rglob("*"):
-        if not path.is_file() or any(part in excluded for part in path.relative_to(ROOT).parts):
+        relative_path = path.relative_to(ROOT)
+        if not path.is_file() or security_scan_excludes(relative_path):
             continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue
-        relative = str(path.relative_to(ROOT))
+        relative = str(relative_path)
         if relative not in {"scripts/validate.py", "verify.sh"} and secret_pattern.search(text):
             fail(f"secret-like value found in {relative}")
         if relative != "scripts/validate.py" and site_pattern.search(text):
