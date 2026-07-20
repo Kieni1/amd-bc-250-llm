@@ -10,7 +10,7 @@ UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 help:
 	@printf '%s\n' \
 	  'make sources    Download pinned governor and CU-tool sources' \
-	  'make validate   Run repository checks' \
+	  'make validate   Run basic RPM preflight checks' \
 	  'make source-tar Create the project source archive' \
 	  'make srpm       Build the source RPM' \
 	  'make rpm        Build binary and source RPMs' \

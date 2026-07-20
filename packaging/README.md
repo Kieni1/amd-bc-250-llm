@@ -43,10 +43,14 @@ change the kernel command line, create a swap file, resize zram or reboot. The
 balanced Ollama runtime profile is shipped as a normal systemd drop-in; switching
 profiles creates an explicit `/etc/systemd/system` override.
 
-Run before building:
+Build with:
 
 ```bash
-make sources
-make validate
 make rpm
 ```
+
+`make rpm` prepares pinned sources, creates the project source archive, runs
+the basic pre-1.0 RPM preflight and invokes rpmbuild. The preflight checks only
+syntax, version alignment, required inputs, model metadata and manifest source
+paths. Full policy, unit, security and `rpmlint` gates are deferred to the
+1.0.0 production-readiness cycle.

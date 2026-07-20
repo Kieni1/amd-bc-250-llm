@@ -208,6 +208,8 @@ fi
 - Group experiment, MTP and embedding helpers under the models feature tree
 - Separate download-only MTP inputs from the Ollama experiment catalog
 - Package the MTP catalog as an operator-editable noreplace configuration
+- Keep repository scans out of RPM-prepared third-party source trees
+- Reduce pre-1.0 validation to the deterministic checks needed to build RPMs
 
 * Mon Jul 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.2-0.1.testing
 - Keep catalogs and long-form Modelfile names aligned with the current model set

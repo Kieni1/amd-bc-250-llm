@@ -111,15 +111,15 @@ immediately from a trusted LAN.
 ## Build locally on Fedora 44
 
 ```bash
-sudo dnf install -y make rpm-build rpmdevtools rust cargo gcc \
+sudo dnf install -y make rpm-build rust cargo gcc \
   systemd-rpm-macros libdrm-devel curl tar gzip xz python3
-make sources
 make rpm
 ```
 
-`make sources` prepares four immutable inputs: the governor source, its Cargo
-vendor archive, the fduraibi 40-CU source and the WinnieLV live manager. Once
-they exist, repeated RPM builds do not need to download third-party source again.
+`make rpm` validates the source tree and prepares four immutable inputs: the
+governor source, its Cargo vendor archive, the fduraibi 40-CU source and the
+WinnieLV live manager. Once they exist, repeated RPM builds do not need to
+download third-party source again.
 
 Artifacts and their checksums are written to `dist/`.
 

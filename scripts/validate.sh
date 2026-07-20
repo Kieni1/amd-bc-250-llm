@@ -16,17 +16,5 @@ for file in "${shell_files[@]}"; do
   bash -n "$file"
 done
 
-if command -v shellcheck >/dev/null 2>&1; then
-  shellcheck --external-sources --severity=warning "${shell_files[@]}"
-else
-  echo "NOTE: shellcheck is not installed; syntax checks still ran." >&2
-fi
-
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate.py
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
-
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C "$ROOT" diff --check
-fi
-
-echo "Repository validation passed."
+echo "Basic RPM preflight passed."

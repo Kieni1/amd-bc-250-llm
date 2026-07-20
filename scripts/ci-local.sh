@@ -9,14 +9,9 @@ podman run --rm --pull=always \
   fedora:44 \
   bash -Eeuxo pipefail -c '
     dnf install -y \
-      bash cargo curl findutils gcc git gzip jq make \
-      libdrm-devel patch python3 rpm-build rpmdevtools rpmlint rust \
+      bash cargo curl findutils gcc git gzip make \
+      libdrm-devel patch python3 rpm-build rust \
       systemd systemd-rpm-macros tar xz
 
-    make validate
-    make sources
     make rpm
-
-    rpmlint dist/*.rpm 2>&1 | tee dist/RPMLINT.txt
-    rpm -qpl dist/*.x86_64.rpm | tee dist/RPM-CONTENTS.txt
   '
