@@ -1,7 +1,8 @@
 # Target on BC-250: /etc/systemd/system/bc250-night-shutdown.service
 [Unit]
 Description=Suspend the LLM server only when idle
-After=owui-prune.service owui-backup-users.service owui-backup-config.service
+After=owui-maintenance@prune-uploads.service
+After=owui-maintenance@backup-users.service owui-maintenance@backup-config.service
 
 [Service]
 Type=oneshot

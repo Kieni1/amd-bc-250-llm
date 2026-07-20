@@ -3,16 +3,7 @@ NAME := bc250-llm-server
 VERSION := $(shell cat VERSION)
 TOPDIR := $(CURDIR)/rpmbuild
 DISTDIR := $(CURDIR)/dist
-
-GOV_COMMIT := 60ab6e5b354f01f287c73d920990dcd618a674cc
-GOV_SOURCE := sources/cyan-skillfish-governor-$(GOV_COMMIT).tar.gz
-GOV_VENDOR := sources/cyan-skillfish-governor-vendor-$(GOV_COMMIT).tar.xz
-
-UNLOCK_COMMIT := 6c3969ddee40e894297869e6ca30537f274619cb
-UNLOCK_SOURCE := sources/bc250-40cu-unlock-$(UNLOCK_COMMIT).tar.gz
-
-LIVE_MANAGER_COMMIT := 8eb45f07810af738f3e4945ea0cc29d399e378a6
-LIVE_MANAGER_SOURCE := sources/bc250-cu-live-manager-$(LIVE_MANAGER_COMMIT).tar.gz
+UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 
 .PHONY: help sources source-tar srpm rpm validate clean
 
@@ -26,9 +17,7 @@ help:
 	  'make clean      Remove generated build output and source archives'
 
 sources:
-	./scripts/prepare-governor-sources.sh
-	./scripts/prepare-40cu-source.sh
-	./scripts/prepare-live-manager-source.sh
+	./scripts/prepare-sources.py
 
 source-tar:
 	./scripts/make-source-tarball.sh
@@ -39,7 +28,7 @@ validate:
 srpm: sources source-tar validate
 	mkdir -p $(TOPDIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} $(DISTDIR)
 	cp build/$(NAME)-$(VERSION).tar.gz $(TOPDIR)/SOURCES/
-	cp $(GOV_SOURCE) $(GOV_VENDOR) $(UNLOCK_SOURCE) $(LIVE_MANAGER_SOURCE) $(TOPDIR)/SOURCES/
+	cp $(UPSTREAM_SOURCES) $(TOPDIR)/SOURCES/
 	cp packaging/$(NAME).spec $(TOPDIR)/SPECS/
 	rpmbuild --define '_topdir $(TOPDIR)' -bs $(TOPDIR)/SPECS/$(NAME).spec
 	cp -f $(TOPDIR)/SRPMS/*.src.rpm $(DISTDIR)/
@@ -47,7 +36,7 @@ srpm: sources source-tar validate
 rpm: sources source-tar validate
 	mkdir -p $(TOPDIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} $(DISTDIR)
 	cp build/$(NAME)-$(VERSION).tar.gz $(TOPDIR)/SOURCES/
-	cp $(GOV_SOURCE) $(GOV_VENDOR) $(UNLOCK_SOURCE) $(LIVE_MANAGER_SOURCE) $(TOPDIR)/SOURCES/
+	cp $(UPSTREAM_SOURCES) $(TOPDIR)/SOURCES/
 	cp packaging/$(NAME).spec $(TOPDIR)/SPECS/
 	rpmbuild --define '_topdir $(TOPDIR)' -ba $(TOPDIR)/SPECS/$(NAME).spec
 	find $(TOPDIR)/RPMS $(TOPDIR)/SRPMS -type f -name '*.rpm' -exec cp -f {} $(DISTDIR)/ \;

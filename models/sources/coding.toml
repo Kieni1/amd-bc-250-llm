@@ -1,0 +1,30 @@
+schema = 1
+
+[defaults]
+category = "coding"
+destination = "/var/llm/ollama-agent/gguf"
+download_namespace = "agentic"
+layout = "flat"
+modelfile_destination = "/var/llm/ollama-agent/modelfiles"
+ollama_host = "127.0.0.1:11436"
+min_free_bytes = 8589934592
+
+[[models]]
+enabled = true
+provider = "ollama"
+id = "agentic-ornith1-9b-deepreinforce-q5-k-m"
+name = "agentic-ornith1-9b-deepreinforce-q5-k-m"
+repository = "deepreinforce-ai/Ornith-1.0-9B-GGUF"
+revision = "latest"
+gguf = "ornith-1.0-9b-Q5_K_M.gguf"
+modelfile = "agentic-ornith1-9b-deepreinforce-q5-k-m.Modelfile"
+
+[[models]]
+enabled = true
+provider = "ollama"
+id = "agentic-qwable9b-empero-q6-k"
+name = "agentic-qwable9b-empero-q6-k"
+repository = "empero-ai/Qwable-9B-Claude-Fable-5-GGUF"
+revision = "latest"
+gguf = "Qwable-9B-Claude-Fable-5-Q6_K.gguf"
+modelfile = "agentic-qwable9b-empero-q6-k.Modelfile"

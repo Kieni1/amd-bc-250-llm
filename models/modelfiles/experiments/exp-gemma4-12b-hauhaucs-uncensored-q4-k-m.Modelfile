@@ -1,0 +1,16 @@
+# Ollama model: exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
+# Source: HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced @ latest
+# GGUF: Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf
+FROM /var/llm/gguf-experiments/exp-gemma4-12b-hauhaucs-uncensored-q4-k-m/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.6
+PARAMETER top_p 0.9
+PARAMETER top_k 64
+PARAMETER min_p 0.05
+PARAMETER repeat_penalty 1.1
+SYSTEM """You are an experimental general, document, coding, and creative assistant. Be direct and dependable, follow the requested format, and state uncertainty instead of fabricating details. Answer in the user's language."""

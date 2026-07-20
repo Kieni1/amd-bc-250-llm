@@ -15,9 +15,11 @@ Open WebUI is published only on `127.0.0.1:3000`; nginx exposes it through the
 standard HTTP service. Tika remains private on the Podman network.
 
 Ollama listens on `0.0.0.0:11434` so the rootful container can access the host.
-The package does not open that port in firewalld. Verify the active firewall
-zone and do not expose the unauthenticated API to untrusted networks.
-**If firewalld is inactive, Ollama is exposed on every host interface.**
+Task and agent setup add `ollama-task.service` on `11435` and
+`ollama-agent.service` on `11436`. The package does not open any of these ports
+in firewalld. Verify the active firewall zone and do not expose the
+unauthenticated APIs to untrusted networks. **If firewalld is inactive, enabled
+Ollama instances are exposed on every configured host interface.**
 
 ## First login
 

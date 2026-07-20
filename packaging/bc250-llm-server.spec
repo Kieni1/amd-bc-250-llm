@@ -6,10 +6,11 @@
 %global project_libexec %{_libexecdir}/bc250-llm-server
 %global project_share %{_datadir}/bc250-llm-server
 %global project_config %{_sysconfdir}/bc250-llm-server
+%global payload_filelist %{_builddir}/%{name}-%{version}.files
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.5.1
+Version:        0.6.3
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -83,8 +84,8 @@ Requires(postun): systemd
 A testing-oriented Fedora integration package for using an AMD BC-250 as a
 small local LLM server. It installs the reviewed Cyan Skillfish SMU governor,
 Ollama Vulkan defaults, Open WebUI and Tika Quadlets, an HTTP reverse proxy,
-model and experiment templates, maintenance tools, benchmarks and optional
-local coding-agent helpers. The live CU manager and experimental 40-CU source
+model and experiment templates, maintenance tools, benchmarks and isolated
+task and coding-agent helpers. The live CU manager and experimental 40-CU source
 helper are installed, but the RPM never changes CU routing automatically.
 Ollama remains an external operator-installed prerequisite. Model weights,
 Open WebUI settings, HTTPS and CU changes remain operator-controlled.
@@ -117,183 +118,26 @@ popd
 bash scripts/validate.sh
 
 %install
-# Governor: pinned filippor binary plus locally reviewed support files.
-install -Dpm0755 governor-src/target/release/cyan-skillfish-governor-smu \
-  %{buildroot}%{_bindir}/cyan-skillfish-governor-smu
-install -Dpm0755 governor-src/scripts/cyan-skillfish-performance-mode \
-  %{buildroot}%{_bindir}/cyan-skillfish-performance-mode
-install -Dpm0644 governor/cyan-skillfish-governor-smu.service \
-  %{buildroot}%{_unitdir}/cyan-skillfish-governor-smu.service
-install -Dpm0644 governor/config.toml \
-  %{buildroot}%{_sysconfdir}/cyan-skillfish-governor-smu/config.toml
-install -Dpm0644 governor/com.cyanskillfish.Governor.conf \
-  %{buildroot}%{_datadir}/dbus-1/system.d/com.cyanskillfish.Governor.conf
-
-# Persistent directory declarations and service defaults.
-install -Dpm0644 packaging/bc250-llm-server.tmpfiles \
-  %{buildroot}%{_tmpfilesdir}/bc250-llm-server.conf
-install -Dpm0644 packaging/90-bc250-llm-server.preset \
-  %{buildroot}%{_presetdir}/90-bc250-llm-server.preset
-install -Dpm0644 system/99-sensors.conf \
-  %{buildroot}%{_modulesloaddir}/99-bc250-sensors.conf
-install -Dpm0644 system/options-sensors.conf \
-  %{buildroot}%{_modprobedir}/99-bc250-sensors.conf
-install -Dpm0644 system/ollama.service.d-override.conf \
-  %{buildroot}%{_unitdir}/ollama.service.d/50-bc250-llm-server.conf
-install -Dpm0644 system/ollama-profiles/balanced.conf \
-  %{buildroot}%{_unitdir}/ollama.service.d/60-bc250-runtime-profile.conf
-
-# Rootful Quadlets use Podman's vendor directory.
-install -d %{buildroot}%{_datadir}/containers/systemd
-install -pm0644 containers/llm.network containers/tika.container \
-  containers/open-webui.container %{buildroot}%{_datadir}/containers/systemd/
-
-# HTTP-only testing front door, inserted into Fedora nginx's default server.
-install -Dpm0644 nginx/bc250-llm-server.conf \
-  %{buildroot}%{_sysconfdir}/nginx/default.d/bc250-llm-server.conf
-install -Dpm0644 nginx/websocket-map.conf \
-  %{buildroot}%{_sysconfdir}/nginx/conf.d/00-bc250-websocket-map.conf
-
-# Editable package configuration. No model is enabled by default.
-install -d -m0755 %{buildroot}%{project_config}
-install -pm0644 models/model-sources.sh \
-  %{buildroot}%{project_config}/model-sources.sh
-install -pm0644 experiments/experiment-sources.sh \
-  %{buildroot}%{project_config}/experiment-sources.sh
-install -Dpm0644 maintenance/owui-maintenance.env \
-  %{buildroot}%{project_share}/examples/maintenance.env.example
-
-# Main-package implementation scripts.
-install -d %{buildroot}%{project_libexec}
-install -pm0755 models/fetch-models.sh \
-  %{buildroot}%{project_libexec}/fetch-models.sh
-install -pm0755 models/pull-embedding-model.sh \
-  %{buildroot}%{project_libexec}/pull-embedding-model.sh
-install -pm0755 experiments/fetch-experiments.sh \
-  %{buildroot}%{project_libexec}/fetch-experiments.sh
-install -pm0755 experiments/compare-experiments.sh \
-  %{buildroot}%{project_libexec}/compare-experiments.sh
-install -pm0755 experiments/run-mtp-llamacpp.sh \
-  %{buildroot}%{project_libexec}/run-mtp-llamacpp.sh
-install -pm0755 benchmark/compare-models.sh \
-  %{buildroot}%{project_libexec}/compare-models.sh
-install -pm0755 benchmark/log_sensors.sh \
-  %{buildroot}%{project_libexec}/log_sensors.sh
-install -pm0755 monitoring/check-temp.sh \
-  %{buildroot}%{project_libexec}/check-temp.sh
-install -Dpm0755 monitoring/llm-run-diagnose.sh \
-  %{buildroot}%{_bindir}/llm-run-diagnose
-install -pm0755 system/install-cu-manager.sh \
-  %{buildroot}%{project_libexec}/install-cu-manager.sh
-install -pm0755 system/install-ollama.sh \
-  %{buildroot}%{project_libexec}/install-ollama.sh
-install -pm0755 system/ollama-profile.sh \
-  %{buildroot}%{project_libexec}/ollama-profile.sh
-install -pm0755 system/memory-profile.sh \
-  %{buildroot}%{project_libexec}/memory-profile.sh
-install -pm0755 system/swap-profile.sh \
-  %{buildroot}%{project_libexec}/swap-profile.sh
-install -pm0755 system/cu-status.sh \
-  %{buildroot}%{project_libexec}/cu-status.sh
-install -pm0755 verify.sh %{buildroot}%{project_libexec}/verify.sh
-install -pm0755 verify-lan.sh %{buildroot}%{project_libexec}/verify-lan.sh
-install -pm0755 raspi-wol/enable-wol.sh \
-  %{buildroot}%{project_libexec}/enable-wol.sh
-for script in backup-config.sh backup-users.sh restore-config.sh restore-users.sh \
-  prune-uploads.sh warmup.sh safe-suspend.sh; do
-  install -pm0755 maintenance/$script %{buildroot}%{project_libexec}/$script
-done
-
-install -d %{buildroot}%{project_libexec}/coding-agent
-install -pm0755 coding-agent/coding-agent.sh \
-  coding-agent/commit-agent.sh coding-agent/gitea-review.sh \
-  %{buildroot}%{project_libexec}/coding-agent/
-
-# Stable user-facing commands, including the operator-triggered 40-CU helper.
-install -d %{buildroot}%{_bindir}
-install -pm0755 packaging/wrappers/* %{buildroot}%{_bindir}/
-
-# Pinned live CU manager. It is installed but never invoked by an RPM scriptlet.
-install -pm0755 live-manager-src/bc250-cu-live-manager.sh \
-  %{buildroot}%{_bindir}/bc250-cu-live-manager
-install -d %{buildroot}%{project_share}/cu-live-manager
-install -pm0644 live-manager-src/README.md \
-  %{buildroot}%{project_share}/cu-live-manager/README-upstream.md
-printf '%s\n' '%{live_manager_commit}' > \
-  %{buildroot}%{project_share}/cu-live-manager/SOURCE-REVISION
-
-# Optional 40-CU payload. No module or modprobe changes occur here.
-install -d %{buildroot}%{project_libexec}/40cu %{buildroot}%{project_share}/40cu
-install -pm0755 unlock-src/scripts/bc250-enable-40cu-fedora.sh \
-  %{buildroot}%{project_libexec}/40cu/bc250-enable-40cu-fedora.sh
-install -pm0644 unlock-src/patch/bc250-40cu-amdgpu.patch \
-  %{buildroot}%{project_share}/40cu/bc250-40cu-amdgpu.patch
-install -pm0644 unlock-src/README.md \
-  %{buildroot}%{project_share}/40cu/README-upstream.md
-printf '%s\n' '%{unlock_commit}' > \
-  %{buildroot}%{project_share}/40cu/SOURCE-REVISION
-
-# Reviewed Ollama runtime profiles. The balanced profile is the packaged default.
-install -d %{buildroot}%{project_share}/ollama-profiles
-install -pm0644 system/ollama-profiles/*.conf \
-  %{buildroot}%{project_share}/ollama-profiles/
-
-# Services and optional timers. Maintenance and suspend timers remain disabled.
-install -d %{buildroot}%{_unitdir}
-install -pm0644 maintenance/*.service maintenance/*.timer \
-  %{buildroot}%{_unitdir}/
-install -pm0644 raspi-wol/bc250-enable-wol.service \
-  raspi-wol/bc250-night-shutdown.service \
-  raspi-wol/bc250-night-shutdown.timer %{buildroot}%{_unitdir}/
-
-# Model and experiment examples.
-install -d %{buildroot}%{project_share}/models \
-  %{buildroot}%{project_share}/experiments
-install -pm0644 models/*.Modelfile %{buildroot}%{project_share}/models/
-install -pm0644 models/model-sources.sh \
-  %{buildroot}%{project_share}/models/model-sources.example.sh
-install -pm0644 experiments/*.Modelfile %{buildroot}%{project_share}/experiments/
-install -pm0644 experiments/experiment-sources.sh \
-  %{buildroot}%{project_share}/experiments/experiment-sources.example.sh
-install -pm0644 experiments/mtp-sources.example.sh \
-  %{buildroot}%{project_share}/experiments/
-
-# Optional operator-side examples.
-install -d %{buildroot}%{project_share}/examples/task-model \
-  %{buildroot}%{project_share}/examples/coding-agent \
-  %{buildroot}%{project_share}/examples/raspi-wol
-install -pm0644 task-model/README.md task-model/Modelfile \
-  %{buildroot}%{project_share}/examples/task-model/
-install -pm0755 task-model/setup-gemma-1b-task.sh \
-  %{buildroot}%{project_share}/examples/task-model/
-install -pm0644 coding-agent/README.md coding-agent/Modelfile \
-  coding-agent/gitea.env.example \
-  %{buildroot}%{project_share}/examples/coding-agent/
-install -pm0755 coding-agent/setup-coding-agent.sh \
-  %{buildroot}%{project_share}/examples/coding-agent/
-install -pm0644 raspi-wol/bc250-wake.service raspi-wol/bc250-wake.timer \
-  raspi-wol/bc250-wake.env.example raspi-wol/bc250-wol.env.example \
-  %{buildroot}%{project_share}/examples/raspi-wol/
-install -pm0755 raspi-wol/wake-bc250.sh \
-  %{buildroot}%{project_share}/examples/raspi-wol/
-
-# Documentation.
-install -d %{buildroot}%{_docdir}/%{name}
-install -pm0644 README.md TLDR.md licenses/THIRD_PARTY_NOTICES.md \
-  openwebui-settings.md %{buildroot}%{_docdir}/%{name}/
-install -pm0644 docs/*.md %{buildroot}%{_docdir}/%{name}/
-install -pm0644 packaging/README.md \
-  %{buildroot}%{_docdir}/%{name}/PACKAGING.md
-install -pm0644 benchmark/README.md \
-  %{buildroot}%{_docdir}/%{name}/BENCHMARK.md
-install -pm0644 experiments/README.md \
-  %{buildroot}%{_docdir}/%{name}/EXPERIMENTS.md
-install -pm0644 coding-agent/README.md \
-  %{buildroot}%{_docdir}/%{name}/CODING-AGENT.md
-install -pm0644 nginx/https-example.conf \
-  %{buildroot}%{_docdir}/%{name}/
-install -pm0644 system/GOVERNOR.md system/kernel-cmdline.md \
-  %{buildroot}%{_docdir}/%{name}/
+python3 scripts/install-manifest.py \
+  --manifest packaging/install-manifest.tsv \
+  --source-root "$PWD" \
+  --buildroot "%{buildroot}" \
+  --filelist "%{payload_filelist}" \
+  --define "bindir=%{_bindir}" \
+  --define "libexec=%{project_libexec}" \
+  --define "share=%{project_share}" \
+  --define "config=%{project_config}" \
+  --define "sysconfdir=%{_sysconfdir}" \
+  --define "datadir=%{_datadir}" \
+  --define "docdir=%{_docdir}/%{name}" \
+  --define "unitdir=%{_unitdir}" \
+  --define "tmpfilesdir=%{_tmpfilesdir}" \
+  --define "presetdir=%{_presetdir}" \
+  --define "modulesloaddir=%{_modulesloaddir}" \
+  --define "modprobedir=%{_modprobedir}" \
+  --define "dbusdir=%{_datadir}/dbus-1/system.d" \
+  --define "unlock_commit=%{unlock_commit}" \
+  --define "live_manager_commit=%{live_manager_commit}"
 
 %post
 %systemd_post %{bc250_units}
@@ -326,7 +170,7 @@ cat <<'EOF_POST'
 BC-250 LLM server installed (testing profile).
 Open http://SERVER_IP/ on a trusted LAN and register the first admin immediately.
 HTTP is unencrypted. Read /usr/share/doc/bc250-llm-server/HTTPS.md before wider use.
-No chat model is downloaded until you edit /etc/bc250-llm-server/model-sources.sh.
+No chat model is downloaded until production-models.toml enables an entry.
 Optional helpers: bc250-install-ollama, bc250-ollama-profile,
 bc250-memory-profile, bc250-swap-profile, bc250-setup-task-model and
 bc250-setup-coding-agent. Run llm-run-diagnose for a performance capture.
@@ -356,96 +200,28 @@ Ollama profile overrides, firewalld/SELinux changes and .rpmsave files. Ollama i
 EOF_POSTUN
 fi
 
-%files
+%files -f %{payload_filelist}
 %license licenses/LICENSE governor-src/LICENSE licenses/40CU-LICENSE-NOTICE
-%{_bindir}/cyan-skillfish-governor-smu
-%{_bindir}/cyan-skillfish-performance-mode
-%{_bindir}/bc250-benchmark
-%{_bindir}/bc250-check-temp
-%{_bindir}/bc250-code
-%{_bindir}/bc250-code-commit
-%{_bindir}/bc250-compare-experiments
-%{_bindir}/bc250-40cu
-%{_bindir}/bc250-cu-live-manager
-%{_bindir}/bc250-fetch-experiments
-%{_bindir}/bc250-fetch-models
-%{_bindir}/bc250-gitea-review
-%{_bindir}/bc250-install-cu-manager
-%{_bindir}/bc250-install-ollama
-%{_bindir}/bc250-memory-profile
-%{_bindir}/bc250-ollama-profile
-%{_bindir}/bc250-pull-embedding-model
-%{_bindir}/bc250-run-mtp
-%{_bindir}/bc250-setup-coding-agent
-%{_bindir}/bc250-setup-task-model
-%{_bindir}/bc250-swap-profile
-%{_bindir}/bc250-cu-status
-%{_bindir}/bc250-uninstall-info
-%{_bindir}/bc250-verify
-%{_bindir}/bc250-verify-lan
-%{_bindir}/llm-run-diagnose
-%dir %{project_libexec}
-%{project_libexec}/fetch-models.sh
-%{project_libexec}/pull-embedding-model.sh
-%{project_libexec}/fetch-experiments.sh
-%{project_libexec}/compare-experiments.sh
-%{project_libexec}/run-mtp-llamacpp.sh
-%{project_libexec}/compare-models.sh
-%{project_libexec}/log_sensors.sh
-%{project_libexec}/check-temp.sh
-%{project_libexec}/install-cu-manager.sh
-%{project_libexec}/install-ollama.sh
-%{project_libexec}/ollama-profile.sh
-%{project_libexec}/memory-profile.sh
-%{project_libexec}/swap-profile.sh
-%{project_libexec}/cu-status.sh
-%{project_libexec}/verify.sh
-%{project_libexec}/verify-lan.sh
-%{project_libexec}/enable-wol.sh
-%{project_libexec}/backup-config.sh
-%{project_libexec}/backup-users.sh
-%{project_libexec}/restore-config.sh
-%{project_libexec}/restore-users.sh
-%{project_libexec}/prune-uploads.sh
-%{project_libexec}/warmup.sh
-%{project_libexec}/safe-suspend.sh
-%{project_libexec}/coding-agent/
-%{project_libexec}/40cu/
-%dir %{project_share}
-%{project_share}/40cu/
-%{project_share}/cu-live-manager/
-%{project_share}/models/
-%{project_share}/experiments/
-%{project_share}/examples/
-%{project_share}/ollama-profiles/
-%{_datadir}/containers/systemd/llm.network
-%{_datadir}/containers/systemd/tika.container
-%{_datadir}/containers/systemd/open-webui.container
-%{_unitdir}/cyan-skillfish-governor-smu.service
-%dir %{_unitdir}/ollama.service.d
-%{_unitdir}/ollama.service.d/50-bc250-llm-server.conf
-%{_unitdir}/ollama.service.d/60-bc250-runtime-profile.conf
-%{_unitdir}/owui-*.service
-%{_unitdir}/owui-*.timer
-%{_unitdir}/bc250-enable-wol.service
-%{_unitdir}/bc250-night-shutdown.service
-%{_unitdir}/bc250-night-shutdown.timer
-%{_tmpfilesdir}/bc250-llm-server.conf
-%{_presetdir}/90-bc250-llm-server.preset
-%{_modulesloaddir}/99-bc250-sensors.conf
-%{_modprobedir}/99-bc250-sensors.conf
-%dir %{_sysconfdir}/cyan-skillfish-governor-smu
-%config(noreplace) %{_sysconfdir}/cyan-skillfish-governor-smu/config.toml
-%dir %attr(0755,root,root) %{project_config}
-%config(noreplace) %{project_config}/model-sources.sh
-%config(noreplace) %{project_config}/experiment-sources.sh
-%ghost %config(noreplace) %attr(0600,root,root) %{project_config}/maintenance.env
-%config(noreplace) %{_sysconfdir}/nginx/default.d/bc250-llm-server.conf
-%config(noreplace) %{_sysconfdir}/nginx/conf.d/00-bc250-websocket-map.conf
-%{_docdir}/%{name}/
-%{_datadir}/dbus-1/system.d/com.cyanskillfish.Governor.conf
 
 %changelog
+* Mon Jul 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.3-0.1.testing
+- Group experiment, MTP and embedding helpers under the models feature tree
+- Separate download-only MTP inputs from the Ollama experiment catalog
+- Package the MTP catalog as an operator-editable noreplace configuration
+
+* Mon Jul 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.2-0.1.testing
+- Keep catalogs and long-form Modelfile names aligned with the current model set
+- Move task and coding-agent assets under models and isolate ports 11435/11436
+- Remove obsolete model entries and templates while retaining MTP downloads
+
+* Sun Jul 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.1-0.1.testing
+- Remove pre-production legacy catalog migration code and upgrade hooks
+- Retain strict Modelfile provenance checks and OLLAMA_URL compatibility
+
+* Sun Jul 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.0-0.1.testing
+- Consolidate model management, packaging metadata and compatibility commands
+- Preserve model selections during migration from legacy shell catalogs
+
 * Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.5.1-0.1.testing
 - Add the command-first installation and operations guide
 * Sat Jul 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.5.0-0.1.testing

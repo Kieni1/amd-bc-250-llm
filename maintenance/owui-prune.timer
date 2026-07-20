@@ -2,6 +2,7 @@
 Description=Daily Open WebUI upload prune
 
 [Timer]
+Unit=owui-maintenance@prune-uploads.service
 OnCalendar=*-*-* 18:10:00
 Persistent=false
 AccuracySec=1min

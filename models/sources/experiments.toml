@@ -1,0 +1,79 @@
+schema = 1
+
+[defaults]
+category = "experiments"
+destination = "/var/llm/gguf-experiments"
+download_namespace = "experiments"
+layout = "by-id"
+modelfile_destination = "/var/llm/modelfiles-experiments"
+ollama_host = "127.0.0.1:11434"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-qwen3-4b-lmstudio-q6-k"
+name = "exp-qwen3-4b-lmstudio-q6-k"
+repository = "lmstudio-community/Qwen3-4B-Instruct-2507-GGUF"
+revision = "latest"
+gguf = "Qwen3-4B-Instruct-2507-Q6_K.gguf"
+modelfile = "exp-qwen3-4b-lmstudio-q6-k.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-gemma4-e2b-unsloth-qat-ud-q4-k-xl"
+name = "exp-gemma4-e2b-unsloth-qat-ud-q4-k-xl"
+repository = "unsloth/gemma-4-E2B-it-qat-GGUF"
+revision = "latest"
+gguf = "gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf"
+modelfile = "exp-gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-gemma4-e4b-unsloth-qat-ud-q4-k-xl"
+name = "exp-gemma4-e4b-unsloth-qat-ud-q4-k-xl"
+repository = "unsloth/gemma-4-E4B-it-qat-GGUF"
+revision = "latest"
+gguf = "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf"
+modelfile = "exp-gemma4-e4b-unsloth-qat-ud-q4-k-xl.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-qwen35-9b-unsloth-q6-k"
+name = "exp-qwen35-9b-unsloth-q6-k"
+repository = "unsloth/Qwen3.5-9B-GGUF"
+revision = "latest"
+gguf = "Qwen3.5-9B-Q6_K.gguf"
+modelfile = "exp-qwen35-9b-unsloth-q6-k.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-qwen35-9b-hauhaucs-uncensored-q6-k"
+name = "exp-qwen35-9b-hauhaucs-uncensored-q6-k"
+repository = "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive"
+revision = "latest"
+gguf = "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf"
+modelfile = "exp-qwen35-9b-hauhaucs-uncensored-q6-k.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"
+name = "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"
+repository = "HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced"
+revision = "latest"
+gguf = "Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf"
+modelfile = "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "exp-gpt-oss20b-davidau-neo-mxfp4-moe4"
+name = "exp-gpt-oss20b-davidau-neo-mxfp4-moe4"
+repository = "DavidAU/Openai_gpt-oss-20b-NEO-GGUF"
+revision = "latest"
+gguf = "OpenAI-20B-NEO-MXFP4_MOE4.gguf"
+modelfile = "exp-gpt-oss20b-davidau-neo-mxfp4-moe4.Modelfile"

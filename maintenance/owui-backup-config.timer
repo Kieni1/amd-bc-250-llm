@@ -2,6 +2,7 @@
 Description=Daily Open WebUI config backup
 
 [Timer]
+Unit=owui-maintenance@backup-config.service
 OnCalendar=*-*-* 17:45:00
 Persistent=false
 AccuracySec=1min

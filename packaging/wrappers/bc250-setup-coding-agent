@@ -1,2 +1,0 @@
-#!/usr/bin/env bash
-exec /usr/share/bc250-llm-server/examples/coding-agent/setup-coding-agent.sh "$@"

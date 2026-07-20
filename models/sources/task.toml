@@ -1,0 +1,19 @@
+schema = 1
+
+[defaults]
+category = "task"
+destination = "/var/llm/ollama-task/gguf"
+download_namespace = "task"
+layout = "flat"
+modelfile_destination = "/var/llm/ollama-task/modelfiles"
+ollama_host = "127.0.0.1:11435"
+
+[[models]]
+enabled = true
+provider = "ollama"
+id = "task-gemma3-1b-unsloth-ud-q4-k-xl"
+name = "task-gemma3-1b-unsloth-ud-q4-k-xl"
+repository = "unsloth/gemma-3-1b-it-GGUF"
+revision = "latest"
+gguf = "gemma-3-1b-it-UD-Q4_K_XL.gguf"
+modelfile = "task-gemma3-1b-unsloth-ud-q4-k-xl.Modelfile"

@@ -5,12 +5,14 @@
   without deleting them on uninstall.
 - `90-bc250-llm-server.preset` enables only the bundled governor and leaves
   optional maintenance and Wake-on-LAN timers disabled.
-- `wrappers/` provides stable `/usr/bin/bc250-*` commands.
-- `scripts/prepare-governor-sources.sh` creates the pinned governor source and
-  Cargo vendor archives.
-- `scripts/prepare-40cu-source.sh` creates the pinned fduraibi source archive.
-- `scripts/prepare-live-manager-source.sh` creates the pinned WinnieLV
-  live-manager archive.
+- `bc250` is the multicall dispatcher behind stable `/usr/bin/bc250-*` aliases.
+- `install-manifest.tsv` is the authoritative payload install and ownership map.
+- `upstreams.toml` records pinned third-party revisions and checksums.
+- Model catalogs, long-name Modelfiles and feature-specific task, agent,
+  experiment, MTP and embedding helpers live under `models/`; the installed
+  public command names remain stable.
+- `scripts/prepare-sources.py` prepares all upstream archives, including the
+  governor Cargo vendor archive.
 - `sources/` contains generated source archives used by rpmbuild; archives and
   checksums are intentionally ignored by Git.
 
@@ -21,6 +23,13 @@ The main package is `bc250-llm-server`. It owns the experimental CU tools:
 - `/usr/libexec/bc250-llm-server/40cu/`
 - `/usr/share/bc250-llm-server/40cu/`
 - `/usr/share/bc250-llm-server/cu-live-manager/`
+
+The manifest intentionally centralizes install paths, modes and generated RPM
+ownership in one table. This reduces drift between `%install` and `%files`, at
+the cost of a project-specific layer that Fedora packagers must learn. Keep the
+format limited to the existing six entry types; if it grows beyond simple file
+placement, replace it with explicit spec sections rather than evolving a second
+general-purpose packaging language.
 
 No RPM scriptlet may replace or restore `amdgpu.ko`, write the 40-CU modprobe
 option, run `depmod` or `dracut`, or reboot the host. Those actions remain

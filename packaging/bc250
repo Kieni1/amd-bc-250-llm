@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# Multicall entry point for the package's stable bc250-* command names.
+set -Eeuo pipefail
+
+ALIASES=(
+  40cu benchmark check-temp code code-commit compare-experiments cu-status
+  fetch-experiments fetch-models fetch-mtp gitea-review install-cu-manager install-ollama
+  memory-profile model ollama-profile pull-embedding-model run-mtp
+  setup-coding-agent setup-task-model swap-profile uninstall-info verify verify-lan
+)
+
+if [[ "${1:-}" == --list-aliases ]]; then
+  printf '%s\n' "${ALIASES[@]}"
+  exit 0
+fi
+
+invoked="${0##*/}"
+if [[ "$invoked" == bc250 ]]; then
+  command="${1:-help}"
+  (($# == 0)) || shift
+else
+  command="${invoked#bc250-}"
+fi
+
+LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
+SHARE="${BC250_SHARE:-/usr/share/bc250-llm-server}"
+DOCDIR="${BC250_DOCDIR:-/usr/share/doc/bc250-llm-server}"
+
+usage() {
+  cat <<'USAGE'
+Usage: bc250 COMMAND [ARGUMENTS...]
+
+Model commands:
+  model                    List, inspect, download and register model catalogs
+  fetch-models             Compatibility alias for: model install production
+  fetch-experiments        Compatibility alias for: model install experiments
+  fetch-mtp                Compatibility alias for: model install mtp
+  setup-task-model         Configure task Ollama and install its model
+  setup-coding-agent       Configure agent Ollama on 11436 and install its models
+  pull-embedding-model     Pull and verify the Open WebUI embedding model
+
+Checks and operation:
+  verify                   Post-install server verification
+  verify-lan               Remote-machine LAN exposure verification
+  benchmark                Ollama model benchmark
+  check-temp               Temperature check
+  40cu, cu-status          Experimental compute-unit tools
+  install-ollama           Install or normalize Ollama
+  ollama-profile           Select an Ollama runtime profile
+  memory-profile           Inspect or change the kernel memory profile
+  swap-profile             Inspect or change the swap profile
+
+Coding and optional workflows:
+  code, code-commit, gitea-review, compare-experiments, run-mtp
+
+Run `bc250 COMMAND --help` where supported. Existing bc250-COMMAND names are
+symlinks to this dispatcher and remain compatible.
+USAGE
+}
+
+case "$command" in
+  help|-h|--help) usage ;;
+  model) exec "$LIBEXEC/modelctl" "$@" ;;
+  fetch-models) exec "$LIBEXEC/modelctl" install production "$@" ;;
+  fetch-experiments) exec "$LIBEXEC/modelctl" install experiments "$@" ;;
+  fetch-mtp) exec "$LIBEXEC/modelctl" install mtp "$@" ;;
+  setup-task-model) exec "$SHARE/examples/task-model/setup-ollama.sh" "$@" ;;
+  setup-coding-agent) exec "$SHARE/examples/coding-agent/setup-ollama.sh" "$@" ;;
+  benchmark) exec "$LIBEXEC/compare-models.sh" "$@" ;;
+  check-temp) exec "$LIBEXEC/check-temp.sh" "$@" ;;
+  compare-experiments) exec "$LIBEXEC/compare-experiments.sh" "$@" ;;
+  run-mtp) exec "$LIBEXEC/run-mtp-llamacpp.sh" "$@" ;;
+  code) exec "$LIBEXEC/coding-agent/coding-agent.sh" "$@" ;;
+  code-commit) exec "$LIBEXEC/coding-agent/commit-agent.sh" "$@" ;;
+  gitea-review) exec "$LIBEXEC/coding-agent/gitea-review.sh" "$@" ;;
+  40cu) exec "$LIBEXEC/40cu.sh" "$@" ;;
+  cu-status) exec "$LIBEXEC/cu-status.sh" "$@" ;;
+  install-cu-manager) exec "$LIBEXEC/install-cu-manager.sh" "$@" ;;
+  install-ollama) exec "$LIBEXEC/install-ollama.sh" "$@" ;;
+  memory-profile) exec "$LIBEXEC/memory-profile.sh" "$@" ;;
+  ollama-profile) exec "$LIBEXEC/ollama-profile.sh" "$@" ;;
+  pull-embedding-model) exec "$LIBEXEC/pull-embedding-model.sh" "$@" ;;
+  swap-profile) exec "$LIBEXEC/swap-profile.sh" "$@" ;;
+  verify) exec "$LIBEXEC/verify.sh" "$@" ;;
+  verify-lan) exec "$LIBEXEC/verify-lan.sh" "$@" ;;
+  uninstall-info) exec cat "$DOCDIR/UNINSTALL.md" ;;
+  *)
+    echo "ERROR: unknown command: $command" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

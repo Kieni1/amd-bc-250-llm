@@ -40,9 +40,11 @@ before the administrator account has been created.
 
 ## Protect Ollama
 
-Ollama listens on `0.0.0.0:11434` so the rootful Open WebUI container can reach
-it. The RPM does not open that port in firewalld. If firewalld is stopped or
-disabled, the unauthenticated Ollama API is exposed on every host interface.
+The primary Ollama listens on `0.0.0.0:11434` so the rootful Open WebUI
+container can reach it. Optional task and agent services similarly use `11435`
+and `11436`. The RPM does not open these ports in firewalld. If firewalld is
+stopped or disabled, every enabled unauthenticated Ollama API is exposed on host
+interfaces.
 
 ```bash
 sudo systemctl is-active firewalld
@@ -58,6 +60,7 @@ a private container network.
 ```bash
 sudo systemctl disable --now open-webui.service tika.service nginx.service
 sudo systemctl disable --now ollama.service
+sudo systemctl disable --now ollama-task.service ollama-agent.service
 ```
 
 This retains models, accounts and documents. Re-enable only the services needed

@@ -13,7 +13,7 @@ if curl --fail --silent --show-error --connect-timeout 5 --max-time 15     "http
 else
   bad "HTTP UI not reachable"
 fi
-for port in 3000 11434 11435 9998; do
+for port in 3000 11434 11435 11436 9998; do
   if port_open "$port"; then bad "port $port is reachable from LAN"
   else ok "port $port is not reachable from LAN"; fi
 done

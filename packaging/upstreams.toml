@@ -1,0 +1,46 @@
+schema = 1
+
+[[sources]]
+id = "governor"
+label = "Cyan Skillfish governor"
+repository = "filippor/cyan-skillfish-governor"
+version = "0.4.11"
+commit = "60ab6e5b354f01f287c73d920990dcd618a674cc"
+url = "https://github.com/filippor/cyan-skillfish-governor/archive/{commit}.tar.gz"
+archive = "cyan-skillfish-governor-{commit}.tar.gz"
+sha256 = "15fa19ce8fdc13dd629977144f24f8cca8bf1a1e8c65e61820cd89d6ca02bfd3"
+required = [
+  "cyan-skillfish-governor-{commit}/Cargo.lock",
+  "cyan-skillfish-governor-{commit}/Cargo.toml",
+  "cyan-skillfish-governor-{commit}/LICENSE",
+  "cyan-skillfish-governor-{commit}/scripts/cyan-skillfish-performance-mode",
+]
+cargo_vendor = true
+vendor_archive = "cyan-skillfish-governor-vendor-{commit}.tar.xz"
+
+[[sources]]
+id = "unlock"
+label = "40-CU unlock tools"
+repository = "fduraibi/bc250-40cu-unlock"
+commit = "6c3969ddee40e894297869e6ca30537f274619cb"
+url = "https://github.com/fduraibi/bc250-40cu-unlock/archive/{commit}.tar.gz"
+archive = "bc250-40cu-unlock-{commit}.tar.gz"
+sha256 = "803968cebaddf164ecf7e9c63f109b0d2db973254f44be9f77fe6235568992ba"
+required = [
+  "bc250-40cu-unlock-{commit}/README.md",
+  "bc250-40cu-unlock-{commit}/scripts/bc250-enable-40cu-fedora.sh",
+  "bc250-40cu-unlock-{commit}/patch/bc250-40cu-amdgpu.patch",
+]
+
+[[sources]]
+id = "live_manager"
+label = "CU live manager"
+repository = "WinnieLV/bc250-cu-live-manager"
+commit = "8eb45f07810af738f3e4945ea0cc29d399e378a6"
+url = "https://github.com/WinnieLV/bc250-cu-live-manager/archive/{commit}.tar.gz"
+archive = "bc250-cu-live-manager-{commit}.tar.gz"
+sha256 = "50393641e8abff46d2596f4167d5a43f329f8a7f9a8c8e8dbd697f60145cc020"
+required = [
+  "bc250-cu-live-manager-{commit}/README.md",
+  "bc250-cu-live-manager-{commit}/bc250-cu-live-manager.sh",
+]

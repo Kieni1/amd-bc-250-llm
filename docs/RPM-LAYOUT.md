@@ -5,6 +5,8 @@
 Primary commands:
 
 ```text
+/usr/bin/bc250
+/usr/bin/bc250-model
 /usr/bin/bc250-benchmark
 /usr/bin/bc250-check-temp
 /usr/bin/bc250-40cu
@@ -14,6 +16,7 @@ Primary commands:
 /usr/bin/bc250-compare-experiments
 /usr/bin/bc250-fetch-experiments
 /usr/bin/bc250-fetch-models
+/usr/bin/bc250-fetch-mtp
 /usr/bin/bc250-gitea-review
 /usr/bin/bc250-install-cu-manager
 /usr/bin/bc250-install-ollama
@@ -35,6 +38,8 @@ Implementation files:
 
 ```text
 /usr/libexec/bc250-llm-server/
+/usr/libexec/bc250-llm-server/modelctl
+/usr/libexec/bc250-llm-server/setup-ollama-instance.sh
 /usr/libexec/bc250-llm-server/coding-agent/
 /usr/libexec/bc250-llm-server/40cu/
 ```
@@ -42,8 +47,8 @@ Implementation files:
 Examples and templates:
 
 ```text
-/usr/share/bc250-llm-server/models/
-/usr/share/bc250-llm-server/experiments/
+/usr/share/bc250-llm-server/model-management/sources/
+/usr/share/bc250-llm-server/model-management/modelfiles/
 /usr/share/bc250-llm-server/examples/task-model/
 /usr/share/bc250-llm-server/examples/coding-agent/
 /usr/share/bc250-llm-server/examples/raspi-wol/
@@ -56,6 +61,9 @@ Configuration:
 
 ```text
 /etc/bc250-llm-server/
+/etc/bc250-llm-server/production-models.toml
+/etc/bc250-llm-server/experiments-models.toml
+/etc/bc250-llm-server/mtp-models.toml
 /etc/cyan-skillfish-governor-smu/config.toml
 /etc/nginx/default.d/bc250-llm-server.conf
 /etc/nginx/conf.d/00-bc250-websocket-map.conf
@@ -65,6 +73,9 @@ Persistent data is outside RPM ownership:
 
 ```text
 /var/llm/
+/var/llm/gguf-mtp/
+/var/llm/ollama-task/
+/var/llm/ollama-agent/
 /var/lib/ollama/
 /var/lib/open-webui/
 /var/backups/bc250-llm-server/

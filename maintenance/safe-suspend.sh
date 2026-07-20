@@ -2,7 +2,7 @@
 # Suspend only when no maintenance job and no established UI/inference session exists.
 set -Eeuo pipefail
 log(){ logger -t bc250-safe-suspend -- "$*"; printf '%s\n' "$*"; }
-SAFE_SUSPEND_PORTS="${SAFE_SUSPEND_PORTS:-22 443 3000 11434 11435}"
+SAFE_SUSPEND_PORTS="${SAFE_SUSPEND_PORTS:-22 443 3000 11434 11435 11436}"
 for port in $SAFE_SUSPEND_PORTS; do
   [[ "$port" =~ ^[0-9]{1,5}$ ]] && ((port >= 1 && port <= 65535)) || {
     log "Refusing suspend: invalid SAFE_SUSPEND_PORTS entry: $port"

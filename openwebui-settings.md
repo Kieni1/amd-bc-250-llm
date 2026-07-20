@@ -18,6 +18,8 @@ the service across an untrusted network.
 
 ```text
 Ollama: http://host.containers.internal:11434
+Task:   http://host.containers.internal:11435
+Agent:  http://host.containers.internal:11436
 Tika:   http://tika:9998
 ```
 
@@ -54,7 +56,10 @@ definition and remains administrator-owned.
 | `gpt-oss20b-ggml-org-mxfp4` | Deeper analysis | 8,192–16,384 |
 | `ministral3-8b-unsloth-ud-q5-k-xl` | Translation | 32,768 |
 | `qwen3-4b-lmstudio-q6-k` | Fast office work | 8,192 |
+| `gemma4-e2b-unsloth-qat-ud-q4-k-xl` | Fast text generation | 32,768 |
 | `qwen35-9b-hauhaucs-uncensored-q6-k` | General comparison | 32,768 |
+| `agentic-ornith1-9b-deepreinforce-q5-k-m` | Dedicated agentic work | 32,768 |
+| `agentic-qwable9b-empero-q6-k` | Dedicated agentic comparison | 32,768 |
 
 All contexts must be validated for full GPU residency on the particular board.
 Model output is not authoritative; verify consequential facts against source

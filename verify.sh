@@ -195,14 +195,14 @@ if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewa
   services="$(firewall-cmd --list-services 2>/dev/null || true)"
   ports="$(firewall-cmd --list-ports 2>/dev/null || true)"
   grep -qw http <<< "$services" && ok "HTTP allowed in firewalld" || bad "HTTP not allowed in firewalld"
-  grep -Eq '11434|11435|3000|9998' <<< "$ports" && bad "internal port explicitly opened in firewalld" || ok "no internal port opened explicitly"
+  grep -Eq '11434|11435|11436|3000|9998' <<< "$ports" && bad "internal port explicitly opened in firewalld" || ok "no internal port opened explicitly"
 else
   bad "firewalld inactive; Ollama may be exposed through its all-interface listener"
 fi
 
 section "Package configuration"
-[[ -r /etc/bc250-llm-server/model-sources.sh ]] && ok "production source template installed" || bad "production source template missing"
-[[ -r /etc/bc250-llm-server/experiment-sources.sh ]] && ok "experiment source template installed" || bad "experiment source template missing"
+[[ -r /etc/bc250-llm-server/production-models.toml ]] && ok "production model catalog installed" || bad "production model catalog missing"
+[[ -r /etc/bc250-llm-server/experiments-models.toml ]] && ok "experiment model catalog installed" || bad "experiment model catalog missing"
 if grep -RqsE 'hf_[A-Za-z0-9]{20,}|WEBUI_ADMIN_PASSWORD=' \
   /etc/bc250-llm-server /usr/share/bc250-llm-server 2>/dev/null; then
   bad "token or administrator password found in packaged configuration"

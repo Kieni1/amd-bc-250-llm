@@ -49,7 +49,20 @@ ss -ltnp | grep 11434
 
 A disabled or incorrectly configured firewall can expose the unauthenticated
 Ollama API. Restrict the host to a trusted LAN or add an explicit zone/source
-policy.
+policy. The optional task and agent instances use ports `11435` and `11436` and
+must remain blocked as well.
+
+## Isolated task and agent instances
+
+`bc250-setup-task-model` and `bc250-setup-coding-agent` create
+`ollama-task.service` and `ollama-agent.service` under `/etc/systemd/system`.
+They use separate model stores below `/var/llm/ollama-task` and
+`/var/llm/ollama-agent`; neither changes the primary service profile. All three
+instances share the same GPU, so overlapping model loads can increase memory
+pressure.
+
+See [`../models/README.md`](../models/README.md#storage-behavior-in-ollama) for
+blob, manifest and retained source-GGUF storage behavior.
 
 ## Updates
 

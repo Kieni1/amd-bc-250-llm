@@ -42,6 +42,16 @@ sudo bc250-memory-profile remove
 sudo reboot
 ```
 
+Task and agent setup also creates local systemd units outside RPM ownership.
+Remove them when those isolated instances are no longer wanted:
+
+```bash
+sudo systemctl disable --now ollama-task.service ollama-agent.service
+sudo rm -f /etc/systemd/system/ollama-task.service
+sudo rm -f /etc/systemd/system/ollama-agent.service
+sudo systemctl daemon-reload
+```
+
 The memory and swap commands require explicit confirmation. Skip a command when
 you intentionally want to retain that host configuration.
 
@@ -67,9 +77,13 @@ sudo setsebool -P httpd_can_network_connect 0
 /etc/bc250-llm-server/
 /etc/cyan-skillfish-governor-smu/
 /etc/systemd/system/ollama.service.d/
+/etc/systemd/system/ollama-task.service
+/etc/systemd/system/ollama-agent.service
 /etc/systemd/zram-generator.conf.d/
 /var/swap/bc250-llm.swap
 /var/llm/
+/var/llm/ollama-task/
+/var/llm/ollama-agent/
 /var/lib/ollama/
 /var/lib/open-webui/
 /var/backups/bc250-llm-server/

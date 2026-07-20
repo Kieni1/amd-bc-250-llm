@@ -1,0 +1,29 @@
+schema = 1
+
+[defaults]
+category = "mtp"
+destination = "/var/llm/gguf-mtp"
+download_namespace = "mtp"
+layout = "by-id"
+
+# MTP entries are download-only llama.cpp inputs and intentionally have no
+# Ollama name or Modelfile.
+[[models]]
+enabled = false
+provider = "download-only"
+id = "qwen3.6-27b-mtp"
+repository = "unsloth/Qwen3.6-27B-MTP-GGUF"
+revision = "latest"
+gguf = "Qwen3.6-27B-UD-Q2_K_XL.gguf"
+context = 8192
+draft = 2
+
+[[models]]
+enabled = false
+provider = "download-only"
+id = "qwen3.5-4b-mtp"
+repository = "unsloth/Qwen3.5-4B-MTP-GGUF"
+revision = "latest"
+gguf = "Qwen3.5-4B-UD-Q4_K_XL.gguf"
+context = 16384
+draft = 3
