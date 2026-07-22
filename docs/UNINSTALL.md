@@ -1,102 +1,71 @@
 # Uninstall
 
-Persistent model, Open WebUI and backup data are intentionally retained.
+There are two intentionally different removal paths.
 
-## Restore 40-CU changes first
+## Full appliance purge
 
-When the 40-CU helper has been used, restore the stock state before removing the
-RPM:
-
-```bash
-sudo bc250-40cu disable
-# After the reboot:
-sudo bc250-40cu restore
-sudo reboot
-sudo bc250-40cu status
-```
-
-If the live manager's boot service was enabled, remove its copied service state
-before removing the RPM:
+Run the packaged purge command when the machine should no longer contain the
+BC-250 LLM setup:
 
 ```bash
-sudo bc250-cu-live-manager uninstall-service
+sudo bc250-uninstall
 ```
 
+The command prints its destructive scope and requires the exact phrase
+`PURGE-BC250-LLM`. For unattended disposal, use
+`sudo bc250-uninstall --yes`.
 
-## Remove optional host profiles
+The purge:
 
-These settings live outside RPM ownership and are retained deliberately. Remove
-them before uninstalling when you want to return to Fedora defaults:
+- stops the main, task and agent Ollama instances, Open WebUI, Tika, governor,
+  maintenance, Wake-on-LAN and CU live-manager services;
+- removes the Open WebUI and Tika containers, their dedicated Podman network
+  and their pinned images when nothing else uses those images;
+- removes all GGUF files, rendered Modelfiles, Ollama stores, Hugging Face
+  cache, Open WebUI accounts/uploads/settings, maintenance backups and the
+  installer transcript;
+- removes the disk-swap file and fstab block, zram override and current/legacy
+  BC-250 kernel memory arguments;
+- removes the CU live-manager boot service and saved table;
+- finds every AMDGPU module with a `*.bc250-backup-*` sibling, restores only a
+  backup verified not to contain `bc250_cc_write_mode`, then runs `depmod` and
+  rebuilds that kernel's initramfs;
+- removes the main RPM, setup-owned configuration, generated systemd units,
+  official Ollama installed by this setup, and the setup-created `ollama`
+  account;
+- restores the firewalld HTTP rule and SELinux network boolean to the state
+  recorded before guided installation;
+- removes RPMs recorded as absent before the guided installer added them.
+
+Normal DNF removal cleans requirements that are no longer needed. The package
+record additionally prevents the purge from guessing which direct setup
+additions are disposable. On an installation upgraded from a release that did
+not write `/var/lib/bc250-llm-server/install/packages-added.txt`, that recorded
+step is simply empty. The purge never runs an unbounded `dnf autoremove`.
+
+The purge does not remove unidentified operator files such as arbitrary TLS
+private keys or coding output in user home directories. Review those separately
+if they were added while operating the appliance.
+
+Reboot after a successful purge. The live kernel and zram device cannot return
+to stock state until reboot. Root-filesystem growth and ordinary Fedora system
+upgrades are not reversible and are not rolled back.
+
+If the CU helper finds a patched module but cannot verify a stock backup, it
+retains the backups, reports a warning and exits nonzero after completing the
+remaining bounded cleanup. Restore that kernel from its Fedora package before
+rebooting it.
+
+## RPM-only removal
+
+Use ordinary DNF removal when package binaries and units should go away but
+models, Open WebUI state, profiles and separately installed Ollama should be
+retained:
 
 ```bash
-sudo bc250-ollama-profile reset
-sudo bc250-swap-profile remove
-sudo bc250-memory-profile remove
-sudo reboot
+sudo dnf remove bc250-llm-server.x86_64
 ```
 
-Task and agent setup also creates local systemd units outside RPM ownership.
-Remove them when those isolated instances are no longer wanted:
-
-```bash
-sudo systemctl disable --now ollama-task.service ollama-agent.service
-sudo rm -f /etc/systemd/system/ollama-task.service
-sudo rm -f /etc/systemd/system/ollama-agent.service
-sudo systemctl daemon-reload
-```
-
-The memory and swap commands require explicit confirmation. Skip a command when
-you intentionally want to retain that host configuration.
-
-## Remove the main package
-
-```bash
-sudo dnf remove bc250-llm-server
-```
-
-The package does not remove Ollama installed by `bc250-install-ollama`.
-
-To reverse the global network policy applied by the testing RPM:
-
-```bash
-sudo firewall-cmd --permanent --remove-service=http
-sudo firewall-cmd --reload
-sudo setsebool -P httpd_can_network_connect 0
-```
-
-## Review retained state
-
-```text
-/etc/bc250-llm-server/
-/etc/cyan-skillfish-governor-smu/
-/etc/systemd/system/ollama.service.d/
-/etc/systemd/system/ollama-task.service
-/etc/systemd/system/ollama-agent.service
-/etc/systemd/zram-generator.conf.d/
-/var/swap/bc250-llm.swap
-/var/llm/
-/var/llm/ollama-task/
-/var/llm/ollama-agent/
-/var/lib/ollama/
-/var/lib/open-webui/
-/var/backups/bc250-llm-server/
-```
-
-Also review:
-
-- operator-added HTTPS configuration and certificates;
-- firewalld changes;
-- the global SELinux boolean `httpd_can_network_connect`;
-- Wake-on-LAN configuration;
-- `.rpmsave` and `.rpmnew` files;
-- local coding-agent Gitea credentials under user home directories.
-
-Remove retained data only after backups have been verified. Example:
-
-```bash
-sudo rm -rf /var/llm /var/lib/open-webui
-sudo rm -rf /var/backups/bc250-llm-server
-```
-
-Those commands are destructive and are not run by RPM.
-For good measures reinstall the OS to avoid leftovers.
+This standard RPM path remains intentionally non-destructive. It preserves
+`%config(noreplace)` files and persistent application data so the package can
+be reinstalled or upgraded without data loss.

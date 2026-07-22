@@ -26,8 +26,9 @@ mkdir -p "$stage"
     --exclude='./rpmbuild' \
     --exclude='./sources/*.tar.gz' \
     --exclude='./sources/*.tar.xz' \
-    --exclude='./sources/*.sha256' \
     --exclude='./vendor' \
+    --exclude='*/__pycache__' \
+    --exclude='*.pyc' \
     --exclude='./.git' \
     -cf - .
 ) | tar -xf - -C "$stage"

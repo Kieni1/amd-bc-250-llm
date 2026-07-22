@@ -5,6 +5,17 @@ forms and environment overrides that are useful for automation and diagnosis.
 Commands that change the system generally require `sudo`; read their status or
 help output before applying a profile.
 
+## Guided installer
+
+```text
+sudo ./install [--rpm FILE-OR-DIRECTORY]
+sudo ./install --models-only
+```
+
+The normal mode performs the complete filesystem-to-verification workflow.
+`--models-only` resumes the production, task, agentic and embedding prompts
+after the RPM is installed; it does not repeat host or package setup.
+
 ## Dispatcher
 
 `bc250 COMMAND [ARGUMENTS...]` is the canonical interface. Installed
@@ -26,11 +37,16 @@ bc250-model list CATEGORY [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID [--provider PROVIDER]
   [--source PATH] [--modelfile-dir PATH]
 bc250-model install CATEGORY [SELECTION] [OPTIONS]
+bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
+  [--source PATH] [--modelfile-dir PATH]
 ```
 
-`SELECTION` is `all`, one zero-based index, or a comma-separated set of indices
-and ranges such as `0,2-4`. Only entries with `enabled = true` are selectable.
-`--list` prints those entries without downloading them.
+`SELECTION` is `all`, a stable model id or Ollama display name, one zero-based
+index, or a comma-separated set of those values and ranges such as `0,2-4`.
+Prefer ids/names in automation. Invalid selections fail instead of silently
+changing scope. Entries with `enabled = true` are selectable by default.
+`--include-disabled` exposes the complete catalog for one run without rewriting
+operator configuration. `--list` does not download anything.
 
 Install options:
 
@@ -43,13 +59,32 @@ Install options:
   entry.
 - `--destination PATH`: GGUF destination root.
 - `--min-free-bytes BYTES`: minimum free space before a new download.
+- `--token-file PATH`: read the Hugging Face token from a protected file.
+- `--include-disabled`: include disabled catalog entries in this invocation.
+- `--refresh`: force a new Hugging Face download, full SHA-256 calculation and
+  Ollama registration even when the state file says the model is current.
 
 The manager renders a runtime Modelfile for the selected revision and GGUF path.
 Registered names stay aligned with the full-name packaged templates. It never
-rewrites the packaged template. Relevant environment
+rewrites the packaged template. Matching file/source state is reused for
+commits, tags, branches and `latest`; use `--refresh` for an explicit network
+refresh of a moving revision. Relevant environment
 overrides are `SOURCE_FILE`, `MODELFILE_SOURCE_DIR`, `DEST`, `MODELFILE_DIR`,
 `HF_TOKEN`, `HF_HOME`, `DOWNLOAD_DIR`, `OLLAMA_HOST` and `OLLAMA_URL`. Explicit
 CLI options take precedence where both forms exist.
+
+Authentication is resolved only if a model needs downloading. `HF_TOKEN` or
+`--token-file` is validated with `hf auth whoami` as the `ollama` service
+account. Invalid, empty or skipped tokens continue anonymously and are never
+persisted by the manager. Set `BC250_HF_ANONYMOUS=1` to suppress the prompt in
+unattended public-model installs. Hugging Face progress output remains enabled.
+The download runs in a pseudo-terminal, so its live byte progress is preserved
+when output is captured in the guided installer transcript.
+
+If `--min-free-bytes` or a catalog minimum is not met, installation stops and
+suggests explicit cleanup. Cleanup is scoped to the required category, includes
+disabled entries so existing artifacts remain discoverable, and never edits
+`%config(noreplace)` TOML. Use `--yes` only after reviewing `--list`.
 
 `--provider ollama|download-only` constrains `resolve`. The MTP runner always
 uses the separate `mtp` catalog and `--provider download-only`, so an ordinary
@@ -67,18 +102,8 @@ sudo bc250-fetch-mtp [SELECTION]
 ### Upgrade behavior
 
 RPM upgrades preserve operator-edited TOML catalogs through `%config(noreplace)`
-and restart the web services. Pre-TOML shell catalogs are not migrated; copy
-wanted selections into the TOML catalogs manually before upgrading.
-
-Version 0.6.2 gave every Modelfile its full registered model name. An upgraded
-0.6.1 catalog is therefore kept as the existing config, but must be merged with
-the new `.rpmnew` catalog before another fetch. No executable migration is run.
-
-Version 0.6.3 adds `/etc/bc250-llm-server/mtp-models.toml` as a separate
-`%config(noreplace)` catalog. On an upgrade from 0.6.2, the existing experiment
-catalog is deliberately preserved and may still contain its two old MTP tables.
-Merge `experiments-models.toml.rpmnew` into the active experiment catalog, and
-copy any wanted MTP enablement into `mtp-models.toml`. No executable migration
+and restart the normal web services. When package defaults change, merge the
+corresponding `.rpmnew` file manually. No executable model-catalog migration
 edits operator configuration.
 
 ## Task model setup
@@ -153,16 +178,33 @@ bc250-swap-profile {status|apply|remove}
 bc250-pull-embedding-model
 ```
 
-- `OLLAMA_VERSION` selects the reviewed version or `latest` for the installer.
-- `BC250_ASSUME_YES=1` confirms memory/swap changes for automation.
+- `OLLAMA_VERSION` selects a specific version; the default is `latest`.
+- `OLLAMA_REINSTALL=1` reinstalls an already matching requested version.
+- `BC250_ASSUME_YES=1` confirms Ollama, memory and swap changes for automation.
+- `BC250_PRODUCTION_SELECTION=0,2-4` selects production entries in the guided
+  installer when `BC250_ASSUME_YES=1`; an unset value skips production models.
 - `SWAP_GIB` (`16`) and `ZRAM_MIB` (`2048`) size the swap profile.
 - `EMBED_MODEL` (`nomic-embed-text`) selects the embedding model.
 
 See [`../models/embedding/README.md`](../models/embedding/README.md) for the
 embedding workflow.
 
-Memory and swap changes are explicit and may require a reboot. The RPM does not
-apply them during installation.
+Memory and swap changes are explicit and may require a reboot. RPM scriptlets
+do not apply them; the separate guided installer can invoke both helpers.
+
+## Uninstall
+
+```text
+bc250-uninstall [--yes]
+bc250-uninstall-info
+```
+
+`bc250-uninstall` is the explicitly destructive full purge. It removes models,
+Open WebUI data, backups, containers, Ollama instances, host profiles, CU boot
+persistence, verified replacement-module changes and RPMs recorded as newly
+added by the guided installer. It requires `PURGE-BC250-LLM`; `--yes` is for
+unattended disposal. `bc250-uninstall-info` prints the complete removal policy.
+Ordinary `dnf remove bc250-llm-server.x86_64` retains persistent data.
 
 ## Governor and compute units
 
@@ -172,12 +214,15 @@ bc250-40cu
 bc250-40cu {verify|live-status|live-full|live-stock}
 bc250-40cu health-test MODEL
 bc250-40cu {mask|unmask} WGP
-bc250-40cu {build|status|enable|disable|restore}
+bc250-40cu {status|enable|disable|restore}
 ```
 
 Live WGP-table changes require `APPLY-WGP-TABLE`. The replacement-module
-`enable` path requires `ENABLE-40CU` and a reboot. Neither path changes the
-operator’s governor clock/voltage policy.
+`enable` path requires `ENABLE-40CU` and a reboot. The guided installer already
+installs `kernel-devel`, prepares the module and verifies its initramfs copy;
+`enable` reuses that verified copy and rebuilds initramfs once after writing the
+module option. `prepare`/`build` remains an advanced recovery alias. Neither CU
+path changes the operator’s governor clock/voltage policy.
 
 ## Verification and diagnostics
 

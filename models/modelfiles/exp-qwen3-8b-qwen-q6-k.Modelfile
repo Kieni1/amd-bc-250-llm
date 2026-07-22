@@ -1,0 +1,17 @@
+# Ollama model: exp-qwen3-8b-qwen-q6-k
+# Source: Qwen/Qwen3-8B-GGUF @ latest
+# GGUF: Qwen3-8B-Q6_K.gguf
+FROM /var/lib/bc250-llm-server/gguf/experiments/qwen3-8b-Q6_K/Qwen3-8B-Q6_K.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+# Native context; no YaRN extension is needed for the first office tests.
+PARAMETER num_ctx 32768
+# Qwen's recommended Qwen3 sampling defaults.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental multilingual office assistant. Draft and summarize clearly, and translate faithfully between German and French while preserving meaning, tone, terminology, names, numbers, and formatting."""

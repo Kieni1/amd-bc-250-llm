@@ -13,8 +13,21 @@ fi
 
 PORT="${PORT:-8090}"
 LLAMACPP="${LLAMACPP:-}"
+REVIEWED_LLAMACPP_RELEASE="b10069"
 [[ -x "$LLAMACPP" ]] || { echo "ERROR: set LLAMACPP to an executable llama-server." >&2; exit 1; }
 [[ -x "$MANAGER" ]] || { echo "ERROR: model manager is not executable: $MANAGER" >&2; exit 1; }
+
+help_output="$("$LLAMACPP" --help 2>&1 || true)"
+missing_flags=()
+for flag in --n-gpu-layers --ctx-size --flash-attn --parallel \
+  --cache-type-k --cache-type-v --spec-type --spec-draft-n-max; do
+  grep -Fq -- "$flag" <<< "$help_output" || missing_flags+=("$flag")
+done
+if ((${#missing_flags[@]})); then
+  echo "ERROR: llama-server lacks required option(s): ${missing_flags[*]}" >&2
+  echo "Reviewed llama.cpp release: $REVIEWED_LLAMACPP_RELEASE" >&2
+  exit 1
+fi
 
 choice="${1:-}"
 case "$choice" in
@@ -36,9 +49,10 @@ DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
 [[ -s "$GGUF" ]] || { echo "ERROR: missing $GGUF; run bc250-fetch-mtp first." >&2; exit 1; }
 
 echo "MTP server: http://127.0.0.1:$PORT"
+echo "Compatible llama-server detected; reviewed release: $REVIEWED_LLAMACPP_RELEASE"
 exec "$LLAMACPP" -m "$GGUF" \
   --host 127.0.0.1 --port "$PORT" \
-  -ngl 99 -c "$CTX" -fa on -np 1 \
+  --n-gpu-layers 99 --ctx-size "$CTX" --flash-attn on --parallel 1 \
   --cache-type-k q8_0 --cache-type-v q8_0 \
   --spec-type draft-mtp --spec-draft-n-max "$DRAFT_N_MAX" \
   --temp 0.7 --top-p 0.8 --top-k 20 --presence-penalty 1.5

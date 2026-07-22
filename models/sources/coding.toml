@@ -2,10 +2,10 @@ schema = 1
 
 [defaults]
 category = "coding"
-destination = "/var/llm/ollama-agent/gguf"
+destination = "/var/lib/bc250-llm-server/gguf/agent"
 download_namespace = "agentic"
 layout = "flat"
-modelfile_destination = "/var/llm/ollama-agent/modelfiles"
+modelfile_destination = "/var/lib/bc250-llm-server/modelfiles/agent"
 ollama_host = "127.0.0.1:11436"
 min_free_bytes = 8589934592
 

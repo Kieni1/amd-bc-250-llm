@@ -10,7 +10,7 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.6.3
+Version:        0.8.1
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -74,8 +74,7 @@ Requires:       vulkan-loader
 Requires:       vulkan-tools
 Requires:       xz
 Requires:       zstd
-Recommends:     zram-generator
-Requires(pre):    shadow-utils
+Requires:       zram-generator
 Requires(post):   systemd
 Requires(preun):  systemd
 Requires(postun): systemd
@@ -97,16 +96,9 @@ tar -xzf %{SOURCE1} -C governor-src --strip-components=1
 tar -xJf %{SOURCE2} -C governor-src
 mkdir unlock-src
 tar -xzf %{SOURCE3} -C unlock-src --strip-components=1
-patch -d unlock-src -p1 < patches/40cu-fedora-helper.patch
 mkdir live-manager-src
 tar -xzf %{SOURCE4} -C live-manager-src --strip-components=1
-
-%pre
-getent group ollama >/dev/null || groupadd -r ollama
-id ollama >/dev/null 2>&1 || \
-  useradd -r -g ollama -d /var/lib/ollama \
-    -s /usr/sbin/nologin -M ollama
-exit 0
+patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch
 
 %build
 pushd governor-src
@@ -132,6 +124,7 @@ python3 scripts/install-manifest.py \
   --define "docdir=%{_docdir}/%{name}" \
   --define "unitdir=%{_unitdir}" \
   --define "tmpfilesdir=%{_tmpfilesdir}" \
+  --define "sysusersdir=%{_sysusersdir}" \
   --define "presetdir=%{_presetdir}" \
   --define "modulesloaddir=%{_modulesloaddir}" \
   --define "modprobedir=%{_modprobedir}" \
@@ -194,7 +187,8 @@ if [ "$1" -eq 0 ]; then
   cat <<'EOF_POSTUN'
 BC-250 LLM server package removed. Persistent data was not deleted.
 Review /etc/bc250-llm-server, /etc/cyan-skillfish-governor-smu,
-/var/llm, /var/lib/open-webui, /var/backups/bc250-llm-server,
+/var/lib/bc250-llm-server, /var/cache/bc250-llm-server,
+/var/lib/open-webui, /var/backups/bc250-llm-server,
 operator-added HTTPS/CU/task-model/coding-agent files, memory/swap and
 Ollama profile overrides, firewalld/SELinux changes and .rpmsave files. Ollama installed separately is not removed.
 EOF_POSTUN
@@ -202,8 +196,77 @@ fi
 
 %files -f %{payload_filelist}
 %license licenses/LICENSE governor-src/LICENSE licenses/40CU-LICENSE-NOTICE
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/gguf
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/production
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/experiments
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/mtp
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/task
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/agent
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/production
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/experiments
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/task
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/agent
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/ollama
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/main
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/task
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/agent
+%ghost %dir %attr(0750,root,root) /var/lib/bc250-llm-server/swap
+%ghost %dir %attr(0750,root,ollama) /var/cache/bc250-llm-server
+%ghost %dir %attr(0750,ollama,ollama) /var/cache/bc250-llm-server/huggingface
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/ollama
+%ghost %dir %attr(0750,root,root) /var/lib/open-webui
+%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server
+%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/config
+%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/users
+%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback
+%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/config
+%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Wed Jul 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.8.1-0.1.testing
+- Add an explicit full-purge command for package, state, Ollama and host profiles
+- Restore verified stock AMDGPU backups and remove persistent 40-CU configuration
+- Record packages added by the guided installer for bounded dependency cleanup
+- Restore the pre-install firewalld and SELinux network policy on purge
+- Keep ordered Hugging Face progress output in captured installer transcripts
+- Prepare the running kernel's 40-CU module automatically without enabling it
+- Cache kernel source, skip repeat builds and verify the initramfs module copy
+- Distinguish installed, initramfs and actually loaded AMDGPU state
+- Avoid false module-verification failures and redundant preparation on enable
+- Add a models-only guided-installer resume path after interrupted host setup
+
+* Wed Jul 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.8.0-0.1.testing
+- Simplify pinned source caching and remove per-source digest/member bookkeeping
+- Consolidate model management into one focused command with focused tests
+- Provide the ollama account via sysusers and exclude Fedora's Ollama package
+- Keep Fedora and official Ollama mutually exclusive and fix latest-release installation
+- Reuse matching model state until --refresh and make cleanup explicit and non-mutating
+- Preserve current catalogs, strict Modelfile metadata and all three Ollama instances
+
+* Wed Jul 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.7.1-0.1.testing
+- Improve model management stability with validated Hugging Face token handling
+- Add --refresh for explicit re-download, rehash and Ollama re-registration
+- Add low-disk cleanup for enabled production and experiment Ollama models
+- Document cleanup, token and refresh workflows and validate the new contracts
+
+* Mon Jul 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.7.0-0.1.testing
+- Adopt cmd, config and examples source groups and FHS application-state paths
+- Correct guided task and coding setup, selectable production installs and reboot detection
+- Make GGUF revision changes replace stale files instead of relabeling cached content
+- Install or update Ollama explicitly and require zram-generator for the swap workflow
+- Keep live-manager persistence on the RPM-owned executable and probe llama.cpp MTP flags
+- Expand deterministic validation for release, commands, paths, patches and installer contracts
+
+* Mon Jul 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.4-0.1.testing
+- Keep all current models, features, dependencies and pinned external tools
+- Consolidate command routing and RPM build-tree preparation
+- Group verification and Open WebUI guidance with their feature documentation
+- Flatten full-name Modelfiles and prefix production display names
+- Cache verified GGUF state and unchanged Ollama registration
+- Add the resumable filesystem-to-verification installer and accurate CU totals
+
 * Mon Jul 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.6.3-0.1.testing
 - Group experiment, MTP and embedding helpers under the models feature tree
 - Separate download-only MTP inputs from the Ollama experiment catalog

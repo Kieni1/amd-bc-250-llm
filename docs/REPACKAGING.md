@@ -1,77 +1,68 @@
 # Repackaging and source refresh
 
-The source RPM uses immutable third-party revisions. The authoritative URLs,
-commits, checksums and required archive members are in
-`packaging/upstreams.toml`; the RPM spec retains only the macros needed to name
-its `Source` entries.
+The RPM uses four external inputs: the pinned governor source, its offline Cargo
+vendor tree, the 40-CU helper source and the CU live-manager source. The
+authoritative commits, URLs and archive names are in
+`packaging/upstreams.toml`. Normal builds do not maintain a second set of
+per-download checksums.
 
-Prepare all archives:
+## Normal build
 
 ```bash
-make sources
-cat sources/*.sha256
+make sources          # fetch only missing inputs
+make sources-check    # offline cache check
+make rpm
 ```
 
-The source preparer downloads exact source trees, validates required archive
-members and vendors the governor's Cargo dependencies.
+`sources/` is reusable. `make clean` removes `build/`, `dist/` and `rpmbuild/`
+but keeps the cache. Use `make clean-sources` only when the inputs must be
+fetched again; `make distclean` removes both build output and cached sources.
 
-Do not fetch third-party source during RPM scriptlets.
+The resulting source RPM contains the exact external archives used for that
+build. `dist/SHA256SUMS` covers finished source and binary RPM artifacts. This
+is simpler for local pre-1.0 builds, but it does not independently authenticate
+a cached upstream archive. Build releases from a controlled cache and review
+the source RPM contents. A future release service can add a Fedora lookaside or
+equivalent verified source store without putting that bookkeeping back into the
+local build command.
+
+Do not fetch third-party code from RPM scriptlets or `%build`.
 
 ## Change a pinned revision
 
-1. Review upstream code, license and history.
-2. Update the commit and checksum in `packaging/upstreams.toml`.
-3. Update the corresponding RPM macro in
-   `packaging/bc250-llm-server.spec` so its source name remains aligned with
-   the lock.
-4. Update source/license notices when the reviewed upstream changes:
-   - `licenses/THIRD_PARTY_NOTICES.md`
-   - relevant documentation
-5. Remove old generated archives:
+1. Review the upstream code, license and history.
+2. Update its full commit in `packaging/upstreams.toml`.
+3. Update the corresponding macro in `packaging/bc250-llm-server.spec` so the
+   `Source` filename stays aligned.
+4. If the governor changed, its vendor archive is recreated automatically from
+   `Cargo.lock` by `cargo vendor --locked`.
+5. Update `licenses/THIRD_PARTY_NOTICES.md` and relevant documentation when
+   upstream ownership or licensing changed.
+6. Refresh and build:
 
    ```bash
-   make clean
+   make clean-sources
    make sources
-   ```
-
-6. Run:
-
-   ```bash
    make rpm
    ```
 
-7. Test clean install, upgrade, removal and recovery on the intended Fedora
-   kernel.
-
-## Project URL
-
-The spec uses `https://github.com/Kieni1/amd-bc-250-llm`.
+7. Install and test `dist/RPMS/*.x86_64.rpm`. Keep
+   `dist/SRPMS/*.src.rpm` only as rebuild input.
+8. Test clean installation, upgrade, removal and recovery on Fedora 44.
 
 ## Release checklist
 
-- Bump `VERSION` and the spec `Version` together so DNF treats the package as
-  an upgrade and runs the upgrade scriptlets normally. Add a matching changelog
-  entry for the release history; it is not a preflight build gate.
-- Verify source checksums and licenses.
-- Confirm the main RPM owns `/usr/bin/bc250-40cu`,
-  `/usr/bin/bc250-cu-live-manager` and both pinned CU payloads.
-- Confirm no RPM scriptlet modifies the kernel or CU routing.
-- Test Ollama startup with an existing `/usr/share/ollama` passwd home.
-- Test Open WebUI on an empty `/var/lib/open-webui`.
-- Test backup and restore with SELinux enforcing.
-- Test the coding agent with a limited Gitea token.
-- Reintroduce full policy, unit, security and `rpmlint` gates for the 1.0.0
-  production-readiness cycle.
+- Bump `VERSION` and spec `Version` together and add a matching top
+  `Version-Release` changelog entry.
+- Review pinned commits, the cached source inputs and third-party licenses.
+- Confirm the RPM owns the governor, 40-CU and live-manager payloads.
+- Confirm no RPM scriptlet changes CU routing, a kernel module, memory/swap
+  policy or governor clocks.
+- Test the three Ollama instances and model installation/cleanup paths.
+- Test Open WebUI on empty and upgraded persistent state.
+- Test backup/restore with SELinux enforcing.
+- Run `rpmlint` on the source and binary RPMs in Fedora and review every error.
 
-## Pre-1.0 build validation
-
-`make rpm` runs `make validate` automatically before rpmbuild. The current
-preflight is deliberately limited to build-blocking checks: shell and Python
-syntax, `VERSION`/spec alignment, required build inputs, strict model catalog
-and Modelfile consistency, and install-manifest source paths. The RPM build
-then validates source preparation, compilation, installation and file
-packaging in Fedora's normal build environment.
-
-Unit, repository-policy, security-scan and `rpmlint` gates are deferred until
-the 1.0.0 production-readiness cycle. They must not be mixed into this
-pre-production build gate piecemeal.
+`make rpm` runs `make validate` before rpmbuild. Repository validation is kept
+fast and deterministic; actual compilation, payload inspection, unit loading,
+upgrade testing and `rpmlint` remain build/test-environment responsibilities.

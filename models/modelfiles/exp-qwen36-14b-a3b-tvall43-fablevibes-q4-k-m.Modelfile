@@ -1,0 +1,16 @@
+# Ollama model: exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m
+# Source: tvall43/Qwen3.6-14B-A3B-FableVibes-GGUF @ latest
+# GGUF: Qwen3.6-14B-A3B-FableVibes-Q4_K_M.gguf
+FROM /var/lib/bc250-llm-server/gguf/experiments/qwen36-14b-a3b-fablevibes-Q4_K_M/Qwen3.6-14B-A3B-FableVibes-Q4_K_M.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+# Leave headroom for the 8.47 GB model and its reasoning output.
+PARAMETER num_ctx 16384
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental document-analysis assistant. Summarize, compare, identify assumptions and inconsistencies, and produce clear office-ready drafts while distinguishing source facts from inference."""

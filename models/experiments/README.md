@@ -13,6 +13,9 @@ sudo bc250-fetch-experiments
 Names include model family, source and quantization, for example
 `exp-qwen35-9b-unsloth-q6-k` and
 `exp-gpt-oss20b-davidau-neo-mxfp4-moe4`.
+The disabled evaluation set also includes
+`exp-lfm25-8b-a1b-liquidai-q6-k`, `exp-qwen3-8b-qwen-q6-k` and
+`exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m`.
 
 The revision field accepts a commit, tag or branch such as `main`. Use `latest`
 to follow the repository's default revision without passing `--revision` to

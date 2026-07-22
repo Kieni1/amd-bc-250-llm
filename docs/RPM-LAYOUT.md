@@ -29,6 +29,7 @@ Primary commands:
 /usr/bin/bc250-setup-coding-agent
 /usr/bin/bc250-setup-task-model
 /usr/bin/bc250-uninstall-info
+/usr/bin/bc250-uninstall
 /usr/bin/bc250-verify
 /usr/bin/bc250-verify-lan
 /usr/bin/llm-run-diagnose
@@ -67,19 +68,34 @@ Configuration:
 /etc/cyan-skillfish-governor-smu/config.toml
 /etc/nginx/default.d/bc250-llm-server.conf
 /etc/nginx/conf.d/00-bc250-websocket-map.conf
+/usr/lib/sysusers.d/bc250-llm-server.conf
 ```
 
 Persistent data is outside RPM ownership:
 
 ```text
-/var/llm/
-/var/llm/gguf-mtp/
-/var/llm/ollama-task/
-/var/llm/ollama-agent/
+/var/lib/bc250-llm-server/
+/var/lib/bc250-llm-server/gguf/{production,experiments,mtp,task,agent}/
+/var/lib/bc250-llm-server/modelfiles/{production,experiments,task,agent}/
+/var/lib/bc250-llm-server/ollama/{main,task,agent}/
+/var/cache/bc250-llm-server/huggingface/
 /var/lib/ollama/
 /var/lib/open-webui/
 /var/backups/bc250-llm-server/
 ```
+
+Inspect package ownership without guessing paths:
+
+```bash
+rpm -qlv bc250-llm-server.x86_64
+rpm -qc bc250-llm-server.x86_64
+rpm -qd bc250-llm-server.x86_64
+rpm -V bc250-llm-server.x86_64
+```
+
+Files created below persistent state directories are intentionally not listed
+by `rpm -ql`; they are created by tmpfiles, containers, Ollama or operator
+commands rather than carried in the RPM payload.
 
 ## Installed experimental 40-CU payload
 
@@ -95,4 +111,6 @@ Persistent data is outside RPM ownership:
 ```
 
 These files belong to the main package. No RPM scriptlet builds or replaces a
-kernel module, changes CU routing, or reboots the host.
+kernel module, changes CU routing, or reboots the host. The separate guided
+installer prepares the module and its initramfs copy; only
+`sudo bc250-40cu enable` activates the additional CUs.

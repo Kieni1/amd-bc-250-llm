@@ -1,27 +1,36 @@
 # Ollama installation and service behavior
 
-Ollama is deliberately not bundled in the RPM. The helper currently defaults
-to reviewed release `0.32.1`; install or normalize it with:
+Ollama is deliberately not bundled in the RPM. The helper defaults to the
+latest official release and can also install a specifically requested version:
 
 ```bash
 sudo bc250-install-ollama
+sudo OLLAMA_VERSION=0.32.1 bc250-install-ollama
 ```
 
-The helper downloads the official installer only when the `ollama` command is
-absent and prints that downloaded script's SHA-256 for the operator's audit
-record. On every run it also:
+When Ollama is missing, outdated, or explicitly selected for reinstall, the
+helper downloads the official installer and prints its SHA-256 for the
+operator's audit record. On every run it also:
 
 - ensures the `ollama` service account and required groups exist;
-- creates `/var/lib/ollama`, `/var/llm/ollama` and model directories;
+- creates `/var/lib/ollama`, `/var/lib/bc250-llm-server/ollama/main` and model directories;
 - reloads systemd;
 - enables and restarts `ollama.service`;
 - waits for the local API to answer.
+
+The guided `install` workflow excludes Fedora's `ollama` RPM and installs the
+official release in `/usr/local`. If a Fedora Ollama package is already present,
+it is removed only after `rpm -e --test ollama` confirms that no installed
+package requires it. The workflow stops instead of keeping Fedora and official
+Ollama copies side by side. Rerunning the workflow reinstalls the selected local
+BC-250 RPM, which also supports retesting a corrected build with the same
+version-release.
 
 The packaged drop-in sets:
 
 ```text
 HOME=/var/lib/ollama
-OLLAMA_MODELS=/var/llm/ollama
+OLLAMA_MODELS=/var/lib/bc250-llm-server/ollama/main
 OLLAMA_HOST=0.0.0.0:11434
 ```
 
@@ -56,8 +65,8 @@ must remain blocked as well.
 
 `bc250-setup-task-model` and `bc250-setup-coding-agent` create
 `ollama-task.service` and `ollama-agent.service` under `/etc/systemd/system`.
-They use separate model stores below `/var/llm/ollama-task` and
-`/var/llm/ollama-agent`; neither changes the primary service profile. All three
+They use separate model stores below `/var/lib/bc250-llm-server/ollama/task` and
+`/var/lib/bc250-llm-server/ollama/agent`; neither changes the primary service profile. All three
 instances share the same GPU, so overlapping model loads can increase memory
 pressure.
 
@@ -66,14 +75,16 @@ blob, manifest and retained source-GGUF storage behavior.
 
 ## Updates
 
-A newer model architecture may require a newer Ollama release:
+A newer model architecture may require a newer Ollama release. The helper
+reruns the official installer when the requested version differs:
 
 ```bash
 sudo OLLAMA_VERSION=<reviewed-version> bc250-install-ollama
+sudo OLLAMA_REINSTALL=1 OLLAMA_VERSION=<version> bc250-install-ollama
 ```
 
-The helper does not downgrade an already installed binary. Review upstream
-release notes before replacing it.
+Review upstream release notes before changing versions. Unattended installation
+requires `BC250_ASSUME_YES=1`.
 
 
 ## Runtime profiles

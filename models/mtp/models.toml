@@ -2,7 +2,7 @@ schema = 1
 
 [defaults]
 category = "mtp"
-destination = "/var/llm/gguf-mtp"
+destination = "/var/lib/bc250-llm-server/gguf/mtp"
 download_namespace = "mtp"
 layout = "by-id"
 

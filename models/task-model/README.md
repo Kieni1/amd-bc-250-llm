@@ -46,5 +46,7 @@ The final command should show no resident task model.
 sudo systemctl disable --now ollama-task.service
 sudo rm -f /etc/systemd/system/ollama-task.service
 sudo systemctl daemon-reload
-sudo rm -rf /var/llm/ollama-task
+sudo rm -rf /var/lib/bc250-llm-server/ollama/task \
+  /var/lib/bc250-llm-server/gguf/task \
+  /var/lib/bc250-llm-server/modelfiles/task
 ```

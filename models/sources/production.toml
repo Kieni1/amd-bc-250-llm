@@ -2,68 +2,68 @@ schema = 1
 
 [defaults]
 category = "production"
-destination = "/var/llm/gguf"
+destination = "/var/lib/bc250-llm-server/gguf/production"
 download_namespace = "production"
 layout = "flat"
-modelfile_destination = "/var/llm/modelfiles"
+modelfile_destination = "/var/lib/bc250-llm-server/modelfiles/production"
 ollama_host = "127.0.0.1:11434"
 
 [[models]]
 enabled = false
 provider = "ollama"
-id = "ministral3-8b-unsloth-ud-q5-k-xl"
-name = "ministral3-8b-unsloth-ud-q5-k-xl"
+id = "prod-ministral3-8b-unsloth-ud-q5-k-xl"
+name = "prod-ministral3-8b-unsloth-ud-q5-k-xl"
 repository = "unsloth/Ministral-3-8B-Instruct-2512-GGUF"
 revision = "latest"
 gguf = "Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf"
-modelfile = "ministral3-8b-unsloth-ud-q5-k-xl.Modelfile"
+modelfile = "prod-ministral3-8b-unsloth-ud-q5-k-xl.Modelfile"
 
 [[models]]
 enabled = false
 provider = "ollama"
-id = "qwen35-9b-hauhaucs-uncensored-q6-k"
-name = "qwen35-9b-hauhaucs-uncensored-q6-k"
+id = "prod-qwen35-9b-hauhaucs-uncensored-q6-k"
+name = "prod-qwen35-9b-hauhaucs-uncensored-q6-k"
 repository = "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive"
 revision = "latest"
 gguf = "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf"
-modelfile = "qwen35-9b-hauhaucs-uncensored-q6-k.Modelfile"
+modelfile = "prod-qwen35-9b-hauhaucs-uncensored-q6-k.Modelfile"
 
 [[models]]
 enabled = false
 provider = "ollama"
-id = "gemma4-e4b-unsloth-qat-ud-q4-k-xl"
-name = "gemma4-e4b-unsloth-qat-ud-q4-k-xl"
+id = "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"
+name = "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"
 repository = "unsloth/gemma-4-E4B-it-qat-GGUF"
 revision = "latest"
 gguf = "gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf"
-modelfile = "gemma4-e4b-unsloth-qat-ud-q4-k-xl.Modelfile"
+modelfile = "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl.Modelfile"
 
 [[models]]
 enabled = false
 provider = "ollama"
-id = "gpt-oss20b-ggml-org-mxfp4"
-name = "gpt-oss20b-ggml-org-mxfp4"
+id = "prod-gpt-oss20b-ggml-org-mxfp4"
+name = "prod-gpt-oss20b-ggml-org-mxfp4"
 repository = "ggml-org/gpt-oss-20b-GGUF"
 revision = "latest"
 gguf = "gpt-oss-20b-MXFP4.gguf"
-modelfile = "gpt-oss20b-ggml-org-mxfp4.Modelfile"
+modelfile = "prod-gpt-oss20b-ggml-org-mxfp4.Modelfile"
 
 [[models]]
 enabled = false
 provider = "ollama"
-id = "qwen3-4b-lmstudio-q6-k"
-name = "qwen3-4b-lmstudio-q6-k"
+id = "prod-qwen3-4b-lmstudio-q6-k"
+name = "prod-qwen3-4b-lmstudio-q6-k"
 repository = "lmstudio-community/Qwen3-4B-Instruct-2507-GGUF"
 revision = "latest"
 gguf = "Qwen3-4B-Instruct-2507-Q6_K.gguf"
-modelfile = "qwen3-4b-lmstudio-q6-k.Modelfile"
+modelfile = "prod-qwen3-4b-lmstudio-q6-k.Modelfile"
 
 [[models]]
 enabled = false
 provider = "ollama"
-id = "gemma4-e2b-unsloth-qat-ud-q4-k-xl"
-name = "gemma4-e2b-unsloth-qat-ud-q4-k-xl"
+id = "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl"
+name = "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl"
 repository = "unsloth/gemma-4-E2B-it-qat-GGUF"
 revision = "latest"
 gguf = "gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf"
-modelfile = "gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile"
+modelfile = "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile"

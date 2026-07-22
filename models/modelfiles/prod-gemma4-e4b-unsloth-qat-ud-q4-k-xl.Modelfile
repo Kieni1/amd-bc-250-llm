@@ -1,0 +1,17 @@
+# Ollama model: prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+# Source: unsloth/gemma-4-E4B-it-qat-GGUF @ latest
+# GGUF: gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf
+FROM /var/lib/bc250-llm-server/gguf/production/gemma-4-E4B-it-qat-UD-Q4_K_XL.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Document/RAG slot; raise context only after checking full GPU residency.
+PARAMETER num_ctx 32768
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+# Gemma 4 sampling.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 64
+
+SYSTEM """You are a local document assistant. Ground answers in supplied text, produce usable summaries and drafts, state missing evidence, and answer in the document's or user's language."""

@@ -18,7 +18,9 @@ case "$kind" in
     bind="${TASK_BIND:-0.0.0.0}"
     port="${TASK_PORT:-11435}"
     service="ollama-task.service"
-    instance_root="/var/llm/ollama-task"
+    gguf_root="/var/lib/bc250-llm-server/gguf/task"
+    models_root="/var/lib/bc250-llm-server/ollama/task"
+    modelfile_root="/var/lib/bc250-llm-server/modelfiles/task"
     context=4096
     keep_alive=0
     selection="${TASK_MODEL_SELECTION:-all}"
@@ -29,7 +31,9 @@ case "$kind" in
     bind="${CODING_AGENT_BIND:-0.0.0.0}"
     port="${CODING_AGENT_PORT:-11436}"
     service="ollama-agent.service"
-    instance_root="/var/llm/ollama-agent"
+    gguf_root="/var/lib/bc250-llm-server/gguf/agent"
+    models_root="/var/lib/bc250-llm-server/ollama/agent"
+    modelfile_root="/var/lib/bc250-llm-server/modelfiles/agent"
     context=32768
     keep_alive=5m
     selection="${CODING_AGENT_SELECTION:-all}"
@@ -64,20 +68,19 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -x /usr/libexec/bc250-llm-server/modelctl ]]; then
   manager="${MODEL_MANAGER:-/usr/libexec/bc250-llm-server/modelctl}"
   source_file="${SOURCE_FILE:-/usr/share/bc250-llm-server/model-management/sources/$category.toml}"
-  modelfile_dir="${MODELFILE_SOURCE_DIR:-/usr/share/bc250-llm-server/model-management/modelfiles/$category}"
+  modelfile_dir="${MODELFILE_SOURCE_DIR:-/usr/share/bc250-llm-server/model-management/modelfiles}"
 else
   manager="${MODEL_MANAGER:-$script_dir/modelctl.py}"
   source_file="${SOURCE_FILE:-$script_dir/sources/$category.toml}"
-  modelfile_dir="${MODELFILE_SOURCE_DIR:-$script_dir/modelfiles/$category}"
+  modelfile_dir="${MODELFILE_SOURCE_DIR:-$script_dir/modelfiles}"
 fi
 [[ -x "$manager" ]] || { echo "ERROR: model manager is not executable: $manager" >&2; exit 1; }
 
 ollama_bin="$(readlink -f "$(command -v ollama)")"
 check_host="$bind"
 [[ "$check_host" == 0.0.0.0 ]] && check_host=127.0.0.1
-install -d -o ollama -g ollama -m 0750 \
-  "$instance_root" "$instance_root/gguf" "$instance_root/models"
-install -d -o root -g ollama -m 0750 "$instance_root/modelfiles"
+install -d -o ollama -g ollama -m 0750 "$gguf_root" "$models_root"
+install -d -o root -g ollama -m 0750 "$modelfile_root"
 
 cat > "/etc/systemd/system/$service" <<EOF
 [Unit]
@@ -97,12 +100,12 @@ PrivateTmp=true
 ProtectHome=true
 ProtectSystem=full
 NoNewPrivileges=true
-Environment="HOME=$instance_root"
+Environment="HOME=/var/lib/ollama"
 Environment="OLLAMA_VULKAN=1"
 Environment="GGML_VK_VISIBLE_DEVICES=0"
 Environment="OLLAMA_IGPU_ENABLE=1"
 Environment="OLLAMA_HOST=$bind:$port"
-Environment="OLLAMA_MODELS=$instance_root/models"
+Environment="OLLAMA_MODELS=$models_root"
 Environment="OLLAMA_MAX_LOADED_MODELS=1"
 Environment="OLLAMA_NUM_PARALLEL=1"
 Environment="OLLAMA_KEEP_ALIVE=$keep_alive"
@@ -117,7 +120,7 @@ EOF
 systemctl daemon-reload
 systemctl enable --now "$service"
 for _ in {1..30}; do
-  curl -fsS --connect-timeout 2 "http://$check_host:$port/api/tags" >/dev/null && break
+  curl -fsS --connect-timeout 2 "http://$check_host:$port/api/tags" >/dev/null 2>&1 && break
   sleep 1
 done
 curl -fsS "http://$check_host:$port/api/tags" >/dev/null || {

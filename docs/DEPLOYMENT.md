@@ -37,9 +37,10 @@ add HTTPS or stop the stack—see `HARDENING.md`.
 ## Persistent data
 
 ```text
-/var/llm                     model files and Ollama blobs
-/var/lib/open-webui          Open WebUI state
-/var/backups/bc250-llm-server verified maintenance backups and rollback copies
+/var/lib/bc250-llm-server             GGUF files, rendered Modelfiles and Ollama stores
+/var/cache/bc250-llm-server           Hugging Face cache and reusable 40-CU kernel source
+/var/lib/open-webui                   Open WebUI state
+/var/backups/bc250-llm-server         verified maintenance backups and rollback copies
 ```
 
 The Open WebUI Quadlet uses a private `:Z,U` volume mount. Do not run
@@ -63,11 +64,12 @@ memory configuration:
 ```bash
 sudo bc250-memory-profile status
 sudo bc250-swap-profile status
-df -h / /var/llm
+df -h / /var/lib/bc250-llm-server
 ```
 
-Read `MEMORY.md` before changing kernel arguments. The package never applies
-GTT/TTM, zram or disk-swap settings during installation.
+Read `MEMORY.md` before changing kernel arguments. RPM scriptlets never apply
+GTT/TTM, zram or disk-swap settings. The separate guided installer can invoke
+the documented profiles and pauses for reboot.
 
 ## Sensor-driver preflight
 

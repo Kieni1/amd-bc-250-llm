@@ -2,10 +2,10 @@ schema = 1
 
 [defaults]
 category = "task"
-destination = "/var/llm/ollama-task/gguf"
+destination = "/var/lib/bc250-llm-server/gguf/task"
 download_namespace = "task"
 layout = "flat"
-modelfile_destination = "/var/llm/ollama-task/modelfiles"
+modelfile_destination = "/var/lib/bc250-llm-server/modelfiles/task"
 ollama_host = "127.0.0.1:11435"
 
 [[models]]

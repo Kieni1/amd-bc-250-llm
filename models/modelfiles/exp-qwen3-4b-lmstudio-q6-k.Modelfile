@@ -1,0 +1,14 @@
+# Ollama model: exp-qwen3-4b-lmstudio-q6-k
+# Source: lmstudio-community/Qwen3-4B-Instruct-2507-GGUF @ latest
+# GGUF: Qwen3-4B-Instruct-2507-Q6_K.gguf
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen3-4b-lmstudio-q6-k/Qwen3-4B-Instruct-2507-Q6_K.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+SYSTEM """You are a fast office assistant. Answer clearly and concisely. If unsure, say so rather than guessing. Answer in the user's language; default to German."""

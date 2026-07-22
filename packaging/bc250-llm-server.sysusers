@@ -1,0 +1,3 @@
+# Type Name   ID GECOS         Home             Shell
+g      ollama -
+u      ollama -  "Runs Ollama" /var/lib/ollama /usr/sbin/nologin

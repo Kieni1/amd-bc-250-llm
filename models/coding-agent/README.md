@@ -83,5 +83,7 @@ approves or merges. Treat source, diffs and issue text as untrusted model input.
 sudo systemctl disable --now ollama-agent.service
 sudo rm -f /etc/systemd/system/ollama-agent.service
 sudo systemctl daemon-reload
-sudo rm -rf /var/llm/ollama-agent
+sudo rm -rf /var/lib/bc250-llm-server/ollama/agent \
+  /var/lib/bc250-llm-server/gguf/agent \
+  /var/lib/bc250-llm-server/modelfiles/agent
 ```

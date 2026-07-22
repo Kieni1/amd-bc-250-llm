@@ -1,0 +1,525 @@
+#!/usr/bin/env bash
+# Guided Fedora setup. CU activation and maintenance scheduling remain separate.
+set -Eeuo pipefail
+umask 0022
+
+readonly SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+readonly SCRIPT_DIR="$(dirname -- "$SCRIPT_PATH")"
+readonly ORIGINAL_ARGS=("$@")
+readonly LOG_FILE="${BC250_INSTALL_LOG:-/var/log/bc250-llm-install.log}"
+readonly STATE_DIR="/var/lib/bc250-llm-server/install"
+RPM_PATH=""
+PACKAGE_BASELINE=""
+INSTALL_MODE="full"
+
+cleanup_temporary_files() {
+  [[ -z "$PACKAGE_BASELINE" ]] || rm -f -- "$PACKAGE_BASELINE"
+}
+trap cleanup_temporary_files EXIT
+
+usage() {
+  cat <<'USAGE'
+Usage: sudo ./install [--rpm FILE-OR-DIRECTORY]
+       sudo ./install --models-only
+
+The binary bc250-llm-server x86_64 RPM is expected beside this script. Use
+--rpm only to select a different RPM file or directory. The script grows the
+root filesystem, updates Fedora, installs the RPM, normalizes official Ollama,
+applies memory/swap profiles, prepares 40-CU support, offers model setup and
+runs verification.
+
+Run the same command again after a requested reboot. The installer prepares but
+does not enable experimental CUs; that remains an explicit operator action.
+Maintenance timers are excluded. A .src.rpm is not installable.
+
+Use --models-only to resume the interactive production, task, agentic and
+embedding-model prompts without repeating filesystem, RPM or system setup.
+
+Set BC250_UPDATE_OLLAMA=1 to explicitly refresh an existing official Ollama.
+Set OLLAMA_VERSION to install a particular version instead of latest.
+USAGE
+}
+
+parse_arguments() {
+  while (($#)); do
+    case "$1" in
+      --rpm)
+        [[ $# -ge 2 ]] || { echo "ERROR: --rpm requires a path." >&2; exit 2; }
+        RPM_PATH="$2"
+        shift 2
+        ;;
+      --models-only)
+        INSTALL_MODE="models"
+        shift
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        echo "ERROR: unknown argument: $1" >&2
+        usage >&2
+        exit 2
+        ;;
+    esac
+  done
+  if [[ "$INSTALL_MODE" == models && -n "$RPM_PATH" ]]; then
+    echo "ERROR: --models-only cannot be combined with --rpm." >&2
+    exit 2
+  fi
+}
+
+require_root() {
+  [[ ${EUID} -eq 0 ]] || {
+    echo "ERROR: run this installer with sudo." >&2
+    exit 1
+  }
+}
+
+write_state_once() {
+  local name="$1" value="$2" path
+  path="$STATE_DIR/$name"
+  [[ -e "$path" ]] && return
+  printf '%s\n' "$value" > "$path"
+  chmod 0600 "$path"
+}
+
+capture_package_baseline() {
+  [[ -z "$PACKAGE_BASELINE" ]] || rm -f -- "$PACKAGE_BASELINE"
+  PACKAGE_BASELINE="$(mktemp /run/bc250-packages-before.XXXXXX)"
+  rpm -qa --qf '%{NAME}\n' | LC_ALL=C sort -u > "$PACKAGE_BASELINE"
+}
+
+record_added_packages() {
+  [[ -n "$PACKAGE_BASELINE" && -s "$PACKAGE_BASELINE" ]] || return
+  local current additions merged
+  current="$(mktemp /run/bc250-packages-current.XXXXXX)"
+  additions="$(mktemp /run/bc250-packages-added.XXXXXX)"
+  merged="$(mktemp "$STATE_DIR/.packages-added.XXXXXX")"
+  rpm -qa --qf '%{NAME}\n' | LC_ALL=C sort -u > "$current"
+  LC_ALL=C comm -13 "$PACKAGE_BASELINE" "$current" | \
+    grep -vx 'bc250-llm-server' > "$additions" || true
+  {
+    [[ ! -r "$STATE_DIR/packages-added.txt" ]] || \
+      cat "$STATE_DIR/packages-added.txt"
+    cat "$additions"
+  } | LC_ALL=C sort -u > "$merged"
+  install -m0600 "$merged" "$STATE_DIR/packages-added.txt"
+  rm -f -- "$current" "$additions" "$merged"
+  capture_package_baseline
+}
+
+capture_install_state() {
+  install -d -m0700 "$STATE_DIR"
+
+  # Earlier releases did not record the pre-install state. When upgrading one
+  # of those packages, treat its already-applied network policy as setup
+  # state so a later full purge removes it. Reinstalls keep the first record.
+  if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 && \
+      [[ ! -e "$STATE_DIR/firewall-http-before" ]]; then
+    write_state_once firewall-http-before disabled
+  elif command -v firewall-cmd >/dev/null 2>&1 && \
+      systemctl is-active --quiet firewalld.service; then
+    if firewall-cmd --quiet --permanent --query-service=http; then
+      write_state_once firewall-http-before enabled
+    else
+      write_state_once firewall-http-before disabled
+    fi
+  else
+    write_state_once firewall-http-before unavailable
+  fi
+
+  if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 && \
+      [[ ! -e "$STATE_DIR/selinux-httpd-before" ]]; then
+    write_state_once selinux-httpd-before off
+  elif command -v getsebool >/dev/null 2>&1; then
+    write_state_once selinux-httpd-before \
+      "$(getsebool httpd_can_network_connect 2>/dev/null | awk '{print $3}' || printf unknown)"
+  else
+    write_state_once selinux-httpd-before unavailable
+  fi
+
+  capture_package_baseline
+}
+
+start_transcript() {
+  install -d -m0755 "$(dirname -- "$LOG_FILE")"
+  touch "$LOG_FILE"
+  chmod 0600 "$LOG_FILE"
+
+  # A pseudo-terminal keeps Hugging Face and Ollama progress bars visible while
+  # preserving the installation transcript. The child skips this wrapper.
+  if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 && -t 1 ]] && command -v script >/dev/null; then
+    local command
+    printf -v command '%q ' \
+      env BC250_INSTALL_TRANSCRIPT=1 bash "$SCRIPT_PATH" "${ORIGINAL_ARGS[@]}"
+    exec script --quiet --return --append --command "$command" "$LOG_FILE"
+  fi
+  if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 ]]; then
+    exec > >(tee -a "$LOG_FILE") 2>&1
+  fi
+}
+
+heading() {
+  printf '\n===== %s =====\n' "$1"
+}
+
+yes_no() {
+  local prompt="$1" answer
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
+    return 0
+  fi
+  read -r -p "$prompt [y/N]: " answer
+  [[ "${answer,,}" == y || "${answer,,}" == yes ]]
+}
+
+rerun_command() {
+  local command
+  printf -v command '%q ' sudo bash "$SCRIPT_PATH" "${ORIGINAL_ARGS[@]}"
+  printf '%s\n' "$command"
+}
+
+step_1_grow_root_filesystem() {
+  heading "1. GROW ROOT FILESYSTEM"
+  local source fstype
+  source="$(findmnt -nro SOURCE /)"
+  fstype="$(findmnt -nro FSTYPE /)"
+  echo "Root filesystem: $source ($fstype)"
+
+  if command -v lvs >/dev/null && lvs "$source" >/dev/null 2>&1; then
+    lvextend --resizefs --extents +100%FREE "$source" || \
+      echo "NOTE: LVM may already use all free extents."
+    return
+  fi
+
+  case "$fstype" in
+    xfs)
+      command -v xfs_growfs >/dev/null || dnf install -y xfsprogs
+      xfs_growfs / || echo "NOTE: XFS may already fill its device."
+      ;;
+    ext2|ext3|ext4)
+      command -v resize2fs >/dev/null || dnf install -y e2fsprogs
+      resize2fs "$source" || echo "NOTE: ext filesystem may already fill its device."
+      ;;
+    btrfs)
+      command -v btrfs >/dev/null || dnf install -y btrfs-progs
+      btrfs filesystem resize max / || echo "NOTE: Btrfs may already fill its device."
+      ;;
+    *) echo "NOTE: no automatic grow operation is defined for $fstype." ;;
+  esac
+}
+
+require_current_kernel() {
+  local running newest
+  running="$(uname -r)"
+  newest="$(rpm -q --qf '%{VERSION}-%{RELEASE}.%{ARCH}\n' kernel-core 2>/dev/null | sort -V | tail -1)"
+  if [[ -n "$newest" && "$newest" != "$running" ]]; then
+    echo
+    echo "Fedora installed kernel $newest, but this host is running $running."
+    echo "Reboot and rerun the same installer command:"
+    echo "  sudo reboot"
+    printf '  '
+    rerun_command
+    echo "Transcript: $LOG_FILE"
+    exit 11
+  fi
+}
+
+step_2_update_fedora() {
+  heading "2. UPDATE FEDORA"
+  dnf upgrade --refresh -y
+  require_current_kernel
+}
+
+find_binary_rpm() {
+  local target candidate
+  target="${RPM_PATH:-$SCRIPT_DIR}"
+  if [[ -f "$target" ]]; then
+    case "$target" in
+      *.src.rpm)
+        echo "ERROR: $target is a source RPM; use the x86_64 RPM." >&2
+        return 2
+        ;;
+      *.x86_64.rpm) readlink -f -- "$target"; return ;;
+      *) echo "ERROR: expected an x86_64 RPM, got: $target" >&2; return 2 ;;
+    esac
+  fi
+  [[ -d "$target" ]] || {
+    echo "ERROR: RPM path does not exist: $target" >&2
+    return 2
+  }
+  candidate="$({
+    find "$target" -maxdepth 1 -type f \
+      -name 'bc250-llm-server-*.x86_64.rpm' ! -name '*.src.rpm' -print
+  } | sort -V | tail -1)"
+  [[ -n "$candidate" ]] || {
+    echo "ERROR: no bc250-llm-server x86_64 RPM found in $target" >&2
+    echo "Copy this installer beside the binary RPM or use --rpm PATH." >&2
+    return 2
+  }
+  readlink -f -- "$candidate"
+}
+
+step_3_install_rpm() {
+  heading "3. INSTALL BC-250 RPM"
+  local binary_rpm dnf_action=install
+  binary_rpm="$(find_binary_rpm)"
+  if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1; then
+    dnf_action=reinstall
+  fi
+  echo "${dnf_action^}ing: $binary_rpm"
+  # This package provides its own ollama account through sysusers. Do not pull
+  # Fedora's older Ollama and its large ROCm dependency set.
+  dnf "$dnf_action" -y --setopt=install_weak_deps=False \
+    --exclude=ollama "$binary_rpm"
+  hash -r
+  rpm -q bc250-llm-server.x86_64
+  rpm -q --provides bc250-llm-server.x86_64 | grep '^user(ollama)' >/dev/null && \
+    rpm -q --provides bc250-llm-server.x86_64 | grep '^group(ollama)' >/dev/null || {
+      echo "ERROR: the BC-250 RPM does not provide its ollama account." >&2
+      exit 1
+    }
+  command -v bc250-install-ollama >/dev/null || {
+    echo "ERROR: the installed RPM did not provide bc250-install-ollama." >&2
+    exit 1
+  }
+}
+
+remove_fedora_ollama() {
+  rpm -q ollama >/dev/null 2>&1 || return 0
+  local blockers=""
+  if ! blockers="$(rpm -e --test ollama 2>&1)"; then
+    echo "ERROR: Fedora's Ollama package cannot be removed safely:" >&2
+    printf '%s\n' "$blockers" >&2
+    echo "Refusing to install a second Ollama copy." >&2
+    return 1
+  fi
+  echo "Removing Fedora's Ollama package and unused dependencies."
+  dnf remove -y ollama
+  hash -r
+  systemctl daemon-reload
+}
+
+ollama_version() {
+  "$1" --version 2>/dev/null | awk '{print $NF}' | sed 's/^v//'
+}
+
+setup_ollama_account() {
+  getent group ollama >/dev/null || groupadd -r ollama
+  id ollama >/dev/null 2>&1 || \
+    useradd -r -g ollama -d /var/lib/ollama -s /usr/sbin/nologin -M ollama
+  for group in render video; do
+    getent group "$group" >/dev/null && usermod -aG "$group" ollama
+  done
+  install -d -o root -g ollama -m 0750 \
+    /var/lib/bc250-llm-server /var/cache/bc250-llm-server
+  install -d -o ollama -g ollama -m 0750 \
+    /var/lib/ollama \
+    /var/lib/bc250-llm-server/ollama/main \
+    /var/lib/bc250-llm-server/gguf/production \
+    /var/cache/bc250-llm-server/huggingface
+  restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
+    /var/cache/bc250-llm-server 2>/dev/null || true
+}
+
+wait_for_ollama() {
+  local attempt
+  for attempt in {1..30}; do
+    if curl --fail --silent --connect-timeout 2 \
+        http://127.0.0.1:11434/api/tags >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+  systemctl status ollama.service --no-pager -l || true
+  journalctl -u ollama.service -b --no-pager -n 80 || true
+  echo "ERROR: Ollama did not become reachable on 127.0.0.1:11434." >&2
+  return 1
+}
+
+step_4_install_ollama() {
+  heading "4. INSTALL OFFICIAL OLLAMA"
+  local requested installed="" run_installer=0 official=/usr/local/bin/ollama
+  requested="${OLLAMA_VERSION:-latest}"
+  export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
+  hash -r
+
+  remove_fedora_ollama
+  if [[ -x "$official" ]]; then
+    installed="$(ollama_version "$official")"
+  else
+    run_installer=1
+  fi
+  if [[ "${BC250_UPDATE_OLLAMA:-0}" == 1 ]]; then
+    run_installer=1
+  elif [[ "$requested" != latest && "$installed" != "${requested#v}" ]]; then
+    run_installer=1
+  elif ! systemctl cat ollama.service 2>/dev/null | \
+      grep -F '/usr/local/bin/ollama' >/dev/null; then
+    run_installer=1
+  fi
+
+  if ((run_installer)); then
+    echo "Installing official Ollama ${requested}."
+    BC250_ASSUME_YES=1 OLLAMA_VERSION="$requested" bc250-install-ollama
+  else
+    echo "Keeping official Ollama $installed."
+  fi
+
+  echo "Setting up the Ollama service account and data directories."
+  setup_ollama_account
+  systemctl daemon-reload
+  systemctl enable --now ollama.service
+  hash -r
+  [[ -x "$official" ]] || {
+    echo "ERROR: official Ollama was not installed at $official." >&2
+    exit 1
+  }
+  wait_for_ollama
+  ollama --version
+  echo "Ollama API is ready at http://127.0.0.1:11434."
+}
+
+step_5_memory_and_swap() {
+  heading "5. APPLY MEMORY AND SWAP PROFILES"
+  rpm -q zram-generator >/dev/null 2>&1 || dnf install -y zram-generator
+  if ! grep -qw 'ttm.pages_limit=4194304' /proc/cmdline; then
+    if ! grubby --info=ALL | grep 'ttm.pages_limit=4194304' >/dev/null; then
+      BC250_ASSUME_YES=1 bc250-memory-profile apply-full
+    else
+      echo "Memory profile is configured but is not active yet."
+    fi
+  fi
+  if [[ ! -s /var/lib/bc250-llm-server/swap/bc250-llm.swap ]]; then
+    BC250_ASSUME_YES=1 bc250-swap-profile apply
+  else
+    echo "Swap file already exists; keeping it."
+  fi
+  record_added_packages
+
+  if ! grep -qw 'ttm.pages_limit=4194304' /proc/cmdline; then
+    echo
+    echo "The memory profile requires a reboot. Then rerun:"
+    echo "  sudo reboot"
+    printf '  '
+    rerun_command
+    echo "Transcript: $LOG_FILE"
+    exit 10
+  fi
+}
+
+prepare_hf_authentication() {
+  [[ -z "${HF_TOKEN:-}" ]] || {
+    echo "Using HF_TOKEN supplied in the environment."
+    return
+  }
+  local token=""
+  read -r -s -p "HF_TOKEN (optional; Enter for anonymous downloads): " token
+  echo
+  if [[ -n "$token" ]]; then
+    export HF_TOKEN="$token"
+    unset BC250_HF_ANONYMOUS || true
+  else
+    export BC250_HF_ANONYMOUS=1
+  fi
+}
+
+step_6_prepare_40cu() {
+  heading "6. PREPARE OPTIONAL 40-CU SUPPORT"
+  local kernel
+  kernel="$(uname -r)"
+  echo "Installing build files for the exact running kernel: $kernel"
+  dnf install -y "kernel-devel-$kernel"
+  record_added_packages
+  bc250-40cu prepare
+  echo
+  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
+    echo "Persistent 40-CU mode is already configured."
+  else
+    echo "The replacement module is prepared but 40-CU mode remains disabled."
+    echo "After installation, the only activation command is:"
+    echo "  sudo bc250-40cu enable"
+  fi
+}
+
+step_7_models() {
+  heading "7. OPTIONAL MODEL DOWNLOADS"
+  local production_selection="" install_task=0 install_agent=0 install_embedding=0
+  echo "Production catalog (disabled entries may be selected for this run):"
+  bc250-model list production --all
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
+    production_selection="${BC250_PRODUCTION_SELECTION:-}"
+    [[ -n "$production_selection" ]] || \
+      echo "BC250_PRODUCTION_SELECTION is unset; production models are skipped."
+  else
+    read -r -p "Production models (id/name/index/range; Enter to skip): " production_selection
+  fi
+  yes_no "Install the dedicated task model on port 11435?" && install_task=1
+  yes_no "Install the dedicated agentic models on port 11436?" && install_agent=1
+  yes_no "Pull and verify the embedding model?" && install_embedding=1
+
+  if [[ -n "$production_selection" || $install_task -eq 1 || $install_agent -eq 1 ]]; then
+    prepare_hf_authentication
+  fi
+  [[ -z "$production_selection" ]] || \
+    bc250-model install production "$production_selection" --include-disabled
+  ((install_task == 0)) || bc250-setup-task-model
+  ((install_agent == 0)) || bc250-setup-coding-agent
+  ((install_embedding == 0)) || bc250-pull-embedding-model
+}
+
+step_8_verify() {
+  heading "8. VERIFICATION"
+  bc250-memory-profile status
+  bc250-swap-profile status
+  bc250-cu-status
+  bc250-verify
+  llm-run-diagnose --no-load
+}
+
+run_models_only() {
+  command -v bc250-model >/dev/null 2>&1 || {
+    echo "ERROR: bc250-model is unavailable; install the binary RPM first." >&2
+    exit 1
+  }
+  step_7_models
+  echo
+  echo "Optional model setup completed."
+  echo "Transcript: $LOG_FILE"
+}
+
+main() {
+  parse_arguments "$@"
+  require_root
+  start_transcript
+  if [[ "$INSTALL_MODE" == models ]]; then
+    run_models_only
+    return
+  fi
+  capture_install_state
+  step_1_grow_root_filesystem
+  record_added_packages
+  step_2_update_fedora
+  # Do not classify packages added by a normal Fedora upgrade as appliance
+  # dependencies. Start a fresh baseline immediately after the upgrade.
+  capture_package_baseline
+  step_3_install_rpm
+  record_added_packages
+  step_4_install_ollama
+  step_5_memory_and_swap
+  step_6_prepare_40cu
+  step_7_models
+  step_8_verify
+  echo
+  echo "Installation and verification completed."
+  echo "Transcript: $LOG_FILE"
+  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
+    echo "Persistent 40-CU mode is configured; maintenance timers were not changed."
+  else
+    echo "40-CU support is prepared but disabled; maintenance timers were not changed."
+  fi
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

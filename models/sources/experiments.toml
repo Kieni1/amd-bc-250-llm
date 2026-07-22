@@ -2,10 +2,10 @@ schema = 1
 
 [defaults]
 category = "experiments"
-destination = "/var/llm/gguf-experiments"
+destination = "/var/lib/bc250-llm-server/gguf/experiments"
 download_namespace = "experiments"
 layout = "by-id"
-modelfile_destination = "/var/llm/modelfiles-experiments"
+modelfile_destination = "/var/lib/bc250-llm-server/modelfiles/experiments"
 ollama_host = "127.0.0.1:11434"
 
 [[models]]
@@ -77,3 +77,33 @@ repository = "DavidAU/Openai_gpt-oss-20b-NEO-GGUF"
 revision = "latest"
 gguf = "OpenAI-20B-NEO-MXFP4_MOE4.gguf"
 modelfile = "exp-gpt-oss20b-davidau-neo-mxfp4-moe4.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "lfm25-8b-a1b-Q6_K"
+name = "exp-lfm25-8b-a1b-liquidai-q6-k"
+repository = "LiquidAI/LFM2.5-8B-A1B-GGUF"
+revision = "latest"
+gguf = "LFM2.5-8B-A1B-Q6_K.gguf"
+modelfile = "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "qwen3-8b-Q6_K"
+name = "exp-qwen3-8b-qwen-q6-k"
+repository = "Qwen/Qwen3-8B-GGUF"
+revision = "latest"
+gguf = "Qwen3-8B-Q6_K.gguf"
+modelfile = "exp-qwen3-8b-qwen-q6-k.Modelfile"
+
+[[models]]
+enabled = false
+provider = "ollama"
+id = "qwen36-14b-a3b-fablevibes-Q4_K_M"
+name = "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m"
+repository = "tvall43/Qwen3.6-14B-A3B-FableVibes-GGUF"
+revision = "latest"
+gguf = "Qwen3.6-14B-A3B-FableVibes-Q4_K_M.gguf"
+modelfile = "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile"

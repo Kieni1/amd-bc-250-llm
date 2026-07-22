@@ -1,0 +1,17 @@
+# Ollama model: exp-lfm25-8b-a1b-liquidai-q6-k
+# Source: LiquidAI/LFM2.5-8B-A1B-GGUF @ latest
+# GGUF: LFM2.5-8B-A1B-Q6_K.gguf
+FROM /var/lib/bc250-llm-server/gguf/experiments/lfm25-8b-a1b-Q6_K/LFM2.5-8B-A1B-Q6_K.gguf
+
+# BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
+PARAMETER num_gpu 99
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+# The model supports 128K; begin at 32K on the BC-250 shared-memory profile.
+PARAMETER num_ctx 32768
+# LiquidAI's recommended generation settings.
+PARAMETER temperature 0.2
+PARAMETER top_k 80
+PARAMETER repeat_penalty 1.05
+
+SYSTEM """You are an experimental local office assistant. Produce clear drafts, summaries, and faithful German-French translations while preserving meaning, tone, terminology, names, numbers, and formatting."""

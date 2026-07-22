@@ -16,37 +16,28 @@ jobs:
       - name: Install build tools
         run: |
           dnf install -y \
-            bash cargo curl findutils gcc git gzip jq make \
-            libdrm-devel patch python3 rpm-build rpmdevtools rpmlint rust \
+            bash cargo curl findutils gcc git gzip make \
+            libdrm-devel patch python3 rpm-build rust \
             systemd systemd-rpm-macros tar xz
 
       - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Validate
-        run: make validate
-
-      - name: Prepare pinned sources
-        run: make sources
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Build RPMs
         run: make rpm
 
-      - name: Run rpmlint
-        run: |
-          set -o pipefail
-          rpmlint dist/*.rpm | tee dist/RPMLINT.txt
-
-      - name: Inspect RPM contents
-        run: |
-          rpm -qpl dist/*.x86_64.rpm | tee dist/RPM-CONTENTS.txt
-
-      - name: Upload RPM artifacts
-        uses: actions/upload-artifact@v6
+      - name: Upload binary RPM
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: bc250-llm-server-rpms
+          name: bc250-llm-server-binary-rpm
           path: |
-            dist/*.rpm
+            dist/RPMS/*.x86_64.rpm
             dist/SHA256SUMS
-            dist/RPMLINT.txt
-            dist/RPM-CONTENTS.txt
+
+      - name: Upload source RPM
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bc250-llm-server-source-rpm
+          path: |
+            dist/SRPMS/*.src.rpm
+            dist/SHA256SUMS

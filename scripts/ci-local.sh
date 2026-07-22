@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repo_path=/__w/amd-bc-250-llm/amd-bc-250-llm
+repo_path=/workspace/bc250-llm-server
 
 podman run --rm --pull=always \
   --volume "$PWD:$repo_path:Z" \

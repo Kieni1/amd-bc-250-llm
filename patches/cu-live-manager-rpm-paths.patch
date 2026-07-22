@@ -1,0 +1,41 @@
+diff --git a/bc250-cu-live-manager.sh b/bc250-cu-live-manager.sh
+index 1d4c38e..f58fd04 100755
+--- a/bc250-cu-live-manager.sh
++++ b/bc250-cu-live-manager.sh
+@@ -18,7 +18,7 @@ REG_SPI="mmSPI_PG_ENABLE_STATIC_WGP_MASK"
+ REG_RLC="mmRLC_PG_ALWAYS_ON_WGP_MASK"
+ SERVICE_NAME="bc250-cu-live-manager.service"
+ SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
+-SERVICE_BIN="/usr/local/bin/bc250-cu-live-manager"
++SERVICE_BIN="/usr/bin/bc250-cu-live-manager"
+ SERVICE_CONF="/etc/bc250-cu-live-manager.conf"
+ OLD_UDEV_RULE="/etc/udev/rules.d/99-bc250-cu-live-manager.rules"
+ LAST_REG_PATH=""
+@@ -559,16 +559,7 @@ install_service() {
+ 	need_root
+ 	need_umr
+ 	confirm_service_install || return 0
+-	local source_path
+-	source_path="$(readlink -f "$0")"
+-	if ! install -m 0755 "$source_path" "$SERVICE_BIN"; then
+-		if [ -d /var/usrlocal/bin ]; then
+-			SERVICE_BIN="/var/usrlocal/bin/bc250-cu-live-manager"
+-			install -m 0755 "$source_path" "$SERVICE_BIN"
+-		else
+-			die "failed to install service binary at $SERVICE_BIN"
+-		fi
+-	fi
++	[ -x "$SERVICE_BIN" ] || die "packaged service executable is missing: $SERVICE_BIN"
+ 	cat > "$SERVICE_PATH" <<EOF
+ [Unit]
+ Description=BC-250 CU saved enumeration and dispatch
+@@ -622,7 +613,8 @@ uninstall_service() {
+ uninstall_service() {
+ 	need_root
+ 	systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
+-	rm -f "$SERVICE_PATH" "$SERVICE_BIN" "/var/usrlocal/bin/bc250-cu-live-manager" "$SERVICE_CONF" "$OLD_UDEV_RULE"
++	rm -f "$SERVICE_PATH" "/usr/local/bin/bc250-cu-live-manager" \
++		"/var/usrlocal/bin/bc250-cu-live-manager" "$SERVICE_CONF" "$OLD_UDEV_RULE"
+ 	systemctl daemon-reload
+ 	info "removed $SERVICE_NAME"
+ }
