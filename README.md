@@ -56,7 +56,8 @@ package is under `dist/RPMS/`; the build-only source RPM is under `dist/SRPMS/`.
 Installing a `.src.rpm` does not provide any `bc250-*` command.
 
 For the guided workflow, including filesystem growth, profiles, model setup and
-verification, copy the install script () besides the .rpm onto the bc250:
+verification, copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) 
+besides the .rpm onto the bc250:
 
 ```bash
 sudo ./install
@@ -112,10 +113,10 @@ reboot and access the bc250.
 Download the .rpm from git
 
 ```bash
-curl -L -O *rpm
+curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.8.1/bc250-llm-server-0.8.1-0.1.testing.fc44.src.rpm
 ```
 
-copy the install script () besides the .rpm onto the bc250 and run it:
+copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) besides the .rpm onto the bc250 and run it:
 
 ```bash
 sudo ./install
