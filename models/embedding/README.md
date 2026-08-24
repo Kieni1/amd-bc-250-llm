@@ -1,13 +1,22 @@
-# Embedding model
+# Embedding models
 
-The embedding helper pulls and verifies the model used by Open WebUI for local
-retrieval. It uses the primary Ollama instance on port `11434` and is separate
-from the discovered chat Modelfiles.
+Embedding GGUFs use the same discovered Modelfile workflow as other models and
+register on the primary Ollama instance at port `11434`.
 
 ```bash
-sudo bc250-pull-embedding-model
+bc250-model list embedding
+sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
 ```
 
-The default is `nomic-embed-text`. Set `EMBED_MODEL` to select another model
-and `OLLAMA_HOST` to change the API endpoint. Configure the same model name in
-Open WebUI after the verification succeeds.
+`bc250-pull-embedding-model` remains a compatibility alias and accepts the same
+selection. The current retrieval recommendation is
+`embed-jina-v5-small-retrieval-q4-k-m`; Qwen3 Embedding remains available for
+comparison. Jina's template is CC-BY-NC-4.0, so review its license before any
+commercial use.
+
+Verify a registered model before selecting the same name in Open WebUI:
+
+```bash
+curl -fsS http://127.0.0.1:11434/api/embed \
+  -d '{"model":"embed-jina-v5-small-retrieval-q4-k-m","input":"BC-250 test"}'
+```

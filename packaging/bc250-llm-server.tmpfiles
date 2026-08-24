@@ -5,11 +5,13 @@ d /var/lib/bc250-llm-server/gguf/experiments 0750 ollama ollama -
 d /var/lib/bc250-llm-server/gguf/mtp 0750 ollama ollama -
 d /var/lib/bc250-llm-server/gguf/task 0750 ollama ollama -
 d /var/lib/bc250-llm-server/gguf/agent 0750 ollama ollama -
+d /var/lib/bc250-llm-server/gguf/embedding 0750 ollama ollama -
 d /var/lib/bc250-llm-server/modelfiles 0750 root ollama -
 d /var/lib/bc250-llm-server/modelfiles/production 0750 root ollama -
 d /var/lib/bc250-llm-server/modelfiles/experiments 0750 root ollama -
 d /var/lib/bc250-llm-server/modelfiles/task 0750 root ollama -
 d /var/lib/bc250-llm-server/modelfiles/agent 0750 root ollama -
+d /var/lib/bc250-llm-server/modelfiles/embedding 0750 root ollama -
 d /var/lib/bc250-llm-server/ollama 0750 root ollama -
 d /var/lib/bc250-llm-server/ollama/main 0750 ollama ollama -
 d /var/lib/bc250-llm-server/ollama/task 0750 ollama ollama -

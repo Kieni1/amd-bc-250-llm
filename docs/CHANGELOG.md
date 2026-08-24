@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.5-testing - 2026-08-24
+
+Embedding models now use the same strict Modelfile discovery, Hugging Face
+download, checksum and Ollama registration path as the chat categories. The
+guided installer presents explicit selections for production, task, agentic
+and embedding models; it no longer silently installs every discovered model in
+a tooling category. Existing compatibility commands remain available.
+
+The current operator-supplied model folder is retained and normalized to the
+repository's strict metadata and storage rules. The Jina v5 small retrieval
+GGUF is pinned to its verified upstream revision and corrected SHA-256. Current
+recommended roles now point to Gemma 4 E2B/E4B, LFM 2.5, GPT-OSS 20B, Jina v5,
+Gemma 3 1B and Ornith 1.5 while all other Modelfiles remain selectable for
+testing.
+
 ## 0.9.4-testing - 2026-08-24
 
 `bc250-verify` now reports dedicated Vulkan compute queue families and detects

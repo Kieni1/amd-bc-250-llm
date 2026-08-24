@@ -1,8 +1,8 @@
-# BC250 category: production
-# Ollama model: prod-ministral3-8b-unsloth-ud-q5-k-xl
+# BC250 category: experimental
+# Ollama model: exp-ministral3-8b-unsloth-ud-q5-k-xl
 # Source: unsloth/Ministral-3-8B-Instruct-2512-GGUF @ latest
 # GGUF: Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf
-FROM /var/lib/bc250-llm-server/gguf/production/Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf
+FROM /var/lib/bc250-llm-server/gguf/experiments/Ministral-3-8B-Instruct-2512-UD-Q5_K_XL.gguf
 
 # BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
 PARAMETER num_gpu 99

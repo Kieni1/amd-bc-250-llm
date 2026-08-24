@@ -13,7 +13,7 @@
 - `install-manifest.tsv` is the authoritative payload install and ownership map.
 - `upstreams.toml` records pinned third-party revisions, URLs and archive names.
 - Long-name Modelfiles and feature-specific task, agent, experiment, MTP and
-  embedding helpers live under `models/`; only download-only MTP uses a TOML
+  embedding Modelfiles live under `models/`; only download-only MTP uses a TOML
   runtime catalog. The installed public command names remain stable.
 - Repository inputs are grouped by purpose: `cmd/` for host commands,
   `config/` for shipped service configuration and `examples/` for

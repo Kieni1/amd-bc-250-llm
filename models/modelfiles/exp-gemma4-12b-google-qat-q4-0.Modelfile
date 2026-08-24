@@ -1,0 +1,30 @@
+# BC250 category: experimental
+# Ollama model: exp-gemma4-12b-google-qat-q4-0
+# Source: google/gemma-4-12B-it-qat-q4_0-gguf @ latest
+# GGUF: gemma-4-12b-it-qat-q4_0.gguf
+#
+# Intended role:
+# - Higher-quality document/general assistant
+# - Compare against Gemma4 E4B and GPT-OSS 20B
+#
+# Default profile below is NON-THINKING for fair comparison.
+# Gemma4 thinking can be tested separately by starting the
+# system prompt with <|think|>.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-12b-google-qat-q4-0/gemma-4-12b-it-qat-q4_0.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+
+# 6.98 GB model: leave reasonable KV/context headroom.
+PARAMETER num_ctx 16384
+
+# Official Gemma4 sampling recommendation.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 64
+
+SYSTEM """You are an experimental general and document-analysis assistant. Summarize, compare, identify assumptions and inconsistencies, and produce clear office-ready answers while distinguishing source facts from inference."""

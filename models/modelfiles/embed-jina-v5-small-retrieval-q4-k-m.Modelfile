@@ -1,0 +1,18 @@
+# BC250 category: embedding
+# Ollama model: embed-jina-v5-small-retrieval-q4-k-m
+# Source: jinaai/jina-embeddings-v5-text-small-retrieval @ 06b0656fe9babb86d4a8a8fc45bcad9bd2611499
+# GGUF: v5-small-retrieval-Q4_K_M.gguf
+# SHA256: e1f1d72ead1c23cbc20815f59a88f16b0757cf4ee11a8bc48793686248f08053
+# License: CC-BY-NC-4.0
+#
+# Retrieval embedding model:
+# 677M parameters, 1024-d embeddings, 32768-token context,
+# last-token pooling.
+
+FROM /var/lib/bc250-llm-server/gguf/embedding/v5-small-retrieval-Q4_K_M.gguf
+
+# Force GPU offload on BC-250.
+PARAMETER num_gpu 99
+
+# Native maximum context supported by this embedding model.
+PARAMETER num_ctx 32768

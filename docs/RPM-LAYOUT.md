@@ -15,6 +15,7 @@ Primary commands:
 /usr/bin/bc250-code-commit
 /usr/bin/bc250-compare-experiments
 /usr/bin/bc250-fetch-experiments
+/usr/bin/bc250-fetch-embeddings
 /usr/bin/bc250-fetch-models
 /usr/bin/bc250-fetch-mtp
 /usr/bin/bc250-gitea-review
@@ -75,8 +76,8 @@ Persistent data is outside RPM ownership:
 
 ```text
 /var/lib/bc250-llm-server/
-/var/lib/bc250-llm-server/gguf/{production,experiments,mtp,task,agent}/
-/var/lib/bc250-llm-server/modelfiles/{production,experiments,task,agent}/
+/var/lib/bc250-llm-server/gguf/{production,experiments,mtp,task,agent,embedding}/
+/var/lib/bc250-llm-server/modelfiles/{production,experiments,task,agent,embedding}/
 /var/lib/bc250-llm-server/ollama/{main,task,agent}/
 /var/cache/bc250-llm-server/huggingface/
 /var/lib/ollama/

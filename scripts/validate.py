@@ -194,7 +194,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
     aliases = result.stdout.splitlines()
     required = {
         "40cu", "benchmark", "check-temp", "code", "code-commit",
-        "compare-experiments", "cu-status", "fetch-experiments", "fetch-models",
+        "compare-experiments", "cu-status", "fetch-embeddings", "fetch-experiments", "fetch-models",
         "fetch-mtp", "gitea-review", "install-cu-manager", "install-ollama",
         "memory-profile", "model", "ollama-profile", "pull-embedding-model",
         "run-mtp", "setup-coding-agent", "setup-task-model", "status", "swap-profile",
@@ -213,6 +213,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "packages-added.txt",
             "firewall-http-before",
             'bc250-model install production "$production_selection"',
+            'bc250-model install embedding "$embedding_selection"',
             "bc250-setup-task-model",
             "bc250-setup-coding-agent",
         ),

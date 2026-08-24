@@ -1,0 +1,33 @@
+# BC250 category: experimental
+# Ollama model: exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p
+#
+# Source: HauhauCS/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive @ latest
+# GGUF: Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf
+# SHA256: f28b0ae262158af10d847c3f01bfdb943161dd31320f3aed20775ee2ad6c67a6
+#
+# License: Gemma
+#
+# Intended role:
+# - High-quality uncensored general assistant
+# - Document / writing comparison against prod Gemma4 E4B
+# - Creative and unrestricted-response evaluation
+#
+# Text-only configuration.
+# Vision/audio requires the separate mmproj and is intentionally
+# not configured in this Modelfile.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve initial/system context during context eviction.
+PARAMETER num_keep 256
+
+# Keep same context as production E4B for useful A/B comparison.
+PARAMETER num_ctx 32768
+
+# Official Gemma 4 recommended sampling.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 64

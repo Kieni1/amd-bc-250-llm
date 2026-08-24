@@ -42,8 +42,8 @@ operator Modelfile takes precedence over the packaged template.
 
 | Path | Created by / contents |
 |---|---|
-| `/var/lib/bc250-llm-server/gguf/` | Downloaded source GGUF files and adjacent state JSON |
-| `/var/lib/bc250-llm-server/modelfiles/` | Rendered Modelfiles used for `ollama create` |
+| `/var/lib/bc250-llm-server/gguf/` | Downloaded chat, task, agentic, embedding and MTP GGUFs with adjacent state JSON |
+| `/var/lib/bc250-llm-server/modelfiles/` | Rendered chat and embedding Modelfiles used for `ollama create` |
 | `/var/lib/bc250-llm-server/ollama/main/` | Main Ollama blobs and manifests, port 11434 |
 | `/var/lib/bc250-llm-server/ollama/task/` | Task-instance store, port 11435 |
 | `/var/lib/bc250-llm-server/ollama/agent/` | Agent-instance store, port 11436 |

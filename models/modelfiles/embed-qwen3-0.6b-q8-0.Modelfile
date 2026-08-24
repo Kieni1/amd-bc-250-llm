@@ -1,0 +1,20 @@
+# BC250 category: embedding
+# Ollama model: embed-qwen3-0.6b-q8-0
+# Source: Qwen/Qwen3-Embedding-0.6B-GGUF @ latest
+# GGUF: Qwen3-Embedding-0.6B-Q8_0.gguf
+# SHA256: 06507c7b42688469c4e7298b0a1e16deff06caf291cf0a5b278c308249c3e439
+# License: Apache-2.0
+#
+# Text embedding model:
+# 0.6B parameters
+# 100+ languages
+# 32768-token context
+# up to 1024 embedding dimensions
+
+FROM /var/lib/bc250-llm-server/gguf/embedding/Qwen3-Embedding-0.6B-Q8_0.gguf
+
+# Force GPU offload on BC-250.
+PARAMETER num_gpu 99
+
+# Native supported context.
+PARAMETER num_ctx 32768

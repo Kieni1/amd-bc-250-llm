@@ -46,7 +46,7 @@ case "$mode" in
   *) echo "ERROR: unknown mode: $mode" >&2; usage >&2; exit 2 ;;
 esac
 
-MODEL="${CODING_AGENT_MODEL:-agentic-ornith1-9b-deepreinforce-q5-k-m}"
+MODEL="${CODING_AGENT_MODEL:-agentic-ornith15-9b-ornith-q5-k-m}"
 OLLAMA_URL="${OLLAMA_URL:-${OLLAMA_HOST:-127.0.0.1:11436}}"
 [[ "$OLLAMA_URL" == *://* ]] || OLLAMA_URL="http://$OLLAMA_URL"
 OLLAMA_URL="${OLLAMA_URL%/}"

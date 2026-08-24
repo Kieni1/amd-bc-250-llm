@@ -73,11 +73,19 @@ class InstallerTests(unittest.TestCase):
 
     def test_model_setup_uses_discovered_modelfiles(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn('bc250-model list production', source)
-        self.assertIn(
-            'bc250-model install production "$production_selection"', source
-        )
+        for category in ("production", "task", "agentic", "embedding"):
+            self.assertIn(f"bc250-model list {category}", source)
+        self.assertIn('bc250-model install production "$production_selection"', source)
+        self.assertIn('bc250-setup-task-model "$task_selection"', source)
+        self.assertIn('bc250-setup-coding-agent "$agentic_selection"', source)
+        self.assertIn('bc250-model install embedding "$embedding_selection"', source)
         self.assertNotIn("--include-disabled", source)
+
+    def test_tooling_helpers_require_an_explicit_model_selection(self) -> None:
+        helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
+        self.assertIn("[MODEL-SELECTION]", helper)
+        self.assertNotIn('SELECTION:-all', helper)
+        self.assertIn('[[ -z "$selection" ]] || manager_args+=("$selection")', helper)
 
     def test_installer_prepares_40cu_for_the_exact_running_kernel(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")

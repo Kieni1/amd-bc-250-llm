@@ -1,8 +1,8 @@
-# BC250 category: experimental
-# Ollama model: exp-qwen35-9b-unsloth-q6-k
+# BC250 category: production
+# Ollama model: prod-qwen35-9b-unsloth-q6-k
 # Source: unsloth/Qwen3.5-9B-GGUF @ latest
 # GGUF: Qwen3.5-9B-Q6_K.gguf
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-9b-unsloth-q6-k/Qwen3.5-9B-Q6_K.gguf
+FROM /var/lib/bc250-llm-server/gguf/production/Qwen3.5-9B-Q6_K.gguf
 
 # BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
 PARAMETER num_gpu 99

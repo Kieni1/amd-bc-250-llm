@@ -114,7 +114,7 @@ reboot and access the bc250.
 Download the .rpm from git
 
 ```bash
-curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.4/bc250-llm-server-0.9.4-0.1.testing.fc44.x86_64.rpm
+curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.5/bc250-llm-server-0.9.5-0.1.testing.fc44.x86_64.rpm
 ```
 
 copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) besides the .rpm onto the bc250 and run it:
@@ -154,12 +154,12 @@ module vermagic instead of relying on a hard-coded Fedora kernel version.
 These are some examples, check [`docs/COMMANDS.md`](docs/COMMANDS.md)
 
 ```bash
-# Dedicated title model and agentic models
-sudo bc250-setup-task-model
-sudo bc250-setup-coding-agent
+# Dedicated task and agentic models; omit the name to select interactively
+sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
+sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
 
 # Embedding, experiments and MTP
-sudo bc250-pull-embedding-model
+sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
 sudo bc250-fetch-experiments
 sudo bc250-fetch-mtp
 
@@ -180,20 +180,20 @@ sudo bc250-40cu status
 sudo bc250-40cu enable
 ```
 
-## Example Models 
+## Current recommended models
 
-The dedicated agent set are
-`agentic-ornith1-9b-deepreinforce-q5-k-m` and
-`agentic-qwable9b-empero-q6-k`. 
-The dedicated task model is `task-gemma3-1b-unsloth-ud-q4-k-xl` for Open WebUI
-background tasks such as titles, tags and retrieval-query generation.
-The current production set is
-- Translation: `prod-ministral3-8b-unsloth-ud-q5-k-xl` and
-  `prod-qwen35-9b-hauhaucs-uncensored-q6-k`.
-- Documents: `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` and
-  `prod-gpt-oss20b-ggml-org-mxfp4`.
-- Text generation: `prod-qwen3-4b-lmstudio-q6-k` and
-  `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl`.
+| Role | Model |
+|---|---|
+| Standard office work | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
+| Documents and RAG | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
+| German–French translation | `prod-lfm25-8b-a1b-liquidai-q6-k` |
+| Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
+| Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
+| Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
+| Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
+
+These are the current starting set, not a fixed production contract. All other
+packaged Modelfiles remain selectable for hardware and quality comparisons.
 
 Model names deliberately expose family, source and quantization in `ollama
 list` and Open WebUI. Modelfile discovery, all current templates, storage behavior and

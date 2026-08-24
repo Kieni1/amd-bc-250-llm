@@ -17,6 +17,7 @@ ROUTES=(
   "compare-experiments|$LIBEXEC/compare-experiments.sh"
   "cu-status|$LIBEXEC/cu-status.sh"
   "fetch-experiments|$LIBEXEC/modelctl|install|experiments"
+  "fetch-embeddings|$LIBEXEC/modelctl|install|embedding"
   "fetch-models|$LIBEXEC/modelctl|install|production"
   "fetch-mtp|$LIBEXEC/modelctl|install|mtp"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
@@ -25,7 +26,7 @@ ROUTES=(
   "memory-profile|$LIBEXEC/memory-profile.sh"
   "model|$LIBEXEC/modelctl"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
-  "pull-embedding-model|$LIBEXEC/pull-embedding-model.sh"
+  "pull-embedding-model|$LIBEXEC/modelctl|install|embedding"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "setup-coding-agent|$SHARE/examples/coding-agent/setup-ollama.sh"
   "setup-task-model|$SHARE/examples/task-model/setup-ollama.sh"
@@ -55,7 +56,7 @@ usage() {
 Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
-  model, fetch-models, fetch-experiments, fetch-mtp
+  model, fetch-models, fetch-experiments, fetch-embeddings, fetch-mtp
   setup-task-model, setup-coding-agent, pull-embedding-model
 
 Operation:

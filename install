@@ -317,6 +317,7 @@ setup_ollama_account() {
     /var/lib/ollama \
     /var/lib/bc250-llm-server/ollama/main \
     /var/lib/bc250-llm-server/gguf/production \
+    /var/lib/bc250-llm-server/gguf/embedding \
     /var/cache/bc250-llm-server/huggingface
   restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
     /var/cache/bc250-llm-server 2>/dev/null || true
@@ -444,7 +445,7 @@ step_6_prepare_40cu() {
 
 step_7_models() {
   heading "7. OPTIONAL MODEL DOWNLOADS"
-  local production_selection="" install_task=0 install_agent=0 install_embedding=0
+  local production_selection="" task_selection="" agentic_selection="" embedding_selection=""
   command -v script >/dev/null 2>&1 || {
     echo "ERROR: model-download progress requires /usr/bin/script." >&2
     echo "Install it with: sudo dnf install util-linux-script" >&2
@@ -452,25 +453,39 @@ step_7_models() {
   }
   echo "Discovered production Modelfiles:"
   bc250-model list production
+  echo "Discovered task Modelfiles:"
+  bc250-model list task
+  echo "Discovered agentic Modelfiles:"
+  bc250-model list agentic
+  echo "Discovered embedding Modelfiles:"
+  bc250-model list embedding
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     production_selection="${BC250_PRODUCTION_SELECTION:-}"
+    task_selection="${BC250_TASK_SELECTION:-}"
+    agentic_selection="${BC250_AGENTIC_SELECTION:-}"
+    embedding_selection="${BC250_EMBEDDING_SELECTION:-}"
     [[ -n "$production_selection" ]] || \
       echo "BC250_PRODUCTION_SELECTION is unset; production models are skipped."
+    [[ -n "$task_selection" ]] || echo "BC250_TASK_SELECTION is unset; task models are skipped."
+    [[ -n "$agentic_selection" ]] || echo "BC250_AGENTIC_SELECTION is unset; agentic models are skipped."
+    [[ -n "$embedding_selection" ]] || echo "BC250_EMBEDDING_SELECTION is unset; embedding models are skipped."
   else
     read -r -p "Production models (id/name/index/range; Enter to skip): " production_selection
+    read -r -p "Task models (id/name/index/range; Enter to skip): " task_selection
+    read -r -p "Agentic models (id/name/index/range; Enter to skip): " agentic_selection
+    read -r -p "Embedding models (id/name/index/range; Enter to skip): " embedding_selection
   fi
-  yes_no "Install the dedicated task model on port 11435?" && install_task=1
-  yes_no "Install the dedicated agentic models on port 11436?" && install_agent=1
-  yes_no "Pull and verify the embedding model?" && install_embedding=1
 
-  if [[ -n "$production_selection" || $install_task -eq 1 || $install_agent -eq 1 ]]; then
+  if [[ -n "$production_selection" || -n "$task_selection" || \
+        -n "$agentic_selection" || -n "$embedding_selection" ]]; then
     prepare_hf_authentication
   fi
   [[ -z "$production_selection" ]] || \
     bc250-model install production "$production_selection"
-  ((install_task == 0)) || bc250-setup-task-model
-  ((install_agent == 0)) || bc250-setup-coding-agent
-  ((install_embedding == 0)) || bc250-pull-embedding-model
+  [[ -z "$task_selection" ]] || bc250-setup-task-model "$task_selection"
+  [[ -z "$agentic_selection" ]] || bc250-setup-coding-agent "$agentic_selection"
+  [[ -z "$embedding_selection" ]] || \
+    bc250-model install embedding "$embedding_selection"
 }
 
 step_8_verify() {

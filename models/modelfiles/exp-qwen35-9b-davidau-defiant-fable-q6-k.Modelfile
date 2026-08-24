@@ -1,0 +1,40 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen35-9b-davidau-defiant-fable-q6-k
+#
+# Source: DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP-GGUF @ latest
+# GGUF: Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-NEO-MAX-Q6_K.gguf
+#
+# License: Apache-2.0
+#
+# Intended role:
+# - High-quality general assistant
+# - Reasoning
+# - Coding
+# - Creative writing
+# - Uncensored comparison against stock Qwen3.5-9B
+#
+# QUALITY-FIRST profile:
+# - Regular NEO IMATRIX Q6_K, not MTP
+# - Thinking enabled/default
+# - Compare against prod Qwen3.5-9B and GPT-OSS 20B
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-9b-davidau-defiant-fable-q6-k/Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-NEO-MAX-Q6_K.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve initial prompt/system context during context eviction.
+PARAMETER num_keep 256
+
+# Quality/context compromise for the 8.76 GB Q6_K model.
+PARAMETER num_ctx 32768
+
+# Qwen3.5 recommended THINKING profile for general tasks.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+
+# Author explicitly recommends repetition penalty 1.0,
+# especially for the NEO/MTP family.
+PARAMETER repeat_penalty 1.0

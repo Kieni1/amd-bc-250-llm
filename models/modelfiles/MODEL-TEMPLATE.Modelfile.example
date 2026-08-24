@@ -1,8 +1,8 @@
 # Copy this file to /etc/bc250-llm-server/models.d/NAME.Modelfile.
 # Replace every uppercase placeholder; the filename becomes the Ollama name.
-# Categories: production, experimental, task, agentic
-# Name prefixes: prod-, exp-, task-, agentic-
-# Storage names: production, experiments, task, agent
+# Categories: production, experimental, task, agentic, embedding
+# Name prefixes: prod-, exp-, task-, agentic-, embed-
+# Storage names: production, experiments, task, agent, embedding
 # BC250 category: CATEGORY
 # Ollama model: NAME
 # Source: OWNER/REPOSITORY @ latest
@@ -11,7 +11,7 @@
 # SHA256: 
 FROM /var/lib/bc250-llm-server/gguf/STORAGE/MODEL.gguf
 
-# Keep both parameters in every BC-250 chat Modelfile.
+# Keep num_gpu in every template. Chat templates also require num_keep.
 PARAMETER num_gpu 99
 PARAMETER num_keep 256
 PARAMETER num_ctx 8192

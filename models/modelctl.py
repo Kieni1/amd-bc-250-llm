@@ -35,15 +35,19 @@ CATEGORY_ALIASES = {
     "tasker": "task",
     "agentic": "agentic",
     "coding": "agentic",
+    "embedding": "embedding",
+    "embedded": "embedding",
+    "embed": "embedding",
     "mtp": "mtp",
 }
 CATEGORIES = tuple(CATEGORY_ALIASES)
-OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic")
+OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 CATEGORY_PREFIXES = {
     "production": "prod-",
     "experiments": "exp-",
     "task": "task-",
     "agentic": "agentic-",
+    "embedding": "embed-",
 }
 CATEGORY_DEFAULTS = {
     "production": {
@@ -73,6 +77,13 @@ CATEGORY_DEFAULTS = {
         "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/agent",
         "ollama_host": "127.0.0.1:11436",
         "min_free_bytes": 8589934592,
+    },
+    "embedding": {
+        "destination": "/var/lib/bc250-llm-server/gguf/embedding",
+        "download_namespace": "embedding",
+        "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/embedding",
+        "ollama_host": "127.0.0.1:11434",
+        "min_free_bytes": 0,
     },
 }
 
@@ -222,7 +233,10 @@ def load_modelfile(path: Path) -> dict:
     checksum = metadata["sha256"]
     if checksum and re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
         raise ModelError(f"{path}: SHA256 must be 64 lowercase hexadecimal characters")
-    for parameter in ("PARAMETER num_gpu 99", "PARAMETER num_keep 256"):
+    required_parameters = ["PARAMETER num_gpu 99"]
+    if category != "embedding":
+        required_parameters.append("PARAMETER num_keep 256")
+    for parameter in required_parameters:
         if len(re.findall(rf"^{re.escape(parameter)}$", text, re.MULTILINE)) != 1:
             raise ModelError(f"{path}: expected exactly one {parameter!r}")
 

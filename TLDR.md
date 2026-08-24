@@ -60,9 +60,9 @@ sudo bc250-model cleanup production MODEL-ID
 Dedicated instances and optional inputs:
 
 ```bash
-sudo bc250-setup-task-model       # Ollama 11435
-sudo bc250-setup-coding-agent     # Ollama 11436
-sudo bc250-pull-embedding-model
+sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
+sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
+sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
 sudo bc250-fetch-mtp
 ```
 

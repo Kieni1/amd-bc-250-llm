@@ -21,7 +21,7 @@ Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 Environment=ENABLE_OPENAI_API=false
 Environment=RAG_EMBEDDING_ENGINE=ollama
-Environment=RAG_EMBEDDING_MODEL=nomic-embed-text
+Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m
 Environment=CONTENT_EXTRACTION_ENGINE=tika
 Environment=TIKA_SERVER_URL=http://tika:9998
 Environment=SCARF_NO_ANALYTICS=true

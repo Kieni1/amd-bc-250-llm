@@ -30,7 +30,8 @@ bc250-model --help
 ## Model discovery
 
 The unified manager discovers Ollama templates for `production`, `experiments`,
-`task` and `agentic`. `coding`, `tasker` and `experimental` remain aliases.
+`task`, `agentic` and `embedding`. `coding`, `tasker`, `experimental`, `embed`
+and `embedded` remain aliases.
 Download-only `mtp` is the one category backed by a TOML runtime catalog:
 
 ```text
@@ -98,6 +99,7 @@ Compatibility commands:
 sudo bc250-fetch-models [SELECTION]
 sudo bc250-fetch-experiments [SELECTION]
 sudo bc250-fetch-experiments --list
+sudo bc250-fetch-embeddings [SELECTION]
 sudo bc250-fetch-mtp [SELECTION]
 ```
 
@@ -112,13 +114,13 @@ not run a model migration.
 ## Task model setup
 
 ```bash
-sudo bc250-setup-task-model
+sudo bc250-setup-task-model [SELECTION]
 ```
 
 Overrides:
 
 - `TASK_BIND` (`0.0.0.0`) and `TASK_PORT` (`11435`).
-- `TASK_MODEL_SELECTION` (`all`), `TASK_MODEL_REVISION` and
+- `TASK_MODEL_SELECTION`, `TASK_MODEL_REVISION` and
   `TASK_MODEL_SHA256`.
 - `HF_TOKEN` and `HF_HOME`.
 - `MODEL_MANAGER` and `MODELFILE_SOURCE_DIR` for source-tree or test use.
@@ -129,14 +131,15 @@ uses the unified manager. Keep its port blocked from the LAN.
 ## Coding models and agent
 
 ```bash
-sudo bc250-setup-coding-agent
+sudo bc250-setup-coding-agent [SELECTION]
 bc250-code {generate|refactor|review|document|test} INPUT OUTPUT [INSTRUCTION]
 bc250-code-commit [--yes]
 bc250-gitea-review OWNER/REPOSITORY NUMBER [--output FILE] [--post]
 ```
 
-The setup creates `ollama-agent.service` on port `11436` and installs all
-discovered agentic templates by default. Setup overrides are
+The setup creates `ollama-agent.service` on port `11436` and installs the
+explicitly selected agentic templates. With no argument or environment
+selection it prompts and Enter cancels. Setup overrides are
 `CODING_AGENT_BIND`, `CODING_AGENT_PORT`, `CODING_AGENT_SELECTION`,
 `CODING_AGENT_REVISION`, `CODING_AGENT_SHA256`, `CODING_AGENT_GGUF_DIR`,
 `CODING_AGENT_MIN_FREE_BYTES` (`8589934592`), `HF_TOKEN` and `HF_HOME`.
@@ -178,7 +181,8 @@ bc250-install-ollama
 bc250-ollama-profile {status|balanced|max-context|reset}
 bc250-memory-profile {status|recommend|apply-full|apply-safe|remove}
 bc250-swap-profile {status|apply|remove}
-bc250-pull-embedding-model
+bc250-fetch-embeddings [SELECTION]
+bc250-pull-embedding-model [SELECTION]
 ```
 
 - `OLLAMA_VERSION` selects a specific version; the default is `latest`.
@@ -186,11 +190,14 @@ bc250-pull-embedding-model
 - `BC250_ASSUME_YES=1` confirms Ollama, memory and swap changes for automation.
 - `BC250_PRODUCTION_SELECTION=0,2-4` selects production entries in the guided
   installer when `BC250_ASSUME_YES=1`; an unset value skips production models.
+- `BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION` and
+  `BC250_EMBEDDING_SELECTION` do the same for their categories.
 - `SWAP_GIB` (`16`) and `ZRAM_MIB` (`2048`) size the swap profile.
 - `SWAPPINESS` optionally sets `vm.swappiness` from `0` through `200`. If it is
   unset, the existing system policy is left unchanged. Profile removal restores
   the runtime value recorded before the first override.
-- `EMBED_MODEL` (`nomic-embed-text`) selects the embedding model.
+- Embeddings are selected by full model name, index or range like every other
+  Modelfile category; the `pull-embedding-model` name is a compatibility alias.
 
 See [`../models/embedding/README.md`](../models/embedding/README.md) for the
 embedding workflow.

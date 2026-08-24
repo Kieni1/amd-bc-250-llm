@@ -1,15 +1,15 @@
 # Isolated local coding agent
 
 `bc250-setup-coding-agent` creates `ollama-agent.service` on port `11436` with a
-separate model store. It registers the two current agentic models:
+separate model store. The current agentic choices are:
 
-- `agentic-ornith1-9b-deepreinforce-q5-k-m`
+- `agentic-ornith15-9b-ornith-q5-k-m` (recommended)
 - `agentic-qwable9b-empero-q6-k`
 
 Nothing is downloaded and no agent service is created during RPM installation.
 
 ```bash
-sudo bc250-setup-coding-agent
+sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
 ```
 
 From a source checkout:
@@ -18,12 +18,13 @@ From a source checkout:
 sudo ./models/coding-agent/setup-ollama.sh
 ```
 
-The default setup installs both entries. `CODING_AGENT_SELECTION` accepts the
-same index selection as `bc250-model` and can restrict installation. Revision or
-checksum overrides require one selected model:
+If the selection is omitted, the helper displays the current choices and
+prompts. `CODING_AGENT_SELECTION` accepts the same name/index/range selection
+for unattended setup. Revision or checksum overrides require one selected model:
 
 ```bash
-sudo CODING_AGENT_SELECTION=0 CODING_AGENT_REVISION=main \
+sudo CODING_AGENT_SELECTION=agentic-ornith15-9b-ornith-q5-k-m \
+  CODING_AGENT_REVISION=main \
   bc250-setup-coding-agent
 ```
 
@@ -36,9 +37,9 @@ wanted.
 
 ## Generate, refactor and review
 
-The client defaults to Ornith and port `11436`. Set `CODING_AGENT_MODEL` to the
-Qwable name to use it instead. `OLLAMA_URL` or `OLLAMA_HOST` can override the
-endpoint.
+The client defaults to Ornith 1.5 and port `11436`. Set `CODING_AGENT_MODEL` to
+another installed agentic name to compare it. `OLLAMA_URL` or `OLLAMA_HOST`
+can override the endpoint.
 
 ```bash
 bc250-code review src/app.py review.md

@@ -4,12 +4,13 @@ set -Eeuo pipefail
 umask 0027
 
 usage() {
-  echo "Usage: setup-ollama-instance.sh task|agentic" >&2
+  echo "Usage: setup-ollama-instance.sh task|agentic [MODEL-SELECTION]" >&2
 }
 
 [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
-[[ $# -eq 1 ]] || { usage; exit 2; }
+[[ $# -ge 1 && $# -le 2 ]] || { usage; exit 2; }
 kind="$1"
+requested_selection="${2:-}"
 
 case "$kind" in
   task)
@@ -23,7 +24,7 @@ case "$kind" in
     modelfile_root="/var/lib/bc250-llm-server/modelfiles/task"
     context=4096
     keep_alive=0
-    selection="${TASK_MODEL_SELECTION:-all}"
+    selection="${requested_selection:-${TASK_MODEL_SELECTION:-}}"
     ;;
   agentic|coding)
     label="coding-agent"
@@ -36,7 +37,7 @@ case "$kind" in
     modelfile_root="/var/lib/bc250-llm-server/modelfiles/agent"
     context=32768
     keep_alive=5m
-    selection="${CODING_AGENT_SELECTION:-all}"
+    selection="${requested_selection:-${CODING_AGENT_SELECTION:-}}"
     ;;
   *) usage; exit 2 ;;
 esac
@@ -125,9 +126,10 @@ curl -fsS "http://$check_host:$port/api/tags" >/dev/null || {
 }
 
 manager_args=(
-  install "$category" "$selection"
-  --host "$check_host:$port"
+  install "$category"
 )
+[[ -z "$selection" ]] || manager_args+=("$selection")
+manager_args+=(--host "$check_host:$port")
 if [[ "$kind" == task ]]; then
   [[ -n "${TASK_MODEL_REVISION:-}" ]] && manager_args+=(--revision "$TASK_MODEL_REVISION")
   [[ -n "${TASK_MODEL_SHA256:-}" ]] && manager_args+=(--sha256 "$TASK_MODEL_SHA256")

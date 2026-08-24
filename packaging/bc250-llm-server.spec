@@ -10,7 +10,7 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.9.4
+Version:        0.9.5
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -204,11 +204,13 @@ fi
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/mtp
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/task
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/agent
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/embedding
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/production
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/experiments
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/task
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/agent
+%ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/modelfiles/embedding
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/ollama
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/main
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/task
@@ -226,6 +228,12 @@ fi
 %ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.5-0.1.testing
+- Discover embedding GGUFs through the same strict Modelfile workflow as chat models
+- Make task, agentic and embedding downloads explicit model selections
+- Refresh the recommended office and tooling model set without removing alternatives
+- Normalize the operator-supplied Modelfiles and correct the pinned Jina GGUF digest
+
 * Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.4-0.1.testing
 - Detect optional dedicated GFX1013 compute queues without bundling the patch stack
 - Fail verification when a selected custom Mesa ICD lacks its matching patched kernel

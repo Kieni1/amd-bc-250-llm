@@ -24,14 +24,15 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         models = modelctl.discover_models([MODELFILES])
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
-        self.assertEqual(len(models), 19)
+        self.assertEqual(len(models), 22)
 
     def test_current_model_set_and_dedicated_instances_are_preserved(self) -> None:
         expected = {
-            "production": (6, "127.0.0.1:11434"),
-            "experiments": (10, "127.0.0.1:11434"),
+            "production": (5, "127.0.0.1:11434"),
+            "experiments": (12, "127.0.0.1:11434"),
             "task": (1, "127.0.0.1:11435"),
             "agentic": (2, "127.0.0.1:11436"),
+            "embedding": (2, "127.0.0.1:11434"),
         }
         for category, (count, host) in expected.items():
             with self.subTest(category=category):
@@ -39,16 +40,28 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 self.assertEqual(len(models), count)
                 self.assertEqual(defaults["ollama_host"], host)
 
-    def test_all_chat_modelfiles_keep_bc250_gpu_and_context_settings(self) -> None:
+    def test_all_modelfiles_keep_required_bc250_gpu_and_context_settings(self) -> None:
         for path in MODELFILES.glob("*.Modelfile"):
             with self.subTest(path=path.name):
                 text = path.read_text(encoding="utf-8")
                 self.assertEqual(
                     len(re.findall(r"^PARAMETER num_gpu 99$", text, re.MULTILINE)), 1
                 )
-                self.assertEqual(
-                    len(re.findall(r"^PARAMETER num_keep 256$", text, re.MULTILINE)), 1
-                )
+                if not path.name.startswith("embed-"):
+                    self.assertEqual(
+                        len(re.findall(r"^PARAMETER num_keep 256$", text, re.MULTILINE)), 1
+                    )
+
+    def test_recommended_tooling_models_are_discoverable(self) -> None:
+        expected = {
+            "embedding": "embed-jina-v5-small-retrieval-q4-k-m",
+            "task": "task-gemma3-1b-unsloth-ud-q4-k-xl",
+            "agentic": "agentic-ornith15-9b-ornith-q5-k-m",
+        }
+        for category, name in expected.items():
+            with self.subTest(category=category):
+                _defaults, models = load(category)
+                self.assertIn(name, {model["name"] for model in models})
 
     def test_example_is_ignored_and_operator_template_overrides_package(self) -> None:
         name = "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile"

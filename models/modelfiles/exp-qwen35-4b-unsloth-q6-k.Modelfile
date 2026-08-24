@@ -1,0 +1,30 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen35-4b-unsloth-q6-k
+# Source: unsloth/Qwen3.5-4B-GGUF @ latest
+# GGUF: Qwen3.5-4B-Q6_K.gguf
+#
+# Intended role:
+# - Fast office/general assistant
+# - Candidate replacement for prod-qwen3-4b-lmstudio-q6-k
+#
+# IMPORTANT:
+# - This profile uses Qwen3.5 NON-THINKING sampling.
+# - Open WebUI/Ollama: think = OFF.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-4b-unsloth-q6-k/Qwen3.5-4B-Q6_K.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+
+# Practical BC-250 test context.
+PARAMETER num_ctx 32768
+
+# Qwen3.5 recommended non-thinking/general sampling.
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental fast general assistant. Answer clearly and directly, distinguish facts from guesses, and use the user's language."""

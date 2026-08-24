@@ -43,7 +43,7 @@ listener.
 - Authentication: enabled
 - OpenAI/API cloud connection: disabled unless explicitly required
 - Embedding engine: Ollama
-- Embedding model: `nomic-embed-text`
+- Embedding model: `embed-jina-v5-small-retrieval-q4-k-m`
 - Content extraction: Tika
 - Community sharing and public links: disabled for office use
 - Tools, Functions, Pipelines and arbitrary code execution: disabled for ordinary users
@@ -151,13 +151,13 @@ definition and remains administrator-owned.
 
 | Example | Use | Context starting point |
 |---|---|---:|
+| `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` | Standard office work | 32,768 |
 | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` | Documents and RAG | 32,768 |
 | `prod-gpt-oss20b-ggml-org-mxfp4` | Deeper analysis | 8,192–16,384 |
-| `prod-ministral3-8b-unsloth-ud-q5-k-xl` | Translation | 32,768 |
-| `prod-qwen3-4b-lmstudio-q6-k` | Fast office work | 8,192 |
-| `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` | Fast text generation | 32,768 |
-| `prod-qwen35-9b-hauhaucs-uncensored-q6-k` | General comparison | 32,768 |
-| `agentic-ornith1-9b-deepreinforce-q5-k-m` | Dedicated agentic work | 32,768 |
+| `prod-lfm25-8b-a1b-liquidai-q6-k` | German–French translation | 32,768 |
+| `embed-jina-v5-small-retrieval-q4-k-m` | Retrieval embedding | 32,768 |
+| `task-gemma3-1b-unsloth-ud-q4-k-xl` | Titles, tags and retrieval queries | 4,096 |
+| `agentic-ornith15-9b-ornith-q5-k-m` | Dedicated coding and agentic work | 32,768 |
 | `agentic-qwable9b-empero-q6-k` | Dedicated agentic comparison | 32,768 |
 
 All contexts must be validated for full GPU residency on the particular board.

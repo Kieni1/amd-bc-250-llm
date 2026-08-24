@@ -10,12 +10,13 @@ Ollama catalog to keep synchronized.
 | `experiments` | `exp-` | `127.0.0.1:11434` | `gguf/experiments` |
 | `task` | `task-` | `127.0.0.1:11435` | `gguf/task` |
 | `agentic` | `agentic-` | `127.0.0.1:11436` | `gguf/agent` |
+| `embedding` | `embed-` | `127.0.0.1:11434` | `gguf/embedding` |
 
 Packaged templates live in
 `/usr/share/bc250-llm-server/model-management/modelfiles/`. Operator templates
 live in `/etc/bc250-llm-server/models.d/`; a same-name operator file overrides
-the packaged template. The `coding`, `tasker` and `experimental` category names
-remain accepted aliases.
+the packaged template. The `coding`, `tasker`, `experimental`, `embed` and
+`embedded` category names remain accepted aliases.
 
 ## Add or replace a model
 
@@ -34,7 +35,7 @@ sudo bc250-model install experiments exp-example-source-q4-k-m
 The required header is:
 
 ```text
-# BC250 category: production|experimental|task|agentic
+# BC250 category: production|experimental|task|agentic|embedding
 # Ollama model: NAME
 # Source: OWNER/REPOSITORY @ REVISION
 # GGUF: FILE.gguf
@@ -44,8 +45,9 @@ The required header is:
 omit it for a flexible test model, or provide 64 lowercase hexadecimal
 characters to enforce an exact GGUF. `FROM` must be the category's absolute
 GGUF path shown in the table. The filename, Ollama name, category prefix, GGUF
-metadata and `FROM` basename must agree. Every chat template must contain
-exactly one `PARAMETER num_gpu 99` and `PARAMETER num_keep 256`.
+metadata and `FROM` basename must agree. Every template must contain exactly
+one `PARAMETER num_gpu 99`; chat templates also require exactly one
+`PARAMETER num_keep 256`.
 
 A bad template fails during listing or installation instead of being partially
 registered. Adding, replacing or removing the file is all that is needed to
@@ -68,13 +70,14 @@ sudo bc250-model cleanup production MODEL-NAME
 
 Selection accepts `all`, the displayed zero-based index, a range such as
 `0,2-4`, or the full model name. With no selection, an interactive terminal
-prompts and Enter cancels. Production and experiment downloads therefore remain
-off until explicitly selected. The task and agentic setup helpers pass `all`
-after creating their isolated services:
+prompts and Enter cancels. No category downloads models without an explicit
+selection. Task and agentic setup create their isolated services and then use
+the same name/index/range selection:
 
 ```bash
-sudo bc250-setup-task-model
-sudo bc250-setup-coding-agent
+sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
+sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
+sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
 ```
 
 After a successful download, the manager records the source identity and
@@ -97,8 +100,8 @@ available for later installation.
 
 Optional features are grouped by purpose: `task-model/` and `coding-agent/`
 manage isolated Ollama instances, `experiments/` contains comparison tools,
-`mtp/` contains the llama.cpp MTP workflow, and `embedding/` contains the Open
-WebUI embedding helper.
+`mtp/` contains the llama.cpp MTP workflow, and `embedding/` documents the
+embedding Modelfile workflow.
 
 The main instance stores imported Ollama blobs under
 `/var/lib/bc250-llm-server/ollama/main`. Task and agent instances use

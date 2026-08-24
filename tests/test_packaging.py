@@ -39,6 +39,20 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("model", result.stdout.splitlines())
         self.assertIn("uninstall", result.stdout.splitlines())
         self.assertIn("status", result.stdout.splitlines())
+        self.assertIn("fetch-embeddings", result.stdout.splitlines())
+
+    def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(self) -> None:
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("pull-embedding-model.sh", manifest)
+        self.assertIn('modelctl|install|embedding', dispatcher)
+        self.assertIn(
+            "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
+            quadlet,
+        )
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")

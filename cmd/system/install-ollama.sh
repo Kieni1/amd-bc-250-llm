@@ -79,6 +79,7 @@ install -d -o ollama -g ollama -m 0750 \
   /var/lib/ollama \
   /var/lib/bc250-llm-server/ollama/main \
   /var/lib/bc250-llm-server/gguf/production \
+  /var/lib/bc250-llm-server/gguf/embedding \
   /var/cache/bc250-llm-server/huggingface
 restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
   /var/cache/bc250-llm-server 2>/dev/null || true
