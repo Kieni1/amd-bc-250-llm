@@ -18,9 +18,10 @@ sudo bc250-verify
 Or run `sudo ./install` for the guided filesystem-to-verification workflow.
 Rerun it after the requested memory-profile reboot. Never install the
 `dist/*.src.rpm`; it contains build sources, not runtime commands.
-After an interrupted system-setup run, `sudo ./install --models-only` resumes
-the optional production, task, agentic and embedding-model prompts without
-reinstalling the package.
+During model setup, each category is listed, selected and installed before the
+next category is shown; Enter skips only that category. After an interrupted
+system-setup run, `sudo ./install --models-only` resumes these optional model
+phases without reinstalling the package.
 
 Full destructive removal is `sudo bc250-uninstall`; ordinary
 `sudo dnf remove bc250-llm-server.x86_64` keeps persistent appliance data.

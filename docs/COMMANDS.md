@@ -16,6 +16,11 @@ The normal mode performs the complete filesystem-to-verification workflow.
 `--models-only` resumes the production, task, agentic and embedding prompts
 after the RPM is installed; it does not repeat host or package setup.
 
+Model setup is sequential by category. Each phase lists its current
+Modelfiles, accepts one name/index/range selection, performs that installation,
+and only then shows the next category. Enter skips the current category.
+Hugging Face authentication is prepared once at the first non-empty selection.
+
 ## Dispatcher
 
 `bc250 COMMAND [ARGUMENTS...]` is the canonical interface. Installed
@@ -81,7 +86,9 @@ Authentication is resolved only if a model needs downloading. `HF_TOKEN` or
 `--token-file` is validated with `hf auth whoami` as the `ollama` service
 account. Invalid, empty or skipped tokens continue anonymously and are never
 persisted by the manager. Set `BC250_HF_ANONYMOUS=1` to suppress the prompt in
-unattended public-model installs. Hugging Face progress output remains enabled.
+unattended public-model installs. The guided installer also selects anonymous
+downloads automatically when `BC250_ASSUME_YES=1` and no token was supplied.
+Hugging Face progress output remains enabled.
 The download runs in a pseudo-terminal, so its live byte progress is preserved
 when output is captured in the guided installer transcript.
 

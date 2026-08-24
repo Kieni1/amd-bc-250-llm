@@ -1,6 +1,16 @@
 # Changelog
 
-## 0.9.5-testing - 2026-08-24
+## 0.9.5-0.2.testing - 2026-08-24
+
+The guided model stage is divided into four complete phases: production, task,
+agentic and embedding. Each phase now lists, prompts and installs before the
+next begins, while Hugging Face authentication is prepared only once. The
+installer also distinguishes a same-NEVRA reinstall from a different-version
+RPM transaction, verifies that the selected RPM is the one installed, avoids
+repeating the 40-CU helper's activation message, and runs both verification
+reports before returning a failure.
+
+## 0.9.5-0.1.testing - 2026-08-24
 
 Embedding models now use the same strict Modelfile discovery, Hugging Face
 download, checksum and Ollama registration path as the chat categories. The

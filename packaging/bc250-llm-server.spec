@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.5
-Release:        0.1.testing%{?dist}
+Release:        0.2.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,10 @@ fi
 %ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.5-0.2.testing
+- Split guided model setup into sequential list, selection and installation phases
+- Verify the selected RPM NEVRA and complete both post-install diagnostic reports
+
 * Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.5-0.1.testing
 - Discover embedding GGUFs through the same strict Modelfile workflow as chat models
 - Make task, agentic and embedding downloads explicit model selections

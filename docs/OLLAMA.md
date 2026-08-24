@@ -5,7 +5,7 @@ latest official release and can also install a specifically requested version:
 
 ```bash
 sudo bc250-install-ollama
-sudo OLLAMA_VERSION=0.32.1 bc250-install-ollama
+sudo OLLAMA_VERSION=<reviewed-version> bc250-install-ollama
 ```
 
 When Ollama is missing, outdated, or explicitly selected for reinstall, the
@@ -22,9 +22,9 @@ The guided `install` workflow excludes Fedora's `ollama` RPM and installs the
 official release in `/usr/local`. If a Fedora Ollama package is already present,
 it is removed only after `rpm -e --test ollama` confirms that no installed
 package requires it. The workflow stops instead of keeping Fedora and official
-Ollama copies side by side. Rerunning the workflow reinstalls the selected local
-BC-250 RPM, which also supports retesting a corrected build with the same
-version-release.
+Ollama copies side by side. Rerunning the workflow upgrades to a different
+selected RPM NEVRA or reinstalls the same NEVRA, then verifies that the selected
+package is the one actually installed.
 
 The packaged drop-in sets:
 

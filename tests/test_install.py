@@ -32,6 +32,25 @@ remove_fedora_ollama
     )
 
 
+def run_model_phase_probe() -> subprocess.CompletedProcess[str]:
+    script = r'''
+source "$1"
+bc250-model() { printf 'model:%s\n' "$*"; }
+bc250-setup-task-model() { printf 'task:%s\n' "$*"; }
+bc250-setup-coding-agent() { printf 'agentic:%s\n' "$*"; }
+HF_TOKEN=dummy
+step_7_models
+'''
+    return subprocess.run(
+        ["bash", "-c", script, "installer-test", str(INSTALLER)],
+        input="0\n0\n\n1\n",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+
 class InstallerTests(unittest.TestCase):
     def test_rpm_transaction_excludes_fedora_ollama(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
@@ -73,13 +92,41 @@ class InstallerTests(unittest.TestCase):
 
     def test_model_setup_uses_discovered_modelfiles(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
-        for category in ("production", "task", "agentic", "embedding"):
-            self.assertIn(f"bc250-model list {category}", source)
-        self.assertIn('bc250-model install production "$production_selection"', source)
-        self.assertIn('bc250-setup-task-model "$task_selection"', source)
-        self.assertIn('bc250-setup-coding-agent "$agentic_selection"', source)
-        self.assertIn('bc250-model install embedding "$embedding_selection"', source)
+        phases = (
+            "run_model_phase 1 production Production BC250_PRODUCTION_SELECTION",
+            "run_model_phase 2 task Task BC250_TASK_SELECTION",
+            "run_model_phase 3 agentic Agentic BC250_AGENTIC_SELECTION",
+            "run_model_phase 4 embedding Embedding BC250_EMBEDDING_SELECTION",
+        )
+        for phase in phases:
+            self.assertIn(phase, source)
+        self.assertIn('bc250-model install "$category" "$selection"', source)
+        self.assertIn('bc250-setup-task-model "$selection"', source)
+        self.assertIn('bc250-setup-coding-agent "$selection"', source)
         self.assertNotIn("--include-disabled", source)
+
+    def test_model_categories_prompt_and_run_as_separate_phases(self) -> None:
+        result = run_model_phase_probe()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        expected_order = (
+            "model:list production",
+            "model:install production 0",
+            "model:list task",
+            "task:0",
+            "model:list agentic",
+            "Skipping agentic models.",
+            "model:list embedding",
+            "model:install embedding 1",
+        )
+        positions = [result.stdout.index(value) for value in expected_order]
+        self.assertEqual(positions, sorted(positions), result.stdout)
+        self.assertEqual(result.stdout.count("Using HF_TOKEN supplied"), 1)
+
+    def test_unattended_model_setup_defaults_to_anonymous_hugging_face(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then', source)
+        self.assertIn('export BC250_HF_ANONYMOUS=1', source)
+        self.assertIn("HF_TOKEN is unset; using anonymous", source)
 
     def test_tooling_helpers_require_an_explicit_model_selection(self) -> None:
         helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
@@ -94,6 +141,19 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("bc250-40cu prepare", source)
         self.assertLess(source.index("step_6_prepare_40cu"), source.index("step_7_models"))
         self.assertNotIn("BC250_ASSUME_YES=1 bc250-40cu enable", source)
+
+    def test_rpm_action_distinguishes_upgrade_from_same_nevra_reinstall(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('[[ "$installed_nevra" != "$candidate_nevra" ]] || dnf_action=reinstall', source)
+        self.assertIn('[[ "$installed_after" == "$candidate_nevra" ]]', source)
+
+    def test_verification_runs_both_reports_before_returning_failure(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        verify = source.index("bc250-verify || verify_status=$?")
+        diagnose = source.index("llm-run-diagnose --no-load || diagnose_status=$?")
+        summary = source.index("verification reported failures")
+        self.assertLess(verify, diagnose)
+        self.assertLess(diagnose, summary)
 
     def test_models_only_resumes_after_an_interrupted_system_setup(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")

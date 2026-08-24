@@ -68,8 +68,10 @@ The installer pauses for the required reboot and is then rerun. It prepares and
 checks 40-CU support once, but leaves activation to the explicit
 `sudo bc250-40cu enable` for 40 CUs or fewer than 40 over the live-manager 
 command `sudo bc250-cu-live-manager` menu. It does not enable maintenance timers.
-If system setup was interrupted after the RPM was installed, resume only the
-interactive production, task, agentic and embedding-model prompts with:
+The model stage handles one category at a time: it lists production, prompts
+and completes that selection before proceeding to task, agentic and embedding
+models. Enter skips only the current category. If system setup was interrupted
+after the RPM was installed, resume these model phases with:
 
 ```bash
 sudo ./install --models-only
@@ -114,7 +116,7 @@ reboot and access the bc250.
 Download the .rpm from git
 
 ```bash
-curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.5/bc250-llm-server-0.9.5-0.1.testing.fc44.x86_64.rpm
+curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.5/bc250-llm-server-0.9.5-0.2.testing.fc44.x86_64.rpm
 ```
 
 copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) besides the .rpm onto the bc250 and run it:
