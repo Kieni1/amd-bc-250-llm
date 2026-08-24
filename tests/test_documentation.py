@@ -7,6 +7,17 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parent.parent
+EXCLUDED_DOC_TREES = {
+    ".git",
+    "build",
+    "dist",
+    "rpmbuild",
+    "sources",
+    "governor-src",
+    "unlock-src",
+    "live-manager-src",
+    "__pycache__",
+}
 
 
 def dispatcher_aliases() -> set[str]:
@@ -38,7 +49,7 @@ class DocumentationTests(unittest.TestCase):
         }
         for path in ROOT.rglob("*.md"):
             relative = path.relative_to(ROOT)
-            if any(part in {"build", "dist", "rpmbuild", "sources"} for part in relative.parts):
+            if any(part in EXCLUDED_DOC_TREES for part in relative.parts):
                 continue
             text = path.read_text(encoding="utf-8")
             blocks = re.findall(r"```(?:bash|text)?\n(.*?)```", text, re.DOTALL)
