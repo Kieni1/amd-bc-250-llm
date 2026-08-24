@@ -4,7 +4,7 @@ Description=Daily Open WebUI users backup
 [Timer]
 Unit=owui-maintenance@backup-users.service
 OnCalendar=*-*-* 18:00:00
-Persistent=false
+Persistent=true
 AccuracySec=1min
 
 [Install]

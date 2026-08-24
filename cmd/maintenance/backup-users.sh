@@ -30,8 +30,9 @@ allow = [
     "auth", "user", "api_key", "model_access", "user_settings"
 ]
 tables = [t for t in allow if t in existing]
-if not tables:
-    raise SystemExit("no supported identity tables found")
+missing = {"auth", "user"} - existing
+if missing:
+    raise SystemExit("required identity tables are missing: " + ", ".join(sorted(missing)))
 revision = ""
 if "alembic_version" in existing:
     row = conn.execute("SELECT version_num FROM alembic_version LIMIT 1").fetchone()

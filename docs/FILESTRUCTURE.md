@@ -30,6 +30,8 @@ systemd-preset configuration in their normal Fedora directories. See
 | `/etc/bc250-llm-server/models.d/*.Modelfile` | Added or overridden Ollama models |
 | `/etc/bc250-llm-server/mtp-models.toml` | Download-only MTP runtime entries; `%config(noreplace)` |
 | `/etc/bc250-llm-server/maintenance.env` | Optional maintenance settings |
+| `/etc/systemd/system/bc250-night-shutdown.timer.d/schedule.conf` | Optional weekday power schedule created by `bc250-maintenance setup` |
+| `/etc/default/bc250-wol` | Optional root-only Wake-on-LAN interface setting |
 | `/etc/cyan-skillfish-governor-smu/config.toml` | Governor policy; `%config(noreplace)` |
 | `/etc/nginx/default.d/bc250-llm-server.conf` | Trusted-LAN HTTP endpoint |
 | `/etc/systemd/system/ollama*.service.d/` | Runtime profile overrides created by commands |

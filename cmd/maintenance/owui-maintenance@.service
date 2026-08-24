@@ -1,11 +1,12 @@
 [Unit]
 Description=Open WebUI maintenance task: %i
-After=open-webui.service
+After=local-fs.target open-webui.service
 Before=bc250-night-shutdown.service
 
 [Service]
 Type=oneshot
 EnvironmentFile=-/etc/bc250-llm-server/maintenance.env
-ExecStart=/usr/libexec/bc250-llm-server/%i.sh
+ExecStart=/usr/bin/flock --wait 1800 /run/lock/bc250-llm-maintenance.lock /usr/libexec/bc250-llm-server/%i.sh
 Nice=10
 IOSchedulingClass=idle
+TimeoutStartSec=2h

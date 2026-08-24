@@ -1,6 +1,6 @@
 # Target on BC-250: /etc/systemd/system/bc250-night-shutdown.timer
 [Unit]
-Description=Try to suspend the idle LLM server after work
+Description=Try the configured idle power action after work
 
 [Timer]
 OnCalendar=Mon..Fri 18:30:00

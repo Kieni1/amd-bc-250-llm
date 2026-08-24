@@ -295,19 +295,23 @@ the current directory. Sensor logging also accepts `SENSOR_PATTERN`.
 
 ## Open WebUI maintenance
 
-Configuration is read from `/etc/bc250-llm-server/maintenance.env`. Supported
-settings are documented in the installed example and include `OWUI_URL`,
-`OWUI_API_KEY`, `DRY_RUN`, `MAX_AGE_DAYS`, `MAX_TOTAL_GB`, `WARMUP_MODEL`,
-`WARMUP_KEEP_ALIVE`, backup retention/output/rollback directories, and
-`SAFE_SUSPEND_PORTS`.
+Use the public helper instead of enabling related units one at a time:
 
 ```bash
-systemctl list-timers 'owui-*'
-sudo systemctl enable --now owui-backup-config.timer
-sudo systemctl enable --now owui-backup-users.timer
-sudo systemctl enable --now owui-prune.timer
-sudo systemctl enable --now owui-warmup.timer
+sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance setup
+sudo bc250-maintenance status
+sudo bc250-maintenance run backup
+sudo bc250-maintenance run prune
+sudo bc250-maintenance run all
+sudo bc250-maintenance disable
 ```
 
-Keep pruning in dry-run mode until its output has been reviewed. Restore tools
-require explicit confirmation and create rollback data first.
+Configuration is read from root-only
+`/etc/bc250-llm-server/maintenance.env`. It includes the Open WebUI URL and API
+key, dry-run and retention limits, free-space warning threshold, warm-up model
+and keep-alive, backup retention/output/rollback directories, guarded ports,
+night action and Wake-on-LAN requirement. Keep pruning in dry-run mode until
+its output has been reviewed. Restore tools require explicit confirmation,
+verified checksum sidecars and create rollback data first. See
+[`MAINTENANCE.md`](MAINTENANCE.md) for the privacy, storage and energy contract.

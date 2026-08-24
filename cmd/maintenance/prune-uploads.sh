@@ -12,6 +12,10 @@ DRY_RUN="${DRY_RUN:-0}"
 [[ "$MAX_AGE_DAYS" =~ ^[0-9]+$ ]] || { echo "ERROR: MAX_AGE_DAYS must be integer." >&2; exit 1; }
 [[ "$MAX_TOTAL_GB" =~ ^[0-9]+$ ]] || { echo "ERROR: MAX_TOTAL_GB must be integer." >&2; exit 1; }
 [[ "$DRY_RUN" == 0 || "$DRY_RUN" == 1 ]] || { echo "ERROR: DRY_RUN must be 0 or 1." >&2; exit 1; }
+((MAX_AGE_DAYS > 0 || MAX_TOTAL_GB > 0)) || {
+  echo "ERROR: MAX_AGE_DAYS and MAX_TOTAL_GB cannot both be disabled (0)." >&2
+  exit 1
+}
 
 AUTH=(-H "Authorization: Bearer ${OWUI_API_KEY}")
 now="$(date +%s)"
@@ -33,7 +37,10 @@ import datetime, json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     data = json.load(f)
 if isinstance(data, dict):
-    data = data.get("items") or data.get("files")
+    if isinstance(data.get("items"), list):
+        data = data["items"]
+    else:
+        data = data.get("files")
 if not isinstance(data, list):
     raise SystemExit("API response is not a file list")
 
@@ -43,8 +50,18 @@ def timestamp(value):
         value = float(value)
         if value > 10_000_000_000: value /= 1000
         return int(value)
-    s = str(value).replace("Z", "+00:00")
-    return int(datetime.datetime.fromisoformat(s).timestamp())
+    try:
+        s = str(value).replace("Z", "+00:00")
+        return int(datetime.datetime.fromisoformat(s).timestamp())
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+def byte_size(value):
+    try:
+        parsed = int(value)
+        return parsed if parsed >= 0 else -1
+    except (TypeError, ValueError, OverflowError):
+        return -1
 
 rows=[]
 for f in data:
@@ -52,9 +69,10 @@ for f in data:
     fid=f.get("id")
     if not fid: continue
     ts=timestamp(f.get("created_at"))
-    size=(f.get("meta") or {}).get("size", f.get("size", 0)) or 0
-    rows.append((ts, int(size), str(fid)))
-for ts, size, fid in sorted(rows):
+    meta=f.get("meta") if isinstance(f.get("meta"), dict) else {}
+    size=byte_size(meta.get("size", f.get("size")))
+    rows.append((ts, size, str(fid)))
+for ts, size, fid in sorted(rows, key=lambda row: (row[0] <= 0, row[0], row[2])):
     print(f"{ts}\t{size}\t{fid}")
 PY_FILES
 then
@@ -63,16 +81,27 @@ then
 fi
 
 mapfile -t rows < "$rows_file"
-total=0
-for row in "${rows[@]}"; do IFS=$'\t' read -r _ size _ <<< "$row"; total=$((total+size)); done
-log "Files=${#rows[@]} total=$((total/1024/1024))MiB ceiling=${MAX_TOTAL_GB}GiB age=${MAX_AGE_DAYS}d dry_run=${DRY_RUN}"
+total=0; unknown_age=0; unknown_size=0
+for row in "${rows[@]}"; do
+  IFS=$'\t' read -r ts size _ <<< "$row"
+  ((ts > 0)) || unknown_age=$((unknown_age+1))
+  if ((size >= 0)); then total=$((total+size)); else unknown_size=$((unknown_size+1)); fi
+done
+age_label="${MAX_AGE_DAYS}d"; ceiling_label="${MAX_TOTAL_GB}GiB"
+((MAX_AGE_DAYS > 0)) || age_label=disabled
+((MAX_TOTAL_GB > 0)) || ceiling_label=disabled
+log "Files=${#rows[@]} known_total=$((total/1024/1024))MiB ceiling=${ceiling_label} age=${age_label} dry_run=${DRY_RUN}"
+if ((unknown_age > 0 || unknown_size > 0)); then
+  log "WARNING: preserving uncertain metadata for size pruning (unknown_age=${unknown_age} unknown_size=${unknown_size})."
+fi
 
 deleted=0; freed=0; failures=0
 delete_one(){
-  local ts="$1" size="$2" id="$3" reason="$4" age_label="unknown"
+  local ts="$1" size="$2" id="$3" reason="$4" age_label="unknown" size_label="unknown"
   ((ts > 0)) && age_label="$(((now-ts)/86400))d"
+  ((size >= 0)) && size_label="$((size/1024/1024))MiB"
   if [[ "$DRY_RUN" == 1 ]]; then
-    log "WOULD delete [$reason] id=$id size=$((size/1024/1024))MiB age=$age_label"
+    log "WOULD delete [$reason] id=$id size=$size_label age=$age_label"
   elif ! curl --fail --silent --show-error --retry 2 --retry-all-errors \
       --connect-timeout 10 --max-time 60 -X DELETE "${AUTH[@]}" \
       "${OWUI_URL}/api/v1/files/${id}" >/dev/null; then
@@ -80,25 +109,34 @@ delete_one(){
     failures=$((failures+1))
     return 1
   else
-    log "deleted [$reason] id=$id size=$((size/1024/1024))MiB"
+    log "deleted [$reason] id=$id size=$size_label"
   fi
-  deleted=$((deleted+1)); freed=$((freed+size)); total=$((total-size))
+  deleted=$((deleted+1))
+  if ((size >= 0)); then freed=$((freed+size)); total=$((total-size)); fi
 }
 
 remaining=()
 for row in "${rows[@]}"; do
   IFS=$'\t' read -r ts size id <<< "$row"
-  if (( ts > 0 && ts < cutoff )); then
+  if (( MAX_AGE_DAYS > 0 && ts > 0 && ts < cutoff )); then
     delete_one "$ts" "$size" "$id" "age>${MAX_AGE_DAYS}d" || remaining+=("$row")
   else
     remaining+=("$row")
   fi
 done
-for row in "${remaining[@]}"; do
-  (( total <= max_total_bytes )) && break
-  IFS=$'\t' read -r ts size id <<< "$row"
-  delete_one "$ts" "$size" "$id" "size-ceiling" || true
-done
+if ((MAX_TOTAL_GB > 0)); then
+  for row in "${remaining[@]}"; do
+    (( total <= max_total_bytes )) && break
+    IFS=$'\t' read -r ts size id <<< "$row"
+    # Files without a trustworthy age or size are never selected by the
+    # storage ceiling. An administrator must review them in Open WebUI.
+    ((ts > 0 && size >= 0)) || continue
+    delete_one "$ts" "$size" "$id" "size-ceiling" || true
+  done
+  if ((total > max_total_bytes)); then
+    log "WARNING: known upload total remains above the ceiling; review preserved uncertain files in Open WebUI."
+  fi
+fi
 
 log "Done. deleted/planned=$deleted freed/planned=$((freed/1024/1024))MiB remaining/simulated=$((total/1024/1024))MiB failures=$failures"
 (( failures == 0 ))

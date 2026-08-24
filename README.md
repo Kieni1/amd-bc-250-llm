@@ -116,7 +116,7 @@ reboot and access the bc250.
 Download the .rpm from git
 
 ```bash
-curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.5/bc250-llm-server-0.9.5-0.2.testing.fc44.x86_64.rpm
+curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.5/bc250-llm-server-0.9.5-0.3.testing.fc44.x86_64.rpm
 ```
 
 copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) besides the .rpm onto the bc250 and run it:
@@ -175,6 +175,8 @@ bc250-benchmark
 sudo bc250-ollama-profile status
 sudo bc250-memory-profile status
 sudo bc250-swap-profile status
+sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance status
 sudo bc250-cu-status
 sudo bc250-40cu status
 # The installer has already prepared the matching module. This is the only
@@ -235,6 +237,7 @@ listed in [`licenses/THIRD_PARTY_NOTICES.md`](licenses/THIRD_PARTY_NOTICES.md).
 - [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): installed files and generated state.
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): services, ports and persistent data.
 - [`docs/OLLAMA.md`](docs/OLLAMA.md): Ollama installation and runtime profiles.
+- [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): private backups, storage retention and power scheduling.
 - [`docs/openwebui-settings.md`](docs/openwebui-settings.md): Open WebUI connections and model roles.
 - [`docs/MEMORY.md`](docs/MEMORY.md): unified-memory profile.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): live and replacement-module CU tools.

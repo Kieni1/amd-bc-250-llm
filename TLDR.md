@@ -131,20 +131,19 @@ merge changes.
 
 ## Maintenance and Wake-on-LAN
 
-Configure `/etc/bc250-llm-server/maintenance.env`, then enable only the timers
-you need:
+Fast safe baseline—verified local backups only:
 
 ```bash
-sudo systemctl enable --now owui-backup-config.timer
-sudo systemctl enable --now owui-backup-users.timer
-sudo systemctl enable --now owui-prune.timer
-sudo systemctl enable --now owui-warmup.timer
-sudo systemctl enable --now bc250-enable-wol.service
-sudo systemctl enable --now bc250-night-shutdown.timer
+sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance run backup
+sudo bc250-maintenance status
 ```
 
-Backups, restores, pruning and suspend logic remain operator-controlled. Prune
-defaults to dry-run until configured.
+Use `sudo bc250-maintenance setup` for guided pruning, optional warm-up and a
+weekday `poweroff` or `suspend` schedule. Deletion remains dry-run until
+explicitly changed, warm-up and power remain opt-in, and the API key is never
+printed. Local backups contain private data and need an encrypted off-machine
+copy for protection against disk loss. See `docs/MAINTENANCE.md`.
 
 ## Detailed references
 
@@ -152,6 +151,7 @@ defaults to dry-run until configured.
 - `docs/DEPLOYMENT.md`: services, first login and persistent data.
 - `docs/HARDENING.md` and `docs/HTTPS.md`: optional security work.
 - `docs/OLLAMA.md` and `models/README.md`: model and storage behavior.
+- `docs/MAINTENANCE.md`: backups, retention, storage and power scheduling.
 - `docs/RPM-LAYOUT.md`: installed files and state directories.
 - `docs/FILESTRUCTURE.md`: package-owned files and command-created state.
 - `docs/UNINSTALL.md`: removal and retained state.

@@ -20,6 +20,10 @@ if systemctl is-active --quiet open-webui.service 2>/dev/null; then
 fi
 if [[ -f "$SRC.sha256" ]]; then
   ( cd "$(dirname "$SRC")" && sha256sum --check --strict "$(basename "$SRC").sha256" )
+elif [[ "${ALLOW_UNVERIFIED_BACKUP:-0}" != 1 ]]; then
+  echo "ERROR: checksum sidecar is missing: $SRC.sha256" >&2
+  echo "Set ALLOW_UNVERIFIED_BACKUP=1 only after independently verifying this archive." >&2
+  exit 1
 fi
 tar -tzf "$SRC" >/dev/null
 

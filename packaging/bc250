@@ -23,6 +23,7 @@ ROUTES=(
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install-cu-manager|$LIBEXEC/install-cu-manager.sh"
   "install-ollama|$LIBEXEC/install-ollama.sh"
+  "maintenance|$LIBEXEC/maintenance.sh"
   "memory-profile|$LIBEXEC/memory-profile.sh"
   "model|$LIBEXEC/modelctl"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
@@ -61,7 +62,7 @@ Models:
 
 Operation:
   status, verify, verify-lan, benchmark, check-temp
-  install-ollama, ollama-profile, memory-profile, swap-profile
+  install-ollama, maintenance, ollama-profile, memory-profile, swap-profile
   40cu, cu-status, install-cu-manager, uninstall
 
 Optional workflows:

@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.5
-Release:        0.2.testing%{?dist}
+Release:        0.3.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -220,14 +220,20 @@ fi
 %ghost %dir %attr(0750,ollama,ollama) /var/cache/bc250-llm-server/huggingface
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/ollama
 %ghost %dir %attr(0750,root,root) /var/lib/open-webui
-%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server
-%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/config
-%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/users
-%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback
-%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/config
-%ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/users
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/config
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/users
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/config
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.5-0.3.testing
+- Add one fast maintenance setup, status, manual-run and disable command
+- Serialize persistent backups and keep deletion and model warm-up opt-in
+- Make after-hours poweroff or suspend safe without requiring Wake-on-LAN
+- Harden upload pruning against disabled rules and incomplete file metadata
+
 * Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.5-0.2.testing
 - Split guided model setup into sequential list, selection and installation phases
 - Verify the selected RPM NEVRA and complete both post-install diagnostic reports

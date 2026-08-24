@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.5-0.3.testing - 2026-08-24
+
+The optional maintenance stack now has one `bc250-maintenance` command for a
+fast backup-only baseline, guided office scheduling, storage/backup status,
+manual runs and clean schedule disabling. Local backups persist across missed
+timer events and are serialized with idle I/O priority.
+
+Upload pruning retains its safe dry-run default, treats zero as “disable this
+rule” instead of “delete everything,” and preserves files whose age or size is
+not trustworthy. Warm-up is still opt-in, now follows the current standard
+office model and keeps it resident for only 15 minutes by default.
+
+The former suspend-only helper is now an explicit `poweroff` or `suspend`
+action. It covers HTTP as well as HTTPS/SSH/Ollama sessions, no longer fails
+merely because Wake-on-LAN was not configured, and can require verified WOL
+before acting. Documentation distinguishes same-disk recovery points from an
+encrypted complete off-machine backup.
+
 ## 0.9.5-0.2.testing - 2026-08-24
 
 The guided model stage is divided into four complete phases: production, task,

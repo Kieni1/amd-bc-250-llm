@@ -15,6 +15,10 @@ done
 gzip -t "$SRC"
 if [[ -f "$SRC.sha256" ]]; then
   ( cd "$(dirname "$SRC")" && sha256sum --check --strict "$(basename "$SRC").sha256" )
+elif [[ "${ALLOW_UNVERIFIED_BACKUP:-0}" != 1 ]]; then
+  echo "ERROR: checksum sidecar is missing: $SRC.sha256" >&2
+  echo "Set ALLOW_UNVERIFIED_BACKUP=1 only after independently verifying this backup." >&2
+  exit 1
 fi
 if systemctl is-active --quiet open-webui.service 2>/dev/null; then
   echo "ERROR: stop Open WebUI before restoring: sudo systemctl stop open-webui" >&2
@@ -65,26 +69,32 @@ chmod --reference="$DB" "$pre"
 rollback_db(){
   echo "Restoring pre-restore snapshot: $pre" >&2
   rm -f -- "$DB-wal" "$DB-shm"
-  cp -a -- "$pre" "$DB"
+  if ! sqlite3 "$pre" ".timeout 10000" ".backup '$DB'"; then
+    echo "CRITICAL: automatic database rollback failed. Keep Open WebUI stopped." >&2
+    return 1
+  fi
+  chown --reference="$pre" "$DB"
+  chmod --reference="$pre" "$DB"
+  [[ "$(sqlite3 "$DB" 'PRAGMA integrity_check;')" == ok ]]
 }
 tmp="$(mktemp)"
 trap 'rm -f "$tmp"' EXIT
 zcat "$SRC" > "$tmp"
 if ! sqlite3 "$DB" < "$tmp"; then
   echo "ERROR: restore failed; restoring pre-restore snapshot." >&2
-  rollback_db
+  rollback_db || true
   exit 1
 fi
 [[ "$(sqlite3 "$DB" 'PRAGMA integrity_check;')" == "ok" ]] || {
   echo "ERROR: restored DB failed integrity_check." >&2
-  rollback_db
+  rollback_db || true
   exit 1
 }
 fk_issues="$(sqlite3 "$DB" 'PRAGMA foreign_key_check;' 2>/dev/null || true)"
 [[ -z "$fk_issues" ]] || {
   echo "ERROR: restored DB failed foreign_key_check." >&2
   printf '%s\n' "$fk_issues" >&2
-  rollback_db
+  rollback_db || true
   exit 1
 }
 sqlite3 "$DB" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1 || true

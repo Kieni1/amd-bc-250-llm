@@ -35,6 +35,24 @@ chmod --reference="$DB" "$stage/webui.db"
 touch --reference="$DB" "$stage/webui.db"
 tar -C "$stage" -czf "$archive_tmp" .
 tar -tzf "$archive_tmp" >/dev/null
+python3 - "$archive_tmp" <<'PY_VALIDATE'
+import pathlib
+import sys
+import tarfile
+
+seen_db = False
+with tarfile.open(sys.argv[1], "r:gz") as archive:
+    for member in archive.getmembers():
+        path = pathlib.PurePosixPath(member.name)
+        if path.is_absolute() or ".." in path.parts:
+            raise SystemExit(f"unsafe backup member: {member.name}")
+        if not (member.isdir() or member.isfile()):
+            raise SystemExit(f"unsupported backup member: {member.name}")
+        if path.name == "webui.db":
+            seen_db = True
+if not seen_db:
+    raise SystemExit("backup archive does not contain webui.db")
+PY_VALIDATE
 
 stamp="$(date +%F_%H%M%S)"
 out="$OUT_DIR/owui-config-$stamp.tar.gz"

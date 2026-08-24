@@ -401,6 +401,7 @@ remove_setup_files() {
     /etc/nginx/conf.d/00-bc250-websocket-map.conf.rpmsave \
     /var/log/bc250-llm-install.log
   rm -rf -- \
+    /etc/systemd/system/bc250-night-shutdown.timer.d \
     /etc/bc250-llm-server \
     /etc/cyan-skillfish-governor-smu \
     /var/lib/bc250-llm-server \

@@ -43,6 +43,11 @@ add HTTPS or stop the stack—see `HARDENING.md`.
 /var/backups/bc250-llm-server         verified maintenance backups and rollback copies
 ```
 
+The default maintenance backups are confidential and live on the same
+filesystem; they are recovery points, not protection against disk loss. Keep
+an encrypted off-machine copy and take a complete stopped-service Open WebUI
+snapshot before upgrades. See `MAINTENANCE.md`.
+
 The Open WebUI Quadlet uses a private `:Z,U` volume mount. Do not run
 `restorecon -RF /var/lib/open-webui`; Podman applies the private container label
 when the service starts.
