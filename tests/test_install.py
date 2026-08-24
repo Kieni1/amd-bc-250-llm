@@ -35,6 +35,7 @@ remove_fedora_ollama
 def run_model_phase_probe() -> subprocess.CompletedProcess[str]:
     script = r'''
 source "$1"
+script() { :; }
 bc250-model() { printf 'model:%s\n' "$*"; }
 bc250-setup-task-model() { printf 'task:%s\n' "$*"; }
 bc250-setup-coding-agent() { printf 'agentic:%s\n' "$*"; }
