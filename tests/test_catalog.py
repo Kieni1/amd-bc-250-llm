@@ -78,6 +78,14 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(modelctl.ModelError, "exactly one.*Source"):
                 modelctl.load_modelfile(path)
 
+    def test_task_model_accepts_open_webui_integrated_task_prompts(self) -> None:
+        source = MODELFILES / "task-gemma3-1b-unsloth-ud-q4-k-xl.Modelfile"
+        text = source.read_text(encoding="utf-8")
+        self.assertIn("PARAMETER num_predict 128", text)
+        self.assertNotRegex(
+            text, r"(?m)^SYSTEM\s", msg="task prompts must come from Open WebUI"
+        )
+
     def test_ollama_toml_catalogs_are_not_part_of_the_source_tree(self) -> None:
         source_dir = ROOT / "models/sources"
         self.assertFalse(source_dir.exists() and any(source_dir.glob("*.toml")))

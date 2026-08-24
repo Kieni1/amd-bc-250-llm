@@ -185,8 +185,8 @@ sudo bc250-40cu enable
 The dedicated agent set are
 `agentic-ornith1-9b-deepreinforce-q5-k-m` and
 `agentic-qwable9b-empero-q6-k`. 
-The dedicated task model is `task-gemma3-1b-unsloth-ud-q4-k-xl` to generate 
-chat titles in openweb-ui.
+The dedicated task model is `task-gemma3-1b-unsloth-ud-q4-k-xl` for Open WebUI
+background tasks such as titles, tags and retrieval-query generation.
 The current production set is
 - Translation: `prod-ministral3-8b-unsloth-ud-q5-k-xl` and
   `prod-qwen35-9b-hauhaucs-uncensored-q6-k`.
