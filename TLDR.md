@@ -1,157 +1,108 @@
-# BC-250 LLM appliance: quick operations
-
-This is the short operator path for the Fedora 44 testing package. Commands are
-also available as `bc250 COMMAND`; for example, `bc250 verify` and
-`bc250-verify` are equivalent.
+# BC-250 LLM appliance: quick sheet
 
 ## Install
 
-```bash
-git clone <repo-name>
-make validate
-sudo bash scripts/ci-local.sh
-sudo dnf install ./dist/bc250-llm-server-*.x86_64.rpm
-sudo bc250-install-ollama
-sudo bc250-verify
-```
-
-Or run `sudo ./install` for the guided filesystem-to-verification workflow.
-Rerun it after the requested memory-profile reboot. Never install the
-`dist/*.src.rpm`; it contains build sources, not runtime commands.
-During model setup, each category is listed, selected and installed before the
-next category is shown; Enter skips only that category. After an interrupted
-system-setup run, `sudo ./install --models-only` resumes these optional model
-phases without reinstalling the package.
-
-Full destructive removal is `sudo bc250-uninstall`; ordinary
-`sudo dnf remove bc250-llm-server.x86_64` keeps persistent appliance data.
-
-Open `http://SERVER_IP/` only from the trusted LAN and register the first Open
-WebUI administrator immediately. The default endpoint is HTTP, not HTTPS.
-
-Useful service checks:
+Keep the binary RPM beside the repository's installer, then run:
 
 ```bash
-sudo bc250-status
-systemctl status cyan-skillfish-governor-smu ollama nginx
-systemctl status tika open-webui
-curl -fsS http://127.0.0.1:11434/api/tags
+sudo ./install
 ```
 
-## Models
-
-The manager discovers strict `.Modelfile` templates directly. Select packaged
-models by name or index, or copy the example and add an operator model:
+Rerun it after the requested reboot. Resume only model selection with:
 
 ```bash
-bc250-model list production
-sudo bc250-fetch-models
-
-sudo install -m0644 \
-  /usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example \
-  /etc/bc250-llm-server/models.d/prod-example-source-q4-k-m.Modelfile
-sudoedit /etc/bc250-llm-server/models.d/prod-example-source-q4-k-m.Modelfile
-sudo bc250-fetch-experiments
-
-# Explicit disk cleanup; review the list before selecting anything
-sudo bc250-model cleanup production --list
-sudo bc250-model cleanup production MODEL-ID
+sudo ./install --models-only
 ```
 
-Dedicated instances and optional inputs:
+The model stage asks separately for production, task, agentic and embedding
+models. Enter skips only the current category.
 
-```bash
-sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
-sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
-sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
-sudo bc250-fetch-mtp
-```
-
-Task and agent instances have separate model stores below `/var/lib/bc250-llm-server` and do not
-replace the main Ollama service. Keep ports 11434–11436 blocked from untrusted
-networks. MTP entries are download-only llama.cpp inputs.
-
-## Profiles and CU tools
-
-```bash
-sudo bc250-memory-profile recommend
-sudo bc250-memory-profile status
-sudo bc250-swap-profile status
-sudo bc250-ollama-profile status
-sudo bc250-cu-status
-```
-
-Memory, swap and Ollama profile changes are explicit and reversible. The guided
-installer automatically prepares the matching replacement module, but never
-enables experimental CUs:
-
-```bash
-sudo bc250-40cu status
-sudo bc250-40cu enable          # only activation step; rebuilds initramfs and reboots
-sudo bc250-40cu live-full       # route all 40 WGP/CU live
-sudo bc250-40cu live-stock      # restore stock dispatch live
-```
-
-if you have less than 40 stable CUs you need to set them up over the live-manager 
-script, start the live manager directly
-```bash
-sudo bc250-cu-live-manager menu
-#[e] -> [w] -> [i] 
-# Show status after a reboot to check persistence
-sudo bc250-cu-live-manager status
-```
-kernel-update first prepare then enable the CUs again
-
-```bash
-sudo bc250-40cu prepare
-sudo bc250-40cu enable
-```
-
-Read `docs/CU-UNLOCK.md` before changing CU routing.
-
-## Verification, coding and experiments
+## Verify and open the UI
 
 ```bash
 sudo bc250-status
 sudo bc250-verify
 bc250-verify-lan SERVER_IP
-sudo llm-run-diagnose
-bc250-benchmark
-bc250-check-temp
-
-bc250-code --help
-bc250-code-commit --help
-bc250-gitea-review --help
-bc250-compare-experiments
-bc250-run-mtp --help
 ```
 
-Coding helpers generate local output or commits; they do not push, approve or
-merge changes.
+Open `http://SERVER_IP/` from the trusted LAN and register the first
+administrator. HTTP is not encrypted.
 
-## Maintenance and Wake-on-LAN
-
-Fast safe baseline—verified local backups only:
+## Models
 
 ```bash
+bc250-model list production
+bc250-model list experiments
+bc250-model list task
+bc250-model list agentic
+bc250-model list embedding
+
+sudo bc250-fetch-models
+sudo bc250-fetch-experiments
+sudo bc250-fetch-embeddings
+sudo bc250-setup-task-model
+sudo bc250-setup-coding-agent
+
+# Review before removing source GGUF and Ollama registration
+sudo bc250-model cleanup production --list
+sudo bc250-model cleanup production MODEL-NAME
+```
+
+Selections accept a full name, displayed index, range such as `0,2-4`, or
+`all`. With no selection, the command prompts; Enter cancels.
+
+## Profiles and hardware
+
+```bash
+sudo bc250-memory-profile status
+sudo bc250-swap-profile status
+sudo bc250-ollama-profile status
+sudo bc250-cu-status
+sudo bc250-40cu status
+```
+
+The guided installer applies the memory/swap profiles and prepares the
+kernel-specific 40-CU module, but leaves extra CUs disabled. Test the feasible
+CU count for the individual board; see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
+
+## Operations
+
+```bash
+bc250-benchmark
+bc250-check-temp
+sudo llm-run-diagnose --no-load
+
 sudo bc250-maintenance setup --defaults
 sudo bc250-maintenance run backup
 sudo bc250-maintenance status
 ```
 
-Use `sudo bc250-maintenance setup` for guided pruning, optional warm-up and a
-weekday `poweroff` or `suspend` schedule. Deletion remains dry-run until
-explicitly changed, warm-up and power remain opt-in, and the API key is never
-printed. Local backups contain private data and need an encrypted off-machine
-copy for protection against disk loss. See `docs/MAINTENANCE.md`.
+`setup --defaults` enables verified local backups only. Guided maintenance can
+also configure dry-run upload pruning, optional warm-up and optional after-hours
+power saving.
 
-## Detailed references
+## Services
 
-- `docs/COMMANDS.md`: complete command and override reference.
-- `docs/DEPLOYMENT.md`: services, first login and persistent data.
-- `docs/HARDENING.md` and `docs/HTTPS.md`: optional security work.
-- `docs/OLLAMA.md` and `models/README.md`: model and storage behavior.
-- `docs/MAINTENANCE.md`: backups, retention, storage and power scheduling.
-- `docs/RPM-LAYOUT.md`: installed files and state directories.
-- `docs/FILESTRUCTURE.md`: package-owned files and command-created state.
-- `docs/UNINSTALL.md`: removal and retained state.
+```bash
+sudo systemctl status \
+  cyan-skillfish-governor-smu.service \
+  ollama.service open-webui.service tika.service nginx.service
+curl -fsS http://127.0.0.1:11434/api/tags
+```
+
+Optional task and agent services use `ollama-task.service` on port `11435` and
+`ollama-agent.service` on `11436`. Keep ports `11434`–`11436` blocked from
+untrusted networks.
+
+## Remove
+
+```bash
+# Keep models and persistent application data
+sudo dnf remove bc250-llm-server.x86_64
+
+# Explicitly purge the complete appliance setup
+sudo bc250-uninstall
+```
+
+See [`docs/COMMANDS.md`](docs/COMMANDS.md) for every installed command and
+[`docs/UNINSTALL.md`](docs/UNINSTALL.md) before a full purge.

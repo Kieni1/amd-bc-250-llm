@@ -1,12 +1,4 @@
-# Fedora 44 kernel memory argument
-
-This package recommends one explicit argument for the BC-250 LLM profile:
-
-```text
-ttm.pages_limit=4194304
-```
-
-Use the packaged helper:
+# Fedora memory argument
 
 ```bash
 sudo bc250-memory-profile recommend
@@ -15,11 +7,17 @@ sudo reboot
 sudo bc250-memory-profile status
 ```
 
-It removes legacy `amdgpu.gttsize`, `ttm.page_pool_size` and
-`amdgpu.ppfeaturemask` arguments before applying the TTM limit. The RPM itself
-never changes boot entries or reboots the machine.
+The reviewed BC-250 LLM profile applies only:
 
-To return to kernel defaults:
+```text
+ttm.pages_limit=4194304
+```
+
+It removes legacy `amdgpu.gttsize`, `ttm.page_pool_size` and
+`amdgpu.ppfeaturemask` arguments. The RPM itself never changes boot entries or
+reboots.
+
+Return to kernel defaults with:
 
 ```bash
 sudo bc250-memory-profile remove

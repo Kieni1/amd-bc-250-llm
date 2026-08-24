@@ -1,24 +1,19 @@
-# Benchmark tools
-
-`compare-models.sh` is an end-to-end Ollama benchmark for the BC-250. It records
-cold and warm streaming latency, time to first visible content and answer,
-prompt evaluation, decode throughput, model-load time, optional context curves,
-and optional sustained-load drift.
-
-Run it as the normal operator account while Ollama is available:
+# Benchmark
 
 ```bash
 bc250-benchmark
-```
 
-The script writes a CSV and metadata file in the current directory. Use the same
-Ollama version, governor configuration, context settings, prompt settings and
-cooling state when comparing runs. The numbers describe this Ollama deployment;
-they are not a pure Vulkan microbenchmark and do not measure Open WebUI, RAG,
-Tika, browser rendering or answer quality.
-
-For a temperature/power trace in a second terminal:
-
-```bash
+# Optional sensor trace in another terminal
 /usr/libexec/bc250-llm-server/log_sensors.sh sensors.log
 ```
+
+The interactive benchmark records cold/warm latency, time to first content and
+answer, prompt evaluation, decode throughput, model load time, optional context
+curves and sustained-load drift. It writes timestamped CSV and metadata files
+in the current directory.
+
+Use the same Ollama version, model revision, governor, context, prompts and
+cooling state when comparing results. The benchmark measures this Ollama
+deployment; it does not measure Open WebUI, RAG, Tika, browser rendering or
+answer quality. See [`../../docs/COMMANDS.md`](../../docs/COMMANDS.md) for
+environment controls.

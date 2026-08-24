@@ -1,41 +1,29 @@
-# Sensors and optional fan control
+# Sensors and fan control
 
-The main RPM loads `nct6683` for conservative sensor visibility. It does not
-install an experimental PWM fan-control driver.
-
-Some community setups use an `nct6687` or `nct6687d` out-of-tree module to gain
-PWM control. That driver is optional, kernel-specific and may need rebuilding
-after every kernel update.
-
-Never load `nct6683` and `nct6687` at the same time. They target the same
-Super-I/O hardware and can conflict. Check with:
+## Check the active hardware interface
 
 ```bash
 lsmod | grep -E '^nct6683|^nct6687'
 sensors
 sudo bc250-status
 sudo bc250-verify
+bc250-check-temp [--watch]
 ```
 
-`bc250-status` summarizes the active hwmon drivers, selected temperature,
-power and fan readings, and the number of exposed PWM control files.
-`bc250-verify` additionally treats loading both driver families as a failure
-and warns when an experimental `nct6687` driver exposes no PWM controls.
+The RPM loads `nct6683` for conservative sensor visibility. It does not install
+an experimental PWM driver. Status reports temperatures, power, fan readings
+and exposed PWM controls; verification fails if conflicting driver families
+are loaded.
 
-Before replacing the default driver:
+Community setups sometimes use the out-of-tree
+[`nct6687d`](https://github.com/Fred78290/nct6687d) driver for PWM control. It
+is optional, kernel-specific and may require rebuilding after every kernel
+update. Never load `nct6683` and `nct6687` together because they target the same
+Super-I/O hardware.
 
-1. Keep a working fan curve in hardware or an independent fan controller.
-2. Record current temperatures and fan behavior.
-3. Disable the default `nct6683` module configuration.
-4. Build the optional module for the exact running kernel.
-5. Confirm fan control and temperature reporting before sustained loads.
+Before replacing the default, keep an independent safe fan curve, record
+temperatures, build for the exact running kernel and confirm both cooling and
+sensor reporting before sustained inference. This workflow remains outside the
+base package until tested on the target board.
 
-This RPM intentionally leaves that process outside automatic installation.
-If fan control is later packaged, it should be a separate optional subpackage
-with explicit apply, status and remove operations rather than part of the base
-LLM appliance.
-
-## Reference
-
-- https://elektricm.github.io/amd-bc250-docs/system/sensors/
-- https://github.com/Fred78290/nct6687d
+Hardware reference: [ElektricM BC-250 sensors](https://elektricm.github.io/amd-bc250-docs/system/sensors/).

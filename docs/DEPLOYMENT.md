@@ -1,70 +1,57 @@
-# Deployment notes
+# Deployment
 
-This package is a trusted-LAN testing profile, not an Internet-facing
-appliance.
+The default deployment is a pre-production service for one trusted office LAN.
+It is not suitable for direct Internet exposure.
 
-## Services
+## Check the stack
 
 ```bash
+sudo bc250-status
+sudo bc250-verify
 sudo systemctl status \
   cyan-skillfish-governor-smu.service \
-  ollama.service tika.service open-webui.service nginx.service
+  ollama.service open-webui.service tika.service nginx.service
+bc250-verify-lan SERVER_IP
 ```
 
-Open WebUI is published only on `127.0.0.1:3000`; nginx exposes it through the
-standard HTTP service. Tika remains private on the Podman network.
+Open `http://SERVER_IP/` and register the first Open WebUI account immediately;
+it becomes the administrator.
 
-Ollama listens on `0.0.0.0:11434` so the rootful container can access the host.
-Task and agent setup add `ollama-task.service` on `11435` and
-`ollama-agent.service` on `11436`. The package does not open any of these ports
-in firewalld. Verify the active firewall zone and do not expose the
-unauthenticated APIs to untrusted networks. **If firewalld is inactive, enabled
-Ollama instances are exposed on every configured host interface.**
+## Services and ports
 
-## First login
+| Service | Listener | Purpose |
+|---|---|---|
+| nginx | `SERVER_IP:80` | Trusted-LAN entry point |
+| Open WebUI | `127.0.0.1:3000` | Local UI behind nginx |
+| Ollama main | `0.0.0.0:11434` | Chat, experiments and embeddings |
+| Ollama task | `0.0.0.0:11435` | Optional task model |
+| Ollama agent | `0.0.0.0:11436` | Optional coding/agentic models |
+| Tika | private container network | Document extraction |
 
-Open `http://SERVER_IP/` from the trusted LAN and register the first account
-immediately. It becomes the Open WebUI administrator.
-
-## HTTPS
-
-HTTP sends credentials and prompts in clear text. Follow `docs/HTTPS.md` before
-using untrusted networks.
-
-For a short set of closure options—remove LAN access, restrict it to a subnet,
-add HTTPS or stop the stack—see `HARDENING.md`.
+The rootful Open WebUI container requires the host Ollama listeners. The RPM
+does not open ports `11434`–`11436` in firewalld; keep them blocked from
+untrusted networks. If firewalld is disabled, enabled Ollama instances are
+reachable on all configured host interfaces.
 
 ## Persistent data
 
 ```text
-/var/lib/bc250-llm-server             GGUF files, rendered Modelfiles and Ollama stores
-/var/cache/bc250-llm-server           Hugging Face cache and reusable 40-CU kernel source
-/var/lib/open-webui                   Open WebUI state
-/var/backups/bc250-llm-server         verified maintenance backups and rollback copies
+/var/lib/bc250-llm-server      GGUFs, rendered Modelfiles and Ollama stores
+/var/cache/bc250-llm-server    Hugging Face and 40-CU build caches
+/var/lib/open-webui            Accounts, chats, uploads and vector state
+/var/backups/bc250-llm-server  Verified local backups and rollback copies
 ```
 
-The default maintenance backups are confidential and live on the same
-filesystem; they are recovery points, not protection against disk loss. Keep
-an encrypted off-machine copy and take a complete stopped-service Open WebUI
-snapshot before upgrades. See `MAINTENANCE.md`.
+Local backups contain private office data and share the appliance disk. Copy
+them to encrypted office-controlled storage for protection against disk loss.
+Take a complete stopped-service snapshot of `/var/lib/open-webui` before an
+Open WebUI upgrade.
 
-The Open WebUI Quadlet uses a private `:Z,U` volume mount. Do not run
-`restorecon -RF /var/lib/open-webui`; Podman applies the private container label
-when the service starts.
+The Open WebUI Quadlet uses a private `:Z,U` volume mount. Let Podman apply the
+container label when the service starts; do not recursively relabel the data as
+ordinary host content.
 
-## Verification
-
-```bash
-sudo bc250-verify
-bc250-verify-lan SERVER_IP
-sudo journalctl -u open-webui.service -b -n 100 --no-pager
-```
-
-
-## Memory and swap preflight
-
-Before downloading multi-gigabyte models, check both filesystem and unified
-memory configuration:
+## Preflight for large models
 
 ```bash
 sudo bc250-memory-profile status
@@ -72,11 +59,5 @@ sudo bc250-swap-profile status
 df -h / /var/lib/bc250-llm-server
 ```
 
-Read `MEMORY.md` before changing kernel arguments. RPM scriptlets never apply
-GTT/TTM, zram or disk-swap settings. The separate guided installer can invoke
-the documented profiles and pauses for reboot.
-
-## Sensor-driver preflight
-
-The supported default is `nct6683`. An optional out-of-tree `nct6687` PWM driver
-must not be loaded at the same time. See `SENSORS.md`.
+See [`MEMORY.md`](MEMORY.md) for the reviewed unified-memory profile and
+[`HARDENING.md`](HARDENING.md) for network closure options.

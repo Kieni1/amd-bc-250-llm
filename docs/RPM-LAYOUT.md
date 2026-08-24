@@ -1,117 +1,53 @@
 # RPM layout
 
-## Main package: `bc250-llm-server`
-
-Primary commands:
-
-```text
-/usr/bin/bc250
-/usr/bin/bc250-model
-/usr/bin/bc250-benchmark
-/usr/bin/bc250-check-temp
-/usr/bin/bc250-40cu
-/usr/bin/bc250-cu-live-manager
-/usr/bin/bc250-code
-/usr/bin/bc250-code-commit
-/usr/bin/bc250-compare-experiments
-/usr/bin/bc250-fetch-experiments
-/usr/bin/bc250-fetch-embeddings
-/usr/bin/bc250-fetch-models
-/usr/bin/bc250-fetch-mtp
-/usr/bin/bc250-gitea-review
-/usr/bin/bc250-install-cu-manager
-/usr/bin/bc250-install-ollama
-/usr/bin/bc250-swap-profile
-/usr/bin/bc250-ollama-profile
-/usr/bin/bc250-memory-profile
-/usr/bin/bc250-cu-status
-/usr/bin/bc250-pull-embedding-model
-/usr/bin/bc250-run-mtp
-/usr/bin/bc250-setup-coding-agent
-/usr/bin/bc250-setup-task-model
-/usr/bin/bc250-status
-/usr/bin/bc250-uninstall-info
-/usr/bin/bc250-uninstall
-/usr/bin/bc250-verify
-/usr/bin/bc250-verify-lan
-/usr/bin/llm-run-diagnose
-```
-
-Implementation files:
-
-```text
-/usr/libexec/bc250-llm-server/
-/usr/libexec/bc250-llm-server/modelctl
-/usr/libexec/bc250-llm-server/setup-ollama-instance.sh
-/usr/libexec/bc250-llm-server/coding-agent/
-/usr/libexec/bc250-llm-server/40cu/
-```
-
-Examples and templates:
-
-```text
-/usr/share/bc250-llm-server/model-management/modelfiles/
-/usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example
-/usr/share/bc250-llm-server/examples/task-model/
-/usr/share/bc250-llm-server/examples/coding-agent/
-/usr/share/bc250-llm-server/examples/raspi-wol/
-/usr/share/bc250-llm-server/ollama-profiles/
-/usr/share/bc250-llm-server/40cu/
-/usr/share/bc250-llm-server/cu-live-manager/
-```
-
-Configuration:
-
-```text
-/etc/bc250-llm-server/
-/etc/bc250-llm-server/models.d/
-/etc/bc250-llm-server/mtp-models.toml
-/etc/cyan-skillfish-governor-smu/config.toml
-/etc/nginx/default.d/bc250-llm-server.conf
-/etc/nginx/conf.d/00-bc250-websocket-map.conf
-/usr/lib/sysusers.d/bc250-llm-server.conf
-```
-
-Persistent data is outside RPM ownership:
-
-```text
-/var/lib/bc250-llm-server/
-/var/lib/bc250-llm-server/gguf/{production,experiments,mtp,task,agent,embedding}/
-/var/lib/bc250-llm-server/modelfiles/{production,experiments,task,agent,embedding}/
-/var/lib/bc250-llm-server/ollama/{main,task,agent}/
-/var/cache/bc250-llm-server/huggingface/
-/var/lib/ollama/
-/var/lib/open-webui/
-/var/backups/bc250-llm-server/
-```
-
-Inspect package ownership without guessing paths:
+The main package is `bc250-llm-server`. Inspect the exact installed payload
+instead of relying on a static list:
 
 ```bash
 rpm -qlv bc250-llm-server.x86_64
 rpm -qc bc250-llm-server.x86_64
 rpm -qd bc250-llm-server.x86_64
 rpm -V bc250-llm-server.x86_64
+bc250 --help
 ```
 
-Files created below persistent state directories are intentionally not listed
-by `rpm -ql`; they are created by tmpfiles, containers, Ollama or operator
-commands rather than carried in the RPM payload.
+## Payload groups
 
-## Installed experimental 40-CU payload
+| Prefix | Contents |
+|---|---|
+| `/usr/bin/bc250` and `/usr/bin/bc250-*` | Dispatcher and stable aliases |
+| `/usr/libexec/bc250-llm-server/` | Host-side implementations |
+| `/usr/share/bc250-llm-server/` | Models, examples, profiles and pinned CU inputs |
+| `/usr/share/doc/bc250-llm-server/` | Operator and packaging documentation |
+| `/etc/bc250-llm-server/` | Operator model drop-ins and MTP/maintenance policy |
+| `/usr/lib/systemd/system/` | Services and timers |
+| `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
+
+`packaging/install-manifest.tsv` is the authoritative source-to-payload map.
+It drives installation and RPM ownership. Keep it limited to simple file,
+configuration, directory, alias, generated-text and ghost entries.
+
+## State outside RPM ownership
 
 ```text
-/usr/bin/bc250-40cu
-/usr/bin/bc250-cu-live-manager
-/usr/libexec/bc250-llm-server/40cu/bc250-enable-40cu-fedora.sh
-/usr/share/bc250-llm-server/40cu/bc250-40cu-amdgpu.patch
-/usr/share/bc250-llm-server/40cu/README-upstream.md
-/usr/share/bc250-llm-server/40cu/SOURCE-REVISION
-/usr/share/bc250-llm-server/cu-live-manager/README-upstream.md
-/usr/share/bc250-llm-server/cu-live-manager/SOURCE-REVISION
+/var/lib/bc250-llm-server/
+/var/cache/bc250-llm-server/
+/var/lib/ollama/
+/var/lib/open-webui/
+/var/backups/bc250-llm-server/
 ```
 
-These files belong to the main package. No RPM scriptlet builds or replaces a
-kernel module, changes CU routing, or reboots the host. The separate guided
-installer prepares the module and its initramfs copy; only
-`sudo bc250-40cu enable` activates the additional CUs.
+Services, tmpfiles and operator commands create content below these paths.
+Ordinary RPM removal intentionally preserves it.
+
+## Packaging boundaries
+
+- CU helpers and pinned inputs belong to the main package, but RPM scriptlets
+  never replace AMDGPU, change CU routing, rebuild initramfs or reboot.
+- Memory, swap, Ollama and maintenance profiles remain explicit operator or
+  guided-installer actions.
+- Model weights are never part of the RPM.
+- The source RPM is rebuild input and provides no runtime commands.
+
+See [`FILESTRUCTURE.md`](FILESTRUCTURE.md) for the operator-facing path map and
+[`../packaging/README.md`](../packaging/README.md) for maintainer policy.

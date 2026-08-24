@@ -1,12 +1,9 @@
-# Move beyond the trusted-LAN testing profile
+# Hardening the testing deployment
 
-The packaged defaults favor a quick trusted-LAN test. Before the host is placed
-on a shared, guest, routed or otherwise untrusted network, choose the controls
-that match the deployment.
+The default profile is for a trusted LAN. Choose the controls below before the
+host enters a shared, guest, routed or otherwise untrusted network.
 
-## Close all LAN web access
-
-Remove the HTTP service from the active firewalld zone:
+## Close LAN web access
 
 ```bash
 sudo firewall-cmd --get-active-zones
@@ -14,12 +11,11 @@ sudo firewall-cmd --permanent --remove-service=http
 sudo firewall-cmd --reload
 ```
 
-Open WebUI remains available locally through `http://127.0.0.1:3000`. Restore
-LAN access later with `--add-service=http` only when that is intentional.
+Open WebUI remains local at `http://127.0.0.1:3000`.
 
-## Limit HTTP to one trusted subnet
+## Restrict HTTP to one subnet
 
-Replace the example zone and subnet with the active values:
+Replace both examples with the active zone and intended office subnet:
 
 ```bash
 ZONE=public
@@ -28,23 +24,10 @@ sudo firewall-cmd --zone="$ZONE" --permanent --remove-service=http
 sudo firewall-cmd --zone="$ZONE" --permanent \
   --add-rich-rule="rule family=ipv4 source address=$TRUSTED_CIDR service name=http accept"
 sudo firewall-cmd --reload
+sudo firewall-cmd --zone="$ZONE" --list-all
 ```
 
-List the result with `sudo firewall-cmd --zone="$ZONE" --list-all`.
-
-## Add encrypted access
-
-Follow `HTTPS.md`, verify certificate renewal, then remove unrestricted HTTP or
-retain it only as an HTTPS redirect. Do not expose the first-registration page
-before the administrator account has been created.
-
-## Protect Ollama
-
-The primary Ollama listens on `0.0.0.0:11434` so the rootful Open WebUI
-container can reach it. Optional task and agent services similarly use `11435`
-and `11436`. The RPM does not open these ports in firewalld. If firewalld is
-stopped or disabled, every enabled unauthenticated Ollama API is exposed on host
-interfaces.
+## Check Ollama exposure
 
 ```bash
 sudo systemctl is-active firewalld
@@ -52,10 +35,16 @@ sudo firewall-cmd --list-all
 bc250-verify-lan SERVER_IP
 ```
 
-Keep firewalld active or redesign the deployment so Ollama and Open WebUI share
-a private container network.
+Ollama ports `11434`–`11436` have no authentication and must remain blocked
+from untrusted networks. If firewalld is inactive, enabled instances listen on
+all configured host interfaces.
 
-## Stop the application stack
+## Add HTTPS or stop services
+
+Follow [`HTTPS.md`](HTTPS.md) for encrypted access. Do not expose Open WebUI's
+first-registration page before creating the administrator account.
+
+To retain data while stopping the stack:
 
 ```bash
 sudo systemctl disable --now open-webui.service tika.service nginx.service
@@ -63,5 +52,4 @@ sudo systemctl disable --now ollama.service
 sudo systemctl disable --now ollama-task.service ollama-agent.service
 ```
 
-This retains models, accounts and documents. Re-enable only the services needed
-for the next test.
+Re-enable only the services required by the next test.

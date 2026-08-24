@@ -1,72 +1,56 @@
-# Unified memory profile
+# Unified memory and swap
 
-The reviewed Fedora 44 profile raises TTM's allocation limit to the board's
-full 16 GiB physical memory:
-
-```text
-ttm.pages_limit=4194304
-```
-
-At the normal 4 KiB page size, 4,194,304 pages equal 16 GiB. This is an
-allocation ceiling, not a reservation made at boot. Host processes and GPU
-allocations still compete for the same physical memory, so disk-backed swap is
-recommended for recovery margin.
-
-The older `amdgpu.gttsize`, `ttm.page_pool_size` and
-`amdgpu.ppfeaturemask=0xffffffff` arguments are deliberately removed. The
-feature mask produced no measurable improvement in testing, and the separate
-GTT/page-pool limits only made the effective cap harder to understand.
-
-## Apply or inspect
+## Commands
 
 ```bash
 sudo bc250-memory-profile recommend
 sudo bc250-memory-profile apply-full
 sudo reboot
 sudo bc250-memory-profile status
+sudo bc250-swap-profile status
 sudo bc250-verify
 ```
 
-The apply command first removes current and legacy arguments from every kernel
-entry, then adds only `ttm.pages_limit=4194304`. It never reboots automatically.
+The reviewed profile applies:
 
-Equivalent manual commands:
-
-```bash
-sudo grubby --update-kernel=ALL \
-  --remove-args="amdgpu.gttsize ttm.pages_limit ttm.page_pool_size amdgpu.ppfeaturemask"
-sudo grubby --update-kernel=ALL --args="ttm.pages_limit=4194304"
-sudo reboot
+```text
+ttm.pages_limit=4194304
 ```
 
-## Roll back
+At a 4 KiB page size, this is a 16 GiB allocation ceiling. It is not a boot-time
+reservation: CPU processes and GPU allocations still share the board's physical
+memory. The helper removes legacy `amdgpu.gttsize`, `ttm.page_pool_size` and
+`amdgpu.ppfeaturemask` arguments before applying the reviewed limit. It never
+reboots automatically.
+
+Return to kernel defaults with:
 
 ```bash
 sudo bc250-memory-profile remove
 sudo reboot
 ```
 
-After reboot, check `/proc/cmdline`, free memory, swap activity and a
-representative model workload. A successful boot alone does not prove workload
-stability.
+## Swap
 
-## Swap policy
-
-The separate swap profile defaults to a 2 GiB zram device and a 16 GiB disk
-swap safety margin:
+The reviewed swap profile uses 2 GiB zram plus a 16 GiB disk swap safety margin:
 
 ```bash
-sudo bc250-swap-profile status
 sudo bc250-swap-profile apply
+sudo bc250-swap-profile status
 ```
 
-`SWAP_GIB` and `ZRAM_MIB` change their sizes. `SWAPPINESS` is an optional
-integer from 0 through 200:
+Override sizes with `ZRAM_MIB` and `SWAP_GIB`. `SWAPPINESS` is optional:
 
 ```bash
 sudo SWAPPINESS=100 bc250-swap-profile apply
 ```
 
-If `SWAPPINESS` is unset, the active Fedora policy is not changed. The first
-explicit override records the prior runtime value, which
-`sudo bc250-swap-profile remove` restores.
+If unset, Fedora's current swappiness is preserved. Profile removal restores
+the value recorded before the first explicit override:
+
+```bash
+sudo bc250-swap-profile remove
+```
+
+After any change, check available memory, swap activity, GPU residency and a
+representative long model run. A successful boot alone is not a stability test.

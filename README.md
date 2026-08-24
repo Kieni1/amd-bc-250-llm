@@ -1,190 +1,59 @@
-# BC-250 local LLM server — testing RPM source
+# BC-250 local LLM server
 
-This repository packages a Fedora 44 software base for an AMD BC-250 local LLM
-appliance. It targets office writing, email, documents, coding and
-German–French translation. Board installation and operating-system provisioning
-are outside the package.
+Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
+package provides a Vulkan-oriented Ollama stack, Open WebUI, model management,
+hardware profiles, diagnostics and optional BC-250 tools.
 
-The release is pre-production and assumes a trusted LAN. It enables an
-unencrypted nginx/Open WebUI endpoint after installation. HTTPS and wider
-hardening remain explicit operator choices; see [`docs/HARDENING.md`](docs/HARDENING.md).
+This is a pre-production project for a trusted office LAN. It prioritizes
+repeatable model comparisons, local data processing and understandable
+operator controls. It is not an Internet-facing appliance, and neither model
+outputs nor experimental hardware settings should be treated as production
+assurances.
 
-## What is included
+## Install
 
-| Component | Purpose |
-| --- | --- |
-| Cyan Skillfish governor | Pinned BC-250 SMU governor, fresh-install range 350–1850 MHz |
-| Ollama integration | Vulkan-oriented service defaults and operator-run installer |
-| Open WebUI v0.11.0 and Tika | Digest-pinned rootful Quadlets with persistent local data |
-| nginx | Trusted-LAN HTTP entry point |
-| Model manager | Downloads GGUF files and registers long, traceable Ollama names |
-| Task Ollama | Optional title-generation instance on port 11435 |
-| Agent Ollama | Optional agentic instance on port 11436 |
-| Operations tools | Verification, diagnostics, benchmark, maintenance and Wake-on-LAN |
-| CU tools | Pinned live manager and explicit experimental 40-CU helper |
-
-RPM scriptlets do not download chat models, enable 40 CUs, change memory/swap
-profiles or install HTTPS. 
-The separate guided `install` workflow applies the documented memory/swap profiles 
-and prepares the replacement AMDGPU module for the running kernel. You have to 
-unlock the known good CUs for your board and set up optional maintenance scripts. 
-
-## Source layout
-
-- `cmd/` contains host-side operational commands and units.
-- `config/` contains shipped governor, nginx and Quadlet configuration.
-- `examples/` contains operator-adapted integrations such as Raspberry Pi WOL.
-- `models/` contains Modelfiles and specialized model workflows. Only the
-  download-only MTP feature retains a TOML runtime catalog.
-- `packaging/` and `scripts/` contain RPM policy and deterministic build tools.
-- `docs/` contains operator documentation.
-
-## Build and install
-
-On Fedora 44:
+Build the RPM on Fedora 44, then keep the repository's `install` script beside
+the binary RPM on the BC-250:
 
 ```bash
-sudo dnf install -y make rpm-build rust cargo gcc \
-  systemd-rpm-macros libdrm-devel curl tar gzip xz python3
 make rpm
-sudo dnf install ./dist/bc250-llm-server-*.x86_64.rpm
+sudo ./install --rpm dist
 ```
 
-`make rpm` validates the repository, creates the project Source0 archive,
-reuses or downloads the four pinned external build inputs, and builds the
-binary and source RPMs. `make clean` keeps that source cache. The installable 
-binary and build-only source RPMs are written together under `dist/`.
-Installing a `.src.rpm` does not provide any `bc250-*` command.
+The guided installer:
 
-For the guided workflow, including filesystem growth, profiles, model setup and
-verification, copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) 
-besides the .rpm onto the bc250:
+1. grows the root filesystem when possible;
+2. updates Fedora and installs the local binary RPM;
+3. installs the official Ollama build;
+4. applies the reviewed memory and swap profiles;
+5. prepares, but does not enable, optional 40-CU support;
+6. offers production, task, agentic and embedding models separately; and
+7. verifies the result.
 
-```bash
-sudo ./install
-```
-
-The installer pauses for the required reboot and is then rerun. It prepares and
-checks 40-CU support once, but leaves activation to the explicit
-`sudo bc250-40cu enable` for 40 CUs or fewer than 40 over the live-manager 
-command `sudo bc250-cu-live-manager` menu. It does not enable maintenance timers.
-The model stage handles one category at a time: it lists production, prompts
-and completes that selection before proceeding to task, agentic and embedding
-models. Enter skips only the current category. If system setup was interrupted
-after the RPM was installed, resume these model phases with:
+Rerun it after the requested reboot. To resume only the four model-selection
+phases, use:
 
 ```bash
 sudo ./install --models-only
 ```
 
-This mode does not grow filesystems, update Fedora, reinstall the RPM or change
-the memory and CU setup.
+The RPM and installer do not choose a stable CU count for the board, enable
+maintenance schedules or configure HTTPS. Those remain explicit operator
+decisions.
 
-The guided installer records the RPM packages it adds so the explicit full
-purge can remove that bounded set later. To remove the complete appliance setup,
-including models, Open WebUI data, Ollama, profiles and 40-CU persistence, run:
-
-```bash
-sudo bc250-uninstall
-```
-
-This is intentionally different from `dnf remove`, which retains persistent
-state. Review [`docs/UNINSTALL.md`](docs/UNINSTALL.md) before purging.
-
-GitHub Actions provides the same Fedora 44 `make rpm` build as a manually
-started workflow.
-
-## First setup with install script
-
-Install Fedora 44 with additional packages for headless management
-Log in and run 
+## First checks
 
 ```bash
-sudo dnf up
-```
-
-then set up remote acces of your choice. Basic is adding two lines to 
-`/etc/ssh/sshd_config` for remote management:
-
-```bash
-PasswordAuthentication yes
-AllowUsers <username>
-```
-
-reboot and access the bc250.
-
-Download the .rpm from git
-
-```bash
-curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.5/bc250-llm-server-0.9.5-0.3.testing.fc44.x86_64.rpm
-```
-
-copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) besides the .rpm onto the bc250 and run it:
-
-```bash
-sudo ./install
-```
-
-After an automatic reboot you have to execute the script again. Choose then
-models from the preselection for testing.
-
-Finish with setting up optional workflows, the 40 CU unlock (recommended!) and 
-optional maintenance scripts.
-
-to enable all 40 cus execute:
-```bash
-sudo bc250-40cu enable
-# if you have less than 40 stable CUs you need to set them up over the 
-# live-manager script
-# Start the live manager directly
-sudo bc250-cu-live-manager menu
-[e] -> [w] -> [i] 
-# Show status after a reboot
-sudo bc250-cu-live-manager status
-```
-
-No CU tool is activated by RPM installation or guided preparation. Read
-[`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md) before using it.
-
-After every Fedora kernel update, boot the new kernel, rerun
-`sudo bc250-40cu prepare`, reapply the intended CU mode and reboot. Use
-`sudo bc250-verify` to compare the running kernel, kernel-devel tree and AMDGPU
-module vermagic instead of relying on a hard-coded Fedora kernel version.
-
-## Optional workflows and commands
-
-These are some examples, check [`docs/COMMANDS.md`](docs/COMMANDS.md)
-
-```bash
-# Dedicated task and agentic models; omit the name to select interactively
-sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
-sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
-
-# Embedding, experiments and MTP
-sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
-sudo bc250-fetch-experiments
-sudo bc250-fetch-mtp
-
-# Diagnostics and benchmark
 sudo bc250-status
 sudo bc250-verify
-sudo llm-run-diagnose
-bc250-benchmark
-
-# Runtime profiles and explicit CU tools
-sudo bc250-ollama-profile status
-sudo bc250-memory-profile status
-sudo bc250-swap-profile status
-sudo bc250-maintenance setup --defaults
-sudo bc250-maintenance status
-sudo bc250-cu-status
-sudo bc250-40cu status
-# The installer has already prepared the matching module. This is the only
-# command that activates experimental additional CUs and it reboots the host:
-sudo bc250-40cu enable
+bc250-verify-lan SERVER_IP
 ```
 
-## Current recommended models
+Open `http://SERVER_IP/` only from the trusted LAN and register the first Open
+WebUI administrator immediately. The default endpoint is unencrypted HTTP; see
+[`docs/HARDENING.md`](docs/HARDENING.md) before using a less trusted network.
+
+## Recommended starting models
 
 | Role | Model |
 |---|---|
@@ -196,56 +65,111 @@ sudo bc250-40cu enable
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
-These are the current starting set, not a fixed production contract. All other
-packaged Modelfiles remain selectable for hardware and quality comparisons.
+These are starting points, not a fixed production set. Packaged and
+operator-added `.Modelfile` definitions remain easy to replace for hardware,
+quality and quantization comparisons. The Jina embedding model uses a
+non-commercial license; review every model's current license before use.
 
-Model names deliberately expose family, source and quantization in `ollama
-list` and Open WebUI. Modelfile discovery, all current templates, storage behavior and
-revision overrides are documented in [`models/README.md`](models/README.md).
-In Ollama you must set by hand the recommendations in 
-[`docs/openwebui-settings.md`](docs/openwebui-settings.md).
+## Daily commands
 
-## Acknowledgements
+```bash
+# Models
+bc250-model list production
+sudo bc250-fetch-models
+sudo bc250-fetch-experiments
+sudo bc250-fetch-embeddings
+sudo bc250-setup-task-model
+sudo bc250-setup-coding-agent
 
-This package is an integration of work from many other developers and
-communities. In particular, thank you to:
+# Profiles and hardware
+sudo bc250-memory-profile status
+sudo bc250-swap-profile status
+sudo bc250-ollama-profile status
+sudo bc250-40cu status
 
-- [filippor](https://github.com/filippor/cyan-skillfish-governor) and
-  [Magnap](https://github.com/Magnap/cyan-skillfish-governor) for the Cyan
-  Skillfish governor.
-- [fduraibi](https://github.com/fduraibi/bc250-40cu-unlock) and
-  [duggasco](https://github.com/duggasco/bc250-40cu-unlock) for the 40-CU
-  research and unlock work.
-- [WinnieLV](https://github.com/WinnieLV/bc250-cu-live-manager) for the live
-  CU manager.
-- [DryhoppedIPA](https://github.com/DryhoppedIPA/bc250-gfx1013-fix) for the
-  experimental paired GFX1013 kernel/RADV compute-queue investigation.
-- [ElektricM’s BC-250 documentation](https://elektricm.github.io/amd-bc250-docs/),
-  [redbeard1083’s toolkit](https://github.com/redbeard1083/bc250-toolkit) and
-  [the SteamOS toolkit references](https://github.com/rpf16rj/bc250-steamos-real-toolkit)
-  for hardware findings and operational examples.
-- The Fedora, Linux kernel, Mesa, Ollama, Open WebUI, Hugging Face, Podman,
-  nginx and Apache Tika developers whose software provides the appliance base.
+# Optional maintenance
+sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance status
+```
 
-The exact code carried by the RPM, pinned revisions and licensing notes are
-listed in [`licenses/THIRD_PARTY_NOTICES.md`](licenses/THIRD_PARTY_NOTICES.md).
+The complete installed interface and its exact syntax are in
+[`docs/COMMANDS.md`](docs/COMMANDS.md).
+
+## Components
+
+| Component | Purpose |
+|---|---|
+| Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
+| Ollama | Official install, Vulkan-oriented service defaults and three isolated stores |
+| Open WebUI v0.11.0 and Tika | Digest-pinned local UI and document extraction |
+| nginx | Trusted-LAN HTTP entry point |
+| Model manager | Strict Modelfile discovery, GGUF download, registration and cleanup |
+| Operations | Status, verification, benchmark, maintenance and diagnostics |
+| CU tools | Default-off replacement-module helper and live WGP manager |
+
+The main Ollama instance uses port `11434`; optional task and agent instances
+use `11435` and `11436`. Keep all three unauthenticated APIs blocked from
+untrusted networks.
+
+## Source and build
+
+```bash
+sudo dnf install -y make rpm-build rust cargo gcc \
+  systemd-rpm-macros libdrm-devel curl tar gzip xz python3
+make validate
+make rpm
+```
+
+Binary and source RPMs are written together under `dist/`. Install the
+`*.x86_64.rpm`; the `*.src.rpm` is build input and provides no commands.
+Third-party governor and CU sources are pinned in `packaging/upstreams.toml`
+and cached under `sources/`.
+
+Repository groups:
+
+- `cmd/`: host commands, services and timers;
+- `config/`: shipped governor, nginx and container configuration;
+- `models/`: Modelfiles and specialized model workflows;
+- `packaging/` and `scripts/`: RPM policy and build tooling;
+- `docs/`: operator references.
 
 ## Documentation
 
-- [`TLDR.md`](TLDR.md): setup and command overview.
-- [`docs/COMMANDS.md`](docs/COMMANDS.md): commands and environment overrides.
-- [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): installed files and generated state.
+- [`TLDR.md`](TLDR.md): short installation and operations sheet.
+- [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
+- [`models/README.md`](models/README.md): model discovery, addition and storage.
+- [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
+- [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): backups, retention and power.
+- [`docs/openwebui-settings.md`](docs/openwebui-settings.md): current UI connections and model roles.
+- [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): package, configuration and state paths.
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): services, ports and persistent data.
-- [`docs/OLLAMA.md`](docs/OLLAMA.md): Ollama installation and runtime profiles.
-- [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): private backups, storage retention and power scheduling.
-- [`docs/openwebui-settings.md`](docs/openwebui-settings.md): Open WebUI connections and model roles.
-- [`docs/MEMORY.md`](docs/MEMORY.md): unified-memory profile.
-- [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): live and replacement-module CU tools.
-- [`docs/GFX1013-COMPUTE-QUEUES.md`](docs/GFX1013-COMPUTE-QUEUES.md): optional experimental ACE patch-stack detection.
-- [`docs/REPACKAGING.md`](docs/REPACKAGING.md): RPM source refresh and release process.
-- [`docs/UNINSTALL.md`](docs/UNINSTALL.md): complete removal and retained state.
+- [`docs/UNINSTALL.md`](docs/UNINSTALL.md): RPM removal versus full purge.
+
+## Acknowledgements
+
+This repository integrates work from many developers and communities. Special
+thanks to:
+
+- [filippor](https://github.com/filippor/cyan-skillfish-governor) and
+  [Magnap](https://github.com/Magnap/cyan-skillfish-governor) for the Cyan
+  Skillfish governor;
+- [fduraibi](https://github.com/fduraibi/bc250-40cu-unlock) and
+  [duggasco](https://github.com/duggasco/bc250-40cu-unlock) for 40-CU research;
+- [WinnieLV](https://github.com/WinnieLV/bc250-cu-live-manager) for live CU
+  routing;
+- [DryhoppedIPA](https://github.com/DryhoppedIPA/bc250-gfx1013-fix) for the
+  experimental paired GFX1013 kernel/RADV work;
+- [ElektricM's BC-250 documentation](https://elektricm.github.io/amd-bc250-docs/),
+  [redbeard1083's toolkit](https://github.com/redbeard1083/bc250-toolkit) and
+  [the SteamOS toolkit references](https://github.com/rpf16rj/bc250-steamos-real-toolkit)
+  for community hardware findings; and
+- the Fedora, Linux, Mesa, Ollama, Open WebUI, Hugging Face, Podman, nginx and
+  Tika projects that provide the software base.
+
+Exact carried revisions and licensing notes are in
+[`licenses/THIRD_PARTY_NOTICES.md`](licenses/THIRD_PARTY_NOTICES.md).
 
 ## License
 
-The project is GPL-2.0-only. Pinned external sources retain their own licenses;
-see [`licenses/THIRD_PARTY_NOTICES.md`](licenses/THIRD_PARTY_NOTICES.md).
+Repository integration code and documentation are GPL-2.0-only. Pinned sources
+and model weights retain their own licenses.

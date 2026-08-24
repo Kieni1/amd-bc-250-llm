@@ -23,10 +23,10 @@ The RPM also contains or refers to separately licensed components:
 - Model weights are not shipped. Source templates identify optional
   third-party repositories only. Operators must review each model's current
   license and terms before downloading it.
-- The optional coding-agent setup references
-  `unsloth/Ministral-3-8B-Instruct-2512-GGUF` and defaults to the repository's
-  current revision. The weight is downloaded only after an explicit operator
-  command and is not part of this RPM; review its current license before use.
+- The optional task, agentic, embedding, production and experiment Modelfiles
+  reference third-party model repositories. Weights are downloaded only after
+  explicit operator selection and are not part of this RPM. Each template
+  records its source; review the current model card and license before use.
 
 ## CU live manager
 

@@ -1,112 +1,99 @@
-# Experimental 40-CU tools
+# Experimental CU tools
 
-The package carries the unlock design and pinned source from
-`fduraibi/bc250-40cu-unlock`, commit
-`6c3969ddee40e894297869e6ca30537f274619cb`. That repository is a fork of the
-current `duggasco/bc250-40cu-unlock` implementation. The project declares the
-source GPL-2.0 and its notices are retained.
-
-The RPM itself never compiles or replaces `amdgpu`, changes a module option or
-reboots. The guided `install` script performs default-off preparation after the
-host is running its newest installed kernel:
-
-1. It installs `kernel-devel-$(uname -r)`.
-2. It downloads and caches the matching kernel source when necessary.
-3. It patches, compiles and installs the replacement once for that kernel.
-4. It rebuilds the matching initramfs and inspects the module inside it.
-5. It stops without enabling additional CUs.
-
-The first preparation normally needs a roughly 120 MB kernel-source download
-and several minutes of compilation. The source archive is retained under
-`/var/cache/bc250-llm-server/40cu`; repeat runs skip both download and build
-when the running kernel is already prepared.
-
-## Operator activation
-
-After reading the risks below, the only normal activation command is:
+## Commands
 
 ```bash
-sudo bc250-40cu enable
-```
-
-Type `ENABLE-40CU` at the prompt. The command performs a final preparation
-check only when the prepared module or initramfs copy is missing. It then writes
-the module option, rebuilds the initramfs once and reboots. After the machine
-returns, verify the loaded—not merely installed—module:
-
-```bash
-sudo bc250-40cu verify
-```
-
-`status` deliberately distinguishes three states: the module installed below
-`/usr/lib/modules`, the copy embedded in the initramfs, and the driver actually
-running in the kernel. An on-disk module marked `patched` is not proof that it
-loaded. If activation is configured but the running driver is stock or absent,
-the command prints relevant kernel messages.
-
-```bash
+# Inspect kernel enumeration and live routing
+sudo bc250-cu-status
 sudo bc250-40cu status
-sudo bc250-40cu disable   # mode 0 and reboot; keep the prepared module
-sudo bc250-40cu restore   # restore the verified Fedora module backup
-```
+sudo bc250-40cu verify
 
-The preparation rejects a mismatched module version and an initramfs that does
-not contain `bc250_cc_write_mode`. It also stops before replacement when Secure
-Boot or another policy enforces module signatures and no signed module is
-available. Automatic Machine Owner Key enrollment would require another
-security-sensitive user workflow, so this testing package does not hide it.
+# Activate the prepared replacement module and reboot
+sudo bc250-40cu enable
 
-Every Fedora kernel update installs a new kernel-specific stock AMDGPU module.
-After booting the new kernel, prepare the replacement again and reboot with a
-matching kernel/module pair:
+# Disable additional CUs but keep the prepared module
+sudo bc250-40cu disable
 
-```bash
+# Restore a verified Fedora module backup
+sudo bc250-40cu restore
+
+# Interactive live routing for boards with fewer than 40 stable CUs
+sudo bc250-cu-live-manager menu
+sudo bc250-cu-live-manager status
+
+# Direct live-routing helpers
+sudo bc250-40cu live-status
+sudo bc250-40cu live-full
+sudo bc250-40cu live-stock
+sudo bc250-40cu mask WGP_ID [WGP_ID ...]
+sudo bc250-40cu unmask WGP_ID [WGP_ID ...]
+sudo bc250-40cu health-test [OLLAMA_MODEL]
+
+# After booting a new Fedora kernel
 sudo bc250-40cu prepare
 sudo bc250-40cu enable
 ```
 
-The guided installer can perform the preparation instead. Preparation uses the
-running kernel and preserves the Fedora module backup used by `restore` and the
-full purge command. Never assume that a replacement prepared for the previous
-kernel remains active after an update; confirm with `sudo bc250-verify` and
-`sudo bc250-40cu status`.
+The guided installer compiles and verifies the replacement AMDGPU module for
+the running kernel, embeds it in that kernel's initramfs and stops with the
+unlock disabled. `bc250-40cu enable` is the normal activation step; it requires
+`ENABLE-40CU` and reboots.
 
-## Risks
+## Choose the stable CU count
 
-Harvested compute units may be defective. Possible failures include GPU resets,
-wrong results, artifacts, boot failures, excess power and overheating. Keep a
-second bootable kernel and local console access. Test representative inference
-correctness as well as throughput after activation.
+BC-250 boards contain harvested GPU hardware, so not every board has 40 usable
+CUs. The operator must determine the stable amount. Start by checking 40 CUs,
+then use the interactive live manager to disable unstable WGP pairs. One WGP is
+two CUs, so masking one pair gives 38 CUs and two pairs give 36 CUs. Use the
+WGP IDs reported on the actual board, not IDs copied from another system.
 
-Clock and voltage policy remains entirely the operator's responsibility. The CU
-tools do not inspect, limit or change the shipped governor configuration.
+Test representative inference output, Vulkan initialization, temperature and
+kernel logs—not only reported CU count or speed. Use the live manager's save
+and service-install workflow only after the routing table is stable, then
+confirm it after reboot with `bc250-cu-live-manager status`.
 
-The separate experimental GFX1013 compute-queue stack also replaces AMDGPU and
-must not be layered over this package's 40-CU helper as a second independent
-installer. Use a deliberately merged kernel patch plan or select one module
-workflow. See [`GFX1013-COMPUTE-QUEUES.md`](GFX1013-COMPUTE-QUEUES.md).
+The replacement module and live WGP routing solve different parts of the
+workflow. A live 40/40 table alone does not prove that the patched module is
+loaded or that all CUs produce correct results.
 
-## Pinned live manager
+## Kernel updates
 
-The RPM also contains the live manager pinned to WinnieLV commit
-`8eb45f07810af738f3e4945ea0cc29d399e378a6`. Its repository has no attached
-license; that fact is recorded in the third-party notice.
+AMDGPU modules are tied to the exact kernel ABI. After every Fedora kernel
+update, boot the new kernel, prepare it again, reapply the intended CU mode and
+verify the running module:
 
 ```bash
-sudo bc250-40cu
-sudo bc250-40cu live-status
-sudo bc250-40cu live-full
-sudo bc250-40cu health-test MODEL_NAME
-sudo bc250-40cu live-stock
+sudo bc250-40cu prepare
+sudo bc250-40cu enable
+sudo bc250-40cu verify
+sudo bc250-verify
 ```
 
-Running `bc250-40cu` without arguments opens the interactive manager. Live WGP
-routing is a separate low-level experiment: a 40/40 routing table can coexist
-with stock 24-CU kernel/RADV enumeration. Do not use the live manager as proof
-that the replacement module loaded or that inference is correct.
+`status` distinguishes the module installed on disk, the copy in the initramfs
+and the module currently loaded. A patched file on disk is not proof that it is
+running. Preparation is also blocked when enforced module-signature policy
+cannot load the unsigned replacement.
 
-Upstreams:
+## Risks and recovery
 
-- <https://github.com/duggasco/bc250-40cu-unlock>
-- <https://github.com/fduraibi/bc250-40cu-unlock>
-- <https://github.com/WinnieLV/bc250-cu-live-manager>
+Unstable harvested CUs can cause wrong output, GPU resets, hangs, boot failure
+or excess heat. Keep local console access and another bootable kernel while
+testing. The CU tools do not alter governor frequency or voltage policy.
+
+Use `bc250-40cu disable` to return to disabled CU mode while retaining the
+prepared module. Use `bc250-40cu restore` to restore a verified stock Fedora
+module backup. Do not combine two independent module installers.
+
+## External projects
+
+The package pins and integrates:
+
+- [fduraibi/bc250-40cu-unlock](https://github.com/fduraibi/bc250-40cu-unlock),
+  based on [duggasco/bc250-40cu-unlock](https://github.com/duggasco/bc250-40cu-unlock),
+  for the replacement-module workflow; and
+- [WinnieLV/bc250-cu-live-manager](https://github.com/WinnieLV/bc250-cu-live-manager)
+  for live WGP routing.
+
+The external [GFX1013 compute-queue stack](GFX1013-COMPUTE-QUEUES.md) also
+replaces AMDGPU. Choose one reviewed module workflow or maintain a deliberately
+merged patch set; do not layer the two installers independently.

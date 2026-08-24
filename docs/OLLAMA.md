@@ -1,32 +1,24 @@
-# Ollama installation and service behavior
+# Ollama
 
-Ollama is deliberately not bundled in the RPM. The helper defaults to the
-latest official release and can also install a specifically requested version:
+Ollama is installed separately from the RPM. The guided installer handles the
+normal setup; use the commands below for an explicit reinstall or runtime
+change.
+
+## Install and verify
 
 ```bash
 sudo bc250-install-ollama
-sudo OLLAMA_VERSION=<reviewed-version> bc250-install-ollama
+sudo OLLAMA_VERSION=VERSION bc250-install-ollama
+ollama --version
+sudo systemctl status ollama.service --no-pager -l
+curl -fsS http://127.0.0.1:11434/api/tags
 ```
 
-When Ollama is missing, outdated, or explicitly selected for reinstall, the
-helper downloads the official installer and prints its SHA-256 for the
-operator's audit record. On every run it also:
+The helper installs official Ollama under `/usr/local`, normalizes the `ollama`
+account and storage, enables the service and waits for the local API. It avoids
+keeping Fedora-packaged and official Ollama copies side by side.
 
-- ensures the `ollama` service account and required groups exist;
-- creates `/var/lib/ollama`, `/var/lib/bc250-llm-server/ollama/main` and model directories;
-- reloads systemd;
-- enables and restarts `ollama.service`;
-- waits for the local API to answer.
-
-The guided `install` workflow excludes Fedora's `ollama` RPM and installs the
-official release in `/usr/local`. If a Fedora Ollama package is already present,
-it is removed only after `rpm -e --test ollama` confirms that no installed
-package requires it. The workflow stops instead of keeping Fedora and official
-Ollama copies side by side. Rerunning the workflow upgrades to a different
-selected RPM NEVRA or reinstalls the same NEVRA, then verifies that the selected
-package is the one actually installed.
-
-The packaged drop-in sets:
+The main service uses:
 
 ```text
 HOME=/var/lib/ollama
@@ -34,83 +26,11 @@ OLLAMA_MODELS=/var/lib/bc250-llm-server/ollama/main
 OLLAMA_HOST=0.0.0.0:11434
 ```
 
-The explicit HOME avoids failures on systems where an existing Ollama account
-still has `/usr/share/ollama` as its passwd home.
-
-## Verify
-
-```bash
-getent passwd ollama
-sudo systemctl status ollama.service --no-pager -l
-curl -fsS http://127.0.0.1:11434/api/tags
-```
-
-## Network exposure
-
-Ollama listens on all interfaces so rootful Open WebUI can reach the host
-service. The package does not open port `11434` in firewalld. Confirm it remains
-blocked from untrusted networks:
-
-```bash
-sudo firewall-cmd --list-all
-ss -ltnp | grep 11434
-```
-
-A disabled or incorrectly configured firewall can expose the unauthenticated
-Ollama API. Restrict the host to a trusted LAN or add an explicit zone/source
-policy. The optional task and agent instances use ports `11435` and `11436` and
-must remain blocked as well.
-
-## Isolated task and agent instances
-
-`bc250-setup-task-model` and `bc250-setup-coding-agent` create
-`ollama-task.service` and `ollama-agent.service` under `/etc/systemd/system`.
-They use separate model stores below `/var/lib/bc250-llm-server/ollama/task` and
-`/var/lib/bc250-llm-server/ollama/agent`; neither changes the primary service profile. All three
-instances share the same GPU, so overlapping model loads can increase memory
-pressure.
-
-See [`../models/README.md`](../models/README.md#storage-behavior-in-ollama) for
-blob, manifest and retained source-GGUF storage behavior.
-
-## Updates
-
-A newer model architecture may require a newer Ollama release. The helper
-reruns the official installer when the requested version differs:
-
-```bash
-sudo OLLAMA_VERSION=<reviewed-version> bc250-install-ollama
-sudo OLLAMA_REINSTALL=1 OLLAMA_VERSION=<version> bc250-install-ollama
-```
-
-Review upstream release notes before changing versions. Do not make an
-unreviewed `latest` build the recommended BC-250 baseline. Smoke-test a new
-Vulkan build with a small model, the largest intended model and a representative
-long prompt before keeping it.
-
-Two open upstream reports describe AMD shared-memory Vulkan failures in recent
-Ollama builds: [large allocations returning `ErrorDeviceLost`](https://github.com/ollama/ollama/issues/17748)
-and [long-prefill compute-ring timeouts](https://github.com/ollama/ollama/issues/17870).
-`bc250-verify` reports the installed Ollama version and scans recent Ollama and
-kernel journal entries for these signatures. For the long-prompt case only, a
-smaller `PARAMETER num_batch 128` in a copied operator Modelfile is a reasonable
-diagnostic workaround; it is not a package-wide default or a confirmed BC-250
-fix. Unattended installation requires `BC250_ASSUME_YES=1`.
-
+Optional task and agent setup create `ollama-task.service` on `11435` and
+`ollama-agent.service` on `11436`, each with a separate store. All instances
+share one GPU; overlapping large requests increase unified-memory pressure.
 
 ## Runtime profiles
-
-The packaged default is the balanced profile:
-
-```text
-OLLAMA_NUM_PARALLEL=1
-OLLAMA_MAX_LOADED_MODELS=1
-OLLAMA_CONTEXT_LENGTH=32768
-OLLAMA_FLASH_ATTENTION=1
-OLLAMA_KV_CACHE_TYPE=q8_0
-```
-
-Switch profiles with:
 
 ```bash
 sudo bc250-ollama-profile status
@@ -119,14 +39,43 @@ sudo bc250-ollama-profile max-context
 sudo bc250-ollama-profile reset
 ```
 
-`max-context` uses a 65,536-token server context and `q4_0` KV cache. It saves
-more memory than q8_0 but may have a more noticeable quality cost. Context
-memory also grows with parallel requests, which is why both profiles retain
-`OLLAMA_NUM_PARALLEL=1` and one loaded model.
+| Profile | Context | KV cache | Parallel/loaded models |
+|---|---:|---|---|
+| Balanced | 32,768 | q8_0 | 1 / 1 |
+| Max context | 65,536 | q4_0 | 1 / 1 |
 
-Profile changes create an `/etc/systemd/system/ollama.service.d/` override,
-reload systemd and restart Ollama. They do not change any Modelfile.
+Both enable flash attention. The max-context profile reduces KV-cache memory at
+a possible quality cost. Service profiles do not modify individual Modelfiles.
 
-## Runtime-setting reference
+## Network exposure
 
-- https://docs.ollama.com/faq
+The host listeners let rootful Open WebUI reach Ollama. They are unauthenticated
+and must remain blocked from untrusted networks:
+
+```bash
+sudo firewall-cmd --list-all
+ss -ltnp | grep -E ':(11434|11435|11436)\b'
+```
+
+## Updating safely
+
+Do not make an untested `latest` build the baseline merely because it is newer.
+Review release notes and smoke-test each Vulkan update with:
+
+1. a small known-good model;
+2. the largest intended model;
+3. a representative long prompt; and
+4. `sudo bc250-verify` plus the kernel journal.
+
+```bash
+sudo OLLAMA_VERSION=VERSION bc250-install-ollama
+sudo OLLAMA_REINSTALL=1 OLLAMA_VERSION=VERSION bc250-install-ollama
+sudo bc250-verify
+```
+
+Recent upstream AMD shared-memory reports include Vulkan device loss,
+command-submission memory failures and compute-ring timeouts. Verification
+prints the exact Ollama version and scans recent Ollama/kernel logs for those
+patterns. A smaller `PARAMETER num_batch 128` in a copied operator Modelfile is
+a diagnostic for long-prompt prefill failures, not a package-wide default or a
+confirmed BC-250 fix.

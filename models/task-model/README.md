@@ -1,71 +1,37 @@
 # Isolated Open WebUI task model
 
-`bc250-setup-task-model` creates `ollama-task.service` on port `11435`, gives it
-a separate model store, and registers
-`task-gemma3-1b-unsloth-ud-q4-k-xl`. The model unloads after every request. The
-RPM installs the helper but does not create or enable the service automatically.
-
-The Modelfile deliberately has no fixed `SYSTEM` instruction. Open WebUI v0.11
-uses the selected task model for titles, tags, follow-ups, autocomplete, and
-retrieval or web-search query rewriting; each request supplies its own task
-prompt.
+## Setup and verify
 
 ```bash
-sudo bc250-setup-task-model
+sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
+
+curl -fsS http://127.0.0.1:11435/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"task-gemma3-1b-unsloth-ud-q4-k-xl:latest","messages":[{"role":"user","content":"Return only a short title for: Installing Fedora on a BC-250"}],"stream":false,"keep_alive":0}'
+sleep 2
+OLLAMA_HOST=127.0.0.1:11435 ollama ps
 ```
 
-From a source checkout:
+The helper creates `ollama-task.service` on port `11435` with a separate model
+store. With no selection it lists task Modelfiles and prompts. The model unloads
+after each request; the last command should show no resident task model.
 
-```bash
-sudo ./models/task-model/setup-ollama.sh
-```
-
-Supported overrides are `TASK_BIND` (`0.0.0.0`), `TASK_PORT` (`11435`),
-`TASK_MODEL_REVISION`, `TASK_MODEL_SHA256`, `HF_TOKEN` and `HF_HOME`. A revision
-may be a commit, tag, branch or `latest`.
-
-Keep port `11435` blocked from the LAN. Add this Open WebUI connection:
+Keep port `11435` blocked from untrusted networks. Add this Open WebUI
+connection:
 
 ```text
 http://host.containers.internal:11435
 ```
 
-Set **Task Model (Local)** to
-`task-gemma3-1b-unsloth-ud-q4-k-xl:latest`.
+Set the local task model to:
 
-Recommended starting toggles under **Admin Settings -> Experience -> Interface**:
-
-| Setting | Value |
-|---|---|
-| Title Generation | On |
-| Tags Generation | On |
-| Retrieval Query Generation | On when using RAG |
-| Follow Up Generation | Off initially |
-| Autocomplete Generation | Off |
-| Web Search Query Generation | Off unless web search is configured |
-
-Autocomplete is intentionally disabled for the baseline because it can wake the
-task model repeatedly while the user types.
-
-## Verify
-
-```bash
-curl -fsS http://127.0.0.1:11435/api/chat \
-  -H 'Content-Type: application/json' \
-  -d '{"model":"task-gemma3-1b-unsloth-ud-q4-k-xl:latest","messages":[{"role":"user","content":"Return only JSON in the form {\"title\":\"...\"} for: Installing Fedora on a BC-250"}],"stream":false,"keep_alive":0}'
-sleep 2
-OLLAMA_HOST=127.0.0.1:11435 ollama ps
+```text
+task-gemma3-1b-unsloth-ud-q4-k-xl:latest
 ```
 
-The final command should show no resident task model.
+Start with title, tag and RAG query generation enabled. Leave autocomplete,
+follow-ups and web-search query generation off until needed. Autocomplete can
+repeatedly load the task model while a larger chat model remains warm.
 
-## Remove
-
-```bash
-sudo systemctl disable --now ollama-task.service
-sudo rm -f /etc/systemd/system/ollama-task.service
-sudo systemctl daemon-reload
-sudo rm -rf /var/lib/bc250-llm-server/ollama/task \
-  /var/lib/bc250-llm-server/gguf/task \
-  /var/lib/bc250-llm-server/modelfiles/task
-```
+The Modelfile deliberately has no fixed `SYSTEM` prompt: Open WebUI supplies a
+different task prompt for each title, tag or query-rewrite request.
