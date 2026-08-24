@@ -6,6 +6,7 @@ separate phases. Use the commands below later to add, refresh or remove models.
 ## Commands
 
 ```bash
+bc250-model list
 bc250-model list production
 bc250-model list experiments
 bc250-model list task
@@ -18,9 +19,17 @@ sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
 ```
 
-Selections accept a full name, displayed index, comma list, range such as
-`0,2-4`, or `all`. With no selection, a terminal prompts and Enter cancels.
-Prefer full names in scripts.
+The category-free list shows all Ollama-backed models with one global index,
+download state and registration state. Category filters keep those global
+indexes, so a number means the same model in list, install and cleanup. MTP has
+its own local indexes. Selections accept a full name, displayed index, comma
+list, range such as `0,2-4`, or `all`. With no selection, a terminal prompts and
+Enter cancels. Prefer full names in scripts.
+
+`download unknown` means an unregistered model's protected source path is not
+readable by the current user. Run `sudo bc250-model list` when an exact
+downloaded-but-not-registered check is needed. A registration without a current
+Modelfile is shown as unmanaged.
 
 | Category | Prefix | Ollama API | Source GGUF directory |
 |---|---|---|---|

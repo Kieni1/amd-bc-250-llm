@@ -64,7 +64,7 @@ selects a reviewed version.
 ## Models
 
 ```text
-bc250-model list CATEGORY [--all] [--source PATH] [--modelfile-dir PATH]
+bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID [--provider PROVIDER]
 bc250-model install CATEGORY [SELECTION] [OPTIONS]
 bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
@@ -75,13 +75,24 @@ Categories are `production`, `experiments`, `task`, `agentic`, `embedding` and
 `embedded`. MTP is the only TOML-backed, download-only category; the other
 categories are discovered from strict Modelfiles.
 
-`SELECTION` accepts a full model name, displayed zero-based index, comma list,
-range such as `0,2-4`, or `all`. With no selection, a terminal prompts and Enter
-cancels. Prefer full names in automation.
+With no category, `list` shows every Ollama-backed category as one catalog with
+global indexes. A category filters the same catalog without renumbering it.
+MTP remains separate and must be requested explicitly.
+
+Every Ollama entry reports its definition origin, download state and whether it
+is registered on the category's Ollama instance. `download unknown` means the
+model is not registered and the current user cannot inspect its protected GGUF
+path; use `sudo bc250-model list` for an exact source-file check. Registrations
+without a current Modelfile are reported separately as unmanaged models.
+
+`SELECTION` accepts a full model name, displayed global catalog index, comma
+list, range such as `0,2-4`, or `all`. The same index is used by filtered lists,
+install and cleanup. MTP retains its own local indexes. With no selection, a
+terminal prompts and Enter cancels. Prefer full names in automation.
 
 Important install options:
 
-- `--list`: show the selection without downloading;
+- `--list`: show the current status without downloading;
 - `--revision REVISION`: override one model's commit, tag, branch or `latest`;
 - `--sha256 DIGEST`: require an exact downloaded-file checksum;
 - `--refresh`: download and register again even when state matches;

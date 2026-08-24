@@ -272,7 +272,13 @@ def discover_models(directories: list[Path]) -> list[dict]:
     if not found_directory:
         joined = ", ".join(str(path) for path in directories)
         raise ModelError(f"no Modelfile directory found: {joined}")
-    return sorted(discovered.values(), key=lambda model: model["name"])
+    models = sorted(
+        discovered.values(),
+        key=lambda model: (OLLAMA_CATEGORIES.index(model["category"]), model["name"]),
+    )
+    for index, model in enumerate(models):
+        model["index"] = index
+    return models
 
 
 def load_mtp_catalog(path: Path) -> tuple[dict, list[dict]]:
@@ -334,11 +340,8 @@ def load_models(
         raise ModelError("--source is only supported for the MTP catalog")
     defaults = dict(CATEGORY_DEFAULTS[canonical])
     defaults["category"] = canonical
-    models = [
-        model
-        for model in discover_models(model_directories(directories))
-        if model["category"] == canonical
-    ]
+    discovered = discover_models(model_directories(directories))
+    models = [model for model in discovered if model["category"] == canonical]
     return defaults, models
 
 
@@ -348,30 +351,83 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
     value = selection.strip()
     if value.lower() == "all":
         return list(models)
-    lookup = {model["id"]: index for index, model in enumerate(models)}
+    lookup = {
+        key: index
+        for index, model in enumerate(models)
+        for key in (model["id"], str(model.get("index", index)))
+    }
     selected: list[int] = []
     for item in value.split(","):
         item = item.strip()
-        if item in lookup:
-            selected.append(lookup[item])
-        elif re.fullmatch(r"[0-9]+", item):
-            selected.append(int(item))
-        elif match := re.fullmatch(r"([0-9]+)-([0-9]+)", item):
+        choices = [item]
+        if match := re.fullmatch(r"([0-9]+)-([0-9]+)", item):
             first, last = map(int, match.groups())
             if first > last:
                 first, last = last, first
-            selected.extend(range(first, last + 1))
-        else:
-            raise ModelError(f"unknown model selection {item!r}")
-    if not selected or any(index >= len(models) for index in selected):
-        raise ModelError(f"selection is outside 0-{len(models) - 1}")
+            choices = [str(number) for number in range(first, last + 1)]
+        for choice in choices:
+            if choice not in lookup:
+                raise ModelError(f"unknown model selection {choice!r}")
+            selected.append(lookup[choice])
     return [models[index] for index in dict.fromkeys(selected)]
 
 
-def print_models(models: list[dict]) -> None:
-    for index, model in enumerate(models):
-        detail = model.get("origin", "enabled" if model["enabled"] else "disabled")
-        print(f"  {index:2d}) {model.get('name', model['id']):<56} [{model['provider']}, {detail}]")
+def registered_models(host: str) -> set[str] | None:
+    if not (ollama := shutil.which("ollama")):
+        return None
+    result = subprocess.run(
+        [ollama, "list"],
+        env={**os.environ, "OLLAMA_HOST": host},
+        capture_output=True, text=True, check=False,
+    )
+    return None if result.returncode else {
+        line.split()[0].removesuffix(":latest")
+        for line in result.stdout.splitlines()[1:]
+        if line.strip()
+    }
+
+
+def print_models(defaults: dict, models: list[dict], registered=None, destination=None) -> None:
+    for offset, model in enumerate(models):
+        try:
+            source = model_path(defaults, model, destination).stat().st_size > 0
+        except FileNotFoundError:
+            source = False
+        except OSError:
+            source = None
+        origin = model.get("origin", "enabled" if model["enabled"] else "disabled")
+        download = {True: "downloaded", False: "not downloaded", None: "download unknown"}
+        if model["provider"] == "ollama":
+            setup = None if registered is None else model["name"] in registered
+            source = True if setup is True else None if setup is None and source is False else source
+            setup_text = {True: "set up", False: "not set up", None: "setup unknown"}[setup]
+        details = [model["provider"], origin, download[source]]
+        if model["provider"] == "ollama":
+            details.append(setup_text)
+        index = model.get("index", offset)
+        print(f"  {index:2d}) {model.get('name', model['id']):<56} [{', '.join(details)}]")
+
+
+def print_all_models(directories: list[Path]) -> None:
+    models = discover_models(directories)
+    hosts = {CATEGORY_DEFAULTS[category]["ollama_host"] for category in OLLAMA_CATEGORIES}
+    registrations = {host: registered_models(host) for host in hosts}
+    for category in OLLAMA_CATEGORIES:
+        defaults = CATEGORY_DEFAULTS[category]
+        selected = [model for model in models if model["category"] == category]
+        print(f"{category.title()} models:")
+        print_models(defaults, selected, registrations[defaults["ollama_host"]])
+    known = {model["name"] for model in models}
+    unmanaged = sorted(
+        (host, name)
+        for host, names in registrations.items()
+        for name in names or ()
+        if name not in known
+    )
+    if unmanaged:
+        print("Unmanaged Ollama models (registered without a Modelfile):")
+        for host, name in unmanaged:
+            print(f"    - {name:<56} [{host}, set up, Modelfile missing]")
 
 
 def state_path(output: Path) -> Path:
@@ -680,12 +736,6 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         except (ModelError, OSError) as error:
             print(f"    ERROR: {error}", file=sys.stderr)
             failures.append(label)
-    if ollama_bin:
-        subprocess.run(
-            [ollama_bin, "list"],
-            env={**os.environ, "OLLAMA_HOST": host},
-            check=False,
-        )
     if failures:
         print(f"\nFailed: {' '.join(failures)}", file=sys.stderr)
         return 2
@@ -702,7 +752,8 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             print("Cleanup cancelled.")
             return 0
     _uid, gid = ollama_identity()
-    host = defaults.get("ollama_host", "127.0.0.1:11434")
+    host = os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_URL") or \
+        defaults.get("ollama_host", "127.0.0.1:11434")
     ollama_bin = shutil.which("ollama")
     for model in models:
         label = model.get("name", model["id"])
@@ -729,8 +780,10 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     return 0
 
 
-def catalog_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("category", choices=CATEGORIES)
+def catalog_arguments(parser: argparse.ArgumentParser, *, category_optional: bool = False) -> None:
+    parser.add_argument(
+        "category", choices=CATEGORIES, nargs="?" if category_optional else None
+    )
     parser.add_argument("--source", type=Path, help="alternate MTP TOML catalog")
     parser.add_argument(
         "--modelfile-dir",
@@ -744,7 +797,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bc250-model", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     listing = commands.add_parser("list", help="list discovered templates")
-    catalog_arguments(listing)
+    catalog_arguments(listing, category_optional=True)
     listing.add_argument("--all", action="store_true", help="include disabled MTP entries")
     resolving = commands.add_parser("resolve", help="resolve one model id")
     catalog_arguments(resolving)
@@ -780,6 +833,11 @@ def main(argv: list[str] | None = None) -> int:
         if reconfigure:
             reconfigure(line_buffering=True)
     args = build_parser().parse_args(argv)
+    if args.command == "list" and args.category is None:
+        if args.source or args.all:
+            raise ModelError("--source and --all require the MTP category")
+        print_all_models(model_directories(args.modelfile_dir))
+        return 0
     category = canonical_category(args.category)
     defaults, models = load_models(
         category,
@@ -789,8 +847,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "list":
         available = models if category != "mtp" or args.all else [m for m in models if m["enabled"]]
-        print(f"{category.title()} models:")
-        print_models(available)
+        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        host = defaults.get("ollama_host")
+        print_models(defaults, available, registered_models(host) if host else None)
         return 0
     if args.command == "resolve":
         for model in models:
@@ -808,7 +867,14 @@ def main(argv: list[str] | None = None) -> int:
     if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
         available = [model for model in models if model["enabled"]]
     print(f"Available {category} models:")
-    print_models(available)
+    host = getattr(args, "host", None) or os.environ.get("OLLAMA_HOST") or \
+        os.environ.get("OLLAMA_URL") or defaults.get("ollama_host")
+    print_models(
+        defaults,
+        available,
+        registered_models(host) if host else None,
+        destination=getattr(args, "destination", None),
+    )
     if args.list:
         return 0
     if not available:

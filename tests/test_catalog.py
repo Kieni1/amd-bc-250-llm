@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 import re
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -126,10 +129,45 @@ class SelectionTests(unittest.TestCase):
     def test_all_selects_every_entry(self) -> None:
         self.assertEqual(modelctl.select_models(self.models, "all"), self.models)
 
+    def test_catalog_indexes_are_global_and_selectable(self) -> None:
+        _defaults, experiments = load("experiments")
+        self.assertEqual([model["index"] for model in self.models], list(range(5)))
+        self.assertEqual([model["index"] for model in experiments], list(range(5, 17)))
+        self.assertEqual(modelctl.select_models(experiments, "5"), [experiments[0]])
+
     def test_empty_and_invalid_selections_fail(self) -> None:
         for selection in ("", "999", "original-name"):
             with self.subTest(selection=selection), self.assertRaises(modelctl.ModelError):
                 modelctl.select_models(self.models, selection)
+
+
+class StatusTests(unittest.TestCase):
+    def test_combined_status_handles_protected_sources_and_unmanaged_models(self) -> None:
+        class ProtectedPath:
+            def stat(self):
+                raise PermissionError
+
+        registrations = {
+            "127.0.0.1:11434": {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+                "unmanaged-test-model",
+            },
+            "127.0.0.1:11435": {"task-gemma3-1b-unsloth-ud-q4-k-xl"},
+            "127.0.0.1:11436": set(),
+        }
+        output = StringIO()
+        with patch.object(
+            modelctl, "registered_models", side_effect=lambda host: registrations[host]
+        ), patch.object(modelctl, "model_path", return_value=ProtectedPath()), \
+             redirect_stdout(output):
+            modelctl.print_all_models([MODELFILES])
+
+        text = output.getvalue()
+        self.assertIn("   5) exp-gemma4-12b-google-qat-q4-0", text)
+        self.assertIn("downloaded, set up", text)
+        self.assertIn("download unknown, not set up", text)
+        self.assertIn("unmanaged-test-model", text)
+        self.assertIn("Modelfile missing", text)
 
 
 if __name__ == "__main__":
