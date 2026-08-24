@@ -40,6 +40,11 @@ class StatusTests(unittest.TestCase):
             "ollama-task.service",
             "ollama-agent.service",
             "PWM controls",
+            "memory PSI",
+            "Ollama main",
+            "Ollama task",
+            "Ollama agent",
+            "Podman storage",
         ):
             self.assertIn(expected, source)
 
@@ -80,8 +85,18 @@ class VerifyTests(unittest.TestCase):
             "Not enough memory for command submission",
             "ring comp_",
             "journalctl -k -b",
+            "for port in 11434 11435 11436",
+            "expected container-bridge listener",
         ):
             self.assertIn(expected, source)
+
+
+class CuStatusTests(unittest.TestCase):
+    def test_cu_status_reports_stale_preparation_after_kernel_change(self) -> None:
+        source = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
+        self.assertIn("/var/lib/bc250-llm-server/40cu/prepared", source)
+        self.assertIn("stale: prepared for", source)
+        self.assertIn("sudo bc250-40cu prepare", source)
 
 
 class SwapProfileTests(unittest.TestCase):

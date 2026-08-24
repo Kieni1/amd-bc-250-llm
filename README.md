@@ -12,12 +12,12 @@ assurances.
 
 ## Install
 
-Build the RPM on Fedora 44, then keep the repository's `install` script beside
-the binary RPM on the BC-250:
+Download the Fedora 44 binary RPM artifact built by the repository's GitHub
+Actions workflow and keep it beside the repository's `install` script on the
+BC-250. Then run:
 
 ```bash
-make rpm
-sudo ./install --rpm dist
+sudo ./install
 ```
 
 The guided installer:
@@ -27,19 +27,19 @@ The guided installer:
 3. installs the official Ollama build;
 4. applies the reviewed memory and swap profiles;
 5. prepares, but does not enable, optional 40-CU support;
-6. offers production, task, agentic and embedding models separately; and
+6. offers production, task, agentic, embedding, experiment and MTP models; and
 7. verifies the result.
 
-Rerun it after the requested reboot. To resume only the four model-selection
-phases, use:
+Rerun it after the requested reboot. To resume only model selection, use:
 
 ```bash
 sudo ./install --models-only
 ```
 
-The RPM and installer do not choose a stable CU count for the board, enable
-maintenance schedules or configure HTTPS. Those remain explicit operator
-decisions.
+After installation, start the guided CU/live-manager workflow with
+`sudo bc250-40cu`. The package does not choose a stable CU count: test 40, 38,
+36 or another available configuration on the individual board. Maintenance
+schedules and HTTPS also remain explicit operator decisions.
 
 ## First checks
 
@@ -87,9 +87,10 @@ sudo bc250-swap-profile status
 sudo bc250-ollama-profile status
 sudo bc250-40cu status
 
-# Optional maintenance
+# Optional maintenance / storage
+sudo bc250-status
 sudo bc250-maintenance setup --defaults
-sudo bc250-maintenance status
+sudo bc250-maintenance clean-cache
 ```
 
 The complete installed interface and its exact syntax are in
@@ -113,17 +114,11 @@ untrusted networks.
 
 ## Source and build
 
-```bash
-sudo dnf install -y make rpm-build rust cargo gcc \
-  systemd-rpm-macros libdrm-devel curl tar gzip xz python3
-make validate
-make rpm
-```
-
-Binary and source RPMs are written together under `dist/`. Install the
-`*.x86_64.rpm`; the `*.src.rpm` is build input and provides no commands.
-Third-party governor and CU sources are pinned in `packaging/upstreams.toml`
-and cached under `sources/`.
+`make validate` is the deterministic repository check. The normal RPM build is
+the Fedora 44 GitHub Actions workflow in `.github/workflows/build-rpm.yml`; it
+produces binary and source RPM artifacts. Maintainers can still use `make rpm`
+in a matching Fedora build environment. Third-party governor and CU sources are
+pinned in `packaging/upstreams.toml`.
 
 Repository groups:
 

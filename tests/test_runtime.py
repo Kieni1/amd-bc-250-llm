@@ -54,10 +54,11 @@ class RuntimeContractTests(unittest.TestCase):
     def test_host_precedence_preserves_both_supported_environment_names(self) -> None:
         source = (ROOT / "models/modelctl.py").read_text(encoding="utf-8")
         host_expression = (
-            'args.host or os.environ.get("OLLAMA_HOST") or '
+            'return override or os.environ.get("OLLAMA_HOST") or '
             'os.environ.get("OLLAMA_URL")'
         )
         self.assertIn(host_expression, source.replace("\\\n        ", ""))
+        self.assertIn("host = ollama_host(defaults, args.host)", source)
 
     def test_install_does_not_probe_ollama_before_download(self) -> None:
         source = (ROOT / "models/modelctl.py").read_text(encoding="utf-8")

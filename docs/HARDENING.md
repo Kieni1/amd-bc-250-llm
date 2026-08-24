@@ -36,8 +36,11 @@ bc250-verify-lan SERVER_IP
 ```
 
 Ollama ports `11434`–`11436` have no authentication and must remain blocked
-from untrusted networks. If firewalld is inactive, enabled instances listen on
-all configured host interfaces.
+from untrusted networks. The wildcard host listeners are intentional so the
+rootful Open WebUI container can use `host.containers.internal`; firewalld is
+the LAN boundary. `bc250-verify` warns about unexpected listener shapes or an
+inactive/incorrect firewall, and `bc250-verify-lan` checks exposure from a
+second LAN machine.
 
 ## Add HTTPS or stop services
 

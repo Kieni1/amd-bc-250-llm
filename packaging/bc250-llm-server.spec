@@ -10,8 +10,8 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.9.5
-Release:        0.3.testing%{?dist}
+Version:        0.9.6
+Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.1.testing
+- Streamline model handling and reuse validated GGUF bytes unless refresh is explicit
+- Extend guided model selection with experiments and MTP without duplicating setup logic
+- Consolidate appliance storage, memory, cache cleanup and network visibility
+- Report stale CU preparation after kernel changes and validate upstream pin/spec alignment
+
 * Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.5-0.3.testing
 - Add one fast maintenance setup, status, manual-run and disable command
 - Serialize persistent backups and keep deletion and model warm-up opt-in

@@ -33,8 +33,8 @@ Run the same command again after a requested reboot. The installer prepares but
 does not enable experimental CUs; that remains an explicit operator action.
 Maintenance timers are excluded. A .src.rpm is not installable.
 
-Use --models-only to resume the interactive production, task, agentic and
-embedding-model prompts without repeating filesystem, RPM or system setup.
+Use --models-only to resume optional production, task, agentic, embedding,
+experiment and MTP model prompts without repeating system setup.
 
 Set BC250_UPDATE_OLLAMA=1 to explicitly refresh an existing official Ollama.
 Set OLLAMA_VERSION to install a particular version instead of latest.
@@ -73,6 +73,13 @@ parse_arguments() {
 require_root() {
   [[ ${EUID} -eq 0 ]] || {
     echo "ERROR: run this installer with sudo." >&2
+    exit 1
+  }
+}
+
+require_progress_terminal() {
+  command -v script >/dev/null 2>&1 || {
+    echo "ERROR: /usr/bin/script is required (Fedora package: util-linux-script)." >&2
     exit 1
   }
 }
@@ -150,7 +157,7 @@ start_transcript() {
 
   # A pseudo-terminal keeps Hugging Face and Ollama progress bars visible while
   # preserving the installation transcript. The child skips this wrapper.
-  if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 && -t 1 ]] && command -v script >/dev/null; then
+  if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 && -t 1 ]]; then
     local command
     printf -v command '%q ' \
       env BC250_INSTALL_TRANSCRIPT=1 bash "$SCRIPT_PATH" "${ORIGINAL_ARGS[@]}"
@@ -464,9 +471,8 @@ step_6_prepare_40cu() {
 }
 
 run_model_phase() {
-  local number="$1" category="$2" label="$3" selection_variable="$4"
-  local selection=""
-  heading "7.$number $label MODELS"
+  local category="$1" label="$2" selection_variable="$3" selection=""
+  heading "7. $label MODELS"
   bc250-model list "$category"
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     selection="${!selection_variable:-}"
@@ -485,26 +491,26 @@ run_model_phase() {
   prepare_hf_authentication
   echo "Installing selected ${label,,} model(s) before continuing."
   case "$category" in
-    production|embedding) bc250-model install "$category" "$selection" ;;
     task) bc250-setup-task-model "$selection" ;;
     agentic) bc250-setup-coding-agent "$selection" ;;
-    *) echo "ERROR: unsupported guided model category: $category" >&2; return 2 ;;
+    *) bc250-model install "$category" "$selection" ;;
   esac
 }
 
 step_7_models() {
   heading "7. OPTIONAL MODEL DOWNLOADS"
-  command -v script >/dev/null 2>&1 || {
-    echo "ERROR: model-download progress requires /usr/bin/script." >&2
-    echo "Install it with: sudo dnf install util-linux-script" >&2
-    exit 1
-  }
-  echo "Each category is listed, selected and installed separately."
-  echo "Enter skips only the current category."
-  run_model_phase 1 production Production BC250_PRODUCTION_SELECTION
-  run_model_phase 2 task Task BC250_TASK_SELECTION
-  run_model_phase 3 agentic Agentic BC250_AGENTIC_SELECTION
-  run_model_phase 4 embedding Embedding BC250_EMBEDDING_SELECTION
+  echo "Each group is listed separately; Enter skips only that group."
+  local phase category label selection_variable
+  for phase in \
+    'production|Production|BC250_PRODUCTION_SELECTION' \
+    'task|Task|BC250_TASK_SELECTION' \
+    'agentic|Agentic|BC250_AGENTIC_SELECTION' \
+    'embedding|Embedding|BC250_EMBEDDING_SELECTION' \
+    'experiments|Experiments|BC250_EXPERIMENT_SELECTION' \
+    'mtp|MTP|BC250_MTP_SELECTION'; do
+    IFS='|' read -r category label selection_variable <<< "$phase"
+    run_model_phase "$category" "$label" "$selection_variable"
+  done
 }
 
 step_8_verify() {
@@ -535,6 +541,7 @@ run_models_only() {
 main() {
   parse_arguments "$@"
   require_root
+  require_progress_terminal
   start_transcript
   if [[ "$INSTALL_MODE" == models ]]; then
     run_models_only
@@ -562,6 +569,7 @@ main() {
   else
     echo "40-CU support is prepared but disabled; maintenance timers were not changed."
   fi
+  echo "Next: sudo bc250-40cu  # test a stable CU configuration for this board"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

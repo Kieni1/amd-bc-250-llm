@@ -19,8 +19,11 @@ make clean-sources  # remove cached external archives
 make distclean      # remove both
 ```
 
-Authoritative upstream commits, URLs and archive names are in
-`packaging/upstreams.toml`. RPM scriptlets must never fetch third-party code.
+Authoritative upstream repositories, commits, URLs and archive names are in
+`packaging/upstreams.toml`. `make validate` checks full commit formatting and
+that each pinned commit is referenced by the RPM spec; maintainers still review
+the upstream repository itself before changing a pin. RPM scriptlets must never
+fetch third-party code.
 
 ## Update a pinned source
 

@@ -52,11 +52,12 @@ sudo ./install --models-only
 
 Normal mode performs the complete host-to-verification workflow. It may pause
 for a reboot and should then be rerun. `--models-only` skips host setup and asks
-separately for production, task, agentic and embedding models.
+for production, task, agentic, embedding, experiment and MTP selections.
 
 Useful unattended selections are `BC250_PRODUCTION_SELECTION`,
-`BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION` and
-`BC250_EMBEDDING_SELECTION`; use them with `BC250_ASSUME_YES=1`. Set
+`BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION`, `BC250_EMBEDDING_SELECTION`,
+`BC250_EXPERIMENT_SELECTION` and `BC250_MTP_SELECTION`; use them with
+`BC250_ASSUME_YES=1`. Set
 `BC250_HF_ANONYMOUS=1` to skip the token prompt. `BC250_UPDATE_OLLAMA=1`
 explicitly refreshes an existing Ollama installation, and `OLLAMA_VERSION`
 selects a reviewed version.
@@ -65,7 +66,7 @@ selects a reviewed version.
 
 ```text
 bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
-bc250-model resolve CATEGORY ID [--provider PROVIDER]
+bc250-model resolve CATEGORY ID
 bc250-model install CATEGORY [SELECTION] [OPTIONS]
 bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
 ```
@@ -95,7 +96,7 @@ Important install options:
 - `--list`: show the current status without downloading;
 - `--revision REVISION`: override one model's commit, tag, branch or `latest`;
 - `--sha256 DIGEST`: require an exact downloaded-file checksum;
-- `--refresh`: download and register again even when state matches;
+- `--refresh`: deliberately download new bytes, then register again;
 - `--host HOST[:PORT]`: override the target Ollama API;
 - `--destination PATH`: override the GGUF root;
 - `--min-free-bytes BYTES`: require free space before downloading;
@@ -104,9 +105,12 @@ Important install options:
 - `--modelfile-dir PATH`: add a Modelfile search directory;
 - `--source PATH`: use another MTP TOML catalog.
 
-Authentication is requested only when a download is required. `HF_TOKEN` or
-`--token-file` is validated as the `ollama` account; an empty or rejected token
-falls back to anonymous access. Tokens are not persisted by the manager.
+Authentication is requested only when a download is required. A validated GGUF
+is reused when Modelfile repository/revision metadata changes; Ollama is
+re-registered from those existing bytes. Use `--refresh` when the bytes should
+actually be fetched again. `HF_TOKEN` or `--token-file` is validated as the
+`ollama` account; an empty or rejected token falls back to anonymous access.
+Tokens are not persisted by the manager.
 
 Convenience commands:
 
@@ -173,11 +177,12 @@ bc250-check-temp [--watch]
 bc250-benchmark
 ```
 
-`bc250-status` is a short overview; `bc250-verify` is the detailed pass/fail
+`bc250-status` is a short overview including RAM, memory pressure, zram, disk
+swap, swappiness and appliance storage. `bc250-verify` is the detailed pass/fail
 check. Verification includes kernel/module alignment, CU state, Ollama version,
-service health, optional GFX1013 compute queues and recent Vulkan/AMDGPU failure
-patterns. `bc250-verify-lan` runs on a client; `HTTP_PORT` changes its expected
-web port.
+internal Ollama listener/firewall policy, service health, optional GFX1013
+compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
+runs on a client; `HTTP_PORT` changes its expected web port.
 
 The benchmark writes a timestamped CSV and metadata file in the current
 directory. Important overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`,
@@ -190,12 +195,15 @@ directory. Important overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`,
 bc250-maintenance setup [--defaults]
 bc250-maintenance status
 bc250-maintenance run {backup|prune|all}
+bc250-maintenance clean-cache
 bc250-maintenance disable
 ```
 
-`setup --defaults` enables verified local backups only. Interactive setup can
-also configure dry-run upload pruning, model warm-up and an after-hours power
-action. Configuration is stored in root-readable
+`setup --defaults` enables verified local backups only. `clean-cache` requires
+confirmation and removes only rebuildable Hugging Face cache, dangling Podman
+images and older journal data; model and Open WebUI data are retained.
+Interactive setup can also configure dry-run upload pruning, model warm-up and
+an after-hours power action. Configuration is stored in root-readable
 `/etc/bc250-llm-server/maintenance.env`. See
 [`MAINTENANCE.md`](MAINTENANCE.md) before enabling deletion or power actions.
 

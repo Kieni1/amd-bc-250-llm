@@ -17,6 +17,7 @@ usage() {
 Usage: sudo bc250-maintenance setup [--defaults]
        sudo bc250-maintenance status
        sudo bc250-maintenance run backup|prune|all
+       sudo bc250-maintenance clean-cache
        sudo bc250-maintenance disable
 
 Set up and inspect privacy-conscious maintenance for the local office appliance.
@@ -24,11 +25,13 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
   setup             Interactive setup for backups, upload pruning, optional
                     model warm-up and after-hours power saving.
   setup --defaults  Fast safe baseline: enable only verified local backups.
-  status            Read-only schedule, storage and backup overview. The API
-                    key is never printed.
+  status            Read-only schedule and backup overview. The API key is
+                    never printed; bc250-status shows appliance storage.
   run backup        Run configuration and identity backups now, in sequence.
   run prune         Run the configured upload-prune policy now.
   run all           Run backups and then pruning.
+  clean-cache       Confirm removal of the Hugging Face cache, dangling Podman
+                    images and old journal data; models and office data stay.
   disable           Disable all optional maintenance and power timers. Data and
                     configuration are retained.
 
@@ -271,12 +274,6 @@ timer_line() {
     "${enabled:-unknown}" "${active:-unknown}" "${next:-n/a}" "${last:-n/a}"
 }
 
-tree_usage() {
-  local label="$1" path="$2" usage='missing'
-  [[ -e "$path" ]] && usage="$(du -sh -- "$path" 2>/dev/null | awk '{print $1}' || printf '?')"
-  printf '  %-20s %8s  %s\n' "$label" "$usage" "$path"
-}
-
 backup_summary() {
   local label="$1" directory="$2" pattern="$3" count=0 newest='none'
   if [[ -d "$directory" ]]; then
@@ -288,7 +285,7 @@ backup_summary() {
 }
 
 show_status() {
-  local api_state='not configured' free_gb='unknown' min_free storage_probe
+  local api_state='not configured'
   if [[ -e "$CONFIG" && ! -r "$CONFIG" ]]; then
     echo "ERROR: maintenance configuration is private; run status with sudo." >&2
     return 1
@@ -298,7 +295,6 @@ show_status() {
     return 0
   }
   [[ "$(get_setting OWUI_API_KEY '')" != REPLACE_WITH_ADMIN_API_KEY && -n "$(get_setting OWUI_API_KEY '')" ]] && api_state=configured
-  min_free="$(get_setting MIN_FREE_GB 20)"
 
   echo "BC-250 maintenance status"
   echo
@@ -316,21 +312,7 @@ show_status() {
   printf '  Night power action: %s\n' "$(get_setting NIGHT_POWER_ACTION poweroff)"
 
   echo
-  echo "Storage"
-  df -h / 2>/dev/null | sed 's/^/  /'
-  if [[ "$(get_setting MIN_FREE_GB 20)" =~ ^[0-9]+$ ]]; then
-    storage_probe=/var/lib/bc250-llm-server
-    [[ -d "$storage_probe" ]] || storage_probe=/
-    free_gb="$(df -B1G --output=avail "$storage_probe" 2>/dev/null | awk 'NR==2 {gsub(/ /,""); print $1}')"
-    if [[ "$free_gb" =~ ^[0-9]+$ && "$free_gb" -lt "$min_free" ]]; then
-      printf '  WARNING: free storage is %sGiB; configured warning threshold is %sGiB.\n' "$free_gb" "$min_free"
-    fi
-  fi
-  tree_usage "GGUF sources" /var/lib/bc250-llm-server/gguf
-  tree_usage "Ollama stores" /var/lib/bc250-llm-server/ollama
-  tree_usage "Hugging Face cache" /var/cache/bc250-llm-server/huggingface
-  tree_usage "Open WebUI" /var/lib/open-webui
-  tree_usage "Local backups" /var/backups/bc250-llm-server
+  echo "Storage overview: sudo bc250-status"
 
   echo
   echo "Backups"
@@ -368,6 +350,18 @@ run_selected() {
   esac
 }
 
+clean_cache() {
+  local cache
+  require_root
+  echo "This removes only rebuildable caches/old logs; GGUFs, Ollama models and Open WebUI data are retained."
+  ask_yes_no "Clean appliance cache, dangling container images and old journal data" no || { echo "Cleanup cancelled."; return; }
+  cache=/var/cache/bc250-llm-server/huggingface
+  [[ ! -d "$cache" ]] || find "$cache" -mindepth 1 -delete
+  command -v podman >/dev/null 2>&1 && podman image prune -f
+  command -v journalctl >/dev/null 2>&1 && journalctl --vacuum-size=512M
+  echo "Cleanup completed; persistent models and office data were retained."
+}
+
 disable_all() {
   require_root
   disable_units "${ALL_TIMERS[@]}" bc250-enable-wol.service
@@ -387,6 +381,7 @@ main() {
       ;;
     status) (($# <= 1)) || { usage >&2; exit 2; }; show_status ;;
     run) (($# == 2)) || { usage >&2; exit 2; }; run_selected "$2" ;;
+    clean-cache) (($# == 1)) || { usage >&2; exit 2; }; clean_cache ;;
     disable) (($# == 1)) || { usage >&2; exit 2; }; disable_all ;;
     -h|--help|help) usage ;;
     *) echo "ERROR: unknown command: $1" >&2; usage >&2; exit 2 ;;

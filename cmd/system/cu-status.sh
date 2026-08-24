@@ -28,6 +28,17 @@ read_param() {
 }
 
 echo "BC-250 CU status"
+running_kernel="$(uname -r)"
+echo "  Running kernel          : $running_kernel"
+prepared_file=/var/lib/bc250-llm-server/40cu/prepared
+if [[ -r "$prepared_file" ]]; then
+  prepared_kernel="$(sed -n 's/^kernel=//p' "$prepared_file" | head -1)"
+  [[ "$prepared_kernel" == "$running_kernel" ]] && prepared_state="ready for running kernel" || \
+    prepared_state="stale: prepared for ${prepared_kernel:-unknown}; rerun sudo bc250-40cu prepare"
+  echo "  Prepared module state   : $prepared_state"
+else
+  echo "  Prepared module state   : not recorded"
+fi
 echo "  Kernel active_cu_number : $(read_param /sys/module/amdgpu/parameters/active_cu_number)"
 echo "  Kernel cc_write_mode    : $(read_param /sys/module/amdgpu/parameters/bc250_cc_write_mode)"
 if grep -qo 'amdgpu.bc250_cc_write_mode=[^ ]*' /proc/cmdline 2>/dev/null; then

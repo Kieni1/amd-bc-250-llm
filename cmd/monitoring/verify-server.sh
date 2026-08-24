@@ -339,6 +339,16 @@ section "Listeners and firewall"
 listeners="$(ss -H -lnt 2>/dev/null || true)"
 awk '$4 ~ /:80$/ {found=1} END{exit found?0:1}' <<< "$listeners" && ok "HTTP :80 listener exists" || bad "HTTP :80 listener missing"
 awk '$4 ~ /:9998$/ {found=1} END{exit found?0:1}' <<< "$listeners" && bad "host has Tika :9998 listener" || ok "no host Tika :9998 listener"
+for port in 11434 11435 11436; do
+  ollama_listeners="$(awk -v suffix=":$port" 'index($4, suffix) == length($4)-length(suffix)+1 {print $4}' <<< "$listeners")"
+  [[ -n "$ollama_listeners" ]] || { [[ "$port" == 11434 ]] && bad "main Ollama :11434 listener missing" || info "optional Ollama :$port listener absent"; continue; }
+  if grep -Evq "^(\*|0\.0\.0\.0|\[::\]):$port$" <<< "$ollama_listeners"; then
+    warn "Ollama :$port has an unexpected bind: $(tr '\n' ' ' <<< "$ollama_listeners")"
+  else
+    info "Ollama :$port uses the expected container-bridge listener; firewalld must keep it off the LAN"
+  fi
+done
+
 webui="$(awk '$4 ~ /:3000$/ {print $4}' <<< "$listeners")"
 if [[ -z "$webui" ]]; then
   bad "Open WebUI :3000 listener missing"

@@ -36,8 +36,10 @@ sudo bc250-40cu enable
 
 The guided installer compiles and verifies the replacement AMDGPU module for
 the running kernel, embeds it in that kernel's initramfs and stops with the
-unlock disabled. `bc250-40cu enable` is the normal activation step; it requires
-`ENABLE-40CU` and reboots.
+unlock disabled. After installation run `sudo bc250-40cu` for the guided
+workflow. `bc250-cu-status` reports when preparation belongs to an older kernel.
+`bc250-40cu enable` is the normal activation step; it requires `ENABLE-40CU`
+and reboots.
 
 ## Choose the stable CU count
 

@@ -214,10 +214,12 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "rpm -e --test ollama",
             "packages-added.txt",
             "firewall-http-before",
-            "run_model_phase 1 production Production BC250_PRODUCTION_SELECTION",
-            "run_model_phase 2 task Task BC250_TASK_SELECTION",
-            "run_model_phase 3 agentic Agentic BC250_AGENTIC_SELECTION",
-            "run_model_phase 4 embedding Embedding BC250_EMBEDDING_SELECTION",
+            "production|Production|BC250_PRODUCTION_SELECTION",
+            "task|Task|BC250_TASK_SELECTION",
+            "agentic|Agentic|BC250_AGENTIC_SELECTION",
+            "embedding|Embedding|BC250_EMBEDDING_SELECTION",
+            "experiments|Experiments|BC250_EXPERIMENT_SELECTION",
+            "mtp|MTP|BC250_MTP_SELECTION",
             "bc250-setup-task-model",
             "bc250-setup-coding-agent",
         ),
@@ -311,6 +313,10 @@ def check_upstream_manifest() -> None:
     forbidden = {"sha256", "vendor_sha256", "required"}
     if any(forbidden & source.keys() for source in sources if isinstance(source, dict)):
         fail("upstream source manifest restored obsolete digest/member bookkeeping")
+    spec = SPEC.read_text(encoding="utf-8")
+    for source in sources:
+        if isinstance(source, dict) and source.get("commit") not in spec:
+            fail(f"upstream pin is not referenced by the RPM spec: {source.get('id', 'unknown')}")
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts/prepare-sources.py"), "--print-files"],
         text=True,

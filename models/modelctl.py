@@ -27,21 +27,12 @@ INSTALLED_CONFIG = Path(f"/etc/{PROJECT}")
 PACKAGED_MODEL_DIR = INSTALLED_SHARE / "modelfiles"
 OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 
-CATEGORY_ALIASES = {
-    "production": "production",
-    "experimental": "experiments",
-    "experiments": "experiments",
-    "task": "task",
-    "tasker": "task",
-    "agentic": "agentic",
-    "coding": "agentic",
-    "embedding": "embedding",
-    "embedded": "embedding",
-    "embed": "embedding",
-    "mtp": "mtp",
+OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
+CATEGORY_ALIASES = {name: name for name in (*OLLAMA_CATEGORIES, "mtp")} | {
+    "experimental": "experiments", "tasker": "task", "coding": "agentic",
+    "embedded": "embedding", "embed": "embedding",
 }
 CATEGORIES = tuple(CATEGORY_ALIASES)
-OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 CATEGORY_PREFIXES = {
     "production": "prod-",
     "experiments": "exp-",
@@ -99,16 +90,11 @@ def canonical_category(value: str) -> str:
         raise ModelError(f"unsupported model category: {value}") from error
 
 
-def require_string(table: dict, key: str, context: str) -> str:
+def require_string(table: dict, key: str, context: str, *, filename: bool = False) -> str:
     value = table.get(key)
     if not isinstance(value, str) or not value:
         raise ModelError(f"{context}: {key} must be a non-empty string")
-    return value
-
-
-def require_filename(table: dict, key: str, context: str) -> str:
-    value = require_string(table, key, context)
-    if Path(value).name != value or value in {".", ".."}:
+    if filename and (Path(value).name != value or value in {".", ".."}):
         raise ModelError(f"{context}: {key} must be a filename")
     return value
 
@@ -315,7 +301,7 @@ def load_mtp_catalog(path: Path) -> tuple[dict, list[dict]]:
         seen.add(model_id)
         require_string(model, "repository", context)
         require_string(model, "revision", context)
-        require_filename(model, "gguf", context)
+        require_string(model, "gguf", context, filename=True)
         for key in ("context", "draft"):
             if type(model.get(key)) is not int or model[key] <= 0:
                 raise ModelError(f"{context}: {key} must be a positive integer")
@@ -443,15 +429,12 @@ def load_state(path: Path) -> dict:
 
 
 def state_matches(state: dict, model: dict, output: Path) -> bool:
+    """Reuse a validated GGUF until refresh or a new exact checksum requires bytes."""
     recorded = str(state.get("sha256", ""))
     expected = model.get("sha256", "")
-    return (
-        output.is_file()
-        and output.stat().st_size > 0
-        and all(state.get(key) == model[key] for key in ("repository", "revision", "gguf"))
-        and re.fullmatch(r"[0-9a-f]{64}", recorded) is not None
-        and (not expected or recorded == expected)
-    )
+    return (output.is_file() and output.stat().st_size > 0
+            and re.fullmatch(r"[0-9a-f]{64}", recorded) is not None
+            and (not expected or recorded == expected))
 
 
 def sha256(path: Path) -> str:
@@ -513,6 +496,11 @@ def command_path(name: str) -> str:
             )
         raise ModelError(f"missing command: {name}")
     return path
+
+
+def ollama_host(defaults: dict, override: str | None = None) -> str:
+    return override or os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_URL") or \
+        defaults.get("ollama_host", "127.0.0.1:11434")
 
 
 def ollama_identity() -> tuple[int, int]:
@@ -639,8 +627,7 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     command_path("runuser")
     command_path("script")
     ollama_bin = command_path("ollama") if any(m["provider"] == "ollama" for m in models) else ""
-    host = args.host or os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_URL") \
-        or defaults.get("ollama_host", "127.0.0.1:11434")
+    host = ollama_host(defaults, args.host)
     hf_home = Path(os.environ.get("HF_HOME", f"/var/cache/{PROJECT}/huggingface"))
     download_root = Path(
         os.environ.get("DOWNLOAD_DIR", str(hf_home / "downloads" / defaults["download_namespace"]))
@@ -673,7 +660,9 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             state = load_state(metadata)
             if state_matches(state, model, output) and not args.refresh:
                 checksum = state["sha256"]
-                print(f"    reusing GGUF; recorded SHA-256 {checksum}")
+                print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
+                if any(state.get(key) != model[key] for key in ("repository", "revision")):
+                    print("    source metadata changed; use --refresh to download new bytes")
             else:
                 minimum = args.min_free_bytes if args.min_free_bytes is not None \
                     else int(defaults.get("min_free_bytes", 0))
@@ -752,8 +741,7 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             print("Cleanup cancelled.")
             return 0
     _uid, gid = ollama_identity()
-    host = os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_URL") or \
-        defaults.get("ollama_host", "127.0.0.1:11434")
+    host = ollama_host(defaults)
     ollama_bin = shutil.which("ollama")
     for model in models:
         label = model.get("name", model["id"])
@@ -802,7 +790,6 @@ def build_parser() -> argparse.ArgumentParser:
     resolving = commands.add_parser("resolve", help="resolve one model id")
     catalog_arguments(resolving)
     resolving.add_argument("id")
-    resolving.add_argument("--provider", choices=("ollama", "download-only"))
     installing = commands.add_parser("install", help="download and register selected models")
     catalog_arguments(installing)
     installing.add_argument("selection", nargs="?")
@@ -853,9 +840,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "resolve":
         for model in models:
-            if model["id"] == args.id and (
-                args.provider is None or model["provider"] == args.provider
-            ) and (category != "mtp" or model["enabled"]):
+            if model["id"] == args.id and (category != "mtp" or model["enabled"]):
                 print(
                     f"{model_path(defaults, model)}\t"
                     f"{model.get('context', '')}\t{model.get('draft', '')}"
@@ -867,8 +852,7 @@ def main(argv: list[str] | None = None) -> int:
     if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
         available = [model for model in models if model["enabled"]]
     print(f"Available {category} models:")
-    host = getattr(args, "host", None) or os.environ.get("OLLAMA_HOST") or \
-        os.environ.get("OLLAMA_URL") or defaults.get("ollama_host")
+    host = ollama_host(defaults, getattr(args, "host", None)) if defaults.get("ollama_host") else None
     print_models(
         defaults,
         available,

@@ -42,6 +42,15 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("/usr/bin/flock --wait 1800", service)
         self.assertIn("IOSchedulingClass=idle", service)
 
+    def test_cache_cleanup_is_explicit_and_keeps_persistent_model_data(self) -> None:
+        source = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
+        self.assertIn("clean-cache", source)
+        self.assertIn("/var/cache/bc250-llm-server/huggingface", source)
+        self.assertIn("podman image prune -f", source)
+        self.assertIn("journalctl --vacuum-size=512M", source)
+        self.assertNotIn("find /var/lib/bc250-llm-server/gguf", source)
+        self.assertNotIn("find /var/lib/bc250-llm-server/ollama", source)
+
     def test_power_action_is_explicit_and_wol_is_optional(self) -> None:
         source = (ROOT / "cmd/maintenance/safe-power.sh").read_text(encoding="utf-8")
         self.assertIn("22 80 443 3000 11434 11435 11436", source)

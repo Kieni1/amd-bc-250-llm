@@ -40,9 +40,7 @@ if [[ -z "$choice" ]]; then
   exit 2
 fi
 
-resolved="$("$MANAGER" resolve mtp "$choice" \
-  --provider download-only \
-  --source "$SOURCE_FILE")" || exit 1
+resolved="$("$MANAGER" resolve mtp "$choice" --source "$SOURCE_FILE")" || exit 1
 IFS=$'\t' read -r GGUF DEFAULT_CTX DEFAULT_DRAFT <<< "$resolved"
 CTX="${CTX:-$DEFAULT_CTX}"
 DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"

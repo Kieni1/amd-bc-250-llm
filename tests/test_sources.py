@@ -23,7 +23,10 @@ class SourceManifestTests(unittest.TestCase):
         prepare = load_prepare_sources()
         sources = prepare.load_sources()
         self.assertEqual(len(prepare.source_files(sources)), 4)
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         for source in sources:
+            self.assertIn("repository", source)
+            self.assertIn(source["commit"], spec)
             self.assertNotIn("sha256", source)
             self.assertNotIn("required", source)
             self.assertNotIn("vendor_sha256", source)

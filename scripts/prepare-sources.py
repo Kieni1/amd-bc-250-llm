@@ -40,7 +40,7 @@ def load_sources() -> list[dict]:
     if document.get("schema") != 1 or not isinstance(sources, list):
         raise SourceError(f"invalid source manifest: {LOCK}")
 
-    required = ("id", "label", "commit", "url", "archive")
+    required = ("id", "label", "repository", "commit", "url", "archive")
     seen: set[str] = set()
     for source in sources:
         if not isinstance(source, dict):
@@ -56,6 +56,8 @@ def load_sources() -> list[dict]:
         commit = source["commit"]
         if len(commit) != 40 or any(char not in "0123456789abcdef" for char in commit):
             raise SourceError(f"{source_id}: commit must be a full lowercase SHA-1")
+        if source["repository"].count("/") != 1 or "{commit}" not in source["url"] + source["archive"]:
+            raise SourceError(f"{source_id}: repository and commit-templated source path are required")
         if source.get("cargo_vendor") and not isinstance(source.get("vendor_archive"), str):
             raise SourceError(f"{source_id}: cargo_vendor requires vendor_archive")
     return sources

@@ -56,11 +56,18 @@ rollback data before replacement.
 ## Storage and retention
 
 ```bash
-sudo bc250-maintenance status
+sudo bc250-status
 sudo bc250-model cleanup production --list
+sudo bc250-maintenance clean-cache
 sudo bc250-maintenance run prune
 sudo journalctl -u owui-maintenance@prune-uploads.service -n 100 --no-pager
 ```
+
+`bc250-status` is the shared storage view for GGUFs, the three Ollama stores,
+Hugging Face cache, Open WebUI, Podman and journal usage. `clean-cache` requires
+confirmation and removes rebuildable Hugging Face cache, dangling container
+images and older journal data; it does not delete GGUFs, Ollama models or Open
+WebUI data.
 
 Model weights are never deleted automatically. Use `bc250-model cleanup` to
 remove a selected registration, source GGUF, state file and rendered
@@ -75,7 +82,7 @@ before setting `DRY_RUN=0` in root-readable
 - `MAX_TOTAL_GB=0` disables the known-size ceiling.
 - Both rules cannot be disabled together.
 - Unknown timestamps or sizes are preserved and reported.
-- `MIN_FREE_GB` only controls a status warning; it never deletes data.
+- `MIN_FREE_GB` remains a maintenance policy value; it never deletes data.
 
 Use generous retention and agree the policy with office users before enabling
 deletion.

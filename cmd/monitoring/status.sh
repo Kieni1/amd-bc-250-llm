@@ -145,13 +145,18 @@ if swapon --show --noheadings 2>/dev/null | grep -q .; then
 else
   echo "  No active swap"
 fi
+[[ -r /proc/pressure/memory ]] && sed 's/^/  memory PSI: /' /proc/pressure/memory
 
 section "Storage"
 df -h / /boot 2>/dev/null | awk '!seen[$1]++' | sed 's/^/  /'
 directory_usage "GGUF sources" /var/lib/bc250-llm-server/gguf
-directory_usage "Ollama stores" /var/lib/bc250-llm-server/ollama
+directory_usage "Ollama main" /var/lib/bc250-llm-server/ollama/main
+directory_usage "Ollama task" /var/lib/bc250-llm-server/ollama/task
+directory_usage "Ollama agent" /var/lib/bc250-llm-server/ollama/agent
 directory_usage "Hugging Face cache" /var/cache/bc250-llm-server/huggingface
 directory_usage "Open WebUI" /var/lib/open-webui
+directory_usage "Podman storage" /var/lib/containers/storage
+command -v journalctl >/dev/null 2>&1 && journalctl --disk-usage 2>/dev/null | sed 's/^/  Journal: /'
 
 section "Sensors"
 sensor_drivers="$(

@@ -1,7 +1,8 @@
 # Model management
 
-The guided installer asks for production, task, agentic and embedding models in
-separate phases. Use the commands below later to add, refresh or remove models.
+The guided installer asks separately for production, task, agentic, embedding,
+experiment and MTP selections. Use the commands below later to add, refresh or
+remove models.
 
 ## Commands
 
@@ -79,8 +80,11 @@ same-name operator file overrides the packaged template and survives upgrades.
 ## Download state and authentication
 
 After a successful download, an adjacent `*.bc250.json` file records source
-identity and calculated SHA-256. Matching state is reused even for a moving
-revision such as `latest`; use `--refresh` for a deliberate network refresh.
+identity and calculated SHA-256. A non-empty GGUF with a recorded valid digest
+is reused even when the Modelfile repository/revision changes; only Ollama
+registration is regenerated. A newly supplied exact SHA-256 must still match.
+Use `--refresh` for a deliberate network refresh, including moving revisions
+such as `latest`.
 
 Hugging Face authentication is requested only when needed. `HF_TOKEN` or
 `--token-file PATH` is validated as the `ollama` account. Missing or rejected

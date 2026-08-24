@@ -14,8 +14,8 @@ Rerun it after the requested reboot. Resume only model selection with:
 sudo ./install --models-only
 ```
 
-The model stage asks separately for production, task, agentic and embedding
-models. Enter skips only the current category.
+The model stage asks separately for production, task, agentic, embedding,
+experiment and MTP models. Enter skips only the current category.
 
 ## Verify and open the UI
 
@@ -62,8 +62,9 @@ sudo bc250-40cu status
 ```
 
 The guided installer applies the memory/swap profiles and prepares the
-kernel-specific 40-CU module, but leaves extra CUs disabled. Test the feasible
-CU count for the individual board; see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
+kernel-specific 40-CU module, but leaves extra CUs disabled. Start with
+`sudo bc250-40cu`, then test the feasible CU count for the individual board;
+see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 
 ## Operations
 
@@ -74,7 +75,7 @@ sudo llm-run-diagnose --no-load
 
 sudo bc250-maintenance setup --defaults
 sudo bc250-maintenance run backup
-sudo bc250-maintenance status
+sudo bc250-maintenance clean-cache
 ```
 
 `setup --defaults` enables verified local backups only. Guided maintenance can

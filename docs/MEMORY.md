@@ -8,6 +8,7 @@ sudo bc250-memory-profile apply-full
 sudo reboot
 sudo bc250-memory-profile status
 sudo bc250-swap-profile status
+sudo bc250-status
 sudo bc250-verify
 ```
 
@@ -52,5 +53,6 @@ the value recorded before the first explicit override:
 sudo bc250-swap-profile remove
 ```
 
-After any change, check available memory, swap activity, GPU residency and a
-representative long model run. A successful boot alone is not a stability test.
+`bc250-status` reports RAM, memory PSI, zram, disk swap and current swappiness
+together. After any change, also check GPU residency and a representative long
+model run. A successful boot alone is not a stability test.

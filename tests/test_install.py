@@ -44,7 +44,7 @@ step_7_models
 '''
     return subprocess.run(
         ["bash", "-c", script, "installer-test", str(INSTALLER)],
-        input="0\n0\n\n1\n",
+        input="0\n0\n\n1\n\n0\n",
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -94,10 +94,12 @@ class InstallerTests(unittest.TestCase):
     def test_model_setup_uses_discovered_modelfiles(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
         phases = (
-            "run_model_phase 1 production Production BC250_PRODUCTION_SELECTION",
-            "run_model_phase 2 task Task BC250_TASK_SELECTION",
-            "run_model_phase 3 agentic Agentic BC250_AGENTIC_SELECTION",
-            "run_model_phase 4 embedding Embedding BC250_EMBEDDING_SELECTION",
+            "production|Production|BC250_PRODUCTION_SELECTION",
+            "task|Task|BC250_TASK_SELECTION",
+            "agentic|Agentic|BC250_AGENTIC_SELECTION",
+            "embedding|Embedding|BC250_EMBEDDING_SELECTION",
+            "experiments|Experiments|BC250_EXPERIMENT_SELECTION",
+            "mtp|MTP|BC250_MTP_SELECTION",
         )
         for phase in phases:
             self.assertIn(phase, source)
@@ -118,6 +120,10 @@ class InstallerTests(unittest.TestCase):
             "Skipping agentic models.",
             "model:list embedding",
             "model:install embedding 1",
+            "model:list experiments",
+            "Skipping experiments models.",
+            "model:list mtp",
+            "model:install mtp 0",
         )
         positions = [result.stdout.index(value) for value in expected_order]
         self.assertEqual(positions, sorted(positions), result.stdout)
@@ -128,6 +134,11 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then', source)
         self.assertIn('export BC250_HF_ANONYMOUS=1', source)
         self.assertIn("HF_TOKEN is unset; using anonymous", source)
+
+    def test_progress_terminal_is_checked_before_system_changes(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("Fedora package: util-linux-script", source)
+        self.assertLess(source.index("require_progress_terminal\n  start_transcript"), source.index("capture_install_state", source.index("main()")))
 
     def test_tooling_helpers_require_an_explicit_model_selection(self) -> None:
         helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")

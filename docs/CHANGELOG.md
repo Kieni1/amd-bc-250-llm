@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.9.6-0.1.testing - 2026-08-24
+
+This streamlining update expands the guided model stage to production, task,
+agentic, embedding, experiments and MTP through one shared installer path. The
+installer checks Fedora's `script` prerequisite before changing the system and
+ends with the short `sudo bc250-40cu` next step while leaving CU activation
+explicit and board-specific.
+
+Model replacement now reuses an already validated GGUF when only source
+metadata changes and rebuilds the Ollama registration; `--refresh` remains the
+explicit way to fetch new bytes. Model discovery, validation and Ollama host
+selection share fewer code paths without renaming or removing packaged models.
+
+`bc250-status` now combines per-instance model storage, Hugging Face cache,
+Podman, journal, memory pressure, zram, disk swap and swappiness visibility.
+`bc250-maintenance clean-cache` is an explicitly confirmed rebuildable-cache
+cleanup that retains GGUFs, Ollama models and Open WebUI data. Verification
+checks the internal Ollama listener shape/firewall policy, CU status reports
+stale kernel preparation, and deterministic validation cross-checks upstream
+pins against the RPM spec.
+
 ## 0.9.5-0.3.testing - 2026-08-24
 
 The optional maintenance stack now has one `bc250-maintenance` command for a
