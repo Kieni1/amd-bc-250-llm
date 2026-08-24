@@ -13,13 +13,50 @@ bad() { printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); }
 info() { printf '  [info] %s\n' "$1"; }
 section() { printf '\n=== %s ===\n' "$1"; }
 read_param() { [[ -r "$1" ]] && cat "$1" || printf 'not exposed'; }
+toml_table_value() {
+  local table="$1" key="$2" file="$3"
+  awk -v table="[$table]" -v key="$key" '
+    $0 == table { inside=1; next }
+    /^\[/ { inside=0 }
+    inside && $1 == key && $2 == "=" {
+      sub(/#.*/, "")
+      sub(/^[^=]*=[[:space:]]*/, "")
+      sub(/[[:space:]]+$/, "")
+      print
+      exit
+    }
+  ' "$file"
+}
 
 if [[ ${EUID} -ne 0 ]]; then
   warn "not running as root; Podman, journal and live-CU checks may be incomplete"
 fi
 
 section "Platform"
-info "kernel: $(uname -r)"
+kernel="$(uname -r)"
+info "running kernel: $kernel"
+if [[ -e "/usr/lib/modules/$kernel/build" ]]; then
+  ok "matching kernel-devel/build tree is present"
+else
+  warn "matching kernel-devel/build tree is missing for $kernel"
+fi
+if command -v modinfo >/dev/null 2>&1; then
+  amdgpu_path="$(modinfo -n amdgpu 2>/dev/null || true)"
+  amdgpu_vermagic="$(modinfo -F vermagic amdgpu 2>/dev/null | awk 'NR == 1 {print $1}' || true)"
+  amdgpu_metadata="$(modinfo amdgpu 2>/dev/null || true)"
+  info "amdgpu module: ${amdgpu_path:-unknown}"
+  info "amdgpu vermagic: ${amdgpu_vermagic:-unknown}"
+  if grep -q 'bc250_cc_write_mode' <<< "$amdgpu_metadata"; then
+    info "amdgpu type: modified 40-CU module"
+  else
+    info "amdgpu type: stock or unrecognized"
+  fi
+  if [[ -n "$amdgpu_vermagic" && "$amdgpu_vermagic" != "$kernel" ]]; then
+    warn "amdgpu was built for a different kernel; rebuild/reapply the 40-CU module"
+  fi
+else
+  warn "modinfo is unavailable; AMDGPU kernel compatibility was not checked"
+fi
 if command -v rpm >/dev/null 2>&1; then
   mesa="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' mesa-vulkan-drivers 2>/dev/null || true)"
   [[ -n "$mesa" ]] && info "Mesa: $mesa" || warn "mesa-vulkan-drivers package not found"
@@ -75,6 +112,9 @@ while read -r fs size used avail pct mount; do
 done < <(df -h / /var/lib/bc250-llm-server 2>/dev/null | awk '!seen[$1]++')
 
 section "Swap and zram"
+swappiness="$(sysctl -n vm.swappiness 2>/dev/null || true)"
+[[ -n "$swappiness" ]] && info "vm.swappiness: $swappiness" || \
+  warn "vm.swappiness is not readable"
 if swapon --show --noheadings 2>/dev/null | grep -q .; then
   swapon --show 2>/dev/null | sed 's/^/  /'
   ok "swap is active"
@@ -113,23 +153,42 @@ fi
 
 section "Governor and sensors"
 config=/etc/cyan-skillfish-governor-smu/config.toml
+if command -v cyan-skillfish-governor-smu >/dev/null 2>&1; then
+  governor_version="$(cyan-skillfish-governor-smu --version 2>/dev/null | head -1 || true)"
+  info "governor version: ${governor_version:-unknown}"
+else
+  warn "cyan-skillfish-governor-smu executable is missing"
+fi
 if [[ -r "$config" ]]; then
   ok "governor config installed"
   min="$(awk '/^\[frequency-range\]/{s=1;next} /^\[/{s=0} s&&$1=="min"{print $3;exit}' "$config")"
   max="$(awk '/^\[frequency-range\]/{s=1;next} /^\[/{s=0} s&&$1=="max"{print $3;exit}' "$config")"
+  fix_freq="$(toml_table_value gpu-usage fix-freq "$config")"
+  usage_method="$(toml_table_value gpu-usage method "$config")"
   info "governor range: ${min:-unknown}-${max:-unknown} MHz"
+  info "governor gpu usage: method=${usage_method:-unknown}; fix-freq=${fix_freq:-not set}"
+  [[ -n "$fix_freq" ]] || \
+    warn "governor fix-freq is not explicit; v0.4.12 defaults it to false"
+  [[ "$usage_method" != '"kernel"' ]] || \
+    warn "governor kernel usage method requires a separately patched compatible kernel"
 else
   bad "governor config missing"
 fi
 if command -v sensors >/dev/null 2>&1; then
-  temp_lines="$(sensors 2>/dev/null | grep -Ei 'edge:|junction:|mem:|power1:' | head -12 || true)"
-  [[ -n "$temp_lines" ]] && printf '%s\n' "$temp_lines" | sed 's/^/  /' || warn "no GPU temperature lines found"
+  sensor_lines="$(sensors 2>/dev/null | \
+    grep -Ei 'Tctl:|edge:|junction:|mem:|PPT:|power[0-9]+:|fan[0-9]+:' | \
+    head -20 || true)"
+  [[ -n "$sensor_lines" ]] && printf '%s\n' "$sensor_lines" | sed 's/^/  /' || \
+    warn "no selected temperature, power or fan readings found"
 fi
 mods="$(lsmod 2>/dev/null | awk '{print $1}')"
 if grep -qx nct6683 <<< "$mods" && grep -Eq '^nct6687' <<< "$mods"; then
   bad "nct6683 and nct6687 drivers are both loaded; they conflict"
 elif grep -Eq '^nct6687' <<< "$mods"; then
   warn "experimental nct6687 PWM driver is loaded; rebuild/check it after kernel updates"
+  pwm_count="$(find /sys/class/hwmon -maxdepth 2 -type f -name 'pwm[0-9]*' 2>/dev/null | wc -l)"
+  ((pwm_count > 0)) && info "$pwm_count PWM control file(s) exposed" || \
+    warn "nct6687 is loaded but no PWM control files are exposed"
 elif grep -qx nct6683 <<< "$mods"; then
   ok "safe nct6683 sensor driver is loaded"
 else
@@ -201,8 +260,12 @@ else
 fi
 
 section "Package configuration"
-[[ -r /etc/bc250-llm-server/production-models.toml ]] && ok "production model catalog installed" || bad "production model catalog missing"
-[[ -r /etc/bc250-llm-server/experiments-models.toml ]] && ok "experiment model catalog installed" || bad "experiment model catalog missing"
+packaged_models=/usr/share/bc250-llm-server/model-management/modelfiles
+operator_models=/etc/bc250-llm-server/models.d
+[[ -d "$packaged_models" ]] && ok "packaged Modelfile directory installed" || bad "packaged Modelfile directory missing"
+[[ -d "$operator_models" ]] && ok "operator models.d directory installed" || bad "operator models.d directory missing"
+model_count="$(find "$packaged_models" "$operator_models" -maxdepth 1 -type f -name '*.Modelfile' 2>/dev/null | wc -l)"
+((model_count > 0)) && ok "$model_count Modelfile template(s) discoverable" || bad "no Modelfile templates found"
 if grep -RqsE 'hf_[A-Za-z0-9]{20,}|WEBUI_ADMIN_PASSWORD=' \
   /etc/bc250-llm-server /usr/share/bc250-llm-server 2>/dev/null; then
   bad "token or administrator password found in packaged configuration"

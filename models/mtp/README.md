@@ -1,7 +1,7 @@
 # MTP models
 
-MTP models are optional `download-only` llama.cpp inputs. They are kept out of
-the Ollama experiment catalog because they have no Ollama name or Modelfile.
+MTP models are optional `download-only` llama.cpp inputs. They retain a small
+runtime catalog because they have no Ollama name or Modelfile.
 Both entries are disabled by default.
 
 ```bash

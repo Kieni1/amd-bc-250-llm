@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.9.3-testing - 2026-08-23
+
+This integration update pins Open WebUI v0.11.0 by its OCI index digest while
+retaining the existing Ollama, private Tika, persistent-data, loopback and
+privacy settings. Clean installations initialize the current schema directly.
+Because v0.11.0 includes database schema changes, existing installations must
+take a complete offline snapshot of `/var/lib/open-webui` before upgrading.
+
+The Fedora kernel workflow remains tied to the kernel actually running, not to
+a release number. Installation and 40-CU preparation use `uname -r` and the
+matching kernel-devel tree; verification reports the AMDGPU module path and
+vermagic and warns when the module must be rebuilt after a kernel update. The
+governor remains pinned to v0.4.12 with `fix-freq = false`,
+`method = "busy-flag"` and the fresh-install 1850 MHz maximum.
+
+The shell validation entry point no longer depends on `/dev/fd`, allowing the
+same checks to run in restricted build environments without changing the test
+scope.
+
+## 0.9.2-testing - 2026-08-21
+
+This focused hardware-maintenance update pins Cyan Skillfish governor v0.4.12
+at commit `be9537fc36f24b17570088cafa8c79365f80fee8`. Fresh installations keep
+the existing conservative usage policy, now expressed as `fix-freq = false`
+and `method = "busy-flag"`. Operators should enable `fix-freq` only for the
+eight-core GPU-frequency reporting problem; the optional `kernel` usage method
+still requires a separately patched compatible kernel.
+
+`bc250-verify` now reports the running kernel, matching kernel-devel/build tree,
+AMDGPU module path and vermagic, installed governor version and effective
+`fix-freq`/usage-method settings. A kernel/module mismatch produces an explicit
+warning to rebuild and reapply the 40-CU module after a Fedora kernel update.
+No Fedora kernel release is hard-coded, and the existing Vulkan-oriented Ollama
+configuration remains unchanged.
+
+## 0.9.1-testing - 2026-07-23
+
+This operational update adds `bc250-status`, a concise read-only overview of
+the kernel, live CU report, governor, all three Ollama instances, web services,
+memory, swap, storage and sensors. The existing verifier remains the detailed
+pass/fail tool.
+
+The swap profile now reports `vm.swappiness` and accepts an optional
+`SWAPPINESS=0..200` override. It records the previous runtime value so profile
+removal and full purge can restore it. If the variable is unset, existing
+system policy is left alone. Sensor checks now include fan readings and
+available PWM controls without installing an experimental fan-control stack.
+
+Fresh installations use a 350–1850 MHz governor range. The 2000 MHz curve point
+remains available for deliberate operator overrides, and `%config(noreplace)`
+continues to preserve an existing governor configuration during upgrades.
+
+## 0.9.0-testing - 2026-07-22
+
+This update removes duplicated Ollama catalogs and makes each strict
+`.Modelfile` the complete discoverable model definition. Packaged templates are
+read from `/usr/share`; operator additions and same-name overrides are read
+from `/etc/bc250-llm-server/models.d`. Production and experiment downloads
+still require an explicit selection, while task and agentic setup keep their
+dedicated Ollama instances on ports 11435 and 11436.
+
+MTP retains its TOML because its llama.cpp context and draft-token fields do
+not belong in an Ollama Modelfile. Revisions remain flexible and SHA-256
+metadata is optional; downloaded files are still hashed and recorded locally.
+The build now places source and binary RPMs together in `dist/`, declares the
+Fedora `util-linux-script` dependency needed for visible Hugging Face progress,
+and includes an installed-files overview.
+
 ## 0.8.1-testing - 2026-07-22
 
 This maintenance release adds a bounded, explicit full-purge path, retains

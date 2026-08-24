@@ -1,11 +1,10 @@
 # Experimental model tools
 
-Experimental models are intentionally separate from the production list. The
-RPM installs an editable TOML catalog and keeps its Modelfiles in the shared
-model-management tree.
+Experimental models are intentionally separate from the production list. They
+are discovered from `exp-*.Modelfile` templates in the shared packaged tree and
+the operator drop-in directory.
 
 ```bash
-sudoedit /etc/bc250-llm-server/experiments-models.toml
 bc250-model list experiments
 sudo bc250-fetch-experiments
 ```
@@ -17,9 +16,9 @@ The disabled evaluation set also includes
 `exp-lfm25-8b-a1b-liquidai-q6-k`, `exp-qwen3-8b-qwen-q6-k` and
 `exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m`.
 
-The revision field accepts a commit, tag or branch such as `main`. Use `latest`
-to follow the repository's default revision without passing `--revision` to
-Hugging Face. Moving revisions favor freshness over reproducibility.
+The `# Source:` revision accepts a commit, tag or branch such as `main`. Use
+`latest` to follow the repository's default revision. Moving revisions favor
+freshness over reproducibility; use `--refresh` to check them again.
 
 Test quality, full GPU residency, cold load, context scaling and sustained
 correctness before exposing any experiment in Open WebUI. The benchmark command

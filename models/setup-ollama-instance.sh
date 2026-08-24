@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Configure an isolated task or coding-agent Ollama service and its models.
+# Configure an isolated task or agentic Ollama service and its models.
 set -Eeuo pipefail
 umask 0027
 
 usage() {
-  echo "Usage: setup-ollama-instance.sh task|coding" >&2
+  echo "Usage: setup-ollama-instance.sh task|agentic" >&2
 }
 
 [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
@@ -25,9 +25,9 @@ case "$kind" in
     keep_alive=0
     selection="${TASK_MODEL_SELECTION:-all}"
     ;;
-  coding)
+  agentic|coding)
     label="coding-agent"
-    category="coding"
+    category="agentic"
     bind="${CODING_AGENT_BIND:-0.0.0.0}"
     port="${CODING_AGENT_PORT:-11436}"
     service="ollama-agent.service"
@@ -67,12 +67,8 @@ done
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -x /usr/libexec/bc250-llm-server/modelctl ]]; then
   manager="${MODEL_MANAGER:-/usr/libexec/bc250-llm-server/modelctl}"
-  source_file="${SOURCE_FILE:-/usr/share/bc250-llm-server/model-management/sources/$category.toml}"
-  modelfile_dir="${MODELFILE_SOURCE_DIR:-/usr/share/bc250-llm-server/model-management/modelfiles}"
 else
   manager="${MODEL_MANAGER:-$script_dir/modelctl.py}"
-  source_file="${SOURCE_FILE:-$script_dir/sources/$category.toml}"
-  modelfile_dir="${MODELFILE_SOURCE_DIR:-$script_dir/modelfiles}"
 fi
 [[ -x "$manager" ]] || { echo "ERROR: model manager is not executable: $manager" >&2; exit 1; }
 
@@ -130,8 +126,6 @@ curl -fsS "http://$check_host:$port/api/tags" >/dev/null || {
 
 manager_args=(
   install "$category" "$selection"
-  --source "$source_file"
-  --modelfile-dir "$modelfile_dir"
   --host "$check_host:$port"
 )
 if [[ "$kind" == task ]]; then

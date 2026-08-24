@@ -64,6 +64,11 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn("/api/tags", source)
         self.assertNotIn("curl", source)
 
+    def test_missing_progress_terminal_names_the_fedora_package(self) -> None:
+        with patch.object(modelctl.shutil, "which", return_value=None):
+            with self.assertRaisesRegex(modelctl.ModelError, "util-linux-script"):
+                modelctl.command_path("script")
+
 
 if __name__ == "__main__":
     unittest.main()

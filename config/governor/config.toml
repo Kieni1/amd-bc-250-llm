@@ -1,4 +1,4 @@
-# Based on filippor/cyan-skillfish-governor v0.4.11 default-config.toml.
+# Based on filippor/cyan-skillfish-governor v0.4.12 default-config.toml.
 # Microseconds.
 [timing.intervals]
 sample = 250
@@ -6,7 +6,8 @@ adjust = 100_000
 
 [gpu-usage]
 fix-metrics = true
-method = "busy-flag" # "busy-flag" or "process"
+fix-freq = false
+method = "busy-flag" # "kernel" requires a separately patched compatible kernel
 flush-every = 10
 
 [gpu]
@@ -17,7 +18,7 @@ enabled = true
 
 [frequency-range]
 min = 350
-max = 2000
+max = 1850
 
 [timing.ramp-rates]
 normal = 1

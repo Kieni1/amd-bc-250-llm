@@ -31,7 +31,7 @@ jobs:
         with:
           name: bc250-llm-server-binary-rpm
           path: |
-            dist/RPMS/*.x86_64.rpm
+            dist/*.x86_64.rpm
             dist/SHA256SUMS
 
       - name: Upload source RPM
@@ -39,5 +39,5 @@ jobs:
         with:
           name: bc250-llm-server-source-rpm
           path: |
-            dist/SRPMS/*.src.rpm
+            dist/*.src.rpm
             dist/SHA256SUMS

@@ -24,7 +24,11 @@ class PackagingTests(unittest.TestCase):
     def test_model_package_and_public_dispatcher_are_installed(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("models/modelctl.py\t{libexec}/modelctl", manifest)
+        self.assertIn("{config}/models.d", manifest)
+        self.assertIn("models/modelfiles/*.Modelfile", manifest)
+        self.assertNotIn("models/sources", manifest)
         self.assertIn("uninstall.sh\t{libexec}/uninstall.sh", manifest)
+        self.assertIn("cmd/monitoring/status.sh\t{libexec}/status.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
         result = subprocess.run(
             [str(ROOT / "packaging/bc250"), "--list-aliases"],
@@ -34,6 +38,54 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertIn("model", result.stdout.splitlines())
         self.assertIn("uninstall", result.stdout.splitlines())
+        self.assertIn("status", result.stdout.splitlines())
+
+    def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
+        config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")
+        self.assertRegex(
+            config,
+            r"(?ms)^\[frequency-range\]\s*$.*?^min = 350\s*$.*?^max = 1850\s*$",
+        )
+
+    def test_governor_v0412_pin_keeps_conservative_usage_defaults(self) -> None:
+        commit = "be9537fc36f24b17570088cafa8c79365f80fee8"
+        upstreams = (ROOT / "packaging/upstreams.toml").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")
+        self.assertIn('version = "0.4.12"', upstreams)
+        self.assertIn(f'commit = "{commit}"', upstreams)
+        self.assertIn("%global governor_version 0.4.12", spec)
+        self.assertIn(f"%global governor_commit {commit}", spec)
+        self.assertRegex(
+            config,
+            r"(?ms)^\[gpu-usage\]\s*$.*?^fix-metrics = true\s*$.*?^fix-freq = false\s*$.*?^method = \"busy-flag\"",
+        )
+
+    def test_open_webui_v0110_is_digest_pinned(self) -> None:
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("# v0.11.0, pinned OCI index digest.", quadlet)
+        self.assertIn(
+            "Image=ghcr.io/open-webui/open-webui@sha256:"
+            "72c0ba641ba75e7aa52655cb242570906ececd09b1140fb736483038a22b3228",
+            quadlet,
+        )
+        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.0)$")
+
+    def test_build_outputs_share_one_dist_directory(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("dist/RPMS", makefile + workflow)
+        self.assertNotIn("dist/SRPMS", makefile + workflow)
+        self.assertIn("dist/*.x86_64.rpm", workflow)
+        self.assertIn("dist/*.src.rpm", workflow)
+
+    def test_progress_terminal_dependency_is_explicit(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("Requires:       util-linux-script", spec)
 
     def test_package_provides_its_own_ollama_account(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")

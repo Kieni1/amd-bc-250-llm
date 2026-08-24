@@ -169,10 +169,11 @@ else wn "could not read ollama unit env (need sudo)"; fi
 
 # ---------------------------------------------------------------------------
 sec "8. GOVERNOR RANGE"
-exp "max=2000 (or your chosen cap). min/throttle differ harmlessly between ref boards (350vs500, 90/78 vs 85/75)."
+exp "package default max=1850; operator-selected caps may differ. min/throttle also differ between tested boards."
 gmax=$(grep -E '^\s*max\s*=' /etc/cyan-skillfish-governor-smu/config.toml 2>/dev/null | grep -oE '[0-9]+' | head -1)
 if [[ -n "$gmax" ]]; then
-  if [[ "$gmax" -ge 1850 && "$gmax" -le 2000 ]]; then ok "max=$gmax MHz"
+  if [[ "$gmax" -eq 1850 ]]; then ok "max=$gmax MHz (package default)"
+  elif [[ "$gmax" -gt 1850 && "$gmax" -le 2000 ]]; then wn "max=$gmax MHz (operator override above package default)"
   elif [[ "$gmax" -gt 2000 ]]; then wn "max=$gmax MHz  <- >2000 buys <2% decode for real extra voltage/heat; not worth it on this hardware"
   else wn "max=$gmax MHz (below ref 2000)"; fi
 else wn "governor config not found"; fi

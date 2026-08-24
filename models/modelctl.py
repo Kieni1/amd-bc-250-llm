@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and register BC-250 model catalog entries."""
+"""Discover BC-250 Modelfiles, download their GGUFs and register them."""
 
 from __future__ import annotations
 
@@ -22,13 +22,70 @@ import tomllib
 
 
 PROJECT = "bc250-llm-server"
-CATEGORIES = ("production", "experiments", "mtp", "task", "coding")
 INSTALLED_SHARE = Path(f"/usr/share/{PROJECT}/model-management")
 INSTALLED_CONFIG = Path(f"/etc/{PROJECT}")
+PACKAGED_MODEL_DIR = INSTALLED_SHARE / "modelfiles"
+OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
+
+CATEGORY_ALIASES = {
+    "production": "production",
+    "experimental": "experiments",
+    "experiments": "experiments",
+    "task": "task",
+    "tasker": "task",
+    "agentic": "agentic",
+    "coding": "agentic",
+    "mtp": "mtp",
+}
+CATEGORIES = tuple(CATEGORY_ALIASES)
+OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic")
+CATEGORY_PREFIXES = {
+    "production": "prod-",
+    "experiments": "exp-",
+    "task": "task-",
+    "agentic": "agentic-",
+}
+CATEGORY_DEFAULTS = {
+    "production": {
+        "destination": "/var/lib/bc250-llm-server/gguf/production",
+        "download_namespace": "production",
+        "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/production",
+        "ollama_host": "127.0.0.1:11434",
+        "min_free_bytes": 0,
+    },
+    "experiments": {
+        "destination": "/var/lib/bc250-llm-server/gguf/experiments",
+        "download_namespace": "experiments",
+        "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/experiments",
+        "ollama_host": "127.0.0.1:11434",
+        "min_free_bytes": 0,
+    },
+    "task": {
+        "destination": "/var/lib/bc250-llm-server/gguf/task",
+        "download_namespace": "task",
+        "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/task",
+        "ollama_host": "127.0.0.1:11435",
+        "min_free_bytes": 0,
+    },
+    "agentic": {
+        "destination": "/var/lib/bc250-llm-server/gguf/agent",
+        "download_namespace": "agentic",
+        "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/agent",
+        "ollama_host": "127.0.0.1:11436",
+        "min_free_bytes": 8589934592,
+    },
+}
 
 
 class ModelError(RuntimeError):
     """A concise error suitable for command-line output."""
+
+
+def canonical_category(value: str) -> str:
+    try:
+        return CATEGORY_ALIASES[value]
+    except KeyError as error:
+        raise ModelError(f"unsupported model category: {value}") from error
 
 
 def require_string(table: dict, key: str, context: str) -> str:
@@ -45,139 +102,229 @@ def require_filename(table: dict, key: str, context: str) -> str:
     return value
 
 
-def default_paths(category: str) -> tuple[Path, Path]:
+def local_source_root() -> Path | None:
     script_dir = Path(__file__).resolve().parent
-    source_catalog = (
-        script_dir / "mtp/models.toml"
-        if category == "mtp"
-        else script_dir / "sources" / f"{category}.toml"
-    )
-    if source_catalog.is_file():
-        return source_catalog, script_dir / "modelfiles"
-    if category in {"production", "experiments", "mtp"}:
-        catalog = INSTALLED_CONFIG / f"{category}-models.toml"
-    else:
-        catalog = INSTALLED_SHARE / "sources" / f"{category}.toml"
-    return catalog, INSTALLED_SHARE / "modelfiles"
+    if (script_dir / "modelfiles").is_dir() and (script_dir / "mtp/models.toml").is_file():
+        return script_dir
+    return None
+
+
+def model_directories(explicit: list[Path] | None = None) -> list[Path]:
+    if explicit:
+        return explicit
+    override = os.environ.get("MODELFILE_SOURCE_DIR", "")
+    if override:
+        return [Path(value) for value in override.split(os.pathsep) if value]
+    source_root = local_source_root()
+    if source_root:
+        return [source_root / "modelfiles"]
+    return [PACKAGED_MODEL_DIR, OPERATOR_MODEL_DIR]
+
+
+def default_mtp_catalog() -> Path:
+    source_root = local_source_root()
+    if source_root:
+        return source_root / "mtp/models.toml"
+    configured = INSTALLED_CONFIG / "mtp-models.toml"
+    return configured if configured.is_file() else INSTALLED_SHARE / "mtp-models.toml"
 
 
 def model_path(defaults: dict, model: dict, destination: str | None = None) -> Path:
-    root = Path(destination or defaults["destination"])
+    if destination:
+        return Path(destination) / model["gguf"]
+    if model["provider"] == "ollama":
+        return Path(model["from"])
+    root = Path(defaults["destination"])
     if defaults.get("layout", "flat") == "by-id":
         root /= model["id"]
     return root / model["gguf"]
 
 
 def modelfile_metadata(path: Path) -> dict[str, str]:
-    values = {"name": "", "repository": "", "revision": "", "gguf": "", "from": ""}
+    values = {
+        "category": "",
+        "name": "",
+        "repository": "",
+        "revision": "",
+        "gguf": "",
+        "sha256": "",
+        "from": "",
+    }
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError as error:
         raise ModelError(f"cannot read Modelfile {path}: {error}") from error
     for line in lines:
-        if line.startswith("# Ollama model: "):
+        if line.startswith("# BC250 category: "):
+            values["category"] = line.removeprefix("# BC250 category: ").strip()
+        elif line.startswith("# Ollama model: "):
             values["name"] = line.removeprefix("# Ollama model: ").strip()
         elif line.startswith("# Source: ") and " @ " in line:
             source = line.removeprefix("# Source: ").strip()
             values["repository"], values["revision"] = source.rsplit(" @ ", 1)
         elif line.startswith("# GGUF: "):
             values["gguf"] = line.removeprefix("# GGUF: ").strip()
+        elif line.startswith("# SHA256: "):
+            values["sha256"] = line.removeprefix("# SHA256: ").strip()
         elif line.startswith("FROM ") and not values["from"]:
             values["from"] = line.split(maxsplit=1)[1].strip()
     return values
 
 
-def load_catalog(path: Path, category: str, modelfile_dir: Path) -> tuple[dict, list[dict]]:
+def load_modelfile(path: Path) -> dict:
+    context = str(path)
+    if path.suffix != ".Modelfile":
+        raise ModelError(f"{path}: expected a .Modelfile template")
+    name = path.name.removesuffix(".Modelfile")
+    if re.fullmatch(r"[a-z0-9][a-z0-9._-]*", name) is None:
+        raise ModelError(f"{path}: filename must be a lowercase Ollama model name")
+
+    metadata = modelfile_metadata(path)
+    for key in ("category", "name", "repository", "revision", "gguf", "from"):
+        if not metadata[key]:
+            raise ModelError(f"{path}: missing {key} metadata")
+    text = path.read_text(encoding="utf-8")
+    required_markers = (
+        "# BC250 category: ",
+        "# Ollama model: ",
+        "# Source: ",
+        "# GGUF: ",
+        "FROM ",
+    )
+    for marker in required_markers:
+        if sum(line.startswith(marker) for line in text.splitlines()) != 1:
+            raise ModelError(f"{path}: expected exactly one {marker.strip()!r} line")
+    if sum(line.startswith("# SHA256:") for line in text.splitlines()) > 1:
+        raise ModelError(f"{path}: expected at most one '# SHA256:' line")
+    category = canonical_category(metadata["category"])
+    if category not in OLLAMA_CATEGORIES:
+        raise ModelError(f"{path}: MTP entries cannot use Modelfiles")
+    if metadata["name"] != name:
+        raise ModelError(f"{path}: Ollama name must match the filename")
+    if not name.startswith(CATEGORY_PREFIXES[category]):
+        raise ModelError(
+            f"{path}: {category} model name must start with {CATEGORY_PREFIXES[category]!r}"
+        )
+    if re.fullmatch(r"[^/\s]+/[^/\s]+", metadata["repository"]) is None:
+        raise ModelError(f"{path}: source must be a Hugging Face owner/repository")
+    if re.fullmatch(r"\S+", metadata["revision"]) is None:
+        raise ModelError(f"{path}: revision must be a commit, tag, branch or latest")
+    if Path(metadata["gguf"]).name != metadata["gguf"]:
+        raise ModelError(f"{path}: GGUF metadata must be a filename")
+
+    output = Path(metadata["from"])
+    if not output.is_absolute() or output.name != metadata["gguf"]:
+        raise ModelError(f"{path}: FROM must be an absolute path ending in the GGUF filename")
+    expected_root = Path(CATEGORY_DEFAULTS[category]["destination"])
+    if not output.is_relative_to(expected_root):
+        raise ModelError(f"{path}: FROM must be below {expected_root}")
+
+    checksum = metadata["sha256"]
+    if checksum and re.fullmatch(r"[0-9a-f]{64}", checksum) is None:
+        raise ModelError(f"{path}: SHA256 must be 64 lowercase hexadecimal characters")
+    for parameter in ("PARAMETER num_gpu 99", "PARAMETER num_keep 256"):
+        if len(re.findall(rf"^{re.escape(parameter)}$", text, re.MULTILINE)) != 1:
+            raise ModelError(f"{path}: expected exactly one {parameter!r}")
+
+    return {
+        "enabled": True,
+        "provider": "ollama",
+        "category": category,
+        "id": name,
+        "name": name,
+        "repository": metadata["repository"],
+        "revision": metadata["revision"],
+        "gguf": metadata["gguf"],
+        "sha256": checksum,
+        "from": metadata["from"],
+        "modelfile": path.name,
+        "template": path,
+        "origin": "operator" if OPERATOR_MODEL_DIR in path.parents else "packaged",
+    }
+
+
+def discover_models(directories: list[Path]) -> list[dict]:
+    # Later directories override a same-named packaged template. This gives
+    # /etc/bc250-llm-server/models.d the usual operator-over-package precedence.
+    discovered: dict[str, dict] = {}
+    found_directory = False
+    for directory in directories:
+        if not directory.is_dir():
+            continue
+        found_directory = True
+        for path in sorted(directory.glob("*.Modelfile")):
+            model = load_modelfile(path)
+            discovered[model["name"]] = model
+    if not found_directory:
+        joined = ", ".join(str(path) for path in directories)
+        raise ModelError(f"no Modelfile directory found: {joined}")
+    return sorted(discovered.values(), key=lambda model: model["name"])
+
+
+def load_mtp_catalog(path: Path) -> tuple[dict, list[dict]]:
     try:
         with path.open("rb") as stream:
             document = tomllib.load(stream)
     except (OSError, tomllib.TOMLDecodeError) as error:
-        raise ModelError(f"cannot load catalog {path}: {error}") from error
+        raise ModelError(f"cannot load MTP catalog {path}: {error}") from error
     if document.get("schema") != 1:
         raise ModelError(f"{path}: unsupported or missing schema")
     defaults = document.get("defaults")
     models = document.get("models")
     if not isinstance(defaults, dict) or not isinstance(models, list):
         raise ModelError(f"{path}: defaults and models are required")
-    if defaults.get("category") != category:
-        raise ModelError(f"{path}: category must be {category!r}")
+    if defaults.get("category") != "mtp":
+        raise ModelError(f"{path}: category must be 'mtp'")
     require_string(defaults, "destination", f"{path}: defaults")
     require_string(defaults, "download_namespace", f"{path}: defaults")
     if defaults.get("layout", "flat") not in {"flat", "by-id"}:
         raise ModelError(f"{path}: layout must be flat or by-id")
-    minimum = defaults.get("min_free_bytes", 0)
-    if type(minimum) is not int or minimum < 0:
-        raise ModelError(f"{path}: min_free_bytes must be a non-negative integer")
 
-    prefixes = {
-        "production": "prod-",
-        "experiments": "exp-",
-        "task": "task-",
-        "coding": "agentic-",
-    }
-    seen_ids: set[str] = set()
-    seen_names: set[str] = set()
-    seen_modelfiles: set[str] = set()
+    seen: set[str] = set()
     for index, model in enumerate(models):
         context = f"{path}: models[{index}]"
         if not isinstance(model, dict):
             raise ModelError(f"{context} must be a table")
         if not isinstance(model.get("enabled"), bool):
             raise ModelError(f"{context}: enabled must be true or false")
-        provider = require_string(model, "provider", context)
-        if provider not in {"ollama", "download-only"}:
-            raise ModelError(f"{context}: unsupported provider {provider!r}")
+        if model.get("provider") != "download-only":
+            raise ModelError(f"{context}: MTP provider must be download-only")
         model_id = require_string(model, "id", context)
-        if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", model_id) is None:
-            raise ModelError(f"{context}: id must be a path-safe identifier")
-        if model_id in seen_ids:
-            raise ModelError(f"{path}: duplicate model id {model_id!r}")
-        seen_ids.add(model_id)
+        if model_id in seen or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", model_id) is None:
+            raise ModelError(f"{context}: duplicate or invalid id")
+        seen.add(model_id)
         require_string(model, "repository", context)
         require_string(model, "revision", context)
         require_filename(model, "gguf", context)
+        for key in ("context", "draft"):
+            if type(model.get(key)) is not int or model[key] <= 0:
+                raise ModelError(f"{context}: {key} must be a positive integer")
         checksum = model.get("sha256", "")
         if not isinstance(checksum, str) or (
             checksum and re.fullmatch(r"[0-9a-f]{64}", checksum) is None
         ):
-            raise ModelError(f"{context}: sha256 must be 64 lowercase hexadecimal characters")
+            raise ModelError(f"{context}: invalid SHA256")
+    return defaults, models
 
-        if provider == "download-only":
-            for key in ("context", "draft"):
-                if type(model.get(key)) is not int or model[key] <= 0:
-                    raise ModelError(f"{context}: {key} must be a positive integer")
-            if "name" in model or "modelfile" in model:
-                raise ModelError(f"{context}: download-only entries cannot define Ollama fields")
-            continue
 
-        name = require_string(model, "name", context)
-        modelfile_name = require_filename(model, "modelfile", context)
-        if name in seen_names or modelfile_name in seen_modelfiles:
-            raise ModelError(f"{context}: duplicate Ollama name or Modelfile")
-        seen_names.add(name)
-        seen_modelfiles.add(modelfile_name)
-        if modelfile_name != f"{name}.Modelfile":
-            raise ModelError(f"{context}: Modelfile filename must match the Ollama name")
-        prefix = prefixes.get(category)
-        if prefix and not name.startswith(prefix):
-            raise ModelError(f"{context}: Ollama name must start with {prefix!r}")
-
-        template = modelfile_dir / modelfile_name
-        expected = {
-            "name": name,
-            "repository": model["repository"],
-            "revision": model["revision"],
-            "gguf": model["gguf"],
-            "from": str(model_path(defaults, model)),
-        }
-        actual = modelfile_metadata(template)
-        for key, value in expected.items():
-            if actual[key] != value:
-                raise ModelError(f"{template}: {key} is {actual[key]!r}, expected {value!r}")
-        text = template.read_text(encoding="utf-8")
-        for parameter in ("PARAMETER num_gpu 99", "PARAMETER num_keep 256"):
-            if len(re.findall(rf"^{re.escape(parameter)}$", text, re.MULTILINE)) != 1:
-                raise ModelError(f"{template}: expected exactly one {parameter!r}")
+def load_models(
+    category: str,
+    *,
+    directories: list[Path] | None = None,
+    source: Path | None = None,
+) -> tuple[dict, list[dict]]:
+    canonical = canonical_category(category)
+    if canonical == "mtp":
+        return load_mtp_catalog(source or default_mtp_catalog())
+    if source is not None:
+        raise ModelError("--source is only supported for the MTP catalog")
+    defaults = dict(CATEGORY_DEFAULTS[canonical])
+    defaults["category"] = canonical
+    models = [
+        model
+        for model in discover_models(model_directories(directories))
+        if model["category"] == canonical
+    ]
     return defaults, models
 
 
@@ -185,13 +332,9 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
     if not models:
         return []
     value = selection.strip()
-    if not value or value.lower() == "all":
+    if value.lower() == "all":
         return list(models)
-    lookup: dict[str, int] = {}
-    for index, model in enumerate(models):
-        lookup[model["id"]] = index
-        if model.get("name"):
-            lookup[model["name"]] = index
+    lookup = {model["id"]: index for index, model in enumerate(models)}
     selected: list[int] = []
     for item in value.split(","):
         item = item.strip()
@@ -213,8 +356,8 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
 
 def print_models(models: list[dict]) -> None:
     for index, model in enumerate(models):
-        state = "enabled" if model["enabled"] else "disabled"
-        print(f"  {index:2d}) {model.get('name', model['id']):<56} [{model['provider']}, {state}]")
+        detail = model.get("origin", "enabled" if model["enabled"] else "disabled")
+        print(f"  {index:2d}) {model.get('name', model['id']):<56} [{model['provider']}, {detail}]")
 
 
 def state_path(output: Path) -> Path:
@@ -294,6 +437,10 @@ def atomic_replace(staged: Path, output: Path) -> None:
 def command_path(name: str) -> str:
     path = shutil.which(name)
     if path is None:
+        if name == "script":
+            raise ModelError(
+                "missing command: script (install Fedora package util-linux-script)"
+            )
         raise ModelError(f"missing command: {name}")
     return path
 
@@ -320,8 +467,8 @@ def run_as_ollama(
     sys.stdout.flush()
     sys.stderr.flush()
     if terminal:
-        # Hugging Face suppresses its progress renderer when output is captured.
-        # A small PTY keeps live byte progress visible in installer transcripts.
+        # Hugging Face suppresses progress when output is captured. A PTY keeps
+        # live byte progress visible in both direct use and installer logs.
         argv = [
             command_path("script"),
             "--quiet",
@@ -381,7 +528,9 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
         token = os.environ.get("HF_TOKEN", "").strip()
     if not token and os.environ.get("BC250_HF_ANONYMOUS") != "1" and can_prompt():
         token = prompt_secret("HF_TOKEN (optional; Enter for anonymous downloads): ")
-    if token and run_as_ollama([hf_bin, "auth", "whoami"], hf_environment(token, hf_home)).returncode == 0:
+    if token and run_as_ollama(
+        [hf_bin, "auth", "whoami"], hf_environment(token, hf_home)
+    ).returncode == 0:
         print("Using the validated Hugging Face token.")
         return token
     if token:
@@ -391,13 +540,10 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
     return ""
 
 
-def render_modelfile(source: Path, destination: Path, model: dict, output: Path) -> None:
-    lines = source.read_text(encoding="utf-8").splitlines()
+def render_modelfile(source: Path, model: dict, output: Path, destination: Path) -> None:
     rendered: list[str] = []
-    for line in lines:
-        if line.startswith("# Ollama model: "):
-            line = f"# Ollama model: {model['name']}"
-        elif line.startswith("# Source: "):
+    for line in source.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# Source: "):
             line = f"# Source: {model['repository']} @ {model['revision']}"
         elif line.startswith("# GGUF: "):
             line = f"# GGUF: {model['gguf']}"
@@ -413,20 +559,25 @@ def render_modelfile(source: Path, destination: Path, model: dict, output: Path)
         temporary.unlink(missing_ok=True)
 
 
-def install_models(defaults: dict, models: list[dict], modelfiles: Path, args: argparse.Namespace) -> int:
+def install_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
     if len(models) != 1 and (args.revision is not None or args.sha256 is not None):
         raise ModelError("--revision and --sha256 require one selected model")
     uid, gid = ollama_identity()
     hf_bin = command_path("hf")
+    command_path("runuser")
+    command_path("script")
     ollama_bin = command_path("ollama") if any(m["provider"] == "ollama" for m in models) else ""
     host = args.host or os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_URL") \
         or defaults.get("ollama_host", "127.0.0.1:11434")
     hf_home = Path(os.environ.get("HF_HOME", f"/var/cache/{PROJECT}/huggingface"))
-    download_root = Path(os.environ.get("DOWNLOAD_DIR", str(hf_home / "downloads" / defaults["download_namespace"])))
-    modelfile_root = Path(os.environ.get("MODELFILE_DIR", defaults.get("modelfile_destination", ""))) \
-        if os.environ.get("MODELFILE_DIR") or defaults.get("modelfile_destination") else None
+    download_root = Path(
+        os.environ.get("DOWNLOAD_DIR", str(hf_home / "downloads" / defaults["download_namespace"]))
+    )
+    modelfile_root = Path(
+        os.environ.get("MODELFILE_DIR", defaults.get("modelfile_destination", ""))
+    ) if os.environ.get("MODELFILE_DIR") or defaults.get("modelfile_destination") else None
     for path in (hf_home, hf_home / "hub", download_root):
         ensure_directory(path, uid, gid)
     if modelfile_root:
@@ -458,7 +609,9 @@ def install_models(defaults: dict, models: list[dict], modelfiles: Path, args: a
                     else int(defaults.get("min_free_bytes", 0))
                 free = shutil.disk_usage(output.parent).free
                 if minimum and free < minimum:
-                    raise ModelError(f"{free / 1024**3:.1f} GiB free; {minimum / 1024**3:.1f} GiB required")
+                    raise ModelError(
+                        f"{free / 1024**3:.1f} GiB free; {minimum / 1024**3:.1f} GiB required"
+                    )
                 staging = download_root / model["id"]
                 ensure_directory(staging, uid, gid)
                 staged = staging / model["gguf"]
@@ -491,12 +644,16 @@ def install_models(defaults: dict, models: list[dict], modelfiles: Path, args: a
 
             os.chown(output, 0, gid)
             os.chmod(output, 0o640)
-
             if model["provider"] == "download-only":
                 print("    ready for llama.cpp")
                 continue
-            runtime_template = modelfile_root / model["modelfile"] if modelfile_root else output.parent / model["modelfile"]
-            render_modelfile(modelfiles / model["modelfile"], runtime_template, model, output)
+
+            runtime_template = (
+                modelfile_root / model["modelfile"]
+                if modelfile_root
+                else output.parent / model["modelfile"]
+            )
+            render_modelfile(model["template"], model, output, runtime_template)
             os.chown(runtime_template, 0, gid)
             os.chmod(runtime_template, 0o640)
             result = run_as_ollama(
@@ -510,7 +667,11 @@ def install_models(defaults: dict, models: list[dict], modelfiles: Path, args: a
             print(f"    ERROR: {error}", file=sys.stderr)
             failures.append(label)
     if ollama_bin:
-        subprocess.run([ollama_bin, "list"], env={**os.environ, "OLLAMA_HOST": host}, check=False)
+        subprocess.run(
+            [ollama_bin, "list"],
+            env={**os.environ, "OLLAMA_HOST": host},
+            check=False,
+        )
     if failures:
         print(f"\nFailed: {' '.join(failures)}", file=sys.stderr)
         return 2
@@ -546,32 +707,36 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             if path.exists():
                 path.unlink()
                 print(f"    removed {path}")
-        if defaults.get("layout") == "by-id":
-            try:
-                output.parent.rmdir()
-            except OSError:
-                pass
-    print(f"\nRemoved {len(models)} model(s). Catalog was not changed.")
+        try:
+            output.parent.rmdir()
+        except OSError:
+            pass
+    print(f"\nRemoved {len(models)} model(s). Source Modelfiles were retained.")
     return 0
 
 
 def catalog_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("category", choices=CATEGORIES)
-    parser.add_argument("--source", type=Path)
-    parser.add_argument("--modelfile-dir", type=Path)
+    parser.add_argument("--source", type=Path, help="alternate MTP TOML catalog")
+    parser.add_argument(
+        "--modelfile-dir",
+        type=Path,
+        action="append",
+        help="alternate Modelfile directory; may be repeated",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bc250-model", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    listing = commands.add_parser("list", help="list catalog entries")
+    listing = commands.add_parser("list", help="list discovered templates")
     catalog_arguments(listing)
-    listing.add_argument("--all", action="store_true", help="include disabled entries")
-    resolving = commands.add_parser("resolve", help="resolve one enabled entry")
+    listing.add_argument("--all", action="store_true", help="include disabled MTP entries")
+    resolving = commands.add_parser("resolve", help="resolve one model id")
     catalog_arguments(resolving)
     resolving.add_argument("id")
     resolving.add_argument("--provider", choices=("ollama", "download-only"))
-    installing = commands.add_parser("install", help="download and register selected entries")
+    installing = commands.add_parser("install", help="download and register selected models")
     catalog_arguments(installing)
     installing.add_argument("selection", nargs="?")
     installing.add_argument("--list", action="store_true")
@@ -581,9 +746,13 @@ def build_parser() -> argparse.ArgumentParser:
     installing.add_argument("--destination")
     installing.add_argument("--min-free-bytes", type=int)
     installing.add_argument("--token-file", type=Path)
-    installing.add_argument("--include-disabled", action="store_true")
+    installing.add_argument(
+        "--include-disabled",
+        action="store_true",
+        help="include disabled MTP entries for this invocation",
+    )
     installing.add_argument("--refresh", action="store_true")
-    cleaning = commands.add_parser("cleanup", help="remove selected local model artifacts")
+    cleaning = commands.add_parser("cleanup", help="remove selected deployed models")
     catalog_arguments(cleaning)
     cleaning.add_argument("selection", nargs="?")
     cleaning.add_argument("--list", action="store_true")
@@ -597,44 +766,50 @@ def main(argv: list[str] | None = None) -> int:
         if reconfigure:
             reconfigure(line_buffering=True)
     args = build_parser().parse_args(argv)
-    default_source, default_modelfiles = default_paths(args.category)
-    source = args.source or Path(os.environ.get("SOURCE_FILE", default_source))
-    modelfiles = args.modelfile_dir or Path(os.environ.get("MODELFILE_SOURCE_DIR", default_modelfiles))
-    defaults, catalog_models = load_catalog(source, args.category, modelfiles)
+    category = canonical_category(args.category)
+    defaults, models = load_models(
+        category,
+        directories=args.modelfile_dir,
+        source=args.source or (Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None),
+    )
 
     if args.command == "list":
-        print(f"{args.category.title()} models:")
-        print_models([model for model in catalog_models if args.all or model["enabled"]])
+        available = models if category != "mtp" or args.all else [m for m in models if m["enabled"]]
+        print(f"{category.title()} models:")
+        print_models(available)
         return 0
     if args.command == "resolve":
-        for model in catalog_models:
-            if model["enabled"] and model["id"] == args.id and (
+        for model in models:
+            if model["id"] == args.id and (
                 args.provider is None or model["provider"] == args.provider
-            ):
-                print(f"{model_path(defaults, model)}\t{model.get('context', '')}\t{model.get('draft', '')}")
+            ) and (category != "mtp" or model["enabled"]):
+                print(
+                    f"{model_path(defaults, model)}\t"
+                    f"{model.get('context', '')}\t{model.get('draft', '')}"
+                )
                 return 0
-        raise ModelError(f"enabled model id not found: {args.id}")
+        raise ModelError(f"model id not found: {args.id}")
 
-    available = catalog_models if args.command == "cleanup" or args.include_disabled \
-        else [model for model in catalog_models if model["enabled"]]
-    print(f"Available {args.category} models:")
+    available = models
+    if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
+        available = [model for model in models if model["enabled"]]
+    print(f"Available {category} models:")
     print_models(available)
     if args.list:
         return 0
     if not available:
-        print(f"No selectable {args.category} models in {source}.")
+        print(f"No selectable {category} models were found.")
         return 0
     selection = args.selection
     if selection is None:
-        default = "" if args.command == "cleanup" else "all"
-        selection = prompt_line("Models (id/name/index/range): ", default)
+        selection = prompt_line("Models (id/index/range; Enter to cancel): ")
     if not selection:
-        print("Cleanup cancelled.")
+        print("No models selected.")
         return 0
     selected = select_models(available, selection)
     if args.command == "cleanup":
         return cleanup_models(defaults, selected, args)
-    return install_models(defaults, selected, modelfiles, args)
+    return install_models(defaults, selected, args)
 
 
 if __name__ == "__main__":

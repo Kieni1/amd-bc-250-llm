@@ -12,9 +12,9 @@
   `/usr/bin/bc250-uninstall`.
 - `install-manifest.tsv` is the authoritative payload install and ownership map.
 - `upstreams.toml` records pinned third-party revisions, URLs and archive names.
-- Model catalogs, long-name Modelfiles and feature-specific task, agent,
-  experiment, MTP and embedding helpers live under `models/`; the installed
-  public command names remain stable.
+- Long-name Modelfiles and feature-specific task, agent, experiment, MTP and
+  embedding helpers live under `models/`; only download-only MTP uses a TOML
+  runtime catalog. The installed public command names remain stable.
 - Repository inputs are grouped by purpose: `cmd/` for host commands,
   `config/` for shipped service configuration and `examples/` for
   operator-adapted integrations.
@@ -73,7 +73,7 @@ alignment, required inputs, paths, command routing, strict model metadata, the
 install manifest and focused unit tests. Fedora policy and `rpmlint` remain
 build-environment checks.
 
-Installable packages are written to `dist/RPMS/`; source packages are written
-to `dist/SRPMS/`. The build also verifies that the binary payload contains
+Installable and source packages are written together to `dist/`. The build
+also verifies that the binary payload contains
 `/usr/bin/bc250-install-ollama`. A source RPM is build input and must not be
 used as the appliance runtime package.

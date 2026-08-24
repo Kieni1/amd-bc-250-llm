@@ -253,6 +253,9 @@ remove_fstab_swap_block() {
 
 remove_host_profiles() {
   heading "3. REMOVE MEMORY AND SWAP PROFILES"
+  local previous_swappiness=""
+  [[ -r /var/lib/bc250-llm-server/swap/swappiness.previous ]] && \
+    previous_swappiness="$(head -n 1 /var/lib/bc250-llm-server/swap/swappiness.previous)"
   if command -v grubby >/dev/null 2>&1; then
     grubby --update-kernel=ALL --remove-args="$MEMORY_ARGS" || \
       failed "could not remove BC-250 kernel arguments"
@@ -263,7 +266,14 @@ remove_host_profiles() {
   remove_fstab_swap_block
   rm -f -- \
     /var/lib/bc250-llm-server/swap/bc250-llm.swap \
-    /etc/systemd/zram-generator.conf.d/90-bc250-llm-server.conf
+    /etc/systemd/zram-generator.conf.d/90-bc250-llm-server.conf \
+    /etc/sysctl.d/90-bc250-llm-server-swap.conf
+  if [[ "$previous_swappiness" =~ ^[0-9]+$ && "$previous_swappiness" -le 200 ]]; then
+    sysctl --write "vm.swappiness=$previous_swappiness" >/dev/null || \
+      failed "could not restore vm.swappiness"
+  else
+    sysctl --system >/dev/null || failed "could not reload sysctl policy"
+  fi
   rmdir /etc/systemd/zram-generator.conf.d >/dev/null 2>&1 || true
 }
 

@@ -56,12 +56,11 @@ def check_required_inputs() -> None:
         "packaging/bc250-llm-server.sysusers",
         "packaging/upstreams.toml",
         "models/modelctl.py",
+        "cmd/monitoring/status.sh",
         "cmd/system/40cu-module.sh",
-        "models/sources/production.toml",
-        "models/sources/experiments.toml",
-        "models/sources/task.toml",
-        "models/sources/coding.toml",
+        "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "models/mtp/models.toml",
+        "docs/FILESTRUCTURE.md",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",
@@ -77,6 +76,7 @@ def check_required_inputs() -> None:
         "packaging/bc250",
         "models/modelctl.py",
         "cmd/system/40cu-module.sh",
+        "cmd/monitoring/status.sh",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",
@@ -128,6 +128,13 @@ def check_configuration() -> None:
         return
     if governor.get("frequency-range", {}).get("min") != 350:
         fail("packaged governor minimum must be 350 MHz")
+    if governor.get("frequency-range", {}).get("max") != 1850:
+        fail("packaged governor maximum must be 1850 MHz")
+    gpu_usage = governor.get("gpu-usage", {})
+    if gpu_usage.get("fix-freq") is not False:
+        fail("packaged governor fix-freq must be explicitly false")
+    if gpu_usage.get("method") != "busy-flag":
+        fail("packaged governor usage method must remain busy-flag")
     points = governor.get("safe-points", [])
     if not any(
         isinstance(point, dict)
@@ -189,7 +196,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
         "compare-experiments", "cu-status", "fetch-experiments", "fetch-models",
         "fetch-mtp", "gitea-review", "install-cu-manager", "install-ollama",
         "memory-profile", "model", "ollama-profile", "pull-embedding-model",
-        "run-mtp", "setup-coding-agent", "setup-task-model", "swap-profile",
+        "run-mtp", "setup-coding-agent", "setup-task-model", "status", "swap-profile",
         "uninstall", "uninstall-info", "verify", "verify-lan",
     }
     if result.returncode != 0:
@@ -204,7 +211,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "rpm -e --test ollama",
             "packages-added.txt",
             "firewall-http-before",
-            'bc250-model install production "$production_selection" --include-disabled',
+            'bc250-model install production "$production_selection"',
             "bc250-setup-task-model",
             "bc250-setup-coding-agent",
         ),
@@ -233,9 +240,12 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "HF_TOKEN",
             "terminal=True",
             'command_path("script")',
+            "OPERATOR_MODEL_DIR",
+            "discover_models",
         ),
         "packaging/bc250-llm-server.spec": (
             "Requires:       zram-generator",
+            "Requires:       util-linux-script",
             "systemctl try-restart tika.service open-webui.service",
         ),
     }

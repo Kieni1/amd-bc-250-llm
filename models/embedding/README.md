@@ -2,7 +2,7 @@
 
 The embedding helper pulls and verifies the model used by Open WebUI for local
 retrieval. It uses the primary Ollama instance on port `11434` and is separate
-from the chat-model catalogs.
+from the discovered chat Modelfiles.
 
 ```bash
 sudo bc250-pull-embedding-model

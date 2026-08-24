@@ -6,8 +6,8 @@ are licensed under GNU GPL version 2 only, as provided in `licenses/LICENSE`.
 The RPM also contains or refers to separately licensed components:
 
 - **cyan-skillfish-governor-smu** is sourced from
-  `filippor/cyan-skillfish-governor`, release `v0.4.11`, commit
-  `60ab6e5b354f01f287c73d920990dcd618a674cc`, under the MIT License. The
+  `filippor/cyan-skillfish-governor`, release `v0.4.12`, commit
+  `be9537fc36f24b17570088cafa8c79365f80fee8`, under the MIT License. The
   project is based on `Magnap/cyan-skillfish-governor`; its upstream license is
   retained in the RPM.
 - The main RPM's **BC-250 40-CU unlock** payload contains the upstream patch

@@ -71,6 +71,14 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn("2> >(sed", installer)
         self.assertIn('api/tags" >/dev/null 2>&1 && break', helper)
 
+    def test_model_setup_uses_discovered_modelfiles(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('bc250-model list production', source)
+        self.assertIn(
+            'bc250-model install production "$production_selection"', source
+        )
+        self.assertNotIn("--include-disabled", source)
+
     def test_installer_prepares_40cu_for_the_exact_running_kernel(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn('kernel="$(uname -r)"', source)

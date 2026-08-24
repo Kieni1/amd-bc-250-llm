@@ -27,10 +27,11 @@ bc250 model --help
 bc250-model --help
 ```
 
-## Model catalogs
+## Model discovery
 
-The unified manager handles `production`, `experiments`, `mtp`, `task` and
-`coding`:
+The unified manager discovers Ollama templates for `production`, `experiments`,
+`task` and `agentic`. `coding`, `tasker` and `experimental` remain aliases.
+Download-only `mtp` is the one category backed by a TOML runtime catalog:
 
 ```text
 bc250-model list CATEGORY [--all] [--source PATH] [--modelfile-dir PATH]
@@ -44,14 +45,16 @@ bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
 `SELECTION` is `all`, a stable model id or Ollama display name, one zero-based
 index, or a comma-separated set of those values and ranges such as `0,2-4`.
 Prefer ids/names in automation. Invalid selections fail instead of silently
-changing scope. Entries with `enabled = true` are selectable by default.
-`--include-disabled` exposes the complete catalog for one run without rewriting
-operator configuration. `--list` does not download anything.
+changing scope. `--list` does not download anything. A missing selection
+prompts on a terminal; Enter cancels instead of selecting every discovered
+model. MTP exposes only `enabled = true` entries unless `--all` or
+`--include-disabled` is used.
 
 Install options:
 
-- `--source PATH`: alternate TOML catalog.
-- `--modelfile-dir PATH`: alternate packaged-template directory.
+- `--source PATH`: alternate TOML catalog; MTP only.
+- `--modelfile-dir PATH`: alternate Modelfile directory; repeat to set
+  package-then-operator precedence.
 - `--host HOST[:PORT]`: Ollama API endpoint.
 - `--revision REVISION`: Hugging Face commit, tag, branch or `latest`; requires
   one selected entry.
@@ -60,7 +63,7 @@ Install options:
 - `--destination PATH`: GGUF destination root.
 - `--min-free-bytes BYTES`: minimum free space before a new download.
 - `--token-file PATH`: read the Hugging Face token from a protected file.
-- `--include-disabled`: include disabled catalog entries in this invocation.
+- `--include-disabled`: include disabled MTP entries in this invocation.
 - `--refresh`: force a new Hugging Face download, full SHA-256 calculation and
   Ollama registration even when the state file says the model is current.
 
@@ -81,10 +84,9 @@ unattended public-model installs. Hugging Face progress output remains enabled.
 The download runs in a pseudo-terminal, so its live byte progress is preserved
 when output is captured in the guided installer transcript.
 
-If `--min-free-bytes` or a catalog minimum is not met, installation stops and
-suggests explicit cleanup. Cleanup is scoped to the required category, includes
-disabled entries so existing artifacts remain discoverable, and never edits
-`%config(noreplace)` TOML. Use `--yes` only after reviewing `--list`.
+If `--min-free-bytes` or the agentic minimum is not met, installation stops.
+Cleanup is scoped to the required category and retains the source Modelfile.
+Use `--yes` only after reviewing `--list`.
 
 `--provider ollama|download-only` constrains `resolve`. The MTP runner always
 uses the separate `mtp` catalog and `--provider download-only`, so an ordinary
@@ -101,10 +103,11 @@ sudo bc250-fetch-mtp [SELECTION]
 
 ### Upgrade behavior
 
-RPM upgrades preserve operator-edited TOML catalogs through `%config(noreplace)`
-and restart the normal web services. When package defaults change, merge the
-corresponding `.rpmnew` file manually. No executable model-catalog migration
-edits operator configuration.
+RPM upgrades update packaged Modelfiles and leave operator templates under
+`/etc/bc250-llm-server/models.d/` untouched. A same-name operator file continues
+to override its packaged template. The MTP TOML and other configuration retain
+`%config(noreplace)` behavior. Upgrades restart the normal web services and do
+not run a model migration.
 
 ## Task model setup
 
@@ -118,8 +121,7 @@ Overrides:
 - `TASK_MODEL_SELECTION` (`all`), `TASK_MODEL_REVISION` and
   `TASK_MODEL_SHA256`.
 - `HF_TOKEN` and `HF_HOME`.
-- `MODEL_MANAGER`, `SOURCE_FILE` and `MODELFILE_SOURCE_DIR` for source-tree or
-  test use.
+- `MODEL_MANAGER` and `MODELFILE_SOURCE_DIR` for source-tree or test use.
 
 The helper creates the isolated `ollama-task.service`, waits for its API, then
 uses the unified manager. Keep its port blocked from the LAN.
@@ -133,8 +135,8 @@ bc250-code-commit [--yes]
 bc250-gitea-review OWNER/REPOSITORY NUMBER [--output FILE] [--post]
 ```
 
-The setup creates `ollama-agent.service` on port `11436` and installs both
-enabled coding-catalog entries by default. Setup overrides are
+The setup creates `ollama-agent.service` on port `11436` and installs all
+discovered agentic templates by default. Setup overrides are
 `CODING_AGENT_BIND`, `CODING_AGENT_PORT`, `CODING_AGENT_SELECTION`,
 `CODING_AGENT_REVISION`, `CODING_AGENT_SHA256`, `CODING_AGENT_GGUF_DIR`,
 `CODING_AGENT_MIN_FREE_BYTES` (`8589934592`), `HF_TOKEN` and `HF_HOME`.
@@ -151,10 +153,11 @@ environment. The helpers do not stage, push, approve or merge.
 
 ## Experiments and MTP
 
-Ollama experiments and download-only MTP models use separate editable catalogs:
+Ollama experiments are discovered Modelfiles; download-only MTP retains an
+editable runtime catalog:
 
 ```bash
-sudoedit /etc/bc250-llm-server/experiments-models.toml
+bc250-model list experiments
 sudo bc250-fetch-experiments
 BASELINE_MODEL=MODEL bc250-compare-experiments
 
@@ -184,6 +187,9 @@ bc250-pull-embedding-model
 - `BC250_PRODUCTION_SELECTION=0,2-4` selects production entries in the guided
   installer when `BC250_ASSUME_YES=1`; an unset value skips production models.
 - `SWAP_GIB` (`16`) and `ZRAM_MIB` (`2048`) size the swap profile.
+- `SWAPPINESS` optionally sets `vm.swappiness` from `0` through `200`. If it is
+  unset, the existing system policy is left unchanged. Profile removal restores
+  the runtime value recorded before the first override.
 - `EMBED_MODEL` (`nomic-embed-text`) selects the embedding model.
 
 See [`../models/embedding/README.md`](../models/embedding/README.md) for the
@@ -229,6 +235,7 @@ path changes the operator’s governor clock/voltage policy.
 These tools have different execution contexts and are intentionally separate:
 
 ```bash
+sudo bc250-status
 sudo bc250-verify
 RUN_MODEL_TESTS=1 sudo bc250-verify
 bc250-verify-lan SERVER_IP
@@ -236,7 +243,9 @@ sudo llm-run-diagnose --no-load
 MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 ```
 
-`bc250-verify` is the post-RPM check on the server. `bc250-verify-lan` runs from
+`bc250-status` is a concise, read-only summary and does not replace validation.
+Run it with `sudo` for complete live-CU and storage information. `bc250-verify`
+is the post-RPM pass/fail check on the server. `bc250-verify-lan` runs from
 another machine; `HTTP_PORT` changes its expected web port. The diagnostic is
 only for model-run investigation: without `--no-load` it generates sustained
 load. It also accepts `OLLAMA_URL`.

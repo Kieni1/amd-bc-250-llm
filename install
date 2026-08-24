@@ -445,8 +445,13 @@ step_6_prepare_40cu() {
 step_7_models() {
   heading "7. OPTIONAL MODEL DOWNLOADS"
   local production_selection="" install_task=0 install_agent=0 install_embedding=0
-  echo "Production catalog (disabled entries may be selected for this run):"
-  bc250-model list production --all
+  command -v script >/dev/null 2>&1 || {
+    echo "ERROR: model-download progress requires /usr/bin/script." >&2
+    echo "Install it with: sudo dnf install util-linux-script" >&2
+    exit 1
+  }
+  echo "Discovered production Modelfiles:"
+  bc250-model list production
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     production_selection="${BC250_PRODUCTION_SELECTION:-}"
     [[ -n "$production_selection" ]] || \
@@ -462,7 +467,7 @@ step_7_models() {
     prepare_hf_authentication
   fi
   [[ -z "$production_selection" ]] || \
-    bc250-model install production "$production_selection" --include-disabled
+    bc250-model install production "$production_selection"
   ((install_task == 0)) || bc250-setup-task-model
   ((install_agent == 0)) || bc250-setup-coding-agent
   ((install_embedding == 0)) || bc250-pull-embedding-model

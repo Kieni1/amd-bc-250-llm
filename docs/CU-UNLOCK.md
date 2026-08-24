@@ -56,9 +56,20 @@ Boot or another policy enforces module signatures and no signed module is
 available. Automatic Machine Owner Key enrollment would require another
 security-sensitive user workflow, so this testing package does not hide it.
 
-Run the guided installer again after booting a newly updated kernel. It prepares
-that exact kernel while preserving the Fedora module backup used by `restore`
-and the full purge command.
+Every Fedora kernel update installs a new kernel-specific stock AMDGPU module.
+After booting the new kernel, prepare the replacement again and reboot with a
+matching kernel/module pair:
+
+```bash
+sudo bc250-40cu prepare
+sudo bc250-40cu enable
+```
+
+The guided installer can perform the preparation instead. Preparation uses the
+running kernel and preserves the Fedora module backup used by `restore` and the
+full purge command. Never assume that a replacement prepared for the previous
+kernel remains active after an update; confirm with `sudo bc250-verify` and
+`sudo bc250-40cu status`.
 
 ## Risks
 

@@ -28,6 +28,7 @@ Primary commands:
 /usr/bin/bc250-run-mtp
 /usr/bin/bc250-setup-coding-agent
 /usr/bin/bc250-setup-task-model
+/usr/bin/bc250-status
 /usr/bin/bc250-uninstall-info
 /usr/bin/bc250-uninstall
 /usr/bin/bc250-verify
@@ -48,8 +49,8 @@ Implementation files:
 Examples and templates:
 
 ```text
-/usr/share/bc250-llm-server/model-management/sources/
 /usr/share/bc250-llm-server/model-management/modelfiles/
+/usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example
 /usr/share/bc250-llm-server/examples/task-model/
 /usr/share/bc250-llm-server/examples/coding-agent/
 /usr/share/bc250-llm-server/examples/raspi-wol/
@@ -62,8 +63,7 @@ Configuration:
 
 ```text
 /etc/bc250-llm-server/
-/etc/bc250-llm-server/production-models.toml
-/etc/bc250-llm-server/experiments-models.toml
+/etc/bc250-llm-server/models.d/
 /etc/bc250-llm-server/mtp-models.toml
 /etc/cyan-skillfish-governor-smu/config.toml
 /etc/nginx/default.d/bc250-llm-server.conf

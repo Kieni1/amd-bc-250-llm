@@ -1,5 +1,5 @@
-%global governor_version 0.4.11
-%global governor_commit 60ab6e5b354f01f287c73d920990dcd618a674cc
+%global governor_version 0.4.12
+%global governor_commit be9537fc36f24b17570088cafa8c79365f80fee8
 %global unlock_commit 6c3969ddee40e894297869e6ca30537f274619cb
 %global live_manager_commit 8eb45f07810af738f3e4945ea0cc29d399e378a6
 %global source_date_epoch_from_changelog 1
@@ -10,13 +10,13 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.8.1
+Version:        0.9.3
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
 Source0:        %{name}-%{version}.tar.gz
-# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.11
+# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.12
 Source1:        cyan-skillfish-governor-%{governor_commit}.tar.gz
 Source2:        cyan-skillfish-governor-vendor-%{governor_commit}.tar.xz
 # fduraibi/bc250-40cu-unlock, pinned Fedora helper revision
@@ -69,6 +69,7 @@ Requires:       sqlite
 Requires:       systemd
 Requires:       tar
 Requires:       util-linux
+Requires:       util-linux-script
 Requires:       umr
 Requires:       vulkan-loader
 Requires:       vulkan-tools
@@ -163,7 +164,7 @@ cat <<'EOF_POST'
 BC-250 LLM server installed (testing profile).
 Open http://SERVER_IP/ on a trusted LAN and register the first admin immediately.
 HTTP is unencrypted. Read /usr/share/doc/bc250-llm-server/HTTPS.md before wider use.
-No chat model is downloaded until production-models.toml enables an entry.
+No chat model is downloaded until an operator selects a discovered Modelfile.
 Optional helpers: bc250-install-ollama, bc250-ollama-profile,
 bc250-memory-profile, bc250-swap-profile, bc250-setup-task-model and
 bc250-setup-coding-agent. Run llm-run-diagnose for a performance capture.
@@ -225,6 +226,38 @@ fi
 %ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Aug 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.3-0.1.testing
+- Pin Open WebUI v0.11.0 by OCI index digest for clean-install testing
+- Document the required complete data snapshot before an existing UI is migrated
+- Keep kernel-devel and 40-CU checks tied to the running kernel rather than a NEVRA
+- Retain governor v0.4.12, busy-flag usage, fix-freq false and the 1850 MHz maximum
+- Make repository validation independent of the optional /dev/fd mount
+
+* Fri Aug 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.2-0.1.testing
+- Update the Cyan Skillfish governor to v0.4.12 at its pinned release commit
+- Keep busy-flag usage detection and make the new fix-freq option explicitly false
+- Report running kernel, matching kernel-devel tree and AMDGPU module vermagic
+- Warn when AMDGPU belongs to another kernel and 40-CU preparation must be repeated
+- Report the installed governor version and effective fix-freq setting
+
+* Thu Jul 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.1-0.1.testing
+- Add a concise read-only appliance status command
+- Report Ollama instances, live CUs, governor, memory, storage and sensors together
+- Add an optional reversible swappiness setting to the existing swap profile
+- Expand zram, fan and PWM visibility without installing another control stack
+- Set the fresh-install governor range to 350-1850 MHz
+- Credit the upstream and community projects that make the appliance possible
+
+* Wed Jul 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.0-0.1.testing
+- Discover Ollama models directly from strict long-name Modelfiles
+- Add an operator models.d drop-in directory with package-overriding precedence
+- Remove duplicate production, experiment, task and agentic TOML catalogs
+- Retain MTP TOML only for download-only runtime metadata
+- Keep model revisions flexible and checksums optional for pre-production testing
+- Put binary and source RPM outputs together in dist
+- Add the missing util-linux-script runtime dependency for visible download progress
+- Document the installed filesystem and the Modelfile-only extension workflow
+
 * Wed Jul 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.8.1-0.1.testing
 - Add an explicit full-purge command for package, state, Ollama and host profiles
 - Restore verified stock AMDGPU backups and remove persistent 40-CU configuration

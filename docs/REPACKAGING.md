@@ -46,8 +46,8 @@ Do not fetch third-party code from RPM scriptlets or `%build`.
    make rpm
    ```
 
-7. Install and test `dist/RPMS/*.x86_64.rpm`. Keep
-   `dist/SRPMS/*.src.rpm` only as rebuild input.
+7. Install and test `dist/*.x86_64.rpm`. Keep `dist/*.src.rpm` only as rebuild
+   input.
 8. Test clean installation, upgrade, removal and recovery on Fedora 44.
 
 ## Release checklist

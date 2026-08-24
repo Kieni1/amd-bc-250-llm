@@ -29,6 +29,7 @@ ROUTES=(
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "setup-coding-agent|$SHARE/examples/coding-agent/setup-ollama.sh"
   "setup-task-model|$SHARE/examples/task-model/setup-ollama.sh"
+  "status|$LIBEXEC/status.sh"
   "swap-profile|$LIBEXEC/swap-profile.sh"
   "uninstall|$LIBEXEC/uninstall.sh"
   "uninstall-info|cat|$DOCDIR/UNINSTALL.md"
@@ -58,7 +59,7 @@ Models:
   setup-task-model, setup-coding-agent, pull-embedding-model
 
 Operation:
-  verify, verify-lan, benchmark, check-temp
+  status, verify, verify-lan, benchmark, check-temp
   install-ollama, ollama-profile, memory-profile, swap-profile
   40cu, cu-status, install-cu-manager, uninstall
 

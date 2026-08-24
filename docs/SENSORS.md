@@ -13,8 +13,14 @@ Super-I/O hardware and can conflict. Check with:
 ```bash
 lsmod | grep -E '^nct6683|^nct6687'
 sensors
+sudo bc250-status
 sudo bc250-verify
 ```
+
+`bc250-status` summarizes the active hwmon drivers, selected temperature,
+power and fan readings, and the number of exposed PWM control files.
+`bc250-verify` additionally treats loading both driver families as a failure
+and warns when an experimental `nct6687` driver exposes no PWM controls.
 
 Before replacing the default driver:
 
@@ -25,7 +31,11 @@ Before replacing the default driver:
 5. Confirm fan control and temperature reporting before sustained loads.
 
 This RPM intentionally leaves that process outside automatic installation.
+If fan control is later packaged, it should be a separate optional subpackage
+with explicit apply, status and remove operations rather than part of the base
+LLM appliance.
 
 ## Reference
 
 - https://elektricm.github.io/amd-bc250-docs/system/sensors/
+- https://github.com/Fred78290/nct6687d

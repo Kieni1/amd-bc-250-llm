@@ -1,3 +1,4 @@
+# BC250 category: production
 # Ollama model: prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 # Source: unsloth/gemma-4-E2B-it-qat-GGUF @ latest
 # GGUF: gemma-4-E2B-it-qat-UD-Q4_K_XL.gguf

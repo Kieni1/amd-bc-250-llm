@@ -11,9 +11,9 @@ dir	0755	-	{share}/examples/raspi-wol
 dir	0755	-	{share}/examples/task-model
 dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
-dir	0755	-	{share}/model-management/sources
 dir	0755	-	{share}/ollama-profiles
 dir	0755	-	{config}
+dir	0755	-	{config}/models.d
 dir	0755	-	{sysconfdir}/cyan-skillfish-governor-smu
 dir	0755	-	{unitdir}/ollama.service.d
 dir	0755	-	{docdir}
@@ -35,8 +35,6 @@ file	0644	cmd/system/ollama-profiles/balanced.conf	{unitdir}/ollama.service.d/60
 file	0644	config/containers/*	{datadir}/containers/systemd/
 config	0644	config/nginx/bc250-llm-server.conf	{sysconfdir}/nginx/default.d/bc250-llm-server.conf
 config	0644	config/nginx/websocket-map.conf	{sysconfdir}/nginx/conf.d/00-bc250-websocket-map.conf
-config	0644	models/sources/production.toml	{config}/production-models.toml
-config	0644	models/sources/experiments.toml	{config}/experiments-models.toml
 config	0644	models/mtp/models.toml	{config}/mtp-models.toml
 file	0644	cmd/maintenance/owui-maintenance.env	{share}/examples/maintenance.env.example
 ghost	0600	-	{config}/maintenance.env
@@ -50,6 +48,7 @@ file	0755	cmd/benchmark/compare-models.sh	{libexec}/compare-models.sh
 file	0755	cmd/benchmark/log_sensors.sh	{libexec}/log_sensors.sh
 file	0755	cmd/monitoring/check-temp.sh	{libexec}/check-temp.sh
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
+file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
 file	0755	cmd/system/40cu.sh	{libexec}/40cu.sh
 file	0755	cmd/system/install-cu-manager.sh	{libexec}/install-cu-manager.sh
 file	0755	cmd/system/install-ollama.sh	{libexec}/install-ollama.sh
@@ -83,9 +82,9 @@ file	0644	examples/raspi-wol/bc250-enable-wol.service	{unitdir}/bc250-enable-wol
 file	0644	examples/raspi-wol/bc250-night-shutdown.service	{unitdir}/bc250-night-shutdown.service
 file	0644	examples/raspi-wol/bc250-night-shutdown.timer	{unitdir}/bc250-night-shutdown.timer
 
-file	0644	models/sources/*.toml	{share}/model-management/sources/
-file	0644	models/mtp/models.toml	{share}/model-management/sources/mtp.toml
+file	0644	models/mtp/models.toml	{share}/model-management/mtp-models.toml
 file	0644	models/modelfiles/*.Modelfile	{share}/model-management/modelfiles/
+file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-management/MODEL-TEMPLATE.Modelfile.example
 
 file	0644	models/task-model/README.md	{share}/examples/task-model/README.md
 file	0755	models/task-model/setup-ollama.sh	{share}/examples/task-model/setup-ollama.sh

@@ -14,6 +14,18 @@ package.
 The packaged HTTP endpoint is not encrypted. Complete `docs/HTTPS.md` before using
 the service across an untrusted network.
 
+## Packaged image and upgrades
+
+The Quadlet pins Open WebUI v0.11.0 by OCI index digest. A clean installation
+initializes the current schema automatically and needs no migration step.
+
+Open WebUI v0.11.0 includes database schema changes. Before upgrading a host
+with existing `/var/lib/open-webui` state, stop `open-webui.service` and take a
+complete filesystem snapshot or offline copy of that directory. The packaged
+configuration-backup helper excludes uploads, vector data and caches, so it is
+not a complete substitute for this pre-upgrade snapshot. Start the service only
+after the backup is complete; the container performs its migration at startup.
+
 ## Connections
 
 ```text

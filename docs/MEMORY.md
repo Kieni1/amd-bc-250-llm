@@ -49,3 +49,24 @@ sudo reboot
 After reboot, check `/proc/cmdline`, free memory, swap activity and a
 representative model workload. A successful boot alone does not prove workload
 stability.
+
+## Swap policy
+
+The separate swap profile defaults to a 2 GiB zram device and a 16 GiB disk
+swap safety margin:
+
+```bash
+sudo bc250-swap-profile status
+sudo bc250-swap-profile apply
+```
+
+`SWAP_GIB` and `ZRAM_MIB` change their sizes. `SWAPPINESS` is an optional
+integer from 0 through 200:
+
+```bash
+sudo SWAPPINESS=100 bc250-swap-profile apply
+```
+
+If `SWAPPINESS` is unset, the active Fedora policy is not changed. The first
+explicit override records the prior runtime value, which
+`sudo bc250-swap-profile remove` restores.

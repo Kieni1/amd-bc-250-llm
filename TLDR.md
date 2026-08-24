@@ -10,14 +10,14 @@ also available as `bc250 COMMAND`; for example, `bc250 verify` and
 git clone <repo-name>
 make validate
 sudo bash scripts/ci-local.sh
-sudo dnf install ./dist/RPMS/bc250-llm-server-*.x86_64.rpm
+sudo dnf install ./dist/bc250-llm-server-*.x86_64.rpm
 sudo bc250-install-ollama
 sudo bc250-verify
 ```
 
 Or run `sudo ./install` for the guided filesystem-to-verification workflow.
 Rerun it after the requested memory-profile reboot. Never install the
-`dist/SRPMS/*.src.rpm`; it contains build sources, not runtime commands.
+`dist/*.src.rpm`; it contains build sources, not runtime commands.
 After an interrupted system-setup run, `sudo ./install --models-only` resumes
 the optional production, task, agentic and embedding-model prompts without
 reinstalling the package.
@@ -31,6 +31,7 @@ WebUI administrator immediately. The default endpoint is HTTP, not HTTPS.
 Useful service checks:
 
 ```bash
+sudo bc250-status
 systemctl status cyan-skillfish-governor-smu ollama nginx
 systemctl status tika open-webui
 curl -fsS http://127.0.0.1:11434/api/tags
@@ -38,14 +39,17 @@ curl -fsS http://127.0.0.1:11434/api/tags
 
 ## Models
 
-Review and enable entries before downloading the main or experiment catalogs:
+The manager discovers strict `.Modelfile` templates directly. Select packaged
+models by name or index, or copy the example and add an operator model:
 
 ```bash
-sudoedit /etc/bc250-llm-server/production-models.toml
-sudo bc250-model list production --all
+bc250-model list production
 sudo bc250-fetch-models
 
-sudoedit /etc/bc250-llm-server/experiments-models.toml
+sudo install -m0644 \
+  /usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example \
+  /etc/bc250-llm-server/models.d/prod-example-source-q4-k-m.Modelfile
+sudoedit /etc/bc250-llm-server/models.d/prod-example-source-q4-k-m.Modelfile
 sudo bc250-fetch-experiments
 
 # Explicit disk cleanup; review the list before selecting anything
@@ -107,6 +111,7 @@ Read `docs/CU-UNLOCK.md` before changing CU routing.
 ## Verification, coding and experiments
 
 ```bash
+sudo bc250-status
 sudo bc250-verify
 bc250-verify-lan SERVER_IP
 sudo llm-run-diagnose
@@ -147,4 +152,5 @@ defaults to dry-run until configured.
 - `docs/HARDENING.md` and `docs/HTTPS.md`: optional security work.
 - `docs/OLLAMA.md` and `models/README.md`: model and storage behavior.
 - `docs/RPM-LAYOUT.md`: installed files and state directories.
+- `docs/FILESTRUCTURE.md`: package-owned files and command-created state.
 - `docs/UNINSTALL.md`: removal and retained state.
