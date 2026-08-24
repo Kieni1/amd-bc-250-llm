@@ -104,6 +104,75 @@ for token in amdgpu.gttsize ttm.page_pool_size amdgpu.ppfeaturemask; do
   grep -qE "(^| )${token}=" <<< "$cmdline" && warn "obsolete kernel argument remains active: $token"
 done
 
+section "GFX1013 compute queues"
+gfx1013_root=/opt/bc250-gfx1013
+gfx1013_marker=bc250.gfx1013_v33=1
+dedicated_compute_queues=0
+if command -v vulkaninfo >/dev/null 2>&1; then
+  queue_flags="$(vulkaninfo 2>/dev/null | \
+    awk '/queueFlags[[:space:]]*=/ {print}' || true)"
+  dedicated_compute_queues="$(awk '
+    /QUEUE_COMPUTE_BIT/ && !/QUEUE_GRAPHICS_BIT/ {count++}
+    END {print count + 0}
+  ' <<< "$queue_flags")"
+  if ((dedicated_compute_queues > 0)); then
+    info "dedicated Vulkan compute queue families: $dedicated_compute_queues"
+  else
+    info "dedicated Vulkan compute queue: not exposed"
+  fi
+else
+  warn "vulkaninfo is unavailable; dedicated compute queues were not checked"
+fi
+
+gfx1013_mesa_installed=0
+gfx1013_mesa_selected=0
+gfx1013_kernel_active=0
+gfx1013_selector="${VK_DRIVER_FILES:-}"$'\n'"${VK_ICD_FILENAMES:-}"
+gfx1013_selector+=$'\n'"$(systemctl show ollama.service -p Environment --value 2>/dev/null || true)"
+ollama_main_pid="$(systemctl show ollama.service -p MainPID --value 2>/dev/null || true)"
+if [[ "$ollama_main_pid" =~ ^[1-9][0-9]*$ && -r "/proc/$ollama_main_pid/environ" ]]; then
+  gfx1013_selector+=$'\n'"$(tr '\0' '\n' < "/proc/$ollama_main_pid/environ" 2>/dev/null || true)"
+fi
+[[ -d "$gfx1013_root" ]] && gfx1013_mesa_installed=1
+grep -qF "$gfx1013_root" <<< "$gfx1013_selector" && gfx1013_mesa_selected=1
+grep -qw "$gfx1013_marker" <<< "$cmdline" && gfx1013_kernel_active=1
+
+gfx1013_module_active=0
+if ((gfx1013_kernel_active)) && [[ -d /sys/module/amdgpu ]] && \
+   [[ "${amdgpu_path:-}" == */updates/amdgpu.ko* ]] && \
+   [[ "${amdgpu_vermagic:-}" == "$kernel" ]]; then
+  gfx1013_module_active=1
+fi
+
+if ((gfx1013_mesa_installed)); then
+  info "optional GFX1013 Mesa tree: $gfx1013_root"
+else
+  info "optional GFX1013 Mesa tree: not installed"
+fi
+if ((gfx1013_mesa_selected)); then
+  info "custom GFX1013 Mesa ICD is selected by this environment or Ollama"
+  if ((!gfx1013_kernel_active)); then
+    bad "custom GFX1013 Mesa is selected without the patched boot marker; disable the custom ICD"
+  elif ((!gfx1013_module_active)); then
+    bad "GFX1013 patched boot is marked active, but the matching updates/amdgpu module was not verified"
+  else
+    ok "custom GFX1013 Mesa and matching patched AMDGPU are active"
+  fi
+elif ((gfx1013_mesa_installed)); then
+  if ((gfx1013_kernel_active && gfx1013_module_active)); then
+    info "GFX1013 patched kernel is active; custom Mesa is not selected for this verifier or Ollama"
+  else
+    info "GFX1013 files are installed but not selected; patched boot is not active"
+  fi
+fi
+if ((dedicated_compute_queues > 0)); then
+  if ((gfx1013_mesa_selected && gfx1013_module_active)); then
+    ok "dedicated compute queue is exposed by the verified paired patch stack"
+  else
+    warn "dedicated compute queue is exposed without a fully verified GFX1013 Mesa/kernel pair"
+  fi
+fi
+
 while read -r fs size used avail pct mount; do
   [[ "$fs" == Filesystem ]] && continue
   info "$mount: $avail available ($pct used)"
@@ -212,6 +281,12 @@ else
 fi
 
 section "Ollama"
+if command -v ollama >/dev/null 2>&1; then
+  ollama_version="$(ollama --version 2>&1 | head -1 || true)"
+  info "Ollama version: ${ollama_version:-unknown}"
+else
+  warn "Ollama executable is missing; version could not be reported"
+fi
 if curl -fsS "$OLLAMA_URL/api/tags" >/dev/null; then
   ok "Ollama API reachable"
   tag_count="$(curl -fsS "$OLLAMA_URL/api/tags" | jq '.models | length' 2>/dev/null || echo '?')"
@@ -226,6 +301,28 @@ for key in OLLAMA_CONTEXT_LENGTH OLLAMA_KV_CACHE_TYPE OLLAMA_FLASH_ATTENTION \
   value="$(grep -oE "${key}=[^ ]+" <<< "$ollama_env" | tail -1 || true)"
   [[ -n "$value" ]] && info "$value" || warn "$key is not visible in the effective service environment"
 done
+
+if command -v journalctl >/dev/null 2>&1; then
+  ollama_log="$(journalctl -b --no-pager -n 1000 \
+    -u ollama.service -u ollama-task.service -u ollama-agent.service \
+    2>/dev/null || true)"
+  kernel_log="$(journalctl -k -b --no-pager -n 1000 2>/dev/null || \
+    dmesg 2>/dev/null | tail -n 1000 || true)"
+  vulkan_failures="$(printf '%s\n%s\n' "$ollama_log" "$kernel_log" | \
+    grep -Ei 'ErrorDeviceLost|Not enough memory for command submission|ring comp_[[:alnum:]_.-]+[[:space:]]+timeout' | \
+    tail -n 20 || true)"
+  if [[ -n "$vulkan_failures" ]]; then
+    warn "recent Ollama/AMDGPU logs contain Vulkan device-loss or compute-ring failures"
+    printf '%s\n' "$vulkan_failures" | sed 's/^/    /'
+    info "for long-prompt timeouts, test a smaller num_batch in an operator Modelfile"
+  elif [[ -n "$ollama_log" || -n "$kernel_log" ]]; then
+    ok "no known Vulkan device-loss or compute-ring failure pattern in recent logs"
+  else
+    warn "Ollama and kernel journals are unreadable; Vulkan failure patterns were not checked"
+  fi
+else
+  warn "journalctl is unavailable; Vulkan failure patterns were not checked"
+fi
 
 section "Local endpoints"
 curl -fsS http://127.0.0.1:3000/ >/dev/null && ok "Open WebUI loopback endpoint reachable" || bad "Open WebUI unavailable"

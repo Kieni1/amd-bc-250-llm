@@ -10,7 +10,7 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.9.3
+Version:        0.9.4
 Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -226,6 +226,12 @@ fi
 %ghost %dir %attr(0750,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.4-0.1.testing
+- Detect optional dedicated GFX1013 compute queues without bundling the patch stack
+- Fail verification when a selected custom Mesa ICD lacks its matching patched kernel
+- Report the exact Ollama version and recent Vulkan or AMDGPU failure signatures
+- Document smoke testing for new Ollama Vulkan releases and kernel-bound patch rebuilds
+
 * Sun Aug 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.3-0.1.testing
 - Pin Open WebUI v0.11.0 by OCI index digest for clean-install testing
 - Document the required complete data snapshot before an existing UI is migrated

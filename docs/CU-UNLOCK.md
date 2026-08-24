@@ -81,6 +81,11 @@ correctness as well as throughput after activation.
 Clock and voltage policy remains entirely the operator's responsibility. The CU
 tools do not inspect, limit or change the shipped governor configuration.
 
+The separate experimental GFX1013 compute-queue stack also replaces AMDGPU and
+must not be layered over this package's 40-CU helper as a second independent
+installer. Use a deliberately merged kernel patch plan or select one module
+workflow. See [`GFX1013-COMPUTE-QUEUES.md`](GFX1013-COMPUTE-QUEUES.md).
+
 ## Pinned live manager
 
 The RPM also contains the live manager pinned to WinnieLV commit

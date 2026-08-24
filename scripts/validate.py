@@ -61,6 +61,7 @@ def check_required_inputs() -> None:
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "models/mtp/models.toml",
         "docs/FILESTRUCTURE.md",
+        "docs/GFX1013-COMPUTE-QUEUES.md",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",

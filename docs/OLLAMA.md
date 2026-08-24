@@ -83,8 +83,19 @@ sudo OLLAMA_VERSION=<reviewed-version> bc250-install-ollama
 sudo OLLAMA_REINSTALL=1 OLLAMA_VERSION=<version> bc250-install-ollama
 ```
 
-Review upstream release notes before changing versions. Unattended installation
-requires `BC250_ASSUME_YES=1`.
+Review upstream release notes before changing versions. Do not make an
+unreviewed `latest` build the recommended BC-250 baseline. Smoke-test a new
+Vulkan build with a small model, the largest intended model and a representative
+long prompt before keeping it.
+
+Two open upstream reports describe AMD shared-memory Vulkan failures in recent
+Ollama builds: [large allocations returning `ErrorDeviceLost`](https://github.com/ollama/ollama/issues/17748)
+and [long-prefill compute-ring timeouts](https://github.com/ollama/ollama/issues/17870).
+`bc250-verify` reports the installed Ollama version and scans recent Ollama and
+kernel journal entries for these signatures. For the long-prompt case only, a
+smaller `PARAMETER num_batch 128` in a copied operator Modelfile is a reasonable
+diagnostic workaround; it is not a package-wide default or a confirmed BC-250
+fix. Unattended installation requires `BC250_ASSUME_YES=1`.
 
 
 ## Runtime profiles

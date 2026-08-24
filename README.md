@@ -114,7 +114,7 @@ reboot and access the bc250.
 Download the .rpm from git
 
 ```bash
-curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.3/bc250-llm-server-0.9.3-0.1.testing.fc44.x86_64.rpm
+curl -L -O https://github.com/Kieni1/amd-bc-250-llm/releases/download/v.0.9.4/bc250-llm-server-0.9.4-0.1.testing.fc44.x86_64.rpm
 ```
 
 copy the [`install script`](https://github.com/Kieni1/amd-bc-250-llm/blob/main/install) besides the .rpm onto the bc250 and run it:
@@ -214,6 +214,8 @@ communities. In particular, thank you to:
   research and unlock work.
 - [WinnieLV](https://github.com/WinnieLV/bc250-cu-live-manager) for the live
   CU manager.
+- [DryhoppedIPA](https://github.com/DryhoppedIPA/bc250-gfx1013-fix) for the
+  experimental paired GFX1013 kernel/RADV compute-queue investigation.
 - [ElektricM’s BC-250 documentation](https://elektricm.github.io/amd-bc250-docs/),
   [redbeard1083’s toolkit](https://github.com/redbeard1083/bc250-toolkit) and
   [the SteamOS toolkit references](https://github.com/rpf16rj/bc250-steamos-real-toolkit)
@@ -234,6 +236,7 @@ listed in [`licenses/THIRD_PARTY_NOTICES.md`](licenses/THIRD_PARTY_NOTICES.md).
 - [`docs/openwebui-settings.md`](docs/openwebui-settings.md): Open WebUI connections and model roles.
 - [`docs/MEMORY.md`](docs/MEMORY.md): unified-memory profile.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): live and replacement-module CU tools.
+- [`docs/GFX1013-COMPUTE-QUEUES.md`](docs/GFX1013-COMPUTE-QUEUES.md): optional experimental ACE patch-stack detection.
 - [`docs/REPACKAGING.md`](docs/REPACKAGING.md): RPM source refresh and release process.
 - [`docs/UNINSTALL.md`](docs/UNINSTALL.md): complete removal and retained state.
 

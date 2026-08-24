@@ -128,6 +128,13 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('if ! prepared_module_ready "$target"; then', helper)
         self.assertNotIn("do_enable() {\n  do_prepare", helper)
 
+    def test_gfx1013_compute_patch_stack_is_not_bundled(self) -> None:
+        upstreams = (ROOT / "packaging/upstreams.toml").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertNotIn("bc250-gfx1013", upstreams + manifest)
+        self.assertNotRegex(spec, r"(?m)^Source[0-9]+:.*gfx1013")
+
 
 if __name__ == "__main__":
     unittest.main()

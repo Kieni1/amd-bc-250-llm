@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.4-testing - 2026-08-24
+
+`bc250-verify` now reports dedicated Vulkan compute queue families and detects
+the optional external GFX1013 kernel/Mesa patch stack without packaging it. A
+custom `/opt/bc250-gfx1013` Mesa ICD selected without the project's patched
+boot marker and matching kernel-specific `updates/amdgpu.ko` is a failure. The
+documentation keeps this experimental module workflow separate from the
+package's existing 40-CU replacement helper and requires a rebuild after every
+kernel update.
+
+The verifier now prints the exact Ollama version and scans recent Ollama and
+kernel journal entries for `ErrorDeviceLost`, command-submission memory errors
+and AMDGPU compute-ring timeouts. Ollama Vulkan updates are documented as
+reviewed smoke-test candidates rather than automatic recommended baselines; a
+smaller per-model `num_batch` is documented only as a diagnostic for the
+reported long-prompt timeout case.
+
+The Fedora kernel, governor and existing 40-CU upstream inputs remain unpinned
+from runtime kernel versions and otherwise unchanged.
+
 ## 0.9.3-testing - 2026-08-23
 
 This integration update pins Open WebUI v0.11.0 by its OCI index digest while

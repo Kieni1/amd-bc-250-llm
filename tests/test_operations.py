@@ -67,6 +67,22 @@ class VerifyTests(unittest.TestCase):
             r"\b[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.fc44(?:\.[A-Za-z0-9_]+)?\b",
         )
 
+    def test_verify_detects_optional_compute_stack_and_vulkan_failures(self) -> None:
+        source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        for expected in (
+            "QUEUE_COMPUTE_BIT",
+            "QUEUE_GRAPHICS_BIT",
+            "/opt/bc250-gfx1013",
+            "bc250.gfx1013_v33=1",
+            "*/updates/amdgpu.ko*",
+            "ollama --version",
+            "ErrorDeviceLost",
+            "Not enough memory for command submission",
+            "ring comp_",
+            "journalctl -k -b",
+        ):
+            self.assertIn(expected, source)
+
 
 class SwapProfileTests(unittest.TestCase):
     def test_swappiness_override_is_optional_and_reversible(self) -> None:

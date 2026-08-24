@@ -245,10 +245,14 @@ MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 
 `bc250-status` is a concise, read-only summary and does not replace validation.
 Run it with `sudo` for complete live-CU and storage information. `bc250-verify`
-is the post-RPM pass/fail check on the server. `bc250-verify-lan` runs from
-another machine; `HTTP_PORT` changes its expected web port. The diagnostic is
-only for model-run investigation: without `--no-load` it generates sustained
-load. It also accepts `OLLAMA_URL`.
+is the post-RPM pass/fail check on the server. It also reports dedicated Vulkan
+compute queues, validates a selected `/opt/bc250-gfx1013` Mesa tree against the
+external project's patched-boot marker/module path, prints the exact Ollama
+version and scans recent logs for Vulkan device loss, command-submission memory
+errors and AMDGPU compute-ring timeouts. `bc250-verify-lan` runs from another
+machine; `HTTP_PORT` changes its expected web port. The diagnostic is only for
+model-run investigation: without `--no-load` it generates sustained load. It
+also accepts `OLLAMA_URL`.
 
 ## Benchmark and sensors
 
