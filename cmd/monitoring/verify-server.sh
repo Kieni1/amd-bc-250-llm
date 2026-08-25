@@ -79,6 +79,27 @@ else
   bad "vulkaninfo missing"
 fi
 
+section "CPU power states"
+physical_cores="$(lscpu -p=SOCKET,CORE 2>/dev/null | grep -v '^#' | sort -u | wc -l)"
+threads="$(nproc 2>/dev/null || printf '0')"
+info "CPU topology: $physical_cores physical cores / $threads online threads"
+cpufreq_driver="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_driver 2>/dev/null | sort -u | paste -sd, -)"
+cpufreq_governor="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | sort -u | paste -sd, -)"
+[[ -n "$cpufreq_driver" ]] && info "cpufreq driver: $cpufreq_driver" || warn "cpufreq driver is not exposed"
+[[ -n "$cpufreq_governor" ]] && info "cpufreq governor: $cpufreq_governor" || warn "cpufreq governor is not exposed"
+missing_idle="$(for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+  [[ -d "$cpu" ]] || continue
+  [[ -r "$cpu/online" && "$(cat "$cpu/online")" == 0 ]] && continue
+  compgen -G "$cpu/cpuidle/state*" >/dev/null || printf '%s\n' "${cpu##*/}"
+done | paste -sd, -)"
+if [[ -n "$missing_idle" ]]; then
+  info "online CPUs without cpuidle states: $missing_idle"
+  [[ "$threads" == 16 ]] && warn "16 threads are active but some CPUs lack C-states; check idle power/correctness" || \
+    info "C-state availability is incomplete"
+else
+  ok "all online CPUs expose cpuidle states"
+fi
+
 section "GPU memory and storage"
 gtt="$(read_param /sys/module/amdgpu/parameters/gttsize)"
 pages="$(read_param /sys/module/ttm/parameters/pages_limit)"
@@ -358,10 +379,24 @@ else
   ok "Open WebUI :3000 is loopback-only"
 fi
 if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld; then
-  services="$(firewall-cmd --list-services 2>/dev/null || true)"
-  ports="$(firewall-cmd --list-ports 2>/dev/null || true)"
-  grep -qw http <<< "$services" && ok "HTTP allowed in firewalld" || bad "HTTP not allowed in firewalld"
-  grep -Eq '11434|11435|11436|3000|9998' <<< "$ports" && bad "internal port explicitly opened in firewalld" || ok "no internal port opened explicitly"
+  mapfile -t active_zones < <(firewall-cmd --get-active-zones 2>/dev/null | awk '/^[^[:space:]]/{print $1}')
+  ((${#active_zones[@]})) || active_zones+=("$(firewall-cmd --get-default-zone 2>/dev/null)")
+  http_open=0
+  internal_open=0
+  for zone in "${active_zones[@]}"; do
+    services="$(firewall-cmd --zone="$zone" --list-services 2>/dev/null || true)"
+    ports="$(firewall-cmd --zone="$zone" --list-ports 2>/dev/null || true)"
+    rich="$(firewall-cmd --zone="$zone" --list-rich-rules 2>/dev/null || true)"
+    grep -qw http <<< "$services" && http_open=1
+    grep -Eq 'service name="http".*accept' <<< "$rich" && http_open=1
+    if grep -Eq '(^|[^0-9])(11434|11435|11436|3000|9998)(/|[^0-9]|$)' <<< "$ports" ||
+       grep -E 'port port="(11434|11435|11436|3000|9998)(-[0-9]+)?"' <<< "$rich" | grep -qE '(^| )accept( |$)'; then
+      bad "internal port explicitly allowed in active firewalld zone $zone"
+      internal_open=1
+    fi
+  done
+  ((http_open)) && ok "HTTP allowed in an active firewalld zone" || bad "HTTP not allowed in any active firewalld zone"
+  ((internal_open)) || ok "no internal port explicitly allowed in active firewalld zones"
 else
   bad "firewalld inactive; Ollama may be exposed through its all-interface listener"
 fi

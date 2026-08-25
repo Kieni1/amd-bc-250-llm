@@ -31,7 +31,7 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
   run prune         Run the configured upload-prune policy now.
   run all           Run backups and then pruning.
   clean-cache       Confirm removal of the Hugging Face cache, dangling Podman
-                    images and old journal data; models and office data stay.
+                    images and old system-wide journal archives; models/data stay.
   disable           Disable all optional maintenance and power timers. Data and
                     configuration are retained.
 
@@ -353,8 +353,8 @@ run_selected() {
 clean_cache() {
   local cache
   require_root
-  echo "This removes only rebuildable caches/old logs; GGUFs, Ollama models and Open WebUI data are retained."
-  ask_yes_no "Clean appliance cache, dangling container images and old journal data" no || { echo "Cleanup cancelled."; return; }
+  echo "This removes rebuildable caches and old system-wide journal archives; GGUFs, Ollama models and Open WebUI data are retained."
+  ask_yes_no "Clean appliance cache, dangling images and old system-wide journal archives" no || { echo "Cleanup cancelled."; return; }
   cache=/var/cache/bc250-llm-server/huggingface
   [[ ! -d "$cache" ]] || find "$cache" -mindepth 1 -delete
   command -v podman >/dev/null 2>&1 && podman image prune -f

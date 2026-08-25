@@ -14,12 +14,12 @@
 #   Board A  "good bin"   : 84 tok/s decode | ~134W peak | ~31W idle | edge sensor
 #   Board B  "ok bin"  : 73 tok/s decode | ~144W peak | ~38W idle | Tctl sensor
 #   IDENTICAL on both: mclk 450, fclk 450, socclk 1254, 40/40 CU,
-#     VBIOS 113-AMDRBN-003, SMU fw 88.6.0, Mesa 26.1.4, gov 0.4.11.
+#     VBIOS 113-AMDRBN-003, SMU fw 88.6.0, Mesa 26.1.4, gov 0.4.12.
 #
 # THE ONE LAW OF THIS HARDWARE:
 #   decode tok/s is MEMORY-BANDWIDTH-bound (mclk=450, governor CANNOT raise it).
 #   GPU core clock (sclk) only affects PREFILL. So a decode gap between boards,
-#   when mclk matches and both pin 2000MHz under load, is SILICON LEAKAGE
+#   when mclk matches and both hold their configured top clock under load, is SILICON LEAKAGE
 #   (compare the power line) - NOT cooling, NOT governor max, NOT a setting.
 #   Proven this run: 1850->2100 MHz moved decode <2%; cooling 83C->70C moved 0%.
 # ===========================================================================
@@ -144,7 +144,7 @@ else wn "dmesg unavailable (need sudo)"; fi
 
 # ---------------------------------------------------------------------------
 sec "6. VERSIONS  (compare these when investigating a performance delta)"
-exp "Mesa 26.1.4 | governor 0.4.11.  The installed Ollama version is reported without enforcing an old pin."
+exp "Mesa 26.1.4 | governor 0.4.12.  The installed Ollama version is reported without enforcing an old pin."
 k=$(uname -r); echo "  kernel: $k"
 ov=$(ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 [[ -n "$ov" ]] && ok "ollama=$ov" || wn "Ollama version unavailable"
@@ -153,7 +153,7 @@ if have vulkaninfo; then
   [[ "$mv" == "Mesa 26.1.4" ]] && ok "$mv" || wn "${mv:-Mesa ?}  (ref Mesa 26.1.4)"
 fi
 gv=$(cyan-skillfish-governor-smu --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-[[ "$gv" == "0.4.11" ]] && ok "governor=$gv" || wn "governor=${gv:-?}  (ref 0.4.11)"
+[[ "$gv" == "0.4.12" ]] && ok "governor=$gv" || wn "governor=${gv:-?}  (packaged 0.4.12)"
 
 # ---------------------------------------------------------------------------
 sec "7. OLLAMA SERVICE ENV"
@@ -175,14 +175,14 @@ if [[ -n "$gmax" ]]; then
   if [[ "$gmax" -eq 1850 ]]; then ok "max=$gmax MHz (package default)"
   elif [[ "$gmax" -gt 1850 && "$gmax" -le 2000 ]]; then wn "max=$gmax MHz (operator override above package default)"
   elif [[ "$gmax" -gt 2000 ]]; then wn "max=$gmax MHz  <- >2000 buys <2% decode for real extra voltage/heat; not worth it on this hardware"
-  else wn "max=$gmax MHz (below ref 2000)"; fi
+  else wn "max=$gmax MHz (below package default 1850)"; fi
 else wn "governor config not found"; fi
 
 # ---------------------------------------------------------------------------
 if [[ $DO_LOAD -eq 1 ]]; then
 sec "9. SUSTAINED LOAD  (clock stability + the power/leakage tell)"
-exp "sclk should PIN 2000MHz the whole run (no throttling). Power: ref A ~120avg/134peak, ref B ~135avg/144peak."
-exp "If your board pins 2000 but draws MORE watts than ref A -> ok bin -> expect lower tok/s. That's silicon, not fixable."
+exp "sclk should hold the configured top clock under load (package default 1850MHz). SMU power is uncalibrated/indicative."
+exp "Compare power only within the same board/setup; SMU readings are not calibrated measurements."
   log="/tmp/bc250-load-$(hostname).log"; : > "$log"
   curl -s "$OLLAMA/api/generate" -d "{\"model\":\"$MODEL\",\"prompt\":\"Write a detailed 2000-word technical essay about GPU memory bandwidth and LLM inference.\",\"stream\":false,\"options\":{\"num_predict\":$NUM_PREDICT}}" >/dev/null 2>&1 &
   gp=$!
@@ -199,21 +199,21 @@ exp "If your board pins 2000 but draws MORE watts than ref A -> ok bin -> expect
   # verdict: did it hold top clock while busy? (busy rows = power>60W).
   # field 4 is literal "power=NNN"; strip prefix to a number first.
   PW='{v=$4; sub(/power=/,"",v); v=v+0}'
-  top=$(grep 'power=' "$log" | awk "$PW"' v>60' | grep -c '2000Mhz')
+  top=$(grep 'power=' "$log" | awk "$PW"' v>60' | grep -c "${gmax:-1850}Mhz")
   busy=$(grep 'power=' "$log" | awk "$PW"' v>60' | wc -l)
   echo "  sclk distribution while busy:"
   grep 'power=' "$log" | awk "$PW"' v>60{print $2}' | sort | uniq -c | sort -rn | sed 's/^/    /'
-  if [[ "$busy" -gt 0 && "$top" -eq "$busy" ]]; then ok "held 2000MHz for all $busy busy samples (no throttle)"
-  elif [[ "$busy" -gt 0 ]]; then wn "dropped below 2000MHz in $((busy-top))/$busy busy samples (thermal/power limit - but note: sub-2000 barely affects DECODE)"
+  if [[ "$busy" -gt 0 && "$top" -eq "$busy" ]]; then ok "held ${gmax:-1850}MHz for all $busy busy samples (no throttle)"
+  elif [[ "$busy" -gt 0 ]]; then wn "did not hold ${gmax:-1850}MHz in $((busy-top))/$busy busy samples (check thermal/power limits)"
   else wn "no busy samples captured (model too fast / didn't load?)"; fi
 
   # power verdict vs the two reference bins
   read -r pavg ppk < <(grep 'power=' "$log" | awk "$PW"' v>60{s+=v;n++; if(v>x)x=v} END{if(n)printf "%.0f %.0f", s/n, x; else print "0 0"}')
-  echo "  power under load: avg=${pavg}W peak=${ppk}W"
+  echo "  SMU power under load (uncalibrated): avg=${pavg}W peak=${ppk}W"
   if   [[ "$ppk" -eq 0 ]]; then wn "no load power captured"
-  elif [[ "$ppk" -le 136 ]]; then ok "peak ${ppk}W ~ ref A (good bin) -> expect ~84 tok/s class"
-  elif [[ "$ppk" -le 150 ]]; then wn "peak ${ppk}W ~ ref B (ok bin) -> expect ~73 tok/s class; this is silicon, not config"
-  else wn "peak ${ppk}W ABOVE both refs -> very leaky / high governor voltage; check governor max"; fi
+  elif [[ "$ppk" -le 136 ]]; then ok "uncalibrated peak ${ppk}W ~ reference A; compare only with the same telemetry path"
+  elif [[ "$ppk" -le 150 ]]; then wn "uncalibrated peak ${ppk}W ~ reference B; compare only with the same telemetry path"
+  else wn "uncalibrated peak ${ppk}W is above both references; compare clocks, thermals and governor settings"; fi
 
   tmax=$(grep 'temp=' "$log" | grep -oE 'temp=[0-9.]+' | cut -d= -f2 | sort -n | tail -1)
   echo "  temp peak=${tmax}C  (NOTE: ref A read 'edge', ref B read 'Tctl' - labels differ ~5-8C, normalize before comparing)"
@@ -228,7 +228,7 @@ if [[ $fail -gt 0 ]]; then
   echo "  -> FAILs are real misconfig (usually the ttm memory bug in check 1). Fix those first."
 elif [[ $warn -gt 0 ]]; then
   echo "  -> No hard failures. WARNs are deltas vs the reference boards - if tok/s is low"
-  echo "     despite mclk=450 + 100% GPU + 2000MHz held, it's the silicon bin (power line), not a bug."
+  echo "     compare clocks, thermals and tok/s first; SMU power is only an uncalibrated indicator."
 else
-  echo "  -> Matches the reference stack. Any residual tok/s gap = silicon leakage bin."
+  echo "  -> Matches the reference stack. Treat residual power differences as uncalibrated indicators."
 fi

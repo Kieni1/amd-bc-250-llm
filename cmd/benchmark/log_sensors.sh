@@ -18,6 +18,7 @@ touch -- "$OUT"
 chmod 0640 "$OUT"
 
 echo "Logging sensors to $OUT every ${INTERVAL}s; press Ctrl-C to stop." >&2
+echo "NOTE: BC-250 SMU/PPT power readings are uncalibrated indicators." >&2
 trap 'echo "Sensor logging stopped." >&2' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM

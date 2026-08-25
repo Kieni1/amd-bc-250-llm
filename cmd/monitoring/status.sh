@@ -87,6 +87,22 @@ else
   echo "  Reboot:       needs-restarting is not installed"
 fi
 
+section "CPU power states"
+physical_cores="$(lscpu -p=SOCKET,CORE 2>/dev/null | grep -v '^#' | sort -u | wc -l)"
+threads="$(nproc 2>/dev/null || printf '?')"
+printf '  Topology:     %s physical cores / %s online threads\n' "$physical_cores" "$threads"
+cpufreq_driver="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_driver 2>/dev/null | sort -u | paste -sd, -)"
+cpufreq_governor="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | sort -u | paste -sd, -)"
+printf '  cpufreq:      driver=%s, governor=%s\n' "$(value_or_unknown "$cpufreq_driver")" "$(value_or_unknown "$cpufreq_governor")"
+missing_idle="$(for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+  [[ -d "$cpu" ]] || continue
+  [[ -r "$cpu/online" && "$(cat "$cpu/online")" == 0 ]] && continue
+  compgen -G "$cpu/cpuidle/state*" >/dev/null || printf '%s\n' "${cpu##*/}"
+done | paste -sd, -)"
+printf '  Missing C-states: %s\n' "${missing_idle:-none on online CPUs}"
+[[ "$threads" == 16 && -n "$missing_idle" ]] && \
+  echo "  WARNING: 16 threads are active but some CPUs lack C-states"
+
 section "Compute and governor"
 cu_helper=""
 if command -v bc250-cu-status >/dev/null 2>&1; then
@@ -157,6 +173,15 @@ directory_usage "Hugging Face cache" /var/cache/bc250-llm-server/huggingface
 directory_usage "Open WebUI" /var/lib/open-webui
 directory_usage "Podman storage" /var/lib/containers/storage
 command -v journalctl >/dev/null 2>&1 && journalctl --disk-usage 2>/dev/null | sed 's/^/  Journal: /'
+maintenance_config="${BC250_MAINTENANCE_CONFIG:-/etc/bc250-llm-server/maintenance.env}"
+if [[ -r "$maintenance_config" ]]; then
+  min_free_gb="$(awk -F= '$1 == "MIN_FREE_GB" {gsub(/[[:space:]]/, "", $2); print $2; exit}' "$maintenance_config")"
+  free_kb="$(df -Pk / 2>/dev/null | awk 'NR==2 {print $4}')"
+  if [[ "$min_free_gb" =~ ^[0-9]+$ && "$free_kb" =~ ^[0-9]+$ ]] && ((min_free_gb > 0)); then
+    free_gb=$((free_kb / 1024 / 1024))
+    ((free_gb >= min_free_gb)) || printf '  WARNING: root free space %s GiB is below MIN_FREE_GB=%s\n' "$free_gb" "$min_free_gb"
+  fi
+fi
 
 section "Sensors"
 sensor_drivers="$(

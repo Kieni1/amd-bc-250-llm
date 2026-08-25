@@ -583,7 +583,7 @@ run_throttle_test() {
 }
 
 run_ctx_curve() {
-  local model="$1" label="$2" n prompt row
+  local model="$1" label="$2" n prompt row previous_pec=""
   for n in $CTX_POINTS; do
     echo "  [ctx-curve] ~$((n * 23)) prompt tokens ($n filler sentences)..."
     prompt="$(make_unique_prompt "$(make_filler "$n") Given all of the above context, $QUESTION")"
@@ -599,6 +599,10 @@ run_ctx_curve() {
       "$wall_s" "$tds" "$lds" "$tps" "$ptps" "$pec"
     warn_hidden_overhead "$server_overhead_s"
     warn_early_eos "$ec" "$NUM_PREDICT_SHORT"
+    if [[ -n "$previous_pec" ]] && (( pec <= previous_pec )); then
+      echo "    WARNING: prompt_eval_count stopped growing ($previous_pec -> $pec); likely silent context truncation" >&2
+    fi
+    previous_pec="$pec"
   done
 }
 
