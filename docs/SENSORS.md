@@ -7,8 +7,17 @@ lsmod | grep -E '^nct6683|^nct6687'
 sensors
 sudo bc250-status
 sudo bc250-verify
-bc250-check-temp [--watch]
+bc250-check-temp --once
 ```
+
+For continuous monitoring:
+
+```bash
+bc250-check-temp
+```
+
+`bc250-check-temp` refreshes the selected temperatures/fans/power every second by
+default; `--once` prints one snapshot.
 
 The RPM loads `nct6683` for conservative sensor visibility. It does not install
 an experimental PWM driver. Status reports temperatures, power, fan readings

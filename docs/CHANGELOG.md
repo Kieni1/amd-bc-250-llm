@@ -1,5 +1,53 @@
 # Changelog
 
+## 0.9.6-0.4.testing - 2026-08-25
+
+Correct `bc250-ocr install/show` alias validation so an unknown OCR model exits
+with status 2 before invoking the model manager or Ollama. Rename the GLM OCR
+experiment to `exp-glm-ocr-ggml-q8-0` so its testing name reflects the actual
+`ggml-org` source. Existing registrations under the old experimental name are
+left untouched and may appear as unmanaged until the operator removes them.
+
+MTP now explicitly adds `--no-cache-idle-slots` when supported alongside
+`--cache-ram 0`. CPU power-state diagnostics ignore an unexpanded sysfs CPU
+glob on systems where that interface is absent. Multi-command documentation
+uses `bc250-check-temp --once` so the default continuous watcher does not block
+following commands. Chandra keeps the currently published dotted upstream GGUF
+filename `chandra-ocr-2.Q4_K_M.gguf`.
+
+## 0.9.6-0.3.testing - 2026-08-25
+
+Add four compact experimental office OCR definitions (GLM-OCR, dots.ocr,
+OvisOCR2 and Chandra OCR 2) plus `bc250-ocr`, a thin list/install/show/test
+wrapper over the shared model manager and main Ollama instance. GLM uses a 16K
+context; Chandra remains a Q4_K_M compatibility probe pending real BC-250 image
+testing.
+
+Status and verification now report CPU topology, cpufreq driver/governor and
+missing cpuidle states without adding CPU-unlock behavior. MTP disables the
+llama.cpp RAM prompt cache when that option is available. Benchmarks warn when
+`prompt_eval_count` stops growing and label SMU power as uncalibrated. Temperature
+monitoring is continuous by default, while legacy diagnostics now match governor
+v0.4.12 and the 1850 MHz package default.
+
+## 0.9.6-0.2.testing - 2026-08-25
+
+Correct model reuse so cached GGUF bytes are accepted only when repository,
+revision and filename still match their recorded provenance. Modelfile-only
+SYSTEM/PARAMETER edits continue to reuse the same bytes, while a changed source
+identity triggers a download. Ornith Q5_K_M is pinned to the upstream commit
+matching its packaged exact checksum.
+
+Clean Fedora installation can now start its transcript with `tee` before the RPM
+provides `util-linux-script`; `/usr/bin/script` is required only when a selected
+model download needs visible progress. Guided MTP selection explicitly lists
+and opts into its disabled download-only entries.
+
+`bc250-status` again warns when root free space falls below `MIN_FREE_GB`. Model
+listing reports known registrations on the wrong Ollama instance, firewall
+verification checks every active zone plus accepting rich rules, and cache
+cleanup documentation states that journal vacuuming is system-wide.
+
 ## 0.9.6-0.1.testing - 2026-08-24
 
 This streamlining update expands the guided model stage to production, task,

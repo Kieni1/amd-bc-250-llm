@@ -11,7 +11,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250` | Canonical multicall dispatcher |
 | `bc250-40cu` | Replacement-module and live CU controls |
 | `bc250-benchmark` | Interactive Ollama performance benchmark |
-| `bc250-check-temp` | Current or continuously refreshed sensors |
+| `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
 | `bc250-code` | Local generate/refactor/review/document/test helper |
 | `bc250-code-commit` | Propose and optionally create a local Git commit |
 | `bc250-compare-experiments` | Compare experiment responses with a baseline |
@@ -27,6 +27,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-maintenance` | Backups, retention and optional power schedules |
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
 | `bc250-model` | Unified model discovery, installation and cleanup |
+| `bc250-ocr` | Experimental office OCR model list/install/test helper |
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
 | `bc250-pull-embedding-model` | Compatibility alias for embedding installation |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
@@ -74,7 +75,9 @@ bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
 Categories are `production`, `experiments`, `task`, `agentic`, `embedding` and
 `mtp`. Accepted aliases include `experimental`, `tasker`, `coding`, `embed` and
 `embedded`. MTP is the only TOML-backed, download-only category; the other
-categories are discovered from strict Modelfiles.
+categories are discovered from strict Modelfiles. Four OCR experiments use a
+strict experimental `hf.co/...` FROM exception so Ollama can manage their paired
+vision projector and model blobs.
 
 With no category, `list` shows every Ollama-backed category as one catalog with
 global indexes. A category filters the same catalog without renumbering it.
@@ -83,8 +86,11 @@ MTP remains separate and must be requested explicitly.
 Every Ollama entry reports its definition origin, download state and whether it
 is registered on the category's Ollama instance. `download unknown` means the
 model is not registered and the current user cannot inspect its protected GGUF
-path; use `sudo bc250-model list` for an exact source-file check. Registrations
-without a current Modelfile are reported separately as unmanaged models.
+path; use `sudo bc250-model list` for an exact source-file check. For remote
+experimental vision definitions, `download unknown` while unregistered means the
+source is Ollama-managed rather than a separately inspectable GGUF. Registrations
+without a current Modelfile are reported separately as unmanaged models; known
+models found on the wrong Ollama instance are reported as misplaced.
 
 `SELECTION` accepts a full model name, displayed global catalog index, comma
 list, range such as `0,2-4`, or `all`. The same index is used by filtered lists,
@@ -105,11 +111,16 @@ Important install options:
 - `--modelfile-dir PATH`: add a Modelfile search directory;
 - `--source PATH`: use another MTP TOML catalog.
 
+Remote experimental `hf.co/...` definitions do not accept `--revision`,
+`--sha256` or `--destination`; Ollama owns those source blobs.
+
 Authentication is requested only when a download is required. A validated GGUF
-is reused when Modelfile repository/revision metadata changes; Ollama is
-re-registered from those existing bytes. Use `--refresh` when the bytes should
-actually be fetched again. `HF_TOKEN` or `--token-file` is validated as the
-`ollama` account; an empty or rejected token falls back to anonymous access.
+is reused only while its recorded repository, revision and filename still
+match. Modelfile-only edits such as SYSTEM or PARAMETER changes therefore
+rebuild the Ollama registration without downloading again; changed source
+provenance downloads the requested bytes. `HF_TOKEN` or `--token-file` is
+validated as the `ollama` account; an empty or rejected token falls back to
+anonymous access.
 Tokens are not persisted by the manager.
 
 Convenience commands:
@@ -122,6 +133,22 @@ sudo bc250-fetch-mtp [SELECTION]
 sudo bc250-setup-task-model [SELECTION]
 sudo bc250-setup-coding-agent [SELECTION]
 ```
+
+## Experimental OCR
+
+```text
+bc250-ocr list
+sudo bc250-ocr install glm|dots|ovis|chandra
+bc250-ocr show glm|dots|ovis|chandra
+bc250-ocr test glm|dots|ovis|chandra IMAGE
+```
+
+OCR models stay in the normal `experiments` category and main Ollama instance;
+there is no OCR daemon or separate model store. The helper tests one image and
+prints extracted text/Markdown for comparison. GLM is the lightweight baseline,
+dots.ocr and OvisOCR2 are structured-document experiments, and Chandra remains
+a compatibility probe until real BC-250 image inference is verified. Test DE/FR/EN
+letters, invoices, forms and table-heavy scans before using OCR output for RAG.
 
 Task setup creates `ollama-task.service` on port `11435`; agentic setup creates
 `ollama-agent.service` on `11436`. Each has its own model store. Setup selection
@@ -161,8 +188,10 @@ bc250-cu-live-manager {menu|status}
 
 `bc250-40cu enable` requires the phrase `ENABLE-40CU` and reboots. Live
 mask/unmask operations require `APPLY-WGP-TABLE`. The guided installer prepares
-the module for the running kernel but never enables additional CUs. See
-[`CU-UNLOCK.md`](CU-UNLOCK.md) before changing routing.
+the module for the running kernel but never enables additional CUs. CPU-core
+unlocking is intentionally avoided: extra CPU cores do not improve the practical
+model-capacity limit of this ~16 GB unified-memory appliance and add power/thermal
+pressure. See [`CU-UNLOCK.md`](CU-UNLOCK.md) before changing GPU routing.
 
 ## Verification and monitoring
 
@@ -173,19 +202,24 @@ RUN_MODEL_TESTS=1 sudo bc250-verify
 bc250-verify-lan SERVER_IP
 sudo llm-run-diagnose --no-load
 MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
-bc250-check-temp [--watch]
+bc250-check-temp --once
 bc250-benchmark
 ```
 
-`bc250-status` is a short overview including RAM, memory pressure, zram, disk
-swap, swappiness and appliance storage. `bc250-verify` is the detailed pass/fail
-check. Verification includes kernel/module alignment, CU state, Ollama version,
+`bc250-status` is a short overview including CPU topology/power-state exposure,
+RAM, memory pressure, zram, disk swap, swappiness and appliance storage.
+`bc250-verify` is the detailed pass/fail check. `bc250-check-temp` refreshes every
+second by default; use `--once` only when a single sample is useful. Verification includes kernel/module alignment, CU state, Ollama version,
 internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
 runs on a client; `HTTP_PORT` changes its expected web port.
 
 The benchmark writes a timestamped CSV and metadata file in the current
-directory. Important overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`,
+directory. Context curves warn when `prompt_eval_count` stops growing, which can
+indicate silent context truncation. Treat SMU/PPT power as an uncalibrated
+comparison signal. Around 13 GiB of model weights is a practical BC-250 planning
+ceiling, not a hard limit; context/KV cache and resident services reduce available
+headroom. Important overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`,
 `RUN_LATENCY`, `NUM_PREDICT_SHORT`, `NUM_PREDICT_LONG`, `CTX_POINTS` and
 `THROTTLE_WINDOWS`.
 
@@ -201,7 +235,8 @@ bc250-maintenance disable
 
 `setup --defaults` enables verified local backups only. `clean-cache` requires
 confirmation and removes only rebuildable Hugging Face cache, dangling Podman
-images and older journal data; model and Open WebUI data are retained.
+images and old **system-wide** journal archives; model and Open WebUI data are
+retained.
 Interactive setup can also configure dry-run upload pruning, model warm-up and
 an after-hours power action. Configuration is stored in root-readable
 `/etc/bc250-llm-server/maintenance.env`. See
@@ -225,7 +260,9 @@ push, approve or merge without the command's explicit local action.
 Experiment comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
 `NUM_PREDICT` and `PROMPT`. MTP requires a compatible external llama.cpp
 server binary through `LLAMACPP`; `PORT`, `CTX` and `DRAFT_N_MAX` override its
-runtime values.
+runtime values. When supported, the runner passes `--cache-ram 0` and
+`--no-cache-idle-slots` to avoid shared serialized prompt-cache state and its
+RAM reservation.
 
 ## Uninstall
 
