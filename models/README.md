@@ -13,6 +13,7 @@ bc250-model list experiments
 bc250-model list task
 bc250-model list agentic
 bc250-model list embedding
+bc250-model list mtp --all
 
 sudo bc250-model install production MODEL-NAME
 sudo bc250-model install production MODEL-NAME --refresh
@@ -30,7 +31,8 @@ Enter cancels. Prefer full names in scripts.
 `download unknown` means an unregistered model's protected source path is not
 readable by the current user. Run `sudo bc250-model list` when an exact
 downloaded-but-not-registered check is needed. A registration without a current
-Modelfile is shown as unmanaged.
+Modelfile is shown as unmanaged; a known model on the wrong Ollama instance is
+shown as misplaced.
 
 | Category | Prefix | Ollama API | Source GGUF directory |
 |---|---|---|---|
@@ -68,9 +70,11 @@ Required header:
 ```
 
 `REVISION` can be a commit, tag, branch or `latest`. An optional `# SHA256:`
-line pins the exact GGUF. `FROM` must use the absolute category GGUF path and
-agree with the metadata filename. Every template requires exactly one
-`PARAMETER num_gpu 99`; chat templates also require exactly one
+line pins the exact GGUF. Normally `FROM` must use the absolute category GGUF
+path and agree with the metadata filename. Experimental vision/OCR definitions have one narrow exception: `FROM hf.co/OWNER/REPOSITORY:TAG` lets
+Ollama manage a vision model and its paired projector directly. Remote FROM is
+rejected outside `experiments`. Every template requires exactly one
+`PARAMETER num_gpu 99`; chat/vision templates also require exactly one
 `PARAMETER num_keep 256`.
 
 Invalid metadata, names, prefixes, paths or duplicate required parameters fail
@@ -79,14 +83,20 @@ same-name operator file overrides the packaged template and survives upgrades.
 
 ## Download state and authentication
 
-After a successful download, an adjacent `*.bc250.json` file records source
-identity and calculated SHA-256. A non-empty GGUF with a recorded valid digest
-is reused even when the Modelfile repository/revision changes; only Ollama
-registration is regenerated. A newly supplied exact SHA-256 must still match.
-Use `--refresh` for a deliberate network refresh, including moving revisions
-such as `latest`.
+After a successful manager-downloaded GGUF, an adjacent `*.bc250.json` file
+records source identity and calculated SHA-256. A non-empty GGUF with a recorded valid digest
+is reused only when repository, revision and GGUF filename still match.
+Modelfile-only changes therefore regenerate the Ollama registration without
+re-downloading. Use `--refresh` to
+re-fetch a matching source deliberately, including a moving revision such as
+`latest`.
 
-Hugging Face authentication is requested only when needed. `HF_TOKEN` or
+For experimental OCR definitions with remote `hf.co/...` FROM, Ollama owns the
+source blobs and projector in its normal model store; `bc250-model` therefore
+reports source download state as unknown until that model is registered and does
+not create a duplicate source GGUF.
+
+Hugging Face authentication is requested only when a manager download needs it. `HF_TOKEN` or
 `--token-file PATH` is validated as the `ollama` account. Missing or rejected
 tokens continue anonymously and are not persisted. Use
 `BC250_HF_ANONYMOUS=1` for unattended public downloads.
@@ -106,9 +116,11 @@ A local model can therefore consume space as both source GGUF and Ollama blob.
 Shared layers may reduce incremental Ollama use, while `ollama list` reports
 logical model size rather than total appliance use.
 
-Prefer `bc250-model cleanup` over deleting one side manually. It removes the
-selected Ollama registration, source GGUF, state and rendered Modelfile but
-keeps the source template discoverable for later installation.
+Prefer `bc250-model cleanup` over deleting one side manually. For ordinary
+local-GGUF definitions it removes the selected Ollama registration, source GGUF,
+state and rendered Modelfile while retaining the source template. For remote OCR
+definitions it removes the registration/rendered Modelfile; there is no separate
+manager-owned source GGUF to delete.
 
 See [`../docs/COMMANDS.md`](../docs/COMMANDS.md) for every option and
 [`../docs/openwebui-settings.md`](../docs/openwebui-settings.md) for current

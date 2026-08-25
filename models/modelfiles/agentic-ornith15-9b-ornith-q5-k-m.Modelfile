@@ -1,7 +1,7 @@
 # BC250 category: agentic
 # Ollama model: agentic-ornith15-9b-ornith-q5-k-m
 #
-# Source: ornith-ai/Ornith-1.5-9B-GGUF @ latest
+# Source: ornith-ai/Ornith-1.5-9B-GGUF @ 87fcf5d7dbecb02941c0917a0e93619af2075b61
 # GGUF: Ornith-1.5-9B-Q5_K_M.gguf
 # SHA256: e4d9634a3b6546a5c00a8680568fe1125f6c98c704ee51ae52ba07650fb4247d
 # License: MIT

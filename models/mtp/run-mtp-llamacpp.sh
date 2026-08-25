@@ -28,6 +28,9 @@ if ((${#missing_flags[@]})); then
   echo "Reviewed llama.cpp release: $REVIEWED_LLAMACPP_RELEASE" >&2
   exit 1
 fi
+cache_flags=()
+grep -Fq -- '--cache-ram' <<< "$help_output" && cache_flags+=(--cache-ram 0)
+grep -Fq -- '--no-cache-idle-slots' <<< "$help_output" && cache_flags+=(--no-cache-idle-slots)
 
 choice="${1:-}"
 case "$choice" in
@@ -51,6 +54,6 @@ echo "Compatible llama-server detected; reviewed release: $REVIEWED_LLAMACPP_REL
 exec "$LLAMACPP" -m "$GGUF" \
   --host 127.0.0.1 --port "$PORT" \
   --n-gpu-layers 99 --ctx-size "$CTX" --flash-attn on --parallel 1 \
-  --cache-type-k q8_0 --cache-type-v q8_0 \
+  "${cache_flags[@]}" --cache-type-k q8_0 --cache-type-v q8_0 \
   --spec-type draft-mtp --spec-draft-n-max "$DRAFT_N_MAX" \
   --temp 0.7 --top-p 0.8 --top-k 20 --presence-penalty 1.5
