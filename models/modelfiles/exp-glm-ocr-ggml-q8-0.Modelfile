@@ -1,0 +1,14 @@
+# BC250 category: experimental
+# Ollama model: exp-glm-ocr-ggml-q8-0
+# Source: ggml-org/GLM-OCR-GGUF @ main
+# GGUF: GLM-OCR-Q8_0.gguf
+#
+# Lightweight OCR baseline. Ollama manages the paired vision projector from
+# the Hugging Face source. 16K avoids known image/table failures at small ctx.
+
+FROM hf.co/ggml-org/GLM-OCR-GGUF:Q8_0
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 16384
+PARAMETER temperature 0

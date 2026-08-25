@@ -1,0 +1,14 @@
+# BC250 category: experimental
+# Ollama model: exp-ovisocr2-abiray-q8-0
+# Source: Abiray/OvisOCR2-GGUF @ main
+# GGUF: OvisOCR2-Q8_0.gguf
+#
+# Compact Markdown/table OCR experiment. Ollama manages the paired vision
+# projector from the Hugging Face source.
+
+FROM hf.co/Abiray/OvisOCR2-GGUF:Q8_0
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 16384
+PARAMETER temperature 0
