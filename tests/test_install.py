@@ -36,6 +36,7 @@ def run_model_phase_probe() -> subprocess.CompletedProcess[str]:
     script = r'''
 source "$1"
 script() { :; }
+require_progress_terminal() { printf 'progress-terminal\n'; }
 bc250-model() { printf 'model:%s\n' "$*"; }
 bc250-setup-task-model() { printf 'task:%s\n' "$*"; }
 bc250-setup-coding-agent() { printf 'agentic:%s\n' "$*"; }
@@ -106,7 +107,8 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('bc250-model install "$category" "$selection"', source)
         self.assertIn('bc250-setup-task-model "$selection"', source)
         self.assertIn('bc250-setup-coding-agent "$selection"', source)
-        self.assertNotIn("--include-disabled", source)
+        self.assertIn('bc250-model list mtp --all', source)
+        self.assertIn('bc250-model install mtp "$selection" --include-disabled', source)
 
     def test_model_categories_prompt_and_run_as_separate_phases(self) -> None:
         result = run_model_phase_probe()
@@ -122,8 +124,8 @@ class InstallerTests(unittest.TestCase):
             "model:install embedding 1",
             "model:list experiments",
             "Skipping experiments models.",
-            "model:list mtp",
-            "model:install mtp 0",
+            "model:list mtp --all",
+            "model:install mtp 0 --include-disabled",
         )
         positions = [result.stdout.index(value) for value in expected_order]
         self.assertEqual(positions, sorted(positions), result.stdout)
@@ -135,10 +137,13 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('export BC250_HF_ANONYMOUS=1', source)
         self.assertIn("HF_TOKEN is unset; using anonymous", source)
 
-    def test_progress_terminal_is_checked_before_system_changes(self) -> None:
+    def test_progress_terminal_is_required_only_for_selected_model_downloads(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("Fedora package: util-linux-script", source)
-        self.assertLess(source.index("require_progress_terminal\n  start_transcript"), source.index("capture_install_state", source.index("main()")))
+        self.assertIn("command -v script >/dev/null 2>&1; then", source)
+        self.assertNotIn("require_progress_terminal\n  start_transcript", source)
+        self.assertLess(source.index("require_progress_terminal", source.index("run_model_phase()")),
+                        source.index("prepare_hf_authentication", source.index("run_model_phase()")))
 
     def test_tooling_helpers_require_an_explicit_model_selection(self) -> None:
         helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")

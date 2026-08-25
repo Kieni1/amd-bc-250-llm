@@ -27,7 +27,8 @@ The guided installer:
 3. installs the official Ollama build;
 4. applies the reviewed memory and swap profiles;
 5. prepares, but does not enable, optional 40-CU support;
-6. offers production, task, agentic, embedding, experiment and MTP models; and
+6. offers production, task, agentic, embedding, experiment and explicitly
+   selected MTP models; and
 7. verifies the result.
 
 Rerun it after the requested reboot. To resume only model selection, use:
@@ -78,6 +79,7 @@ bc250-model list production
 sudo bc250-fetch-models
 sudo bc250-fetch-experiments
 sudo bc250-fetch-embeddings
+bc250-ocr list
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 
@@ -104,7 +106,7 @@ The complete installed interface and its exact syntax are in
 | Ollama | Official install, Vulkan-oriented service defaults and three isolated stores |
 | Open WebUI v0.11.0 and Tika | Digest-pinned local UI and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
-| Model manager | Strict Modelfile discovery, GGUF download, registration and cleanup |
+| Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 

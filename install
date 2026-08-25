@@ -157,7 +157,7 @@ start_transcript() {
 
   # A pseudo-terminal keeps Hugging Face and Ollama progress bars visible while
   # preserving the installation transcript. The child skips this wrapper.
-  if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 && -t 1 ]]; then
+  if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 && -t 1 ]] && command -v script >/dev/null 2>&1; then
     local command
     printf -v command '%q ' \
       env BC250_INSTALL_TRANSCRIPT=1 bash "$SCRIPT_PATH" "${ORIGINAL_ARGS[@]}"
@@ -473,7 +473,11 @@ step_6_prepare_40cu() {
 run_model_phase() {
   local category="$1" label="$2" selection_variable="$3" selection=""
   heading "7. $label MODELS"
-  bc250-model list "$category"
+  if [[ "$category" == mtp ]]; then
+    bc250-model list mtp --all
+  else
+    bc250-model list "$category"
+  fi
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     selection="${!selection_variable:-}"
     if [[ -z "$selection" ]]; then
@@ -488,11 +492,13 @@ run_model_phase() {
     fi
   fi
 
+  require_progress_terminal
   prepare_hf_authentication
   echo "Installing selected ${label,,} model(s) before continuing."
   case "$category" in
     task) bc250-setup-task-model "$selection" ;;
     agentic) bc250-setup-coding-agent "$selection" ;;
+    mtp) bc250-model install mtp "$selection" --include-disabled ;;
     *) bc250-model install "$category" "$selection" ;;
   esac
 }
@@ -541,7 +547,6 @@ run_models_only() {
 main() {
   parse_arguments "$@"
   require_root
-  require_progress_terminal
   start_transcript
   if [[ "$INSTALL_MODE" == models ]]; then
     run_models_only

@@ -40,6 +40,7 @@ file	0644	cmd/maintenance/owui-maintenance.env	{share}/examples/maintenance.env.
 ghost	0600	-	{config}/maintenance.env
 
 file	0755	models/modelctl.py	{libexec}/modelctl
+file	0755	models/ocr/bc250-ocr.sh	{libexec}/ocr.sh
 file	0755	models/setup-ollama-instance.sh	{libexec}/setup-ollama-instance.sh
 file	0755	models/experiments/compare-experiments.sh	{libexec}/compare-experiments.sh
 file	0755	models/mtp/run-mtp-llamacpp.sh	{libexec}/run-mtp-llamacpp.sh

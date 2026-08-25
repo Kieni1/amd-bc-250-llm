@@ -29,15 +29,19 @@ class StateTests(unittest.TestCase):
             state = {**MODEL, "schema": 1, "sha256": modelctl.sha256(output)}
             self.assertTrue(modelctl.state_matches(state, MODEL, output))
 
-    def test_changed_source_metadata_reuses_validated_bytes_but_new_checksum_does_not(self) -> None:
+    def test_changed_provenance_or_checksum_does_not_reuse_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / MODEL["gguf"]
             output.write_bytes(b"weights")
             state = {**MODEL, "schema": 1, "sha256": modelctl.sha256(output)}
-            changed = {**MODEL, "revision": "new"}
-            pinned = {**MODEL, "sha256": "0" * 64}
-            self.assertTrue(modelctl.state_matches(state, changed, output))
-            self.assertFalse(modelctl.state_matches(state, pinned, output))
+            for changed in (
+                {**MODEL, "repository": "example/other"},
+                {**MODEL, "revision": "new"},
+                {**MODEL, "gguf": "other.gguf"},
+                {**MODEL, "sha256": "0" * 64},
+            ):
+                with self.subTest(changed=changed):
+                    self.assertFalse(modelctl.state_matches(state, changed, output))
 
     def test_invalid_state_is_ignored(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

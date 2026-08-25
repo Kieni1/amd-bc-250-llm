@@ -40,6 +40,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("uninstall", result.stdout.splitlines())
         self.assertIn("status", result.stdout.splitlines())
         self.assertIn("fetch-embeddings", result.stdout.splitlines())
+        self.assertIn("ocr", result.stdout.splitlines())
+        self.assertIn("models/ocr/bc250-ocr.sh\t{libexec}/ocr.sh", manifest)
 
     def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")

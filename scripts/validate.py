@@ -198,7 +198,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
         "40cu", "benchmark", "check-temp", "code", "code-commit",
         "compare-experiments", "cu-status", "fetch-embeddings", "fetch-experiments", "fetch-models",
         "fetch-mtp", "gitea-review", "install-cu-manager", "install-ollama",
-        "maintenance", "memory-profile", "model", "ollama-profile", "pull-embedding-model",
+        "maintenance", "memory-profile", "model", "ocr", "ollama-profile", "pull-embedding-model",
         "run-mtp", "setup-coding-agent", "setup-task-model", "status", "swap-profile",
         "uninstall", "uninstall-info", "verify", "verify-lan",
     }

@@ -45,6 +45,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_cache_cleanup_is_explicit_and_keeps_persistent_model_data(self) -> None:
         source = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
         self.assertIn("clean-cache", source)
+        self.assertIn("system-wide journal archives", source)
         self.assertIn("/var/cache/bc250-llm-server/huggingface", source)
         self.assertIn("podman image prune -f", source)
         self.assertIn("journalctl --vacuum-size=512M", source)

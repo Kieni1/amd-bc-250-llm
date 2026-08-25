@@ -45,6 +45,10 @@ class StatusTests(unittest.TestCase):
             "Ollama task",
             "Ollama agent",
             "Podman storage",
+            "MIN_FREE_GB",
+            "CPU power states",
+            "cpufreq",
+            "Missing C-states",
         ):
             self.assertIn(expected, source)
 
@@ -87,8 +91,44 @@ class VerifyTests(unittest.TestCase):
             "journalctl -k -b",
             "for port in 11434 11435 11436",
             "expected container-bridge listener",
+            "--get-active-zones",
+            "--list-rich-rules",
+            "CPU topology",
+            "cpufreq driver",
+            "16 threads are active",
         ):
             self.assertIn(expected, source)
+
+
+class RuntimeConvenienceTests(unittest.TestCase):
+    def test_temperature_watch_is_default_and_once_is_available(self) -> None:
+        source = (ROOT / "cmd/monitoring/check-temp.sh").read_text(encoding="utf-8")
+        self.assertIn('""|-w|--watch)', source)
+        self.assertIn('--once) show_temps', source)
+        result = subprocess.run(
+            [str(ROOT / "cmd/monitoring/check-temp.sh"), "--help"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("continuous watch is the default", result.stdout)
+
+    def test_mtp_disables_shared_prompt_cache_when_supported(self) -> None:
+        source = (ROOT / "models/mtp/run-mtp-llamacpp.sh").read_text(encoding="utf-8")
+        self.assertIn("grep -Fq -- '--cache-ram'", source)
+        self.assertIn("cache_flags+=(--cache-ram 0)", source)
+        self.assertIn("grep -Fq -- '--no-cache-idle-slots'", source)
+        self.assertIn("cache_flags+=(--no-cache-idle-slots)", source)
+
+    def test_cpu_sysfs_scan_ignores_an_unexpanded_glob(self) -> None:
+        for relative in ("cmd/monitoring/status.sh", "cmd/monitoring/verify-server.sh"):
+            source = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn('[[ -d "$cpu" ]] || continue', source)
+
+    def test_benchmark_flags_context_plateau_and_uncalibrated_power(self) -> None:
+        benchmark = (ROOT / "cmd/benchmark/compare-models.sh").read_text(encoding="utf-8")
+        sensors = (ROOT / "cmd/benchmark/log_sensors.sh").read_text(encoding="utf-8")
+        self.assertIn("prompt_eval_count stopped growing", benchmark)
+        self.assertIn("uncalibrated", sensors)
 
 
 class CuStatusTests(unittest.TestCase):

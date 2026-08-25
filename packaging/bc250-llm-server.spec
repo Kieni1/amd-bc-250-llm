@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.6
-Release:        0.1.testing%{?dist}
+Release:        0.4.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,24 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.4.testing
+- Fix OCR alias validation and rename the GLM experiment to reflect its ggml-org source
+- Explicitly disable llama.cpp idle-slot prompt caching for MTP when supported
+- Harden CPU sysfs diagnostics and make multi-command temperature examples one-shot
+- Keep Chandra provenance aligned with the current upstream dotted GGUF filename
+
+* Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.3.testing
+- Add compact experimental office OCR workflows for GLM, dots.ocr, OvisOCR2 and Chandra
+- Report CPU topology, cpufreq and C-state availability without enabling extra CPU cores
+- Disable llama.cpp RAM prompt cache for MTP when supported and flag context truncation in benchmarks
+- Make temperature watching the default and align diagnostics with governor v0.4.12 / 1850 MHz
+
+* Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.2.testing
+- Restore GGUF provenance matching while preserving Modelfile-only reuse
+- Let clean installs log before util-linux-script arrives and fix guided MTP selection
+- Restore free-space warnings and tighten model-instance and active-zone firewall status
+- Pin Ornith Q5_K_M to the upstream commit matching its exact checksum
+
 * Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.1.testing
 - Streamline model handling and reuse validated GGUF bytes unless refresh is explicit
 - Extend guided model selection with experiments and MTP without duplicating setup logic

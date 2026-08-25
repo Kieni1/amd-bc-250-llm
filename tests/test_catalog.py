@@ -27,12 +27,12 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         models = modelctl.discover_models([MODELFILES])
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
-        self.assertEqual(len(models), 22)
+        self.assertEqual(len(models), 26)
 
     def test_current_model_set_and_dedicated_instances_are_preserved(self) -> None:
         expected = {
             "production": (5, "127.0.0.1:11434"),
-            "experiments": (12, "127.0.0.1:11434"),
+            "experiments": (16, "127.0.0.1:11434"),
             "task": (1, "127.0.0.1:11435"),
             "agentic": (2, "127.0.0.1:11436"),
             "embedding": (2, "127.0.0.1:11434"),
@@ -54,6 +54,35 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                     self.assertEqual(
                         len(re.findall(r"^PARAMETER num_keep 256$", text, re.MULTILINE)), 1
                     )
+
+    def test_experimental_ocr_models_use_ollama_managed_hf_sources(self) -> None:
+        expected = {
+            "exp-glm-ocr-ggml-q8-0",
+            "exp-dots-ocr-ggml-q8-0",
+            "exp-ovisocr2-abiray-q8-0",
+            "exp-chandra-ocr2-prithivmlmods-q4-k-m",
+        }
+        models = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
+        self.assertTrue(expected <= models.keys())
+        self.assertTrue(all(models[name]["provider"] == "ollama-hf" for name in expected))
+        glm = (MODELFILES / "exp-glm-ocr-ggml-q8-0.Modelfile").read_text()
+        self.assertIn("PARAMETER num_ctx 16384", glm)
+        chandra = (MODELFILES / "exp-chandra-ocr2-prithivmlmods-q4-k-m.Modelfile").read_text()
+        self.assertIn("# GGUF: chandra-ocr-2.Q4_K_M.gguf", chandra)
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "exp-remote-mismatch.Modelfile"
+            path.write_text(
+                glm.replace("exp-glm-ocr-ggml-q8-0", "exp-remote-mismatch")
+                   .replace("hf.co/ggml-org/GLM-OCR-GGUF", "hf.co/other/repository"),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(modelctl.ModelError, "must match Source metadata"):
+                modelctl.load_modelfile(path)
+
+    def test_ornith_checksum_is_pinned_to_replacement_commit(self) -> None:
+        text = (MODELFILES / "agentic-ornith15-9b-ornith-q5-k-m.Modelfile").read_text()
+        self.assertIn("@ 87fcf5d7dbecb02941c0917a0e93619af2075b61", text)
+        self.assertIn("# SHA256: e4d9634a3b6546a5c00a8680568fe1125f6c98c704ee51ae52ba07650fb4247d", text)
 
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {
@@ -130,10 +159,11 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(modelctl.select_models(self.models, "all"), self.models)
 
     def test_catalog_indexes_are_global_and_selectable(self) -> None:
+        all_models = modelctl.discover_models([MODELFILES])
+        self.assertEqual([model["index"] for model in all_models], list(range(len(all_models))))
         _defaults, experiments = load("experiments")
-        self.assertEqual([model["index"] for model in self.models], list(range(5)))
-        self.assertEqual([model["index"] for model in experiments], list(range(5, 17)))
-        self.assertEqual(modelctl.select_models(experiments, "5"), [experiments[0]])
+        first_index = experiments[0]["index"]
+        self.assertEqual(modelctl.select_models(experiments, str(first_index)), [experiments[0]])
 
     def test_empty_and_invalid_selections_fail(self) -> None:
         for selection in ("", "999", "original-name"):
@@ -153,7 +183,7 @@ class StatusTests(unittest.TestCase):
                 "unmanaged-test-model",
             },
             "127.0.0.1:11435": {"task-gemma3-1b-unsloth-ud-q4-k-xl"},
-            "127.0.0.1:11436": set(),
+            "127.0.0.1:11436": {"prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"},
         }
         output = StringIO()
         with patch.object(
@@ -163,11 +193,18 @@ class StatusTests(unittest.TestCase):
             modelctl.print_all_models([MODELFILES])
 
         text = output.getvalue()
-        self.assertIn("   5) exp-gemma4-12b-google-qat-q4-0", text)
+        gemma = next(
+            model for model in modelctl.discover_models([MODELFILES])
+            if model["name"] == "exp-gemma4-12b-google-qat-q4-0"
+        )
+        self.assertIn(f"  {gemma['index']:2d}) exp-gemma4-12b-google-qat-q4-0", text)
         self.assertIn("downloaded, set up", text)
         self.assertIn("download unknown, not set up", text)
         self.assertIn("unmanaged-test-model", text)
         self.assertIn("Modelfile missing", text)
+        self.assertIn("Misplaced Ollama models", text)
+        self.assertIn("prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl", text)
+        self.assertIn("expected 127.0.0.1:11434", text)
 
 
 if __name__ == "__main__":

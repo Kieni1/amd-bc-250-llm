@@ -50,6 +50,63 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("owner/repo", command[5])
 
 
+class OcrInstallTests(unittest.TestCase):
+    def test_remote_ocr_install_uses_ollama_without_hf_download_tools(self) -> None:
+        defaults, models = modelctl.load_models(
+            "experiments", directories=[ROOT / "models/modelfiles"]
+        )
+        model = next(item for item in models if item["name"] == "exp-glm-ocr-ggml-q8-0")
+        args = SimpleNamespace(
+            revision=None, sha256=None, destination=None, min_free_bytes=None,
+            token_file=None, refresh=False, host=None,
+        )
+        completed = SimpleNamespace(returncode=0)
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"MODELFILE_DIR": temporary}, clear=False
+        ), patch.object(modelctl.os, "geteuid", return_value=0), patch.object(
+            modelctl, "ollama_identity", return_value=(1000, 1000)
+        ), patch.object(modelctl.os, "chown"), patch.object(modelctl.os, "chmod"), patch.object(
+            modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"
+        ) as command_path, patch.object(
+            modelctl, "run_as_ollama", return_value=completed
+        ) as run:
+            self.assertEqual(modelctl.install_models(defaults, [model], args), 0)
+            rendered = Path(temporary, model["modelfile"]).read_text(encoding="utf-8")
+
+        requested = [call.args[0] for call in command_path.call_args_list]
+        self.assertNotIn("hf", requested)
+        self.assertNotIn("script", requested)
+        self.assertIn("FROM hf.co/ggml-org/GLM-OCR-GGUF:Q8_0", rendered)
+        self.assertEqual(run.call_args.args[0][:2], ["/usr/bin/ollama", "create"])
+
+    def test_invalid_ocr_alias_fails_before_manager_or_ollama(self) -> None:
+        script = ROOT / "models/ocr/bc250-ocr.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary_path = Path(temporary)
+            marker = temporary_path / "called"
+            manager = temporary_path / "manager"
+            ollama = temporary_path / "ollama"
+            body = f'#!/bin/sh\ntouch "{marker}"\nexit 0\n'
+            manager.write_text(body, encoding="utf-8")
+            ollama.write_text(body, encoding="utf-8")
+            manager.chmod(0o755)
+            ollama.chmod(0o755)
+            environment = os.environ.copy()
+            environment["MODEL_MANAGER"] = str(manager)
+            environment["PATH"] = f"{temporary}:{environment.get('PATH', '')}"
+            for action in ("install", "show"):
+                with self.subTest(action=action):
+                    marker.unlink(missing_ok=True)
+                    result = subprocess.run(
+                        [str(script), action, "nope"],
+                        env=environment, text=True, stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT, check=False,
+                    )
+                    self.assertEqual(result.returncode, 2, result.stdout)
+                    self.assertIn("OCR model must be", result.stdout)
+                    self.assertFalse(marker.exists(), result.stdout)
+
+
 class RuntimeContractTests(unittest.TestCase):
     def test_host_precedence_preserves_both_supported_environment_names(self) -> None:
         source = (ROOT / "models/modelctl.py").read_text(encoding="utf-8")

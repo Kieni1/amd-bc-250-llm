@@ -15,7 +15,8 @@ sudo ./install --models-only
 ```
 
 The model stage asks separately for production, task, agentic, embedding,
-experiment and MTP models. Enter skips only the current category.
+experiment and MTP models. Enter skips only the current category; MTP entries
+remain disabled by default outside an explicit guided selection.
 
 ## Verify and open the UI
 
@@ -36,6 +37,7 @@ bc250-model list experiments
 bc250-model list task
 bc250-model list agentic
 bc250-model list embedding
+bc250-ocr list
 
 sudo bc250-fetch-models
 sudo bc250-fetch-experiments
@@ -70,7 +72,7 @@ see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 
 ```bash
 bc250-benchmark
-bc250-check-temp
+bc250-check-temp --once
 sudo llm-run-diagnose --no-load
 
 sudo bc250-maintenance setup --defaults
