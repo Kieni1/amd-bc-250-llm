@@ -45,6 +45,13 @@ content prefix empty. See [`RAG.md`](RAG.md) for the exact pilot settings.
 Open WebUI persists many RAG settings in `webui.db`; values saved in the Admin
 UI can override packaged fresh-install environment defaults after first launch.
 
+For bulk document work, keep originals under `/srv/bc250-documents` and use
+`bc250-rag-import plan` before syncing. The importer separates authoritative
+German originals from French translations into distinct knowledge bases so a
+French query can deliberately use the translation set without weakening the
+German source-of-truth policy. Public/confidential filesystem branches are also
+kept as separate Open WebUI knowledge bases.
+
 ## Task model
 
 Under **Admin Settings → Experience → Interface**, set the local task model to:

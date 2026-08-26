@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.9.6-0.6.testing - 2026-08-26
+
+Add `bc250-rag-import` for the operator-owned `/srv/bc250-documents` tree. It
+validates active Markdown front matter and source-PDF SHA-256 provenance, then
+incrementally syncs each collection into separate Originals and Français Open
+WebUI knowledge bases while keeping public/confidential boundaries distinct.
+German originals remain authoritative; French translations are intended for
+French queries. Remote files removed locally are retained unless `--prune` is
+explicitly requested.
+
+The package now creates `/srv/bc250-documents` as `root:root` mode `0750` and
+ships a metadata-only Markdown template. No real office documents or API keys
+are packaged.
+
 ## 0.9.6-0.5.testing - 2026-08-25
 
 Add a privacy-oriented Open WebUI/Tika RAG baseline for German/French/English

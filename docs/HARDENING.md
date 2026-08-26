@@ -49,7 +49,7 @@ or restricted to the necessary users/groups, disable public/open sharing, and
 leave cloud model/API connections and web search disabled unless an operator
 explicitly approves them. `/var/lib/open-webui/webui.db`, `uploads/` and
 `vector_db/` contain or derive from confidential material; protect their backups
-accordingly. See [`RAG.md`](RAG.md).
+accordingly. Keep the authoritative `/srv/bc250-documents` tree `root:root` mode `0750`; the importer creates private knowledge bases owned by the Open WebUI API-key account and does not publish them. Configure group access explicitly after sync. See [`RAG.md`](RAG.md).
 
 ## Add HTTPS or stop services
 

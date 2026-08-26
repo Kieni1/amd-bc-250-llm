@@ -30,7 +30,7 @@ Open `http://SERVER_IP/` from the trusted LAN and register the first
 administrator. HTTP is not encrypted.
 
 For a document/RAG pilot, install the document answer model and embedding model,
-then follow [`docs/RAG.md`](docs/RAG.md) before uploading confidential files.
+then follow [`docs/RAG.md`](docs/RAG.md). Operator documents live under `/srv/bc250-documents`; run `bc250-rag-import plan` before any bulk sync.
 
 ## Models
 
@@ -41,6 +41,7 @@ bc250-model list task
 bc250-model list agentic
 bc250-model list embedding
 bc250-ocr list
+bc250-rag-import plan /srv/bc250-documents
 
 sudo bc250-fetch-models
 sudo bc250-fetch-experiments

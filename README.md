@@ -80,6 +80,7 @@ sudo bc250-fetch-models
 sudo bc250-fetch-experiments
 sudo bc250-fetch-embeddings
 bc250-ocr list
+bc250-rag-import plan /srv/bc250-documents
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 
@@ -107,6 +108,7 @@ The complete installed interface and its exact syntax are in
 | Open WebUI v0.11.0 and Tika | Digest-pinned local UI and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
+| RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 

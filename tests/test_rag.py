@@ -44,21 +44,19 @@ class RagBaselineTests(unittest.TestCase):
         ):
             self.assertIn(name, model_names)
             self.assertIn(name, guide)
-        for command in ("bc250-fetch-models", "bc250-fetch-embeddings", "bc250-model", "bc250-ocr", "bc250-status", "bc250-verify"):
+        for command in ("bc250-fetch-models", "bc250-fetch-embeddings", "bc250-model", "bc250-ocr", "bc250-rag-import", "bc250-status", "bc250-verify"):
             self.assertIn(command, guide)
 
     def test_package_contains_no_office_document_payloads(self) -> None:
         forbidden = {".pdf", ".doc", ".docx", ".odt", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf"}
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         found = []
-    
         for line in manifest.splitlines():
             if not line or line.startswith("#"):
                 continue
             fields = line.split("\t")
             if len(fields) >= 4 and Path(fields[2]).suffix.lower() in forbidden:
                 found.append(fields[2])
-    
         self.assertEqual(found, [])
 
     def test_verify_reports_rag_without_loading_embedding_model(self) -> None:
@@ -76,6 +74,7 @@ class RagBaselineTests(unittest.TestCase):
         self.assertIn("[UNANSWERED_CONTROL]", template)
         self.assertNotIn("Customer project A", template)
         self.assertIn("examples/rag/pilot-evaluation.tsv\t{share}/examples/rag/pilot-evaluation.tsv", manifest)
+        self.assertIn("examples/rag/document-template.md\t{share}/examples/rag/document-template.md", manifest)
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ ROUTES=(
   "memory-profile|$LIBEXEC/memory-profile.sh"
   "model|$LIBEXEC/modelctl"
   "ocr|$LIBEXEC/ocr.sh"
+  "rag-import|$LIBEXEC/rag-import"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "pull-embedding-model|$LIBEXEC/modelctl|install|embedding"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
@@ -58,7 +59,7 @@ usage() {
 Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
-  model, ocr, fetch-models, fetch-experiments, fetch-embeddings, fetch-mtp
+  model, ocr, rag-import, fetch-models, fetch-experiments, fetch-embeddings, fetch-mtp
   setup-task-model, setup-coding-agent, pull-embedding-model
 
 Operation:

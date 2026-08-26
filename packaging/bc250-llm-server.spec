@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.6
-Release:        0.5.testing%{?dist}
+Release:        0.6.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Wed Aug 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.6.testing
+- Add metadata-aware incremental RAG import for the public/confidential COLLECTION/active layout.
+- Route authoritative German originals and French translations into separate Open WebUI knowledge bases.
+- Verify Markdown source PDF checksums locally; keep remote pruning explicit.
+
 * Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.5.testing
 - Add a privacy-oriented Open WebUI/Tika RAG baseline for German/French/English office documents
 - Package deterministic chunking/retrieval defaults and Jina query/document prefixes for fresh installs

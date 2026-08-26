@@ -2,13 +2,14 @@
 
 This is the recommended **local, privacy-oriented pilot** for searchable German,
 French and English office documents. It uses the package's existing Open WebUI,
-Tika and main Ollama instance; it adds no vector service, RAG daemon or automatic
-ingestion.
+Tika and main Ollama instance. It adds no separate vector service or RAG daemon;
+document synchronization remains an explicit operator action.
 
-**Never put confidential documents in this repository.** Real files belong only
-in the live Open WebUI data under `/var/lib/open-webui/` and in encrypted
-operator-controlled backups. The repository contains only a blank evaluation
-template at `/usr/share/bc250-llm-server/examples/rag/pilot-evaluation.tsv`.
+**Never put confidential documents in this repository.** Keep authoritative
+source files under `/srv/bc250-documents/`, Open WebUI-managed copies under
+`/var/lib/open-webui/`, and recoverable copies on encrypted operator-controlled
+backups. The package contains only blank RAG templates under
+`/usr/share/bc250-llm-server/examples/rag/`.
 
 ## 1. Back up Open WebUI before ingestion
 
@@ -110,36 +111,104 @@ The 1000/100/Top-K-5 baseline keeps retrieval context bounded on this 16 GB UMA
 machine. Do not add a reranker until vector-only and hybrid-without-reranker
 results have been measured.
 
-## 4. Build a controlled pilot library
+## 4. Authoritative document tree and language policy
 
-In **Workspace → Knowledge**, create collections by subject and confidentiality,
-not just by language. Example *names only*:
-
-```text
-Office procedures
-Product documentation
-Customer project [PLACEHOLDER]
-Restricted [PLACEHOLDER]
-```
-
-Start with approximately 10–30 locally held representative files. Suggested
-placeholders for your own private test set:
+Keep the operator library outside Open WebUI under the package-created root:
 
 ```text
-[GERMAN_SEARCHABLE_PDF]
-[FRENCH_SEARCHABLE_PDF]
-[GERMAN_SOURCE_FRENCH_QUERY]
-[FRENCH_SOURCE_GERMAN_QUERY]
-[DOCX_OR_ODT]
-[MIXED_LANGUAGE_DOCUMENT]
-[INVOICE_OR_REFERENCE_NUMBERS]
-[CONFLICTING_OR_OUTDATED_VERSION]
-[TABLE_HEAVY_DOCUMENT]
-[POOR_SCAN_OR_SCANNED_PDF]
+/srv/bc250-documents/
+├── confidential/
+│   └── COLLECTION/
+│       ├── active/
+│       └── sources/
+└── public/
+    └── COLLECTION/
+        ├── active/
+        └── sources/
 ```
+
+The root is `root:root` mode `0750`. `sources/` holds the authoritative PDFs;
+`active/` holds the canonical Markdown used for RAG. Do not index both copies:
+that wastes Top-K slots and can return duplicate passages. PDFs without a ready
+Markdown derivative can still be tested manually in Open WebUI, but the bulk
+importer intentionally uploads only `active/*.md`.
+
+For this library the German document is the authoritative original. The French
+document is a translation and should be searched for French queries only. The
+importer therefore creates separate knowledge bases per collection and security
+boundary:
+
+```text
+[PUBLIC] COLLECTION — Originals
+[PUBLIC] COLLECTION — Français
+[CONFIDENTIAL] COLLECTION — Originals
+[CONFIDENTIAL] COLLECTION — Français
+```
+
+There is deliberately no automatic query-language router. Attach/select **Originals** for German and English queries and **Français** for French queries. If a translation and original conflict, verify and cite the German
+Originals collection. This separation also prevents parallel DE/FR chunks from
+consuming two of the same Top-K retrieval slots.
+
+## 5. Markdown metadata and provenance
+
+Use YAML front matter like the installed template at
+`/usr/share/bc250-llm-server/examples/rag/document-template.md`:
+
+```yaml
+---
+document_id: "[DOCUMENT_ID]"
+title: "[DOCUMENT_TITLE]"
+language: "de-CH"
+status: "currentness-not-verified"
+authority: "original"
+source_file: "[SOURCE_PDF_FILENAME]"
+source_sha256: "[SOURCE_PDF_SHA256]"
+relation:
+  type: "translation-pair"
+  counterpart: "[FRENCH_COUNTERPART.md]"
+  source_language: "de-CH"
+---
+```
+
+`authority` is recommended but not required for the existing DE/FR set:
+`bc250-rag-import` infers `de-*` as `original`, and infers a `fr-*`
+`translation-pair` whose `source_language` is German as `translation`. Other
+languages must state authority explicitly. The importer verifies the declared
+source SHA-256 before any network request. If `source_file` has been renamed but
+exactly one PDF in `sources/` matches the SHA-256, it reports the mismatch and
+continues; a missing or incorrect source checksum is an error.
+
+## 6. Validate and bulk-sync active Markdown
+
+First inspect routing and provenance. This does not contact Open WebUI:
+
+```bash
+bc250-rag-import plan /srv/bc250-documents
+```
+
+For API sync, enable Open WebUI API keys deliberately, generate a key for the
+account that should own the knowledge bases, and store it outside the repository:
+
+```bash
+sudo install -m 0600 -o root -g root /PATH/TO/KEY \
+  /etc/bc250-llm-server/rag-api-key
+sudo bc250-rag-import sync /srv/bc250-documents \
+  --token-file /etc/bc250-llm-server/rag-api-key
+```
+
+The sync uses Open WebUI v0.11.0's incremental knowledge API. Treat these four generated knowledge-base name patterns as importer-managed: do not add unrelated files to them manually if you plan to use `--prune`. Unchanged files
+are skipped. A changed Markdown file is uploaded first and only then replaces
+the stale Open WebUI copy. Files removed locally are reported but retained
+remotely; remove them only with an explicit second run using `--prune`. The
+importer never uploads `sources/` PDFs and never stores the API key itself.
+
+New knowledge bases are private to the API-key account. After the first sync,
+review **Workspace → Knowledge** and assign public/restricted group permissions
+manually. In particular, do not infer Open WebUI access from the filesystem word
+`public`; it is only a local classification boundary.
 
 For scans, run the OCR experiments first and evaluate the extracted text before
-it becomes retrieval input:
+placing cleaned Markdown in `active/`:
 
 ```bash
 bc250-ocr list
@@ -149,7 +218,7 @@ bc250-ocr test glm /PATH/TO/ONE-SCANNED-PAGE.png
 Tika extracts searchable PDFs and office documents; it is not a substitute for
 OCR on image-only scans.
 
-## 5. Retrieval mode: important Open WebUI v0.11.0 behavior
+## 7. Retrieval mode: important Open WebUI v0.11.0 behavior
 
 Use **Focused Retrieval** for the growing library. Use **Full Context** only for
 one short document that comfortably fits the model context.
@@ -176,7 +245,7 @@ The packaged Gemma Modelfile already tells the answer model to treat retrieved
 context as primary evidence, preserve names/numbers/dates, identify conflicts
 and say when evidence is insufficient.
 
-## 6. Evaluate retrieval separately from generation
+## 8. Evaluate retrieval separately from generation
 
 Copy the installed blank template somewhere private and fill it with your test
 questions:
@@ -195,7 +264,7 @@ If retrieval selected the wrong passage, changing the answer model usually does
 not fix the retrieval problem. Tune extraction, prefixes, chunking, Top K or
 hybrid search first.
 
-## 7. Observe memory and model switching
+## 9. Observe memory and model switching
 
 During indexing and questions:
 
@@ -229,7 +298,7 @@ the answer model and questions can evict the embedding model. Record cold-start
 latency before considering more resident models; the unified-memory budget is
 more important than avoiding every model switch.
 
-## 8. Second phase: hybrid search
+## 10. Second phase: hybrid search
 
 Only after recording the vector-only baseline, enable Hybrid Search and repeat
 the same evaluation set. Open WebUI combines BM25 keyword matching with vector
@@ -239,7 +308,7 @@ numbers, product names, abbreviations and German compound terms.
 Keep the reranker disabled for this second phase. A reranker adds memory and
 latency and should earn its place through measured retrieval improvement.
 
-## 9. Privacy, access and backups
+## 11. Privacy, access and backups
 
 - Require Open WebUI authentication.
 - Keep confidential knowledge bases private/restricted and grant access only to
@@ -275,5 +344,7 @@ without a demonstrated benefit for this single-machine pilot.
 - [Open WebUI environment configuration](https://docs.openwebui.com/reference/env-configuration/)
 - [Open WebUI RAG and File Context behavior](https://docs.openwebui.com/features/chat-conversations/rag/)
 - [Open WebUI Knowledge retrieval modes](https://docs.openwebui.com/features/workspace/knowledge/)
+- [Open WebUI API endpoints](https://docs.openwebui.com/reference/api-endpoints/)
+- [Open WebUI API keys](https://docs.openwebui.com/features/authentication-access/api-keys/)
 - [Jina v5 small retrieval model card](https://huggingface.co/jinaai/jina-embeddings-v5-text-small-retrieval)
 - [Qwen3 Embedding 0.6B GGUF model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF)

@@ -56,6 +56,9 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |
 | `/var/cache/bc250-llm-server/40cu/` | Kernel-specific build cache |
+| `/srv/bc250-documents/` | Operator-owned authoritative document tree, `root:root` mode `0750` |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/sources/` | Original PDFs; never automatically uploaded by `bc250-rag-import` |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/active/` | Canonical Markdown eligible for metadata-aware RAG sync |
 | `/var/lib/open-webui/` | Open WebUI application data; treat as confidential |
 | `/var/lib/open-webui/webui.db` | Accounts, chats, settings and knowledge metadata; confidential |
 | `/var/lib/open-webui/uploads/` | Uploaded source documents; confidential |

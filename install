@@ -502,8 +502,8 @@ run_model_phase() {
     *) bc250-model install "$category" "$selection" ;;
   esac
   if [[ "$category" == embedding ]]; then
-    echo "RAG is ready for configuration. Confidential documents remain operator-managed in Open WebUI."
-    echo "See /usr/share/doc/bc250-llm-server/RAG.md before creating a knowledge base."
+    echo "RAG is ready for configuration. Keep source documents operator-managed under /srv/bc250-documents/."
+    echo "See /usr/share/doc/bc250-llm-server/RAG.md; bulk libraries can start with: bc250-rag-import plan"
   fi
 }
 

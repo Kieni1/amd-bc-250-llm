@@ -42,6 +42,7 @@ class DocumentationTests(unittest.TestCase):
         allowed = dispatcher_aliases() | {
             "coding-agent",
             "cu-live-manager",
+            "documents",
             "gfx1013",
             "llm-server",
             "night-shutdown",

@@ -28,3 +28,4 @@ d /var/backups/bc250-llm-server/rollback 0700 root root -
 d /var/backups/bc250-llm-server/rollback/config 0700 root root -
 d /var/backups/bc250-llm-server/rollback/users 0700 root root -
 C /etc/bc250-llm-server/maintenance.env 0600 root root - /usr/share/bc250-llm-server/examples/maintenance.env.example
+d /srv/bc250-documents 0750 root root -

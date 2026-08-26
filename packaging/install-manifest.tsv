@@ -42,6 +42,7 @@ ghost	0600	-	{config}/maintenance.env
 
 file	0755	models/modelctl.py	{libexec}/modelctl
 file	0755	models/ocr/bc250-ocr.sh	{libexec}/ocr.sh
+file	0755	models/rag/rag_import.py	{libexec}/rag-import
 file	0755	models/setup-ollama-instance.sh	{libexec}/setup-ollama-instance.sh
 file	0755	models/experiments/compare-experiments.sh	{libexec}/compare-experiments.sh
 file	0755	models/mtp/run-mtp-llamacpp.sh	{libexec}/run-mtp-llamacpp.sh
@@ -98,6 +99,7 @@ file	0644	examples/raspi-wol/bc250-wake.env.example	{share}/examples/raspi-wol/b
 file	0644	examples/raspi-wol/bc250-wol.env.example	{share}/examples/raspi-wol/bc250-wol.env.example
 file	0755	examples/raspi-wol/wake-bc250.sh	{share}/examples/raspi-wol/wake-bc250.sh
 file	0644	examples/rag/pilot-evaluation.tsv	{share}/examples/rag/pilot-evaluation.tsv
+file	0644	examples/rag/document-template.md	{share}/examples/rag/document-template.md
 
 file	0644	README.md	{docdir}/README.md
 file	0644	TLDR.md	{docdir}/TLDR.md

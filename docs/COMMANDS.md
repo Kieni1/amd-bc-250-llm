@@ -28,6 +28,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
 | `bc250-model` | Unified model discovery, installation and cleanup |
 | `bc250-ocr` | Experimental office OCR model list/install/test helper |
+| `bc250-rag-import` | Validate and incrementally sync the operator document tree |
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
 | `bc250-pull-embedding-model` | Compatibility alias for embedding installation |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
@@ -135,8 +136,29 @@ sudo bc250-setup-coding-agent [SELECTION]
 ```
 
 For office document retrieval, use the existing embedding workflow with
-Open WebUI/Tika; see [`RAG.md`](RAG.md). There is deliberately no separate RAG
-daemon or ingestion command.
+Open WebUI/Tika; see [`RAG.md`](RAG.md). There is no separate RAG daemon or
+vector store. `bc250-rag-import` is only a metadata-aware Open WebUI sync client.
+
+## Documents / RAG import
+
+```text
+bc250-rag-import plan [ROOT]
+sudo bc250-rag-import sync [ROOT] --token-file FILE [--prune]
+```
+
+The default root is `/srv/bc250-documents`. The supported layout is
+`public|confidential/COLLECTION/{active,sources}`. Only Markdown files directly
+inside `active/` are sent to Open WebUI; PDFs in `sources/` remain the local
+authoritative evidence and their SHA-256 is checked against each Markdown
+header before sync.
+
+German originals are routed to `[SCOPE] COLLECTION — Originals`; French
+translation pairs are routed to `[SCOPE] COLLECTION — Français`. `plan` makes no
+network request. `sync` uses Open WebUI's v0.11 incremental knowledge API,
+skips unchanged files and replaces changed files only after the new upload
+succeeds. Files removed locally remain in Open WebUI unless `--prune` is
+explicitly supplied. The API key is never packaged; read it from a protected
+file or `OPEN_WEBUI_API_KEY`.
 
 ## Experimental OCR
 
