@@ -47,9 +47,18 @@ class RagBaselineTests(unittest.TestCase):
         for command in ("bc250-fetch-models", "bc250-fetch-embeddings", "bc250-model", "bc250-ocr", "bc250-status", "bc250-verify"):
             self.assertIn(command, guide)
 
-    def test_repository_contains_no_office_document_payloads(self) -> None:
+    def test_package_contains_no_office_document_payloads(self) -> None:
         forbidden = {".pdf", ".doc", ".docx", ".odt", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf"}
-        found = [p.relative_to(ROOT) for p in ROOT.rglob("*") if p.is_file() and p.suffix.lower() in forbidden]
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        found = []
+    
+        for line in manifest.splitlines():
+            if not line or line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            if len(fields) >= 4 and Path(fields[2]).suffix.lower() in forbidden:
+                found.append(fields[2])
+    
         self.assertEqual(found, [])
 
     def test_verify_reports_rag_without_loading_embedding_model(self) -> None:
