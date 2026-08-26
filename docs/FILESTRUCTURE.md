@@ -56,7 +56,10 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |
 | `/var/cache/bc250-llm-server/40cu/` | Kernel-specific build cache |
-| `/var/lib/open-webui/` | Open WebUI application data |
+| `/var/lib/open-webui/` | Open WebUI application data; treat as confidential |
+| `/var/lib/open-webui/webui.db` | Accounts, chats, settings and knowledge metadata; confidential |
+| `/var/lib/open-webui/uploads/` | Uploaded source documents; confidential |
+| `/var/lib/open-webui/vector_db/` | Derived vector/RAG index data; confidential |
 | `/var/backups/bc250-llm-server/` | Maintenance backups |
 | `/var/log/bc250-llm-install.log` | Guided-installer transcript |
 

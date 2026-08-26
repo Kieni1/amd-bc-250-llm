@@ -29,6 +29,9 @@ bc250-verify-lan SERVER_IP
 Open `http://SERVER_IP/` from the trusted LAN and register the first
 administrator. HTTP is not encrypted.
 
+For a document/RAG pilot, install the document answer model and embedding model,
+then follow [`docs/RAG.md`](docs/RAG.md) before uploading confidential files.
+
 ## Models
 
 ```bash

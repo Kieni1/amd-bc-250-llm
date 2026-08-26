@@ -8,6 +8,7 @@ dir	0755	-	{share}/cu-live-manager
 dir	0755	-	{share}/examples
 dir	0755	-	{share}/examples/coding-agent
 dir	0755	-	{share}/examples/raspi-wol
+dir	0755	-	{share}/examples/rag
 dir	0755	-	{share}/examples/task-model
 dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
@@ -96,6 +97,7 @@ file	0644	examples/raspi-wol/bc250-wake.timer	{share}/examples/raspi-wol/bc250-w
 file	0644	examples/raspi-wol/bc250-wake.env.example	{share}/examples/raspi-wol/bc250-wake.env.example
 file	0644	examples/raspi-wol/bc250-wol.env.example	{share}/examples/raspi-wol/bc250-wol.env.example
 file	0755	examples/raspi-wol/wake-bc250.sh	{share}/examples/raspi-wol/wake-bc250.sh
+file	0644	examples/rag/pilot-evaluation.tsv	{share}/examples/rag/pilot-evaluation.tsv
 
 file	0644	README.md	{docdir}/README.md
 file	0644	TLDR.md	{docdir}/TLDR.md

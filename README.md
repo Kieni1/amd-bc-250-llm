@@ -136,6 +136,7 @@ Repository groups:
 - [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
 - [`models/README.md`](models/README.md): model discovery, addition and storage.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
+- [`docs/RAG.md`](docs/RAG.md): German/French/English office-document and knowledge-base pilot.
 - [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): backups, retention and power.
 - [`docs/openwebui-settings.md`](docs/openwebui-settings.md): current UI connections and model roles.
 - [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): package, configuration and state paths.

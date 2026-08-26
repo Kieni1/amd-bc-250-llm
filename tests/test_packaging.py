@@ -55,6 +55,9 @@ class PackagingTests(unittest.TestCase):
             "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
             quadlet,
         )
+        self.assertIn("Environment=RAG_TEXT_SPLITTER=token", quadlet)
+        self.assertIn("Environment=CHUNK_SIZE=1000", quadlet)
+        self.assertIn("Environment=RAG_TOP_K=5", quadlet)
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")

@@ -23,9 +23,13 @@ their services are installed. Tika must not be exposed as a host/LAN listener.
 
 - Keep authentication enabled.
 - Disable cloud API connections unless explicitly required.
-- Use Ollama embeddings with
-  `embed-jina-v5-small-retrieval-q4-k-m`.
+- Use Ollama embeddings with `embed-jina-v5-small-retrieval-q4-k-m`.
 - Use Tika for content extraction.
+- Start document retrieval with token splitting, 1000-token chunks, 100-token
+  overlap, Top K 5, Markdown-header splitting on, hybrid search off and async
+  embedding off.
+- Jina's fresh-install prefixes are `Query: ` and `Document: `. Changing the
+  embedding model or prefixes requires reindexing affected documents.
 - Disable public sharing and community features for private office data.
 - Disable arbitrary tools, functions, pipelines and code execution for ordinary
   users.
@@ -33,8 +37,13 @@ their services are installed. Tika must not be exposed as a host/LAN listener.
 - Leave request concurrency to the packaged one-parallel/one-loaded-model
   Ollama profile.
 
-The Jina embedding model is CC-BY-NC-4.0; choose the packaged Qwen embedding
-alternative if the intended use is incompatible with that license.
+The Jina embedding model is CC-BY-NC-4.0; choose the packaged Apache-2.0 Qwen
+embedding alternative if the intended use is incompatible with that license.
+For Qwen, use an English retrieval instruction on the query side and leave the
+content prefix empty. See [`RAG.md`](RAG.md) for the exact pilot settings.
+
+Open WebUI persists many RAG settings in `webui.db`; values saved in the Admin
+UI can override packaged fresh-install environment defaults after first launch.
 
 ## Task model
 
@@ -73,9 +82,13 @@ Leave Open WebUI `num_ctx`, temperature, `top_p` and `top_k` unset unless the
 test specifically compares an override. Enabling Open WebUI's context control
 can override the Modelfile on every request.
 
-For document/RAG use, enable file upload and file context, but start with memory,
-builtin tools, web search, vision, code execution and image generation off. The
-packaged Gemma 4 GGUF has no multimodal projector.
+For document/RAG use, enable file upload and File Context. For a predictable
+chat-attached baseline, keep Builtin Tools off and attach the knowledge base in
+the chat. With a knowledge base attached permanently to a model in Open WebUI
+v0.11.0 Native mode, enable the Knowledge Base builtin-tool category or the
+model cannot retrieve that bound knowledge. Keep memory, web search, code
+execution and image generation off initially. The packaged Gemma 4 GGUF has no
+multimodal projector.
 
 For GPT-OSS, leave `think` at default for the baseline. Use `low`, `medium` or
 `high` only for deliberate reasoning/latency comparisons; leave Open WebUI's

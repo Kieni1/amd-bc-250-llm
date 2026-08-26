@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.6
-Release:        0.4.testing%{?dist}
+Release:        0.5.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.5.testing
+- Add a privacy-oriented Open WebUI/Tika RAG baseline for German/French/English office documents
+- Package deterministic chunking/retrieval defaults and Jina query/document prefixes for fresh installs
+- Report RAG embedding/extraction configuration without loading the embedding model
+- Add a document-free pilot evaluation template and explicit full-backup/hardening guidance
+
 * Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.4.testing
 - Fix OCR alias validation and rename the GLM experiment to reflect its ggml-org source
 - Explicitly disable llama.cpp idle-slot prompt caching for MTP when supported

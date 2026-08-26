@@ -308,9 +308,10 @@ if command -v ollama >/dev/null 2>&1; then
 else
   warn "Ollama executable is missing; version could not be reported"
 fi
-if curl -fsS "$OLLAMA_URL/api/tags" >/dev/null; then
+ollama_tags="$(curl -fsS "$OLLAMA_URL/api/tags" 2>/dev/null || true)"
+if [[ -n "$ollama_tags" ]]; then
   ok "Ollama API reachable"
-  tag_count="$(curl -fsS "$OLLAMA_URL/api/tags" | jq '.models | length' 2>/dev/null || echo '?')"
+  tag_count="$(jq '.models | length' <<< "$ollama_tags" 2>/dev/null || echo '?')"
   loaded_count="$(curl -fsS "$OLLAMA_URL/api/ps" | jq '.models | length' 2>/dev/null || echo '?')"
   info "registered models: $tag_count; currently loaded: $loaded_count"
 else
@@ -344,6 +345,26 @@ if command -v journalctl >/dev/null 2>&1; then
 else
   warn "journalctl is unavailable; Vulkan failure patterns were not checked"
 fi
+
+section "Documents / RAG"
+rag_env="$(podman inspect open-webui --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null || true)"
+rag_embedding_model="$(awk -F= '$1 == "RAG_EMBEDDING_MODEL" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
+rag_extraction_engine="$(awk -F= '$1 == "CONTENT_EXTRACTION_ENGINE" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
+if [[ -n "$rag_embedding_model" ]]; then
+  info "Open WebUI embedding default: $rag_embedding_model"
+  if [[ -n "$ollama_tags" ]] && jq -e --arg model "$rag_embedding_model" \
+      'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
+      <<< "$ollama_tags" >/dev/null 2>&1; then
+    ok "default RAG embedding model is registered with main Ollama"
+  else
+    warn "default RAG embedding model is not registered with main Ollama"
+  fi
+else
+  warn "Open WebUI RAG embedding model is not visible in the container environment"
+fi
+[[ -n "$rag_extraction_engine" ]] && info "Open WebUI extraction engine: $rag_extraction_engine" || \
+  warn "Open WebUI extraction engine is not visible in the container environment"
+info "Open WebUI database settings can override persistent RAG defaults after first launch"
 
 section "Local endpoints"
 curl -fsS http://127.0.0.1:3000/ >/dev/null && ok "Open WebUI loopback endpoint reachable" || bad "Open WebUI unavailable"

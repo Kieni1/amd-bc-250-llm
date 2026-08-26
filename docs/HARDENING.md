@@ -42,6 +42,15 @@ the LAN boundary. `bc250-verify` warns about unexpected listener shapes or an
 inactive/incorrect firewall, and `bc250-verify-lan` checks exposure from a
 second LAN machine.
 
+## Confidential documents and knowledge bases
+
+For confidential RAG use, require authentication, keep knowledge bases private
+or restricted to the necessary users/groups, disable public/open sharing, and
+leave cloud model/API connections and web search disabled unless an operator
+explicitly approves them. `/var/lib/open-webui/webui.db`, `uploads/` and
+`vector_db/` contain or derive from confidential material; protect their backups
+accordingly. See [`RAG.md`](RAG.md).
+
 ## Add HTTPS or stop services
 
 Follow [`HTTPS.md`](HTTPS.md) for encrypted access. Do not expose Open WebUI's

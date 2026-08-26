@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.9.6-0.5.testing - 2026-08-25
+
+Add a privacy-oriented Open WebUI/Tika RAG baseline for German/French/English
+office documents without adding another retrieval service or ingesting example
+business data. Fresh installs now start with deterministic 1000/100 token
+chunking, Top K 5, Markdown-header splitting, vector-only search, sequential
+Ollama embeddings and Jina `Query:` / `Document:` prefixes.
+
+`bc250-verify` reports the Open WebUI embedding/extraction defaults and checks
+that the configured embedding model is registered with main Ollama without
+running an embedding request. The installer points operators to the new RAG
+guide after an embedding selection. Documentation covers Open WebUI v0.11.0's
+Native-mode knowledge behavior, DE/FR cross-language evaluation, OCR-first
+scans, reindexing, confidential data paths and complete stopped-instance
+backups. A blank pilot evaluation TSV is packaged; no real documents are.
+
 ## 0.9.6-0.4.testing - 2026-08-25
 
 Correct `bc250-ocr install/show` alias validation so an unknown OCR model exits

@@ -501,6 +501,10 @@ run_model_phase() {
     mtp) bc250-model install mtp "$selection" --include-disabled ;;
     *) bc250-model install "$category" "$selection" ;;
   esac
+  if [[ "$category" == embedding ]]; then
+    echo "RAG is ready for configuration. Confidential documents remain operator-managed in Open WebUI."
+    echo "See /usr/share/doc/bc250-llm-server/RAG.md before creating a knowledge base."
+  fi
 }
 
 step_7_models() {

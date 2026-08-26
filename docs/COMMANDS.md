@@ -134,6 +134,10 @@ sudo bc250-setup-task-model [SELECTION]
 sudo bc250-setup-coding-agent [SELECTION]
 ```
 
+For office document retrieval, use the existing embedding workflow with
+Open WebUI/Tika; see [`RAG.md`](RAG.md). There is deliberately no separate RAG
+daemon or ingestion command.
+
 ## Experimental OCR
 
 ```text
