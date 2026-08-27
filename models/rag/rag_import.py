@@ -22,6 +22,18 @@ SCOPES = ("public", "confidential")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
+def knowledge_name(scope: str, collection: str, lane: str) -> str:
+    suffix = "Originals" if lane == "original" else "Français"
+    return f"[{scope.upper()}] {collection} — {suffix}"
+
+
+def knowledge_description(scope: str, collection: str, lane: str) -> str:
+    base = f"BC-250 managed RAG import from {scope}/{collection}/active."
+    if lane == "original":
+        return base + " Authoritative German/English originals; use for German and English queries."
+    return base + " French translations; use for French queries. German originals remain authoritative on conflict."
+
+
 @dataclass(frozen=True)
 class Document:
     path: Path
@@ -34,15 +46,11 @@ class Document:
 
     @property
     def kb_name(self) -> str:
-        suffix = "Originals" if self.lane == "original" else "Français"
-        return f"[{self.scope.upper()}] {self.collection} — {suffix}"
+        return knowledge_name(self.scope, self.collection, self.lane)
 
     @property
     def kb_description(self) -> str:
-        base = f"BC-250 managed RAG import from {self.scope}/{self.collection}/active."
-        if self.lane == "original":
-            return base + " Authoritative German originals; use for German and English queries."
-        return base + " French translations; use for French queries. German originals remain authoritative on conflict."
+        return knowledge_description(self.scope, self.collection, self.lane)
 
 
 def _unquote(value: str) -> str:
@@ -176,6 +184,22 @@ def groups(docs: list[Document]) -> dict[str, list[Document]]:
     return result
 
 
+def expected_knowledge(root: Path) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for scope in SCOPES:
+        scope_dir = root / scope
+        if not scope_dir.is_dir():
+            continue
+        for collection_dir in sorted(p for p in scope_dir.iterdir() if p.is_dir()):
+            if not (collection_dir / "active").is_dir():
+                continue
+            for lane in ("original", "translation"):
+                result[knowledge_name(scope, collection_dir.name, lane)] = knowledge_description(
+                    scope, collection_dir.name, lane
+                )
+    return result
+
+
 def print_plan(root: Path, docs: list[Document], warnings: list[str]) -> None:
     print(f"Document root: {root}")
     if not docs:
@@ -216,16 +240,22 @@ class OpenWebUI:
             raise RuntimeError(f"Open WebUI is unreachable at {self.base}: {exc.reason}") from exc
         return json.loads(raw) if raw else {}
 
-    def knowledge(self, name: str, description: str) -> dict[str, object]:
+    def find_knowledge(self, name: str) -> dict[str, object] | None:
         result = self._request("GET", f"/api/v1/knowledge/search?query={quote(name)}&page=1")
         items = result.get("items", []) if isinstance(result, dict) else []
         exact = [item for item in items if isinstance(item, dict) and item.get("name") == name]
         if len(exact) > 1:
             raise RuntimeError(f"multiple knowledge bases have the exact name {name!r}")
-        if exact:
-            if exact[0].get("write_access") is False:
-                raise RuntimeError(f"API-key owner does not have write access to {name!r}")
-            return exact[0]
+        if not exact:
+            return None
+        if exact[0].get("write_access") is False:
+            raise RuntimeError(f"API-key owner does not have write access to {name!r}")
+        return exact[0]
+
+    def knowledge(self, name: str, description: str) -> dict[str, object]:
+        existing = self.find_knowledge(name)
+        if existing is not None:
+            return existing
         created = self._request("POST", "/api/v1/knowledge/create", {"name": name, "description": description})
         if not isinstance(created, dict) or not created.get("id"):
             raise RuntimeError(f"failed to create knowledge base {name!r}")
@@ -303,11 +333,20 @@ def sync(root: Path, docs: list[Document], warnings: list[str], args: argparse.N
     print_plan(root, docs, warnings)
     api = OpenWebUI(args.url, token_from(args), args.timeout)
     grouped = groups(docs)
+    expected = expected_knowledge(root)
     by_key = {(doc.kb_name, doc.path.name): doc for doc in docs}
+    names = set(grouped) | (set(expected) if args.prune else set())
 
-    for name, members in sorted(grouped.items()):
+    for name in sorted(names):
+        members = grouped.get(name, [])
         print(f"\nSyncing {name}")
-        kb = api.knowledge(name, members[0].kb_description)
+        if members:
+            kb = api.knowledge(name, members[0].kb_description)
+        else:
+            kb = api.find_knowledge(name)
+            if kb is None:
+                print("  empty local lane and no remote knowledge base; nothing to prune")
+                continue
         kb_id = str(kb["id"])
         diff = api.diff(kb_id, members)
         added = diff.get("added", []) if isinstance(diff.get("added"), list) else []

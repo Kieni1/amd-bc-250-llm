@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.9.6-0.7.testing - 2026-08-27
+
+Make Ollama **0.32.15** the package-standard runtime for BC-250 smoke tests; the
+official installer helper now requests that version unless an operator deliberately
+sets `OLLAMA_VERSION`. Verification and diagnostics warn, rather than fail, when a
+different Ollama runtime is being compared.
+
+Overhaul `bc250-benchmark` around useful BC-250/office measurements instead of a
+single generation tok/s figure. The default `moderate` profile now separates cold
+model-switch latency, warm latency, loaded decode throughput, document-prefill
+throughput, context-capacity/truncation behavior, loaded Ollama allocation and host
+memory/swap headroom. `conservative` is a shorter lower-context pass. Optional
+embedding benchmarking uses `/api/embed` with a multilingual office batch; OCR
+remains a real-page quality test through `bc250-ocr`. Dedicated task/agent stores
+can be measured by pointing `OLLAMA_URL` at ports 11435/11436.
+
+Make the fresh-install RAG baseline **moderate** at 1500-token chunks, 200 overlap
+and Top K 8. Keep 1000/100/5 as the documented conservative alternative. Retrieval
+query generation is disabled for the baseline so embedding/chunking quality is
+measured before task-model query rewriting is introduced. Documentation now
+distinguishes reindexing from source re-upload/re-sync.
+
+`modelctl.py` removes redundant temporary `hf.co/...` OCR registrations after a
+friendly packaged alias is created, while retaining safe status handling if cleanup
+cannot occur. `bc250-rag-import --prune` can also clear the final stale remote file
+when a generated Originals/Français lane has become locally empty.
+
 ## 0.9.6-0.6.testing - 2026-08-26
 
 Add `bc250-rag-import` for the operator-owned `/srv/bc250-documents` tree. It

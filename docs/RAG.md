@@ -43,9 +43,12 @@ commercial use, select the packaged Apache-2.0 Qwen alternative instead:
 sudo bc250-fetch-embeddings embed-qwen3-0.6b-q8-0
 ```
 
-Do not mix embedding models or prefix schemes inside one existing index. Change
-the Open WebUI embedding model/prefixes first, then reindex the affected files
-or knowledge bases.
+Do not mix embedding models or prefix schemes inside one existing index. Changing
+the embedding model, embedding prefixes or chunking requires **reindexing** the
+affected Knowledge documents. Changing the extraction engine or fixing source
+extraction requires **re-uploading/re-syncing the source content**, because a
+reindex works from text Open WebUI already extracted. Standalone chat attachments
+likewise need re-uploading when their extracted text must change.
 
 ### Embedding prefixes
 
@@ -85,31 +88,40 @@ embedding model, so it is a deliberate operator test rather than part of
 
 ## 3. Fresh-install Open WebUI baseline
 
-The packaged Quadlet supplies these starting values:
+The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 
-| Setting | Fresh-install value |
-|---|---|
-| Extraction engine | Tika |
-| Embedding engine | Ollama |
-| RAG Ollama URL | `http://host.containers.internal:11434` |
-| Embedding model | `embed-jina-v5-small-retrieval-q4-k-m` |
-| Text splitter | Token |
-| Markdown header splitting | On |
-| Chunk size | `1000` |
-| Chunk overlap | `100` |
-| Top K | `5` |
-| Relevance threshold | `0` |
-| Hybrid search | Off initially |
-| Async embedding | Off |
-| Reranker | None |
+| Setting | Moderate standard | Conservative alternative |
+|---|---:|---:|
+| Extraction engine | Tika | Tika |
+| Embedding engine | Ollama | Ollama |
+| RAG Ollama URL | `http://host.containers.internal:11434` | same |
+| Embedding model | `embed-jina-v5-small-retrieval-q4-k-m` | same |
+| Text splitter | Token | Token |
+| Markdown header splitting | On | On |
+| Chunk size | `1500` | `1000` |
+| Chunk overlap | `200` | `100` |
+| Top K | `8` | `5` |
+| Relevance threshold | `0` | `0` |
+| Hybrid search | Off initially | Off initially |
+| Async embedding | Off | Off |
+| Retrieval-query generation | Off for baseline | Off for baseline |
+| Reranker | None | None |
+
+The **moderate** 1500/200/Top-K-8 profile is the package standard for the 32K
+document model: it gives each retrieval hit more surrounding office-document
+context while keeping the injected context well below the model window. The
+**conservative** 1000/100/Top-K-5 profile is useful when testing a larger model,
+long chat history, tighter memory headroom or a retrieval problem where smaller
+chunks are desirable. These are starting points to measure, not fixed quality
+claims.
 
 Open WebUI persists many Admin settings in `webui.db`. After first launch,
 database values can override packaged `ConfigVar` defaults. Treat the Quadlet as
 a fresh-install baseline and make later changes in **Admin Settings → Documents**.
-
-The 1000/100/Top-K-5 baseline keeps retrieval context bounded on this 16 GB UMA
-machine. Do not add a reranker until vector-only and hybrid-without-reranker
-results have been measured.
+Keep retrieval-query generation off for the first measured baseline so the user
+query reaches retrieval unchanged. Test task-model query rewriting only after the
+embedding/chunking baseline is recorded. Do not add a reranker until vector-only
+and hybrid-without-reranker results have been measured.
 
 ## 4. Authoritative document tree and language policy
 
@@ -183,7 +195,7 @@ continues; a missing or incorrect source checksum is an error.
 First inspect routing and provenance. This does not contact Open WebUI:
 
 ```bash
-bc250-rag-import plan /srv/bc250-documents
+sudo bc250-rag-import plan /srv/bc250-documents
 ```
 
 For API sync, enable Open WebUI API keys deliberately, generate a key for the
@@ -199,24 +211,54 @@ sudo bc250-rag-import sync /srv/bc250-documents \
 The sync uses Open WebUI v0.11.0's incremental knowledge API. Treat these four generated knowledge-base name patterns as importer-managed: do not add unrelated files to them manually if you plan to use `--prune`. Unchanged files
 are skipped. A changed Markdown file is uploaded first and only then replaces
 the stale Open WebUI copy. Files removed locally are reported but retained
-remotely; remove them only with an explicit second run using `--prune`. The
-importer never uploads `sources/` PDFs and never stores the API key itself.
+remotely; remove them only with an explicit second run using `--prune`. `--prune`
+also handles a generated Originals/Français lane that has become completely
+empty, so the final stale remote file does not become stranded. The importer
+never uploads `sources/` PDFs and never stores the API key itself.
 
 New knowledge bases are private to the API-key account. After the first sync,
 review **Workspace → Knowledge** and assign public/restricted group permissions
 manually. In particular, do not infer Open WebUI access from the filesystem word
 `public`; it is only a local classification boundary.
 
-For scans, run the OCR experiments first and evaluate the extracted text before
-placing cleaned Markdown in `active/`:
+### OCR workflow for scanned office documents
+
+Use Tika for text-native PDFs and office files. Use OCR only for image-only or
+poorly extracted scans; OCR is a preprocessing step before RAG, not a replacement
+for the answer model.
+
+Current OCR test set:
+
+| Model | Starting use |
+|---|---|
+| `exp-glm-ocr-ggml-q8-0` | lightweight baseline / compatibility check |
+| `exp-ovisocr2-abiray-q8-0` | compact page-to-Markdown, tables and formulas |
+| `exp-dots-ocr-ggml-q8-0` | multilingual layout/table comparison |
+| `exp-chandra-ocr2-prithivmlmods-q4-k-m` | quality candidate for complex office scans |
+
+Use `bc250-ocr` for reproducible ingestion tests rather than exposing OCR models
+as normal chat models:
 
 ```bash
 bc250-ocr list
 bc250-ocr test glm /PATH/TO/ONE-SCANNED-PAGE.png
 ```
 
-Tika extracts searchable PDFs and office documents; it is not a substitute for
-OCR on image-only scans.
+Use the engine names reported by `bc250-ocr list`. For the pilot, process page
+images individually, preserve page order, review the OCR output, and save the
+cleaned canonical Markdown under `active/` before indexing it. Do not index both
+the scan and its cleaned Markdown derivative.
+
+OCR prompts should **transcribe and preserve the source language**. Do not ask the
+OCR model to translate, summarize or rewrite German/French/English content during
+extraction. Translation or interpretation belongs in the downstream LLM step.
+Preserve headings, paragraphs, tables, numbers, dates and reading order where the
+model supports them.
+
+Multimodal OCR GGUFs require their matching image/projector path where applicable;
+`bc250-ocr` should own those model-specific invocation details. Open WebUI can be
+used for ad-hoc visual A/B tests, but its chat output should not become the
+canonical RAG source without the same review/cleanup step.
 
 ## 7. Retrieval mode: important Open WebUI v0.11.0 behavior
 
@@ -348,3 +390,7 @@ without a demonstrated benefit for this single-machine pilot.
 - [Open WebUI API keys](https://docs.openwebui.com/features/authentication-access/api-keys/)
 - [Jina v5 small retrieval model card](https://huggingface.co/jinaai/jina-embeddings-v5-text-small-retrieval)
 - [Qwen3 Embedding 0.6B GGUF model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF)
+- [GLM-OCR GGUF](https://huggingface.co/ggml-org/GLM-OCR-GGUF)
+- [dots.ocr GGUF](https://huggingface.co/ggml-org/dots.ocr-GGUF)
+- [OvisOCR2 GGUF](https://huggingface.co/Abiray/OvisOCR2-GGUF)
+- [Chandra OCR 2 GGUF](https://huggingface.co/prithivMLmods/chandra-ocr-2-GGUF)

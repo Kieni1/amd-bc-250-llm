@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.6
-Release:        0.6.testing%{?dist}
+Release:        0.7.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Aug 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.7.testing
+- Standardize the tested Ollama runtime on 0.32.15 while retaining explicit comparison overrides.
+- Overhaul model benchmarking with moderate/conservative profiles, prefill/context/headroom metrics and embedding-specific tests.
+- Make the moderate Open WebUI RAG baseline 1500/200/Top-K-8 and disable retrieval-query rewriting for the measured baseline.
+- Clean temporary Ollama-HF backing registrations and allow explicit pruning of an emptied generated RAG language lane.
+
 * Wed Aug 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.6.testing
 - Add metadata-aware incremental RAG import for the public/confidential COLLECTION/active layout.
 - Route authoritative German originals and French translations into separate Open WebUI knowledge bases.

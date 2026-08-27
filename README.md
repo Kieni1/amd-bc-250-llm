@@ -80,7 +80,7 @@ sudo bc250-fetch-models
 sudo bc250-fetch-experiments
 sudo bc250-fetch-embeddings
 bc250-ocr list
-bc250-rag-import plan /srv/bc250-documents
+sudo bc250-rag-import plan /srv/bc250-documents
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 
@@ -94,6 +94,9 @@ sudo bc250-40cu status
 sudo bc250-status
 sudo bc250-maintenance setup --defaults
 sudo bc250-maintenance clean-cache
+
+# Compare installed models with the moderate runtime benchmark
+bc250-benchmark
 ```
 
 The complete installed interface and its exact syntax are in
@@ -104,7 +107,7 @@ The complete installed interface and its exact syntax are in
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama | Official install, Vulkan-oriented service defaults and three isolated stores |
+| Ollama v0.32.15 | Package-standard official runtime, Vulkan-oriented service defaults and three isolated stores |
 | Open WebUI v0.11.0 and Tika | Digest-pinned local UI and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |

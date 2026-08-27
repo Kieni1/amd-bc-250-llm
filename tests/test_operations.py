@@ -124,11 +124,31 @@ class RuntimeConvenienceTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn('[[ -d "$cpu" ]] || continue', source)
 
-    def test_benchmark_flags_context_plateau_and_uncalibrated_power(self) -> None:
-        benchmark = (ROOT / "cmd/benchmark/compare-models.sh").read_text(encoding="utf-8")
+    def test_benchmark_uses_role_appropriate_runtime_metrics(self) -> None:
+        benchmark_path = ROOT / "cmd/benchmark/compare-models.sh"
+        benchmark = benchmark_path.read_text(encoding="utf-8")
         sensors = (ROOT / "cmd/benchmark/log_sensors.sh").read_text(encoding="utf-8")
+        self.assertIn('BENCH_PROFILE="${BENCH_PROFILE:-moderate}"', benchmark)
+        self.assertIn("NUM_PREDICT_PREFILL", benchmark)
         self.assertIn("prompt_eval_count stopped growing", benchmark)
+        self.assertIn("allocated_context", benchmark)
+        self.assertIn("resident_size_bytes", benchmark)
+        self.assertIn("embedding_process_duration_s", benchmark)
+        self.assertIn("mem_available_mib", benchmark)
+        self.assertIn("INCLUDE_EMBEDDINGS", benchmark)
+        self.assertIn('"$OLLAMA/api/embed"', benchmark)
+        self.assertIn("truncate: false", benchmark)
+        self.assertIn("keep_alive: $keep_alive", benchmark)
+        self.assertEqual(benchmark.count('record_success "$model" "$label" "cold_chat" 1 "$row"'), 1)
+        self.assertIn("grep -viE 'embed|ocr'", benchmark)
+        self.assertIn("0.32.15", benchmark)
         self.assertIn("uncalibrated", sensors)
+        result = subprocess.run(
+            [str(benchmark_path), "--help"], text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("moderate is the package standard", result.stdout)
 
 
 class CuStatusTests(unittest.TestCase):

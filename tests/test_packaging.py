@@ -56,8 +56,18 @@ class PackagingTests(unittest.TestCase):
             quadlet,
         )
         self.assertIn("Environment=RAG_TEXT_SPLITTER=token", quadlet)
-        self.assertIn("Environment=CHUNK_SIZE=1000", quadlet)
-        self.assertIn("Environment=RAG_TOP_K=5", quadlet)
+        self.assertIn("Environment=CHUNK_SIZE=1500", quadlet)
+        self.assertIn("Environment=CHUNK_OVERLAP=200", quadlet)
+        self.assertIn("Environment=RAG_TOP_K=8", quadlet)
+        self.assertIn("Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false", quadlet)
+
+    def test_package_standard_ollama_is_03215(self) -> None:
+        helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
+        installer = (ROOT / "install").read_text(encoding="utf-8")
+        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn('VERSION="${OLLAMA_VERSION:-0.32.15}"', helper)
+        self.assertIn('requested="${OLLAMA_VERSION:-0.32.15}"', installer)
+        self.assertIn("package standard 0.32.15", verify)
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")

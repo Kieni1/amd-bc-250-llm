@@ -305,6 +305,12 @@ section "Ollama"
 if command -v ollama >/dev/null 2>&1; then
   ollama_version="$(ollama --version 2>&1 | head -1 || true)"
   info "Ollama version: ${ollama_version:-unknown}"
+  ollama_semver="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$ollama_version" | head -1 || true)"
+  if [[ "$ollama_semver" == "0.32.15" ]]; then
+    ok "Ollama matches the package standard 0.32.15"
+  elif [[ -n "$ollama_semver" ]]; then
+    warn "Ollama $ollama_semver differs from package standard 0.32.15; treat this as a deliberate runtime test"
+  fi
 else
   warn "Ollama executable is missing; version could not be reported"
 fi

@@ -419,11 +419,16 @@ def print_all_models(directories: list[Path]) -> None:
         print(f"{category.title()} models:")
         print_models(defaults, selected, registrations[defaults["ollama_host"]])
     known = {model["name"] for model in models}
+    hf_backings = {
+        (CATEGORY_DEFAULTS[model["category"]]["ollama_host"], model["from"]): model["name"]
+        for model in models if model["provider"] == "ollama-hf"
+    }
     unmanaged = sorted(
         (host, name)
         for host, names in registrations.items()
         for name in names or ()
         if name not in known
+        and not (hf_backings.get((host, name)) in (names or set()))
     )
     if unmanaged:
         print("Unmanaged Ollama models (registered without a Modelfile):")
@@ -622,6 +627,25 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
     return ""
 
 
+def remove_hf_backing_registration(ollama_bin: str, host: str, model: dict) -> None:
+    """Drop a redundant hf.co source manifest after the friendly alias exists."""
+    registrations = registered_models(host)
+    source = model["from"]
+    if registrations is None or source not in registrations or model["name"] not in registrations:
+        return
+    result = run_as_ollama(
+        [ollama_bin, "rm", source],
+        {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
+    )
+    if result.returncode != 0:
+        print(f"    WARNING: could not remove temporary HF source registration {source}", file=sys.stderr)
+        return
+    remaining = registered_models(host)
+    if remaining is not None and model["name"] not in remaining:
+        raise ModelError(f"friendly Ollama registration disappeared after removing {source}")
+    print(f"    removed temporary HF source registration {source}")
+
+
 def render_modelfile(source: Path, model: dict, output: Path | None, destination: Path) -> None:
     rendered: list[str] = []
     for line in source.read_text(encoding="utf-8").splitlines():
@@ -695,6 +719,7 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 )
                 if result.returncode != 0:
                     raise ModelError("ollama create failed")
+                remove_hf_backing_registration(ollama_bin, host, model)
                 print("    registered with Ollama; source blobs are Ollama-managed")
                 continue
             output = model_path(defaults, model, args.destination or os.environ.get("DEST"))

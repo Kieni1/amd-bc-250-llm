@@ -95,6 +95,18 @@ class RagImportTests(unittest.TestCase):
         self.assertIn("--prune", source)
         self.assertNotIn("sqlite", source.lower())
 
+    def test_prune_knows_both_generated_lanes_even_when_one_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
+            expected = rag.expected_knowledge(root)
+            self.assertEqual(
+                set(expected),
+                {"[PUBLIC] COLLECTION — Originals", "[PUBLIC] COLLECTION — Français"},
+            )
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("set(grouped) | (set(expected) if args.prune else set())", source)
+
     def test_importer_is_packaged_and_document_root_is_operator_owned(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")

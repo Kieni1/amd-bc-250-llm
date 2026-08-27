@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import io
 from pathlib import Path
 from types import SimpleNamespace
 import subprocess
@@ -78,6 +79,33 @@ class OcrInstallTests(unittest.TestCase):
         self.assertNotIn("script", requested)
         self.assertIn("FROM hf.co/ggml-org/GLM-OCR-GGUF:Q8_0", rendered)
         self.assertEqual(run.call_args.args[0][:2], ["/usr/bin/ollama", "create"])
+
+    def test_hf_backing_registration_is_removed_after_friendly_alias(self) -> None:
+        defaults, models = modelctl.load_models(
+            "experiments", directories=[ROOT / "models/modelfiles"]
+        )
+        model = next(item for item in models if item["name"] == "exp-glm-ocr-ggml-q8-0")
+        completed = SimpleNamespace(returncode=0)
+        with patch.object(
+            modelctl, "registered_models",
+            side_effect=[{model["from"], model["name"]}, {model["name"]}],
+        ), patch.object(modelctl, "run_as_ollama", return_value=completed) as run:
+            modelctl.remove_hf_backing_registration("/usr/bin/ollama", defaults["ollama_host"], model)
+        self.assertEqual(run.call_args.args[0], ["/usr/bin/ollama", "rm", model["from"]])
+
+    def test_hf_backing_with_friendly_alias_is_not_reported_as_unmanaged(self) -> None:
+        _, models = modelctl.load_models(
+            "experiments", directories=[ROOT / "models/modelfiles"]
+        )
+        model = next(item for item in models if item["name"] == "exp-glm-ocr-ggml-q8-0")
+        main_host = modelctl.CATEGORY_DEFAULTS[model["category"]]["ollama_host"]
+        registrations = {model["name"], model["from"]}
+        output = io.StringIO()
+        with patch.object(modelctl, "discover_models", return_value=[model]), patch.object(
+            modelctl, "registered_models", side_effect=lambda host: registrations if host == main_host else set()
+        ), patch("sys.stdout", output):
+            modelctl.print_all_models([ROOT / "models/modelfiles"] )
+        self.assertNotIn("Unmanaged Ollama models", output.getvalue())
 
     def test_invalid_ocr_alias_fails_before_manager_or_ollama(self) -> None:
         script = ROOT / "models/ocr/bc250-ocr.sh"

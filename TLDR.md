@@ -30,7 +30,7 @@ Open `http://SERVER_IP/` from the trusted LAN and register the first
 administrator. HTTP is not encrypted.
 
 For a document/RAG pilot, install the document answer model and embedding model,
-then follow [`docs/RAG.md`](docs/RAG.md). Operator documents live under `/srv/bc250-documents`; run `bc250-rag-import plan` before any bulk sync.
+then follow [`docs/RAG.md`](docs/RAG.md). Operator documents live under `/srv/bc250-documents`; run `sudo bc250-rag-import plan` before any bulk sync.
 
 ## Models
 
@@ -41,7 +41,7 @@ bc250-model list task
 bc250-model list agentic
 bc250-model list embedding
 bc250-ocr list
-bc250-rag-import plan /srv/bc250-documents
+sudo bc250-rag-import plan /srv/bc250-documents
 
 sudo bc250-fetch-models
 sudo bc250-fetch-experiments
@@ -75,7 +75,9 @@ see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 ## Operations
 
 ```bash
-bc250-benchmark
+bc250-benchmark                       # moderate standard runtime profile
+BENCH_PROFILE=conservative bc250-benchmark
+# Task/agent instances: OLLAMA_URL=http://127.0.0.1:11435 or :11436
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
 

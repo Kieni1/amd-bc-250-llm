@@ -1,36 +1,21 @@
 #!/usr/bin/env bash
-# Ollama model benchmark v5.1
+# Ollama model benchmark v6.0
 #
 # Measures:
-#   - OpenWebUI-style cold and warm streaming chat latency
-#   - time to first visible content (thinking OR answer)
-#   - time to first answer text
+#   - cold model-switch and warm streaming chat latency (TTFC / TTFA)
 #   - Ollama model-load, prompt-eval, generation, and total durations
-#   - external client wall-clock duration
-#   - repeated short-burst generation throughput
-#   - long-context generation and prefill throughput
-#   - optional multi-point context curve
+#   - loaded model allocation from /api/ps plus host memory/swap headroom
+#   - repeated decode throughput and a dedicated document-prefill test
+#   - optional context-capacity curve with truncation warnings
 #   - optional sustained tok/s drift / throttle test
+#   - optional embedding cold/warm batch throughput via /api/embed
 #
 # Dependencies: bash, jq, curl, awk, GNU date.
 # Fedora: sudo dnf install -y jq curl gawk coreutils
 #
-# Changes vs v5:
-#   - Fixes intermittent `Bad file descriptor` messages from Bash coproc FDs.
-#   - Polls /api/ps after unload so cold-start tests are actually cold.
-#   - Reduces streaming parser overhead to one jq invocation per chunk.
-#   - Adds server_overhead_s and client_overhead_s to expose hidden stalls.
-#   - Adds a configurable whole-request timeout.
-#
-# Changes inherited from v5:
-#   - Adds one cold and configurable repeated warm streaming /api/chat tests.
-#   - Records load_duration_s, wall_duration_s, TTFC, and TTFA in the CSV.
-#   - TTFC = time to first visible content (reasoning or answer).
-#   - TTFA = time to first actual answer content. This exposes models that begin
-#     reasoning quickly but make the user wait a long time for the answer.
-#   - Prints and summarizes total execution duration, not only tok/s.
-#   - Records full benchmark start/end timestamps and total elapsed time.
-#   - Preserves v4 warmup, cache-busting, context curve, and throttle tests.
+# Profiles:
+#   - moderate (default): representative office-model comparison
+#   - conservative: shorter, lower-context smoke/comparison pass
 #
 # Notes:
 #   - The streaming chat test calls Ollama directly. It approximates OpenWebUI's
@@ -42,20 +27,67 @@
 #     runs unless RUN_LATENCY=0 is set.
 set -uo pipefail
 
-QUESTION="Write a detailed technical explanation of how memory bandwidth affects local LLM inference. Cover prefill vs decode, quantization, batching, and typical consumer-hardware bottlenecks. Use around 800 words."
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  cat <<'EOF_HELP'
+Usage: bc250-benchmark
+
+Interactive runtime benchmark for registered Ollama models.
+BENCH_PROFILE=moderate is the package standard; use BENCH_PROFILE=conservative
+for a faster, lower-context pass. Set INCLUDE_EMBEDDINGS=1 to benchmark embedding
+models through /api/embed instead of generation endpoints. OCR models are intentionally
+excluded; compare them with the same page corpus through bc250-ocr.
+
+Important overrides: OLLAMA_URL, THINK_MODE, RUN_LATENCY, REPEATS, CTX_POINTS,
+NUM_PREDICT_SHORT, NUM_PREDICT_PREFILL, NUM_PREDICT_CONTEXT, NUM_PREDICT_LONG.
+EOF_HELP
+  exit 0
+fi
+
+QUESTION="Write a structured office memo that summarizes the relevant policy points, dates, responsibilities, and next actions. Use around 500 words."
 PROMPT_SHORT="$QUESTION"
 
 CHAT_SYSTEM_PROMPT="${CHAT_SYSTEM_PROMPT:-You are a concise, helpful assistant. Answer directly.}"
-CHAT_PROMPT="${CHAT_PROMPT:-In one concise paragraph, explain why memory bandwidth matters for local LLM inference.}"
+CHAT_PROMPT="${CHAT_PROMPT:-In one concise paragraph, summarize a routine office policy update and state the next action clearly.}"
 
-NUM_PREDICT_SHORT="${NUM_PREDICT_SHORT:-512}"
-NUM_PREDICT_LONG="${NUM_PREDICT_LONG:-4096}"
-NUM_PREDICT_LATENCY="${NUM_PREDICT_LATENCY:-96}"
-REPEATS="${REPEATS:-3}"
-LATENCY_REPEATS="${LATENCY_REPEATS:-2}"
+EMBED_INPUT_JSON='["Kündigungsfrist und Zahlungsbedingungen im Mietvertrag","Délai de résiliation et conditions de paiement du contrat","Meeting minutes approving the annual maintenance budget","Reglement über die Benutzung gemeinsamer Räume","Règlement concernant l’utilisation des locaux communs","Invoice reference 2026-0317 and due date 30 September 2026"]'
+
+BENCH_PROFILE="${BENCH_PROFILE:-moderate}"
+case "${BENCH_PROFILE,,}" in
+  moderate)
+    : "${NUM_PREDICT_SHORT:=384}"
+    : "${NUM_PREDICT_PREFILL:=32}"
+    : "${NUM_PREDICT_CONTEXT:=128}"
+    : "${NUM_PREDICT_LONG:=3072}"
+    : "${NUM_PREDICT_LATENCY:=96}"
+    : "${REPEATS:=3}"
+    : "${LATENCY_REPEATS:=2}"
+    : "${EMBED_REPEATS:=2}"
+    : "${PREFILL_SENTENCES:=220}"
+    : "${CTX_POINTS:=44 176 352 704}"
+    DEFAULT_CTX="y"
+    ;;
+  conservative)
+    : "${NUM_PREDICT_SHORT:=256}"
+    : "${NUM_PREDICT_PREFILL:=24}"
+    : "${NUM_PREDICT_CONTEXT:=96}"
+    : "${NUM_PREDICT_LONG:=2048}"
+    : "${NUM_PREDICT_LATENCY:=64}"
+    : "${REPEATS:=2}"
+    : "${LATENCY_REPEATS:=1}"
+    : "${EMBED_REPEATS:=1}"
+    : "${PREFILL_SENTENCES:=110}"
+    : "${CTX_POINTS:=22 88 220}"
+    DEFAULT_CTX="n"
+    ;;
+  *)
+    echo "ERROR: BENCH_PROFILE must be moderate or conservative" >&2
+    exit 2
+    ;;
+esac
+
 RUN_LATENCY="${RUN_LATENCY:-1}"
 THROTTLE_WINDOWS="${THROTTLE_WINDOWS:-3}"
-OLLAMA="${OLLAMA_URL:-http://localhost:11434}"
+OLLAMA="${OLLAMA_URL:-${OLLAMA_HOST:-http://localhost:11434}}"
 MAX_RETRIES="${MAX_RETRIES:-3}"
 CONNECT_TIMEOUT="${CONNECT_TIMEOUT:-10}"
 REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-900}"
@@ -65,17 +97,18 @@ OVERHEAD_WARN_S="${OVERHEAD_WARN_S:-2.0}"
 KEEP_ALIVE="${KEEP_ALIVE:-30m}"
 COLD_UNLOAD_WAIT="${COLD_UNLOAD_WAIT:-2}"
 THINK_MODE="${THINK_MODE:-false}"
-
-# Context-curve points, in filler-sentence counts (~22.6 tokens/sentence):
-# 10 ~= 0.25k, 55 ~= 1.25k, 110 ~= 2.5k, 220 ~= 5k prompt tokens.
-CTX_POINTS="${CTX_POINTS:-10 55 110 220}"
+INCLUDE_EMBEDDINGS="${INCLUDE_EMBEDDINGS:-${ALLOW_EMBED:-0}}"
 EARLY_EOS_FRACTION="${EARLY_EOS_FRACTION:-0.90}"
+STANDARD_OLLAMA_VERSION="${STANDARD_OLLAMA_VERSION:-0.32.15}"
+
+# Approximate prompt sizes use ~23 tokens per synthetic office sentence.
+# Moderate: ~1k, 4k, 8k, 16k. Conservative: ~0.5k, 2k, 5k.
 
 command -v jq   >/dev/null || { echo "ERROR: jq missing -> sudo dnf install -y jq"; exit 1; }
 command -v curl >/dev/null || { echo "ERROR: curl missing"; exit 1; }
 command -v awk  >/dev/null || { echo "ERROR: awk missing"; exit 1; }
 
-for numeric_var in NUM_PREDICT_SHORT NUM_PREDICT_LONG NUM_PREDICT_LATENCY REPEATS LATENCY_REPEATS THROTTLE_WINDOWS MAX_RETRIES; do
+for numeric_var in NUM_PREDICT_SHORT NUM_PREDICT_PREFILL NUM_PREDICT_CONTEXT NUM_PREDICT_LONG NUM_PREDICT_LATENCY REPEATS LATENCY_REPEATS EMBED_REPEATS PREFILL_SENTENCES THROTTLE_WINDOWS MAX_RETRIES; do
   value="${!numeric_var}"
   [[ "$value" =~ ^[0-9]+$ ]] || { echo "ERROR: $numeric_var must be a non-negative integer (got '$value')"; exit 1; }
 done
@@ -109,10 +142,13 @@ done
   exit 1
 }
 
-[[ "$RUN_LATENCY" == "0" || "$RUN_LATENCY" == "1" ]] || {
-  echo "ERROR: RUN_LATENCY must be 0 or 1"
-  exit 1
-}
+for toggle in RUN_LATENCY INCLUDE_EMBEDDINGS; do
+  value="${!toggle}"
+  [[ "$value" == "0" || "$value" == "1" ]] || {
+    echo "ERROR: $toggle must be 0 or 1"
+    exit 1
+  }
+done
 
 CURL_TIMEOUT_ARGS=(--connect-timeout "$CONNECT_TIMEOUT")
 if awk -v timeout="$REQUEST_TIMEOUT" 'BEGIN { exit !(timeout > 0) }'; then
@@ -137,16 +173,16 @@ make_unique_prompt() {
   printf '[reqid %s_%s] %s' "$(date +%s%N)" "$RANDOM" "$1"
 }
 
-# Build n filler sentences for context-pressure prompts.
+# Build synthetic office-document text for prefill/context-pressure tests.
 make_filler() {
   local n="$1" i out=""
   for ((i=1; i<=n; i++)); do
-    out+="Background context sentence number $i discussing distributed systems, caching layers, and network topology in modern data centers. "
+    out+="Office document paragraph sentence $i records a dated policy item, reference number, responsible department, payment term, and procedural note for later retrieval. "
   done
   printf '%s' "$out"
 }
 
-PROMPT_LONG="$(make_filler 220) Given all of the above context, $QUESTION"
+PROMPT_LONG="$(make_filler "$PREFILL_SENTENCES") Given all of the above office-document context, $QUESTION"
 
 # Short readable label from a full model name.
 short() {
@@ -217,6 +253,28 @@ format_optional_seconds() {
   fi
 }
 
+runtime_state() {
+  local model="$1" base ps row
+  base="${model%:latest}"
+  resident_size_bytes=""
+  resident_vram_bytes=""
+  allocated_context=""
+  if ps="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/ps" 2>/dev/null)"; then
+    row="$(jq -r --arg base "$base" '
+      [(.models // [])[] | select(((.name // .model // "") | sub(":latest$"; "")) == $base)]
+      | first // empty
+      | [(.size // ""), (.size_vram // ""), (.context_length // "")] | @tsv
+    ' <<< "$ps" 2>/dev/null || true)"
+    [[ -z "$row" ]] || IFS=$'\t' read -r resident_size_bytes resident_vram_bytes allocated_context <<< "$row"
+  fi
+  read -r mem_available_mib swap_used_mib < <(awk '
+    /MemAvailable:/ {available=$2}
+    /SwapTotal:/ {total=$2}
+    /SwapFree:/ {free=$2}
+    END {printf "%.0f %.0f\n", available/1024, (total-free)/1024}
+  ' /proc/meminfo)
+}
+
 build_generate_payload() {
   local model="$1" prompt="$2" np="$3"
   jq -nc \
@@ -272,29 +330,42 @@ build_chat_payload() {
 #  6 status
 #  7 eval_count
 #  8 eval_duration_s
-#  9 tokens_per_second
+#  9 tokens_per_second      (decode for chat; input throughput for embed rows)
 # 10 prompt_eval_count
 # 11 prompt_eval_duration_s
 # 12 prompt_tokens_per_second
 # 13 total_duration_s       (reported by Ollama)
 # 14 load_duration_s        (reported by Ollama)
 # 15 wall_duration_s        (measured externally around curl)
-# 16 time_to_first_content_s (first thinking OR answer text)
-# 17 time_to_first_answer_s  (first answer text)
+# 16 time_to_first_content_s
+# 17 time_to_first_answer_s
 # 18 done_reason
-# 19 server_overhead_s      (total - load - prompt_eval - eval)
-# 20 client_overhead_s      (wall - Ollama total)
+# 19 server_overhead_s
+# 20 client_overhead_s
+# 21 resident_size_bytes    (/api/ps after the request)
+# 22 resident_vram_bytes    (/api/ps; indicative on unified-memory Vulkan)
+# 23 allocated_context      (/api/ps)
+# 24 mem_available_mib      (/proc/meminfo after the request)
+# 25 swap_used_mib          (/proc/meminfo after the request)
+# 26 batch_items            (embedding rows only)
+# 27 output_dimensions      (embedding rows only)
+# 28 embedding_process_duration_s (estimated as total_duration - load_duration)
 write_result() {
   local model="$1" label="$2" test="$3" run="$4" status="$5"
   local ec="${6:-}" eds="${7:-}" tps="${8:-}" pec="${9:-}" peds="${10:-}"
   local ptps="${11:-}" tds="${12:-}" lds="${13:-}" wall="${14:-}"
   local ttfc="${15:-}" ttfa="${16:-}" done_reason="${17:-}"
   local server_overhead="${18:-}" client_overhead="${19:-}"
+  local resident_size="${20:-}" resident_vram="${21:-}" context="${22:-}"
+  local mem_available="${23:-}" swap_used="${24:-}" batch_items="${25:-}" dimensions="${26:-}"
+  local embedding_process="${27:-}"
 
-  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
+  printf '%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n' \
     "$(date --iso-8601=seconds)" "$model" "$label" "$test" "$run" "$status" \
     "$ec" "$eds" "$tps" "$pec" "$peds" "$ptps" "$tds" "$lds" "$wall" \
-    "$ttfc" "$ttfa" "$done_reason" "$server_overhead" "$client_overhead" >> "$RESULTS"
+    "$ttfc" "$ttfa" "$done_reason" "$server_overhead" "$client_overhead" \
+    "$resident_size" "$resident_vram" "$context" "$mem_available" "$swap_used" \
+    "$batch_items" "$dimensions" "$embedding_process" >> "$RESULTS"
 }
 
 write_failed() {
@@ -303,6 +374,9 @@ write_failed() {
 
 unload_model() {
   local payload
+  if command -v ollama >/dev/null 2>&1; then
+    OLLAMA_HOST="$OLLAMA" ollama stop "$1" >/dev/null 2>&1 && return 0
+  fi
   payload="$(jq -nc --arg model "$1" '{model: $model, keep_alive: 0}')"
   curl -sS "${CURL_TIMEOUT_ARGS[@]}" \
     -H 'Content-Type: application/json' \
@@ -501,6 +575,68 @@ run_streaming_chat_once() {
   return 1
 }
 
+
+is_embedding_model() {
+  local model="$1" show
+  [[ "$model" == embed-* ]] && return 0
+  show="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/show" \
+    -H 'Content-Type: application/json' \
+    -d "$(jq -nc --arg model "$model" '{model: $model}')" 2>/dev/null || true)"
+  jq -e '(.capabilities // []) | index("embedding") != null' <<< "$show" >/dev/null 2>&1
+}
+
+run_embedding_once() {
+  local model="$1" label="$2" test="$3" run="$4"
+  local payload json start_ns finish_ns wall_s prompt_count total_s load_s process_s
+  local batch_items dimensions embed_tps client_overhead_s attempt
+  payload="$(jq -nc --arg model "$model" --argjson input "$EMBED_INPUT_JSON" --arg keep_alive "$KEEP_ALIVE" \
+    '{model: $model, input: $input, truncate: false, keep_alive: $keep_alive}')"
+
+  for ((attempt=1; attempt<=MAX_RETRIES; attempt++)); do
+    start_ns="$(date +%s%N)"
+    if json="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" \
+      -H 'Content-Type: application/json' "$OLLAMA/api/embed" -d "$payload" 2>/dev/null)"; then
+      finish_ns="$(date +%s%N)"
+      wall_s="$(ns_diff_s "$start_ns" "$finish_ns")"
+      if [[ -n "$json" ]] && ! jq -e '.error' >/dev/null 2>&1 <<< "$json"; then
+        read -r prompt_count total_s load_s batch_items dimensions < <(jq -r '[
+          (.prompt_eval_count // 0),
+          ((.total_duration // 0)/1e9),
+          ((.load_duration // 0)/1e9),
+          ((.embeddings // []) | length),
+          (((.embeddings // [])[0] // []) | length)
+        ] | @tsv' <<< "$json")
+        process_s="$(calc_nonnegative_remainder "$total_s" "$load_s" 0 0)"
+        embed_tps="$(calc "$prompt_count" "$process_s")"
+        client_overhead_s="$(calc_nonnegative_remainder "$wall_s" "$total_s" 0 0)"
+        runtime_state "$model"
+        write_result "$model" "$label" "$test" "$run" "ok" \
+          "" "" "$embed_tps" "$prompt_count" "" "" \
+          "$total_s" "$load_s" "$wall_s" "NA" "NA" "embedding" "" "$client_overhead_s" \
+          "$resident_size_bytes" "$resident_vram_bytes" "$allocated_context" \
+          "$mem_available_mib" "$swap_used_mib" "$batch_items" "$dimensions" "$process_s"
+        printf '    wall %.3fs | load %.3fs | batch=%s | dim=%s | input=%s tok/s\n' \
+          "$wall_s" "$load_s" "$batch_items" "$dimensions" "$embed_tps"
+        return 0
+      fi
+    fi
+    sleep 3
+  done
+  write_failed "$model" "$label" "$test" "$run"
+  return 1
+}
+
+run_embedding_tests() {
+  local model="$1" label="$2" r
+  echo "  [embedding-cold] unload -> multilingual office batch via /api/embed..."
+  prepare_cold_model "$model"
+  run_embedding_once "$model" "$label" "embed_cold" 1 || echo "    cold embedding batch failed"
+  for ((r=1; r<=EMBED_REPEATS; r++)); do
+    echo "  [embedding-warm] run $r/$EMBED_REPEATS..."
+    run_embedding_once "$model" "$label" "embed_warm" "$r" || echo "    warm embedding batch failed"
+  done
+}
+
 parse_metrics() {
   local row="$1"
   IFS=$'\t' read -r ec eds pec peds tds lds wall_s ttfc_s ttfa_s done_reason <<< "$row"
@@ -513,9 +649,12 @@ record_success() {
   ptps="$(calc "$pec" "$peds")"
   server_overhead_s="$(calc_nonnegative_remainder "$tds" "$lds" "$peds" "$eds")"
   client_overhead_s="$(calc_nonnegative_remainder "$wall_s" "$tds" 0 0)"
+  runtime_state "$model"
   write_result "$model" "$label" "$test" "$run" "ok" \
     "$ec" "$eds" "$tps" "$pec" "$peds" "$ptps" "$tds" "$lds" "$wall_s" \
-    "$ttfc_s" "$ttfa_s" "$done_reason" "$server_overhead_s" "$client_overhead_s"
+    "$ttfc_s" "$ttfa_s" "$done_reason" "$server_overhead_s" "$client_overhead_s" \
+    "$resident_size_bytes" "$resident_vram_bytes" "$allocated_context" \
+    "$mem_available_mib" "$swap_used_mib"
 }
 
 run_latency_tests() {
@@ -588,7 +727,7 @@ run_ctx_curve() {
     echo "  [ctx-curve] ~$((n * 23)) prompt tokens ($n filler sentences)..."
     prompt="$(make_unique_prompt "$(make_filler "$n") Given all of the above context, $QUESTION")"
 
-    if ! row="$(run_once "$model" "$prompt" "$NUM_PREDICT_SHORT")"; then
+    if ! row="$(run_once "$model" "$prompt" "$NUM_PREDICT_CONTEXT")"; then
       write_failed "$model" "$label" "ctx_${n}" 1
       echo "    failed"
       continue
@@ -598,9 +737,12 @@ run_ctx_curve() {
     printf '    wall %.2fs | total %.2fs | load %.3fs | gen %s tok/s | prompt %s tok/s | %s prompt tokens\n' \
       "$wall_s" "$tds" "$lds" "$tps" "$ptps" "$pec"
     warn_hidden_overhead "$server_overhead_s"
-    warn_early_eos "$ec" "$NUM_PREDICT_SHORT"
+    warn_early_eos "$ec" "$NUM_PREDICT_CONTEXT"
     if [[ -n "$previous_pec" ]] && (( pec <= previous_pec )); then
       echo "    WARNING: prompt_eval_count stopped growing ($previous_pec -> $pec); likely silent context truncation" >&2
+    fi
+    if [[ "$allocated_context" =~ ^[0-9]+$ ]] && (( pec + NUM_PREDICT_CONTEXT >= allocated_context )); then
+      echo "    NOTE: evaluated prompt plus requested answer reaches the allocated context ($allocated_context); treat this point as a capacity edge." >&2
     fi
     previous_pec="$pec"
   done
@@ -608,10 +750,10 @@ run_ctx_curve() {
 
 # --- Discover models ---
 TAGS="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/tags" 2>/dev/null || true)"
-if [[ "${ALLOW_EMBED:-0}" == "1" ]]; then
-  mapfile -t ALL < <(printf '%s' "$TAGS" | jq -r '.models[].name' 2>/dev/null)
+if [[ "$INCLUDE_EMBEDDINGS" == "1" ]]; then
+  mapfile -t ALL < <(printf '%s' "$TAGS" | jq -r '.models[].name' 2>/dev/null | grep -vi 'ocr')
 else
-  mapfile -t ALL < <(printf '%s' "$TAGS" | jq -r '.models[].name' 2>/dev/null | grep -vi 'embed')
+  mapfile -t ALL < <(printf '%s' "$TAGS" | jq -r '.models[].name' 2>/dev/null | grep -viE 'embed|ocr')
 fi
 [[ ${#ALL[@]} -eq 0 ]] && { echo "ERROR: no models from $OLLAMA/api/tags (is Ollama up?)"; exit 1; }
 
@@ -644,7 +786,13 @@ fi
 read -rp "Run sustained-load throttle test too? (adds ~$NUM_PREDICT_LONG tokens per model, slow) [y/N]: " DO_LONG
 DO_LONG="${DO_LONG,,}"
 
-read -rp "Run context-length curve too? (adds $(wc -w <<<"$CTX_POINTS") generations per model at ~0.25k-5k prompt tokens) [y/N]: " DO_CTX
+if [[ "$DEFAULT_CTX" == "y" ]]; then
+  read -rp "Run context-capacity curve too? (profile $BENCH_PROFILE; $(wc -w <<<"$CTX_POINTS") points) [Y/n]: " DO_CTX
+  DO_CTX="${DO_CTX:-y}"
+else
+  read -rp "Run context-capacity curve too? (profile $BENCH_PROFILE; $(wc -w <<<"$CTX_POINTS") points) [y/N]: " DO_CTX
+  DO_CTX="${DO_CTX:-n}"
+fi
 DO_CTX="${DO_CTX,,}"
 
 read -rp "Board/cooling/governor note for this run [optional]: " BOARD_NOTE
@@ -663,6 +811,8 @@ OLLAMA_VERSION="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/version" 2>/de
   echo "host: $(hostname)"
   echo "ollama_url: $OLLAMA"
   echo "ollama_version: ${OLLAMA_VERSION:-unknown}"
+  echo "ollama_standard_version: $STANDARD_OLLAMA_VERSION"
+  echo "benchmark_profile: $BENCH_PROFILE"
   echo "request_timeout_s: $REQUEST_TIMEOUT"
   echo "unload_timeout_s: $UNLOAD_TIMEOUT"
   echo "unload_poll_interval_s: $UNLOAD_POLL_INTERVAL"
@@ -676,10 +826,14 @@ OLLAMA_VERSION="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/version" 2>/de
   echo "think_mode: $THINK_MODE"
   echo "keep_alive: $KEEP_ALIVE"
   echo "num_predict_short: $NUM_PREDICT_SHORT"
+  echo "num_predict_prefill: $NUM_PREDICT_PREFILL"
+  echo "num_predict_context: $NUM_PREDICT_CONTEXT"
+  echo "prefill_sentences: $PREFILL_SENTENCES"
   echo "num_predict_long: $NUM_PREDICT_LONG"
   echo "throttle_windows: $THROTTLE_WINDOWS"
   echo "ctx_points_sentences: $CTX_POINTS (enabled: ${DO_CTX:-n})"
   echo "repeats: $REPEATS"
+  echo "embedding_repeats: $EMBED_REPEATS (included: $INCLUDE_EMBEDDINGS)"
   echo "models: ${MODELS[*]}"
   echo "model_details:"
   for m in "${MODELS[@]}"; do
@@ -692,7 +846,10 @@ OLLAMA_VERSION="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/version" 2>/de
 } > "$META_FILE"
 
 echo "Metadata written to $META_FILE (ollama $OLLAMA_VERSION)"
-echo "timestamp,model,label,test,run,status,eval_count,eval_duration_s,tokens_per_second,prompt_eval_count,prompt_eval_duration_s,prompt_tokens_per_second,total_duration_s,load_duration_s,wall_duration_s,time_to_first_content_s,time_to_first_answer_s,done_reason,server_overhead_s,client_overhead_s" > "$RESULTS"
+if [[ "$OLLAMA_VERSION" != "$STANDARD_OLLAMA_VERSION" ]]; then
+  echo "WARNING: package standard is Ollama $STANDARD_OLLAMA_VERSION; results are a runtime-version comparison, not the standard baseline." >&2
+fi
+echo "timestamp,model,label,test,run,status,eval_count,eval_duration_s,tokens_per_second,prompt_eval_count,prompt_eval_duration_s,prompt_tokens_per_second,total_duration_s,load_duration_s,wall_duration_s,time_to_first_content_s,time_to_first_answer_s,done_reason,server_overhead_s,client_overhead_s,resident_size_bytes,resident_vram_bytes,allocated_context,mem_available_mib,swap_used_mib,batch_items,output_dimensions,embedding_process_duration_s" > "$RESULTS"
 
 ok=0
 fail=0
@@ -701,6 +858,13 @@ for MODEL in "${MODELS[@]}"; do
   LABEL="$(short "$MODEL")"
   echo
   echo "=== $LABEL  ($MODEL) ==="
+
+  if is_embedding_model "$MODEL"; then
+    run_embedding_tests "$MODEL" "$LABEL"
+    unload_model "$MODEL"
+    sleep 2
+    continue
+  fi
 
   if [[ "$RUN_LATENCY" == "1" ]]; then
     run_latency_tests "$MODEL" "$LABEL"
@@ -751,16 +915,15 @@ for MODEL in "${MODELS[@]}"; do
     printf '  [short] client wall mean=%ss  stdev=%ss (n=%d)\n' "$wall_mean" "$wall_sd" "${#wall_list[@]}"
   fi
 
-  echo "  [long-context] single run..."
+  echo "  [prefill] document-sized prompt with short answer..."
   NONCED_LONG="$(make_unique_prompt "$PROMPT_LONG")"
-  if ML="$(run_once "$MODEL" "$NONCED_LONG" "$NUM_PREDICT_SHORT")"; then
-    record_success "$MODEL" "$LABEL" "long_context" 1 "$ML"
-    printf '    wall %.2fs | total %.2fs | load %.3fs | gen %s tok/s | prompt %s tok/s | %s prompt tokens\n' \
-      "$wall_s" "$tds" "$lds" "$tps" "$ptps" "$pec"
+  if ML="$(run_once "$MODEL" "$NONCED_LONG" "$NUM_PREDICT_PREFILL")"; then
+    record_success "$MODEL" "$LABEL" "prefill" 1 "$ML"
+    printf '    wall %.2fs | total %.2fs | load %.3fs | prompt %s tok/s | %s prompt tokens | decode %s tok/s\n' \
+      "$wall_s" "$tds" "$lds" "$ptps" "$pec" "$tps"
     warn_hidden_overhead "$server_overhead_s"
-    warn_early_eos "$ec" "$NUM_PREDICT_SHORT"
   else
-    write_failed "$MODEL" "$LABEL" "long_context" 1
+    write_failed "$MODEL" "$LABEL" "prefill" 1
   fi
 
   if [[ "$DO_CTX" == "y" || "$DO_CTX" == "yes" ]]; then
@@ -858,19 +1021,38 @@ awk -F, '
 ' "$RESULTS" | sort -nr | cut -f2-
 
 echo
-echo "Long-context (~5K tok) generation tok/s and penalty vs short-burst mean:"
+echo "Document-prefill throughput (synthetic office context; short answer):"
 awk -F, '
-  $4=="short" && $6=="ok"        {ssum[$3]+=$9; sn[$3]++}
-  $4=="long_context" && $6=="ok" {lc[$3]=$9; wall[$3]=$15; total[$3]=$13}
+  $4=="prefill" && $6=="ok" {
+    printf "%.6f\t  %-22s %7.2f prompt tok/s  prompt=%6d  wall=%7.2fs\n",-$12,$3,$12,$10,$15
+  }
+' "$RESULTS" | sort -n | cut -f2-
+
+echo
+echo "Loaded allocation and host headroom (last successful row per model):"
+awk -F, '
+  $6=="ok" && $21!="" {size[$3]=$21; vram[$3]=$22; ctx[$3]=$23; mem[$3]=$24; swap[$3]=$25}
   END {
-    for (m in lc) {
-      if (sn[m]>0) {
-        smean=ssum[m]/sn[m]
-        pen=(smean>0) ? (smean-lc[m])/smean*100 : 0
-        printf "  %-22s %.2f tok/s  penalty=%5.1f%%  wall=%7.2fs  total=%7.2fs\n",m,lc[m],pen,wall[m],total[m]
-      }
+    for (m in size) {
+      sg=size[m]/1073741824; vg=vram[m]/1073741824; pct=(size[m]>0 ? vram[m]/size[m]*100 : 0)
+      printf "  %-22s resident=%5.2fGiB  vram-reported=%5.2fGiB (%3.0f%%)  ctx=%6s  MemAvailable=%5.0fMiB  swap=%5.0fMiB\n",m,sg,vg,pct,ctx[m],mem[m],swap[m]
     }
   }
+' "$RESULTS" | sort
+
+echo
+echo "Embedding cold-load cost (when INCLUDE_EMBEDDINGS=1):"
+awk -F, '
+  $4=="embed_cold" && $6=="ok" {
+    printf "  %-22s load=%6.3fs  wall=%6.3fs  batch=%s  dim=%s\n",$3,$14,$15,$26,$27
+  }
+' "$RESULTS" | sort
+
+echo
+echo "Embedding warm indexing throughput (when INCLUDE_EMBEDDINGS=1):"
+awk -F, '
+  $4=="embed_warm" && $6=="ok" {sum[$3]+=$9; wall[$3]+=$15; n[$3]++; dim[$3]=$27; items[$3]=$26}
+  END {for (m in n) printf "  %-22s %7.2f input tok/s  wall=%6.3fs  batch=%s  dim=%s (n=%d)\n",m,sum[m]/n[m],wall[m]/n[m],items[m],dim[m],n[m]}
 ' "$RESULTS" | sort -k2 -nr
 
 if [[ "$DO_CTX" == "y" || "$DO_CTX" == "yes" ]]; then

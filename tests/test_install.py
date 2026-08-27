@@ -81,6 +81,12 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("Refusing to install a second Ollama copy", result.stdout)
         self.assertNotIn("dnf remove", result.stdout)
 
+    def test_standard_ollama_version_is_used_unless_overridden(self) -> None:
+        helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
+        installer = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('VERSION="${OLLAMA_VERSION:-0.32.15}"', helper)
+        self.assertIn('requested="${OLLAMA_VERSION:-0.32.15}"', installer)
+
     def test_latest_is_not_sent_as_an_upstream_version_query(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         self.assertIn("env -u OLLAMA_VERSION sh", helper)

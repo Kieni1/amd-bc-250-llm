@@ -142,7 +142,7 @@ vector store. `bc250-rag-import` is only a metadata-aware Open WebUI sync client
 ## Documents / RAG import
 
 ```text
-bc250-rag-import plan [ROOT]
+sudo bc250-rag-import plan [ROOT]
 sudo bc250-rag-import sync [ROOT] --token-file FILE [--prune]
 ```
 
@@ -240,14 +240,23 @@ internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
 runs on a client; `HTTP_PORT` changes its expected web port.
 
-The benchmark writes a timestamped CSV and metadata file in the current
-directory. Context curves warn when `prompt_eval_count` stops growing, which can
-indicate silent context truncation. Treat SMU/PPT power as an uncalibrated
-comparison signal. Around 13 GiB of model weights is a practical BC-250 planning
-ceiling, not a hard limit; context/KV cache and resident services reduce available
-headroom. Important overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`,
-`RUN_LATENCY`, `NUM_PREDICT_SHORT`, `NUM_PREDICT_LONG`, `CTX_POINTS` and
-`THROTTLE_WINDOWS`.
+The benchmark writes a timestamped CSV and metadata file in the current directory.
+Its standard `BENCH_PROFILE=moderate` separates cold model-load/TTFA, warm latency,
+loaded decode throughput, document-prefill throughput, context capacity and
+memory/swap headroom. The moderate context curve is enabled by default; use
+`BENCH_PROFILE=conservative` for a quicker lower-context pass. Set
+`INCLUDE_EMBEDDINGS=1` to benchmark embedding models through `/api/embed` rather
+than generation endpoints. Point `OLLAMA_URL` at `http://127.0.0.1:11435` or
+`:11436` to benchmark task or agentic models on their real dedicated instance.
+Context curves warn when `prompt_eval_count` stops
+growing or reaches the allocated context. Treat Ollama `size_vram` and SMU/PPT
+power as indicative comparison signals on this UMA machine. Around 13 GiB of
+model weights is a practical planning ceiling, not a hard limit. Important
+overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`, `RUN_LATENCY`,
+`NUM_PREDICT_SHORT`, `NUM_PREDICT_PREFILL`, `NUM_PREDICT_CONTEXT`,
+`NUM_PREDICT_LONG`, `CTX_POINTS` and `THROTTLE_WINDOWS`. See `BENCHMARK.md` for
+metric interpretation and use the RAG evaluation template for answer/retrieval
+quality rather than treating tok/s as a quality score.
 
 ## Maintenance
 

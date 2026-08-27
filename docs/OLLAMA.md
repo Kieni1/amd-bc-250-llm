@@ -4,10 +4,13 @@ Ollama is installed separately from the RPM. The guided installer handles the
 normal setup; use the commands below for an explicit reinstall or runtime
 change.
 
+Package standard: **Ollama v0.32.15**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden.
+
 ## Install and verify
 
 ```bash
 sudo bc250-install-ollama
+# Deliberate runtime comparison only:
 sudo OLLAMA_VERSION=VERSION bc250-install-ollama
 ollama --version
 sudo systemctl status ollama.service --no-pager -l
@@ -27,8 +30,11 @@ OLLAMA_HOST=0.0.0.0:11434
 ```
 
 Optional task and agent setup create `ollama-task.service` on `11435` and
-`ollama-agent.service` on `11436`, each with a separate store. All instances
-share one GPU; overlapping large requests increase unified-memory pressure.
+`ollama-agent.service` on `11436`, each with a separate store. The task service
+uses `OLLAMA_KEEP_ALIVE=0` so background tasks unload immediately. The main/task
+separation is intentional. The coding-agent service is expected to be used
+exclusively rather than alongside a large main-model request. All instances still
+share the BC-250 unified-memory pool.
 
 ## Runtime profiles
 
@@ -59,8 +65,8 @@ ss -ltnp | grep -E ':(11434|11435|11436)\b'
 
 ## Updating safely
 
-Do not make an untested `latest` build the baseline merely because it is newer.
-Review release notes and smoke-test each Vulkan update with:
+Do not replace the package-standard **0.32.15** merely because a newer Ollama is
+available. Review release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;
 2. the largest intended model;
