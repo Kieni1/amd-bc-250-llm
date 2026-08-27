@@ -115,9 +115,20 @@ long chat history, tighter memory headroom or a retrieval problem where smaller
 chunks are desirable. These are starting points to measure, not fixed quality
 claims.
 
+The packaged `RAG_TEMPLATE` is deliberately stricter than Open WebUI's generic
+default: document facts must be supported by retrieved context. If the available
+context does not support the requested fact, the model should say that the
+documents provide insufficient evidence instead of filling the gap from general
+knowledge. General/external knowledge remains available when the user explicitly
+asks for it. Keep `{{CONTEXT}}` in custom templates; do not add `{{QUERY}}`, because
+Open WebUI appends the user query automatically.
+
 Open WebUI persists many Admin settings in `webui.db`. After first launch,
-database values can override packaged `ConfigVar` defaults. Treat the Quadlet as
-a fresh-install baseline and make later changes in **Admin Settings → Documents**.
+database values can override packaged `ConfigVar` defaults. A full v0.9.7 guided
+installer rerun deliberately resets those persisted ConfigVars once to the current
+packaged baseline, then returns Open WebUI to normal persistent-configuration mode;
+accounts, chats, uploads and Knowledge data are not deleted. `--models-only` does
+not perform that reset. Make later changes in **Admin Settings → Documents**.
 Keep retrieval-query generation off for the first measured baseline so the user
 query reaches retrieval unchanged. Test task-model query rewriting only after the
 embedding/chunking baseline is recorded. Do not add a reranker until vector-only

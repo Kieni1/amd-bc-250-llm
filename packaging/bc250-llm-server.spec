@@ -10,8 +10,8 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.9.6
-Release:        0.7.testing%{?dist}
+Version:        0.9.7
+Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Aug 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.1.testing
+- Enforce a stricter office-document RAG evidence template and align Qwen/OCR model prompts with reviewed upstream settings.
+- Make guided installer reruns converge package-managed configuration and Open WebUI ConfigVars to the current package while retaining persistent data.
+- Add deployed-model reconciliation so current Modelfiles regenerate existing Ollama registrations without unnecessary GGUF downloads.
+- Record registered Modelfile hashes in benchmark metadata for reproducible BC-250 comparisons.
+
 * Thu Aug 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.7.testing
 - Standardize the tested Ollama runtime on 0.32.15 while retaining explicit comparison overrides.
 - Overhaul model benchmarking with moderate/conservative profiles, prefill/context/headroom metrics and embedding-specific tests.

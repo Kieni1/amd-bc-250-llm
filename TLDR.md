@@ -8,7 +8,12 @@ Keep the binary RPM beside the repository's installer, then run:
 sudo ./install
 ```
 
-Rerun it after the requested reboot. Resume only model selection with:
+Rerun it after the requested reboot. A full rerun backs up and reapplies the
+current package-managed settings, resets Open WebUI ConfigVars to the package
+baseline once, refreshes existing task/agent services and regenerates deployed
+Ollama registrations from current Modelfiles without redownloading unchanged
+GGUFs. Persistent user/document/model data, secrets and operator `models.d` remain.
+Resume only model selection without convergence with:
 
 ```bash
 sudo ./install --models-only
@@ -48,6 +53,9 @@ sudo bc250-fetch-experiments
 sudo bc250-fetch-embeddings
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
+
+# Recreate already-deployed registrations from current Modelfiles
+sudo bc250-model reconcile
 
 # Review before removing source GGUF and Ollama registration
 sudo bc250-model cleanup production --list

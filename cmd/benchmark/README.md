@@ -56,7 +56,9 @@ prompt-evaluation duration for embeddings.
 
 Use the same Ollama version (**package standard 0.32.15**), model revision,
 governor, CU state, profile, prompts and cooling state when comparing results.
-The CSV and metadata file make those runs easier to audit. `/api/ps`
+The metadata records the SHA-256 of the Modelfile returned by `ollama show`, so a
+result can be tied to the exact registered runtime definition rather than just a
+model name. The CSV and metadata file make those runs easier to audit. `/api/ps`
 `size_vram` is an Ollama-reported allocation and should be treated as indicative
 on this unified-memory Vulkan system rather than a calibrated physical-VRAM
 measurement. SMU/PPT power is likewise uncalibrated and useful only for

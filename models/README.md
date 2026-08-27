@@ -17,6 +17,7 @@ bc250-model list mtp --all
 
 sudo bc250-model install production MODEL-NAME
 sudo bc250-model install production MODEL-NAME --refresh
+sudo bc250-model reconcile
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
 ```
@@ -33,6 +34,13 @@ readable by the current user. Run `sudo bc250-model list` when an exact
 downloaded-but-not-registered check is needed. A registration without a current
 Modelfile is shown as unmanaged; a known model on the wrong Ollama instance is
 shown as misplaced.
+
+`sudo bc250-model reconcile` is the non-destructive package-upgrade path for
+already deployed Ollama models. It recreates registrations from the currently
+discovered packaged/operator Modelfiles. A valid GGUF is reused when source
+provenance is unchanged; a real repository/revision/filename change follows the
+normal verified download path. Models that were never deployed are not installed.
+The full guided installer runs this automatically after an upgrade/rerun.
 
 | Category | Prefix | Ollama API | Source GGUF directory |
 |---|---|---|---|

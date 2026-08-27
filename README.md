@@ -31,7 +31,14 @@ The guided installer:
    selected MTP models; and
 7. verifies the result.
 
-Rerun it after the requested reboot. To resume only model selection, use:
+Rerun it after the requested reboot. A full rerun is intentionally a
+**package-convergence operation** for this green-field appliance: package-managed
+configuration and Open WebUI ConfigVars are reset to the current package baseline,
+existing task/agent services are regenerated, and already-deployed Ollama models
+are recreated from the current Modelfiles. Valid unchanged GGUFs are reused.
+Accounts, chats, Knowledge data, document libraries, secrets and operator
+`models.d` additions are retained. To resume only model selection without that
+convergence, use:
 
 ```bash
 sudo ./install --models-only
@@ -62,6 +69,7 @@ WebUI administrator immediately. The default endpoint is unencrypted HTTP; see
 | Documents and RAG | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
 | German–French translation | `prod-lfm25-8b-a1b-liquidai-q6-k` |
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
+| Higher-quality/general office alternative | `prod-qwen35-9b-unsloth-q6-k` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |

@@ -10,6 +10,7 @@ dir	0755	-	{share}/examples/coding-agent
 dir	0755	-	{share}/examples/raspi-wol
 dir	0755	-	{share}/examples/rag
 dir	0755	-	{share}/examples/task-model
+dir	0755	-	{share}/defaults
 dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
 dir	0755	-	{share}/ollama-profiles
@@ -37,6 +38,11 @@ file	0644	config/containers/*	{datadir}/containers/systemd/
 config	0644	config/nginx/bc250-llm-server.conf	{sysconfdir}/nginx/default.d/bc250-llm-server.conf
 config	0644	config/nginx/websocket-map.conf	{sysconfdir}/nginx/conf.d/00-bc250-websocket-map.conf
 config	0644	models/mtp/models.toml	{config}/mtp-models.toml
+# Factory copies let the guided installer deliberately converge package-managed /etc files.
+file	0644	config/governor/config.toml	{share}/defaults/governor-config.toml
+file	0644	config/nginx/bc250-llm-server.conf	{share}/defaults/nginx-bc250-llm-server.conf
+file	0644	config/nginx/websocket-map.conf	{share}/defaults/nginx-websocket-map.conf
+file	0644	models/mtp/models.toml	{share}/defaults/mtp-models.toml
 file	0644	cmd/maintenance/owui-maintenance.env	{share}/examples/maintenance.env.example
 ghost	0600	-	{config}/maintenance.env
 

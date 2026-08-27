@@ -30,6 +30,12 @@ class RagBaselineTests(unittest.TestCase):
         )
         for line in expected:
             self.assertIn(line, quadlet)
+        template = next(
+            line for line in quadlet.splitlines() if 'Environment="RAG_TEMPLATE=' in line
+        )
+        self.assertIn("do not provide sufficient evidence", template)
+        self.assertIn("{{CONTEXT}}", template)
+        self.assertNotIn("{{QUERY}}", template)
 
     def test_rag_guide_uses_real_packaged_models_and_commands(self) -> None:
         guide = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")

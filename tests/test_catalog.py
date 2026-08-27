@@ -79,6 +79,17 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(modelctl.ModelError, "must match Source metadata"):
                 modelctl.load_modelfile(path)
 
+    def test_reviewed_qwen_profiles_match_their_intended_roles(self) -> None:
+        fable = (MODELFILES / "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile").read_text()
+        self.assertIn("PARAMETER temperature 1.0", fable)
+        self.assertIn("PARAMETER top_p 0.95", fable)
+        self.assertIn("PARAMETER top_k 20", fable)
+
+        production = (MODELFILES / "prod-qwen35-9b-unsloth-q6-k.Modelfile").read_text()
+        self.assertNotIn("experimental general assistant", production.lower())
+        self.assertIn("production general office assistant", production.lower())
+        self.assertIn("German, French or English", production)
+
     def test_ornith_checksum_is_pinned_to_replacement_commit(self) -> None:
         text = (MODELFILES / "agentic-ornith15-9b-ornith-q5-k-m.Modelfile").read_text()
         self.assertIn("@ 87fcf5d7dbecb02941c0917a0e93619af2075b61", text)

@@ -33,6 +33,21 @@ does not open ports `11434`–`11436` in firewalld; keep them blocked from
 untrusted networks. If firewalld is disabled, enabled Ollama instances are
 reachable on all configured host interfaces.
 
+## Guided upgrade convergence
+
+A normal `dnf` upgrade keeps operator-edited `%config(noreplace)` files. A full
+`sudo ./install` rerun is deliberately stronger for this green-field appliance:
+it backs up and restores the current package defaults for package-managed `/etc`
+configuration, resets Open WebUI ConfigVars once from the packaged Quadlet,
+refreshes existing task/agent service units and runs `sudo bc250-model reconcile`.
+Valid unchanged GGUFs are reused while Ollama registrations are rebuilt from the
+current Modelfiles.
+
+The convergence step does **not** delete Open WebUI accounts/chats/Knowledge,
+`/srv/bc250-documents`, operator `models.d` definitions, HTTPS material, API or
+maintenance secrets, or persistent model data. Use `sudo ./install --models-only`
+when only model selection should run and no configuration convergence is wanted.
+
 ## Persistent data
 
 ```text

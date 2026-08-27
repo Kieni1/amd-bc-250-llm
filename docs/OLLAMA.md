@@ -53,6 +53,22 @@ sudo bc250-ollama-profile reset
 Both enable flash attention. The max-context profile reduces KV-cache memory at
 a possible quality cost. Service profiles do not modify individual Modelfiles.
 
+
+## Registration convergence
+
+A full guided-installer rerun executes:
+
+```bash
+sudo bc250-model reconcile
+```
+
+This regenerates **already deployed** Ollama models from the currently discovered
+packaged/operator Modelfiles. Unchanged valid GGUFs are reused; changed source
+provenance follows the normal verified download path. It does not automatically
+install models that were never deployed and does not remove unmanaged models.
+Use the command directly after a deliberate Modelfile/package change when the
+full installer is unnecessary.
+
 ## Network exposure
 
 The host listeners let rootful Open WebUI reach Ollama. They are unauthenticated

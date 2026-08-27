@@ -4,13 +4,26 @@ set -Eeuo pipefail
 umask 0027
 
 usage() {
-  echo "Usage: setup-ollama-instance.sh task|agentic [MODEL-SELECTION]" >&2
+  echo "Usage: setup-ollama-instance.sh task|agentic [MODEL-SELECTION] [--service-only]" >&2
 }
 
 [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
-[[ $# -ge 1 && $# -le 2 ]] || { usage; exit 2; }
+[[ $# -ge 1 && $# -le 3 ]] || { usage; exit 2; }
 kind="$1"
-requested_selection="${2:-}"
+shift
+requested_selection=""
+service_only=0
+while (($#)); do
+  case "$1" in
+    --service-only) service_only=1 ;;
+    -*) usage; exit 2 ;;
+    *)
+      [[ -z "$requested_selection" ]] || { usage; exit 2; }
+      requested_selection="$1"
+      ;;
+  esac
+  shift
+done
 
 case "$kind" in
   task)
@@ -124,6 +137,11 @@ curl -fsS "http://$check_host:$port/api/tags" >/dev/null || {
   systemctl status "$service" --no-pager
   exit 1
 }
+
+if ((service_only)); then
+  echo "Refreshed $label service on $bind:$port without changing model selection."
+  exit 0
+fi
 
 manager_args=(
   install "$category"

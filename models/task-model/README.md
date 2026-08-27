@@ -29,7 +29,8 @@ Set the local task model to:
 task-gemma3-1b-unsloth-ud-q4-k-xl:latest
 ```
 
-Start with title, tag and RAG query generation enabled. Leave autocomplete,
+Start with title and tag generation enabled. Keep retrieval-query generation
+disabled for the baseline and test it separately with RAG. Leave autocomplete,
 follow-ups and web-search query generation off until needed. Autocomplete can
 repeatedly load the task model while a larger chat model remains warm.
 

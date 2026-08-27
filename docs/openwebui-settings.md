@@ -35,6 +35,10 @@ their services are installed. Tika must not be exposed as a host/LAN listener.
 - Jina's fresh-install prefixes are `Query: ` and `Document: `. Changing the
   embedding model, prefixes or chunking requires reindexing Knowledge documents;
   extraction-engine/source-text changes require re-uploading or re-syncing content.
+- The packaged office `RAG_TEMPLATE` treats retrieved context as evidence: if a
+  document fact is unsupported, report insufficient evidence instead of silently
+  substituting general model knowledge. General knowledge may still be used when
+  the user explicitly asks for it.
 - Disable public sharing and community features for private office data.
 - Disable arbitrary tools, functions, pipelines and code execution for ordinary
   users.
@@ -47,8 +51,11 @@ embedding alternative if the intended use is incompatible with that license.
 For Qwen, use an English retrieval instruction on the query side and leave the
 content prefix empty. See [`RAG.md`](RAG.md) for the exact pilot settings.
 
-Open WebUI persists many RAG settings in `webui.db`; values saved in the Admin
-UI can override packaged fresh-install environment defaults after first launch.
+Open WebUI persists many Admin settings in `webui.db`; values saved in the UI
+can override packaged environment defaults after first launch. A **full guided
+installer rerun** in v0.9.7 resets persisted ConfigVars once to the current package
+baseline and then restores normal persistence. It does not delete accounts, chats,
+uploads or Knowledge data. `./install --models-only` leaves WebUI settings alone.
 
 For bulk document work, keep originals under `/srv/bc250-documents` and use
 `sudo bc250-rag-import plan` before syncing. The importer separates authoritative

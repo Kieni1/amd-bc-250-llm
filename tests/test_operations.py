@@ -142,6 +142,8 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertEqual(benchmark.count('record_success "$model" "$label" "cold_chat" 1 "$row"'), 1)
         self.assertIn("grep -viE 'embed|ocr'", benchmark)
         self.assertIn("0.32.15", benchmark)
+        self.assertIn("modelfile_sha256", benchmark)
+        self.assertIn(".modelfile // empty", benchmark)
         self.assertIn("uncalibrated", sensors)
         result = subprocess.run(
             [str(benchmark_path), "--help"], text=True, stdout=subprocess.PIPE,

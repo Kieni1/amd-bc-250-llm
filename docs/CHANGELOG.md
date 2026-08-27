@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.9.7-0.1.testing - 2026-08-27
+
+Tighten the office-document RAG baseline so retrieved context is treated as the
+evidence source: unsupported document facts must be reported as insufficient
+evidence instead of silently falling back to model knowledge. Align the Qwen3.6
+FableVibes sampling baseline, production Qwen3.5 multilingual SYSTEM prompt and
+dots/Ovis OCR prompts with their reviewed upstream behavior.
+
+A full guided-installer rerun is now a deliberate convergence operation for this
+green-field appliance. Package-managed `/etc` defaults are backed up and replaced
+with the current package copies, the main Ollama runtime profile returns to the
+packaged baseline, existing task/agent service definitions are regenerated, and
+Open WebUI persistent ConfigVars are reset once from the packaged Quadlet without
+deleting accounts, chats, uploads or knowledge data. Operator-owned `models.d`,
+maintenance/API secrets, document libraries, HTTPS material and persistent model
+data remain outside that reset boundary.
+
+`bc250-model reconcile` regenerates already deployed Ollama registrations from
+the currently discovered Modelfiles. Valid unchanged GGUFs are reused; a real
+source-provenance change still triggers the normal verified download path. The
+installer runs this reconciliation automatically on package reruns/upgrades.
+Benchmark metadata now records the SHA-256 of each registered Ollama Modelfile so
+performance results can be tied to the exact runtime registration.
+
 ## 0.9.6-0.7.testing - 2026-08-27
 
 Make Ollama **0.32.15** the package-standard runtime for BC-250 smoke tests; the

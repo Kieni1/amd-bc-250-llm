@@ -53,11 +53,20 @@ case "${1:-}" in
     model="$(model_name "$2")"
     image="$(realpath -e -- "$3")"
     [[ -f "$image" ]] || { echo "ERROR: image is not a regular file: $image" >&2; exit 1; }
-    if [[ "$2" == glm ]]; then
-      prompt='Text Recognition:'
-    else
-      prompt='Extract all readable content in natural reading order as Markdown. Preserve the original text without translation or commentary.'
-    fi
+    case "$2" in
+      glm)
+        prompt='Text Recognition:'
+        ;;
+      dots)
+        prompt='Extract this document page in human reading order. Return normal text and headings as Markdown, tables as HTML, and formulas as LaTeX. Preserve the original text and language; do not translate or add commentary.'
+        ;;
+      ovis)
+        prompt='Extract all readable content in natural human reading order and output one Markdown document. Format formulas as LaTeX and tables as HTML. Preserve the original text without translation or paraphrasing.'
+        ;;
+      chandra)
+        prompt='Extract all readable content in natural reading order as Markdown. Preserve the original text without translation or commentary.'
+        ;;
+    esac
     run_ollama run "$model" "$image" "$prompt"
     ;;
   -h|--help) usage ;;

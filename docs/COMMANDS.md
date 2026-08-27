@@ -53,8 +53,12 @@ sudo ./install --models-only
 ```
 
 Normal mode performs the complete host-to-verification workflow. It may pause
-for a reboot and should then be rerun. `--models-only` skips host setup and asks
-for production, task, agentic, embedding, experiment and MTP selections.
+for a reboot and should then be rerun. A full rerun converges package-managed
+configuration and Open WebUI ConfigVars to the current package, refreshes existing
+task/agent service definitions and runs `bc250-model reconcile`. Persistent
+user/document/model data and operator `/etc/bc250-llm-server/models.d/` additions
+are retained. `--models-only` skips host/config convergence and asks only for
+production, task, agentic, embedding, experiment and MTP selections.
 
 Useful unattended selections are `BC250_PRODUCTION_SELECTION`,
 `BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION`, `BC250_EMBEDDING_SELECTION`,
@@ -70,6 +74,7 @@ selects a reviewed version.
 bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 bc250-model install CATEGORY [SELECTION] [OPTIONS]
+sudo bc250-model reconcile
 bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ollama model benchmark v6.0
+# Ollama model benchmark v6.1
 #
 # Measures:
 #   - cold model-switch and warm streaming chat latency (TTFC / TTFA)
@@ -837,11 +837,17 @@ OLLAMA_VERSION="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/version" 2>/de
   echo "models: ${MODELS[*]}"
   echo "model_details:"
   for m in "${MODELS[@]}"; do
-    d="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/show" \
+    show_json="$(curl -sS "${CURL_TIMEOUT_ARGS[@]}" "$OLLAMA/api/show" \
       -H 'Content-Type: application/json' \
-      -d "$(jq -nc --arg model "$m" '{model: $model}')" 2>/dev/null | \
-      jq -r '"family=" + (.details.family // "?") + " params=" + (.details.parameter_size // "?") + " quant=" + (.details.quantization_level // "?")' 2>/dev/null || true)"
-    echo "  $m: ${d:-unavailable}"
+      -d "$(jq -nc --arg model "$m" '{model: $model}')" 2>/dev/null || true)"
+    d="$(jq -r '"family=" + (.details.family // "?") + " params=" + (.details.parameter_size // "?") + " quant=" + (.details.quantization_level // "?")' <<< "$show_json" 2>/dev/null || true)"
+    modelfile="$(jq -r '.modelfile // empty' <<< "$show_json" 2>/dev/null || true)"
+    if [[ -n "$modelfile" ]]; then
+      modelfile_hash="$(printf '%s' "$modelfile" | sha256sum | awk '{print $1}')"
+    else
+      modelfile_hash="unavailable"
+    fi
+    echo "  $m: ${d:-unavailable} modelfile_sha256=$modelfile_hash"
   done
 } > "$META_FILE"
 
