@@ -30,7 +30,8 @@ Environment=CHUNK_OVERLAP=200
 Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true
 Environment=RAG_TOP_K=8
 Environment=RAG_RELEVANCE_THRESHOLD=0
-Environment="RAG_TEMPLATE=Use the supplied document context as the evidence for factual claims about the documents. If the requested information is not supported by the context, state clearly that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for general or external knowledge. Respond in the user's language. Preserve uncertainty, conflicts, and version differences in the source material. When source ids are provided, cite them as [id] and do not invent citations. <context>{{CONTEXT}}</context>"
+# Office/RAG baseline: do not silently replace missing document evidence with model knowledge.
+Environment="RAG_TEMPLATE=Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
 Environment=ENABLE_RAG_HYBRID_SEARCH=false
 Environment=ENABLE_ASYNC_EMBEDDING=false
 Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false

@@ -1,28 +1,28 @@
 # Changelog
 
-## 0.9.7-0.1.testing - 2026-08-27
+## 0.9.7-0.2.testing - 2026-08-30
 
-Tighten the office-document RAG baseline so retrieved context is treated as the
-evidence source: unsupported document facts must be reported as insufficient
-evidence instead of silently falling back to model knowledge. Align the Qwen3.6
-FableVibes sampling baseline, production Qwen3.5 multilingual SYSTEM prompt and
-dots/Ovis OCR prompts with their reviewed upstream behavior.
+Refactor `bc250-benchmark` into a thin dispatcher with stdlib-only Python suites
+for generation, embeddings, OCR and the isolated Open WebUI task model. Generation
+now separates a neutral cross-model mode from production Modelfile behavior, uses
+model-family `think` policies compatible with Ollama 0.32.15, records response
+JSONL and model digests, and treats short `done_reason=stop` separately from a
+normal `length` limit.
 
-A full guided-installer rerun is now a deliberate convergence operation for this
-green-field appliance. Package-managed `/etc` defaults are backed up and replaced
-with the current package copies, the main Ollama runtime profile returns to the
-packaged baseline, existing task/agent service definitions are regenerated, and
-Open WebUI persistent ConfigVars are reset once from the packaged Quadlet without
-deleting accounts, chats, uploads or knowledge data. Operator-owned `models.d`,
-maintenance/API secrets, document libraries, HTTPS material and persistent model
-data remain outside that reset boundary.
+Add request-time BC-250 telemetry for peak/p95 temperature, time at 80/83/85 C,
+GPU busy/clock range, AMDGPU VRAM/GTT counters, minimum `MemAvailable`, maximum
+swap use and Ollama allocation. `RUN_THERMAL=1` adds sustained decode windows.
+Resource values are documented as overlapping UMA signals rather than independent
+pools.
 
-`bc250-model reconcile` regenerates already deployed Ollama registrations from
-the currently discovered Modelfiles. Valid unchanged GGUFs are reused; a real
-source-provenance change still triggers the normal verified download path. The
-installer runs this reconciliation automatically on package reruns/upgrades.
-Benchmark metadata now records the SHA-256 of each registered Ollama Modelfile so
-performance results can be tied to the exact runtime registration.
+Add multilingual office fixtures and quality metrics for Jina/Qwen embeddings,
+GLM/dots/Ovis/Chandra OCR and Open WebUI 0.11-style title/tag/retrieval-query
+tasks. OCR prompts are model-specific and preserve source language.
+
+Correct Qwen3.6 FableVibes to upstream `1.0 / 0.95 / 20` sampling, replace the
+production Qwen3.5 stale experimental SYSTEM with the multilingual office prompt,
+and add a source-grounded Open WebUI RAG template that reports insufficient
+document evidence instead of silently falling back to model knowledge.
 
 ## 0.9.6-0.7.testing - 2026-08-27
 

@@ -53,21 +53,17 @@ sudo bc250-ollama-profile reset
 Both enable flash attention. The max-context profile reduces KV-cache memory at
 a possible quality cost. Service profiles do not modify individual Modelfiles.
 
+## Benchmark API baseline
 
-## Registration convergence
+`bc250-benchmark` targets the Ollama **0.32.15** request schema. Neutral generation
+uses the top-level `/api/generate` `system` override without `raw=true`; production
+mode omits the override. `think` may be omitted, boolean, or
+`low`/`medium`/`high`/`max` as supported by 0.32.15. Embedding tests use
+`/api/embed` with `truncate=false`; model allocation comes from `/api/ps`.
 
-A full guided-installer rerun executes:
-
-```bash
-sudo bc250-model reconcile
-```
-
-This regenerates **already deployed** Ollama models from the currently discovered
-packaged/operator Modelfiles. Unchanged valid GGUFs are reused; changed source
-provenance follows the normal verified download path. It does not automatically
-install models that were never deployed and does not remove unmanaged models.
-Use the command directly after a deliberate Modelfile/package change when the
-full installer is unnecessary.
+The benchmark samples BC-250 temperature and memory/AMDGPU counters during each
+request. `RUN_THERMAL=1` adds sustained decode windows; no second `watch` terminal
+is required for peak resource values.
 
 ## Network exposure
 

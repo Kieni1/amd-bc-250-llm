@@ -107,12 +107,6 @@ class OcrInstallTests(unittest.TestCase):
             modelctl.print_all_models([ROOT / "models/modelfiles"] )
         self.assertNotIn("Unmanaged Ollama models", output.getvalue())
 
-    def test_ocr_wrapper_uses_document_specific_prompts(self) -> None:
-        source = (ROOT / "models/ocr/bc250-ocr.sh").read_text(encoding="utf-8")
-        self.assertIn("tables as HTML, and formulas as LaTeX", source)
-        self.assertIn("output one Markdown document", source)
-        self.assertIn("Text Recognition:", source)
-
     def test_invalid_ocr_alias_fails_before_manager_or_ollama(self) -> None:
         script = ROOT / "models/ocr/bc250-ocr.sh"
         with tempfile.TemporaryDirectory() as temporary:
@@ -139,27 +133,6 @@ class OcrInstallTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 2, result.stdout)
                     self.assertIn("OCR model must be", result.stdout)
                     self.assertFalse(marker.exists(), result.stdout)
-
-
-class ReconcileTests(unittest.TestCase):
-    def test_reconcile_regenerates_only_already_deployed_models_without_refresh(self) -> None:
-        defaults, models = modelctl.load_models(
-            "production", directories=[ROOT / "models/modelfiles"]
-        )
-        deployed = models[0]
-        with patch.object(modelctl.os, "geteuid", return_value=0), patch.object(
-            modelctl, "discover_models", return_value=models
-        ), patch.object(
-            modelctl, "registered_models",
-            side_effect=lambda host: {deployed["name"]} if host == defaults["ollama_host"] else set(),
-        ), patch.object(modelctl, "install_models", return_value=0) as install:
-            self.assertEqual(modelctl.reconcile_models([ROOT / "models/modelfiles"]), 0)
-
-        self.assertEqual(install.call_count, 1)
-        called_defaults, selected, args = install.call_args.args
-        self.assertEqual(called_defaults["ollama_host"], defaults["ollama_host"])
-        self.assertEqual([model["name"] for model in selected], [deployed["name"]])
-        self.assertFalse(args.refresh)
 
 
 class RuntimeContractTests(unittest.TestCase):

@@ -1,0 +1,44 @@
+[
+  {
+    "id":"title-de",
+    "type":"title",
+    "language":"de",
+    "input":"Wie kann ich in Open WebUI deutsche und französische PDF-Dokumente durchsuchen?",
+    "keywords":["webui","pdf","dokument","rag","suche"]
+  },
+  {
+    "id":"title-fr",
+    "type":"title",
+    "language":"fr",
+    "input":"Je dois préparer une traduction fidèle d'un règlement interne allemand vers le français.",
+    "keywords":["traduction","règlement","allemand","français"]
+  },
+  {
+    "id":"tags-en",
+    "type":"tags",
+    "language":"en",
+    "input":"Compare local OCR models for scanned invoices, tables and multilingual office documents.",
+    "keywords":["ocr","invoice","document","table"]
+  },
+  {
+    "id":"tags-de",
+    "type":"tags",
+    "language":"de",
+    "input":"Wir prüfen Kündigungsfristen, Zahlungsbedingungen und Vertragsnummern in internen Dokumenten.",
+    "keywords":["vertrag","kündigung","zahlung","dokument"]
+  },
+  {
+    "id":"query-fr",
+    "type":"query",
+    "language":"fr",
+    "input":"Dans nos documents, qui doit approuver les frais de voyage supérieurs à 500 CHF et dans quel délai faut-il fournir les justificatifs ?",
+    "keywords":["500","frais","voyage","justificatifs","approbation"]
+  },
+  {
+    "id":"query-de",
+    "type":"query",
+    "language":"de",
+    "input":"Welche Richtlinie sagt, ob vertrauliche Personaldaten in öffentlichen Cloud-Diensten gespeichert werden dürfen?",
+    "keywords":["personaldaten","cloud","datenschutz"]
+  }
+]

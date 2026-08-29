@@ -2,10 +2,6 @@
 
 ## Build
 
-The normal package build is the Fedora 44 GitHub Actions workflow. It runs the
-repository checks and publishes the binary RPM and SRPM together. Maintainers
-with a matching Fedora build environment can reproduce that path locally with:
-
 ```bash
 make validate
 make rpm
@@ -45,11 +41,7 @@ for operator-adapted integrations. Only MTP retains a TOML model catalog.
 - Dependency cleanup is limited to packages recorded as newly added by the
   guided installer; never use unbounded `dnf autoremove`.
 - Configuration that operators may change uses `%config(noreplace)` or lives
-  outside RPM ownership. Ordinary RPM upgrades therefore remain non-destructive.
-- A full guided-installer rerun is an explicit convergence operation: it backs up
-  and reapplies the packaged copies of all four `%config(noreplace)` defaults,
-  resets Open WebUI ConfigVars once, refreshes generated Ollama instance units and
-  reconciles deployed models. Operator secrets/data and `models.d` are excluded.
+  outside RPM ownership.
 
 The install manifest deliberately remains a small placement table. If it ever
 needs logic beyond its existing entry types, move that logic into explicit spec

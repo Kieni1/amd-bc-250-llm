@@ -53,12 +53,8 @@ sudo ./install --models-only
 ```
 
 Normal mode performs the complete host-to-verification workflow. It may pause
-for a reboot and should then be rerun. A full rerun converges package-managed
-configuration and Open WebUI ConfigVars to the current package, refreshes existing
-task/agent service definitions and runs `bc250-model reconcile`. Persistent
-user/document/model data and operator `/etc/bc250-llm-server/models.d/` additions
-are retained. `--models-only` skips host/config convergence and asks only for
-production, task, agentic, embedding, experiment and MTP selections.
+for a reboot and should then be rerun. `--models-only` skips host setup and asks
+for production, task, agentic, embedding, experiment and MTP selections.
 
 Useful unattended selections are `BC250_PRODUCTION_SELECTION`,
 `BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION`, `BC250_EMBEDDING_SELECTION`,
@@ -74,7 +70,6 @@ selects a reviewed version.
 bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 bc250-model install CATEGORY [SELECTION] [OPTIONS]
-sudo bc250-model reconcile
 bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
 ```
 
@@ -245,23 +240,27 @@ internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
 runs on a client; `HTTP_PORT` changes its expected web port.
 
-The benchmark writes a timestamped CSV and metadata file in the current directory.
-Its standard `BENCH_PROFILE=moderate` separates cold model-load/TTFA, warm latency,
-loaded decode throughput, document-prefill throughput, context capacity and
-memory/swap headroom. The moderate context curve is enabled by default; use
-`BENCH_PROFILE=conservative` for a quicker lower-context pass. Set
-`INCLUDE_EMBEDDINGS=1` to benchmark embedding models through `/api/embed` rather
-than generation endpoints. Point `OLLAMA_URL` at `http://127.0.0.1:11435` or
-`:11436` to benchmark task or agentic models on their real dedicated instance.
-Context curves warn when `prompt_eval_count` stops
-growing or reaches the allocated context. Treat Ollama `size_vram` and SMU/PPT
-power as indicative comparison signals on this UMA machine. Around 13 GiB of
-model weights is a practical planning ceiling, not a hard limit. Important
-overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`, `RUN_LATENCY`,
-`NUM_PREDICT_SHORT`, `NUM_PREDICT_PREFILL`, `NUM_PREDICT_CONTEXT`,
-`NUM_PREDICT_LONG`, `CTX_POINTS` and `THROTTLE_WINDOWS`. See `BENCHMARK.md` for
-metric interpretation and use the RAG evaluation template for answer/retrieval
-quality rather than treating tok/s as a quality score.
+The benchmark writes timestamped CSV, JSONL and metadata files in the current
+directory. The default generation lane uses `BENCH_MODE=neutral`: a per-request
+neutral SYSTEM override and deterministic sampling for comparable model/runtime
+measurements. `BENCH_MODE=production` tests the registered Modelfile SYSTEM and
+sampling as deployed. `THINK_MODE=auto` applies the package's model-family policy.
+
+```bash
+bc250-benchmark                         # generation, neutral mode
+BENCH_MODE=production bc250-benchmark
+BENCH_PROFILE=conservative bc250-benchmark
+bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
+bc250-benchmark ocr                     # office OCR fixtures
+bc250-benchmark task                    # Open WebUI 0.11-style task prompts
+OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
+```
+
+Every lane records request-time peak temperature, clock/utilization, minimum
+`MemAvailable`, maximum swap use, AMDGPU VRAM/GTT counters when available and
+Ollama `/api/ps` allocation. `RUN_THERMAL=1` adds sustained decode windows. Treat
+resource figures as overlapping UMA signals, not independent pools. See
+`BENCHMARK.md` for metrics, category fixtures and Ollama 0.32.15 request policy.
 
 ## Maintenance
 

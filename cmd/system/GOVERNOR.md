@@ -13,10 +13,8 @@ sudo bc250-verify
 The RPM pins `filippor/cyan-skillfish-governor` v0.4.12 at commit
 `be9537fc36f24b17570088cafa8c79365f80fee8`. Fresh installations use a
 350–1850 MHz range. The 2000 MHz / 960 mV point remains available in the curve
-for deliberate operator testing. Ordinary RPM upgrades preserve local tuning via
-`%config(noreplace)`. A full guided-installer rerun is the deliberate green-field
-convergence path and backs up then restores this file to the current package
-default.
+for deliberate operator testing. `%config(noreplace)` preserves local tuning
+on upgrades.
 
 The packaged usage policy is:
 

@@ -178,19 +178,6 @@ class InstallerTests(unittest.TestCase):
         self.assertLess(verify, diagnose)
         self.assertLess(diagnose, summary)
 
-    def test_full_rerun_converges_managed_settings_and_deployed_models(self) -> None:
-        source = INSTALLER.read_text(encoding="utf-8")
-        helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
-        self.assertIn("/usr/share/bc250-llm-server/defaults", source)
-        self.assertIn("installer-convergence", source)
-        self.assertIn("Environment=RESET_CONFIG_ON_START=true", source)
-        self.assertIn("bc250-model reconcile", source)
-        self.assertIn('--service-only', helper)
-        self.assertIn("Accounts, chats, uploads and Knowledge data were retained", source)
-        self.assertIn("Operator models.d, maintenance/API secrets, HTTPS material and persistent data were retained", source)
-        self.assertLess(source.index("step_3b_converge_package_defaults"), source.index("step_4_install_ollama", source.index("main()")))
-        self.assertLess(source.index("step_4b_converge_existing_runtime"), source.index("step_5_memory_and_swap", source.index("main()")))
-
     def test_models_only_resumes_after_an_interrupted_system_setup(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("sudo ./install --models-only", source)

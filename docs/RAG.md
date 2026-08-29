@@ -86,6 +86,10 @@ Both packaged embedding models use up to 1024 dimensions. This request loads the
 embedding model, so it is a deliberate operator test rather than part of
 `bc250-verify`.
 
+Use `bc250-benchmark embeddings` to compare the packaged models on the same
+DE/FR/EN retrieval fixture. It reports Recall@1/@3, MRR, cross-language retrieval
+and throughput; do not select an embedding model on tok/s alone.
+
 ## 3. Fresh-install Open WebUI baseline
 
 The packaged Quadlet now uses the **moderate BC-250 profile** by default:
@@ -115,20 +119,14 @@ long chat history, tighter memory headroom or a retrieval problem where smaller
 chunks are desirable. These are starting points to measure, not fixed quality
 claims.
 
-The packaged `RAG_TEMPLATE` is deliberately stricter than Open WebUI's generic
-default: document facts must be supported by retrieved context. If the available
-context does not support the requested fact, the model should say that the
-documents provide insufficient evidence instead of filling the gap from general
-knowledge. General/external knowledge remains available when the user explicitly
-asks for it. Keep `{{CONTEXT}}` in custom templates; do not add `{{QUERY}}`, because
-Open WebUI appends the user query automatically.
-
 Open WebUI persists many Admin settings in `webui.db`. After first launch,
-database values can override packaged `ConfigVar` defaults. A full v0.9.7 guided
-installer rerun deliberately resets those persisted ConfigVars once to the current
-packaged baseline, then returns Open WebUI to normal persistent-configuration mode;
-accounts, chats, uploads and Knowledge data are not deleted. `--models-only` does
-not perform that reset. Make later changes in **Admin Settings → Documents**.
+database values can override packaged `ConfigVar` defaults. Treat the Quadlet as
+a fresh-install baseline and make later changes in **Admin Settings → Documents**.
+
+The fresh-install `RAG_TEMPLATE` is intentionally source-grounded: if the retrieved
+context does not support the requested fact, it asks the answer model to state that
+evidence is insufficient instead of silently falling back to general model
+knowledge. Existing database settings can override this template as well.
 Keep retrieval-query generation off for the first measured baseline so the user
 query reaches retrieval unchanged. Test task-model query rewriting only after the
 embedding/chunking baseline is recorded. Do not add a reranker until vector-only
@@ -265,6 +263,11 @@ OCR model to translate, summarize or rewrite German/French/English content durin
 extraction. Translation or interpretation belongs in the downstream LLM step.
 Preserve headings, paragraphs, tables, numbers, dates and reading order where the
 model supports them.
+
+For a comparable regression check, run `bc250-benchmark ocr`. It uses packaged
+DE/FR/mixed office-page fixtures with model-specific prompts and reports text/field
+recall plus resource telemetry. Use `bc250-ocr test ENGINE REAL-PAGE.png` on a
+representative scan corpus before choosing the production OCR path.
 
 Multimodal OCR GGUFs require their matching image/projector path where applicable;
 `bc250-ocr` should own those model-specific invocation details. Open WebUI can be

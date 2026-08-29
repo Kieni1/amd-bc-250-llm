@@ -124,33 +124,32 @@ class RuntimeConvenienceTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn('[[ -d "$cpu" ]] || continue', source)
 
-    def test_benchmark_uses_role_appropriate_runtime_metrics(self) -> None:
-        benchmark_path = ROOT / "cmd/benchmark/compare-models.sh"
-        benchmark = benchmark_path.read_text(encoding="utf-8")
-        sensors = (ROOT / "cmd/benchmark/log_sensors.sh").read_text(encoding="utf-8")
-        self.assertIn('BENCH_PROFILE="${BENCH_PROFILE:-moderate}"', benchmark)
-        self.assertIn("NUM_PREDICT_PREFILL", benchmark)
-        self.assertIn("prompt_eval_count stopped growing", benchmark)
-        self.assertIn("allocated_context", benchmark)
-        self.assertIn("resident_size_bytes", benchmark)
-        self.assertIn("embedding_process_duration_s", benchmark)
-        self.assertIn("mem_available_mib", benchmark)
-        self.assertIn("INCLUDE_EMBEDDINGS", benchmark)
-        self.assertIn('"$OLLAMA/api/embed"', benchmark)
-        self.assertIn("truncate: false", benchmark)
-        self.assertIn("keep_alive: $keep_alive", benchmark)
-        self.assertEqual(benchmark.count('record_success "$model" "$label" "cold_chat" 1 "$row"'), 1)
-        self.assertIn("grep -viE 'embed|ocr'", benchmark)
-        self.assertIn("0.32.15", benchmark)
-        self.assertIn("modelfile_sha256", benchmark)
-        self.assertIn(".modelfile // empty", benchmark)
-        self.assertIn("uncalibrated", sensors)
+    def test_benchmark_dispatches_structured_suites_and_records_resource_peaks(self) -> None:
+        wrapper = (ROOT / "cmd/benchmark/compare-models.sh").read_text(encoding="utf-8")
+        generation = (ROOT / "cmd/benchmark/generation-benchmark.py").read_text(encoding="utf-8")
+        categories = (ROOT / "cmd/benchmark/category-benchmark.py").read_text(encoding="utf-8")
+        common = (ROOT / "cmd/benchmark/benchmark_common.py").read_text(encoding="utf-8")
+        for expected in ("embeddings|embedding|ocr|task", "generation-benchmark.py", "Ollama 0.32.15"):
+            self.assertIn(expected, wrapper)
+        for expected in (
+            "BENCH_MODE", "NEUTRAL_SYSTEM", 'payload["system"] = NEUTRAL_SYSTEM',
+            "THINK_MODE", "resolve_think_policy", "done_reason=stop", "RUN_THERMAL",
+            "temp_max_c", "mem_available_min_mib", "swap_used_max_mib",
+            "vram_used_max_bytes", "gtt_used_max_bytes", "client.digest(model)",
+        ):
+            self.assertIn(expected, generation)
+        self.assertNotIn('"think": false', generation.lower())
+        for expected in ("recall_at_1", "cross_mrr", "OCR_PROMPTS", "task_prompt", '"keep_alive": 0'):
+            self.assertIn(expected, categories)
+        for expected in ("mem_info_vram_used", "mem_info_gtt_used", "seconds_ge_85c", "gpu_clock_min_mhz"):
+            self.assertIn(expected, common)
         result = subprocess.run(
-            [str(benchmark_path), "--help"], text=True, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT, check=False,
+            [str(ROOT / "cmd/benchmark/compare-models.sh"), "--help"], text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("moderate is the package standard", result.stdout)
+        self.assertIn("BENCH_MODE=neutral", result.stdout)
+        self.assertIn("Ollama 0.32.15", result.stdout)
 
 
 class CuStatusTests(unittest.TestCase):

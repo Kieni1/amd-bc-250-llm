@@ -1,75 +1,104 @@
 # Benchmark
 
+The package standard is **Ollama 0.32.15**. Keep the Ollama version, model
+revision, CU/governor state and cooling setup fixed when comparing runs.
+
+## Generation
+
 ```bash
+# Cross-model comparison: neutral SYSTEM override + deterministic sampling
 bc250-benchmark
 
-# Faster/lower-context comparison
+# Faster/lower-context pass
 BENCH_PROFILE=conservative bc250-benchmark
 
-# Include embedding models and benchmark them through /api/embed
-INCLUDE_EMBEDDINGS=1 bc250-benchmark
+# Test the registered Modelfile as deployed (SYSTEM and sampling unchanged)
+BENCH_MODE=production bc250-benchmark
 
-# Dedicated task/agent instances use the same benchmark with their own endpoint
-OLLAMA_URL=http://127.0.0.1:11435 bc250-benchmark
-OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark
+# Specific registered models
+bc250-benchmark generation MODEL_A MODEL_B
 
-# Optional sensor trace in another terminal
-/usr/libexec/bc250-llm-server/log_sensors.sh sensors.log
+# Agentic store; use the agent service exclusively while benchmarking it
+OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```
 
-`moderate` is the package-standard profile. It uses three loaded decode repeats,
-two warm latency repeats, a document-sized prefill test and, by default, a
-context-capacity curve at roughly 1K/4K/8K/16K prompt tokens. `conservative`
-uses fewer repeats and roughly 0.5K/2K/5K context points for quicker checks or
-tighter memory headroom. Environment overrides still take precedence.
+`BENCH_MODE=neutral` is the default. Ollama `/api/generate` receives a per-request
+`system` override; `/api/chat` receives the same text as a system message. The
+registered model is not modified and its normal renderer/template is still used.
+`BENCH_MODE=production` omits that override and does not override temperature,
+`top_p` or `top_k`.
 
-Run each model on the Ollama instance that actually owns it: main/production and
-embeddings on 11434, task models on 11435, and agentic models on 11436. This keeps
-model stores and service settings comparable instead of copying models between
-instances just for a benchmark.
+`THINK_MODE=auto` preserves the package's model-family policy: GPT-OSS uses
+`medium`, packaged stock Qwen3.5/Qwen3-4B non-thinking profiles use `false`, and
+Gemma4/native-reasoning families leave `think` unset. Explicit
+`THINK_MODE=omit|false|true|low|medium|high|max` is available for a deliberate
+comparison. These values match Ollama 0.32.15's request API.
 
-The benchmark records the datapoints that matter most when comparing models on
-the BC-250:
+The standard generation suite records cold/warm chat latency, loaded decode,
+document prefill and a context-capacity curve. `RUN_THERMAL=1` adds sustained
+decode windows. Early-stop warnings are emitted only for a short
+`done_reason=stop`; reaching the requested limit with `done_reason=length` is not
+an early-EOS failure.
 
-- **cold model-switch latency**: model load time, TTFC, TTFA and wall time;
-- **warm interaction latency**: TTFC/TTFA once the model is resident;
-- **decode throughput**: repeated loaded generation tok/s and variance;
-- **document prefill**: prompt-evaluation tok/s on a synthetic office-sized
-  prompt, separated from long generation;
-- **context capacity**: actual `prompt_eval_count`, allocated context from
-  `/api/ps`, generation speed at larger prompts and warnings when the evaluated
-  prompt stops growing or reaches the context edge;
-- **memory/headroom**: `/api/ps` resident size, reported VRAM allocation,
-  allocated context, host `MemAvailable` and swap use after each request;
-- **sustained stability**: optional decode-throughput drift plus an optional
-  external temperature/power trace;
-- **embedding indexing cost**: optional cold/warm multilingual office batches via
-  `/api/embed`, including vector dimensions and input-token throughput.
+## Embeddings
 
-Ollama's generation API exposes load, prompt-evaluation, generation and total
-durations directly. The embedding API exposes total/load duration and input-token
-count but not a separate prompt-evaluation duration, so embedding input tok/s is
-computed from `prompt_eval_count / (total_duration - load_duration)` and is
-labelled as an indexing-throughput estimate. The CSV keeps that inferred
-`embedding_process_duration_s` separate instead of pretending Ollama reported a
-prompt-evaluation duration for embeddings.
+```bash
+bc250-benchmark embeddings
+bc250-benchmark embeddings embed-jina-v5-small-retrieval-q4-k-m embed-qwen3-0.6b-q8-0
+```
 
-Use the same Ollama version (**package standard 0.32.15**), model revision,
-governor, CU state, profile, prompts and cooling state when comparing results.
-The metadata records the SHA-256 of the Modelfile returned by `ollama show`, so a
-result can be tied to the exact registered runtime definition rather than just a
-model name. The CSV and metadata file make those runs easier to audit. `/api/ps`
-`size_vram` is an Ollama-reported allocation and should be treated as indicative
-on this unified-memory Vulkan system rather than a calibrated physical-VRAM
-measurement. SMU/PPT power is likewise uncalibrated and useful only for
-same-board comparisons.
+The packaged DE/FR/EN office fixture measures Recall@1, Recall@3, MRR,
+cross-language retrieval and warm input throughput. Jina uses `Query:` /
+`Document:`; Qwen3 Embedding uses the documented English retrieval instruction
+on queries and no content prefix. Use the same prefix scheme in Open WebUI and
+reindex when switching embedding models.
 
-This is a **runtime benchmark**, not an answer-quality score. For office/RAG
-quality, use `examples/rag/pilot-evaluation.tsv` and inspect retrieval, citations,
-source correctness, language choice and refusal on unanswered questions. OCR
-quality should be compared with the same real page corpus through `bc250-ocr`.
+## OCR
 
-For planning, roughly 13 GiB of model weights remains a practical BC-250 ceiling,
-not a fixed technical limit: KV/context buffers, the OS and resident services all
-share the same ~16 GB memory. See [`../../docs/COMMANDS.md`](../../docs/COMMANDS.md)
-for environment controls.
+```bash
+bc250-benchmark ocr
+bc250-ocr test dots /PATH/TO/REAL-PAGE.png
+```
+
+The benchmark uses deterministic German, French and mixed office-page images and
+checks text/field recall plus runtime. GLM, dots.ocr, OvisOCR2 and Chandra receive
+model-specific extraction prompts. OCR must preserve the source language; review
+and clean the result before putting canonical Markdown under the RAG `active/`
+tree. The packaged fixtures are regression/comparison tests, not a substitute for
+a representative real scan corpus.
+
+## Task model
+
+```bash
+bc250-benchmark task
+```
+
+The task suite targets `http://127.0.0.1:11435` by default and exercises Open
+WebUI 0.11-style title, tag and retrieval-query prompts in German, French and
+English. It checks JSON shape, simple content relevance and latency. Requests use
+`keep_alive=0`, matching the isolated task service.
+
+## Telemetry and outputs
+
+All benchmark lanes sample hardware/resource telemetry during the request rather
+than relying on a second terminal:
+
+- peak and p95 temperature plus time at/above 80/83/85 °C;
+- GPU busy percentage and observed min/max GPU clock;
+- AMDGPU `mem_info_vram_used` / `mem_info_gtt_used` peaks when exposed;
+- minimum Linux `MemAvailable` and maximum swap use;
+- Ollama `/api/ps` resident size, reported `size_vram` and allocated context.
+
+On the BC-250 these are overlapping views of unified memory. Do **not** add host,
+VRAM and GTT values as separate pools or automatically infer that a larger quant
+will fit. Use them as same-board headroom signals and validate a larger quant
+with an actual run.
+
+Generation produces CSV + JSONL response sidecar + JSON metadata. Category runs
+produce the same three-file pattern. Metadata records Ollama version, model
+digest/family/quant and benchmark policy so refreshed model registrations are not
+silently compared as if they were identical.
+
+Useful overrides include `OLLAMA_URL`, `BENCH_MODE`, `THINK_MODE`,
+`BENCH_PROFILE`, `RUN_LATENCY`, `RUN_CONTEXT`, `RUN_THERMAL`, `REPEATS`,
+`TELEMETRY_INTERVAL`, `KEEP_ALIVE`, `CTX_POINTS` and the `NUM_PREDICT_*` values.

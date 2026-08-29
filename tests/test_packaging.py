@@ -42,17 +42,14 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("fetch-embeddings", result.stdout.splitlines())
         self.assertIn("ocr", result.stdout.splitlines())
         self.assertIn("models/ocr/bc250-ocr.sh\t{libexec}/ocr.sh", manifest)
-
-    def test_guided_convergence_has_non_config_factory_copies(self) -> None:
-        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        for name in (
-            "governor-config.toml",
-            "nginx-bc250-llm-server.conf",
-            "nginx-websocket-map.conf",
-            "mtp-models.toml",
+        for entry in (
+            "cmd/benchmark/generation-benchmark.py\t{libexec}/generation-benchmark.py",
+            "cmd/benchmark/category-benchmark.py\t{libexec}/category-benchmark.py",
+            "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
+            "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
+            "examples/benchmark/ocr/manifest.json\t{share}/benchmark/ocr/manifest.json",
         ):
-            self.assertRegex(manifest, rf"(?m)^file\t0644\t.*\t\{{share\}}/defaults/{re.escape(name)}$")
-        self.assertEqual(len(re.findall(r"(?m)^config\t", manifest)), 4)
+            self.assertIn(entry, manifest)
 
     def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")

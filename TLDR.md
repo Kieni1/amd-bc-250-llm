@@ -8,12 +8,7 @@ Keep the binary RPM beside the repository's installer, then run:
 sudo ./install
 ```
 
-Rerun it after the requested reboot. A full rerun backs up and reapplies the
-current package-managed settings, resets Open WebUI ConfigVars to the package
-baseline once, refreshes existing task/agent services and regenerates deployed
-Ollama registrations from current Modelfiles without redownloading unchanged
-GGUFs. Persistent user/document/model data, secrets and operator `models.d` remain.
-Resume only model selection without convergence with:
+Rerun it after the requested reboot. Resume only model selection with:
 
 ```bash
 sudo ./install --models-only
@@ -54,9 +49,6 @@ sudo bc250-fetch-embeddings
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 
-# Recreate already-deployed registrations from current Modelfiles
-sudo bc250-model reconcile
-
 # Review before removing source GGUF and Ollama registration
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
@@ -83,9 +75,12 @@ see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 ## Operations
 
 ```bash
-bc250-benchmark                       # moderate standard runtime profile
-BENCH_PROFILE=conservative bc250-benchmark
-# Task/agent instances: OLLAMA_URL=http://127.0.0.1:11435 or :11436
+bc250-benchmark                       # neutral generation comparison
+BENCH_MODE=production bc250-benchmark    # deployed Modelfile behavior
+bc250-benchmark embeddings
+bc250-benchmark ocr
+bc250-benchmark task
+# Agent instance: OLLAMA_URL=http://127.0.0.1:11436
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
 

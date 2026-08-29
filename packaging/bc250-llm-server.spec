@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.7
-Release:        0.1.testing%{?dist}
+Release:        0.2.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,11 +228,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
-* Thu Aug 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.1.testing
-- Enforce a stricter office-document RAG evidence template and align Qwen/OCR model prompts with reviewed upstream settings.
-- Make guided installer reruns converge package-managed configuration and Open WebUI ConfigVars to the current package while retaining persistent data.
-- Add deployed-model reconciliation so current Modelfiles regenerate existing Ollama registrations without unnecessary GGUF downloads.
-- Record registered Modelfile hashes in benchmark metadata for reproducible BC-250 comparisons.
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.2.testing
+- Split benchmarking into neutral/production generation, embedding, OCR and task suites.
+- Add request-time thermal/UMA telemetry, model digests and JSONL response sidecars.
+- Align benchmark request shapes with Ollama 0.32.15 and model-specific think policies.
+- Correct Qwen3.6 FableVibes sampling and the production Qwen3.5 multilingual SYSTEM prompt.
+- Add a source-grounded Open WebUI RAG template and model-specific OCR prompts.
 
 * Thu Aug 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.7.testing
 - Standardize the tested Ollama runtime on 0.32.15 while retaining explicit comparison overrides.

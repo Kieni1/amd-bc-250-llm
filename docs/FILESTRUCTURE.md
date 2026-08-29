@@ -19,7 +19,6 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/bin/llm-run-diagnose` | Model-run diagnostic |
 | `/usr/libexec/bc250-llm-server/` | Command implementations |
 | `/usr/share/bc250-llm-server/model-management/` | Packaged Modelfiles and operator template |
-| `/usr/share/bc250-llm-server/defaults/` | Factory copies used only by guided-installer convergence |
 | `/usr/share/bc250-llm-server/40cu/` | Pinned unlock patch and source metadata |
 | `/usr/share/doc/bc250-llm-server/` | Installed documentation |
 | `/usr/lib/systemd/system/` | Packaged services and timers |
@@ -41,12 +40,8 @@ and systemd-preset configuration in the standard Fedora directories.
 | `/etc/sysctl.d/90-bc250-llm-server-swap.conf` | Optional swappiness override |
 | `/etc/default/bc250-wol` | Optional Wake-on-LAN interface |
 
-Ordinary RPM upgrades preserve `%config(noreplace)` files. A full guided-installer
-rerun is intentionally different: it backs up and replaces package-managed `/etc`
-defaults with the current package copies, while operator-owned additions remain
-untouched. The installer does not touch operator Modelfiles under
-`/etc/bc250-llm-server/models.d/`. A same-name file there overrides the packaged
-definition.
+RPM upgrades preserve `%config(noreplace)` files and do not touch operator
+Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 
 ## Generated state
 

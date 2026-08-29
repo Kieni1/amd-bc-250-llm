@@ -58,13 +58,13 @@ case "${1:-}" in
         prompt='Text Recognition:'
         ;;
       dots)
-        prompt='Extract this document page in human reading order. Return normal text and headings as Markdown, tables as HTML, and formulas as LaTeX. Preserve the original text and language; do not translate or add commentary.'
+        prompt='Extract the document text in natural reading order. Preserve the original text without translation. Keep headings and lists as Markdown; render tables as HTML and formulas as LaTeX when present.'
         ;;
       ovis)
         prompt='Extract all readable content in natural human reading order and output one Markdown document. Format formulas as LaTeX and tables as HTML. Preserve the original text without translation or paraphrasing.'
         ;;
       chandra)
-        prompt='Extract all readable content in natural reading order as Markdown. Preserve the original text without translation or commentary.'
+        prompt='Convert this office document image to structured Markdown. Preserve the original language, reading order, headings, tables, form fields, names, dates, numbers and reference identifiers. Do not translate or summarize.'
         ;;
     esac
     run_ollama run "$model" "$image" "$prompt"

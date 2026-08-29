@@ -144,7 +144,7 @@ else wn "dmesg unavailable (need sudo)"; fi
 
 # ---------------------------------------------------------------------------
 sec "6. VERSIONS  (compare these when investigating a performance delta)"
-exp "Record the current Mesa build; governor 0.4.12 and package-standard Ollama 0.32.15 are the reviewed baselines.  Other Ollama versions are explicit comparison runs."
+exp "Mesa 26.1.4 | governor 0.4.12 | package-standard Ollama 0.32.15.  Other Ollama versions are explicit comparison runs."
 k=$(uname -r); echo "  kernel: $k"
 ov=$(ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 if [[ "$ov" == "0.32.15" ]]; then ok "ollama=$ov (package standard)"
@@ -152,7 +152,7 @@ elif [[ -n "$ov" ]]; then wn "ollama=$ov (package standard 0.32.15; compare resu
 else wn "Ollama version unavailable"; fi
 if have vulkaninfo; then
   mv=$(vulkaninfo --summary 2>/dev/null | grep -m1 -i driverInfo | grep -oE 'Mesa [0-9.]+')
-  [[ -n "$mv" ]] && ok "$mv (record for comparison)" || wn "Mesa version unavailable"
+  [[ "$mv" == "Mesa 26.1.4" ]] && ok "$mv" || wn "${mv:-Mesa ?}  (ref Mesa 26.1.4)"
 fi
 gv=$(cyan-skillfish-governor-smu --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 [[ "$gv" == "0.4.12" ]] && ok "governor=$gv" || wn "governor=${gv:-?}  (packaged 0.4.12)"

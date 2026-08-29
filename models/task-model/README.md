@@ -30,9 +30,10 @@ task-gemma3-1b-unsloth-ud-q4-k-xl:latest
 ```
 
 Start with title and tag generation enabled. Keep retrieval-query generation
-disabled for the baseline and test it separately with RAG. Leave autocomplete,
-follow-ups and web-search query generation off until needed. Autocomplete can
-repeatedly load the task model while a larger chat model remains warm.
+off for the baseline and enable it only when deliberately testing query rewriting.
+Leave autocomplete, follow-ups and web-search query generation off until needed.
+Autocomplete can repeatedly load the task model while a larger chat model remains
+warm. Run `bc250-benchmark task` for the packaged DE/FR/EN task comparison.
 
 The Modelfile deliberately has no fixed `SYSTEM` prompt: Open WebUI supplies a
 different task prompt for each title, tag or query-rewrite request.

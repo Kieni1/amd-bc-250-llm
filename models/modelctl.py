@@ -798,55 +798,6 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     return 0
 
 
-
-def model_is_deployed(defaults: dict, model: dict, registered: set[str]) -> bool:
-    if model.get("name") in registered:
-        return True
-    if model["provider"] == "ollama-hf":
-        return model["from"] in registered
-    try:
-        return model_path(defaults, model).stat().st_size > 0
-    except (FileNotFoundError, OSError):
-        return False
-
-
-def reconcile_models(directories: list[Path]) -> int:
-    """Regenerate registrations for models that are already deployed locally."""
-    if os.geteuid() != 0:
-        raise ModelError("run with sudo")
-    discovered = discover_models(directories)
-    processed = failures = 0
-    for category in OLLAMA_CATEGORIES:
-        defaults = CATEGORY_DEFAULTS[category]
-        host = defaults["ollama_host"]
-        registered = registered_models(host)
-        category_models = [model for model in discovered if model["category"] == category]
-        local_candidates = [
-            model for model in category_models
-            if model["provider"] != "ollama-hf" and model_is_deployed(defaults, model, set())
-        ]
-        if registered is None:
-            if local_candidates:
-                print(f"WARNING: {category} Ollama instance {host} is unavailable; skipping reconciliation", file=sys.stderr)
-            continue
-        selected = [
-            model for model in category_models
-            if model_is_deployed(defaults, model, registered)
-        ]
-        if not selected:
-            continue
-        print(f"\nReconciling {category} models on {host}: {len(selected)} deployed")
-        args = argparse.Namespace(
-            host=None, revision=None, sha256=None, destination=None,
-            min_free_bytes=None, token_file=None, refresh=False,
-        )
-        result = install_models(defaults, selected, args)
-        processed += len(selected)
-        failures += result != 0
-    if not processed:
-        print("No deployed Ollama models require reconciliation.")
-    return 2 if failures else 0
-
 def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
@@ -925,10 +876,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="include disabled MTP entries for this invocation",
     )
     installing.add_argument("--refresh", action="store_true")
-    commands.add_parser(
-        "reconcile",
-        help="regenerate already deployed Ollama models from current Modelfiles",
-    )
     cleaning = commands.add_parser("cleanup", help="remove selected deployed models")
     catalog_arguments(cleaning)
     cleaning.add_argument("selection", nargs="?")
@@ -943,8 +890,6 @@ def main(argv: list[str] | None = None) -> int:
         if reconfigure:
             reconfigure(line_buffering=True)
     args = build_parser().parse_args(argv)
-    if args.command == "reconcile":
-        return reconcile_models(model_directories())
     if args.command == "list" and args.category is None:
         if args.source or args.all:
             raise ModelError("--source and --all require the MTP category")

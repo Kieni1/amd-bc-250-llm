@@ -20,6 +20,7 @@ class RagBaselineTests(unittest.TestCase):
             "Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true",
             "Environment=RAG_TOP_K=8",
             "Environment=RAG_RELEVANCE_THRESHOLD=0",
+            'Environment="RAG_TEMPLATE=Answer the user from the supplied context.',
             "Environment=ENABLE_RAG_HYBRID_SEARCH=false",
             "Environment=ENABLE_ASYNC_EMBEDDING=false",
             "Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false",
@@ -30,12 +31,6 @@ class RagBaselineTests(unittest.TestCase):
         )
         for line in expected:
             self.assertIn(line, quadlet)
-        template = next(
-            line for line in quadlet.splitlines() if 'Environment="RAG_TEMPLATE=' in line
-        )
-        self.assertIn("do not provide sufficient evidence", template)
-        self.assertIn("{{CONTEXT}}", template)
-        self.assertNotIn("{{QUERY}}", template)
 
     def test_rag_guide_uses_real_packaged_models_and_commands(self) -> None:
         guide = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")

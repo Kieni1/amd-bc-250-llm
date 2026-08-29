@@ -79,7 +79,6 @@ class DocumentationTests(unittest.TestCase):
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
             "prod-lfm25-8b-a1b-liquidai-q6-k",
             "prod-gpt-oss20b-ggml-org-mxfp4",
-            "prod-qwen35-9b-unsloth-q6-k",
             "embed-jina-v5-small-retrieval-q4-k-m",
             "task-gemma3-1b-unsloth-ud-q4-k-xl",
             "agentic-ornith15-9b-ornith-q5-k-m",
