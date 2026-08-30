@@ -93,8 +93,11 @@ def front_matter(path: Path) -> dict[str, object]:
     for line_number, raw in enumerate(lines[1:end], 2):
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
-        indent = len(raw) - len(raw.lstrip(" "))
-        if "	" in raw[:indent] or indent not in {0, 2}:
+        leading = raw[: len(raw) - len(raw.lstrip())]
+        if "\t" in leading:
+            raise ValueError(f"unsupported YAML indentation on line {line_number}")
+        indent = len(leading)
+        if indent not in {0, 2}:
             raise ValueError(f"unsupported YAML indentation on line {line_number}")
         match = re.fullmatch(r"\s*([A-Za-z0-9_-]+):(?:\s*(.*))?", raw)
         if not match:
@@ -576,7 +579,7 @@ def main(argv: list[str] | None = None) -> int:
             print_plan(root, docs, warnings)
         else:
             sync(root, docs, warnings, args)
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (OSError, TypeError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     return 0

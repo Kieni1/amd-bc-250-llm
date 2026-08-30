@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import io
 import re
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "models/rag/rag_import.py"
@@ -137,6 +140,33 @@ class RagImportTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "unsupported front-matter key"):
                 rag.front_matter(path)
+
+    def test_front_matter_rejects_tab_indentation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad.md"
+            path.write_text("---\n\tlanguage: de-CH\n---\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unsupported YAML indentation"):
+                rag.front_matter(path)
+            path.write_text(
+                "---\nrelation:\n  \ttype: translation-pair\n---\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "unsupported YAML indentation"):
+                rag.front_matter(path)
+
+    def test_main_handles_invalid_sync_response_type_without_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stderr = io.StringIO()
+            with (
+                patch.object(
+                    rag, "sync", side_effect=TypeError("invalid sync diff response")
+                ),
+                redirect_stderr(stderr),
+            ):
+                result = rag.main(["sync", tmp])
+        self.assertEqual(result, 2)
+        self.assertIn("ERROR: invalid sync diff response", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_plan_needs_no_api_key_and_sync_contract_is_incremental(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

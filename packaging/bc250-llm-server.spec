@@ -231,6 +231,7 @@ fi
 * Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.5.testing
 - Harden model/source integrity, cold benchmark state and RAG provenance validation
 - Debloat compatibility commands, rename MTP quick comparison and add CI linting
+- Harden RAG error handling, manifest source containment and cache-free source archives
 
 * Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.4.testing
 - Fix Jina embedding metadata source, complete upload pruning pagination and agent unload policy.

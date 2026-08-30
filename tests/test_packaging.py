@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -19,6 +21,73 @@ class PackagingTests(unittest.TestCase):
             spec,
             rf"(?m)^%changelog\n\* .* - {re.escape(version)}-{re.escape(release.group(1))}$",
         )
+
+    def test_install_manifest_rejects_sources_outside_source_root(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source_root = base / "source"
+            source_root.mkdir()
+            outside = base / "outside.txt"
+            outside.write_text("outside\n", encoding="utf-8")
+            manifest = base / "manifest.tsv"
+            manifest.write_text(
+                "file\t0644\t../outside.txt\t/usr/share/test/outside.txt\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/install-manifest.py"),
+                    "--manifest",
+                    str(manifest),
+                    "--source-root",
+                    str(source_root),
+                    "--check",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("source escapes source root", result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source_root = base / "source"
+            source_root.mkdir()
+            outside = base / "outside.txt"
+            outside.write_text("outside\n", encoding="utf-8")
+            link = source_root / "linked.txt"
+            link.symlink_to(outside)
+            manifest = base / "manifest.tsv"
+            manifest.write_text(
+                "file\t0644\tlinked.txt\t/usr/share/test/linked.txt\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/install-manifest.py"),
+                    "--manifest",
+                    str(manifest),
+                    "--source-root",
+                    str(source_root),
+                    "--check",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("source must not be a symlink", result.stderr)
+
+    def test_source_tarball_excludes_python_and_ruff_caches(self) -> None:
+        source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
+        gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("--exclude='./.ruff_cache'", source)
+        self.assertIn("--exclude='*/__pycache__'", source)
+        self.assertIn("--exclude='*.pyc'", source)
+        self.assertIn(".ruff_cache/", gitignore)
 
     def test_model_package_and_public_dispatcher_are_installed(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")

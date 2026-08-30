@@ -19,7 +19,10 @@ vendor archive with local SHA-256 sidecars; `sources-check` now verifies them.
 Remove the dead sensor logger and obsolete `install-cu-manager` /
 `pull-embedding-model` compatibility commands. Rename the narrow speed-only
 experiment helper to `bc250-compare-mtp`. CI now runs on pushes and pull requests
-and adds Fedora Ruff/ShellCheck before the RPM build.
+and adds Fedora Ruff/ShellCheck before the RPM build. Follow-up hardening catches
+malformed Open WebUI sync response types cleanly, rejects tab-indented RAG metadata,
+keeps install-manifest sources inside the source tree, and excludes Ruff/Python caches
+from handoff/source archives.
 
 ## 0.9.7-0.4.testing - 2026-08-30
 

@@ -12,5 +12,6 @@
 *~
 .DS_Store
 __pycache__/
+.ruff_cache/
 *.pyc
 gitea-pr-*-review.md

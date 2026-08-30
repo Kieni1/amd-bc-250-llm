@@ -85,15 +85,26 @@ def rpm_line(kind: str, mode: str, destination: str) -> str:
 def source_matches(source_root: Path, pattern: str, line_number: int) -> list[Path]:
     if pattern == "-":
         return []
+    root = source_root.resolve()
     matches = [Path(item) for item in sorted(glob.glob(str(source_root / pattern)))]
     if not matches:
         raise ManifestError(
             f"manifest line {line_number}: source does not match: {pattern}"
         )
-    if any(not path.is_file() for path in matches):
-        raise ManifestError(
-            f"manifest line {line_number}: source patterns must match files only"
-        )
+    for path in matches:
+        if path.is_symlink():
+            raise ManifestError(
+                f"manifest line {line_number}: source must not be a symlink: {path}"
+            )
+        if not path.is_file():
+            raise ManifestError(
+                f"manifest line {line_number}: source patterns must match files only"
+            )
+        resolved = path.resolve()
+        if not resolved.is_relative_to(root):
+            raise ManifestError(
+                f"manifest line {line_number}: source escapes source root: {path}"
+            )
     return matches
 
 
