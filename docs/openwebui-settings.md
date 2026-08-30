@@ -1,7 +1,9 @@
 # Open WebUI settings
 
-The package supplies local connections and privacy-oriented container defaults;
-application accounts and model behavior remain operator-managed.
+The package supplies local connections and a fresh-install privacy baseline;
+application accounts and model behavior remain operator-managed. The Quadlet
+explicitly disables community sharing, code execution, the code interpreter and
+memories. Operators can deliberately re-enable those features later.
 
 Package baseline: **Open WebUI v0.11.0** with standard **Ollama v0.32.15**.
 
@@ -32,12 +34,15 @@ their services are installed. Tika must not be exposed as a host/LAN listener.
   hybrid search off and async embedding off.
 - The **conservative** alternative is 1000/100/Top-K-5 when model/context headroom
   is tighter or when deliberately testing smaller retrieval chunks.
-- Jina's fresh-install prefixes are `Query: ` and `Document: `. Changing the
-  embedding model, prefixes or chunking requires reindexing Knowledge documents;
-  extraction-engine/source-text changes require re-uploading or re-syncing content.
-- Disable public sharing and community features for private office data.
-- Disable arbitrary tools, functions, pipelines and code execution for ordinary
-  users.
+- Jina's fresh-install prefixes are `Query: ` and `Document: `. The packaged
+  The packaged Jina GGUF carries upstream `pooling_type` metadata. Reindex after
+  replacing the older package GGUF, and whenever changing embedding model,
+  prefixes or chunking. Extraction-engine/source-text changes require re-uploading
+  or re-syncing content.
+- Keep the packaged community-sharing, code-execution/interpreter and memory
+  defaults **off** for private office data unless local policy explicitly enables
+  them.
+- Disable arbitrary tools, functions and pipelines for ordinary users.
 - Keep uploads at or below nginx's 256 MiB limit.
 - Leave request concurrency to the packaged one-parallel/one-loaded-model
   Ollama profile.
@@ -47,8 +52,11 @@ embedding alternative if the intended use is incompatible with that license.
 For Qwen, use an English retrieval instruction on the query side and leave the
 content prefix empty. See [`RAG.md`](RAG.md) for the exact pilot settings.
 
-Open WebUI persists many RAG settings in `webui.db`; values saved in the Admin
-UI can override packaged fresh-install environment defaults after first launch.
+Open WebUI persists many application/RAG settings in `webui.db`; values saved in
+the Admin UI can override packaged fresh-install environment defaults after first
+launch. The four privacy feature flags above are therefore a green-field baseline,
+not a migration policy for an existing database.
+
 The packaged fresh-install RAG template is source-grounded and does not silently
 fill missing document facts from general model knowledge. Review the saved RAG
 template in **Admin Settings → Documents** on upgraded/existing instances because

@@ -59,7 +59,9 @@ a possible quality cost. Service profiles do not modify individual Modelfiles.
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` as supported by 0.32.15. Embedding tests use
-`/api/embed` with `truncate=false`; model allocation comes from `/api/ps`.
+`/api/embed` with `truncate=false`; model allocation comes from `/api/ps`. The
+dedicated `bc250-benchmark agent` lane uses `/api/chat` on port 11436 and does
+not globally force reasoning off.
 
 The benchmark samples BC-250 temperature and memory/AMDGPU counters during each
 request. `RUN_THERMAL=1` adds sustained decode windows; no second `watch` terminal

@@ -16,7 +16,9 @@ sudo ./install --models-only
 
 The model stage asks separately for production, task, agentic, embedding,
 experiment and MTP models. Enter skips only the current category; MTP entries
-remain disabled by default outside an explicit guided selection.
+remain disabled by default outside an explicit guided selection. Before 1.0 the
+installer assumes a green-field/test appliance and may reapply project defaults.
+See [`MODEL.md`](MODEL.md) before keeping local model overrides.
 
 ## Verify and open the UI
 
@@ -76,11 +78,11 @@ see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 
 ```bash
 bc250-benchmark                       # neutral generation comparison
-BENCH_MODE=production bc250-benchmark    # deployed Modelfile behavior
+BENCH_MODE=production bc250-benchmark    # generic workload + deployed config
 bc250-benchmark embeddings
 bc250-benchmark ocr
 bc250-benchmark task
-# Agent instance: OLLAMA_URL=http://127.0.0.1:11436
+bc250-benchmark agent                 # dedicated agent correctness lane, port 11436
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
 

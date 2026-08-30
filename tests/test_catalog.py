@@ -84,6 +84,12 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("@ 87fcf5d7dbecb02941c0917a0e93619af2075b61", text)
         self.assertIn("# SHA256: e4d9634a3b6546a5c00a8680568fe1125f6c98c704ee51ae52ba07650fb4247d", text)
 
+    def test_jina_embedding_uses_pooling_metadata_revision(self) -> None:
+        text = (MODELFILES / "embed-jina-v5-small-retrieval-q4-k-m.Modelfile").read_text()
+        self.assertIn("@ e9137ac0a9d41c851de69bea36babc029b7f5fc9", text)
+        self.assertIn("# SHA256: 9440cf89f3e8a7a31a42e11b87e106dd5b344af4e0e3b6b21a96136cc8686e21", text)
+        self.assertIn("pooling metadata", text)
+
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {
             "embedding": "embed-jina-v5-small-retrieval-q4-k-m",

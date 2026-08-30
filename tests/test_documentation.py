@@ -58,6 +58,19 @@ class DocumentationTests(unittest.TestCase):
                 for suffix in re.findall(r"\bbc250-([a-z0-9-]+)\b", block):
                     self.assertIn(suffix, allowed, f"{relative}: bc250-{suffix}")
 
+    def test_internal_markdown_links_resolve(self) -> None:
+        for path in ROOT.rglob("*.md"):
+            relative = path.relative_to(ROOT)
+            if any(part in EXCLUDED_DOC_TREES for part in relative.parts):
+                continue
+            text = path.read_text(encoding="utf-8")
+            for target in re.findall(r"\[[^]]*\]\(([^)]+)\)", text):
+                if target.startswith(("http://", "https://", "mailto:", "#")):
+                    continue
+                local = target.split("#", 1)[0]
+                if local:
+                    self.assertTrue((path.parent / local).exists(), f"{relative}: {target}")
+
     def test_documented_model_sets_match_current_modelfiles(self) -> None:
         names = set()
         for path in (ROOT / "models/modelfiles").glob("*.Modelfile"):

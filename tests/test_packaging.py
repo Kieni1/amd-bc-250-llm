@@ -47,7 +47,9 @@ class PackagingTests(unittest.TestCase):
             "cmd/benchmark/category-benchmark.py\t{libexec}/category-benchmark.py",
             "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
             "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
+            "examples/benchmark/agent-cases.json\t{share}/benchmark/agent-cases.json",
             "examples/benchmark/ocr/manifest.json\t{share}/benchmark/ocr/manifest.json",
+            "MODEL.md\t{docdir}/MODEL.md",
         ):
             self.assertIn(entry, manifest)
 
@@ -57,7 +59,9 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertNotIn("pull-embedding-model.sh", manifest)
+        self.assertNotIn("pull-embedding-model", dispatcher)
+        self.assertNotIn("install-cu-manager", dispatcher)
+        self.assertNotIn("log_sensors.sh", manifest)
         self.assertIn('modelctl|install|embedding', dispatcher)
         self.assertIn(
             "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
@@ -109,6 +113,28 @@ class PackagingTests(unittest.TestCase):
             quadlet,
         )
         self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.0)$")
+
+    def test_open_webui_fresh_install_privacy_features_are_disabled(self) -> None:
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        for setting in (
+            "ENABLE_COMMUNITY_SHARING=false",
+            "ENABLE_CODE_EXECUTION=false",
+            "ENABLE_CODE_INTERPRETER=false",
+            "ENABLE_MEMORIES=false",
+        ):
+            self.assertIn(f"Environment={setting}", quadlet)
+
+    def test_compare_mtp_does_not_force_global_think_false(self) -> None:
+        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        self.assertNotIn("think:false", source)
+
+    def test_ci_runs_on_push_and_pull_request_with_static_linters(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        self.assertRegex(workflow, r"(?m)^  push:$")
+        self.assertRegex(workflow, r"(?m)^  pull_request:$")
+        self.assertIn("ruff check .", workflow)
+        self.assertIn("shellcheck", workflow)
+        self.assertIn("ruff rust ShellCheck", workflow)
 
     def test_build_outputs_share_one_dist_directory(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")

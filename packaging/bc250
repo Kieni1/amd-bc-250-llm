@@ -14,14 +14,13 @@ ROUTES=(
   "check-temp|$LIBEXEC/check-temp.sh"
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
-  "compare-experiments|$LIBEXEC/compare-experiments.sh"
+  "compare-mtp|$LIBEXEC/compare-mtp.sh"
   "cu-status|$LIBEXEC/cu-status.sh"
   "fetch-experiments|$LIBEXEC/modelctl|install|experiments"
   "fetch-embeddings|$LIBEXEC/modelctl|install|embedding"
   "fetch-models|$LIBEXEC/modelctl|install|production"
   "fetch-mtp|$LIBEXEC/modelctl|install|mtp"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
-  "install-cu-manager|$LIBEXEC/install-cu-manager.sh"
   "install-ollama|$LIBEXEC/install-ollama.sh"
   "maintenance|$LIBEXEC/maintenance.sh"
   "memory-profile|$LIBEXEC/memory-profile.sh"
@@ -29,7 +28,6 @@ ROUTES=(
   "ocr|$LIBEXEC/ocr.sh"
   "rag-import|$LIBEXEC/rag-import"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
-  "pull-embedding-model|$LIBEXEC/modelctl|install|embedding"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "setup-coding-agent|$SHARE/examples/coding-agent/setup-ollama.sh"
   "setup-task-model|$SHARE/examples/task-model/setup-ollama.sh"
@@ -60,15 +58,15 @@ Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
   model, ocr, rag-import, fetch-models, fetch-experiments, fetch-embeddings, fetch-mtp
-  setup-task-model, setup-coding-agent, pull-embedding-model
+  setup-task-model, setup-coding-agent
 
 Operation:
   status, verify, verify-lan, benchmark, check-temp
   install-ollama, maintenance, ollama-profile, memory-profile, swap-profile
-  40cu, cu-status, install-cu-manager, uninstall
+  40cu, cu-status, uninstall
 
 Optional workflows:
-  code, code-commit, gitea-review, compare-experiments, run-mtp
+  code, code-commit, gitea-review, compare-mtp, run-mtp
 
 Run `bc250 COMMAND --help` where supported. The bc250-COMMAND compatibility
 names are symlinks to this dispatcher.

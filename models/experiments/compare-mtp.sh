@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Compare an Ollama baseline with the running llama.cpp MTP server.
+# Quick speed comparison between an Ollama baseline and a running llama.cpp MTP server.
+# For model-quality/correctness comparisons use bc250-benchmark instead.
 set -Eeuo pipefail
 
 for cmd in curl jq awk; do command -v "$cmd" >/dev/null || { echo "ERROR: missing command: $cmd" >&2; exit 1; }; done
@@ -11,7 +12,7 @@ PROMPT="${PROMPT:-Write a concise 300-word explanation of how memory bandwidth l
 
 baseline_json="$(curl -fsS "$OLLAMA_URL/api/generate" -H 'Content-Type: application/json' -d "$(jq -nc \
   --arg model "$BASELINE_MODEL" --arg prompt "$PROMPT" --argjson n "$NUM_PREDICT" \
-  '{model:$model,prompt:$prompt,stream:false,think:false,options:{temperature:0,num_predict:$n}}')" 2>/dev/null || true)"
+  '{model:$model,prompt:$prompt,stream:false,options:{temperature:0,num_predict:$n}}')" 2>/dev/null || true)"
 baseline_tps="$(jq -r 'if .error or ((.eval_duration // 0) <= 0) then empty else .eval_count / (.eval_duration / 1e9) end' <<<"$baseline_json" 2>/dev/null || true)"
 
 mtp_json="$(curl -fsS "$MTP_URL/v1/chat/completions" -H 'Content-Type: application/json' -d "$(jq -nc \

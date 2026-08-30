@@ -8,7 +8,7 @@ GEN="$SCRIPT_DIR/generation-benchmark.py"
 CATEGORY="$SCRIPT_DIR/category-benchmark.py"
 
 case "${1:-}" in
-  embeddings|embedding|ocr|task)
+  embeddings|embedding|ocr|task|agent|coding)
     exec python3 "$CATEGORY" "$@"
     ;;
   generation)
@@ -22,23 +22,26 @@ Usage:
   bc250-benchmark embeddings [MODEL ...]
   bc250-benchmark ocr [MODEL ...]
   bc250-benchmark task [MODEL ...]
+  bc250-benchmark agent [MODEL ...]
 
 Generation defaults to BENCH_MODE=neutral: one per-request neutral SYSTEM
 and deterministic sampling for comparable model/runtime measurements.
-BENCH_MODE=production preserves the registered Modelfile SYSTEM and sampling.
+BENCH_MODE=production preserves the registered Modelfile SYSTEM and sampling
+for the same generic generation workload (production-configuration comparison).
 
 Category suites:
   embeddings  DE/FR/EN retrieval quality (Recall@1/@3, MRR) + throughput
   ocr         office-page extraction quality + runtime
-  task        Open WebUI 0.11-style title/tag/retrieval-query tasks
+  task        Open WebUI 0.11.0-compatible title/tag/retrieval-query tasks
+  agent       syntax/structure correctness for coding/agent output (port 11436)
 
-All lanes record peak temperature, GPU clocks/utilization, AMDGPU VRAM/GTT
-counters, minimum MemAvailable, maximum swap use, model allocation and digest.
+Generation, embedding and OCR lanes record the full resource set; task and agent
+lanes intentionally keep a smaller latency/correctness-oriented telemetry set.
 Ollama 0.32.15 is the package benchmark standard.
 
 Useful environment overrides:
   OLLAMA_URL, BENCH_MODE, THINK_MODE, BENCH_PROFILE, RUN_LATENCY,
-  RUN_CONTEXT, RUN_THERMAL, TELEMETRY_INTERVAL, REPEATS, KEEP_ALIVE.
+  RUN_CONTEXT, RUN_THERMAL, TELEMETRY_INTERVAL, BC250_DRM_CARD, REPEATS, KEEP_ALIVE.
 EOF
     ;;
   *)

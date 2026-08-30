@@ -435,6 +435,9 @@ def main() -> int:
         "moderate": {"short": 384, "prefill": 32, "context": 128, "long": 3072, "latency": 96, "repeats": 3, "latency_repeats": 2, "filler": 220, "ctx": [44, 176, 352, 704]},
         "conservative": {"short": 256, "prefill": 24, "context": 96, "long": 2048, "latency": 64, "repeats": 2, "latency_repeats": 1, "filler": 110, "ctx": [22, 88, 220]},
     }[profile]
+    # TODO (future release): production mode currently keeps deployment SYSTEM/sampling
+    # but still uses the generic generation workload. Add role-specific office/RAG/
+    # translation fixtures separately; do not turn the neutral suite into a role benchmark.
     mode = os.environ.get("BENCH_MODE", "neutral").casefold()
     if mode not in {"neutral", "production"}:
         raise BenchmarkError("BENCH_MODE must be neutral or production")
@@ -476,7 +479,7 @@ def main() -> int:
     meta = {
         "started_at": started,
         "category": "generation",
-        "benchmark_version": "7.0",
+        "benchmark_version": "7.1",
         "bench_mode": mode,
         "ollama_url": client.base_url,
         "ollama_version": version,
@@ -538,75 +541,78 @@ def main() -> int:
             think_policy = resolve_think_policy(model, think_requested)
             print(f"\n=== {short_name(model)} ({model}) | mode={mode} think={think_policy} ===")
 
-            if run_latency:
-                client.stop(model)
-                client.wait_unloaded(model)
-                metrics, _telemetry, detail = run_chat_stream(
-                    client, model, make_unique_prompt(CHAT_PROMPT), num_latency, mode, think_policy, keep_alive, telemetry_interval
-                )
-                record(model, "cold_chat", 1, metrics, detail, num_latency, think_policy)
-                for run in range(1, latency_repeats + 1):
+            try:
+                if run_latency:
+                    client.ensure_unloaded(model)
                     metrics, _telemetry, detail = run_chat_stream(
                         client, model, make_unique_prompt(CHAT_PROMPT), num_latency, mode, think_policy, keep_alive, telemetry_interval
                     )
-                    record(model, "warm_chat", run, metrics, detail, num_latency, think_policy)
-
-            # Warm model before throughput comparisons so model load does not
-            # dominate the short-generation measurement.
-            try:
-                run_generate(client, model, make_unique_prompt(SHORT_PROMPT), 32, mode, think_policy, keep_alive, telemetry_interval)
-            except BenchmarkError as exc:
-                print(f"    warmup failed: {exc}", file=sys.stderr)
-
-            for run in range(1, repeats + 1):
-                metrics, _telemetry, detail = run_generate(
-                    client, model, make_unique_prompt(SHORT_PROMPT), num_short, mode, think_policy, keep_alive, telemetry_interval
-                )
-                record(model, "short", run, metrics, detail, num_short, think_policy)
-
-            metrics, _telemetry, detail = run_generate(
-                client, model, make_unique_prompt(long_prompt), num_prefill, mode, think_policy, keep_alive, telemetry_interval
-            )
-            record(model, "prefill", 1, metrics, detail, num_prefill, think_policy)
-
-            if run_context:
-                previous_prompt_count = -1
-                for point in ctx_points:
-                    prompt = make_filler(point) + " Given all of the above context, " + SHORT_PROMPT
-                    metrics, _telemetry, detail = run_generate(
-                        client, model, make_unique_prompt(prompt), num_context, mode, think_policy, keep_alive, telemetry_interval
-                    )
-                    record(model, f"ctx_{point}", 1, metrics, detail, num_context, think_policy)
-                    prompt_count = int(metrics.get("prompt_eval_count") or 0)
-                    if previous_prompt_count >= 0 and prompt_count <= previous_prompt_count:
-                        print(
-                            f"    WARNING: prompt_eval_count stopped growing ({previous_prompt_count} -> {prompt_count}); possible context truncation",
-                            file=sys.stderr,
+                    record(model, "cold_chat", 1, metrics, detail, num_latency, think_policy)
+                    for run in range(1, latency_repeats + 1):
+                        metrics, _telemetry, detail = run_chat_stream(
+                            client, model, make_unique_prompt(CHAT_PROMPT), num_latency, mode, think_policy, keep_alive, telemetry_interval
                         )
-                    allocated = metrics.get("allocated_context")
-                    if isinstance(allocated, int) and prompt_count + num_context >= allocated:
-                        print(f"    NOTE: ctx point approaches allocated context {allocated}", file=sys.stderr)
-                    previous_prompt_count = prompt_count
+                        record(model, "warm_chat", run, metrics, detail, num_latency, think_policy)
 
-            if run_thermal:
-                window_tokens = max(1, num_long // max(1, thermal_windows))
-                first_tps: float | None = None
-                last_tps: float | None = None
-                for window in range(1, thermal_windows + 1):
+                # Warm model before throughput comparisons so model load does not
+                # dominate the short-generation measurement.
+                try:
+                    run_generate(client, model, make_unique_prompt(SHORT_PROMPT), 32, mode, think_policy, keep_alive, telemetry_interval)
+                except BenchmarkError as exc:
+                    print(f"    warmup failed: {exc}", file=sys.stderr)
+
+                for run in range(1, repeats + 1):
                     metrics, _telemetry, detail = run_generate(
-                        client, model, make_unique_prompt(SHORT_PROMPT), window_tokens, mode, think_policy, keep_alive, telemetry_interval
+                        client, model, make_unique_prompt(SHORT_PROMPT), num_short, mode, think_policy, keep_alive, telemetry_interval
                     )
-                    record(model, f"thermal_w{window}", 1, metrics, detail, window_tokens, think_policy)
-                    tps = float(metrics.get("tokens_per_second") or 0)
-                    if first_tps is None:
-                        first_tps = tps
-                    last_tps = tps
-                if first_tps and last_tps is not None:
-                    drop = (first_tps - last_tps) / first_tps * 100.0
-                    print(f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s ({drop:+.1f}%)")
+                    record(model, "short", run, metrics, detail, num_short, think_policy)
 
-            client.stop(model)
-            client.wait_unloaded(model)
+                metrics, _telemetry, detail = run_generate(
+                    client, model, make_unique_prompt(long_prompt), num_prefill, mode, think_policy, keep_alive, telemetry_interval
+                )
+                record(model, "prefill", 1, metrics, detail, num_prefill, think_policy)
+
+                if run_context:
+                    previous_prompt_count = -1
+                    for point in ctx_points:
+                        prompt = make_filler(point) + " Given all of the above context, " + SHORT_PROMPT
+                        metrics, _telemetry, detail = run_generate(
+                            client, model, make_unique_prompt(prompt), num_context, mode, think_policy, keep_alive, telemetry_interval
+                        )
+                        record(model, f"ctx_{point}", 1, metrics, detail, num_context, think_policy)
+                        prompt_count = int(metrics.get("prompt_eval_count") or 0)
+                        if previous_prompt_count >= 0 and prompt_count <= previous_prompt_count:
+                            print(
+                                f"    WARNING: prompt_eval_count stopped growing ({previous_prompt_count} -> {prompt_count}); possible context truncation",
+                                file=sys.stderr,
+                            )
+                        allocated = metrics.get("allocated_context")
+                        if isinstance(allocated, int) and prompt_count + num_context >= allocated:
+                            print(f"    NOTE: ctx point approaches allocated context {allocated}", file=sys.stderr)
+                        previous_prompt_count = prompt_count
+
+                if run_thermal:
+                    window_tokens = max(1, num_long // max(1, thermal_windows))
+                    first_tps: float | None = None
+                    last_tps: float | None = None
+                    for window in range(1, thermal_windows + 1):
+                        metrics, _telemetry, detail = run_generate(
+                            client, model, make_unique_prompt(SHORT_PROMPT), window_tokens, mode, think_policy, keep_alive, telemetry_interval
+                        )
+                        record(model, f"thermal_w{window}", 1, metrics, detail, window_tokens, think_policy)
+                        tps = float(metrics.get("tokens_per_second") or 0)
+                        if first_tps is None:
+                            first_tps = tps
+                        last_tps = tps
+                    if first_tps and last_tps is not None:
+                        drop = (first_tps - last_tps) / first_tps * 100.0
+                        print(f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s ({drop:+.1f}%)")
+
+            finally:
+                try:
+                    client.ensure_unloaded(model)
+                except BenchmarkError as exc:
+                    print(f"WARNING: {exc}", file=sys.stderr)
 
     meta["finished_at"] = iso_now()
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")

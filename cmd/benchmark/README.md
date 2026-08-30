@@ -12,13 +12,13 @@ bc250-benchmark
 # Faster/lower-context pass
 BENCH_PROFILE=conservative bc250-benchmark
 
-# Test the registered Modelfile as deployed (SYSTEM and sampling unchanged)
+# Production-configuration comparison: keep registered SYSTEM and sampling
 BENCH_MODE=production bc250-benchmark
 
 # Specific registered models
 bc250-benchmark generation MODEL_A MODEL_B
 
-# Agentic store; use the agent service exclusively while benchmarking it
+# Generic generation on the agent store (performance comparison only)
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```
 
@@ -26,7 +26,9 @@ OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 `system` override; `/api/chat` receives the same text as a system message. The
 registered model is not modified and its normal renderer/template is still used.
 `BENCH_MODE=production` omits that override and does not override temperature,
-`top_p` or `top_k`.
+`top_p` or `top_k`. It is a **production-configuration** comparison using the same
+generic generation workload; it is not yet the deferred role-specific Office/RAG/
+translation use-case suite.
 
 `THINK_MODE=auto` preserves the package's model-family policy: GPT-OSS uses
 `medium`, packaged stock Qwen3.5/Qwen3-4B non-thinking profiles use `false`, and
@@ -35,8 +37,10 @@ Gemma4/native-reasoning families leave `think` unset. Explicit
 comparison. These values match Ollama 0.32.15's request API.
 
 The standard generation suite records cold/warm chat latency, loaded decode,
-document prefill and a context-capacity curve. `RUN_THERMAL=1` adds sustained
-decode windows. Early-stop warnings are emitted only for a short
+document prefill and a context-capacity curve. A run labelled `cold_chat` is
+started only after Ollama `/api/ps` confirms the previous model is unloaded; an
+unload failure aborts that cold measurement instead of silently recording a warm
+load. `RUN_THERMAL=1` adds sustained decode windows. Early-stop warnings are emitted only for a short
 `done_reason=stop`; reaching the requested limit with `done_reason=length` is not
 an early-EOS failure.
 
@@ -50,8 +54,10 @@ bc250-benchmark embeddings embed-jina-v5-small-retrieval-q4-k-m embed-qwen3-0.6b
 The packaged DE/FR/EN office fixture measures Recall@1, Recall@3, MRR,
 cross-language retrieval and warm input throughput. Jina uses `Query:` /
 `Document:`; Qwen3 Embedding uses the documented English retrieval instruction
-on queries and no content prefix. Use the same prefix scheme in Open WebUI and
-reindex when switching embedding models.
+on queries and no content prefix. The packaged Jina GGUF includes upstream
+`pooling_type` metadata required for reliable embedding-model detection. Use the
+same prefix scheme in Open WebUI and reindex when switching embedding models or
+when replacing an older Jina GGUF with the refreshed package file.
 
 ## OCR
 
@@ -61,8 +67,9 @@ bc250-ocr test dots /PATH/TO/REAL-PAGE.png
 ```
 
 The benchmark uses deterministic German, French and mixed office-page images and
-checks text/field recall plus runtime. GLM, dots.ocr, OvisOCR2 and Chandra receive
-model-specific extraction prompts. OCR must preserve the source language; review
+checks token precision/recall/F1, normalized character similarity, exact required-
+field recall, key-field reading order and runtime. GLM, dots.ocr, OvisOCR2 and
+Chandra receive model-specific extraction prompts. OCR must preserve the source language; review
 and clean the result before putting canonical Markdown under the RAG `active/`
 tree. The packaged fixtures are regression/comparison tests, not a substitute for
 a representative real scan corpus.
@@ -73,19 +80,41 @@ a representative real scan corpus.
 bc250-benchmark task
 ```
 
-The task suite targets `http://127.0.0.1:11435` by default and exercises Open
-WebUI 0.11-style title, tag and retrieval-query prompts in German, French and
-English. It checks JSON shape, simple content relevance and latency. Requests use
-`keep_alive=0`, matching the isolated task service.
+The task suite targets `http://127.0.0.1:11435` by default and mirrors the
+relevant Open WebUI **0.11.0** task behavior in compact fixtures: title uses the
+latest two messages, tags the latest six (with the short-chat `General` fallback),
+and retrieval-query generation the latest six plus the current date. It checks
+JSON shape, simple content relevance and latency. Requests use
+`keep_alive=0`, matching the isolated task service. Its CSV deliberately keeps
+only the small telemetry subset useful for this short background workload.
+
+## Agent/coding
+
+```bash
+bc250-benchmark agent
+bc250-benchmark agent agentic-ornith15-9b-ornith-q5-k-m
+```
+
+This lane defaults to `http://127.0.0.1:11436`. Stop/avoid a large main-model
+workload while using it. The small fixture set checks Bash syntax, Python syntax
+and required structured output without executing model-generated code. A response
+passes only when syntax/structure and the fixture's required elements both pass.
+Native model reasoning is not globally forced off. The lane also leaves
+temperature/top-p/top-k to the deployed Modelfile by default; set
+`AGENT_TEMPERATURE=0` only for an explicit deterministic comparison. It does not
+override the agent service keep-alive and unloads each benchmarked model after
+the run.
 
 ## Telemetry and outputs
 
-All benchmark lanes sample hardware/resource telemetry during the request rather
-than relying on a second terminal:
+Generation, embedding and OCR lanes sample the full hardware/resource set during
+the request rather than relying on a second terminal. One AMD DRM device is
+selected (prefer the boot VGA device; override with `BC250_DRM_CARD=cardN`) and
+its on-die/edge temperature is used for the 80/83/85 °C thresholds:
 
-- peak and p95 temperature plus time at/above 80/83/85 °C;
-- GPU busy percentage and observed min/max GPU clock;
-- AMDGPU `mem_info_vram_used` / `mem_info_gtt_used` peaks when exposed;
+- peak and p95 GPU edge temperature plus time at/above 80/83/85 °C;
+- selected-GPU busy percentage and observed min/max GPU clock;
+- selected AMDGPU `mem_info_vram_used` / `mem_info_gtt_used` peaks when exposed;
 - minimum Linux `MemAvailable` and maximum swap use;
 - Ollama `/api/ps` resident size, reported `size_vram` and allocated context.
 
@@ -95,10 +124,12 @@ will fit. Use them as same-board headroom signals and validate a larger quant
 with an actual run.
 
 Generation produces CSV + JSONL response sidecar + JSON metadata. Category runs
-produce the same three-file pattern. Metadata records Ollama version, model
-digest/family/quant and benchmark policy so refreshed model registrations are not
-silently compared as if they were identical.
+produce the same three-file pattern. Category metadata is intentionally lighter
+than generation metadata but still records Ollama version and model identity.
+Task and agent CSVs intentionally keep a smaller telemetry subset.
 
 Useful overrides include `OLLAMA_URL`, `BENCH_MODE`, `THINK_MODE`,
 `BENCH_PROFILE`, `RUN_LATENCY`, `RUN_CONTEXT`, `RUN_THERMAL`, `REPEATS`,
-`TELEMETRY_INTERVAL`, `KEEP_ALIVE`, `CTX_POINTS` and the `NUM_PREDICT_*` values.
+`TELEMETRY_INTERVAL`, `BC250_DRM_CARD`, `KEEP_ALIVE`, `CTX_POINTS`,
+`AGENT_TEMPERATURE` and the `NUM_PREDICT_*` values. `KEEP_ALIVE` applies to the generation/embedding/OCR
+paths; task keeps `0` and the agent lane relies on its service policy then unloads.

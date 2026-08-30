@@ -22,7 +22,9 @@ make distclean      # remove both
 Authoritative upstream repositories, commits, URLs and archive names are in
 `packaging/upstreams.toml`. `make validate` checks full commit formatting and
 that each pinned commit is referenced by the RPM spec; maintainers still review
-the upstream repository itself before changing a pin. RPM scriptlets must never
+the upstream repository itself before changing a pin. The first HTTPS fetch of a
+pinned commit records a local `sources/ARCHIVE.sha256`; cached upstream and Cargo
+vendor archives are reused only after that sidecar verifies. RPM scriptlets never
 fetch third-party code.
 
 ## Update a pinned source
@@ -42,14 +44,16 @@ fetch third-party code.
 6. Install the `dist/*.x86_64.rpm` on Fedora 44 and test the affected feature.
 
 The governor vendor archive is generated from its `Cargo.lock` with
-`cargo vendor --locked`. Cached source archives are not independently
-authenticated by a second local lock file, so release builders should use a
-controlled cache and inspect the source RPM.
+`cargo vendor --locked` and receives the same local checksum sidecar. The
+sidecars protect a prepared build cache against later corruption/replacement;
+they do not claim that GitHub's generated tarball bytes are a permanent global
+release checksum. Inspect the source RPM for release builds.
 
 ## Release checklist
 
-- Bump `VERSION`, spec `Version`, spec `Release` and the top spec changelog
-  entry together.
+- For a feature version bump, update `VERSION` and spec `Version`; for every
+  build bump spec `Release`. Keep the top spec changelog entry aligned with the
+  resulting Version-Release.
 - Review pinned revisions, licenses and source-RPM contents.
 - Run `make validate` and build on Fedora 44.
 - Inspect the binary payload and run `rpmlint`.

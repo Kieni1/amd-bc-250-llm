@@ -129,7 +129,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         generation = (ROOT / "cmd/benchmark/generation-benchmark.py").read_text(encoding="utf-8")
         categories = (ROOT / "cmd/benchmark/category-benchmark.py").read_text(encoding="utf-8")
         common = (ROOT / "cmd/benchmark/benchmark_common.py").read_text(encoding="utf-8")
-        for expected in ("embeddings|embedding|ocr|task", "generation-benchmark.py", "Ollama 0.32.15"):
+        for expected in ("embeddings|embedding|ocr|task|agent|coding", "generation-benchmark.py", "Ollama 0.32.15"):
             self.assertIn(expected, wrapper)
         for expected in (
             "BENCH_MODE", "NEUTRAL_SYSTEM", 'payload["system"] = NEUTRAL_SYSTEM',
@@ -139,9 +139,9 @@ class RuntimeConvenienceTests(unittest.TestCase):
         ):
             self.assertIn(expected, generation)
         self.assertNotIn('"think": false', generation.lower())
-        for expected in ("recall_at_1", "cross_mrr", "OCR_PROMPTS", "task_prompt", '"keep_alive": 0'):
+        for expected in ("recall_at_1", "cross_mrr", "OCR_PROMPTS", "word_precision", "word_f1", "char_similarity", "field_order_score", "task_prompt", "benchmark_agent", "validate_agent_output", '"keep_alive": 0'):
             self.assertIn(expected, categories)
-        for expected in ("mem_info_vram_used", "mem_info_gtt_used", "seconds_ge_85c", "gpu_clock_min_mhz"):
+        for expected in ("mem_info_vram_used", "mem_info_gtt_used", "seconds_ge_85c", "gpu_clock_min_mhz", "discover_amdgpu_device", "amdgpu_edge_temperature"):
             self.assertIn(expected, common)
         result = subprocess.run(
             [str(ROOT / "cmd/benchmark/compare-models.sh"), "--help"], text=True,
@@ -150,6 +150,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("BENCH_MODE=neutral", result.stdout)
         self.assertIn("Ollama 0.32.15", result.stdout)
+        self.assertIn("bc250-benchmark agent", result.stdout)
 
 
 class CuStatusTests(unittest.TestCase):

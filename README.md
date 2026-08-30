@@ -20,6 +20,10 @@ BC-250. Then run:
 sudo ./install
 ```
 
+Until 1.0 this is a green-field/test-appliance installer: it may reapply the
+reviewed project baseline rather than preserve unrelated host tuning. Operator
+Modelfiles remain overrideable; see [`MODEL.md`](MODEL.md).
+
 The guided installer:
 
 1. grows the root filesystem when possible;
@@ -101,6 +105,7 @@ bc250-benchmark
 bc250-benchmark embeddings
 bc250-benchmark ocr
 bc250-benchmark task
+bc250-benchmark agent
 ```
 
 The complete installed interface and its exact syntax are in
@@ -143,7 +148,8 @@ Repository groups:
 
 - [`TLDR.md`](TLDR.md): short installation and operations sheet.
 - [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
-- [`models/README.md`](models/README.md): model discovery, addition and storage.
+- [`MODEL.md`](MODEL.md): operator model roles, swapping, overrides and cleanup.
+- [`models/README.md`](models/README.md): detailed Modelfile discovery/storage contract.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
 - [`docs/RAG.md`](docs/RAG.md): German/French/English office-document and knowledge-base pilot.
 - [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): backups, retention and power.

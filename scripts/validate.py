@@ -47,6 +47,7 @@ def included_files():
 def check_required_inputs() -> None:
     required = (
         "VERSION",
+        "MODEL.md",
         "Makefile",
         "install",
         "uninstall.sh",
@@ -61,6 +62,7 @@ def check_required_inputs() -> None:
         "cmd/system/40cu-module.sh",
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "models/mtp/models.toml",
+        "examples/benchmark/agent-cases.json",
         "docs/FILESTRUCTURE.md",
         "docs/RAG.md",
         "docs/GFX1013-COMPUTE-QUEUES.md",
@@ -197,9 +199,9 @@ def check_dispatcher_and_runtime_contracts() -> None:
     aliases = result.stdout.splitlines()
     required = {
         "40cu", "benchmark", "check-temp", "code", "code-commit",
-        "compare-experiments", "cu-status", "fetch-embeddings", "fetch-experiments", "fetch-models",
-        "fetch-mtp", "gitea-review", "install-cu-manager", "install-ollama",
-        "maintenance", "memory-profile", "model", "ocr", "rag-import", "ollama-profile", "pull-embedding-model",
+        "compare-mtp", "cu-status", "fetch-embeddings", "fetch-experiments", "fetch-models",
+        "fetch-mtp", "gitea-review", "install-ollama",
+        "maintenance", "memory-profile", "model", "ocr", "rag-import", "ollama-profile" ,
         "run-mtp", "setup-coding-agent", "setup-task-model", "status", "swap-profile",
         "uninstall", "uninstall-info", "verify", "verify-lan",
     }

@@ -1,5 +1,62 @@
 # Changelog
 
+## 0.9.7-0.5.testing - 2026-08-30
+
+Harden manager-owned GGUF reuse with schema-2 state metadata: unchanged size,
+mtime and ctime use the fast path; changed/legacy state is SHA-256 verified before
+reuse. Model cleanup now retains local source files when an Ollama registration
+cannot be removed.
+
+Require confirmed model unload before measurements labelled cold, normalize
+scheme-less Ollama hosts, and let agent benchmarks inherit deployed sampling by
+default (`AGENT_TEMPERATURE` remains an explicit deterministic override).
+
+Make RAG front matter a strict documented YAML subset, require `source_file` to
+remain inside its collection's `sources/` directory, and reject active/source
+symlink escapes. Protect reusable RPM source archives and the generated Cargo
+vendor archive with local SHA-256 sidecars; `sources-check` now verifies them.
+
+Remove the dead sensor logger and obsolete `install-cu-manager` /
+`pull-embedding-model` compatibility commands. Rename the narrow speed-only
+experiment helper to `bc250-compare-mtp`. CI now runs on pushes and pull requests
+and adds Fedora Ruff/ShellCheck before the RPM build.
+
+## 0.9.7-0.4.testing - 2026-08-30
+
+Fix the reviewed Jina embedding source to the upstream Q4_K_M GGUF carrying
+`pooling_type` metadata, paginate the complete Open WebUI upload inventory before
+pruning, and make the agent benchmark respect the isolated service residency
+policy with guaranteed immediate unload.
+
+Bind benchmark thermal/GPU/VRAM/GTT sampling to one selected AMD DRM device,
+use its edge/on-die temperature for the 80/83/85 C thresholds, and bump generation
+benchmark metadata to 7.1 for the changed telemetry semantics. Add embedding
+dimension validation and exception-safe per-model unload cleanup.
+
+Make OCR quality scoring penalize hallucinated output with token precision/F1 and
+normalized character similarity while retaining exact required-field/order checks.
+Align compact task fixtures with Open WebUI 0.11.0 message-window/tag/query
+behavior, remove the legacy experiment helper's global `think:false`, and set a
+fresh-install Open WebUI privacy baseline for sharing, code execution/interpreter
+and memories. Clarify that `BENCH_MODE=production` remains a generic
+production-configuration comparison; role-specific use-case benchmarking stays
+deferred.
+
+## 0.9.7-0.3.testing - 2026-08-30
+
+Add a compact `bc250-benchmark agent` lane for the isolated port-11436 service.
+The deterministic fixtures validate Bash/Python syntax and required structured
+output without executing model-generated code. This keeps coding correctness
+visible without adding a separate benchmark framework or dependency.
+
+Harden embedding/OCR telemetry cleanup so sampler threads are stopped on request
+errors. OCR now also reports required-field reading-order score. Task telemetry
+and lighter category metadata remain intentionally unchanged.
+
+Refresh benchmark, model and installation documentation, correct the source-tree
+benchmark link, add `MODEL.md`, and document the pre-1.0 green-field installer
+policy and intentionally flexible model revisions.
+
 ## 0.9.7-0.2.testing - 2026-08-30
 
 Refactor `bc250-benchmark` into a thin dispatcher with stdlib-only Python suites

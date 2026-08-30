@@ -109,6 +109,51 @@ class MaintenanceTests(unittest.TestCase):
             self.assertNotEqual(disabled.returncode, 0)
             self.assertIn("cannot both be disabled", disabled.stdout)
 
+    def test_pruning_fetches_all_open_webui_file_pages_before_selection(self) -> None:
+        script = ROOT / "cmd/maintenance/prune-uploads.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = Path(temporary) / "curl"
+            log = Path(temporary) / "pages.log"
+            fake.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    url="${@: -1}"
+                    page="${url##*page=}"
+                    printf '%s\\n' "$page" >> "$CURL_LOG"
+                    python3 - "$page" <<'PY'
+                    import json, sys
+                    page = int(sys.argv[1])
+                    total = 120
+                    start = (page - 1) * 50
+                    stop = min(start + 50, total)
+                    items = [
+                        {"id": f"file-{i:03d}", "created_at": 1_700_000_000 + i, "meta": {"size": 10 * 1024 * 1024}}
+                        for i in range(start, stop)
+                    ]
+                    print(json.dumps({"items": items, "total": total}))
+                    PY
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake.chmod(0o755)
+            env = os.environ | {
+                "PATH": f"{temporary}:{os.environ['PATH']}",
+                "CURL_LOG": str(log),
+                "OWUI_API_KEY": "test-key",
+                "MAX_AGE_DAYS": "0",
+                "MAX_TOTAL_GB": "1",
+                "DRY_RUN": "1",
+            }
+            result = subprocess.run(
+                [str(script)], env=env, text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Files=120", result.stdout)
+            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["1", "2", "3"])
+
 
 if __name__ == "__main__":
     unittest.main()

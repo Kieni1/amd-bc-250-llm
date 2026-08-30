@@ -81,6 +81,11 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("Refusing to install a second Ollama copy", result.stdout)
         self.assertNotIn("dnf remove", result.stdout)
 
+    def test_pre_v1_green_field_policy_is_explicit(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("green-field/test appliance", source)
+        self.assertIn("may reapply the reviewed project baseline", source)
+
     def test_standard_ollama_version_is_used_unless_overridden(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = INSTALLER.read_text(encoding="utf-8")

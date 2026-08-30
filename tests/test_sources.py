@@ -19,7 +19,7 @@ def load_prepare_sources():
 
 
 class SourceManifestTests(unittest.TestCase):
-    def test_manifest_describes_four_rpm_inputs_without_digest_bookkeeping(self) -> None:
+    def test_manifest_describes_four_rpm_inputs_with_local_cache_integrity(self) -> None:
         prepare = load_prepare_sources()
         sources = prepare.load_sources()
         self.assertEqual(len(prepare.source_files(sources)), 4)
@@ -27,21 +27,34 @@ class SourceManifestTests(unittest.TestCase):
         for source in sources:
             self.assertIn("repository", source)
             self.assertIn(source["commit"], spec)
-            self.assertNotIn("sha256", source)
             self.assertNotIn("required", source)
-            self.assertNotIn("vendor_sha256", source)
 
-    def test_existing_nonempty_archive_is_reused(self) -> None:
+    def test_existing_verified_archive_is_reused(self) -> None:
         prepare = load_prepare_sources()
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary) / "cached.tar.gz"
             archive.write_bytes(b"cached")
+            prepare.write_checksum(archive)
             prepare.download(
                 {"url": "https://invalid.example/{commit}", "commit": "a" * 40},
                 archive,
                 force=False,
             )
             self.assertEqual(archive.read_bytes(), b"cached")
+
+    def test_changed_cached_archive_is_rejected(self) -> None:
+        prepare = load_prepare_sources()
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "cached.tar.gz"
+            archive.write_bytes(b"cached")
+            prepare.write_checksum(archive)
+            archive.write_bytes(b"tampered")
+            with self.assertRaises(prepare.SourceError):
+                prepare.download(
+                    {"url": "https://invalid.example/{commit}", "commit": "a" * 40},
+                    archive,
+                    force=False,
+                )
 
 
 if __name__ == "__main__":

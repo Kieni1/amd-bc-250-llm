@@ -24,10 +24,11 @@ Usage: sudo ./install [--rpm FILE-OR-DIRECTORY]
        sudo ./install --models-only
 
 The binary bc250-llm-server x86_64 RPM is expected beside this script. Use
---rpm only to select a different RPM file or directory. The script grows the
-root filesystem, updates Fedora, installs the RPM, normalizes official Ollama,
-applies memory/swap profiles, prepares 40-CU support, offers model setup and
-runs verification.
+--rpm only to select a different RPM file or directory. Before 1.0 this installer
+assumes a green-field/test appliance and may reapply the reviewed project baseline
+instead of preserving unrelated host tuning. It grows the root filesystem, updates
+Fedora, installs the RPM, normalizes official Ollama, applies memory/swap profiles,
+prepares 40-CU support, offers model setup and runs verification.
 
 Run the same command again after a requested reboot. The installer prepares but
 does not enable experimental CUs; that remains an explicit operator action.

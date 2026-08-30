@@ -1,0 +1,23 @@
+[
+  {
+    "id": "bash-model-list",
+    "validator": "bash",
+    "num_predict": 320,
+    "required": ["find", "*.Modelfile", "sort"],
+    "prompt": "Write a Bash script that accepts one directory argument and prints only the basenames of *.Modelfile files directly in that directory, sorted lexicographically. Exit with status 2 when the argument is missing. Handle spaces in paths safely. Return only the script, with no Markdown fences or explanation."
+  },
+  {
+    "id": "python-port-parser",
+    "validator": "python",
+    "num_predict": 384,
+    "required": ["def parse_ports", "split", "sort"],
+    "prompt": "Write Python 3 code defining parse_ports(value: str) -> list[int]. It must parse comma-separated TCP ports, ignore blank items, reject values outside 1..65535 with ValueError, remove duplicates, and return ascending ports. Use only the standard library. Return only code, with no Markdown fences or explanation."
+  },
+  {
+    "id": "json-repo-plan",
+    "validator": "json",
+    "num_predict": 192,
+    "required": ["summary", "files", "commands"],
+    "prompt": "Return one raw JSON object for a small repository-change plan. It must contain keys summary (string), files (array of strings), and commands (array of strings). The change is: update a benchmark fixture and run the repository validation suite. Return only JSON, with no Markdown or explanation."
+  }
+]

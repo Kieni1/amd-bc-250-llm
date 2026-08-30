@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Fetch the pinned third-party archives needed by rpmbuild.
 
-Normal builds reuse non-empty files in sources/.  This intentionally keeps
-source acquisition separate from release-artifact checksums: the pinned commit
-URLs identify upstream revisions, while the generated SRPM records the exact
-bytes used for a build.
+Normal builds reuse cached files only after validating a local SHA-256 sidecar.
+The first HTTPS fetch is anchored by the pinned upstream commit URL, then records
+the exact bytes in sources/*.sha256 so later builds detect cache corruption or
+replacement. Generated Cargo vendor archives use the same integrity sidecar.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 from pathlib import Path
 import shutil
@@ -83,9 +84,42 @@ def display_path(path: Path) -> Path:
         return path
 
 
+
+
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def checksum_path(path: Path) -> Path:
+    return path.with_name(f"{path.name}.sha256")
+
+
+def write_checksum(path: Path) -> None:
+    checksum_path(path).write_text(f"{sha256(path)}  {path.name}\n", encoding="utf-8")
+
+
+def verify_checksum(path: Path) -> bool:
+    sidecar = checksum_path(path)
+    if not path.is_file() or path.stat().st_size == 0 or not sidecar.is_file():
+        return False
+    parts = sidecar.read_text(encoding="utf-8").strip().split()
+    if len(parts) != 2 or parts[1] != path.name or len(parts[0]) != 64:
+        raise SourceError(f"invalid checksum sidecar: {display_path(sidecar)}")
+    actual = sha256(path)
+    if actual != parts[0].lower():
+        raise SourceError(
+            f"cached source checksum mismatch: {display_path(path)}; "
+            "remove it or rerun with --force"
+        )
+    return True
+
 def download(source: dict, archive: Path, *, force: bool) -> None:
-    if archive.is_file() and archive.stat().st_size and not force:
-        print(f"Using cached {display_path(archive)}")
+    if not force and verify_checksum(archive):
+        print(f"Using verified cache {display_path(archive)}")
         return
     curl = shutil.which("curl")
     if curl is None:
@@ -119,15 +153,16 @@ def download(source: dict, archive: Path, *, force: bool) -> None:
         if temporary.stat().st_size == 0:
             raise SourceError(f"download produced an empty archive: {archive.name}")
         os.replace(temporary, archive)
-        print(f"Fetched {display_path(archive)}")
+        write_checksum(archive)
+        print(f"Fetched and checksummed {display_path(archive)}")
     finally:
         temporary.unlink(missing_ok=True)
 
 
 def prepare_cargo_vendor(source: dict, archive: Path, *, force: bool) -> Path:
     vendor = SOURCE_DIR / expand(source["vendor_archive"], source)
-    if vendor.is_file() and vendor.stat().st_size and not force:
-        print(f"Using cached {display_path(vendor)}")
+    if not force and verify_checksum(vendor):
+        print(f"Using verified cache {display_path(vendor)}")
         return vendor
 
     for command in ("cargo", "tar"):
@@ -173,9 +208,10 @@ def prepare_cargo_vendor(source: dict, archive: Path, *, force: bool) -> Path:
             check=True,
         )
         os.replace(temporary, vendor)
+        write_checksum(vendor)
     finally:
         temporary.unlink(missing_ok=True)
-    print(f"Created {display_path(vendor)}")
+    print(f"Created and checksummed {display_path(vendor)}")
     return vendor
 
 
@@ -214,7 +250,19 @@ def main() -> int:
         ]
         if missing:
             raise SourceError(f"missing source files: {', '.join(missing)}")
-        print(f"Source cache ready: {len(source_files(selected))} file(s)")
+        unchecked = [
+            str(path.relative_to(ROOT))
+            for path in source_files(selected)
+            if not checksum_path(path).is_file()
+        ]
+        if unchecked:
+            raise SourceError(
+                "source files lack checksum sidecars; run make clean-sources && make sources: "
+                + ", ".join(unchecked)
+            )
+        for path in source_files(selected):
+            verify_checksum(path)
+        print(f"Source cache verified: {len(source_files(selected))} file(s)")
         return 0
 
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)

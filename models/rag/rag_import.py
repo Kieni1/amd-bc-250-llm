@@ -20,6 +20,8 @@ DEFAULT_ROOT = Path(os.environ.get("BC250_RAG_ROOT", "/srv/bc250-documents"))
 DEFAULT_URL = os.environ.get("OPEN_WEBUI_URL", "http://127.0.0.1:3000").rstrip("/")
 SCOPES = ("public", "confidential")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+TOP_LEVEL_KEYS = {"document_id", "title", "language", "status", "authority", "source_file", "source_sha256", "relation"}
+RELATION_KEYS = {"type", "counterpart", "source_language"}
 
 
 def knowledge_name(scope: str, collection: str, lane: str) -> str:
@@ -61,6 +63,7 @@ def _unquote(value: str) -> str:
 
 
 def front_matter(path: Path) -> dict[str, object]:
+    """Parse the deliberately small YAML subset documented for RAG metadata."""
     lines = path.read_text(encoding="utf-8").splitlines()
     if not lines or lines[0].strip() != "---":
         raise ValueError("missing YAML front matter")
@@ -71,22 +74,41 @@ def front_matter(path: Path) -> dict[str, object]:
 
     data: dict[str, object] = {}
     section: str | None = None
-    for raw in lines[1:end]:
+    for line_number, raw in enumerate(lines[1:end], 2):
         if not raw.strip() or raw.lstrip().startswith("#"):
             continue
-        indent = len(raw) - len(raw.lstrip())
-        match = re.match(r"^\s*([A-Za-z0-9_-]+):(?:\s*(.*))?$", raw)
+        indent = len(raw) - len(raw.lstrip(" "))
+        if "	" in raw[:indent] or indent not in {0, 2}:
+            raise ValueError(f"unsupported YAML indentation on line {line_number}")
+        match = re.fullmatch(r"\s*([A-Za-z0-9_-]+):(?:\s*(.*))?", raw)
         if not match:
-            continue
+            raise ValueError(f"unsupported YAML syntax on line {line_number}")
         key, value = match.group(1), (match.group(2) or "")
         if indent == 0:
-            section = key if not value else None
-            if value:
-                data[key] = _unquote(value)
-            elif key == "relation":
+            if key not in TOP_LEVEL_KEYS:
+                raise ValueError(f"unsupported front-matter key: {key}")
+            if key in data:
+                raise ValueError(f"duplicate front-matter key: {key}")
+            if not value:
+                if key != "relation":
+                    raise ValueError(f"only relation may be a nested section: {key}")
                 data[key] = {}
-        elif section == "relation" and isinstance(data.get("relation"), dict):
-            data["relation"][key] = _unquote(value)  # type: ignore[index]
+                section = key
+            else:
+                data[key] = _unquote(value)
+                section = None
+            continue
+        if section != "relation" or not isinstance(data.get("relation"), dict):
+            raise ValueError(f"nested key outside relation on line {line_number}")
+        if key not in RELATION_KEYS:
+            raise ValueError(f"unsupported relation key: {key}")
+        relation = data["relation"]
+        assert isinstance(relation, dict)
+        if key in relation:
+            raise ValueError(f"duplicate relation key: {key}")
+        if not value:
+            raise ValueError(f"relation value must be scalar: {key}")
+        relation[key] = _unquote(value)
     return data
 
 
@@ -125,14 +147,20 @@ def _sha256(path: Path) -> str:
 
 
 def _resolve_source(active_file: Path, source_file: str, expected: str) -> tuple[Path, str | None]:
+    if Path(source_file).name != source_file or source_file in {".", ".."}:
+        raise ValueError("source_file must be a filename inside sources/")
     sources = active_file.parent.parent / "sources"
-    named = sources / source_file
-    if named.is_file() and _sha256(named).lower() == expected.lower():
-        return named, None
+    if sources.is_symlink():
+        raise ValueError(f"sources directory must not be a symlink: {sources}")
     if not sources.is_dir():
         raise ValueError(f"missing sources directory: {sources}")
+    named = sources / source_file
+    if named.is_symlink():
+        raise ValueError(f"source_file must not be a symlink: {source_file}")
+    if named.is_file() and _sha256(named).lower() == expected.lower():
+        return named, None
 
-    matches = [p for p in sources.iterdir() if p.is_file() and _sha256(p).lower() == expected.lower()]
+    matches = [p for p in sources.iterdir() if p.is_file() and not p.is_symlink() and _sha256(p).lower() == expected.lower()]
     if len(matches) == 1:
         return matches[0], f"source_file names {source_file!r}, checksum matches {matches[0].name!r}"
     if named.is_file():
@@ -146,10 +174,19 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
     errors: list[str] = []
     for scope in SCOPES:
         scope_dir = root / scope
+        if scope_dir.is_symlink():
+            errors.append(f"{scope_dir}: scope directory must not be a symlink")
+            continue
         if not scope_dir.exists():
             continue
         for collection_dir in sorted(p for p in scope_dir.iterdir() if p.is_dir()):
+            if collection_dir.is_symlink():
+                errors.append(f"{collection_dir}: collection directory must not be a symlink")
+                continue
             active = collection_dir / "active"
+            if active.is_symlink():
+                errors.append(f"{active}: active directory must not be a symlink")
+                continue
             if not active.is_dir():
                 continue
             nested = [p for p in active.rglob("*.md") if p.parent != active]
@@ -158,6 +195,8 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
                 continue
             for path in sorted(active.glob("*.md")):
                 try:
+                    if path.is_symlink():
+                        raise ValueError("active Markdown must not be a symlink")
                     meta = front_matter(path)
                     lane, language = route(meta)
                     source_file = str(meta.get("source_file", "")).strip()

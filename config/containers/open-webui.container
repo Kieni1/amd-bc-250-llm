@@ -20,6 +20,12 @@ DropCapability=all
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 Environment=ENABLE_OPENAI_API=false
+# Fresh-install privacy baseline. Operators can deliberately re-enable these
+# application features later if their local policy/use case requires them.
+Environment=ENABLE_COMMUNITY_SHARING=false
+Environment=ENABLE_CODE_EXECUTION=false
+Environment=ENABLE_CODE_INTERPRETER=false
+Environment=ENABLE_MEMORIES=false
 Environment=RAG_EMBEDDING_ENGINE=ollama
 Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m
 Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11434

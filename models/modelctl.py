@@ -15,6 +15,7 @@ import pwd
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -169,7 +170,6 @@ def modelfile_metadata(path: Path) -> dict[str, str]:
 
 
 def load_modelfile(path: Path) -> dict:
-    context = str(path)
     if path.suffix != ".Modelfile":
         raise ModelError(f"{path}: expected a .Modelfile template")
     name = path.name.removesuffix(".Modelfile")
@@ -452,18 +452,33 @@ def load_state(path: Path) -> dict:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    return value if isinstance(value, dict) and value.get("schema") == 1 else {}
+    if not isinstance(value, dict) or value.get("schema") not in {1, 2}:
+        return {}
+    return value
 
 
 def state_matches(state: dict, model: dict, output: Path) -> bool:
-    """Reuse bytes only when their recorded source identity still matches."""
+    """Validate the current GGUF, using stat metadata only as a safe fast path."""
+    if not output.is_file():
+        return False
+    stat = output.stat()
+    if stat.st_size <= 0:
+        return False
     recorded = str(state.get("sha256", ""))
     expected = model.get("sha256", "")
     provenance = ("repository", "revision", "gguf")
-    return (output.is_file() and output.stat().st_size > 0
-            and all(state.get(key) == model[key] for key in provenance)
-            and re.fullmatch(r"[0-9a-f]{64}", recorded) is not None
-            and (not expected or recorded == expected))
+    if (not all(state.get(key) == model[key] for key in provenance)
+            or re.fullmatch(r"[0-9a-f]{64}", recorded) is None
+            or (expected and recorded != expected)):
+        return False
+    if (state.get("schema") == 2
+            and state.get("size") == stat.st_size
+            and state.get("mtime_ns") == stat.st_mtime_ns
+            and state.get("ctime_ns") == stat.st_ctime_ns):
+        return True
+    # Old sidecars and files whose stat metadata changed are re-hashed. This
+    # catches corruption/modification without reading multi-GiB GGUFs on every list/install.
+    return sha256(output) == recorded
 
 
 def sha256(path: Path) -> str:
@@ -474,13 +489,31 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def ensure_file_permissions(path: Path, uid: int, gid: int, mode: int) -> bool:
+    """Apply ownership/mode only when needed; return whether inode metadata changed."""
+    current = path.stat()
+    changed = False
+    if current.st_uid != uid or current.st_gid != gid:
+        os.chown(path, uid, gid)
+        changed = True
+        current = path.stat()
+    if stat.S_IMODE(current.st_mode) != mode:
+        os.chmod(path, mode)
+        changed = True
+    return changed
+
+
 def write_state(path: Path, model: dict, checksum: str, gid: int) -> None:
+    stat = path.with_name(path.name.removesuffix(".bc250.json")).stat()
     value = {
-        "schema": 1,
+        "schema": 2,
         "repository": model["repository"],
         "revision": model["revision"],
         "gguf": model["gguf"],
         "sha256": checksum,
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "ctime_ns": stat.st_ctime_ns,
     }
     temporary = path.with_name(f".{path.name}.tmp")
     try:
@@ -728,6 +761,13 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             state = load_state(metadata)
             if state_matches(state, model, output) and not args.refresh:
                 checksum = state["sha256"]
+                permissions_changed = ensure_file_permissions(output, 0, gid, 0o640)
+                current = output.stat()
+                if (state.get("schema") != 2 or state.get("size") != current.st_size
+                        or state.get("mtime_ns") != current.st_mtime_ns
+                        or state.get("ctime_ns") != current.st_ctime_ns
+                        or permissions_changed):
+                    write_state(metadata, model, checksum, gid)
                 print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
             else:
                 minimum = args.min_free_bytes if args.min_free_bytes is not None \
@@ -762,13 +802,10 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 if expected and checksum != expected:
                     raise ModelError(f"checksum mismatch: got {checksum}, expected {expected}")
                 atomic_replace(staged, output)
-                os.chown(output, 0, gid)
-                os.chmod(output, 0o640)
+                ensure_file_permissions(output, 0, gid, 0o640)
                 write_state(metadata, model, checksum, gid)
                 print(f"    recorded SHA-256 {checksum}")
 
-            os.chown(output, 0, gid)
-            os.chmod(output, 0o640)
             if model["provider"] == "download-only":
                 print("    ready for llama.cpp")
                 continue
@@ -806,18 +843,30 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
             print("Cleanup cancelled.")
             return 0
-    _uid, gid = ollama_identity()
+    _uid, _gid = ollama_identity()
     host = ollama_host(defaults)
     ollama_bin = shutil.which("ollama")
+    failures: list[str] = []
+    removed = 0
     for model in models:
         label = model.get("name", model["id"])
         print(f"\n>>> removing {label}")
-        if model["provider"].startswith("ollama") and ollama_bin:
-            run_as_ollama(
+        if model["provider"].startswith("ollama"):
+            if not ollama_bin:
+                print("    ERROR: ollama executable is unavailable; local source retained", file=sys.stderr)
+                failures.append(label)
+                continue
+            result = run_as_ollama(
                 [ollama_bin, "rm", model["name"]],
                 {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
             )
-        paths = []
+            if result.returncode != 0:
+                registrations = registered_models(host)
+                if registrations is None or model["name"] in registrations:
+                    print("    ERROR: Ollama registration could not be removed; local source retained", file=sys.stderr)
+                    failures.append(label)
+                    continue
+        paths: list[Path] = []
         output = None
         if model["provider"] != "ollama-hf":
             output = model_path(defaults, model)
@@ -834,7 +883,11 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 output.parent.rmdir()
             except OSError:
                 pass
-    print(f"\nRemoved {len(models)} model(s). Source Modelfiles were retained.")
+        removed += 1
+    print(f"\nRemoved {removed} model(s). Source Modelfiles were retained.")
+    if failures:
+        print(f"Failed: {' '.join(failures)}", file=sys.stderr)
+        return 2
     return 0
 
 

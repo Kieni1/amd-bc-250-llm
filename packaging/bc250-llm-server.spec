@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.7
-Release:        0.2.testing%{?dist}
+Release:        0.5.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,21 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.5.testing
+- Harden model/source integrity, cold benchmark state and RAG provenance validation
+- Debloat compatibility commands, rename MTP quick comparison and add CI linting
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.4.testing
+- Fix Jina embedding metadata source, complete upload pruning pagination and agent unload policy.
+- Bind benchmark telemetry to the selected AMD DRM device and improve OCR hallucination scoring.
+- Align task fixtures with Open WebUI 0.11.0 behavior and harden fresh-install privacy defaults.
+- Add focused cleanup/dimension/reasoning regressions and clarify production-configuration benchmarking.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.3.testing
+- Add a compact agent/coding correctness benchmark on the isolated agent service.
+- Harden benchmark telemetry cleanup and add OCR key-field reading-order scoring.
+- Refresh model/install/benchmark documentation and add the pre-1.0 MODEL.md guide.
+
 * Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.2.testing
 - Split benchmarking into neutral/production generation, embedding, OCR and task suites.
 - Add request-time thermal/UMA telemetry, model digests and JSONL response sidecars.

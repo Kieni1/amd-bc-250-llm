@@ -23,13 +23,6 @@ STANDARD_OLLAMA_VERSION = "0.32.15"
 DEFAULT_TIMEOUT = 900.0
 DEFAULT_TELEMETRY_INTERVAL = 0.5
 TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
-TEMP_LABEL_RE = re.compile(
-    os.environ.get(
-        "BC250_TELEMETRY_TEMP_PATTERN",
-        r"(edge|junction|tctl|amd tsi|thermistor)",
-    ),
-    re.IGNORECASE,
-)
 
 
 class BenchmarkError(RuntimeError):
@@ -38,6 +31,9 @@ class BenchmarkError(RuntimeError):
 
 class OllamaClient:
     def __init__(self, base_url: str, timeout: float = DEFAULT_TIMEOUT) -> None:
+        base_url = base_url.strip()
+        if "://" not in base_url:
+            base_url = f"http://{base_url}"
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
@@ -123,11 +119,12 @@ class OllamaClient:
     def ps(self) -> list[dict[str, Any]]:
         return list(self.json_request("/api/ps").get("models", []))
 
-    def stop(self, model: str) -> None:
+    def stop(self, model: str) -> bool:
+        """Request model unload, falling back to the Ollama 0.32.15 HTTP path."""
         env = os.environ.copy()
         env["OLLAMA_HOST"] = self.base_url
         try:
-            subprocess.run(
+            result = subprocess.run(
                 ["ollama", "stop", model],
                 check=False,
                 stdout=subprocess.DEVNULL,
@@ -135,35 +132,51 @@ class OllamaClient:
                 env=env,
                 timeout=30,
             )
-            return
+            if result.returncode == 0:
+                return True
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         # Ollama documents an empty /api/generate request with keep_alive=0 as
         # the HTTP unload path. This remains valid in 0.32.15.
         try:
             self.json_request("/api/generate", {"model": model, "keep_alive": 0, "stream": False})
+            return True
         except BenchmarkError:
-            # Embedding-only or multimodal remote registrations may reject
-            # generation; callers can still continue after the best-effort stop.
-            return
+            # Embedding-only or multimodal registrations can reject generation.
+            # The caller decides whether a failed unload is fatal for its lane.
+            return False
 
-    def wait_unloaded(self, model: str, timeout: float = 30.0) -> None:
+    def model_loaded(self, model: str) -> bool:
+        """Return whether /api/ps currently reports this exact model."""
         normalized = model.removesuffix(":latest")
+        return any(
+            str(row.get("name") or row.get("model") or "").removesuffix(":latest") == normalized
+            for row in self.ps()
+        )
+
+    def wait_unloaded(self, model: str, timeout: float = 30.0) -> bool:
+        """Return True only after /api/ps confirms that the model is absent."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             try:
-                running = self.ps()
+                if not self.model_loaded(model):
+                    return True
             except BenchmarkError:
-                return
-            found = False
-            for row in running:
-                name = str(row.get("name") or row.get("model") or "").removesuffix(":latest")
-                if name == normalized:
-                    found = True
-                    break
-            if not found:
-                return
+                return False
             time.sleep(0.25)
+        return False
+
+    def ensure_unloaded(self, model: str, timeout: float = 30.0) -> None:
+        """Require a confirmed unload; return immediately when already absent."""
+        try:
+            if not self.model_loaded(model):
+                return
+        except BenchmarkError as exc:
+            raise BenchmarkError(f"cannot verify model residency before unload: {model}") from exc
+        if not self.stop(model):
+            raise BenchmarkError(f"could not request unload for {model}")
+        if not self.wait_unloaded(model, timeout):
+            raise BenchmarkError(f"model remained loaded after {timeout:.0f}s: {model}")
 
     def digest(self, model: str) -> str:
         normalized = model.removesuffix(":latest")
@@ -219,45 +232,97 @@ def read_meminfo() -> tuple[float | None, float | None]:
     return available_mib, swap_used_mib
 
 
-def hwmon_temperatures() -> list[tuple[str, float]]:
-    matches: list[tuple[str, float]] = []
-    fallback: list[tuple[str, float]] = []
-    for input_path in Path("/sys/class/hwmon").glob("hwmon*/temp*_input"):
-        raw = read_int(input_path)
+def discover_amdgpu_device(drm_root: Path = Path("/sys/class/drm")) -> Path | None:
+    """Return the BC-250/AMDGPU DRM device used for benchmark telemetry.
+
+    BC-250 appliances normally expose one AMD DRM card. Prefer the boot VGA
+    device if multiple AMD cards exist. BC250_DRM_CARD=cardN can override the
+    automatic choice without changing benchmark output schemas.
+    """
+    forced = os.environ.get("BC250_DRM_CARD", "").strip()
+    candidates: list[Path] = []
+    if forced:
+        card = drm_root / forced
+        if (card / "device").exists():
+            candidates.append(card / "device")
+    else:
+        for card in sorted(drm_root.glob("card[0-9]*")):
+            device = card / "device"
+            if not device.exists():
+                continue
+            try:
+                vendor = (device / "vendor").read_text(encoding="utf-8").strip().casefold()
+            except OSError:
+                continue
+            if vendor == "0x1002":
+                candidates.append(device)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda device: (read_int(device / "boot_vga") != 1, device.parent.name))
+    return candidates[0]
+
+
+def amdgpu_edge_temperature(device: Path | None) -> tuple[str, float | None]:
+    if device is None:
+        return "", None
+    hwmons = sorted((device / "hwmon").glob("hwmon*"))
+    for hwmon in hwmons:
+        try:
+            name = (hwmon / "name").read_text(encoding="utf-8").strip().casefold()
+        except OSError:
+            name = ""
+        if name and name != "amdgpu":
+            continue
+        inputs = sorted(hwmon.glob("temp*_input"))
+        if not inputs:
+            continue
+        chosen: Path | None = None
+        label = ""
+        for input_path in inputs:
+            label_path = input_path.with_name(input_path.name.replace("_input", "_label"))
+            try:
+                current_label = label_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                current_label = ""
+            if current_label.casefold() == "edge":
+                chosen, label = input_path, current_label
+                break
+        if chosen is None:
+            # AMDGPU temp1 is the on-die GPU temperature. On cards that expose
+            # labels this is normally "edge"; older ASICs may omit the label.
+            temp1 = hwmon / "temp1_input"
+            chosen = temp1 if temp1.exists() else inputs[0]
+            label_path = chosen.with_name(chosen.name.replace("_input", "_label"))
+            try:
+                label = label_path.read_text(encoding="utf-8").strip()
+            except OSError:
+                label = "edge" if chosen.name == "temp1_input" else chosen.stem
+        raw = read_int(chosen)
         if raw is None:
             continue
         value = raw / 1000.0 if abs(raw) > 1000 else float(raw)
-        label_path = input_path.with_name(input_path.name.replace("_input", "_label"))
-        try:
-            label = label_path.read_text(encoding="utf-8").strip()
-        except OSError:
-            label = input_path.parent.name + "/" + input_path.stem
-        item = (label, value)
-        fallback.append(item)
-        if TEMP_LABEL_RE.search(label):
-            matches.append(item)
-    return matches or fallback
+        return f"{device.parent.name}/amdgpu/{label or chosen.stem}", value
+    return "", None
 
 
-def current_gpu_clock_mhz() -> float | None:
-    clocks: list[float] = []
-    for path in Path("/sys/class/drm").glob("card*/device/pp_dpm_sclk"):
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
+def current_gpu_clock_mhz(device: Path | None) -> float | None:
+    if device is None:
+        return None
+    try:
+        text = (device / "pp_dpm_sclk").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        if "*" not in line:
             continue
-        for line in text.splitlines():
-            if "*" not in line:
-                continue
-            match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(MHz|Mhz|mhz)", line)
-            if match:
-                clocks.append(float(match.group(1)))
-    return max(clocks) if clocks else None
+        match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*(MHz|Mhz|mhz)", line)
+        if match:
+            return float(match.group(1))
+    return None
 
 
-def max_sysfs_int(pattern: str) -> int | None:
-    values = [value for path in Path("/sys/class/drm").glob(pattern) if (value := read_int(path)) is not None]
-    return max(values) if values else None
+def device_sysfs_int(device: Path | None, name: str) -> int | None:
+    return read_int(device / name) if device is not None else None
 
 
 @dataclass
@@ -277,25 +342,22 @@ class TelemetrySampler:
     def __init__(self, interval: float = DEFAULT_TELEMETRY_INTERVAL) -> None:
         self.interval = max(interval, 0.1)
         self.samples: list[TelemetrySample] = []
+        self.gpu_device = discover_amdgpu_device()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
     def _sample(self) -> TelemetrySample:
-        temps = hwmon_temperatures()
-        if temps:
-            temp_label, temp_c = max(temps, key=lambda item: item[1])
-        else:
-            temp_label, temp_c = "", None
-        busy_raw = max_sysfs_int("card*/device/gpu_busy_percent")
+        temp_label, temp_c = amdgpu_edge_temperature(self.gpu_device)
+        busy_raw = device_sysfs_int(self.gpu_device, "gpu_busy_percent")
         mem_available, swap_used = read_meminfo()
         return TelemetrySample(
             timestamp=time.monotonic(),
             temp_c=temp_c,
             temp_label=temp_label,
             gpu_busy_pct=float(busy_raw) if busy_raw is not None else None,
-            gpu_clock_mhz=current_gpu_clock_mhz(),
-            vram_used_bytes=max_sysfs_int("card*/device/mem_info_vram_used"),
-            gtt_used_bytes=max_sysfs_int("card*/device/mem_info_gtt_used"),
+            gpu_clock_mhz=current_gpu_clock_mhz(self.gpu_device),
+            vram_used_bytes=device_sysfs_int(self.gpu_device, "mem_info_vram_used"),
+            gtt_used_bytes=device_sysfs_int(self.gpu_device, "mem_info_gtt_used"),
             mem_available_mib=mem_available,
             swap_used_mib=swap_used,
         )
@@ -404,6 +466,8 @@ def normalize_words(text: str) -> list[str]:
 
 
 def cosine(left: list[float], right: list[float]) -> float:
+    if len(left) != len(right):
+        raise BenchmarkError(f"embedding dimension mismatch: {len(left)} != {len(right)}")
     numerator = sum(a * b for a, b in zip(left, right))
     left_norm = math.sqrt(sum(a * a for a in left))
     right_norm = math.sqrt(sum(b * b for b in right))

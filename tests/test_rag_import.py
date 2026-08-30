@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib.util
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -80,6 +81,42 @@ class RagImportTests(unittest.TestCase):
             self.assertEqual(len(docs), 1)
             self.assertEqual(len(warnings), 1)
             self.assertIn("checksum matches 'actual.pdf'", warnings[0])
+
+    def test_source_file_cannot_escape_sources_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            doc = self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
+            outside = root / "outside.pdf"
+            outside.write_bytes(b"outside")
+            digest = hashlib.sha256(outside.read_bytes()).hexdigest()
+            text = doc.read_text(encoding="utf-8")
+            text = re.sub(r'source_file: "[^"]+"', 'source_file: "../../outside.pdf"', text)
+            text = re.sub(r'source_sha256: "[^"]+"', f'source_sha256: "{digest}"', text)
+            doc.write_text(text, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "source_file must be a filename"):
+                rag.discover(root)
+
+    def test_active_and_source_symlinks_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            doc = self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
+            source = doc.parent.parent / "sources/de.pdf"
+            target = root / "outside.pdf"
+            target.write_bytes(source.read_bytes())
+            source.unlink()
+            source.symlink_to(target)
+            with self.assertRaisesRegex(ValueError, "must not be a symlink"):
+                rag.discover(root)
+
+    def test_front_matter_rejects_unsupported_or_duplicate_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad.md"
+            path.write_text("---\nlanguage: de-CH\nlanguage: fr-CH\n---\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "duplicate front-matter key"):
+                rag.front_matter(path)
+            path.write_text("---\nlanguage: de-CH\nunknown: value\n---\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unsupported front-matter key"):
+                rag.front_matter(path)
 
     def test_plan_needs_no_api_key_and_sync_contract_is_incremental(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

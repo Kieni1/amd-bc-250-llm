@@ -36,6 +36,11 @@ sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
 bc250-model list
 ```
 
+The packaged Jina Q4_K_M file is the upstream refresh that includes
+`pooling_type` GGUF metadata used by current Ollama to identify embedding models.
+If an existing test index was built with the older package GGUF, refresh/reinstall
+the model and **reindex** that Jina-backed Knowledge data.
+
 Jina v5 uses `CC-BY-NC-4.0`. If the deployment later needs unrestricted
 commercial use, select the packaged Apache-2.0 Qwen alternative instead:
 
@@ -88,7 +93,7 @@ embedding model, so it is a deliberate operator test rather than part of
 
 Use `bc250-benchmark embeddings` to compare the packaged models on the same
 DE/FR/EN retrieval fixture. It reports Recall@1/@3, MRR, cross-language retrieval
-and throughput; do not select an embedding model on tok/s alone.
+and throughput and rejects inconsistent embedding dimensions; do not select an embedding model on tok/s alone.
 
 ## 3. Fresh-install Open WebUI baseline
 
@@ -190,6 +195,14 @@ relation:
   source_language: "de-CH"
 ---
 ```
+
+The importer intentionally supports only this small YAML subset: scalar
+`document_id`, `title`, `language`, `status`, `authority`, `source_file`,
+`source_sha256`, plus the three scalar `relation` keys shown above. Use two-space
+indentation under `relation`; duplicate/unknown keys and other YAML constructs are
+rejected. `source_file` must be a basename inside the collection's `sources/`
+directory. Symlinked collection/active/source paths are rejected so provenance
+cannot escape the operator-owned collection tree.
 
 `authority` is recommended but not required for the existing DE/FR set:
 `bc250-rag-import` infers `de-*` as `original`, and infers a `fr-*`

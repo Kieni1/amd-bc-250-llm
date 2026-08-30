@@ -15,7 +15,6 @@ Jina is CC-BY-NC-4.0; review that restriction before commercial use. The
 fresh Open WebUI RAG baseline uses Jina `Query: ` / `Document: ` prefixes. Qwen
 is Apache-2.0 and should use an English task instruction on queries with no
 content prefix. Changing the embedding model or prefixes requires reindexing.
-`bc250-pull-embedding-model` is a compatibility alias for the same workflow.
 
 See `/usr/share/doc/bc250-llm-server/RAG.md` (source: `docs/RAG.md`) for the
 German/French/English office-document pilot.

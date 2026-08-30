@@ -20,7 +20,7 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/libexec/bc250-llm-server/` | Command implementations |
 | `/usr/share/bc250-llm-server/model-management/` | Packaged Modelfiles and operator template |
 | `/usr/share/bc250-llm-server/40cu/` | Pinned unlock patch and source metadata |
-| `/usr/share/doc/bc250-llm-server/` | Installed documentation |
+| `/usr/share/doc/bc250-llm-server/` | Installed documentation, including `MODEL.md` and `BENCHMARK.md` |
 | `/usr/lib/systemd/system/` | Packaged services and timers |
 | `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
 
