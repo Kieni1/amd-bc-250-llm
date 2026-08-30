@@ -95,6 +95,35 @@ class GenerationPolicyTests(unittest.TestCase):
             )
         )
 
+    def test_reasoning_latency_budget_and_prompt_variants_are_explicit(self) -> None:
+        self.assertEqual(generation.latency_budget(96, 512, "false"), 96)
+        self.assertEqual(generation.latency_budget(96, 512, "medium"), 512)
+        self.assertEqual(generation.latency_budget(96, 512, "omit"), 512)
+        first = generation.prompt_variant("Prompt", 0)
+        second = generation.prompt_variant("Prompt", 1)
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.lstrip("\n").startswith("Prompt"))
+        self.assertNotIn("reqid", first.casefold())
+
+    def test_chat_budget_and_context_warnings_are_persistable(self) -> None:
+        self.assertIsNotNone(
+            generation.answer_budget_warning(
+                {"answer_started": False, "done_reason": "length"}, 512
+            )
+        )
+        self.assertIsNone(
+            generation.answer_budget_warning(
+                {"answer_started": True, "done_reason": "length"}, 512
+            )
+        )
+        self.assertIsNone(generation.context_truncation_warning(100, 200))
+        self.assertIn(
+            "possible context truncation",
+            generation.context_truncation_warning(200, 180),
+        )
+        for field in ("answer_started", "answer_chars", "thinking_chars"):
+            self.assertIn(field, generation.CSV_FIELDS)
+
 
 class CategoryPolicyTests(unittest.TestCase):
     def test_embedding_prefixes_match_packaged_rag_policy(self) -> None:
@@ -178,7 +207,7 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertLess(noisy[3], exact[3])  # normalized character similarity
         self.assertEqual(noisy[4], 1.0)  # exact required fields still present
 
-    def test_task_prompts_follow_open_webui_0110_windows_and_shapes(self) -> None:
+    def test_task_prompts_follow_open_webui_0111_windows_and_shapes(self) -> None:
         messages = [{"role": "user", "content": f"m{i}"} for i in range(7)]
         title = category.task_prompt({"type": "title", "messages": messages})
         tags = category.task_prompt({"type": "tags", "messages": messages})

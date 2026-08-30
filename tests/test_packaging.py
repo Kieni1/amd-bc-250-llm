@@ -172,17 +172,17 @@ class PackagingTests(unittest.TestCase):
             r"(?ms)^\[gpu-usage\]\s*$.*?^fix-metrics = true\s*$.*?^fix-freq = false\s*$.*?^method = \"busy-flag\"",
         )
 
-    def test_open_webui_v0110_is_digest_pinned(self) -> None:
+    def test_open_webui_v0111_is_digest_pinned(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn("# v0.11.0, pinned OCI index digest.", quadlet)
+        self.assertIn("# v0.11.1, pinned OCI index digest.", quadlet)
         self.assertIn(
             "Image=ghcr.io/open-webui/open-webui@sha256:"
-            "72c0ba641ba75e7aa52655cb242570906ececd09b1140fb736483038a22b3228",
+            "6bb1fbe8ab0a3e0456067f493044ffb66a30a65a34be47f6a5862176a370dd16",
             quadlet,
         )
-        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.0)$")
+        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.1)$")
 
     def test_open_webui_fresh_install_privacy_features_are_disabled(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
@@ -195,6 +195,15 @@ class PackagingTests(unittest.TestCase):
             "ENABLE_MEMORIES=false",
         ):
             self.assertIn(f"Environment={setting}", quadlet)
+
+    def test_open_webui_v0111_new_controls_stay_conservative(self) -> None:
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('Environment="TASK_MODEL_PARAMS={}"', quadlet)
+        self.assertIn("Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false", quadlet)
+        self.assertIn("Environment=TIKA_SERVER_VERSION=3", quadlet)
+        self.assertNotIn("Environment=ENABLE_ORJSON=true", quadlet)
 
     def test_compare_mtp_does_not_force_global_think_false(self) -> None:
         source = (ROOT / "models/experiments/compare-mtp.sh").read_text(

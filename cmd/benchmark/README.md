@@ -44,6 +44,25 @@ load. `RUN_THERMAL=1` adds sustained decode windows. Early-stop warnings are emi
 `done_reason=stop`; reaching the requested limit with `done_reason=length` is not
 an early-EOS failure.
 
+Ollama 0.32.15 uses one shared `num_predict` cap for reasoning plus the final
+answer. The moderate latency test therefore keeps 96 tokens for explicit
+non-thinking (`think=false`) profiles but uses 512 for reasoning-capable/unset
+policies; the conservative profile uses 64/384. `NUM_PREDICT_LATENCY` keeps its
+legacy behavior as an override for both unless `NUM_PREDICT_LATENCY_THINKING` is
+set separately. Throughput, context and thermal caps are unchanged. CSV/JSONL
+now record `answer_started`, `answer_chars` and `thinking_chars`: TTFC means first
+reasoning *or* answer content, while TTFA is the first final-answer content and
+may legitimately be empty if the shared generation cap is exhausted first.
+
+Repeated prompts are varied only with leading blank lines instead of a visible
+request-id marker, avoiding benchmark metadata that a reasoning model may spend
+tokens interpreting. For qualitative review, prefer the streamed `/api/chat`
+latency records because they preserve Ollama's separate `thinking` and final
+`content` fields. Some model/template families can expose native reasoning markers
+inside the raw `/api/generate` response; those generate lanes remain intended for
+throughput/prefill/runtime measurements. Context-capacity truncation warnings and
+near-limit notes are persisted in the JSONL sidecar as well as printed.
+
 ## Embeddings
 
 ```bash
@@ -81,12 +100,14 @@ bc250-benchmark task
 ```
 
 The task suite targets `http://127.0.0.1:11435` by default and mirrors the
-relevant Open WebUI **0.11.0** task behavior in compact fixtures: title uses the
+relevant Open WebUI **0.11.1** task behavior in compact fixtures: title uses the
 latest two messages, tags the latest six (with the short-chat `General` fallback),
 and retrieval-query generation the latest six plus the current date. It checks
 JSON shape, simple content relevance and latency. Requests use
-`keep_alive=0`, matching the isolated task service. Its CSV deliberately keeps
-only the small telemetry subset useful for this short background workload.
+`keep_alive=0`, matching the isolated task service. The Open WebUI container
+leaves 0.11.1 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
+reason to tune it. Its CSV deliberately keeps only the small telemetry subset
+useful for this short background workload.
 
 ## Agent/coding
 
@@ -131,5 +152,6 @@ Task and agent CSVs intentionally keep a smaller telemetry subset.
 Useful overrides include `OLLAMA_URL`, `BENCH_MODE`, `THINK_MODE`,
 `BENCH_PROFILE`, `RUN_LATENCY`, `RUN_CONTEXT`, `RUN_THERMAL`, `REPEATS`,
 `TELEMETRY_INTERVAL`, `BC250_DRM_CARD`, `KEEP_ALIVE`, `CTX_POINTS`,
-`AGENT_TEMPERATURE` and the `NUM_PREDICT_*` values. `KEEP_ALIVE` applies to the generation/embedding/OCR
+`AGENT_TEMPERATURE`, `NUM_PREDICT_LATENCY_THINKING` and the other `NUM_PREDICT_*`
+values. `KEEP_ALIVE` applies to the generation/embedding/OCR
 paths; task keeps `0` and the agent lane relies on its service policy then unloads.

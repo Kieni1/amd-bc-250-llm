@@ -5,7 +5,7 @@ application accounts and model behavior remain operator-managed. The Quadlet
 explicitly disables community sharing, code execution, the code interpreter and
 memories. Operators can deliberately re-enable those features later.
 
-Package baseline: **Open WebUI v0.11.0** with standard **Ollama v0.32.15**.
+Package baseline: **Open WebUI v0.11.1** with standard **Ollama v0.32.15**.
 
 ## First login and connections
 
@@ -92,6 +92,12 @@ improves retrieval enough to justify another model invocation. Autocomplete can
 repeatedly load the task model while a larger chat model is still warm, so keep it
 off unless the latency and memory behavior are acceptable.
 
+Open WebUI 0.11.1 adds `TASK_MODEL_PARAMS`. The package explicitly leaves it at
+`{}` so upstream task limits/behavior remain unchanged until measured on the
+dedicated Gemma 3 1B service. Tune it only after `bc250-benchmark task`; note that
+setting a non-empty object replaces Open WebUI's built-in task token-limit behavior,
+so include an explicit `max_tokens` if you later set other task parameters.
+
 ## Model roles
 
 | Role | Model | Context |
@@ -165,7 +171,7 @@ models can stay hidden until a benchmark justifies promotion.
 
 ## Upgrades
 
-Open WebUI v0.11.0 is pinned by OCI digest. Before changing the image on a host
+Open WebUI v0.11.1 is pinned by OCI digest. Before changing the image on a host
 with existing data:
 
 ```bash
@@ -177,3 +183,13 @@ sudo systemctl start open-webui.service
 
 The container applies database migrations at startup. A regular maintenance
 configuration backup is not a substitute for this complete snapshot.
+
+For the 0.11.1 upgrade, smoke-test one normal chat, a multi-turn Ollama reasoning
+chat, title/tag generation, one RAG upload/search/rebuild and Workspace → Knowledge.
+Open WebUI 0.11.1 substantially changed streaming and reasoning-history handling.
+Upstream issue #29035 reports a frontend streaming failure with some thinking-model
+responses, so treat GPT-OSS/Ornith streaming as an upgrade acceptance check and use
+the pre-upgrade snapshot if it reproduces on the appliance. Avoid switching models
+inside an existing reasoning-heavy conversation when the provider uses opaque,
+model-specific reasoning state. Keep Tika on major version 3
+(`TIKA_SERVER_VERSION=3`) and knowledge-file retention disabled for this appliance.

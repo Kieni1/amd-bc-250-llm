@@ -230,7 +230,11 @@ sudo bc250-rag-import sync /srv/bc250-documents \
   --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
-The sync uses Open WebUI v0.11.0's incremental knowledge API. Treat these four generated knowledge-base name patterns as importer-managed: do not add unrelated files to them manually if you plan to use `--prune`. Unchanged files
+The sync uses Open WebUI v0.11.1's incremental knowledge API. The packaged
+baseline keeps `ENABLE_KNOWLEDGE_FILE_RETENTION=false`, so removal from a knowledge
+base remains disposable and `/srv/bc250-documents` stays authoritative. Treat these
+four generated knowledge-base name patterns as importer-managed: do not add unrelated
+files to them manually if you plan to use `--prune`. Unchanged files
 are skipped. A changed Markdown file is uploaded first and only then replaces
 the stale Open WebUI copy. Files removed locally are reported but retained
 remotely; remove them only with an explicit second run using `--prune`. `--prune`
@@ -287,7 +291,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: important Open WebUI v0.11.0 behavior
+## 7. Retrieval mode: important Open WebUI v0.11.1 behavior
 
 Use **Focused Retrieval** for the growing library. Use **Full Context** only for
 one short document that comfortably fits the model context.
@@ -302,9 +306,10 @@ For the most predictable baseline with the relatively small local Gemma model:
 5. **Attach the knowledge base in the chat**, choose Focused Retrieval, and ask
    the evaluation questions.
 
-This detail matters on Open WebUI v0.11.0: knowledge permanently attached to a
-model in Native function-calling mode is accessed through knowledge tools. If
-Builtin Tools are disabled at the same time, that model-bound knowledge is not
+This detail matters on Open WebUI v0.11.1: knowledge permanently attached to a
+model in Native function-calling mode is accessed through knowledge tools. 0.11.1
+also fixes knowledge-vector rebuild so a knowledge-base rebuild includes its files.
+If Builtin Tools are disabled at the same time, that model-bound knowledge is not
 retrieved. If you want a permanently model-bound knowledge base, keep Native
 mode and enable only the **Knowledge Base** builtin-tool category, then verify
 that the model reliably calls the knowledge tools. Do not switch the whole

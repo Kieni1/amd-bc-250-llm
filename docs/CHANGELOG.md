@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.9.7-0.7.testing - 2026-08-30
+
+Correct generation-latency interpretation for reasoning-capable models after the
+first full JSONL review. Keep the existing 96/64-token latency cap for explicit
+non-thinking profiles, but use 512/384 for policies where reasoning can consume
+the shared Ollama `num_predict` budget. Preserve `NUM_PREDICT_LATENCY` as a global
+override and add an optional `NUM_PREDICT_LATENCY_THINKING` split override.
+
+Remove the semantic `[reqid ...]` cache-busting text in favor of harmless leading
+blank-line prompt variants. Record whether a streamed final answer actually
+started plus answer/thinking character counts, warn when a latency request reaches
+`done_reason=length` without final content, and persist context-truncation warnings
+and near-limit notes in JSONL. Clarify that streamed `/api/chat` records are the
+preferred qualitative source for families whose raw `/api/generate` output may
+contain native reasoning markers. Generation benchmark metadata is now 7.2.
+
+## 0.9.7-0.6.testing - 2026-08-30
+
+Upgrade the digest-pinned Open WebUI baseline from v0.11.0 to v0.11.1 for its
+security/access-control, RAG/knowledge, streaming and native Ollama reasoning-history
+fixes while retaining the existing three-Ollama/Tika architecture. Keep Tika on
+major version 3 and explicitly leave knowledge-file retention disabled.
+
+Expose the new `TASK_MODEL_PARAMS` control at `{}` rather than introducing an
+unmeasured task-sampling profile. Refresh the task benchmark compatibility labels,
+RAG/upgrade documentation and smoke-test guidance without changing the compact task
+prompts or enabling ORJSON/new agentic Open WebUI features.
+
 ## 0.9.7-0.5.testing - 2026-08-30
 
 Harden manager-owned GGUF reuse with schema-2 state metadata: unchanged size,

@@ -249,7 +249,10 @@ neutral SYSTEM override and deterministic sampling for comparable model/runtime
 measurements. `BENCH_MODE=production` is the production-configuration
 comparison: it keeps the registered Modelfile SYSTEM and sampling while running the same generic workload.
 Role-specific Office/RAG/translation use-case fixtures are intentionally deferred.
-`THINK_MODE=auto` applies the package's model-family policy.
+`THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
+larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
+not routinely starved by thinking; `NUM_PREDICT_LATENCY_THINKING` can override
+that cap separately.
 
 ```bash
 bc250-benchmark                         # generation, neutral mode
@@ -257,7 +260,7 @@ BENCH_MODE=production bc250-benchmark
 BENCH_PROFILE=conservative bc250-benchmark
 bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
 bc250-benchmark ocr                     # office OCR fixtures
-bc250-benchmark task                    # Open WebUI 0.11.0-compatible task behavior
+bc250-benchmark task                    # Open WebUI 0.11.1-compatible task behavior
 bc250-benchmark agent                   # coding correctness, defaults to port 11436
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```

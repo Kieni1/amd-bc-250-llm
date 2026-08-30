@@ -88,6 +88,9 @@ CSV_FIELDS = [
     "wall_duration_s",
     "time_to_first_content_s",
     "time_to_first_answer_s",
+    "answer_started",
+    "answer_chars",
+    "thinking_chars",
     "done_reason",
     "server_overhead_s",
     "client_overhead_s",
@@ -120,8 +123,18 @@ def short_name(model: str) -> str:
     return name
 
 
-def make_unique_prompt(prompt: str) -> str:
-    return f"[reqid {time.time_ns()}] {prompt}"
+def prompt_variant(prompt: str, variant: int = 0) -> str:
+    """Vary prompt tokens without adding semantic benchmark metadata.
+
+    A few leading blank lines keep repeated requests from being byte-identical
+    without giving reasoning models a request id or other text to interpret.
+    """
+    return "\n" * (1 + variant % 7) + prompt
+
+
+def latency_budget(base: int, thinking: int, think_policy: str) -> int:
+    """Use a larger shared generation cap when reasoning can consume it."""
+    return base if think_policy == "false" else thinking
 
 
 def make_filler(sentences: int) -> str:
@@ -323,12 +336,17 @@ def run_chat_stream(
     metrics["time_to_first_answer_s"] = (
         None if first_answer is None else first_answer - started
     )
+    answer = "".join(content_parts)
+    thinking = "".join(thinking_parts)
+    metrics["answer_started"] = bool(answer)
+    metrics["answer_chars"] = len(answer)
+    metrics["thinking_chars"] = len(thinking)
     metrics.update(client.runtime_state(model))
     metrics.update(telemetry)
     detail = {
         "request": payload,
-        "response": "".join(content_parts),
-        "thinking": "".join(thinking_parts),
+        "response": answer,
+        "thinking": thinking,
     }
     return metrics, telemetry, detail
 
@@ -372,6 +390,24 @@ def early_stop_warning(
     reason = str(metrics.get("done_reason") or "")
     if reason == "stop" and count < requested * fraction:
         return f"early stop: generated {count}/{requested} tokens (done_reason=stop)"
+    return None
+
+
+def context_truncation_warning(previous: int, current: int) -> str | None:
+    if previous >= 0 and current <= previous:
+        return (
+            "prompt_eval_count stopped growing "
+            f"({previous} -> {current}); possible context truncation"
+        )
+    return None
+
+
+def answer_budget_warning(metrics: dict[str, Any], requested: int) -> str | None:
+    if (
+        metrics.get("answer_started") is False
+        and str(metrics.get("done_reason") or "") == "length"
+    ):
+        return f"no final answer before {requested}-token generation cap"
     return None
 
 
@@ -491,6 +527,7 @@ def main() -> int:
             "context": 128,
             "long": 3072,
             "latency": 96,
+            "latency_thinking": 512,
             "repeats": 3,
             "latency_repeats": 2,
             "filler": 220,
@@ -502,6 +539,7 @@ def main() -> int:
             "context": 96,
             "long": 2048,
             "latency": 64,
+            "latency_thinking": 384,
             "repeats": 2,
             "latency_repeats": 1,
             "filler": 110,
@@ -533,7 +571,14 @@ def main() -> int:
     num_prefill = int(os.environ.get("NUM_PREDICT_PREFILL", defaults["prefill"]))
     num_context = int(os.environ.get("NUM_PREDICT_CONTEXT", defaults["context"]))
     num_long = int(os.environ.get("NUM_PREDICT_LONG", defaults["long"]))
-    num_latency = int(os.environ.get("NUM_PREDICT_LATENCY", defaults["latency"]))
+    latency_override = os.environ.get("NUM_PREDICT_LATENCY")
+    num_latency = int(latency_override or defaults["latency"])
+    num_latency_thinking = int(
+        os.environ.get(
+            "NUM_PREDICT_LATENCY_THINKING",
+            latency_override or defaults["latency_thinking"],
+        )
+    )
     repeats = int(os.environ.get("REPEATS", defaults["repeats"]))
     latency_repeats = int(
         os.environ.get("LATENCY_REPEATS", defaults["latency_repeats"])
@@ -585,7 +630,7 @@ def main() -> int:
     meta = {
         "started_at": started,
         "category": "generation",
-        "benchmark_version": "7.1",
+        "benchmark_version": "7.2",
         "bench_mode": mode,
         "ollama_url": client.base_url,
         "ollama_version": version,
@@ -600,6 +645,8 @@ def main() -> int:
         "run_latency": run_latency,
         "run_context": run_context,
         "run_thermal": run_thermal,
+        "latency_num_predict_non_thinking": num_latency,
+        "latency_num_predict_reasoning_capable": num_latency_thinking,
         "board_note": board_note,
         "models": [],
     }
@@ -617,6 +664,11 @@ def main() -> int:
                 "parameter_size": details.get("parameter_size", ""),
                 "quantization_level": details.get("quantization_level", ""),
                 "think_policy": resolve_think_policy(model, think_requested),
+                "latency_num_predict": latency_budget(
+                    num_latency,
+                    num_latency_thinking,
+                    resolve_think_policy(model, think_requested),
+                ),
             }
         )
     meta_path.write_text(
@@ -639,12 +691,22 @@ def main() -> int:
         detail: dict[str, Any],
         requested: int,
         think_policy: str,
+        extra_warning: str | None = None,
     ) -> None:
         row = csv_row(model, test, run, mode, think_policy, metrics)
         rows.append(row)
         writer.writerow(row)
         csv_handle.flush()
-        warning = early_stop_warning(metrics, requested, early_fraction)
+        warnings = [
+            value
+            for value in (
+                early_stop_warning(metrics, requested, early_fraction),
+                answer_budget_warning(metrics, requested),
+                extra_warning,
+            )
+            if value
+        ]
+        warning = "; ".join(warnings) or None
         write_jsonl(
             jsonl_path,
             {
@@ -681,12 +743,15 @@ def main() -> int:
 
             try:
                 if run_latency:
+                    latency_tokens = latency_budget(
+                        num_latency, num_latency_thinking, think_policy
+                    )
                     client.ensure_unloaded(model)
                     metrics, _telemetry, detail = run_chat_stream(
                         client,
                         model,
-                        make_unique_prompt(CHAT_PROMPT),
-                        num_latency,
+                        prompt_variant(CHAT_PROMPT, 0),
+                        latency_tokens,
                         mode,
                         think_policy,
                         keep_alive,
@@ -698,15 +763,15 @@ def main() -> int:
                         1,
                         metrics,
                         detail,
-                        num_latency,
+                        latency_tokens,
                         think_policy,
                     )
                     for run in range(1, latency_repeats + 1):
                         metrics, _telemetry, detail = run_chat_stream(
                             client,
                             model,
-                            make_unique_prompt(CHAT_PROMPT),
-                            num_latency,
+                            prompt_variant(CHAT_PROMPT, run),
+                            latency_tokens,
                             mode,
                             think_policy,
                             keep_alive,
@@ -718,7 +783,7 @@ def main() -> int:
                             run,
                             metrics,
                             detail,
-                            num_latency,
+                            latency_tokens,
                             think_policy,
                         )
 
@@ -728,7 +793,7 @@ def main() -> int:
                     run_generate(
                         client,
                         model,
-                        make_unique_prompt(SHORT_PROMPT),
+                        prompt_variant(SHORT_PROMPT, 6),
                         32,
                         mode,
                         think_policy,
@@ -742,7 +807,7 @@ def main() -> int:
                     metrics, _telemetry, detail = run_generate(
                         client,
                         model,
-                        make_unique_prompt(SHORT_PROMPT),
+                        prompt_variant(SHORT_PROMPT, run),
                         num_short,
                         mode,
                         think_policy,
@@ -756,7 +821,7 @@ def main() -> int:
                 metrics, _telemetry, detail = run_generate(
                     client,
                     model,
-                    make_unique_prompt(long_prompt),
+                    prompt_variant(long_prompt, 0),
                     num_prefill,
                     mode,
                     think_policy,
@@ -776,13 +841,32 @@ def main() -> int:
                         metrics, _telemetry, detail = run_generate(
                             client,
                             model,
-                            make_unique_prompt(prompt),
+                            prompt_variant(prompt, 0),
                             num_context,
                             mode,
                             think_policy,
                             keep_alive,
                             telemetry_interval,
                         )
+                        prompt_count = int(metrics.get("prompt_eval_count") or 0)
+                        context_warning = context_truncation_warning(
+                            previous_prompt_count, prompt_count
+                        )
+                        allocated = metrics.get("allocated_context")
+                        context_note = None
+                        if (
+                            isinstance(allocated, int)
+                            and prompt_count + num_context >= allocated
+                        ):
+                            context_note = (
+                                f"ctx point approaches allocated context {allocated}"
+                            )
+                        if context_warning:
+                            print(f"    WARNING: {context_warning}", file=sys.stderr)
+                        if context_note:
+                            print(f"    NOTE: {context_note}", file=sys.stderr)
+                        detail["context_warning"] = context_warning
+                        detail["context_note"] = context_note
                         record(
                             model,
                             f"ctx_{point}",
@@ -791,25 +875,8 @@ def main() -> int:
                             detail,
                             num_context,
                             think_policy,
+                            context_warning,
                         )
-                        prompt_count = int(metrics.get("prompt_eval_count") or 0)
-                        if (
-                            previous_prompt_count >= 0
-                            and prompt_count <= previous_prompt_count
-                        ):
-                            print(
-                                f"    WARNING: prompt_eval_count stopped growing ({previous_prompt_count} -> {prompt_count}); possible context truncation",
-                                file=sys.stderr,
-                            )
-                        allocated = metrics.get("allocated_context")
-                        if (
-                            isinstance(allocated, int)
-                            and prompt_count + num_context >= allocated
-                        ):
-                            print(
-                                f"    NOTE: ctx point approaches allocated context {allocated}",
-                                file=sys.stderr,
-                            )
                         previous_prompt_count = prompt_count
 
                 if run_thermal:
@@ -820,7 +887,7 @@ def main() -> int:
                         metrics, _telemetry, detail = run_generate(
                             client,
                             model,
-                            make_unique_prompt(SHORT_PROMPT),
+                            prompt_variant(SHORT_PROMPT, window),
                             window_tokens,
                             mode,
                             think_policy,

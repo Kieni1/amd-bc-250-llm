@@ -30,6 +30,8 @@ class RagBaselineTests(unittest.TestCase):
             'Environment="RAG_EMBEDDING_CONTENT_PREFIX=Document: "',
             "Environment=CONTENT_EXTRACTION_ENGINE=tika",
             "Environment=TIKA_SERVER_URL=http://tika:9998",
+            "Environment=TIKA_SERVER_VERSION=3",
+            "Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false",
         )
         for line in expected:
             self.assertIn(line, quadlet)

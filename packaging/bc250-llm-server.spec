@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.7
-Release:        0.5.testing%{?dist}
+Release:        0.7.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,16 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.7.testing
+- Give reasoning-capable latency runs enough shared num_predict budget to reach final content.
+- Remove semantic request-id prompt noise and record answer/thinking presence explicitly.
+- Persist context-truncation diagnostics in JSONL and clarify qualitative chat capture semantics.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.6.testing
+- Pin Open WebUI v0.11.1 and retain the tested Tika 3/local RAG architecture.
+- Expose 0.11.1 task parameters without speculative tuning and keep knowledge retention off.
+- Refresh Open WebUI task/RAG documentation and upgrade smoke-test guidance.
+
 * Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.5.testing
 - Harden model/source integrity, cold benchmark state and RAG provenance validation
 - Debloat compatibility commands, rename MTP quick comparison and add CI linting
