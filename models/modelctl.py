@@ -10,7 +10,6 @@ import grp
 import hashlib
 import json
 import os
-from pathlib import Path
 import pwd
 import re
 import shlex
@@ -19,8 +18,9 @@ import stat
 import subprocess
 import sys
 import tempfile
-import tomllib
+from pathlib import Path
 
+import tomllib
 
 PROJECT = "bc250-llm-server"
 INSTALLED_SHARE = Path(f"/usr/share/{PROJECT}/model-management")
@@ -30,8 +30,11 @@ OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 CATEGORY_ALIASES = {name: name for name in (*OLLAMA_CATEGORIES, "mtp")} | {
-    "experimental": "experiments", "tasker": "task", "coding": "agentic",
-    "embedded": "embedding", "embed": "embedding",
+    "experimental": "experiments",
+    "tasker": "task",
+    "coding": "agentic",
+    "embedded": "embedding",
+    "embed": "embedding",
 }
 CATEGORIES = tuple(CATEGORY_ALIASES)
 CATEGORY_PREFIXES = {
@@ -91,7 +94,9 @@ def canonical_category(value: str) -> str:
         raise ModelError(f"unsupported model category: {value}") from error
 
 
-def require_string(table: dict, key: str, context: str, *, filename: bool = False) -> str:
+def require_string(
+    table: dict, key: str, context: str, *, filename: bool = False
+) -> str:
     value = table.get(key)
     if not isinstance(value, str) or not value:
         raise ModelError(f"{context}: {key} must be a non-empty string")
@@ -102,7 +107,9 @@ def require_string(table: dict, key: str, context: str, *, filename: bool = Fals
 
 def local_source_root() -> Path | None:
     script_dir = Path(__file__).resolve().parent
-    if (script_dir / "modelfiles").is_dir() and (script_dir / "mtp/models.toml").is_file():
+    if (script_dir / "modelfiles").is_dir() and (
+        script_dir / "mtp/models.toml"
+    ).is_file():
         return script_dir
     return None
 
@@ -215,13 +222,19 @@ def load_modelfile(path: Path) -> dict:
     )
     if remote_from:
         if category != "experiments":
-            raise ModelError(f"{path}: remote Hugging Face FROM is limited to experiments")
+            raise ModelError(
+                f"{path}: remote Hugging Face FROM is limited to experiments"
+            )
         if remote_from.group("repository") != metadata["repository"]:
-            raise ModelError(f"{path}: remote FROM repository must match Source metadata")
+            raise ModelError(
+                f"{path}: remote FROM repository must match Source metadata"
+            )
         provider = "ollama-hf"
     else:
         if not output.is_absolute() or output.name != metadata["gguf"]:
-            raise ModelError(f"{path}: FROM must be an absolute path ending in the GGUF filename")
+            raise ModelError(
+                f"{path}: FROM must be an absolute path ending in the GGUF filename"
+            )
         expected_root = Path(CATEGORY_DEFAULTS[category]["destination"])
         if not output.is_relative_to(expected_root):
             raise ModelError(f"{path}: FROM must be below {expected_root}")
@@ -307,7 +320,10 @@ def load_mtp_catalog(path: Path) -> tuple[dict, list[dict]]:
         if model.get("provider") != "download-only":
             raise ModelError(f"{context}: MTP provider must be download-only")
         model_id = require_string(model, "id", context)
-        if model_id in seen or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", model_id) is None:
+        if (
+            model_id in seen
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", model_id) is None
+        ):
             raise ModelError(f"{context}: duplicate or invalid id")
         seen.add(model_id)
         require_string(model, "repository", context)
@@ -375,16 +391,24 @@ def registered_models(host: str) -> set[str] | None:
     result = subprocess.run(
         [ollama, "list"],
         env={**os.environ, "OLLAMA_HOST": host},
-        capture_output=True, text=True, check=False,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    return None if result.returncode else {
-        line.split()[0].removesuffix(":latest")
-        for line in result.stdout.splitlines()[1:]
-        if line.strip()
-    }
+    return (
+        None
+        if result.returncode
+        else {
+            line.split()[0].removesuffix(":latest")
+            for line in result.stdout.splitlines()[1:]
+            if line.strip()
+        }
+    )
 
 
-def print_models(defaults: dict, models: list[dict], registered=None, destination=None) -> None:
+def print_models(
+    defaults: dict, models: list[dict], registered=None, destination=None
+) -> None:
     for offset, model in enumerate(models):
         provider = model["provider"]
         if provider == "ollama-hf":
@@ -399,19 +423,35 @@ def print_models(defaults: dict, models: list[dict], registered=None, destinatio
                 source = None
             setup = None if registered is None else model.get("name") in registered
             if provider == "ollama":
-                source = True if setup is True else None if setup is None and source is False else source
+                source = (
+                    True
+                    if setup is True
+                    else None
+                    if setup is None and source is False
+                    else source
+                )
         origin = model.get("origin", "enabled" if model["enabled"] else "disabled")
-        download = {True: "downloaded", False: "not downloaded", None: "download unknown"}
+        download = {
+            True: "downloaded",
+            False: "not downloaded",
+            None: "download unknown",
+        }
         details = [provider, origin, download[source]]
         if provider.startswith("ollama"):
-            details.append({True: "set up", False: "not set up", None: "setup unknown"}[setup])
+            details.append(
+                {True: "set up", False: "not set up", None: "setup unknown"}[setup]
+            )
         index = model.get("index", offset)
-        print(f"  {index:2d}) {model.get('name', model['id']):<56} [{', '.join(details)}]")
+        print(
+            f"  {index:2d}) {model.get('name', model['id']):<56} [{', '.join(details)}]"
+        )
 
 
 def print_all_models(directories: list[Path]) -> None:
     models = discover_models(directories)
-    hosts = {CATEGORY_DEFAULTS[category]["ollama_host"] for category in OLLAMA_CATEGORIES}
+    hosts = {
+        CATEGORY_DEFAULTS[category]["ollama_host"] for category in OLLAMA_CATEGORIES
+    }
     registrations = {host: registered_models(host) for host in hosts}
     for category in OLLAMA_CATEGORIES:
         defaults = CATEGORY_DEFAULTS[category]
@@ -420,23 +460,32 @@ def print_all_models(directories: list[Path]) -> None:
         print_models(defaults, selected, registrations[defaults["ollama_host"]])
     known = {model["name"] for model in models}
     hf_backings = {
-        (CATEGORY_DEFAULTS[model["category"]]["ollama_host"], model["from"]): model["name"]
-        for model in models if model["provider"] == "ollama-hf"
+        (CATEGORY_DEFAULTS[model["category"]]["ollama_host"], model["from"]): model[
+            "name"
+        ]
+        for model in models
+        if model["provider"] == "ollama-hf"
     }
     unmanaged = sorted(
         (host, name)
         for host, names in registrations.items()
         for name in names or ()
-        if name not in known
-        and not (hf_backings.get((host, name)) in (names or set()))
+        if name not in known and not (hf_backings.get((host, name)) in (names or set()))
     )
     if unmanaged:
         print("Unmanaged Ollama models (registered without a Modelfile):")
         for host, name in unmanaged:
             print(f"    - {name:<56} [{host}, set up, Modelfile missing]")
-    expected = {model["name"]: CATEGORY_DEFAULTS[model["category"]]["ollama_host"] for model in models}
-    misplaced = sorted((host, name, expected[name]) for host, names in registrations.items()
-                       for name in names or () if name in expected and host != expected[name])
+    expected = {
+        model["name"]: CATEGORY_DEFAULTS[model["category"]]["ollama_host"]
+        for model in models
+    }
+    misplaced = sorted(
+        (host, name, expected[name])
+        for host, names in registrations.items()
+        for name in names or ()
+        if name in expected and host != expected[name]
+    )
     if misplaced:
         print("Misplaced Ollama models (registered on the wrong instance):")
         for host, name, wanted in misplaced:
@@ -467,14 +516,18 @@ def state_matches(state: dict, model: dict, output: Path) -> bool:
     recorded = str(state.get("sha256", ""))
     expected = model.get("sha256", "")
     provenance = ("repository", "revision", "gguf")
-    if (not all(state.get(key) == model[key] for key in provenance)
-            or re.fullmatch(r"[0-9a-f]{64}", recorded) is None
-            or (expected and recorded != expected)):
+    if (
+        not all(state.get(key) == model[key] for key in provenance)
+        or re.fullmatch(r"[0-9a-f]{64}", recorded) is None
+        or (expected and recorded != expected)
+    ):
         return False
-    if (state.get("schema") == 2
-            and state.get("size") == stat.st_size
-            and state.get("mtime_ns") == stat.st_mtime_ns
-            and state.get("ctime_ns") == stat.st_ctime_ns):
+    if (
+        state.get("schema") == 2
+        and state.get("size") == stat.st_size
+        and state.get("mtime_ns") == stat.st_mtime_ns
+        and state.get("ctime_ns") == stat.st_ctime_ns
+    ):
         return True
     # Old sidecars and files whose stat metadata changed are re-hashed. This
     # catches corruption/modification without reading multi-GiB GGUFs on every list/install.
@@ -517,7 +570,9 @@ def write_state(path: Path, model: dict, checksum: str, gid: int) -> None:
     }
     temporary = path.with_name(f".{path.name}.tmp")
     try:
-        temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temporary.write_text(
+            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         os.chown(temporary, 0, gid)
         os.chmod(temporary, 0o640)
         os.replace(temporary, path)
@@ -561,15 +616,21 @@ def command_path(name: str) -> str:
 
 
 def ollama_host(defaults: dict, override: str | None = None) -> str:
-    return override or os.environ.get("OLLAMA_HOST") or os.environ.get("OLLAMA_URL") or \
-        defaults.get("ollama_host", "127.0.0.1:11434")
+    return (
+        override
+        or os.environ.get("OLLAMA_HOST")
+        or os.environ.get("OLLAMA_URL")
+        or defaults.get("ollama_host", "127.0.0.1:11434")
+    )
 
 
 def ollama_identity() -> tuple[int, int]:
     try:
         return pwd.getpwnam("ollama").pw_uid, grp.getgrnam("ollama").gr_gid
     except KeyError as error:
-        raise ModelError("ollama user or group is missing; run bc250-install-ollama") from error
+        raise ModelError(
+            "ollama user or group is missing; run bc250-install-ollama"
+        ) from error
 
 
 def ensure_directory(path: Path, uid: int, gid: int) -> None:
@@ -583,7 +644,14 @@ def run_as_ollama(
 ) -> subprocess.CompletedProcess:
     child_environment = dict(os.environ)
     child_environment.update(environment)
-    argv = [command_path("runuser"), "--preserve-environment", "-u", "ollama", "--", *command]
+    argv = [
+        command_path("runuser"),
+        "--preserve-environment",
+        "-u",
+        "ollama",
+        "--",
+        *command,
+    ]
     sys.stdout.flush()
     sys.stderr.flush()
     if terminal:
@@ -648,13 +716,20 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
         token = os.environ.get("HF_TOKEN", "").strip()
     if not token and os.environ.get("BC250_HF_ANONYMOUS") != "1" and can_prompt():
         token = prompt_secret("HF_TOKEN (optional; Enter for anonymous downloads): ")
-    if token and run_as_ollama(
-        [hf_bin, "auth", "whoami"], hf_environment(token, hf_home)
-    ).returncode == 0:
+    if (
+        token
+        and run_as_ollama(
+            [hf_bin, "auth", "whoami"], hf_environment(token, hf_home)
+        ).returncode
+        == 0
+    ):
         print("Using the validated Hugging Face token.")
         return token
     if token:
-        print("WARNING: Hugging Face rejected the token; downloading anonymously.", file=sys.stderr)
+        print(
+            "WARNING: Hugging Face rejected the token; downloading anonymously.",
+            file=sys.stderr,
+        )
     else:
         print("Using anonymous Hugging Face downloads.")
     return ""
@@ -664,22 +739,33 @@ def remove_hf_backing_registration(ollama_bin: str, host: str, model: dict) -> N
     """Drop a redundant hf.co source manifest after the friendly alias exists."""
     registrations = registered_models(host)
     source = model["from"]
-    if registrations is None or source not in registrations or model["name"] not in registrations:
+    if (
+        registrations is None
+        or source not in registrations
+        or model["name"] not in registrations
+    ):
         return
     result = run_as_ollama(
         [ollama_bin, "rm", source],
         {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
     )
     if result.returncode != 0:
-        print(f"    WARNING: could not remove temporary HF source registration {source}", file=sys.stderr)
+        print(
+            f"    WARNING: could not remove temporary HF source registration {source}",
+            file=sys.stderr,
+        )
         return
     remaining = registered_models(host)
     if remaining is not None and model["name"] not in remaining:
-        raise ModelError(f"friendly Ollama registration disappeared after removing {source}")
+        raise ModelError(
+            f"friendly Ollama registration disappeared after removing {source}"
+        )
     print(f"    removed temporary HF source registration {source}")
 
 
-def render_modelfile(source: Path, model: dict, output: Path | None, destination: Path) -> None:
+def render_modelfile(
+    source: Path, model: dict, output: Path | None, destination: Path
+) -> None:
     rendered: list[str] = []
     for line in source.read_text(encoding="utf-8").splitlines():
         if line.startswith("# Source: "):
@@ -709,15 +795,23 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     hf_bin = command_path("hf") if needs_download else ""
     if needs_download:
         command_path("script")
-    ollama_bin = command_path("ollama") if any(m["provider"].startswith("ollama") for m in models) else ""
+    ollama_bin = (
+        command_path("ollama")
+        if any(m["provider"].startswith("ollama") for m in models)
+        else ""
+    )
     host = ollama_host(defaults, args.host)
     hf_home = Path(os.environ.get("HF_HOME", f"/var/cache/{PROJECT}/huggingface"))
     download_root = Path(
-        os.environ.get("DOWNLOAD_DIR", str(hf_home / "downloads" / defaults["download_namespace"]))
+        os.environ.get(
+            "DOWNLOAD_DIR", str(hf_home / "downloads" / defaults["download_namespace"])
+        )
     )
-    modelfile_root = Path(
-        os.environ.get("MODELFILE_DIR", defaults.get("modelfile_destination", ""))
-    ) if os.environ.get("MODELFILE_DIR") or defaults.get("modelfile_destination") else None
+    modelfile_root = (
+        Path(os.environ.get("MODELFILE_DIR", defaults.get("modelfile_destination", "")))
+        if os.environ.get("MODELFILE_DIR") or defaults.get("modelfile_destination")
+        else None
+    )
     if needs_download:
         for path in (hf_home, hf_home / "hub", download_root):
             ensure_directory(path, uid, gid)
@@ -739,9 +833,19 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         print(f"\n>>> {label} [{model['provider']}]")
         try:
             if model["provider"] == "ollama-hf":
-                if args.revision is not None or args.sha256 is not None or args.destination:
-                    raise ModelError("remote Ollama-managed models do not accept source overrides")
-                runtime_template = modelfile_root / model["modelfile"] if modelfile_root else model["template"]
+                if (
+                    args.revision is not None
+                    or args.sha256 is not None
+                    or args.destination
+                ):
+                    raise ModelError(
+                        "remote Ollama-managed models do not accept source overrides"
+                    )
+                runtime_template = (
+                    modelfile_root / model["modelfile"]
+                    if modelfile_root
+                    else model["template"]
+                )
                 if modelfile_root:
                     render_modelfile(model["template"], model, None, runtime_template)
                     os.chown(runtime_template, 0, gid)
@@ -755,7 +859,9 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 remove_hf_backing_registration(ollama_bin, host, model)
                 print("    registered with Ollama; source blobs are Ollama-managed")
                 continue
-            output = model_path(defaults, model, args.destination or os.environ.get("DEST"))
+            output = model_path(
+                defaults, model, args.destination or os.environ.get("DEST")
+            )
             ensure_directory(output.parent, uid, gid)
             metadata = state_path(output)
             state = load_state(metadata)
@@ -763,15 +869,21 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 checksum = state["sha256"]
                 permissions_changed = ensure_file_permissions(output, 0, gid, 0o640)
                 current = output.stat()
-                if (state.get("schema") != 2 or state.get("size") != current.st_size
-                        or state.get("mtime_ns") != current.st_mtime_ns
-                        or state.get("ctime_ns") != current.st_ctime_ns
-                        or permissions_changed):
+                if (
+                    state.get("schema") != 2
+                    or state.get("size") != current.st_size
+                    or state.get("mtime_ns") != current.st_mtime_ns
+                    or state.get("ctime_ns") != current.st_ctime_ns
+                    or permissions_changed
+                ):
                     write_state(metadata, model, checksum, gid)
                 print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
             else:
-                minimum = args.min_free_bytes if args.min_free_bytes is not None \
+                minimum = (
+                    args.min_free_bytes
+                    if args.min_free_bytes is not None
                     else int(defaults.get("min_free_bytes", 0))
+                )
                 free = shutil.disk_usage(output.parent).free
                 if minimum and free < minimum:
                     raise ModelError(
@@ -791,16 +903,21 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                     f"    downloading {model['repository']} @ {model['revision']}: "
                     f"{model['gguf']}"
                 )
-                if run_as_ollama(
-                    command, hf_environment(token, hf_home), terminal=True
-                ).returncode != 0:
+                if (
+                    run_as_ollama(
+                        command, hf_environment(token, hf_home), terminal=True
+                    ).returncode
+                    != 0
+                ):
                     raise ModelError("Hugging Face download failed")
                 if not staged.is_file() or staged.stat().st_size == 0:
                     raise ModelError(f"download completed without {staged}")
                 print("    calculating SHA-256")
                 checksum = sha256(staged)
                 if expected and checksum != expected:
-                    raise ModelError(f"checksum mismatch: got {checksum}, expected {expected}")
+                    raise ModelError(
+                        f"checksum mismatch: got {checksum}, expected {expected}"
+                    )
                 atomic_replace(staged, output)
                 ensure_file_permissions(output, 0, gid, 0o640)
                 write_state(metadata, model, checksum, gid)
@@ -853,7 +970,10 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         print(f"\n>>> removing {label}")
         if model["provider"].startswith("ollama"):
             if not ollama_bin:
-                print("    ERROR: ollama executable is unavailable; local source retained", file=sys.stderr)
+                print(
+                    "    ERROR: ollama executable is unavailable; local source retained",
+                    file=sys.stderr,
+                )
                 failures.append(label)
                 continue
             result = run_as_ollama(
@@ -863,7 +983,10 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             if result.returncode != 0:
                 registrations = registered_models(host)
                 if registrations is None or model["name"] in registrations:
-                    print("    ERROR: Ollama registration could not be removed; local source retained", file=sys.stderr)
+                    print(
+                        "    ERROR: Ollama registration could not be removed; local source retained",
+                        file=sys.stderr,
+                    )
                     failures.append(label)
                     continue
         paths: list[Path] = []
@@ -891,7 +1014,9 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     return 0
 
 
-def catalog_arguments(parser: argparse.ArgumentParser, *, category_optional: bool = False) -> None:
+def catalog_arguments(
+    parser: argparse.ArgumentParser, *, category_optional: bool = False
+) -> None:
     parser.add_argument(
         "category", choices=CATEGORIES, nargs="?" if category_optional else None
     )
@@ -909,11 +1034,15 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     listing = commands.add_parser("list", help="list discovered templates")
     catalog_arguments(listing, category_optional=True)
-    listing.add_argument("--all", action="store_true", help="include disabled MTP entries")
+    listing.add_argument(
+        "--all", action="store_true", help="include disabled MTP entries"
+    )
     resolving = commands.add_parser("resolve", help="resolve one model id")
     catalog_arguments(resolving)
     resolving.add_argument("id")
-    installing = commands.add_parser("install", help="download and register selected models")
+    installing = commands.add_parser(
+        "install", help="download and register selected models"
+    )
     catalog_arguments(installing)
     installing.add_argument("selection", nargs="?")
     installing.add_argument("--list", action="store_true")
@@ -952,11 +1081,16 @@ def main(argv: list[str] | None = None) -> int:
     defaults, models = load_models(
         category,
         directories=args.modelfile_dir,
-        source=args.source or (Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None),
+        source=args.source
+        or (Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None),
     )
 
     if args.command == "list":
-        available = models if category != "mtp" or args.all else [m for m in models if m["enabled"]]
+        available = (
+            models
+            if category != "mtp" or args.all
+            else [m for m in models if m["enabled"]]
+        )
         print(f"{'MTP' if category == 'mtp' else category.title()} models:")
         host = defaults.get("ollama_host")
         print_models(defaults, available, registered_models(host) if host else None)
@@ -964,7 +1098,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "resolve":
         for model in models:
             if model["id"] == args.id and (category != "mtp" or model["enabled"]):
-                source = model["from"] if model["provider"] == "ollama-hf" else model_path(defaults, model)
+                source = (
+                    model["from"]
+                    if model["provider"] == "ollama-hf"
+                    else model_path(defaults, model)
+                )
                 print(f"{source}\t{model.get('context', '')}\t{model.get('draft', '')}")
                 return 0
         raise ModelError(f"model id not found: {args.id}")
@@ -973,7 +1111,11 @@ def main(argv: list[str] | None = None) -> int:
     if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
         available = [model for model in models if model["enabled"]]
     print(f"Available {category} models:")
-    host = ollama_host(defaults, getattr(args, "host", None)) if defaults.get("ollama_host") else None
+    host = (
+        ollama_host(defaults, getattr(args, "host", None))
+        if defaults.get("ollama_host")
+        else None
+    )
     print_models(
         defaults,
         available,

@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from contextlib import redirect_stdout
-from io import StringIO
-from pathlib import Path
 import re
 import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
 from unittest.mock import patch
-
 
 ROOT = Path(__file__).resolve().parent.parent
 MODELFILES = ROOT / "models/modelfiles"
@@ -52,7 +51,10 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 )
                 if not path.name.startswith("embed-"):
                     self.assertEqual(
-                        len(re.findall(r"^PARAMETER num_keep 256$", text, re.MULTILINE)), 1
+                        len(
+                            re.findall(r"^PARAMETER num_keep 256$", text, re.MULTILINE)
+                        ),
+                        1,
                     )
 
     def test_experimental_ocr_models_use_ollama_managed_hf_sources(self) -> None:
@@ -62,32 +64,49 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             "exp-ovisocr2-abiray-q8-0",
             "exp-chandra-ocr2-prithivmlmods-q4-k-m",
         }
-        models = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
+        models = {
+            model["name"]: model for model in modelctl.discover_models([MODELFILES])
+        }
         self.assertTrue(expected <= models.keys())
-        self.assertTrue(all(models[name]["provider"] == "ollama-hf" for name in expected))
+        self.assertTrue(
+            all(models[name]["provider"] == "ollama-hf" for name in expected)
+        )
         glm = (MODELFILES / "exp-glm-ocr-ggml-q8-0.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 16384", glm)
-        chandra = (MODELFILES / "exp-chandra-ocr2-prithivmlmods-q4-k-m.Modelfile").read_text()
+        chandra = (
+            MODELFILES / "exp-chandra-ocr2-prithivmlmods-q4-k-m.Modelfile"
+        ).read_text()
         self.assertIn("# GGUF: chandra-ocr-2.Q4_K_M.gguf", chandra)
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "exp-remote-mismatch.Modelfile"
             path.write_text(
-                glm.replace("exp-glm-ocr-ggml-q8-0", "exp-remote-mismatch")
-                   .replace("hf.co/ggml-org/GLM-OCR-GGUF", "hf.co/other/repository"),
+                glm.replace("exp-glm-ocr-ggml-q8-0", "exp-remote-mismatch").replace(
+                    "hf.co/ggml-org/GLM-OCR-GGUF", "hf.co/other/repository"
+                ),
                 encoding="utf-8",
             )
-            with self.assertRaisesRegex(modelctl.ModelError, "must match Source metadata"):
+            with self.assertRaisesRegex(
+                modelctl.ModelError, "must match Source metadata"
+            ):
                 modelctl.load_modelfile(path)
 
     def test_ornith_checksum_is_pinned_to_replacement_commit(self) -> None:
         text = (MODELFILES / "agentic-ornith15-9b-ornith-q5-k-m.Modelfile").read_text()
         self.assertIn("@ 87fcf5d7dbecb02941c0917a0e93619af2075b61", text)
-        self.assertIn("# SHA256: e4d9634a3b6546a5c00a8680568fe1125f6c98c704ee51ae52ba07650fb4247d", text)
+        self.assertIn(
+            "# SHA256: e4d9634a3b6546a5c00a8680568fe1125f6c98c704ee51ae52ba07650fb4247d",
+            text,
+        )
 
     def test_jina_embedding_uses_pooling_metadata_revision(self) -> None:
-        text = (MODELFILES / "embed-jina-v5-small-retrieval-q4-k-m.Modelfile").read_text()
+        text = (
+            MODELFILES / "embed-jina-v5-small-retrieval-q4-k-m.Modelfile"
+        ).read_text()
         self.assertIn("@ e9137ac0a9d41c851de69bea36babc029b7f5fc9", text)
-        self.assertIn("# SHA256: 9440cf89f3e8a7a31a42e11b87e106dd5b344af4e0e3b6b21a96136cc8686e21", text)
+        self.assertIn(
+            "# SHA256: 9440cf89f3e8a7a31a42e11b87e106dd5b344af4e0e3b6b21a96136cc8686e21",
+            text,
+        )
         self.assertIn("pooling metadata", text)
 
     def test_recommended_tooling_models_are_discoverable(self) -> None:
@@ -109,15 +128,15 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             models = modelctl.discover_models([MODELFILES, operator])
             selected = next(model for model in models if model["modelfile"] == name)
             self.assertEqual(selected["template"], operator / name)
-            self.assertNotIn(
-                "MODEL-TEMPLATE", {model["name"] for model in models}
-            )
+            self.assertNotIn("MODEL-TEMPLATE", {model["name"] for model in models})
 
     def test_incomplete_modelfile_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "prod-invalid.Modelfile"
             path.write_text("PARAMETER num_gpu 99\nPARAMETER num_keep 256\n")
-            with self.assertRaisesRegex(modelctl.ModelError, "missing category metadata"):
+            with self.assertRaisesRegex(
+                modelctl.ModelError, "missing category metadata"
+            ):
                 modelctl.load_modelfile(path)
 
     def test_duplicate_source_metadata_is_rejected(self) -> None:
@@ -125,17 +144,25 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / source.name
             text = source.read_text(encoding="utf-8")
-            path.write_text(text.replace("# GGUF:", "# Source: owner/other @ main\n# GGUF:"))
+            path.write_text(
+                text.replace("# GGUF:", "# Source: owner/other @ main\n# GGUF:")
+            )
             with self.assertRaisesRegex(modelctl.ModelError, "exactly one.*Source"):
                 modelctl.load_modelfile(path)
 
-    def test_production_qwen35_prompt_and_fablevibes_sampling_match_policy(self) -> None:
-        qwen = (MODELFILES / "prod-qwen35-9b-unsloth-q6-k.Modelfile").read_text(encoding="utf-8")
+    def test_production_qwen35_prompt_and_fablevibes_sampling_match_policy(
+        self,
+    ) -> None:
+        qwen = (MODELFILES / "prod-qwen35-9b-unsloth-q6-k.Modelfile").read_text(
+            encoding="utf-8"
+        )
         self.assertNotIn("experimental general assistant", qwen)
         self.assertIn("German-, French-, and English-speaking users", qwen)
         self.assertIn("PARAMETER temperature 0.7", qwen)
         self.assertIn("PARAMETER top_p 0.8", qwen)
-        fable = (MODELFILES / "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile").read_text(encoding="utf-8")
+        fable = (
+            MODELFILES / "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile"
+        ).read_text(encoding="utf-8")
         self.assertIn("PARAMETER temperature 1.0", fable)
         self.assertIn("PARAMETER top_p 0.95", fable)
         self.assertIn("PARAMETER top_k 20", fable)
@@ -177,19 +204,28 @@ class SelectionTests(unittest.TestCase):
 
     def test_catalog_indexes_are_global_and_selectable(self) -> None:
         all_models = modelctl.discover_models([MODELFILES])
-        self.assertEqual([model["index"] for model in all_models], list(range(len(all_models))))
+        self.assertEqual(
+            [model["index"] for model in all_models], list(range(len(all_models)))
+        )
         _defaults, experiments = load("experiments")
         first_index = experiments[0]["index"]
-        self.assertEqual(modelctl.select_models(experiments, str(first_index)), [experiments[0]])
+        self.assertEqual(
+            modelctl.select_models(experiments, str(first_index)), [experiments[0]]
+        )
 
     def test_empty_and_invalid_selections_fail(self) -> None:
         for selection in ("", "999", "original-name"):
-            with self.subTest(selection=selection), self.assertRaises(modelctl.ModelError):
+            with (
+                self.subTest(selection=selection),
+                self.assertRaises(modelctl.ModelError),
+            ):
                 modelctl.select_models(self.models, selection)
 
 
 class StatusTests(unittest.TestCase):
-    def test_combined_status_handles_protected_sources_and_unmanaged_models(self) -> None:
+    def test_combined_status_handles_protected_sources_and_unmanaged_models(
+        self,
+    ) -> None:
         class ProtectedPath:
             def stat(self):
                 raise PermissionError
@@ -203,15 +239,21 @@ class StatusTests(unittest.TestCase):
             "127.0.0.1:11436": {"prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"},
         }
         output = StringIO()
-        with patch.object(
-            modelctl, "registered_models", side_effect=lambda host: registrations[host]
-        ), patch.object(modelctl, "model_path", return_value=ProtectedPath()), \
-             redirect_stdout(output):
+        with (
+            patch.object(
+                modelctl,
+                "registered_models",
+                side_effect=lambda host: registrations[host],
+            ),
+            patch.object(modelctl, "model_path", return_value=ProtectedPath()),
+            redirect_stdout(output),
+        ):
             modelctl.print_all_models([MODELFILES])
 
         text = output.getvalue()
         gemma = next(
-            model for model in modelctl.discover_models([MODELFILES])
+            model
+            for model in modelctl.discover_models([MODELFILES])
             if model["name"] == "exp-gemma4-12b-google-qat-q4-0"
         )
         self.assertIn(f"  {gemma['index']:2d}) exp-gemma4-12b-google-qat-q4-0", text)

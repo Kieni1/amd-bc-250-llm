@@ -6,10 +6,10 @@ from __future__ import annotations
 import argparse
 import glob
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 
 class ManifestError(RuntimeError):
@@ -30,20 +30,26 @@ def parse_defines(values: list[str]) -> dict[str, str]:
 
 def load_manifest(path: Path) -> list[tuple[int, str, str, str, str]]:
     entries: list[tuple[int, str, str, str, str]] = []
-    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
         fields = raw_line.split("\t")
         if len(fields) != 4:
-            raise ManifestError(f"{path}:{line_number}: expected four tab-separated fields")
+            raise ManifestError(
+                f"{path}:{line_number}: expected four tab-separated fields"
+            )
         kind, mode, source, destination = (field.strip() for field in fields)
         if kind not in {"file", "config", "dir", "ghost", "text", "aliases"}:
             raise ManifestError(f"{path}:{line_number}: unknown entry type {kind!r}")
         try:
             int(mode, 8)
         except ValueError as error:
-            raise ManifestError(f"{path}:{line_number}: invalid mode {mode!r}") from error
+            raise ManifestError(
+                f"{path}:{line_number}: invalid mode {mode!r}"
+            ) from error
         entries.append((line_number, kind, mode, source, destination))
     return entries
 
@@ -52,7 +58,9 @@ def expand(value: str, definitions: dict[str, str], line_number: int) -> str:
     try:
         return value.format_map(definitions)
     except KeyError as error:
-        raise ManifestError(f"manifest line {line_number}: undefined placeholder {error.args[0]!r}") from error
+        raise ManifestError(
+            f"manifest line {line_number}: undefined placeholder {error.args[0]!r}"
+        ) from error
 
 
 def build_path(buildroot: Path, destination: str) -> Path:
@@ -79,9 +87,13 @@ def source_matches(source_root: Path, pattern: str, line_number: int) -> list[Pa
         return []
     matches = [Path(item) for item in sorted(glob.glob(str(source_root / pattern)))]
     if not matches:
-        raise ManifestError(f"manifest line {line_number}: source does not match: {pattern}")
+        raise ManifestError(
+            f"manifest line {line_number}: source does not match: {pattern}"
+        )
     if any(not path.is_file() for path in matches):
-        raise ManifestError(f"manifest line {line_number}: source patterns must match files only")
+        raise ManifestError(
+            f"manifest line {line_number}: source patterns must match files only"
+        )
     return matches
 
 
@@ -101,7 +113,11 @@ def main() -> int:
         for line_number, kind, _mode, source, destination in entries:
             expand(destination, definitions, line_number)
             if kind in {"file", "config", "aliases"}:
-                source_matches(args.source_root, expand(source, definitions, line_number), line_number)
+                source_matches(
+                    args.source_root,
+                    expand(source, definitions, line_number),
+                    line_number,
+                )
         print(f"Install manifest valid: {len(entries)} entries")
         return 0
     if args.buildroot is None or args.filelist is None:
@@ -141,7 +157,9 @@ def main() -> int:
         sources = source_matches(args.source_root, source_value, line_number)
         if kind == "aliases":
             if len(sources) != 1:
-                raise ManifestError(f"manifest line {line_number}: aliases requires one dispatcher")
+                raise ManifestError(
+                    f"manifest line {line_number}: aliases requires one dispatcher"
+                )
             result = subprocess.run(
                 [str(sources[0]), "--list-aliases"],
                 check=True,
@@ -161,7 +179,9 @@ def main() -> int:
 
         destination_is_directory = destination.endswith("/") or len(sources) > 1
         if len(sources) > 1 and not destination.endswith("/"):
-            raise ManifestError(f"manifest line {line_number}: glob destination must end with '/'")
+            raise ManifestError(
+                f"manifest line {line_number}: glob destination must end with '/'"
+            )
         for source_path in sources:
             file_destination = (
                 f"{destination.rstrip('/')}/{source_path.name}"

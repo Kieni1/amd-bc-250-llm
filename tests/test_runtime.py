@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-import os
 import io
-from pathlib import Path
-from types import SimpleNamespace
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
-
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "models"))
@@ -19,10 +18,12 @@ import modelctl
 
 class AuthenticationTests(unittest.TestCase):
     def test_rejected_token_falls_back_without_persisting(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary, patch.dict(
-            os.environ, {"HF_TOKEN": "rejected", "BC250_HF_ANONYMOUS": "1"}
-        ), patch.object(
-            modelctl, "run_as_ollama", return_value=SimpleNamespace(returncode=1)
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            patch.dict(os.environ, {"HF_TOKEN": "rejected", "BC250_HF_ANONYMOUS": "1"}),
+            patch.object(
+                modelctl, "run_as_ollama", return_value=SimpleNamespace(returncode=1)
+            ),
         ):
             self.assertEqual(modelctl.hf_token("hf", Path(temporary), None), "")
         self.assertNotIn("bashrc", (ROOT / "models/modelctl.py").read_text())
@@ -35,9 +36,12 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_hf_download_can_run_in_a_progress_terminal(self) -> None:
         completed = subprocess.CompletedProcess([], 0)
-        with patch.object(
-            modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"
-        ), patch.object(modelctl.subprocess, "run", return_value=completed) as run:
+        with (
+            patch.object(
+                modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"
+            ),
+            patch.object(modelctl.subprocess, "run", return_value=completed) as run,
+        ):
             result = modelctl.run_as_ollama(
                 ["/usr/bin/hf", "download", "owner/repo", "model.gguf"],
                 {"HF_TOKEN": "secret"},
@@ -46,7 +50,9 @@ class AuthenticationTests(unittest.TestCase):
 
         self.assertIs(result, completed)
         command = run.call_args.args[0]
-        self.assertEqual(command[:4], ["/usr/bin/script", "--quiet", "--return", "--flush"])
+        self.assertEqual(
+            command[:4], ["/usr/bin/script", "--quiet", "--return", "--flush"]
+        )
         self.assertIn("/usr/bin/runuser", command[5])
         self.assertIn("owner/repo", command[5])
 
@@ -58,19 +64,27 @@ class OcrInstallTests(unittest.TestCase):
         )
         model = next(item for item in models if item["name"] == "exp-glm-ocr-ggml-q8-0")
         args = SimpleNamespace(
-            revision=None, sha256=None, destination=None, min_free_bytes=None,
-            token_file=None, refresh=False, host=None,
+            revision=None,
+            sha256=None,
+            destination=None,
+            min_free_bytes=None,
+            token_file=None,
+            refresh=False,
+            host=None,
         )
         completed = SimpleNamespace(returncode=0)
-        with tempfile.TemporaryDirectory() as temporary, patch.dict(
-            os.environ, {"MODELFILE_DIR": temporary}, clear=False
-        ), patch.object(modelctl.os, "geteuid", return_value=0), patch.object(
-            modelctl, "ollama_identity", return_value=(1000, 1000)
-        ), patch.object(modelctl.os, "chown"), patch.object(modelctl.os, "chmod"), patch.object(
-            modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"
-        ) as command_path, patch.object(
-            modelctl, "run_as_ollama", return_value=completed
-        ) as run:
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            patch.dict(os.environ, {"MODELFILE_DIR": temporary}, clear=False),
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "ollama_identity", return_value=(1000, 1000)),
+            patch.object(modelctl.os, "chown"),
+            patch.object(modelctl.os, "chmod"),
+            patch.object(
+                modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"
+            ) as command_path,
+            patch.object(modelctl, "run_as_ollama", return_value=completed) as run,
+        ):
             self.assertEqual(modelctl.install_models(defaults, [model], args), 0)
             rendered = Path(temporary, model["modelfile"]).read_text(encoding="utf-8")
 
@@ -86,12 +100,20 @@ class OcrInstallTests(unittest.TestCase):
         )
         model = next(item for item in models if item["name"] == "exp-glm-ocr-ggml-q8-0")
         completed = SimpleNamespace(returncode=0)
-        with patch.object(
-            modelctl, "registered_models",
-            side_effect=[{model["from"], model["name"]}, {model["name"]}],
-        ), patch.object(modelctl, "run_as_ollama", return_value=completed) as run:
-            modelctl.remove_hf_backing_registration("/usr/bin/ollama", defaults["ollama_host"], model)
-        self.assertEqual(run.call_args.args[0], ["/usr/bin/ollama", "rm", model["from"]])
+        with (
+            patch.object(
+                modelctl,
+                "registered_models",
+                side_effect=[{model["from"], model["name"]}, {model["name"]}],
+            ),
+            patch.object(modelctl, "run_as_ollama", return_value=completed) as run,
+        ):
+            modelctl.remove_hf_backing_registration(
+                "/usr/bin/ollama", defaults["ollama_host"], model
+            )
+        self.assertEqual(
+            run.call_args.args[0], ["/usr/bin/ollama", "rm", model["from"]]
+        )
 
     def test_hf_backing_with_friendly_alias_is_not_reported_as_unmanaged(self) -> None:
         _, models = modelctl.load_models(
@@ -101,10 +123,16 @@ class OcrInstallTests(unittest.TestCase):
         main_host = modelctl.CATEGORY_DEFAULTS[model["category"]]["ollama_host"]
         registrations = {model["name"], model["from"]}
         output = io.StringIO()
-        with patch.object(modelctl, "discover_models", return_value=[model]), patch.object(
-            modelctl, "registered_models", side_effect=lambda host: registrations if host == main_host else set()
-        ), patch("sys.stdout", output):
-            modelctl.print_all_models([ROOT / "models/modelfiles"] )
+        with (
+            patch.object(modelctl, "discover_models", return_value=[model]),
+            patch.object(
+                modelctl,
+                "registered_models",
+                side_effect=lambda host: registrations if host == main_host else set(),
+            ),
+            patch("sys.stdout", output),
+        ):
+            modelctl.print_all_models([ROOT / "models/modelfiles"])
         self.assertNotIn("Unmanaged Ollama models", output.getvalue())
 
     def test_invalid_ocr_alias_fails_before_manager_or_ollama(self) -> None:
@@ -127,8 +155,11 @@ class OcrInstallTests(unittest.TestCase):
                     marker.unlink(missing_ok=True)
                     result = subprocess.run(
                         [str(script), action, "nope"],
-                        env=environment, text=True, stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT, check=False,
+                        env=environment,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        check=False,
                     )
                     self.assertEqual(result.returncode, 2, result.stdout)
                     self.assertIn("OCR model must be", result.stdout)
@@ -137,13 +168,23 @@ class OcrInstallTests(unittest.TestCase):
 
 class RuntimeContractTests(unittest.TestCase):
     def test_host_precedence_preserves_both_supported_environment_names(self) -> None:
-        source = (ROOT / "models/modelctl.py").read_text(encoding="utf-8")
-        host_expression = (
-            'return override or os.environ.get("OLLAMA_HOST") or '
-            'os.environ.get("OLLAMA_URL")'
-        )
-        self.assertIn(host_expression, source.replace("\\\n        ", ""))
-        self.assertIn("host = ollama_host(defaults, args.host)", source)
+        defaults = {"ollama_host": "127.0.0.1:11434"}
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(modelctl.ollama_host(defaults), "127.0.0.1:11434")
+
+        with patch.dict(os.environ, {"OLLAMA_URL": "url-host"}, clear=True):
+            self.assertEqual(modelctl.ollama_host(defaults), "url-host")
+
+        with patch.dict(
+            os.environ,
+            {"OLLAMA_HOST": "host-value", "OLLAMA_URL": "url-value"},
+            clear=True,
+        ):
+            self.assertEqual(modelctl.ollama_host(defaults), "host-value")
+
+        with patch.dict(os.environ, {"OLLAMA_HOST": "host-value"}, clear=True):
+            self.assertEqual(modelctl.ollama_host(defaults, "override"), "override")
 
     def test_install_does_not_probe_ollama_before_download(self) -> None:
         source = (ROOT / "models/modelctl.py").read_text(encoding="utf-8")
@@ -151,9 +192,11 @@ class RuntimeContractTests(unittest.TestCase):
         self.assertNotIn("curl", source)
 
     def test_missing_progress_terminal_names_the_fedora_package(self) -> None:
-        with patch.object(modelctl.shutil, "which", return_value=None):
-            with self.assertRaisesRegex(modelctl.ModelError, "util-linux-script"):
-                modelctl.command_path("script")
+        with (
+            patch.object(modelctl.shutil, "which", return_value=None),
+            self.assertRaisesRegex(modelctl.ModelError, "util-linux-script"),
+        ):
+            modelctl.command_path("script")
 
 
 if __name__ == "__main__":

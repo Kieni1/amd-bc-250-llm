@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 class RagBaselineTests(unittest.TestCase):
     def test_packaged_open_webui_rag_defaults(self) -> None:
-        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(
+            encoding="utf-8"
+        )
         expected = (
             "Environment=RAG_EMBEDDING_ENGINE=ollama",
             "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
@@ -36,7 +38,9 @@ class RagBaselineTests(unittest.TestCase):
         guide = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")
         model_names = set()
         for path in (ROOT / "models/modelfiles").glob("*.Modelfile"):
-            match = re.search(r"(?m)^# Ollama model:\s*(\S+)\s*$", path.read_text(encoding="utf-8"))
+            match = re.search(
+                r"(?m)^# Ollama model:\s*(\S+)\s*$", path.read_text(encoding="utf-8")
+            )
             self.assertIsNotNone(match, path.name)
             model_names.add(match.group(1))
         for name in (
@@ -46,11 +50,29 @@ class RagBaselineTests(unittest.TestCase):
         ):
             self.assertIn(name, model_names)
             self.assertIn(name, guide)
-        for command in ("bc250-fetch-models", "bc250-fetch-embeddings", "bc250-model", "bc250-ocr", "bc250-rag-import", "bc250-status", "bc250-verify"):
+        for command in (
+            "bc250-fetch-models",
+            "bc250-fetch-embeddings",
+            "bc250-model",
+            "bc250-ocr",
+            "bc250-rag-import",
+            "bc250-status",
+            "bc250-verify",
+        ):
             self.assertIn(command, guide)
 
     def test_package_contains_no_office_document_payloads(self) -> None:
-        forbidden = {".pdf", ".doc", ".docx", ".odt", ".xls", ".xlsx", ".ppt", ".pptx", ".rtf"}
+        forbidden = {
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".odt",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx",
+            ".rtf",
+        }
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         found = []
         for line in manifest.splitlines():
@@ -70,13 +92,21 @@ class RagBaselineTests(unittest.TestCase):
         self.assertNotIn("/api/embed", verify)
 
     def test_rag_pilot_template_is_placeholder_only_and_packaged(self) -> None:
-        template = (ROOT / "examples/rag/pilot-evaluation.tsv").read_text(encoding="utf-8")
+        template = (ROOT / "examples/rag/pilot-evaluation.tsv").read_text(
+            encoding="utf-8"
+        )
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("[GERMAN_SEARCHABLE_PDF]", template)
         self.assertIn("[UNANSWERED_CONTROL]", template)
         self.assertNotIn("Customer project A", template)
-        self.assertIn("examples/rag/pilot-evaluation.tsv\t{share}/examples/rag/pilot-evaluation.tsv", manifest)
-        self.assertIn("examples/rag/document-template.md\t{share}/examples/rag/document-template.md", manifest)
+        self.assertIn(
+            "examples/rag/pilot-evaluation.tsv\t{share}/examples/rag/pilot-evaluation.tsv",
+            manifest,
+        )
+        self.assertIn(
+            "examples/rag/document-template.md\t{share}/examples/rag/document-template.md",
+            manifest,
+        )
 
 
 if __name__ == "__main__":

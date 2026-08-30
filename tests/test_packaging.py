@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import subprocess
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -53,7 +52,9 @@ class PackagingTests(unittest.TestCase):
         ):
             self.assertIn(entry, manifest)
 
-    def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(self) -> None:
+    def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(
+        self,
+    ) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
@@ -62,7 +63,7 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("pull-embedding-model", dispatcher)
         self.assertNotIn("install-cu-manager", dispatcher)
         self.assertNotIn("log_sensors.sh", manifest)
-        self.assertIn('modelctl|install|embedding', dispatcher)
+        self.assertIn("modelctl|install|embedding", dispatcher)
         self.assertIn(
             "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
             quadlet,
@@ -115,7 +116,9 @@ class PackagingTests(unittest.TestCase):
         self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.0)$")
 
     def test_open_webui_fresh_install_privacy_features_are_disabled(self) -> None:
-        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(
+            encoding="utf-8"
+        )
         for setting in (
             "ENABLE_COMMUNITY_SHARING=false",
             "ENABLE_CODE_EXECUTION=false",
@@ -125,11 +128,15 @@ class PackagingTests(unittest.TestCase):
             self.assertIn(f"Environment={setting}", quadlet)
 
     def test_compare_mtp_does_not_force_global_think_false(self) -> None:
-        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(
+            encoding="utf-8"
+        )
         self.assertNotIn("think:false", source)
 
     def test_ci_runs_on_push_and_pull_request_with_static_linters(self) -> None:
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
+            encoding="utf-8"
+        )
         self.assertRegex(workflow, r"(?m)^  push:$")
         self.assertRegex(workflow, r"(?m)^  pull_request:$")
         self.assertIn("ruff check .", workflow)
@@ -182,7 +189,7 @@ class PackagingTests(unittest.TestCase):
             manifest,
         )
         self.assertNotIn("patches/40cu-fedora-helper.patch", spec)
-        self.assertIn('/var/cache/bc250-llm-server/40cu', helper)
+        self.assertIn("/var/cache/bc250-llm-server/40cu", helper)
         self.assertIn('lsinitrd -k "$KVER" -f "$relative"', helper)
         self.assertIn("Running driver:", helper)
         self.assertIn("signature_enforcement_active", helper)

@@ -3,11 +3,11 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import re
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "models/rag/rag_import.py"
@@ -20,7 +20,16 @@ spec.loader.exec_module(rag)
 
 
 class RagImportTests(unittest.TestCase):
-    def make_doc(self, root: Path, scope: str, name: str, language: str, source_language: str, source_name: str, authority: str = "") -> Path:
+    def make_doc(
+        self,
+        root: Path,
+        scope: str,
+        name: str,
+        language: str,
+        source_language: str,
+        source_name: str,
+        authority: str = "",
+    ) -> Path:
         base = root / scope / "COLLECTION"
         active = base / "active"
         sources = base / "sources"
@@ -35,7 +44,7 @@ class RagImportTests(unittest.TestCase):
             "---\n"
             f'document_id: "{name}"\n'
             f'language: "{language}"\n'
-            f'{authority_line}'
+            f"{authority_line}"
             f'source_file: "{source_name}"\n'
             f'source_sha256: "{digest}"\n'
             "relation:\n"
@@ -60,11 +69,12 @@ class RagImportTests(unittest.TestCase):
                 {"[PUBLIC] COLLECTION — Originals", "[PUBLIC] COLLECTION — Français"},
             )
 
-
     def test_explicit_english_original_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            self.make_doc(root, "public", "en.md", "en", "en", "en.pdf", authority="original")
+            self.make_doc(
+                root, "public", "en.md", "en", "en", "en.pdf", authority="original"
+            )
             docs, warnings = rag.discover(root)
             self.assertEqual(warnings, [])
             self.assertEqual(len(docs), 1)
@@ -74,8 +84,12 @@ class RagImportTests(unittest.TestCase):
     def test_source_filename_drift_is_tolerated_only_when_sha_matches(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            doc = self.make_doc(root, "confidential", "de.md", "de-CH", "de-CH", "actual.pdf")
-            text = doc.read_text(encoding="utf-8").replace('source_file: "actual.pdf"', 'source_file: "old-name.pdf"')
+            doc = self.make_doc(
+                root, "confidential", "de.md", "de-CH", "de-CH", "actual.pdf"
+            )
+            text = doc.read_text(encoding="utf-8").replace(
+                'source_file: "actual.pdf"', 'source_file: "old-name.pdf"'
+            )
             doc.write_text(text, encoding="utf-8")
             docs, warnings = rag.discover(root)
             self.assertEqual(len(docs), 1)
@@ -90,7 +104,9 @@ class RagImportTests(unittest.TestCase):
             outside.write_bytes(b"outside")
             digest = hashlib.sha256(outside.read_bytes()).hexdigest()
             text = doc.read_text(encoding="utf-8")
-            text = re.sub(r'source_file: "[^"]+"', 'source_file: "../../outside.pdf"', text)
+            text = re.sub(
+                r'source_file: "[^"]+"', 'source_file: "../../outside.pdf"', text
+            )
             text = re.sub(r'source_sha256: "[^"]+"', f'source_sha256: "{digest}"', text)
             doc.write_text(text, encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "source_file must be a filename"):
@@ -111,10 +127,14 @@ class RagImportTests(unittest.TestCase):
     def test_front_matter_rejects_unsupported_or_duplicate_yaml(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "bad.md"
-            path.write_text("---\nlanguage: de-CH\nlanguage: fr-CH\n---\n", encoding="utf-8")
+            path.write_text(
+                "---\nlanguage: de-CH\nlanguage: fr-CH\n---\n", encoding="utf-8"
+            )
             with self.assertRaisesRegex(ValueError, "duplicate front-matter key"):
                 rag.front_matter(path)
-            path.write_text("---\nlanguage: de-CH\nunknown: value\n---\n", encoding="utf-8")
+            path.write_text(
+                "---\nlanguage: de-CH\nunknown: value\n---\n", encoding="utf-8"
+            )
             with self.assertRaisesRegex(ValueError, "unsupported front-matter key"):
                 rag.front_matter(path)
 
@@ -122,7 +142,12 @@ class RagImportTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
-            result = subprocess.run([str(SCRIPT), "plan", str(root)], text=True, capture_output=True, check=False)
+            result = subprocess.run(
+                [str(SCRIPT), "plan", str(root)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("[PUBLIC] COLLECTION — Originals", result.stdout)
         source = SCRIPT.read_text(encoding="utf-8")
@@ -147,7 +172,9 @@ class RagImportTests(unittest.TestCase):
     def test_importer_is_packaged_and_document_root_is_operator_owned(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(encoding="utf-8")
+        tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("models/rag/rag_import.py\t{libexec}/rag-import", manifest)
         self.assertIn('"rag-import|$LIBEXEC/rag-import"', dispatcher)
         self.assertIn("d /srv/bc250-documents 0750 root root -", tmpfiles)

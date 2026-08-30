@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
-from pathlib import Path
 import tempfile
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -19,7 +18,9 @@ def load_prepare_sources():
 
 
 class SourceManifestTests(unittest.TestCase):
-    def test_manifest_describes_four_rpm_inputs_with_local_cache_integrity(self) -> None:
+    def test_manifest_describes_four_rpm_inputs_with_local_cache_integrity(
+        self,
+    ) -> None:
         prepare = load_prepare_sources()
         sources = prepare.load_sources()
         self.assertEqual(len(prepare.source_files(sources)), 4)

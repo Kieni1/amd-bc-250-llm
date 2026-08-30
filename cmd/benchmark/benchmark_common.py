@@ -4,19 +4,21 @@
 Stdlib-only by design: these helpers are installed with the RPM and must work on
 an otherwise minimal Fedora host. API shapes target Ollama 0.32.15.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import math
 import os
-from pathlib import Path
 import re
 import statistics
 import subprocess
 import threading
 import time
-from typing import Any, Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 from urllib import error, request
 
 STANDARD_OLLAMA_VERSION = "0.32.15"
@@ -63,9 +65,13 @@ class OllamaClient:
                 body = response.read().decode("utf-8")
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
-            raise BenchmarkError(f"Ollama {path} returned HTTP {exc.code}: {body}") from exc
+            raise BenchmarkError(
+                f"Ollama {path} returned HTTP {exc.code}: {body}"
+            ) from exc
         except OSError as exc:
-            raise BenchmarkError(f"Ollama request failed for {self._url(path)}: {exc}") from exc
+            raise BenchmarkError(
+                f"Ollama request failed for {self._url(path)}: {exc}"
+            ) from exc
         if not body.strip():
             return {}
         try:
@@ -95,17 +101,25 @@ class OllamaClient:
                     try:
                         item = json.loads(raw.decode("utf-8"))
                     except json.JSONDecodeError as exc:
-                        raise BenchmarkError(f"Ollama {path} returned invalid streaming JSON") from exc
+                        raise BenchmarkError(
+                            f"Ollama {path} returned invalid streaming JSON"
+                        ) from exc
                     if isinstance(item, dict) and item.get("error"):
                         raise BenchmarkError(str(item["error"]))
                     if not isinstance(item, dict):
-                        raise BenchmarkError(f"Ollama {path} returned unexpected streaming JSON type")
+                        raise BenchmarkError(
+                            f"Ollama {path} returned unexpected streaming JSON type"
+                        )
                     yield item
         except error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
-            raise BenchmarkError(f"Ollama {path} returned HTTP {exc.code}: {body}") from exc
+            raise BenchmarkError(
+                f"Ollama {path} returned HTTP {exc.code}: {body}"
+            ) from exc
         except OSError as exc:
-            raise BenchmarkError(f"Ollama streaming request failed for {self._url(path)}: {exc}") from exc
+            raise BenchmarkError(
+                f"Ollama streaming request failed for {self._url(path)}: {exc}"
+            ) from exc
 
     def version(self) -> str:
         return str(self.json_request("/api/version").get("version", "unknown"))
@@ -139,7 +153,9 @@ class OllamaClient:
         # Ollama documents an empty /api/generate request with keep_alive=0 as
         # the HTTP unload path. This remains valid in 0.32.15.
         try:
-            self.json_request("/api/generate", {"model": model, "keep_alive": 0, "stream": False})
+            self.json_request(
+                "/api/generate", {"model": model, "keep_alive": 0, "stream": False}
+            )
             return True
         except BenchmarkError:
             # Embedding-only or multimodal registrations can reject generation.
@@ -150,7 +166,8 @@ class OllamaClient:
         """Return whether /api/ps currently reports this exact model."""
         normalized = model.removesuffix(":latest")
         return any(
-            str(row.get("name") or row.get("model") or "").removesuffix(":latest") == normalized
+            str(row.get("name") or row.get("model") or "").removesuffix(":latest")
+            == normalized
             for row in self.ps()
         )
 
@@ -172,7 +189,9 @@ class OllamaClient:
             if not self.model_loaded(model):
                 return
         except BenchmarkError as exc:
-            raise BenchmarkError(f"cannot verify model residency before unload: {model}") from exc
+            raise BenchmarkError(
+                f"cannot verify model residency before unload: {model}"
+            ) from exc
         if not self.stop(model):
             raise BenchmarkError(f"could not request unload for {model}")
         if not self.wait_unloaded(model, timeout):
@@ -181,7 +200,9 @@ class OllamaClient:
     def digest(self, model: str) -> str:
         normalized = model.removesuffix(":latest")
         for row in self.tags():
-            name = str(row.get("name") or row.get("model") or "").removesuffix(":latest")
+            name = str(row.get("name") or row.get("model") or "").removesuffix(
+                ":latest"
+            )
             if name == normalized:
                 return str(row.get("digest") or "")
         return ""
@@ -193,7 +214,9 @@ class OllamaClient:
         except BenchmarkError:
             rows = []
         for row in rows:
-            name = str(row.get("name") or row.get("model") or "").removesuffix(":latest")
+            name = str(row.get("name") or row.get("model") or "").removesuffix(
+                ":latest"
+            )
             if name == normalized:
                 return {
                     "resident_size_bytes": row.get("size"),
@@ -228,7 +251,9 @@ def read_meminfo() -> tuple[float | None, float | None]:
     total = values.get("SwapTotal")
     free = values.get("SwapFree")
     available_mib = available / 1024 if available is not None else None
-    swap_used_mib = (total - free) / 1024 if total is not None and free is not None else None
+    swap_used_mib = (
+        (total - free) / 1024 if total is not None and free is not None else None
+    )
     return available_mib, swap_used_mib
 
 
@@ -251,14 +276,18 @@ def discover_amdgpu_device(drm_root: Path = Path("/sys/class/drm")) -> Path | No
             if not device.exists():
                 continue
             try:
-                vendor = (device / "vendor").read_text(encoding="utf-8").strip().casefold()
+                vendor = (
+                    (device / "vendor").read_text(encoding="utf-8").strip().casefold()
+                )
             except OSError:
                 continue
             if vendor == "0x1002":
                 candidates.append(device)
     if not candidates:
         return None
-    candidates.sort(key=lambda device: (read_int(device / "boot_vga") != 1, device.parent.name))
+    candidates.sort(
+        key=lambda device: (read_int(device / "boot_vga") != 1, device.parent.name)
+    )
     return candidates[0]
 
 
@@ -279,7 +308,9 @@ def amdgpu_edge_temperature(device: Path | None) -> tuple[str, float | None]:
         chosen: Path | None = None
         label = ""
         for input_path in inputs:
-            label_path = input_path.with_name(input_path.name.replace("_input", "_label"))
+            label_path = input_path.with_name(
+                input_path.name.replace("_input", "_label")
+            )
             try:
                 current_label = label_path.read_text(encoding="utf-8").strip()
             except OSError:
@@ -366,9 +397,11 @@ class TelemetrySampler:
         while not self._stop.wait(self.interval):
             self.samples.append(self._sample())
 
-    def start(self) -> "TelemetrySampler":
+    def start(self) -> TelemetrySampler:
         self.samples.append(self._sample())
-        self._thread = threading.Thread(target=self._loop, name="bc250-telemetry", daemon=True)
+        self._thread = threading.Thread(
+            target=self._loop, name="bc250-telemetry", daemon=True
+        )
         self._thread.start()
         return self
 
@@ -383,12 +416,36 @@ class TelemetrySampler:
         if not self.samples:
             return empty_telemetry()
         temps = [sample.temp_c for sample in self.samples if sample.temp_c is not None]
-        busy = [sample.gpu_busy_pct for sample in self.samples if sample.gpu_busy_pct is not None]
-        clocks = [sample.gpu_clock_mhz for sample in self.samples if sample.gpu_clock_mhz is not None]
-        vrams = [sample.vram_used_bytes for sample in self.samples if sample.vram_used_bytes is not None]
-        gtts = [sample.gtt_used_bytes for sample in self.samples if sample.gtt_used_bytes is not None]
-        mems = [sample.mem_available_mib for sample in self.samples if sample.mem_available_mib is not None]
-        swaps = [sample.swap_used_mib for sample in self.samples if sample.swap_used_mib is not None]
+        busy = [
+            sample.gpu_busy_pct
+            for sample in self.samples
+            if sample.gpu_busy_pct is not None
+        ]
+        clocks = [
+            sample.gpu_clock_mhz
+            for sample in self.samples
+            if sample.gpu_clock_mhz is not None
+        ]
+        vrams = [
+            sample.vram_used_bytes
+            for sample in self.samples
+            if sample.vram_used_bytes is not None
+        ]
+        gtts = [
+            sample.gtt_used_bytes
+            for sample in self.samples
+            if sample.gtt_used_bytes is not None
+        ]
+        mems = [
+            sample.mem_available_mib
+            for sample in self.samples
+            if sample.mem_available_mib is not None
+        ]
+        swaps = [
+            sample.swap_used_mib
+            for sample in self.samples
+            if sample.swap_used_mib is not None
+        ]
 
         threshold_seconds = {threshold: 0.0 for threshold in TEMP_THRESHOLDS}
         for previous, current in zip(self.samples, self.samples[1:]):
@@ -409,7 +466,9 @@ class TelemetrySampler:
 
         return {
             "telemetry_samples": len(self.samples),
-            "telemetry_duration_s": max(0.0, self.samples[-1].timestamp - self.samples[0].timestamp),
+            "telemetry_duration_s": max(
+                0.0, self.samples[-1].timestamp - self.samples[0].timestamp
+            ),
             "temp_max_c": max(temps) if temps else None,
             "temp_p95_c": percentile(temps, 95) if temps else None,
             "seconds_ge_80c": threshold_seconds[80.0],
@@ -467,7 +526,9 @@ def normalize_words(text: str) -> list[str]:
 
 def cosine(left: list[float], right: list[float]) -> float:
     if len(left) != len(right):
-        raise BenchmarkError(f"embedding dimension mismatch: {len(left)} != {len(right)}")
+        raise BenchmarkError(
+            f"embedding dimension mismatch: {len(left)} != {len(right)}"
+        )
     numerator = sum(a * b for a, b in zip(left, right))
     left_norm = math.sqrt(sum(a * a for a in left))
     right_norm = math.sqrt(sum(b * b for b in right))

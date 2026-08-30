@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
 import tempfile
 import textwrap
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -58,7 +57,9 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("poweroff or suspend", source)
         self.assertIn("REQUIRE_WOL", source)
         self.assertIn("active SSH, UI or Ollama TCP session", source)
-        self.assertNotIn("safe-suspend.sh", (ROOT / "packaging/install-manifest.tsv").read_text())
+        self.assertNotIn(
+            "safe-suspend.sh", (ROOT / "packaging/install-manifest.tsv").read_text()
+        )
 
     def test_pruning_disables_zero_rules_and_preserves_uncertain_metadata(self) -> None:
         script = ROOT / "cmd/maintenance/prune-uploads.sh"
@@ -147,12 +148,18 @@ class MaintenanceTests(unittest.TestCase):
                 "DRY_RUN": "1",
             }
             result = subprocess.run(
-                [str(script)], env=env, text=True, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, check=False,
+                [str(script)],
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertIn("Files=120", result.stdout)
-            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["1", "2", "3"])
+            self.assertEqual(
+                log.read_text(encoding="utf-8").splitlines(), ["1", "2", "3"]
+            )
 
 
 if __name__ == "__main__":

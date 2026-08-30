@@ -2,19 +2,17 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from pathlib import Path
 from types import SimpleNamespace
-
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "models"))
 
 import modelctl
-
 
 MODEL = {
     "repository": "example/model",
@@ -31,7 +29,14 @@ class StateTests(unittest.TestCase):
             output.write_bytes(b"weights")
             digest = modelctl.sha256(output)
             stat = output.stat()
-            state = {**MODEL, "schema": 2, "sha256": digest, "size": stat.st_size, "mtime_ns": stat.st_mtime_ns, "ctime_ns": stat.st_ctime_ns}
+            state = {
+                **MODEL,
+                "schema": 2,
+                "sha256": digest,
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                "ctime_ns": stat.st_ctime_ns,
+            }
             self.assertTrue(modelctl.state_matches(state, MODEL, output))
 
     def test_changed_provenance_or_checksum_does_not_reuse_bytes(self) -> None:
@@ -40,7 +45,14 @@ class StateTests(unittest.TestCase):
             output.write_bytes(b"weights")
             digest = modelctl.sha256(output)
             stat = output.stat()
-            state = {**MODEL, "schema": 2, "sha256": digest, "size": stat.st_size, "mtime_ns": stat.st_mtime_ns, "ctime_ns": stat.st_ctime_ns}
+            state = {
+                **MODEL,
+                "schema": 2,
+                "sha256": digest,
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                "ctime_ns": stat.st_ctime_ns,
+            }
             for changed in (
                 {**MODEL, "repository": "example/other"},
                 {**MODEL, "revision": "new"},
@@ -50,29 +62,59 @@ class StateTests(unittest.TestCase):
                 with self.subTest(changed=changed):
                     self.assertFalse(modelctl.state_matches(state, changed, output))
 
-    def test_modified_gguf_is_not_reused_even_when_sidecar_provenance_matches(self) -> None:
+    def test_modified_gguf_is_not_reused_even_when_sidecar_provenance_matches(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / MODEL["gguf"]
             output.write_bytes(b"weights")
             digest = modelctl.sha256(output)
             stat = output.stat()
-            state = {**MODEL, "schema": 2, "sha256": digest, "size": stat.st_size, "mtime_ns": stat.st_mtime_ns, "ctime_ns": stat.st_ctime_ns}
+            state = {
+                **MODEL,
+                "schema": 2,
+                "sha256": digest,
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                "ctime_ns": stat.st_ctime_ns,
+            }
             output.write_bytes(b"WEIGHTS")  # same size; writing changes ctime
-            os.utime(output, ns=(stat.st_atime_ns, stat.st_mtime_ns))  # preserve recorded mtime
+            os.utime(
+                output, ns=(stat.st_atime_ns, stat.st_mtime_ns)
+            )  # preserve recorded mtime
             self.assertFalse(modelctl.state_matches(state, MODEL, output))
 
-    def test_cleanup_retains_local_source_when_ollama_registration_removal_fails(self) -> None:
+    def test_cleanup_retains_local_source_when_ollama_registration_removal_fails(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / "model.gguf"
             output.write_bytes(b"weights")
-            model = {"id": "m", "name": "prod-test", "provider": "ollama", "from": str(output), "gguf": output.name}
+            model = {
+                "id": "m",
+                "name": "prod-test",
+                "provider": "ollama",
+                "from": str(output),
+                "gguf": output.name,
+            }
             args = SimpleNamespace(yes=True)
-            with patch.object(modelctl.os, "geteuid", return_value=0), \
-                 patch.object(modelctl, "ollama_identity", return_value=(1, 1)), \
-                 patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"), \
-                 patch.object(modelctl, "run_as_ollama", return_value=SimpleNamespace(returncode=1)), \
-                 patch.object(modelctl, "registered_models", return_value={"prod-test"}):
-                self.assertEqual(modelctl.cleanup_models({"ollama_host": "127.0.0.1:11434"}, [model], args), 2)
+            with (
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(modelctl, "ollama_identity", return_value=(1, 1)),
+                patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+                patch.object(
+                    modelctl,
+                    "run_as_ollama",
+                    return_value=SimpleNamespace(returncode=1),
+                ),
+                patch.object(modelctl, "registered_models", return_value={"prod-test"}),
+            ):
+                self.assertEqual(
+                    modelctl.cleanup_models(
+                        {"ollama_host": "127.0.0.1:11434"}, [model], args
+                    ),
+                    2,
+                )
             self.assertTrue(output.exists())
 
     def test_invalid_state_is_ignored(self) -> None:

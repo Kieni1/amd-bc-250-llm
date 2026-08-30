@@ -10,25 +10,27 @@ The benchmark has two deliberate modes:
 
 Request shapes target Ollama 0.32.15.  The implementation is stdlib-only.
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
-from datetime import datetime, timezone
 import hashlib
 import json
 import os
-from pathlib import Path
 import statistics
 import sys
 import time
-from typing import Any, Iterable
+from collections.abc import Iterable
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
 from benchmark_common import (
-    BenchmarkError,
     DEFAULT_TELEMETRY_INTERVAL,
-    OllamaClient,
     STANDARD_OLLAMA_VERSION,
+    BenchmarkError,
+    OllamaClient,
     TelemetrySampler,
 )
 
@@ -137,7 +139,9 @@ def resolve_think_policy(model: str, requested: str) -> str:
     if "gpt-oss" in lower:
         return "medium"
     # The packaged stock Qwen3.5 profile uses upstream non-thinking sampling.
-    if "qwen35" in lower and not any(token in lower for token in ("defiant", "fable", "heretic")):
+    if "qwen35" in lower and not any(
+        token in lower for token in ("defiant", "fable", "heretic")
+    ):
         return "false"
     if "qwen3-4b" in lower:
         return "false"
@@ -163,7 +167,14 @@ def options_for(mode: str, num_predict: int) -> dict[str, Any]:
     return {"num_predict": num_predict}
 
 
-def generate_payload(model: str, prompt: str, num_predict: int, mode: str, think_policy: str, keep_alive: str) -> dict[str, Any]:
+def generate_payload(
+    model: str,
+    prompt: str,
+    num_predict: int,
+    mode: str,
+    think_policy: str,
+    keep_alive: str,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "model": model,
         "prompt": prompt,
@@ -182,7 +193,14 @@ def generate_payload(model: str, prompt: str, num_predict: int, mode: str, think
     return payload
 
 
-def chat_payload(model: str, prompt: str, num_predict: int, mode: str, think_policy: str, keep_alive: str) -> dict[str, Any]:
+def chat_payload(
+    model: str,
+    prompt: str,
+    num_predict: int,
+    mode: str,
+    think_policy: str,
+    keep_alive: str,
+) -> dict[str, Any]:
     messages: list[dict[str, str]] = []
     if mode == "neutral":
         messages.append({"role": "system", "content": NEUTRAL_SYSTEM})
@@ -234,7 +252,9 @@ def run_generate(
     keep_alive: str,
     telemetry_interval: float,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    payload = generate_payload(model, prompt, num_predict, mode, think_policy, keep_alive)
+    payload = generate_payload(
+        model, prompt, num_predict, mode, think_policy, keep_alive
+    )
     sampler = TelemetrySampler(telemetry_interval).start()
     start = time.monotonic()
     try:
@@ -274,7 +294,9 @@ def run_chat_stream(
     try:
         for item in client.ndjson_request("/api/chat", payload):
             now = time.monotonic()
-            message = item.get("message") if isinstance(item.get("message"), dict) else {}
+            message = (
+                item.get("message") if isinstance(item.get("message"), dict) else {}
+            )
             content = str(message.get("content") or item.get("response") or "")
             thinking = str(message.get("thinking") or item.get("thinking") or "")
             if (content or thinking) and first_content is None:
@@ -291,10 +313,16 @@ def run_chat_stream(
         wall = time.monotonic() - started
         telemetry = sampler.stop()
     if not final:
-        raise BenchmarkError(f"{model}: streaming chat ended without a final done record")
+        raise BenchmarkError(
+            f"{model}: streaming chat ended without a final done record"
+        )
     metrics = response_metrics(final, wall)
-    metrics["time_to_first_content_s"] = None if first_content is None else first_content - started
-    metrics["time_to_first_answer_s"] = None if first_answer is None else first_answer - started
+    metrics["time_to_first_content_s"] = (
+        None if first_content is None else first_content - started
+    )
+    metrics["time_to_first_answer_s"] = (
+        None if first_answer is None else first_answer - started
+    )
     metrics.update(client.runtime_state(model))
     metrics.update(telemetry)
     detail = {
@@ -310,7 +338,15 @@ def write_jsonl(path: Path, data: dict[str, Any]) -> None:
         handle.write(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n")
 
 
-def csv_row(model: str, test: str, run: int, mode: str, think_policy: str, metrics: dict[str, Any], status: str = "ok") -> dict[str, Any]:
+def csv_row(
+    model: str,
+    test: str,
+    run: int,
+    mode: str,
+    think_policy: str,
+    metrics: dict[str, Any],
+    status: str = "ok",
+) -> dict[str, Any]:
     row: dict[str, Any] = {
         "timestamp": iso_now(),
         "model": model,
@@ -327,7 +363,9 @@ def csv_row(model: str, test: str, run: int, mode: str, think_policy: str, metri
     return row
 
 
-def early_stop_warning(metrics: dict[str, Any], requested: int, fraction: float) -> str | None:
+def early_stop_warning(
+    metrics: dict[str, Any], requested: int, fraction: float
+) -> str | None:
     # done_reason=length means Ollama honoured the requested generation cap;
     # only a short stop is evidence of an early EOS/EOT worth investigating.
     count = int(metrics.get("eval_count") or 0)
@@ -342,8 +380,10 @@ def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
         return explicit
     names = [str(row.get("name") or row.get("model") or "") for row in client.tags()]
     names = [
-        name for name in names
-        if name and not any(token in name.casefold() for token in ("embed-", "ocr", "task-"))
+        name
+        for name in names
+        if name
+        and not any(token in name.casefold() for token in ("embed-", "ocr", "task-"))
     ]
     if not names:
         raise BenchmarkError("no generation models found")
@@ -379,7 +419,9 @@ def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
     return unique
 
 
-def bool_setting(name: str, default: bool, *, interactive_prompt: str | None = None) -> bool:
+def bool_setting(
+    name: str, default: bool, *, interactive_prompt: str | None = None
+) -> bool:
     raw = os.environ.get(name)
     if raw is not None:
         return raw.casefold() in {"1", "true", "yes", "y", "on"}
@@ -403,9 +445,11 @@ def fmt(value: Any, digits: int = 2) -> str:
 
 def aggregate_resource(rows: Iterable[dict[str, Any]]) -> dict[str, float | None]:
     values = list(rows)
+
     def extrema(key: str, fn: Any) -> float | None:
         found = [float(row[key]) for row in values if row.get(key) not in (None, "")]
         return fn(found) if found else None
+
     return {
         "temp_max_c": extrema("temp_max_c", max),
         "temp_p95_max_c": extrema("temp_p95_c", max),
@@ -423,8 +467,17 @@ def main() -> int:
         prog="bc250-benchmark",
         description="BC-250 generation benchmark for Ollama 0.32.15.",
     )
-    parser.add_argument("models", nargs="*", help="registered model names; default is interactive discovery")
-    parser.add_argument("--ollama-url", default=os.environ.get("OLLAMA_URL", os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")))
+    parser.add_argument(
+        "models",
+        nargs="*",
+        help="registered model names; default is interactive discovery",
+    )
+    parser.add_argument(
+        "--ollama-url",
+        default=os.environ.get(
+            "OLLAMA_URL", os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+        ),
+    )
     parser.add_argument("--output", help="CSV output path")
     args = parser.parse_args()
 
@@ -432,8 +485,28 @@ def main() -> int:
     if profile not in {"moderate", "conservative"}:
         raise BenchmarkError("BENCH_PROFILE must be moderate or conservative")
     defaults = {
-        "moderate": {"short": 384, "prefill": 32, "context": 128, "long": 3072, "latency": 96, "repeats": 3, "latency_repeats": 2, "filler": 220, "ctx": [44, 176, 352, 704]},
-        "conservative": {"short": 256, "prefill": 24, "context": 96, "long": 2048, "latency": 64, "repeats": 2, "latency_repeats": 1, "filler": 110, "ctx": [22, 88, 220]},
+        "moderate": {
+            "short": 384,
+            "prefill": 32,
+            "context": 128,
+            "long": 3072,
+            "latency": 96,
+            "repeats": 3,
+            "latency_repeats": 2,
+            "filler": 220,
+            "ctx": [44, 176, 352, 704],
+        },
+        "conservative": {
+            "short": 256,
+            "prefill": 24,
+            "context": 96,
+            "long": 2048,
+            "latency": 64,
+            "repeats": 2,
+            "latency_repeats": 1,
+            "filler": 110,
+            "ctx": [22, 88, 220],
+        },
     }[profile]
     # TODO (future release): production mode currently keeps deployment SYSTEM/sampling
     # but still uses the generic generation workload. Add role-specific office/RAG/
@@ -442,8 +515,19 @@ def main() -> int:
     if mode not in {"neutral", "production"}:
         raise BenchmarkError("BENCH_MODE must be neutral or production")
     think_requested = os.environ.get("THINK_MODE", "auto").casefold()
-    if think_requested not in {"auto", "omit", "true", "false", "low", "medium", "high", "max"}:
-        raise BenchmarkError("THINK_MODE must be auto, omit, true, false, low, medium, high, or max")
+    if think_requested not in {
+        "auto",
+        "omit",
+        "true",
+        "false",
+        "low",
+        "medium",
+        "high",
+        "max",
+    }:
+        raise BenchmarkError(
+            "THINK_MODE must be auto, omit, true, false, low, medium, high, or max"
+        )
 
     num_short = int(os.environ.get("NUM_PREDICT_SHORT", defaults["short"]))
     num_prefill = int(os.environ.get("NUM_PREDICT_PREFILL", defaults["prefill"]))
@@ -451,27 +535,49 @@ def main() -> int:
     num_long = int(os.environ.get("NUM_PREDICT_LONG", defaults["long"]))
     num_latency = int(os.environ.get("NUM_PREDICT_LATENCY", defaults["latency"]))
     repeats = int(os.environ.get("REPEATS", defaults["repeats"]))
-    latency_repeats = int(os.environ.get("LATENCY_REPEATS", defaults["latency_repeats"]))
+    latency_repeats = int(
+        os.environ.get("LATENCY_REPEATS", defaults["latency_repeats"])
+    )
     filler_sentences = int(os.environ.get("PREFILL_SENTENCES", defaults["filler"]))
-    ctx_points = [int(value) for value in os.environ.get("CTX_POINTS", " ".join(str(value) for value in defaults["ctx"])).split()]
-    telemetry_interval = float(os.environ.get("TELEMETRY_INTERVAL", str(DEFAULT_TELEMETRY_INTERVAL)))
+    ctx_points = [
+        int(value)
+        for value in os.environ.get(
+            "CTX_POINTS", " ".join(str(value) for value in defaults["ctx"])
+        ).split()
+    ]
+    telemetry_interval = float(
+        os.environ.get("TELEMETRY_INTERVAL", str(DEFAULT_TELEMETRY_INTERVAL))
+    )
     keep_alive = os.environ.get("KEEP_ALIVE", "30m")
     early_fraction = float(os.environ.get("EARLY_EOS_FRACTION", "0.90"))
     run_latency = bool_setting("RUN_LATENCY", True)
-    run_context = bool_setting("RUN_CONTEXT", profile == "moderate", interactive_prompt="Run context-capacity curve too?")
-    run_thermal = bool_setting("RUN_THERMAL", False, interactive_prompt="Run sustained-load thermal test too?")
+    run_context = bool_setting(
+        "RUN_CONTEXT",
+        profile == "moderate",
+        interactive_prompt="Run context-capacity curve too?",
+    )
+    run_thermal = bool_setting(
+        "RUN_THERMAL", False, interactive_prompt="Run sustained-load thermal test too?"
+    )
     thermal_windows = int(os.environ.get("THROTTLE_WINDOWS", "3"))
 
-    client = OllamaClient(args.ollama_url, float(os.environ.get("REQUEST_TIMEOUT", "900")))
+    client = OllamaClient(
+        args.ollama_url, float(os.environ.get("REQUEST_TIMEOUT", "900"))
+    )
     version = client.version()
     if version != STANDARD_OLLAMA_VERSION:
-        print(f"WARNING: Ollama {version} differs from package standard {STANDARD_OLLAMA_VERSION}", file=sys.stderr)
+        print(
+            f"WARNING: Ollama {version} differs from package standard {STANDARD_OLLAMA_VERSION}",
+            file=sys.stderr,
+        )
     models = select_models(client, args.models)
     board_note = os.environ.get("BOARD_NOTE", "")
     if not board_note and sys.stdin.isatty():
-        board_note = input("Board/cooling/governor note for this run [optional]: ").strip()
+        board_note = input(
+            "Board/cooling/governor note for this run [optional]: "
+        ).strip()
 
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_generation_{stamp}.csv")
     jsonl_path = csv_path.with_suffix(".jsonl")
     meta_path = csv_path.with_suffix(".meta.json")
@@ -485,7 +591,9 @@ def main() -> int:
         "ollama_version": version,
         "package_standard_ollama_version": STANDARD_OLLAMA_VERSION,
         "neutral_system_prompt": NEUTRAL_SYSTEM if mode == "neutral" else None,
-        "neutral_system_sha256": hashlib.sha256(NEUTRAL_SYSTEM.encode()).hexdigest() if mode == "neutral" else None,
+        "neutral_system_sha256": hashlib.sha256(NEUTRAL_SYSTEM.encode()).hexdigest()
+        if mode == "neutral"
+        else None,
         "think_mode_requested": think_requested,
         "telemetry_interval_s": telemetry_interval,
         "profile": profile,
@@ -501,30 +609,58 @@ def main() -> int:
         except BenchmarkError:
             show = {}
         details = show.get("details") if isinstance(show.get("details"), dict) else {}
-        meta["models"].append({
-            "model": model,
-            "digest": client.digest(model),
-            "family": details.get("family", ""),
-            "parameter_size": details.get("parameter_size", ""),
-            "quantization_level": details.get("quantization_level", ""),
-            "think_policy": resolve_think_policy(model, think_requested),
-        })
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        meta["models"].append(
+            {
+                "model": model,
+                "digest": client.digest(model),
+                "family": details.get("family", ""),
+                "parameter_size": details.get("parameter_size", ""),
+                "quantization_level": details.get("quantization_level", ""),
+                "think_policy": resolve_think_policy(model, think_requested),
+            }
+        )
+    meta_path.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
     rows: list[dict[str, Any]] = []
-    long_prompt = make_filler(filler_sentences) + " Given all of the above office-document context, " + SHORT_PROMPT
+    long_prompt = (
+        make_filler(filler_sentences)
+        + " Given all of the above office-document context, "
+        + SHORT_PROMPT
+    )
 
-    def record(model: str, test: str, run: int, metrics: dict[str, Any], detail: dict[str, Any], requested: int, think_policy: str) -> None:
+    def record(
+        model: str,
+        test: str,
+        run: int,
+        metrics: dict[str, Any],
+        detail: dict[str, Any],
+        requested: int,
+        think_policy: str,
+    ) -> None:
         row = csv_row(model, test, run, mode, think_policy, metrics)
         rows.append(row)
         writer.writerow(row)
         csv_handle.flush()
         warning = early_stop_warning(metrics, requested, early_fraction)
-        write_jsonl(jsonl_path, {
-            "timestamp": row["timestamp"], "category": "generation", "model": model,
-            "test": test, "run": run, "bench_mode": mode, "think_policy": think_policy,
-            "requested_tokens": requested, "warning": warning, "metrics": metrics, **detail,
-        })
+        write_jsonl(
+            jsonl_path,
+            {
+                "timestamp": row["timestamp"],
+                "category": "generation",
+                "model": model,
+                "test": test,
+                "run": run,
+                "bench_mode": mode,
+                "think_policy": think_policy,
+                "requested_tokens": requested,
+                "warning": warning,
+                "metrics": metrics,
+                **detail,
+            },
+        )
         suffix = f" WARNING: {warning}" if warning else ""
         print(
             f"    {test}#{run}: wall={fmt(metrics.get('wall_duration_s'))}s "
@@ -539,56 +675,141 @@ def main() -> int:
         writer.writeheader()
         for model in models:
             think_policy = resolve_think_policy(model, think_requested)
-            print(f"\n=== {short_name(model)} ({model}) | mode={mode} think={think_policy} ===")
+            print(
+                f"\n=== {short_name(model)} ({model}) | mode={mode} think={think_policy} ==="
+            )
 
             try:
                 if run_latency:
                     client.ensure_unloaded(model)
                     metrics, _telemetry, detail = run_chat_stream(
-                        client, model, make_unique_prompt(CHAT_PROMPT), num_latency, mode, think_policy, keep_alive, telemetry_interval
+                        client,
+                        model,
+                        make_unique_prompt(CHAT_PROMPT),
+                        num_latency,
+                        mode,
+                        think_policy,
+                        keep_alive,
+                        telemetry_interval,
                     )
-                    record(model, "cold_chat", 1, metrics, detail, num_latency, think_policy)
+                    record(
+                        model,
+                        "cold_chat",
+                        1,
+                        metrics,
+                        detail,
+                        num_latency,
+                        think_policy,
+                    )
                     for run in range(1, latency_repeats + 1):
                         metrics, _telemetry, detail = run_chat_stream(
-                            client, model, make_unique_prompt(CHAT_PROMPT), num_latency, mode, think_policy, keep_alive, telemetry_interval
+                            client,
+                            model,
+                            make_unique_prompt(CHAT_PROMPT),
+                            num_latency,
+                            mode,
+                            think_policy,
+                            keep_alive,
+                            telemetry_interval,
                         )
-                        record(model, "warm_chat", run, metrics, detail, num_latency, think_policy)
+                        record(
+                            model,
+                            "warm_chat",
+                            run,
+                            metrics,
+                            detail,
+                            num_latency,
+                            think_policy,
+                        )
 
                 # Warm model before throughput comparisons so model load does not
                 # dominate the short-generation measurement.
                 try:
-                    run_generate(client, model, make_unique_prompt(SHORT_PROMPT), 32, mode, think_policy, keep_alive, telemetry_interval)
+                    run_generate(
+                        client,
+                        model,
+                        make_unique_prompt(SHORT_PROMPT),
+                        32,
+                        mode,
+                        think_policy,
+                        keep_alive,
+                        telemetry_interval,
+                    )
                 except BenchmarkError as exc:
                     print(f"    warmup failed: {exc}", file=sys.stderr)
 
                 for run in range(1, repeats + 1):
                     metrics, _telemetry, detail = run_generate(
-                        client, model, make_unique_prompt(SHORT_PROMPT), num_short, mode, think_policy, keep_alive, telemetry_interval
+                        client,
+                        model,
+                        make_unique_prompt(SHORT_PROMPT),
+                        num_short,
+                        mode,
+                        think_policy,
+                        keep_alive,
+                        telemetry_interval,
                     )
-                    record(model, "short", run, metrics, detail, num_short, think_policy)
+                    record(
+                        model, "short", run, metrics, detail, num_short, think_policy
+                    )
 
                 metrics, _telemetry, detail = run_generate(
-                    client, model, make_unique_prompt(long_prompt), num_prefill, mode, think_policy, keep_alive, telemetry_interval
+                    client,
+                    model,
+                    make_unique_prompt(long_prompt),
+                    num_prefill,
+                    mode,
+                    think_policy,
+                    keep_alive,
+                    telemetry_interval,
                 )
                 record(model, "prefill", 1, metrics, detail, num_prefill, think_policy)
 
                 if run_context:
                     previous_prompt_count = -1
                     for point in ctx_points:
-                        prompt = make_filler(point) + " Given all of the above context, " + SHORT_PROMPT
-                        metrics, _telemetry, detail = run_generate(
-                            client, model, make_unique_prompt(prompt), num_context, mode, think_policy, keep_alive, telemetry_interval
+                        prompt = (
+                            make_filler(point)
+                            + " Given all of the above context, "
+                            + SHORT_PROMPT
                         )
-                        record(model, f"ctx_{point}", 1, metrics, detail, num_context, think_policy)
+                        metrics, _telemetry, detail = run_generate(
+                            client,
+                            model,
+                            make_unique_prompt(prompt),
+                            num_context,
+                            mode,
+                            think_policy,
+                            keep_alive,
+                            telemetry_interval,
+                        )
+                        record(
+                            model,
+                            f"ctx_{point}",
+                            1,
+                            metrics,
+                            detail,
+                            num_context,
+                            think_policy,
+                        )
                         prompt_count = int(metrics.get("prompt_eval_count") or 0)
-                        if previous_prompt_count >= 0 and prompt_count <= previous_prompt_count:
+                        if (
+                            previous_prompt_count >= 0
+                            and prompt_count <= previous_prompt_count
+                        ):
                             print(
                                 f"    WARNING: prompt_eval_count stopped growing ({previous_prompt_count} -> {prompt_count}); possible context truncation",
                                 file=sys.stderr,
                             )
                         allocated = metrics.get("allocated_context")
-                        if isinstance(allocated, int) and prompt_count + num_context >= allocated:
-                            print(f"    NOTE: ctx point approaches allocated context {allocated}", file=sys.stderr)
+                        if (
+                            isinstance(allocated, int)
+                            and prompt_count + num_context >= allocated
+                        ):
+                            print(
+                                f"    NOTE: ctx point approaches allocated context {allocated}",
+                                file=sys.stderr,
+                            )
                         previous_prompt_count = prompt_count
 
                 if run_thermal:
@@ -597,16 +818,33 @@ def main() -> int:
                     last_tps: float | None = None
                     for window in range(1, thermal_windows + 1):
                         metrics, _telemetry, detail = run_generate(
-                            client, model, make_unique_prompt(SHORT_PROMPT), window_tokens, mode, think_policy, keep_alive, telemetry_interval
+                            client,
+                            model,
+                            make_unique_prompt(SHORT_PROMPT),
+                            window_tokens,
+                            mode,
+                            think_policy,
+                            keep_alive,
+                            telemetry_interval,
                         )
-                        record(model, f"thermal_w{window}", 1, metrics, detail, window_tokens, think_policy)
+                        record(
+                            model,
+                            f"thermal_w{window}",
+                            1,
+                            metrics,
+                            detail,
+                            window_tokens,
+                            think_policy,
+                        )
                         tps = float(metrics.get("tokens_per_second") or 0)
                         if first_tps is None:
                             first_tps = tps
                         last_tps = tps
                     if first_tps and last_tps is not None:
                         drop = (first_tps - last_tps) / first_tps * 100.0
-                        print(f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s ({drop:+.1f}%)")
+                        print(
+                            f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s ({drop:+.1f}%)"
+                        )
 
             finally:
                 try:
@@ -615,22 +853,35 @@ def main() -> int:
                     print(f"WARNING: {exc}", file=sys.stderr)
 
     meta["finished_at"] = iso_now()
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    meta_path.write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
 
     print("\n=== Summary ===")
     for model in models:
-        model_rows = [row for row in rows if row["model"] == model and row["status"] == "ok"]
-        short_tps = [float(row["tokens_per_second"]) for row in model_rows if row["test"] == "short" and row.get("tokens_per_second") not in (None, "")]
+        model_rows = [
+            row for row in rows if row["model"] == model and row["status"] == "ok"
+        ]
+        short_tps = [
+            float(row["tokens_per_second"])
+            for row in model_rows
+            if row["test"] == "short" and row.get("tokens_per_second") not in (None, "")
+        ]
         resources = aggregate_resource(model_rows)
         mean_tps = statistics.fmean(short_tps) if short_tps else 0.0
         max_temp = resources["temp_max_c"]
-        thermal_flag = " THERMAL-LIMIT" if max_temp is not None and max_temp >= 85.0 else ""
+        thermal_flag = (
+            " THERMAL-LIMIT" if max_temp is not None and max_temp >= 85.0 else ""
+        )
         print(
             f"  {short_name(model):36s} short={mean_tps:7.2f} tok/s  "
             f"Tmax={fmt(max_temp, 1):>5s}C  MemAvail-min={fmt(resources['mem_available_min_mib'], 0):>6s}MiB  "
             f"swap-max={fmt(resources['swap_used_max_mib'], 0):>5s}MiB{thermal_flag}"
         )
-    print("\nResource headroom is informational on BC-250 unified memory; do not add VRAM/GTT/host figures as independent pools.")
+    print(
+        "\nResource headroom is informational on BC-250 unified memory; do not add VRAM/GTT/host figures as independent pools."
+    )
     print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
     return 0
 

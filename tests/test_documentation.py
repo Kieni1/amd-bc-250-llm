@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import subprocess
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_DOC_TREES = {
@@ -69,7 +68,9 @@ class DocumentationTests(unittest.TestCase):
                     continue
                 local = target.split("#", 1)[0]
                 if local:
-                    self.assertTrue((path.parent / local).exists(), f"{relative}: {target}")
+                    self.assertTrue(
+                        (path.parent / local).exists(), f"{relative}: {target}"
+                    )
 
     def test_documented_model_sets_match_current_modelfiles(self) -> None:
         names = set()
@@ -84,8 +85,12 @@ class DocumentationTests(unittest.TestCase):
         experiment_doc = (ROOT / "models/experiments/README.md").read_text(
             encoding="utf-8"
         )
-        documented_experiments = set(re.findall(r"(?m)^exp-[a-z0-9.-]+$", experiment_doc))
-        self.assertEqual(documented_experiments, {name for name in names if name.startswith("exp-")})
+        documented_experiments = set(
+            re.findall(r"(?m)^exp-[a-z0-9.-]+$", experiment_doc)
+        )
+        self.assertEqual(
+            documented_experiments, {name for name in names if name.startswith("exp-")}
+        )
 
         recommended = (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",

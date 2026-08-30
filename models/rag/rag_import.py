@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Metadata-aware Open WebUI knowledge importer for the BC-250 document tree."""
+
 from __future__ import annotations
 
 import argparse
@@ -20,7 +21,16 @@ DEFAULT_ROOT = Path(os.environ.get("BC250_RAG_ROOT", "/srv/bc250-documents"))
 DEFAULT_URL = os.environ.get("OPEN_WEBUI_URL", "http://127.0.0.1:3000").rstrip("/")
 SCOPES = ("public", "confidential")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
-TOP_LEVEL_KEYS = {"document_id", "title", "language", "status", "authority", "source_file", "source_sha256", "relation"}
+TOP_LEVEL_KEYS = {
+    "document_id",
+    "title",
+    "language",
+    "status",
+    "authority",
+    "source_file",
+    "source_sha256",
+    "relation",
+}
 RELATION_KEYS = {"type", "counterpart", "source_language"}
 
 
@@ -32,8 +42,14 @@ def knowledge_name(scope: str, collection: str, lane: str) -> str:
 def knowledge_description(scope: str, collection: str, lane: str) -> str:
     base = f"BC-250 managed RAG import from {scope}/{collection}/active."
     if lane == "original":
-        return base + " Authoritative German/English originals; use for German and English queries."
-    return base + " French translations; use for French queries. German originals remain authoritative on conflict."
+        return (
+            base
+            + " Authoritative German/English originals; use for German and English queries."
+        )
+    return (
+        base
+        + " French translations; use for French queries. German originals remain authoritative on conflict."
+    )
 
 
 @dataclass(frozen=True)
@@ -116,8 +132,16 @@ def route(meta: dict[str, object]) -> tuple[str, str]:
     language = str(meta.get("language", "")).strip()
     authority = str(meta.get("authority", "")).strip().lower()
     relation = meta.get("relation") if isinstance(meta.get("relation"), dict) else {}
-    rel_type = str(relation.get("type", "")).strip().lower() if isinstance(relation, dict) else ""
-    source_language = str(relation.get("source_language", "")).strip().lower() if isinstance(relation, dict) else ""
+    rel_type = (
+        str(relation.get("type", "")).strip().lower()
+        if isinstance(relation, dict)
+        else ""
+    )
+    source_language = (
+        str(relation.get("source_language", "")).strip().lower()
+        if isinstance(relation, dict)
+        else ""
+    )
     lang = language.lower()
 
     if authority:
@@ -126,7 +150,11 @@ def route(meta: dict[str, object]) -> tuple[str, str]:
         lane = authority
     elif lang.startswith("de"):
         lane = "original"
-    elif lang.startswith("fr") and rel_type == "translation-pair" and source_language.startswith("de"):
+    elif (
+        lang.startswith("fr")
+        and rel_type == "translation-pair"
+        and source_language.startswith("de")
+    ):
         lane = "translation"
     else:
         raise ValueError("cannot infer authority; add authority: original|translation")
@@ -146,7 +174,9 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _resolve_source(active_file: Path, source_file: str, expected: str) -> tuple[Path, str | None]:
+def _resolve_source(
+    active_file: Path, source_file: str, expected: str
+) -> tuple[Path, str | None]:
     if Path(source_file).name != source_file or source_file in {".", ".."}:
         raise ValueError("source_file must be a filename inside sources/")
     sources = active_file.parent.parent / "sources"
@@ -160,12 +190,20 @@ def _resolve_source(active_file: Path, source_file: str, expected: str) -> tuple
     if named.is_file() and _sha256(named).lower() == expected.lower():
         return named, None
 
-    matches = [p for p in sources.iterdir() if p.is_file() and not p.is_symlink() and _sha256(p).lower() == expected.lower()]
+    matches = [
+        p
+        for p in sources.iterdir()
+        if p.is_file() and not p.is_symlink() and _sha256(p).lower() == expected.lower()
+    ]
     if len(matches) == 1:
-        return matches[0], f"source_file names {source_file!r}, checksum matches {matches[0].name!r}"
+        return matches[
+            0
+        ], f"source_file names {source_file!r}, checksum matches {matches[0].name!r}"
     if named.is_file():
         raise ValueError(f"source SHA-256 mismatch: {named.name}")
-    raise ValueError(f"source_file not found and checksum did not identify one source: {source_file}")
+    raise ValueError(
+        f"source_file not found and checksum did not identify one source: {source_file}"
+    )
 
 
 def discover(root: Path) -> tuple[list[Document], list[str]]:
@@ -181,7 +219,9 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
             continue
         for collection_dir in sorted(p for p in scope_dir.iterdir() if p.is_dir()):
             if collection_dir.is_symlink():
-                errors.append(f"{collection_dir}: collection directory must not be a symlink")
+                errors.append(
+                    f"{collection_dir}: collection directory must not be a symlink"
+                )
                 continue
             active = collection_dir / "active"
             if active.is_symlink():
@@ -191,7 +231,9 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
                 continue
             nested = [p for p in active.rglob("*.md") if p.parent != active]
             if nested:
-                errors.append(f"{active}: nested active directories are not supported yet")
+                errors.append(
+                    f"{active}: nested active directories are not supported yet"
+                )
                 continue
             for path in sorted(active.glob("*.md")):
                 try:
@@ -208,7 +250,17 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
                     _, warning = _resolve_source(path, source_file, source_sha256)
                     if warning:
                         warnings.append(f"{path}: {warning}")
-                    docs.append(Document(path, scope, collection_dir.name, lane, language, source_file, source_sha256))
+                    docs.append(
+                        Document(
+                            path,
+                            scope,
+                            collection_dir.name,
+                            lane,
+                            language,
+                            source_file,
+                            source_sha256,
+                        )
+                    )
                 except (OSError, UnicodeError, ValueError) as exc:
                     errors.append(f"{path}: {exc}")
     if errors:
@@ -233,8 +285,8 @@ def expected_knowledge(root: Path) -> dict[str, str]:
             if not (collection_dir / "active").is_dir():
                 continue
             for lane in ("original", "translation"):
-                result[knowledge_name(scope, collection_dir.name, lane)] = knowledge_description(
-                    scope, collection_dir.name, lane
+                result[knowledge_name(scope, collection_dir.name, lane)] = (
+                    knowledge_description(scope, collection_dir.name, lane)
                 )
     return result
 
@@ -252,7 +304,9 @@ def print_plan(root: Path, docs: list[Document], warnings: list[str]) -> None:
         for warning in warnings:
             print(f"  - {warning}")
     print("\nRouting: German/English queries -> Originals; French queries -> Français.")
-    print("The Français knowledge base is a translation aid; German Originals remain authoritative.")
+    print(
+        "The Français knowledge base is a translation aid; German Originals remain authoritative."
+    )
 
 
 class OpenWebUI:
@@ -261,28 +315,49 @@ class OpenWebUI:
         self.token = token
         self.timeout = timeout
 
-    def _request(self, method: str, path: str, payload: object | None = None, headers: dict[str, str] | None = None) -> object:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        payload: object | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> object:
         body = None if payload is None else json.dumps(payload).encode("utf-8")
-        request_headers = {"Authorization": f"Bearer {self.token}", "Accept": "application/json"}
+        request_headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/json",
+        }
         if body is not None:
             request_headers["Content-Type"] = "application/json"
         if headers:
             request_headers.update(headers)
-        request = Request(self.base + path, data=body, method=method, headers=request_headers)
+        request = Request(
+            self.base + path, data=body, method=method, headers=request_headers
+        )
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 raw = response.read()
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")
-            raise RuntimeError(f"Open WebUI {method} {path} failed: HTTP {exc.code}: {detail}") from exc
+            raise RuntimeError(
+                f"Open WebUI {method} {path} failed: HTTP {exc.code}: {detail}"
+            ) from exc
         except URLError as exc:
-            raise RuntimeError(f"Open WebUI is unreachable at {self.base}: {exc.reason}") from exc
+            raise RuntimeError(
+                f"Open WebUI is unreachable at {self.base}: {exc.reason}"
+            ) from exc
         return json.loads(raw) if raw else {}
 
     def find_knowledge(self, name: str) -> dict[str, object] | None:
-        result = self._request("GET", f"/api/v1/knowledge/search?query={quote(name)}&page=1")
+        result = self._request(
+            "GET", f"/api/v1/knowledge/search?query={quote(name)}&page=1"
+        )
         items = result.get("items", []) if isinstance(result, dict) else []
-        exact = [item for item in items if isinstance(item, dict) and item.get("name") == name]
+        exact = [
+            item
+            for item in items
+            if isinstance(item, dict) and item.get("name") == name
+        ]
         if len(exact) > 1:
             raise RuntimeError(f"multiple knowledge bases have the exact name {name!r}")
         if not exact:
@@ -295,7 +370,11 @@ class OpenWebUI:
         existing = self.find_knowledge(name)
         if existing is not None:
             return existing
-        created = self._request("POST", "/api/v1/knowledge/create", {"name": name, "description": description})
+        created = self._request(
+            "POST",
+            "/api/v1/knowledge/create",
+            {"name": name, "description": description},
+        )
         if not isinstance(created, dict) or not created.get("id"):
             raise RuntimeError(f"failed to create knowledge base {name!r}")
         print(f"  created knowledge base: {name}")
@@ -303,12 +382,21 @@ class OpenWebUI:
 
     def diff(self, knowledge_id: str, docs: list[Document]) -> dict[str, object]:
         manifest = [
-            {"filename": doc.path.name, "path": "", "checksum": _sha256(doc.path), "size": doc.path.stat().st_size}
+            {
+                "filename": doc.path.name,
+                "path": "",
+                "checksum": _sha256(doc.path),
+                "size": doc.path.stat().st_size,
+            }
             for doc in docs
         ]
-        result = self._request("POST", f"/api/v1/knowledge/{knowledge_id}/sync/diff", {"manifest": manifest})
+        result = self._request(
+            "POST",
+            f"/api/v1/knowledge/{knowledge_id}/sync/diff",
+            {"manifest": manifest},
+        )
         if not isinstance(result, dict):
-            raise RuntimeError("invalid sync diff response")
+            raise TypeError("invalid sync diff response")
         return result
 
     def upload(self, knowledge_id: str, doc: Document) -> None:
@@ -318,8 +406,8 @@ class OpenWebUI:
         boundary = "----bc250-" + uuid.uuid4().hex
         mime = mimetypes.guess_type(doc.path.name)[0] or "text/markdown"
         parts = [
-            f"--{boundary}\r\nContent-Disposition: form-data; name=\"metadata\"\r\n\r\n{metadata}\r\n".encode(),
-            f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{doc.path.name}\"\r\nContent-Type: {mime}\r\n\r\n".encode(),
+            f'--{boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{metadata}\r\n'.encode(),
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{doc.path.name}"\r\nContent-Type: {mime}\r\n\r\n'.encode(),
             content,
             f"\r\n--{boundary}--\r\n".encode(),
         ]
@@ -340,22 +428,36 @@ class OpenWebUI:
                 result = json.loads(response.read() or b"{}")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")
-            raise RuntimeError(f"upload failed for {doc.path.name}: HTTP {exc.code}: {detail}") from exc
+            raise RuntimeError(
+                f"upload failed for {doc.path.name}: HTTP {exc.code}: {detail}"
+            ) from exc
         except URLError as exc:
-            raise RuntimeError(f"Open WebUI is unreachable at {self.base}: {exc.reason}") from exc
+            raise RuntimeError(
+                f"Open WebUI is unreachable at {self.base}: {exc.reason}"
+            ) from exc
         file_id = str(result.get("id", "")) if isinstance(result, dict) else ""
         if not file_id:
             raise RuntimeError(f"Open WebUI returned no file id for {doc.path.name}")
         status_result = self._request("GET", f"/api/v1/files/{file_id}/process/status")
-        status = status_result.get("status") if isinstance(status_result, dict) else None
+        status = (
+            status_result.get("status") if isinstance(status_result, dict) else None
+        )
         if status != "completed":
-            detail = status_result.get("error") if isinstance(status_result, dict) else None
+            detail = (
+                status_result.get("error") if isinstance(status_result, dict) else None
+            )
             suffix = f": {detail}" if detail else ""
-            raise RuntimeError(f"Open WebUI processing did not complete for {doc.path.name} (status={status!r}){suffix}")
+            raise RuntimeError(
+                f"Open WebUI processing did not complete for {doc.path.name} (status={status!r}){suffix}"
+            )
 
     def cleanup(self, knowledge_id: str, file_ids: list[str]) -> None:
         if file_ids:
-            self._request("POST", f"/api/v1/knowledge/{knowledge_id}/sync/cleanup", {"file_ids": file_ids, "dir_ids": []})
+            self._request(
+                "POST",
+                f"/api/v1/knowledge/{knowledge_id}/sync/cleanup",
+                {"file_ids": file_ids, "dir_ids": []},
+            )
 
 
 def token_from(args: argparse.Namespace) -> str:
@@ -368,7 +470,9 @@ def token_from(args: argparse.Namespace) -> str:
     return token
 
 
-def sync(root: Path, docs: list[Document], warnings: list[str], args: argparse.Namespace) -> None:
+def sync(
+    root: Path, docs: list[Document], warnings: list[str], args: argparse.Namespace
+) -> None:
     print_plan(root, docs, warnings)
     api = OpenWebUI(args.url, token_from(args), args.timeout)
     grouped = groups(docs)
@@ -384,15 +488,23 @@ def sync(root: Path, docs: list[Document], warnings: list[str], args: argparse.N
         else:
             kb = api.find_knowledge(name)
             if kb is None:
-                print("  empty local lane and no remote knowledge base; nothing to prune")
+                print(
+                    "  empty local lane and no remote knowledge base; nothing to prune"
+                )
                 continue
         kb_id = str(kb["id"])
         diff = api.diff(kb_id, members)
         added = diff.get("added", []) if isinstance(diff.get("added"), list) else []
-        modified = diff.get("modified", []) if isinstance(diff.get("modified"), list) else []
-        deleted = diff.get("deleted", []) if isinstance(diff.get("deleted"), list) else []
+        modified = (
+            diff.get("modified", []) if isinstance(diff.get("modified"), list) else []
+        )
+        deleted = (
+            diff.get("deleted", []) if isinstance(diff.get("deleted"), list) else []
+        )
         unchanged = int(diff.get("unmodified_count", 0) or 0)
-        print(f"  {len(added)} added, {len(modified)} changed, {unchanged} unchanged, {len(deleted)} stale remote")
+        print(
+            f"  {len(added)} added, {len(modified)} changed, {unchanged} unchanged, {len(deleted)} stale remote"
+        )
 
         for item in added:
             doc = by_key[(name, str(item["filename"]))]
@@ -406,13 +518,21 @@ def sync(root: Path, docs: list[Document], warnings: list[str], args: argparse.N
 
         if deleted:
             if args.prune:
-                ids = [str(item["file_id"]) for item in deleted if isinstance(item, dict) and item.get("file_id")]
+                ids = [
+                    str(item["file_id"])
+                    for item in deleted
+                    if isinstance(item, dict) and item.get("file_id")
+                ]
                 print(f"  prune:   {len(ids)} stale remote file(s)")
                 api.cleanup(kb_id, ids)
             else:
-                print("  NOTE: stale remote files kept; rerun with --prune to remove them explicitly.")
+                print(
+                    "  NOTE: stale remote files kept; rerun with --prune to remove them explicitly."
+                )
 
-    print("\nSync complete. Review Open WebUI Knowledge permissions before exposing any collection to other users.")
+    print(
+        "\nSync complete. Review Open WebUI Knowledge permissions before exposing any collection to other users."
+    )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -421,14 +541,29 @@ def parser() -> argparse.ArgumentParser:
         description="Validate and sync active Markdown documents into language/authority-separated Open WebUI knowledge bases.",
     )
     sub = p.add_subparsers(dest="command", required=True)
-    plan = sub.add_parser("plan", help="validate metadata/source provenance and show routing without contacting Open WebUI")
+    plan = sub.add_parser(
+        "plan",
+        help="validate metadata/source provenance and show routing without contacting Open WebUI",
+    )
     plan.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT)
-    apply = sub.add_parser("sync", help="incrementally upload changed active Markdown documents")
+    apply = sub.add_parser(
+        "sync", help="incrementally upload changed active Markdown documents"
+    )
     apply.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT)
-    apply.add_argument("--url", default=DEFAULT_URL, help=f"Open WebUI URL (default: {DEFAULT_URL})")
-    apply.add_argument("--token-file", help="root-readable file containing an Open WebUI API key")
-    apply.add_argument("--prune", action="store_true", help="remove remote files no longer present locally")
-    apply.add_argument("--timeout", type=int, default=600, help="per-request timeout in seconds")
+    apply.add_argument(
+        "--url", default=DEFAULT_URL, help=f"Open WebUI URL (default: {DEFAULT_URL})"
+    )
+    apply.add_argument(
+        "--token-file", help="root-readable file containing an Open WebUI API key"
+    )
+    apply.add_argument(
+        "--prune",
+        action="store_true",
+        help="remove remote files no longer present locally",
+    )
+    apply.add_argument(
+        "--timeout", type=int, default=600, help="per-request timeout in seconds"
+    )
     return p
 
 

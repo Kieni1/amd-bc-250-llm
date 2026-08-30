@@ -12,13 +12,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
+from pathlib import Path
 
+import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = ROOT / "packaging/upstreams.toml"
@@ -57,9 +57,16 @@ def load_sources() -> list[dict]:
         commit = source["commit"]
         if len(commit) != 40 or any(char not in "0123456789abcdef" for char in commit):
             raise SourceError(f"{source_id}: commit must be a full lowercase SHA-1")
-        if source["repository"].count("/") != 1 or "{commit}" not in source["url"] + source["archive"]:
-            raise SourceError(f"{source_id}: repository and commit-templated source path are required")
-        if source.get("cargo_vendor") and not isinstance(source.get("vendor_archive"), str):
+        if (
+            source["repository"].count("/") != 1
+            or "{commit}" not in source["url"] + source["archive"]
+        ):
+            raise SourceError(
+                f"{source_id}: repository and commit-templated source path are required"
+            )
+        if source.get("cargo_vendor") and not isinstance(
+            source.get("vendor_archive"), str
+        ):
             raise SourceError(f"{source_id}: cargo_vendor requires vendor_archive")
     return sources
 
@@ -82,8 +89,6 @@ def display_path(path: Path) -> Path:
         return path.relative_to(ROOT)
     except ValueError:
         return path
-
-
 
 
 def sha256(path: Path) -> str:
@@ -116,6 +121,7 @@ def verify_checksum(path: Path) -> bool:
             "remove it or rerun with --force"
         )
     return True
+
 
 def download(source: dict, archive: Path, *, force: bool) -> None:
     if not force and verify_checksum(archive):
@@ -167,7 +173,9 @@ def prepare_cargo_vendor(source: dict, archive: Path, *, force: bool) -> Path:
 
     for command in ("cargo", "tar"):
         if shutil.which(command) is None:
-            raise SourceError(f"{command} is required to create the Cargo vendor archive")
+            raise SourceError(
+                f"{command} is required to create the Cargo vendor archive"
+            )
 
     work = WORK_DIR / source["id"]
     shutil.rmtree(work, ignore_errors=True)
@@ -226,9 +234,15 @@ def prepare(source: dict, *, force: bool) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("ids", nargs="*", help="source ids; default: all")
-    parser.add_argument("--force", action="store_true", help="replace selected cached files")
-    parser.add_argument("--print-files", action="store_true", help="print RPM source paths")
-    parser.add_argument("--check", action="store_true", help="check that all source files exist")
+    parser.add_argument(
+        "--force", action="store_true", help="replace selected cached files"
+    )
+    parser.add_argument(
+        "--print-files", action="store_true", help="print RPM source paths"
+    )
+    parser.add_argument(
+        "--check", action="store_true", help="check that all source files exist"
+    )
     args = parser.parse_args()
 
     sources = load_sources()
@@ -240,7 +254,9 @@ def main() -> int:
     unknown = requested - {source["id"] for source in sources}
     if unknown:
         raise SourceError(f"unknown source ids: {', '.join(sorted(unknown))}")
-    selected = [source for source in sources if not requested or source["id"] in requested]
+    selected = [
+        source for source in sources if not requested or source["id"] in requested
+    ]
 
     if args.check:
         missing = [
