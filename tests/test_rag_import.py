@@ -176,13 +176,17 @@ class RagImportTests(unittest.TestCase):
             1: {"items": [{"id": "a", "name": "Wanted"}], "total": 2},
             2: {"items": [{"id": "b", "name": "Wanted"}], "total": 2},
         }
-        with patch.object(
-            api,
-            "_request",
-            side_effect=lambda _method, path, _payload=None, _headers=None: pages[int(path.rsplit("page=", 1)[1])],
+        with (
+            patch.object(
+                api,
+                "_request",
+                side_effect=lambda _method, path, _payload=None, _headers=None: pages[
+                    int(path.rsplit("page=", 1)[1])
+                ],
+            ),
+            self.assertRaisesRegex(RuntimeError, "multiple knowledge bases"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "multiple knowledge bases"):
-                api.find_knowledge("Wanted")
+            api.find_knowledge("Wanted")
 
     def test_main_handles_invalid_sync_response_type_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
