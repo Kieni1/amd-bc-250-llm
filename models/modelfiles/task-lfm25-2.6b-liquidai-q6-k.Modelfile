@@ -1,0 +1,20 @@
+# BC250 category: task
+# Ollama model: task-lfm25-2.6b-liquidai-q6-k
+# Source: LiquidAI/LFM2.5-2.6B-GGUF @ latest
+# GGUF: LFM2.5-2.6B-Q6_K.gguf
+# License: LFM Open License 1.0
+#
+# Intended role:
+# - Multilingual Open WebUI task-model comparison
+# - Titles, tags, retrieval-query generation
+# - Compare DE/FR adherence against Gemma 3 1B
+
+FROM /var/lib/bc250-llm-server/gguf/task/LFM2.5-2.6B-Q6_K.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_ctx 4096
+PARAMETER num_keep 256
+PARAMETER num_predict 128
+PARAMETER temperature 0.1
+PARAMETER top_k 50
+PARAMETER repeat_penalty 1.1

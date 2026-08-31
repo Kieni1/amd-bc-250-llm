@@ -11,9 +11,9 @@ usage() {
   cat <<'EOF_USAGE'
 Usage:
   bc250-ocr list
-  sudo bc250-ocr install glm|dots|ovis|chandra
-  bc250-ocr show glm|dots|ovis|chandra
-  bc250-ocr test glm|dots|ovis|chandra IMAGE
+  sudo bc250-ocr install glm|ovis
+  bc250-ocr show glm|ovis
+  bc250-ocr test glm|ovis IMAGE
 
 OCR is experimental. Test real German/French/English office pages before use.
 EOF_USAGE
@@ -22,10 +22,8 @@ EOF_USAGE
 model_name() {
   case "$1" in
     glm) echo exp-glm-ocr-ggml-q8-0 ;;
-    dots) echo exp-dots-ocr-ggml-q8-0 ;;
     ovis) echo exp-ovisocr2-abiray-q8-0 ;;
-    chandra) echo exp-chandra-ocr2-prithivmlmods-q4-k-m ;;
-    *) echo "ERROR: OCR model must be glm, dots, ovis or chandra." >&2; exit 2 ;;
+    *) echo "ERROR: OCR model must be glm or ovis." >&2; exit 2 ;;
   esac
 }
 
@@ -36,7 +34,7 @@ run_ollama() {
 
 case "${1:-}" in
   list)
-    "$MANAGER" list experiments | awk 'NR==1 || /exp-(glm-ocr|dots-ocr|ovisocr2|chandra-ocr2)-/'
+    "$MANAGER" list experiments | awk 'NR==1 || /exp-(glm-ocr|ovisocr2)-/'
     ;;
   install)
     [[ $# -eq 2 ]] || { usage >&2; exit 2; }
@@ -57,14 +55,8 @@ case "${1:-}" in
       glm)
         prompt='Text Recognition:'
         ;;
-      dots)
-        prompt='Extract the document text in natural reading order. Preserve the original text without translation. Keep headings and lists as Markdown; render tables as HTML and formulas as LaTeX when present.'
-        ;;
       ovis)
         prompt='Extract all readable content in natural human reading order and output one Markdown document. Format formulas as LaTeX and tables as HTML. Preserve the original text without translation or paraphrasing.'
-        ;;
-      chandra)
-        prompt='Convert this office document image to structured Markdown. Preserve the original language, reading order, headings, tables, form fields, names, dates, numbers and reference identifiers. Do not translate or summarize.'
         ;;
     esac
     run_ollama run "$model" "$image" "$prompt"

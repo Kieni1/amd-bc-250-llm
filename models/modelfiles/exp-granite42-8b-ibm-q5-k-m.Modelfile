@@ -1,0 +1,28 @@
+# BC250 category: experimental
+# Ollama model: exp-granite42-8b-ibm-q5-k-m
+# Source: ibm-granite/granite-4.2-8b-GGUF @ latest
+# GGUF: granite-4.2-8b-Q5_K_M.gguf
+# License: Apache-2.0
+# Role: multilingual enterprise/general/RAG challenger to Qwen3.5 9B and GPT-OSS.
+#
+# Intended role:
+# - Higher-quality DE/FR/EN office assistant comparison
+# - RAG/document synthesis and structured JSON
+# - Coding/tool-use and reasoning comparison
+# - Evaluate whether one 8B model can cover several secondary roles well
+#
+# Granite 4.2 has native thinking. Ollama 0.32.15 predates Granite 4.2's
+# release, so first verify load/template/think behavior on the BC-250 runtime.
+# Do not globally force think:false until that smoke test is complete.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-granite42-8b-ibm-q5-k-m/granite-4.2-8b-Q5_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+# 6.25 GB weights: 32K remains a practical comparison point on unified 16 GB memory.
+PARAMETER num_ctx 32768
+# Upstream Granite 4.2 generation defaults.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+
+SYSTEM """You are an experimental multilingual office, document-analysis and technical assistant. Respond in the language requested by the user, otherwise in the language of the latest request. Support German, French and English naturally. Follow requested output formats exactly. When source material is supplied, treat it as primary evidence, preserve names, dates, amounts and reference numbers, distinguish source facts from inference, and do not invent missing document facts."""

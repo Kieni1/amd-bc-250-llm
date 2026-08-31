@@ -1,0 +1,23 @@
+# BC250 category: agentic
+# Ollama model: agentic-qwen25-coder7b-unsloth-q5-k-m
+# Source: unsloth/Qwen2.5-Coder-7B-Instruct-GGUF @ latest
+# GGUF: Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf
+# License: Apache-2.0
+#
+# Intended role:
+# - Stable non-reasoning Qwen2.5-Coder coding baseline
+# - Repository edits, shell/Python generation, code review
+# - Compare practical correctness/TTFA against Ornith 1.5 9B
+
+FROM /var/lib/bc250-llm-server/gguf/agent/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+# Qwen2.5-Coder GGUF context is 32K; do not add YaRN here.
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+PARAMETER repeat_penalty 1.1
+
+SYSTEM """You are a precise coding and repository assistant. Follow the requested output format exactly. Prefer correct, executable code and commands over explanation. Do not claim that unexecuted changes or tests succeeded."""

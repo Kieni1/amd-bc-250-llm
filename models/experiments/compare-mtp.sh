@@ -6,7 +6,7 @@ set -Eeuo pipefail
 for cmd in curl jq awk; do command -v "$cmd" >/dev/null || { echo "ERROR: missing command: $cmd" >&2; exit 1; }; done
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 MTP_URL="${MTP_URL:-http://127.0.0.1:8090}"
-BASELINE_MODEL="${BASELINE_MODEL:-exp-qwen3-4b-lmstudio-q6-k}"
+BASELINE_MODEL="${BASELINE_MODEL:-exp-qwen35-4b-unsloth-q6-k}"
 NUM_PREDICT="${NUM_PREDICT:-400}"
 PROMPT="${PROMPT:-Write a concise 300-word explanation of how memory bandwidth limits local LLM inference.}"
 
