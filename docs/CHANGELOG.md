@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.7-0.9.testing - 2026-08-31
+
+Make **Ollama 0.33.2** the package-standard runtime while keeping the BC-250 on
+the same explicit Vulkan/one-model service architecture. The Linux-relevant
+0.33.x change is improved cancelled/resumed prefill-cache correctness in 0.33.0;
+0.33.1/0.33.2 are mostly MLX/desktop/proxy follow-ups for this appliance. Preserve
+top-level `think`, request-time `system`, embedding and unload API behavior.
+
+Make generation prefill and context-capacity points unload the runner first so
+the stronger 0.33.x shared-prefix cache cannot distort raw prompt-ingestion
+comparisons; bump generation benchmark metadata to 7.4. Keep production sampling
+and reasoning policies unchanged. Refresh install/verify/diagnostic text, add a
+documented 0.32.15 rollback path and optional Vulkan `cap_perfmon` guidance.
+
+Retain all 28 operator-selected Modelfiles. Update Granite 4.2 experiment comments
+to keep their explicit 32K context bound because upstream 0.33.x reports document
+128K auto/full-context OOM risk on <=16 GB shared-memory systems; refresh Ling and
+Jina runtime notes without changing their model parameters.
+
 ## 0.9.7-0.8.testing - 2026-08-31
 
 Use the first full 0.9.7-0.7 production/category run to tighten benchmark

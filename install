@@ -38,7 +38,7 @@ Use --models-only to resume optional production, task, agentic, embedding,
 experiment and MTP model prompts without repeating system setup.
 
 Set BC250_UPDATE_OLLAMA=1 to explicitly refresh an existing official Ollama.
-The package standard is Ollama 0.32.15; set OLLAMA_VERSION only for a deliberate test override.
+The package standard is Ollama 0.33.2; set OLLAMA_VERSION only for a deliberate test override.
 USAGE
 }
 
@@ -359,7 +359,7 @@ wait_for_ollama() {
 step_4_install_ollama() {
   heading "4. INSTALL OFFICIAL OLLAMA"
   local requested installed="" run_installer=0 official=/usr/local/bin/ollama
-  requested="${OLLAMA_VERSION:-0.32.15}"
+  requested="${OLLAMA_VERSION:-0.33.2}"
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
 

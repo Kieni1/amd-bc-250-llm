@@ -192,6 +192,15 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(models), 2)
         self.assertTrue(all(model["provider"] == "download-only" for model in models))
 
+    def test_granite42_context_is_explicitly_bounded_for_bc250(self) -> None:
+        for name in (
+            "exp-granite42-3b-ibm-q6-k.Modelfile",
+            "exp-granite42-8b-ibm-q5-k-m.Modelfile",
+        ):
+            source = (ROOT / "models/modelfiles" / name).read_text(encoding="utf-8")
+            self.assertIn("PARAMETER num_ctx 32768", source)
+            self.assertIn("128K context", source)
+
 
 class SelectionTests(unittest.TestCase):
     @classmethod

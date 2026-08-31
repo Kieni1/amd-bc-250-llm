@@ -271,7 +271,7 @@ when automatic boot-GPU selection is wrong. Task and agent runs intentionally
 keep the smaller subset useful for those short correctness/latency workloads. `RUN_THERMAL=1` applies to the
 generation lane. Treat resource figures as overlapping UMA signals, not
 independent pools. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
-for metrics, fixtures and Ollama 0.32.15 request policy. The installed copy is
+for metrics, fixtures and Ollama 0.33.2 request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
 
 ## Maintenance

@@ -11,9 +11,10 @@
 # - RAG/document-answering experiment
 # - Lightweight reasoning/tool-use capability check
 #
-# Granite 4.2 has native thinking. Ollama 0.32.15 predates Granite 4.2's
-# release, so first verify load/template/think behavior on the BC-250 runtime.
-# Do not globally force think:false until that smoke test is complete.
+# Granite 4.2 has native thinking and is current-generation for Ollama 0.33.2.
+# Keep num_ctx explicit: Granite 4.2 GGUF metadata advertises 128K context and
+# upstream 0.33.x reports show auto/full-context OOMs on <=16 GB shared-memory
+# systems. Verify load/template/think behavior on BC-250 before role promotion.
 
 FROM /var/lib/bc250-llm-server/gguf/experiments/exp-granite42-3b-ibm-q6-k/granite-4.2-3b-Q6_K.gguf
 

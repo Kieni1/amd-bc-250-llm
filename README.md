@@ -123,13 +123,18 @@ The complete installed interface and its exact syntax are in
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.32.15 | Package-standard official runtime, Vulkan-oriented service defaults and three isolated stores |
+| Ollama v0.33.2 | Package-standard official runtime, Vulkan-oriented service defaults and three isolated stores |
 | Open WebUI v0.11.1 and Tika | Digest-pinned local UI and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
+
+Ollama 0.33.2 is the tested runtime baseline for this release. The relevant
+headless change is the 0.33.0 prompt-cache/prefill reliability work; 0.33.1/0.33.2
+also contain MLX/desktop changes that are not enabled on the BC-250 Vulkan path.
+See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
 
 The main Ollama instance uses port `11434`; optional task and agent instances
 use `11435` and `11436`. Keep all three unauthenticated APIs blocked from

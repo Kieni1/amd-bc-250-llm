@@ -8,7 +8,7 @@ umask 0022
   exit 1
 }
 
-VERSION="${OLLAMA_VERSION:-0.32.15}"
+VERSION="${OLLAMA_VERSION:-0.33.2}"
 URL="https://ollama.com/install.sh"
 
 confirm_install() {

@@ -8,7 +8,7 @@ The benchmark has two deliberate modes:
 * production: no SYSTEM/sampling override, so the registered Modelfile is
   exercised as deployed.
 
-Request shapes target Ollama 0.32.15.  The implementation is stdlib-only.
+Request shapes target Ollama 0.33.2.  The implementation is stdlib-only.
 """
 
 from __future__ import annotations
@@ -151,7 +151,7 @@ def make_filler(sentences: int) -> str:
 
 
 def resolve_think_policy(model: str, requested: str) -> str:
-    """Return omit|true|false|low|medium|high|max for Ollama 0.32.15."""
+    """Return omit|true|false|low|medium|high|max for Ollama 0.33.2."""
     if requested != "auto":
         return requested
     lower = model.casefold()
@@ -202,7 +202,7 @@ def generate_payload(
         "options": options_for(mode, num_predict),
     }
     if mode == "neutral":
-        # Ollama 0.32.15 GenerateRequest.System explicitly overrides the
+        # Ollama 0.33.2 GenerateRequest.System explicitly overrides the
         # registered Modelfile SYSTEM. Do not use raw=true: model renderers and
         # templates remain part of the runtime being benchmarked.
         payload["system"] = NEUTRAL_SYSTEM
@@ -507,7 +507,7 @@ def aggregate_resource(rows: Iterable[dict[str, Any]]) -> dict[str, float | None
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="bc250-benchmark",
-        description="BC-250 generation benchmark for Ollama 0.32.15.",
+        description="BC-250 generation benchmark for Ollama 0.33.2.",
     )
     parser.add_argument(
         "models",
@@ -636,7 +636,7 @@ def main() -> int:
     meta = {
         "started_at": started,
         "category": "generation",
-        "benchmark_version": "7.3",
+        "benchmark_version": "7.4",
         "bench_mode": mode,
         "ollama_url": client.base_url,
         "ollama_version": version,
@@ -653,6 +653,7 @@ def main() -> int:
         "run_thermal": run_thermal,
         "latency_num_predict_non_thinking": num_latency,
         "latency_num_predict_reasoning_capable": num_latency_thinking,
+        "prefill_cache_mode": "cold-runner",
         "board_note": board_note,
         "models": [],
     }
@@ -825,6 +826,10 @@ def main() -> int:
                         model, "short", run, metrics, detail, num_short, think_policy
                     )
 
+                # Ollama 0.33.0 made prompt-cache restore/reuse more reliable.
+                # Start prefill/context measurements from an unloaded runner so
+                # shared filler prefixes do not turn the curve into a cache-hit test.
+                client.ensure_unloaded(model)
                 metrics, _telemetry, detail = run_generate(
                     client,
                     model,
@@ -840,6 +845,7 @@ def main() -> int:
                 if run_context:
                     previous_prompt_count = -1
                     for point in ctx_points:
+                        client.ensure_unloaded(model)
                         prompt = (
                             make_filler(point)
                             + " Given all of the above context, "

@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.7
-Release:        0.8.testing%{?dist}
+Release:        0.9.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.9.testing
+- Standardize the BC-250 runtime and benchmark request baseline on Ollama 0.33.2.
+- Keep prefill/context benchmark points cold across the 0.33.x prompt-cache changes.
+- Refresh Vulkan, rollback and Granite 4.2 context-safety guidance without changing production sampling.
+
 * Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.8.testing
 - Fix task JSON compatibility, LFM latency budgeting and agent reasoning-starvation diagnostics.
 - Add harder multilingual retrieval fixtures and retain the operator comparison model pool.

@@ -37,7 +37,7 @@ Category suites:
 
 Generation, embedding and OCR lanes record the full resource set; task and agent
 lanes intentionally keep a smaller latency/correctness-oriented telemetry set.
-Ollama 0.32.15 is the package benchmark standard.
+Ollama 0.33.2 is the package benchmark standard.
 
 Useful environment overrides:
   OLLAMA_URL, BENCH_MODE, THINK_MODE, BENCH_PROFILE, RUN_LATENCY,

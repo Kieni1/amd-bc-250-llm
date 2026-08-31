@@ -5,7 +5,7 @@ application accounts and model behavior remain operator-managed. The Quadlet
 explicitly disables community sharing, code execution, the code interpreter and
 memories. Operators can deliberately re-enable those features later.
 
-Package baseline: **Open WebUI v0.11.1** with standard **Ollama v0.32.15**.
+Package baseline: **Open WebUI v0.11.1** with standard **Ollama v0.33.2**.
 
 ## First login and connections
 

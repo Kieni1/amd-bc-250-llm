@@ -981,7 +981,7 @@ def add_common(parser: argparse.ArgumentParser, default_url: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="bc250-benchmark",
-        description="Category-specific BC-250 benchmark suites for Ollama 0.32.15.",
+        description="Category-specific BC-250 benchmark suites for Ollama 0.33.2.",
     )
     sub = parser.add_subparsers(dest="category", required=True)
     emb = sub.add_parser(

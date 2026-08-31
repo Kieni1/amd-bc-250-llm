@@ -7,7 +7,7 @@
 #
 # Retrieval embedding model:
 # 677M parameters, 1024-d embeddings, 32768-token context,
-# with upstream GGUF pooling metadata required by Ollama 0.32.15 embedding detection.
+# with upstream GGUF pooling metadata required for correct Ollama embedding detection.
 
 FROM /var/lib/bc250-llm-server/gguf/embedding/v5-small-retrieval-Q4_K_M.gguf
 

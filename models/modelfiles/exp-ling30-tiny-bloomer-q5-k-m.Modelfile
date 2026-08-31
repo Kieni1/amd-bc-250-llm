@@ -10,9 +10,9 @@
 # - Compare reasoning latency/throughput against LFM2.5, Qwen and GPT-OSS
 # - Test coding/agentic capability without committing to the agent service
 #
-# Upstream llama.cpp support for bailingmoe3 landed shortly before Ollama
-# 0.32.15 and upstream validation is CPU/CUDA-focused. Treat BC-250 Vulkan
-# compatibility/performance as experimental until the first load benchmark.
+# Ollama 0.33.2 carries a newer llama.cpp baseline, but bailingmoe3 validation
+# remains much stronger on CPU/CUDA than this GFX1013 Vulkan path. Treat BC-250
+# compatibility/performance as experimental until a full-offload load benchmark.
 # Thinking is native and enabled by default; do not globally force think:false.
 
 FROM /var/lib/bc250-llm-server/gguf/experiments/exp-ling30-tiny-bloomer-q5-k-m/Ling-3.0-tiny-Q5_K_M.gguf

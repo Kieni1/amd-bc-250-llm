@@ -57,7 +57,7 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertEqual(payload["options"], {"num_predict": 128})
         self.assertNotIn("temperature", payload["options"])
 
-    def test_ollama_03215_think_policy_is_model_specific(self) -> None:
+    def test_ollama_0332_think_policy_is_model_specific(self) -> None:
         self.assertEqual(
             generation.resolve_think_policy("prod-gpt-oss20b-x", "auto"), "medium"
         )
@@ -124,6 +124,11 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         for field in ("answer_started", "answer_chars", "thinking_chars"):
             self.assertIn(field, generation.CSV_FIELDS)
+
+    def test_ollama_0330_prompt_cache_fix_does_not_warm_context_curve(self) -> None:
+        source = (BENCH / "generation-benchmark.py").read_text(encoding="utf-8")
+        self.assertIn('"prefill_cache_mode": "cold-runner"', source)
+        self.assertGreaterEqual(source.count("client.ensure_unloaded(model)"), 4)
 
 
 class CategoryPolicyTests(unittest.TestCase):
