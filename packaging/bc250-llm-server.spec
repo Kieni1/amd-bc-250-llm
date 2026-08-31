@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.7
-Release:        0.7.testing%{?dist}
+Release:        0.8.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.8.testing
+- Fix task JSON compatibility, LFM latency budgeting and agent reasoning-starvation diagnostics.
+- Add harder multilingual retrieval fixtures and prune redundant measured model experiments.
+- Add Qwen3.8 4B, LFM2.5 2.6B task and Qwen2.5 Coder 7B comparison Modelfiles.
+
 * Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.7.testing
 - Give reasoning-capable latency runs enough shared num_predict budget to reach final content.
 - Remove semantic request-id prompt noise and record answer/thinking presence explicitly.

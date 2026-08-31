@@ -132,9 +132,15 @@ def prompt_variant(prompt: str, variant: int = 0) -> str:
     return "\n" * (1 + variant % 7) + prompt
 
 
-def latency_budget(base: int, thinking: int, think_policy: str) -> int:
-    """Use a larger shared generation cap when reasoning can consume it."""
-    return base if think_policy == "false" else thinking
+def latency_budget(base: int, thinking: int, think_policy: str, model: str = "") -> int:
+    """Use a larger shared cap when reasoning can still consume answer space.
+
+    LFM2.5 was measured emitting native reasoning even when Ollama received
+    think:false, so keep its latency fixture on the reasoning-capable budget.
+    """
+    if think_policy == "false" and "lfm" not in model.casefold():
+        return base
+    return thinking
 
 
 def make_filler(sentences: int) -> str:
@@ -158,7 +164,7 @@ def resolve_think_policy(model: str, requested: str) -> str:
         return "false"
     if "qwen3-4b" in lower:
         return "false"
-    # Gemma4 mode is selected by its SYSTEM token; LFM/Ornith/Qwythos/etc.
+    # Gemma4 mode is selected by its SYSTEM token; LFM/Ornith/other native families
     # have native/template reasoning behaviour that should not be flattened by
     # a generic boolean in a cross-family benchmark.
     return "omit"
@@ -594,7 +600,7 @@ def main() -> int:
         os.environ.get("TELEMETRY_INTERVAL", str(DEFAULT_TELEMETRY_INTERVAL))
     )
     keep_alive = os.environ.get("KEEP_ALIVE", "30m")
-    early_fraction = float(os.environ.get("EARLY_EOS_FRACTION", "0.90"))
+    early_fraction = float(os.environ.get("EARLY_EOS_FRACTION", "0.10"))
     run_latency = bool_setting("RUN_LATENCY", True)
     run_context = bool_setting(
         "RUN_CONTEXT",
@@ -630,7 +636,7 @@ def main() -> int:
     meta = {
         "started_at": started,
         "category": "generation",
-        "benchmark_version": "7.2",
+        "benchmark_version": "7.3",
         "bench_mode": mode,
         "ollama_url": client.base_url,
         "ollama_version": version,
@@ -668,6 +674,7 @@ def main() -> int:
                     num_latency,
                     num_latency_thinking,
                     resolve_think_policy(model, think_requested),
+                    model,
                 ),
             }
         )
@@ -744,7 +751,7 @@ def main() -> int:
             try:
                 if run_latency:
                     latency_tokens = latency_budget(
-                        num_latency, num_latency_thinking, think_policy
+                        num_latency, num_latency_thinking, think_policy, model
                     )
                     client.ensure_unloaded(model)
                     metrics, _telemetry, detail = run_chat_stream(

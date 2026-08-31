@@ -1,23 +1,152 @@
 {
   "documents": [
-    {"id":"de-kuendigung","language":"de","text":"Mietvertrag Büro Zürich. Die Kündigungsfrist beträgt drei Monate zum Monatsende. Die schriftliche Kündigung muss spätestens am letzten Arbeitstag des Monats eingehen."},
-    {"id":"fr-resiliation","language":"fr","text":"Contrat de location du bureau de Genève. Le délai de résiliation est de six mois pour la fin d'un trimestre. La résiliation doit être envoyée par écrit."},
-    {"id":"de-reisekosten","language":"de","text":"Spesenreglement 2026. Reisekosten über CHF 500 benötigen die Genehmigung der Abteilungsleitung. Belege sind innerhalb von 30 Tagen einzureichen."},
-    {"id":"fr-maintenance","language":"fr","text":"Note de maintenance informatique. La mise à jour des postes commence le 12 octobre 2026. Le service informatique est responsable du déploiement et les utilisateurs doivent fermer leurs applications avant 18 h."},
-    {"id":"en-budget","language":"en","text":"Board minutes 2026. The annual maintenance budget of CHF 85,000 was approved on 18 August 2026. Finance owns the quarterly variance report."},
-    {"id":"de-datenschutz","language":"de","text":"Datenschutzrichtlinie. Vertrauliche Personaldaten dürfen nur in den freigegebenen internen Systemen gespeichert werden. Öffentliche Cloud-Dienste sind für diese Daten nicht zulässig."},
-    {"id":"fr-facture","language":"fr","text":"Procédure des factures. Toute facture doit indiquer le numéro de commande, la date d'échéance et le centre de coûts. Les factures supérieures à CHF 10 000 nécessitent une seconde approbation."},
-    {"id":"en-meeting","language":"en","text":"Meeting policy. Minutes must record decisions, owners and due dates. Draft minutes are distributed within two business days and approved at the next meeting."}
+    {
+      "id": "de-kuendigung",
+      "language": "de",
+      "text": "Mietvertrag Büro Zürich. Die Kündigungsfrist beträgt drei Monate zum Monatsende. Die schriftliche Kündigung muss spätestens am letzten Arbeitstag des Monats eingehen."
+    },
+    {
+      "id": "fr-resiliation",
+      "language": "fr",
+      "text": "Contrat de location du bureau de Genève. Le délai de résiliation est de six mois pour la fin d'un trimestre. La résiliation doit être envoyée par écrit."
+    },
+    {
+      "id": "de-reisekosten",
+      "language": "de",
+      "text": "Spesenreglement 2026. Reisekosten über CHF 500 benötigen die Genehmigung der Abteilungsleitung. Belege sind innerhalb von 30 Tagen einzureichen."
+    },
+    {
+      "id": "fr-maintenance",
+      "language": "fr",
+      "text": "Note de maintenance informatique. La mise à jour des postes commence le 12 octobre 2026. Le service informatique est responsable du déploiement et les utilisateurs doivent fermer leurs applications avant 18 h."
+    },
+    {
+      "id": "en-budget",
+      "language": "en",
+      "text": "Board minutes 2026. The annual maintenance budget of CHF 85,000 was approved on 18 August 2026. Finance owns the quarterly variance report."
+    },
+    {
+      "id": "de-datenschutz",
+      "language": "de",
+      "text": "Datenschutzrichtlinie. Vertrauliche Personaldaten dürfen nur in den freigegebenen internen Systemen gespeichert werden. Öffentliche Cloud-Dienste sind für diese Daten nicht zulässig."
+    },
+    {
+      "id": "fr-facture",
+      "language": "fr",
+      "text": "Procédure des factures. Toute facture doit indiquer le numéro de commande, la date d'échéance et le centre de coûts. Les factures supérieures à CHF 10 000 nécessitent une seconde approbation."
+    },
+    {
+      "id": "en-meeting",
+      "language": "en",
+      "text": "Meeting policy. Minutes must record decisions, owners and due dates. Draft minutes are distributed within two business days and approved at the next meeting."
+    },
+    {
+      "id": "de-kuendigung-alt",
+      "language": "de",
+      "text": "Archivversion des Mietvertrags für das Büro Zürich, gültig bis 31. Dezember 2025. Die Kündigungsfrist betrug sechs Monate zum Quartalsende. Diese Fassung gilt nicht für Neuverträge ab 2026."
+    },
+    {
+      "id": "fr-facture-4821",
+      "language": "fr",
+      "text": "Facture INV-4821 pour les fournitures de bureau. Total CHF 319.50. Échéance de paiement: 31 août 2026. Référence client ZH-204."
+    },
+    {
+      "id": "de-rechnung-4822",
+      "language": "de",
+      "text": "Rechnung INV-4822 für Büromaterial. Gesamtbetrag CHF 391.50. Zahlungsfrist: 30. September 2026. Kundenreferenz ZH-204."
+    }
   ],
   "queries": [
-    {"id":"q1","language":"de","kind":"same","target":"de-kuendigung","text":"Welche Kündigungsfrist gilt für das Büro in Zürich?"},
-    {"id":"q2","language":"fr","kind":"cross","target":"de-kuendigung","text":"Quel est le délai de résiliation du bureau de Zurich ?"},
-    {"id":"q3","language":"fr","kind":"same","target":"fr-resiliation","text":"Quel délai de résiliation s'applique au bureau de Genève ?"},
-    {"id":"q4","language":"de","kind":"cross","target":"fr-maintenance","text":"Wann beginnt die Aktualisierung der Arbeitsplätze und wer ist verantwortlich?"},
-    {"id":"q5","language":"fr","kind":"cross","target":"de-reisekosten","text":"À partir de quel montant les frais de voyage doivent-ils être approuvés par la direction ?"},
-    {"id":"q6","language":"en","kind":"cross","target":"de-datenschutz","text":"May confidential HR data be stored in public cloud services?"},
-    {"id":"q7","language":"de","kind":"cross","target":"fr-facture","text":"Welche zusätzlichen Angaben und Freigaben gelten für Rechnungen über CHF 10 000?"},
-    {"id":"q8","language":"fr","kind":"cross","target":"en-budget","text":"Quel budget annuel de maintenance a été approuvé et à quelle date ?"},
-    {"id":"q9","language":"en","kind":"same","target":"en-meeting","text":"How quickly should draft meeting minutes be distributed?"}
+    {
+      "id": "q1",
+      "language": "de",
+      "kind": "same",
+      "target": "de-kuendigung",
+      "text": "Welche Kündigungsfrist gilt für das Büro in Zürich?"
+    },
+    {
+      "id": "q2",
+      "language": "fr",
+      "kind": "cross",
+      "target": "de-kuendigung",
+      "text": "Quel est le délai de résiliation du bureau de Zurich ?"
+    },
+    {
+      "id": "q3",
+      "language": "fr",
+      "kind": "same",
+      "target": "fr-resiliation",
+      "text": "Quel délai de résiliation s'applique au bureau de Genève ?"
+    },
+    {
+      "id": "q4",
+      "language": "de",
+      "kind": "cross",
+      "target": "fr-maintenance",
+      "text": "Wann beginnt die Aktualisierung der Arbeitsplätze und wer ist verantwortlich?"
+    },
+    {
+      "id": "q5",
+      "language": "fr",
+      "kind": "cross",
+      "target": "de-reisekosten",
+      "text": "À partir de quel montant les frais de voyage doivent-ils être approuvés par la direction ?"
+    },
+    {
+      "id": "q6",
+      "language": "en",
+      "kind": "cross",
+      "target": "de-datenschutz",
+      "text": "May confidential HR data be stored in public cloud services?"
+    },
+    {
+      "id": "q7",
+      "language": "de",
+      "kind": "cross",
+      "target": "fr-facture",
+      "text": "Welche zusätzlichen Angaben und Freigaben gelten für Rechnungen über CHF 10 000?"
+    },
+    {
+      "id": "q8",
+      "language": "fr",
+      "kind": "cross",
+      "target": "en-budget",
+      "text": "Quel budget annuel de maintenance a été approuvé et à quelle date ?"
+    },
+    {
+      "id": "q9",
+      "language": "en",
+      "kind": "same",
+      "target": "en-meeting",
+      "text": "How quickly should draft meeting minutes be distributed?"
+    },
+    {
+      "id": "q-current-lease",
+      "language": "de",
+      "kind": "same",
+      "target": "de-kuendigung",
+      "text": "Welche Kündigungsfrist gilt für den aktuellen Zürcher Büro-Mietvertrag ab 2026?"
+    },
+    {
+      "id": "q-old-lease-fr",
+      "language": "fr",
+      "kind": "cross",
+      "target": "de-kuendigung-alt",
+      "text": "Quelle est l'ancienne période de résiliation du bail de Zurich valable jusqu'à fin 2025?"
+    },
+    {
+      "id": "q-invoice-4821-de",
+      "language": "de",
+      "kind": "cross",
+      "target": "fr-facture-4821",
+      "text": "Welcher Gesamtbetrag und welches Fälligkeitsdatum gehören zur Rechnung INV-4821?"
+    },
+    {
+      "id": "q-invoice-4822-en",
+      "language": "en",
+      "kind": "cross",
+      "target": "de-rechnung-4822",
+      "text": "What total amount and payment deadline belong to invoice INV-4822?"
+    }
   ]
 }

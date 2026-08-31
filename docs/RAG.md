@@ -257,10 +257,8 @@ Current OCR test set:
 
 | Model | Starting use |
 |---|---|
-| `exp-glm-ocr-ggml-q8-0` | lightweight baseline / compatibility check |
-| `exp-ovisocr2-abiray-q8-0` | compact page-to-Markdown, tables and formulas |
-| `exp-dots-ocr-ggml-q8-0` | multilingual layout/table comparison |
-| `exp-chandra-ocr2-prithivmlmods-q4-k-m` | quality candidate for complex office scans |
+| `exp-glm-ocr-ggml-q8-0` | current fidelity leader on packaged office fixtures |
+| `exp-ovisocr2-abiray-q8-0` | faster page-to-Markdown/table alternative |
 
 Use `bc250-ocr` for reproducible ingestion tests rather than exposing OCR models
 as normal chat models:
@@ -282,8 +280,7 @@ Preserve headings, paragraphs, tables, numbers, dates and reading order where th
 model supports them.
 
 For a comparable regression check, run `bc250-benchmark ocr`. It uses packaged
-DE/FR/mixed office-page fixtures with model-specific prompts and reports text/field
-recall plus resource telemetry. Use `bc250-ocr test ENGINE REAL-PAGE.png` on a
+DE/FR/mixed office-page fixtures with model-specific prompts and reports token precision/recall/F1, character similarity, exact-field/order scores and resource telemetry. Use `bc250-ocr test ENGINE REAL-PAGE.png` on a
 representative scan corpus before choosing the production OCR path.
 
 Multimodal OCR GGUFs require their matching image/projector path where applicable;
@@ -423,6 +420,4 @@ without a demonstrated benefit for this single-machine pilot.
 - [Jina v5 small retrieval model card](https://huggingface.co/jinaai/jina-embeddings-v5-text-small-retrieval)
 - [Qwen3 Embedding 0.6B GGUF model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF)
 - [GLM-OCR GGUF](https://huggingface.co/ggml-org/GLM-OCR-GGUF)
-- [dots.ocr GGUF](https://huggingface.co/ggml-org/dots.ocr-GGUF)
 - [OvisOCR2 GGUF](https://huggingface.co/Abiray/OvisOCR2-GGUF)
-- [Chandra OCR 2 GGUF](https://huggingface.co/prithivMLmods/chandra-ocr-2-GGUF)

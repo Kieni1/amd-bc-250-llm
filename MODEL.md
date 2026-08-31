@@ -74,13 +74,32 @@ OCR registrations are Ollama-managed and therefore have different cleanup
 semantics.
 
 Changing an embedding model, its GGUF bytes, or its query/document prefix scheme
-requires an explicit RAG reindex. Since 0.9.7-0.4 the packaged Jina Q4_K_M source
-uses the refreshed upstream GGUF to the upstream GGUF carrying `pooling_type` metadata; refresh that
-model and reindex if an earlier package copy had already been used for RAG.
-Keep OCR extraction in the source language and review the Markdown before it enters the active document library. Translation remains a
-separate step.
+requires an explicit RAG reindex. Since 0.9.7-0.4 the packaged Jina Q4_K_M source uses the refreshed upstream
+GGUF carrying `pooling_type` metadata; refresh that model and reindex if an
+earlier package copy had already been used for RAG. Keep OCR extraction in the
+source language and review the Markdown before it enters the active document
+library. Translation remains a separate step.
 
 For the full Modelfile metadata/storage contract see
 [`models/README.md`](models/README.md). For deployed role presets see
 [`docs/openwebui-settings.md`](docs/openwebui-settings.md), and for exact command
 syntax see [`docs/COMMANDS.md`](docs/COMMANDS.md).
+
+## Current comparison policy
+
+The catalog is intentionally pruned rather than accumulating every trending GGUF.
+Production roles stay stable until a measured replacement wins its real use case.
+For the next comparison cycle the useful additional definitions are:
+
+| Model | Why it exists |
+|---|---|
+| `exp-qwen38-4b-distill-empero-q6-k` | compact native-reasoning Qwen comparison |
+| `task-lfm25-2.6b-liquidai-q6-k` | multilingual task-model challenger to Gemma 3 1B |
+| `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding baseline against native-reasoning Ornith |
+
+The two packaged Gemma 4 12B experiments provide aligned vs. modified 12B
+coverage without adding more E4B variants. GLM-OCR and OvisOCR2 cover quality vs.
+speed on scanned office pages. Do not infer fit from GGUF size alone on the
+BC-250: the 16 GB CPU/GPU pool must also hold KV/cache, runtime and the OS.
+Draft/MTP heads are not standalone models and stay in the dedicated MTP workflow.
+

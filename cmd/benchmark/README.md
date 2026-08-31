@@ -40,14 +40,17 @@ The standard generation suite records cold/warm chat latency, loaded decode,
 document prefill and a context-capacity curve. A run labelled `cold_chat` is
 started only after Ollama `/api/ps` confirms the previous model is unloaded; an
 unload failure aborts that cold measurement instead of silently recording a warm
-load. `RUN_THERMAL=1` adds sustained decode windows. Early-stop warnings are emitted only for a short
-`done_reason=stop`; reaching the requested limit with `done_reason=length` is not
-an early-EOS failure.
+load. `RUN_THERMAL=1` adds sustained decode windows. Early-stop warnings are emitted only for an unusually tiny natural
+`done_reason=stop` (10% of the requested cap by default); a complete answer that
+finishes normally is not treated as suspicious. Reaching the requested limit with
+`done_reason=length` is not an early-EOS failure.
 
 Ollama 0.32.15 uses one shared `num_predict` cap for reasoning plus the final
 answer. The moderate latency test therefore keeps 96 tokens for explicit
 non-thinking (`think=false`) profiles but uses 512 for reasoning-capable/unset
-policies; the conservative profile uses 64/384. `NUM_PREDICT_LATENCY` keeps its
+policies; the conservative profile uses 64/384. LFM2.5 stays on the larger
+latency budget even during an explicit `think=false` experiment because the
+measured Ollama/model path continued to emit native reasoning. `NUM_PREDICT_LATENCY` keeps its
 legacy behavior as an override for both unless `NUM_PREDICT_LATENCY_THINKING` is
 set separately. Throughput, context and thermal caps are unchanged. CSV/JSONL
 now record `answer_started`, `answer_chars` and `thinking_chars`: TTFC means first
@@ -71,7 +74,9 @@ bc250-benchmark embeddings embed-jina-v5-small-retrieval-q4-k-m embed-qwen3-0.6b
 ```
 
 The packaged DE/FR/EN office fixture measures Recall@1, Recall@3, MRR,
-cross-language retrieval and warm input throughput. Jina uses `Query:` /
+cross-language retrieval and warm input throughput. It also includes near-duplicate
+current/archived lease facts and similar invoice references so a model cannot pass
+only by separating unrelated topics. Jina uses `Query:` /
 `Document:`; Qwen3 Embedding uses the documented English retrieval instruction
 on queries and no content prefix. The packaged Jina GGUF includes upstream
 `pooling_type` metadata required for reliable embedding-model detection. Use the
@@ -82,13 +87,14 @@ when replacing an older Jina GGUF with the refreshed package file.
 
 ```bash
 bc250-benchmark ocr
-bc250-ocr test dots /PATH/TO/REAL-PAGE.png
+bc250-ocr test glm /PATH/TO/REAL-PAGE.png
 ```
 
 The benchmark uses deterministic German, French and mixed office-page images and
 checks token precision/recall/F1, normalized character similarity, exact required-
-field recall, key-field reading order and runtime. GLM, dots.ocr, OvisOCR2 and
-Chandra receive model-specific extraction prompts. OCR must preserve the source language; review
+field recall, key-field reading order and runtime. The packaged comparison set
+is GLM-OCR plus OvisOCR2; the scorer keeps model-specific prompt support for
+operator-added OCR experiments. OCR must preserve the source language; review
 and clean the result before putting canonical Markdown under the RAG `active/`
 tree. The packaged fixtures are regression/comparison tests, not a substitute for
 a representative real scan corpus.
@@ -102,8 +108,11 @@ bc250-benchmark task
 The task suite targets `http://127.0.0.1:11435` by default and mirrors the
 relevant Open WebUI **0.11.1** task behavior in compact fixtures: title uses the
 latest two messages, tags the latest six (with the short-chat `General` fallback),
-and retrieval-query generation the latest six plus the current date. It checks
-JSON shape, simple content relevance and latency. Requests use
+and retrieval-query generation the latest six plus the current date. It parses
+the JSON object the same tolerant way Open WebUI 0.11.1 does (including fenced or
+surrounded JSON), while separately reporting `strict_json`. It checks structure,
+simple content relevance, latency and an informational DE/FR/EN `language_hint`;
+the language hint is not a hard correctness gate. Requests use
 `keep_alive=0`, matching the isolated task service. The Open WebUI container
 leaves 0.11.1 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
 reason to tune it. Its CSV deliberately keeps only the small telemetry subset
@@ -119,8 +128,11 @@ bc250-benchmark agent agentic-ornith15-9b-ornith-q5-k-m
 This lane defaults to `http://127.0.0.1:11436`. Stop/avoid a large main-model
 workload while using it. The small fixture set checks Bash syntax, Python syntax
 and required structured output without executing model-generated code. A response
-passes only when syntax/structure and the fixture's required elements both pass.
-Native model reasoning is not globally forced off. The lane also leaves
+passes only when a non-empty final answer has valid syntax/structure and the
+fixture's required elements both pass. Native model reasoning is not globally
+forced off. The cases provide 768-1024 shared output tokens so reasoning-oriented
+models have room to reach final code, and JSONL records thinking/final character
+counts, `eval_count` and `done_reason` for starvation diagnosis. The lane also leaves
 temperature/top-p/top-k to the deployed Modelfile by default; set
 `AGENT_TEMPERATURE=0` only for an explicit deterministic comparison. It does not
 override the agent service keep-alive and unloads each benchmarked model after

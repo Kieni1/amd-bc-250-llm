@@ -94,8 +94,9 @@ off unless the latency and memory behavior are acceptable.
 
 Open WebUI 0.11.1 adds `TASK_MODEL_PARAMS`. The package explicitly leaves it at
 `{}` so upstream task limits/behavior remain unchanged until measured on the
-dedicated Gemma 3 1B service. Tune it only after `bc250-benchmark task`; note that
-setting a non-empty object replaces Open WebUI's built-in task token-limit behavior,
+dedicated Gemma 3 1B service. Tune it only after `bc250-benchmark task`; the packaged LFM2.5 2.6B task
+candidate exists specifically to compare multilingual adherence without changing
+the default. Note that setting a non-empty object replaces Open WebUI's built-in task token-limit behavior,
 so include an explicit `max_tokens` if you later set other task parameters.
 
 ## Model roles
@@ -143,7 +144,8 @@ Gemma 4 thinking is enabled only when its Modelfile `SYSTEM` starts with
 | `prod-lfm25-8b-a1b-liquidai-q6-k` | Workspace model preset | Reasoning Tags: Default; `think`: leave unset/default | LFM2.5 emits native reasoning before the final answer; Open WebUI's default `<think>` parsing is sufficient. For the translation preset keep Builtin Tools, Memory and Web Search off. |
 | `prod-qwen35-9b-unsloth-q6-k` | Workspace model preset → Advanced Parameters | `think`: **Off** | The packaged sampling profile is the Qwen3.5 non-thinking profile. Do not enable thinking on this production preset; use a separate experimental preset/Modelfile when testing Qwen3.5 reasoning. |
 | `prod-gpt-oss20b-ggml-org-mxfp4` | Workspace model preset → Advanced Parameters | `think`: Default | Ollama defaults GPT-OSS to medium reasoning. Use `low`, `medium` or `high` only for deliberate latency/quality comparisons. Leave Open WebUI's separate Reasoning Effort field unset for local Ollama. |
-| `task-gemma3-1b-unsloth-ud-q4-k-xl` | Admin Settings → Experience → Interface | selected as Local Task Model | Do not expose as a normal office-chat preset. |
+| `task-gemma3-1b-unsloth-ud-q4-k-xl` | Admin Settings → Experience → Interface | selected as Local Task Model | Current smallest default; do not expose as a normal office-chat preset. |
+| `task-lfm25-2.6b-liquidai-q6-k` | Admin Settings → Experience → Interface | task-model comparison | Multilingual challenger; benchmark before replacing Gemma 3 1B. |
 | `agentic-ornith15-9b-ornith-q5-k-m` | Agent connection + Workspace model preset | Reasoning Tags: Default; `think`: leave unset/default | Ornith emits native `<think>` reasoning. Enable only the tools required by the coding-agent workflow. The agent service is intended for exclusive use, not concurrently with a large main model. |
 | `embed-jina-v5-small-retrieval-q4-k-m` | Admin Settings → Documents | embedding model + Jina prefixes | Not a chat/task model. Reindex when changing model or prefixes. |
 | `embed-qwen3-0.6b-q8-0` | Admin Settings → Documents | embedding model + Qwen query instruction | Alternative embedding backend; content prefix stays empty. Reindex when switching from Jina. |

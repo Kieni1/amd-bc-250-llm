@@ -345,11 +345,46 @@ Return only one raw JSON object: {{\"queries\": [\"query1\", \"query2\"]}}
 
 
 def parse_json_object(text: str) -> dict[str, Any] | None:
+    """Parse the JSON object the way Open WebUI does for task responses."""
+    stripped = text.strip()
+    start, end = stripped.find("{"), stripped.rfind("}")
+    if start < 0 or end < start:
+        return None
     try:
-        value = json.loads(text.strip())
+        value = json.loads(stripped[start : end + 1])
     except json.JSONDecodeError:
         return None
     return value if isinstance(value, dict) else None
+
+
+def strict_json_object(text: str) -> bool:
+    try:
+        return isinstance(json.loads(text.strip()), dict)
+    except json.JSONDecodeError:
+        return False
+
+
+LANGUAGE_MARKERS = {
+    "de": {"und", "der", "die", "das", "für", "mit", "suche", "dokument", "vertrag", "datenschutz", "kündigung", "zahlung", "analyse"},
+    "fr": {"le", "la", "les", "de", "des", "du", "et", "pour", "avec", "traduction", "règlement", "frais", "voyage", "justificatifs"},
+    "en": {"the", "and", "of", "for", "with", "translation", "task", "document", "privacy", "analysis", "review", "management", "extraction"},
+}
+
+
+def task_language_hint(text: str, expected: str) -> str:
+    words = set(normalize_words(text))
+    scores = {
+        language: len(words & markers) for language, markers in LANGUAGE_MARKERS.items()
+    }
+    best = max(scores.values(), default=0)
+    if best == 0:
+        return "unknown"
+    winners = {language for language, score in scores.items() if score == best}
+    if winners == {expected}:
+        return "match"
+    if expected not in winners:
+        return "other"
+    return "unknown"
 
 
 def keyword_score(text: str, keywords: list[str]) -> float:
@@ -384,7 +419,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
         "task",
         "language",
         "valid_json",
+        "strict_json",
         "structure_ok",
+        "language_hint",
         "keyword_score",
         "wall_s",
         "load_s",
@@ -433,6 +470,8 @@ def benchmark_task(args: argparse.Namespace) -> int:
                 content = str((response.get("message") or {}).get("content") or "")
                 parsed = parse_json_object(content)
                 valid_json = parsed is not None
+                strict_json = strict_json_object(content)
+                language_hint = task_language_hint(content, case["language"])
                 structure_ok = False
                 if parsed is not None:
                     if case["type"] == "title":
@@ -464,7 +503,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
                         "task": case["type"],
                         "language": case["language"],
                         "valid_json": int(valid_json),
+                        "strict_json": int(strict_json),
                         "structure_ok": int(structure_ok),
+                        "language_hint": language_hint,
                         "keyword_score": f"{score:.3f}",
                         "wall_s": f"{wall:.3f}",
                         "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
@@ -484,15 +525,18 @@ def benchmark_task(args: argparse.Namespace) -> int:
                         "case": case,
                         "response": content,
                         "valid_json": valid_json,
+                        "strict_json": strict_json,
                         "structure_ok": structure_ok,
+                        "language_hint": language_hint,
                         "keyword_score": score,
                         "wall_s": wall,
                         "telemetry": telemetry,
                     },
                 )
                 print(
-                    f"  {case['id']}: json={valid_json} structure={structure_ok} keyword={score:.2f} "
-                    f"wall={wall:.2f}s Tmax={fmt(telemetry.get('temp_max_c'), 'C')}"
+                    f"  {case['id']}: json={valid_json} strict={strict_json} structure={structure_ok} "
+                    f"lang={language_hint} keyword={score:.2f} wall={wall:.2f}s "
+                    f"Tmax={fmt(telemetry.get('temp_max_c'), 'C')}"
                 )
             print(f"  mean task score: {mean(scores):.3f}")
     print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
@@ -509,6 +553,8 @@ def clean_code_output(text: str) -> str:
 
 def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, str]:
     body = clean_code_output(text)
+    if not body:
+        return False, False, "empty final answer"
     validator = case["validator"]
     error = ""
     try:
@@ -574,6 +620,9 @@ def benchmark_agent(args: argparse.Namespace) -> int:
         "syntax_ok",
         "requirements_ok",
         "correctness_ok",
+        "answer_started",
+        "answer_chars",
+        "thinking_chars",
         "wall_s",
         "load_s",
         "eval_count",
@@ -605,7 +654,10 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                     finally:
                         wall = time.monotonic() - start
                         telemetry = sampler.stop()
-                    content = str((response.get("message") or {}).get("content") or "")
+                    message = response.get("message") if isinstance(response.get("message"), dict) else {}
+                    content = str(message.get("content") or "")
+                    thinking = str(message.get("thinking") or response.get("thinking") or "")
+                    answer_started = bool(content.strip())
                     syntax_ok, requirements_ok, error = validate_agent_output(
                         content, case
                     )
@@ -619,6 +671,9 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                             "syntax_ok": int(syntax_ok),
                             "requirements_ok": int(requirements_ok),
                             "correctness_ok": int(correctness_ok),
+                            "answer_started": int(answer_started),
+                            "answer_chars": len(content),
+                            "thinking_chars": len(thinking),
                             "wall_s": f"{wall:.3f}",
                             "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
                             "eval_count": response.get("eval_count", 0),
@@ -639,6 +694,12 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                             "model": model,
                             "case": case,
                             "response": content,
+                            "thinking": thinking,
+                            "answer_started": answer_started,
+                            "answer_chars": len(content),
+                            "thinking_chars": len(thinking),
+                            "eval_count": response.get("eval_count", 0),
+                            "done_reason": response.get("done_reason", ""),
                             "syntax_ok": syntax_ok,
                             "requirements_ok": requirements_ok,
                             "correctness_ok": correctness_ok,
@@ -648,7 +709,9 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                         },
                     )
                     print(
-                        f"  {case['id']}: syntax={syntax_ok} requirements={requirements_ok} wall={wall:.2f}s"
+                        f"  {case['id']}: syntax={syntax_ok} requirements={requirements_ok} "
+                        f"answer={answer_started} think_chars={len(thinking)} "
+                        f"done={response.get('done_reason', '')} wall={wall:.2f}s"
                     )
             finally:
                 try:
@@ -661,9 +724,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
 
 OCR_PROMPTS = {
     "glm": "Text Recognition:",
-    "dots": """Please output the document layout and text in human reading order. Include each element's category and text; format tables as HTML, formulas as LaTeX, and other text as Markdown. Preserve the original text exactly without translation.""",
     "ovis": """Extract all readable content from the image in natural human reading order and output one Markdown document. Format formulas as LaTeX and tables as HTML. Preserve the original text without translation or paraphrasing.""",
-    "chandra": """Convert this office document image to structured Markdown. Preserve the original language, reading order, headings, tables, form fields, names, dates, numbers and reference identifiers. Do not translate or summarize.""",
 }
 
 
@@ -671,12 +732,8 @@ def ocr_kind(model: str) -> str:
     lower = model.lower()
     if "glm-ocr" in lower:
         return "glm"
-    if "dots-ocr" in lower or "dots.ocr" in lower:
-        return "dots"
     if "ovisocr" in lower:
         return "ovis"
-    if "chandra" in lower:
-        return "chandra"
     return "generic"
 
 
@@ -818,9 +875,9 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
                         "stream": False,
                         "keep_alive": KEEP_ALIVE,
                     }
-                    # OvisOCR2 and Chandra are Qwen3.5-derived OCR models trained for
-                    # direct extraction rather than a visible reasoning trace.
-                    if kind in {"ovis", "chandra"}:
+                    # OvisOCR2 is trained for direct extraction rather than a
+                    # visible reasoning trace.
+                    if kind == "ovis":
                         payload["think"] = False
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
                     start = time.monotonic()

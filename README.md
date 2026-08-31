@@ -71,6 +71,10 @@ WebUI administrator immediately. The default endpoint is unencrypted HTTP; see
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
+The packaged comparison catalog also includes `task-lfm25-2.6b-liquidai-q6-k`,
+`agentic-qwen25-coder7b-unsloth-q5-k-m` and `exp-qwen38-4b-distill-empero-q6-k`;
+they are benchmark challengers, not silent replacements for the defaults above.
+
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
 quality and quantization comparisons. The Jina embedding model uses a

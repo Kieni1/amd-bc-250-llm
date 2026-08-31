@@ -168,16 +168,15 @@ file or `OPEN_WEBUI_API_KEY`.
 
 ```text
 bc250-ocr list
-sudo bc250-ocr install glm|dots|ovis|chandra
-bc250-ocr show glm|dots|ovis|chandra
-bc250-ocr test glm|dots|ovis|chandra IMAGE
+sudo bc250-ocr install glm|ovis
+bc250-ocr show glm|ovis
+bc250-ocr test glm|ovis IMAGE
 ```
 
 OCR models stay in the normal `experiments` category and main Ollama instance;
 there is no OCR daemon or separate model store. The helper tests one image and
-prints extracted text/Markdown for comparison. GLM is the lightweight baseline,
-dots.ocr and OvisOCR2 are structured-document experiments, and Chandra remains
-a compatibility probe until real BC-250 image inference is verified. Test DE/FR/EN
+prints extracted text/Markdown for comparison. GLM is the measured fidelity
+leader and OvisOCR2 remains the faster structured-document alternative. Test DE/FR/EN
 letters, invoices, forms and table-heavy scans before using OCR output for RAG.
 
 Task setup creates `ollama-task.service` on port `11435`; agentic setup creates
@@ -251,8 +250,9 @@ comparison: it keeps the registered Modelfile SYSTEM and sampling while running 
 Role-specific Office/RAG/translation use-case fixtures are intentionally deferred.
 `THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
 larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
-not routinely starved by thinking; `NUM_PREDICT_LATENCY_THINKING` can override
-that cap separately.
+not routinely starved by thinking; LFM2.5 keeps that larger cap even in an
+explicit `think=false` experiment because measured native reasoning persisted.
+`NUM_PREDICT_LATENCY_THINKING` can override that cap separately.
 
 ```bash
 bc250-benchmark                         # generation, neutral mode

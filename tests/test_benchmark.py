@@ -73,7 +73,7 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             generation.resolve_think_policy(
-                "exp-qwen35-9b-davidau-defiant-fable", "auto"
+                "exp-qwen38-4b-distill-empero-q6-k", "auto"
             ),
             "omit",
         )
@@ -81,24 +81,25 @@ class GenerationPolicyTests(unittest.TestCase):
     def test_early_stop_only_flags_short_done_reason_stop(self) -> None:
         self.assertIsNone(
             generation.early_stop_warning(
-                {"eval_count": 28, "done_reason": "length"}, 384, 0.9
+                {"eval_count": 28, "done_reason": "length"}, 384, 0.10
             )
         )
         self.assertIsNotNone(
             generation.early_stop_warning(
-                {"eval_count": 28, "done_reason": "stop"}, 384, 0.9
+                {"eval_count": 28, "done_reason": "stop"}, 384, 0.10
             )
         )
         self.assertIsNone(
             generation.early_stop_warning(
-                {"eval_count": 380, "done_reason": "stop"}, 384, 0.9
+                {"eval_count": 204, "done_reason": "stop"}, 512, 0.10
             )
         )
 
     def test_reasoning_latency_budget_and_prompt_variants_are_explicit(self) -> None:
-        self.assertEqual(generation.latency_budget(96, 512, "false"), 96)
-        self.assertEqual(generation.latency_budget(96, 512, "medium"), 512)
-        self.assertEqual(generation.latency_budget(96, 512, "omit"), 512)
+        self.assertEqual(generation.latency_budget(96, 512, "false", "prod-qwen35-9b"), 96)
+        self.assertEqual(generation.latency_budget(96, 512, "false", "prod-lfm25-8b"), 512)
+        self.assertEqual(generation.latency_budget(96, 512, "medium", "prod-gpt-oss20b"), 512)
+        self.assertEqual(generation.latency_budget(96, 512, "omit", "prod-gemma4-e2b"), 512)
         first = generation.prompt_variant("Prompt", 0)
         second = generation.prompt_variant("Prompt", 1)
         self.assertNotEqual(first, second)
@@ -136,11 +137,11 @@ class CategoryPolicyTests(unittest.TestCase):
 
     def test_ocr_prompts_preserve_source_language_and_structure(self) -> None:
         self.assertEqual(category.OCR_PROMPTS["glm"], "Text Recognition:")
-        for kind in ("dots", "ovis", "chandra"):
-            prompt = category.OCR_PROMPTS[kind].lower()
-            self.assertIn("preserve", prompt)
-            self.assertIn("translat", prompt)
-        self.assertIn("tables as html", category.OCR_PROMPTS["ovis"].lower())
+        prompt = category.OCR_PROMPTS["ovis"].lower()
+        self.assertIn("preserve", prompt)
+        self.assertIn("translat", prompt)
+        self.assertIn("tables as html", prompt)
+        self.assertEqual(set(category.OCR_PROMPTS), {"glm", "ovis"})
 
     def test_fixtures_cover_multilingual_office_categories(self) -> None:
         embed = json.loads(
@@ -157,8 +158,10 @@ class CategoryPolicyTests(unittest.TestCase):
         agent = json.loads(
             (ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8")
         )
-        self.assertGreaterEqual(len(embed["documents"]), 6)
+        self.assertGreaterEqual(len(embed["documents"]), 9)
         self.assertTrue(any(query.get("kind") == "cross" for query in embed["queries"]))
+        self.assertIn("de-kuendigung-alt", {doc["id"] for doc in embed["documents"]})
+        self.assertIn("q-current-lease", {query["id"] for query in embed["queries"]})
         self.assertEqual({case["language"] for case in task}, {"de", "fr", "en"})
         self.assertTrue({"de", "fr"} <= {case["language"] for case in ocr})
         for case in ocr:
@@ -220,6 +223,26 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertIn('["General"]', tags)
         self.assertIn("Today's date is", query)
         self.assertIn("err on the side", query)
+
+    def test_task_json_parser_matches_open_webui_fenced_json_tolerance(self) -> None:
+        fenced = '```json\n{"title":"Open WebUI PDF extraction"}\n```'
+        self.assertEqual(category.parse_json_object(fenced), {"title": "Open WebUI PDF extraction"})
+        self.assertFalse(category.strict_json_object(fenced))
+        self.assertTrue(category.strict_json_object('{"title":"ok"}'))
+
+    def test_task_language_hint_is_informational(self) -> None:
+        self.assertEqual(category.task_language_hint("Datenschutz und Dokument Analyse", "de"), "match")
+        self.assertEqual(category.task_language_hint("privacy and document analysis", "de"), "other")
+
+    def test_agent_empty_final_is_not_syntax_success_and_budgets_allow_reasoning(self) -> None:
+        case = {"id": "b", "validator": "bash", "required": ["echo"]}
+        self.assertEqual(category.validate_agent_output("", case)[:2], (False, False))
+        cases = json.loads((ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(min(item["num_predict"] for item in cases), 768)
+        source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
+        agent = source.split("def benchmark_agent", 1)[1].split("OCR_PROMPTS", 1)[0]
+        for field in ("thinking_chars", "answer_started", 'response.get("eval_count"', 'response.get("done_reason"'):
+            self.assertIn(field, agent)
 
     def test_agent_lane_inherits_service_sampling_and_keepalive(self) -> None:
         case = {"num_predict": 256}

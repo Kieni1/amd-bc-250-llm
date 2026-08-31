@@ -26,13 +26,13 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         models = modelctl.discover_models([MODELFILES])
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
-        self.assertEqual(len(models), 26)
+        self.assertEqual(len(models), 19)
 
     def test_current_model_set_and_dedicated_instances_are_preserved(self) -> None:
         expected = {
             "production": (5, "127.0.0.1:11434"),
-            "experiments": (16, "127.0.0.1:11434"),
-            "task": (1, "127.0.0.1:11435"),
+            "experiments": (8, "127.0.0.1:11434"),
+            "task": (2, "127.0.0.1:11435"),
             "agentic": (2, "127.0.0.1:11436"),
             "embedding": (2, "127.0.0.1:11434"),
         }
@@ -60,9 +60,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
     def test_experimental_ocr_models_use_ollama_managed_hf_sources(self) -> None:
         expected = {
             "exp-glm-ocr-ggml-q8-0",
-            "exp-dots-ocr-ggml-q8-0",
             "exp-ovisocr2-abiray-q8-0",
-            "exp-chandra-ocr2-prithivmlmods-q4-k-m",
         }
         models = {
             model["name"]: model for model in modelctl.discover_models([MODELFILES])
@@ -73,10 +71,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         )
         glm = (MODELFILES / "exp-glm-ocr-ggml-q8-0.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 16384", glm)
-        chandra = (
-            MODELFILES / "exp-chandra-ocr2-prithivmlmods-q4-k-m.Modelfile"
-        ).read_text()
-        self.assertIn("# GGUF: chandra-ocr-2.Q4_K_M.gguf", chandra)
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "exp-remote-mismatch.Modelfile"
             path.write_text(
@@ -108,6 +102,19 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             text,
         )
         self.assertIn("pooling metadata", text)
+
+    def test_new_compact_candidates_have_reviewed_sampling_and_roles(self) -> None:
+        q38 = (MODELFILES / "exp-qwen38-4b-distill-empero-q6-k.Modelfile").read_text()
+        self.assertIn("PARAMETER temperature 0.6", q38)
+        self.assertIn("PARAMETER top_p 0.95", q38)
+        self.assertIn("PARAMETER top_k 20", q38)
+        lfm = (MODELFILES / "task-lfm25-2.6b-liquidai-q6-k.Modelfile").read_text()
+        self.assertNotRegex(lfm, r"(?m)^SYSTEM\s")
+        self.assertIn("PARAMETER num_ctx 4096", lfm)
+        coder = (MODELFILES / "agentic-qwen25-coder7b-unsloth-q5-k-m.Modelfile").read_text()
+        self.assertIn("PARAMETER num_ctx 32768", coder)
+        self.assertIn("PARAMETER temperature 0.7", coder)
+        self.assertIn("PARAMETER top_p 0.8", coder)
 
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {

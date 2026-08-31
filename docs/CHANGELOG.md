@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.7-0.8.testing - 2026-08-31
+
+Use the first full 0.9.7-0.7 production/category run to tighten benchmark
+interpretation rather than changing production model profiles. Keep LFM2.5 on
+the reasoning-capable latency budget even during explicit `think=false` tests,
+reduce natural-stop warning noise, and bump generation metadata to 7.3.
+
+Match Open WebUI 0.11.1 task JSON extraction while retaining a separate strict
+raw-JSON signal and an informational language hint. Give agent fixtures enough
+shared budget for native reasoning, reject empty final code, and capture thinking,
+answer presence, `eval_count` and `done_reason`. Make the embedding fixture harder
+with multilingual near-duplicate/conflicting office facts.
+
+Prune redundant/losing experimental model definitions and add compact comparison
+Modelfiles for Qwen3.8 4B Distill Q6_K, LFM2.5 2.6B Q6_K as a task challenger,
+and Qwen2.5-Coder 7B Q5_K_M (single-file Unsloth GGUF) as a coding baseline. Retain GLM-OCR and
+OvisOCR2 as the packaged OCR comparison pair.
+
 ## 0.9.7-0.7.testing - 2026-08-30
 
 Correct generation-latency interpretation for reasoning-capable models after the
