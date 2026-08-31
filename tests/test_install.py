@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -21,6 +22,41 @@ rpm() {{
 dnf() {{ printf 'dnf %s\\n' "$*"; }}
 systemctl() {{ :; }}
 remove_fedora_ollama
+"""
+    return subprocess.run(
+        ["bash", "-c", script, "installer-test", str(INSTALLER)],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+
+def run_same_nevra_probe() -> subprocess.CompletedProcess[str]:
+    script = r"""
+source "$1"
+heading() { :; }
+find_binary_rpm() { printf '/tmp/bc250-current.x86_64.rpm\n'; }
+rpm() {
+  case "$*" in
+    "-qp --qf %{NAME}-%{VERSION}-%{RELEASE}.%{ARCH} /tmp/bc250-current.x86_64.rpm")
+      printf 'bc250-llm-server-0.9.7-0.10.testing.fc44.x86_64\n' ;;
+    "-q --qf %{NAME}-%{VERSION}-%{RELEASE}.%{ARCH} bc250-llm-server.x86_64")
+      printf 'bc250-llm-server-0.9.7-0.10.testing.fc44.x86_64\n' ;;
+    "-q --provides bc250-llm-server.x86_64")
+      printf 'user(ollama)\ngroup(ollama)\n' ;;
+    "-q bc250-llm-server.x86_64") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+dnf() { printf 'UNEXPECTED-DNF %s\n' "$*"; return 99; }
+command() {
+  if [[ "$1" == -v && "$2" == bc250-install-ollama ]]; then
+    return 0
+  fi
+  builtin command "$@"
+}
+step_3_install_rpm
 """
     return subprocess.run(
         ["bash", "-c", script, "installer-test", str(INSTALLER)],
@@ -57,7 +93,7 @@ class InstallerTests(unittest.TestCase):
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("--setopt=install_weak_deps=False", source)
         self.assertIn("--exclude=ollama", source)
-        self.assertIn("dnf_action=reinstall", source)
+        self.assertNotIn("dnf_action=reinstall", source)
 
     def test_installer_records_only_its_package_additions(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
@@ -89,7 +125,23 @@ class InstallerTests(unittest.TestCase):
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = INSTALLER.read_text(encoding="utf-8")
         self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
+        self.assertIn('readonly BC250_OLLAMA_VERSION="0.33.2"', installer)
         self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
+        self.assertNotIn('source "$SCRIPT_DIR/config/runtime.env"', installer)
+
+    def test_installer_help_is_self_contained_when_copied_beside_rpm(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            copied = Path(temporary) / "install"
+            copied.write_bytes(INSTALLER.read_bytes())
+            result = subprocess.run(
+                ["bash", str(copied), "--help"],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("The package standard is Ollama 0.33.2", result.stdout)
 
     def test_latest_is_not_sent_as_an_upstream_version_query(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
@@ -179,13 +231,18 @@ class InstallerTests(unittest.TestCase):
         )
         self.assertNotIn("BC250_ASSUME_YES=1 bc250-40cu enable", source)
 
-    def test_rpm_action_distinguishes_upgrade_from_same_nevra_reinstall(self) -> None:
+    def test_rpm_action_skips_same_nevra_instead_of_reinstalling(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn(
-            '[[ "$installed_nevra" != "$candidate_nevra" ]] || dnf_action=reinstall',
-            source,
-        )
+        self.assertIn('[[ "$installed_nevra" == "$candidate_nevra" ]]', source)
+        self.assertIn("Already current:", source)
+        self.assertIn("skipping RPM transaction", source)
+        self.assertNotIn("dnf_action=reinstall", source)
         self.assertIn('[[ "$installed_after" == "$candidate_nevra" ]]', source)
+
+        result = run_same_nevra_probe()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Already current:", result.stdout)
+        self.assertNotIn("UNEXPECTED-DNF", result.stdout)
 
     def test_verification_runs_both_reports_before_returning_failure(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")

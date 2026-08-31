@@ -123,11 +123,19 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("PARAMETER temperature 0.7", coder)
         self.assertIn("PARAMETER top_p 0.8", coder)
 
+    def test_coding_helper_defaults_to_measured_qwen25_coder(self) -> None:
+        helper = (ROOT / "models/coding-agent/coding-agent.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "CODING_AGENT_MODEL:-agentic-qwen25-coder7b-unsloth-q5-k-m", helper
+        )
+
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {
             "embedding": "embed-jina-v5-small-retrieval-q4-k-m",
             "task": "task-gemma3-1b-unsloth-ud-q4-k-xl",
-            "agentic": "agentic-ornith15-9b-ornith-q5-k-m",
+            "agentic": "agentic-qwen25-coder7b-unsloth-q5-k-m",
         }
         for category, name in expected.items():
             with self.subTest(category=category):
@@ -213,6 +221,83 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             self.assertIn("128K context", source)
 
 
+class CategoryInterfaceTests(unittest.TestCase):
+    def test_public_categories_are_canonical_and_include_all(self) -> None:
+        self.assertEqual(
+            modelctl.CATEGORIES,
+            (
+                "production",
+                "experiments",
+                "task",
+                "agentic",
+                "embedding",
+                "mtp",
+                "all",
+            ),
+        )
+        for legacy in ("experimental", "tasker", "coding", "embedded", "embed"):
+            self.assertNotIn(legacy, modelctl.CATEGORIES)
+
+    def test_list_requires_sudo_to_avoid_protected_source_unknown_status(self) -> None:
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=1000),
+            self.assertRaisesRegex(modelctl.ModelError, "sudo bc250-model list"),
+        ):
+            modelctl.main(["list"])
+
+    def test_cleanup_all_without_selection_selects_every_catalog_entry(self) -> None:
+        catalogs = [
+            (
+                {"category": "production"},
+                [{"category": "production", "id": "p", "name": "prod-p"}],
+            ),
+            (
+                {"category": "mtp"},
+                [
+                    {
+                        "category": "mtp",
+                        "id": "m",
+                        "name": "mtp-m",
+                        "enabled": False,
+                    }
+                ],
+            ),
+        ]
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "load_all_catalogs", return_value=catalogs),
+            patch.object(modelctl, "print_catalogs"),
+            patch.object(modelctl, "run_all_catalog_operation", return_value=0) as run,
+        ):
+            self.assertEqual(
+                modelctl.main(["cleanup", "all", "--keep-gguf", "--yes"]), 0
+            )
+        self.assertEqual(
+            {(model["category"], model["id"]) for model in run.call_args.args[1]},
+            {("production", "p"), ("mtp", "m")},
+        )
+
+    def test_all_cleanup_dispatches_each_selected_category(self) -> None:
+        catalogs = [
+            (
+                {"category": "production"},
+                [{"category": "production", "id": "p", "name": "prod-p"}],
+            ),
+            (
+                {"category": "mtp"},
+                [{"category": "mtp", "id": "m", "name": "mtp-m"}],
+            ),
+        ]
+        selected = [catalogs[0][1][0], catalogs[1][1][0]]
+        args = modelctl.argparse.Namespace(command="cleanup", yes=True)
+        with patch.object(modelctl, "cleanup_models", return_value=0) as cleanup:
+            self.assertEqual(
+                modelctl.run_all_catalog_operation(catalogs, selected, args), 0
+            )
+        self.assertEqual(cleanup.call_count, 2)
+        self.assertTrue(all(call.args[2].yes for call in cleanup.call_args_list))
+
+
 class SelectionTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -285,12 +370,51 @@ class StatusTests(unittest.TestCase):
         )
         self.assertIn(f"  {gemma['index']:2d}) exp-gemma4-12b-google-qat-q4-0", text)
         self.assertIn("downloaded, set up", text)
-        self.assertIn("download unknown, not set up", text)
+        self.assertIn("source Ollama-managed (main+projector), not set up", text)
         self.assertIn("unmanaged-test-model", text)
         self.assertIn("Modelfile missing", text)
         self.assertIn("Misplaced Ollama models", text)
         self.assertIn("prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl", text)
         self.assertIn("expected 127.0.0.1:11434", text)
+
+    def test_ollama_hf_status_is_explicitly_managed(self) -> None:
+        model = {
+            "id": "m",
+            "name": "exp-vision",
+            "provider": "ollama-hf",
+            "enabled": True,
+        }
+        output = StringIO()
+        with redirect_stdout(output):
+            modelctl.print_models({}, [model], registered=set())
+        text = output.getvalue()
+        self.assertIn("source Ollama-managed (main+projector), not set up", text)
+        self.assertNotIn("download unknown", text)
+
+    def test_retained_gguf_reports_downloaded_after_registration_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output_path = Path(temporary) / "model.gguf"
+            output_path.write_bytes(b"weights")
+            modelctl.state_path(output_path).write_text("{}", encoding="utf-8")
+            model = {
+                "id": "m",
+                "name": "prod-test",
+                "provider": "ollama",
+                "from": str(output_path),
+                "gguf": output_path.name,
+                "enabled": True,
+            }
+            output = StringIO()
+            with (
+                patch.object(modelctl, "model_path", return_value=output_path),
+                redirect_stdout(output),
+            ):
+                modelctl.print_models(
+                    {"destination": temporary}, [model], registered=set()
+                )
+            text = output.getvalue()
+            self.assertIn("downloaded, not set up", text)
+            self.assertNotIn("download unknown", text)
 
 
 if __name__ == "__main__":

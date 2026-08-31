@@ -146,8 +146,14 @@ if systemctl is-active --quiet firewalld.service; then
 fi
 systemctl enable --now cyan-skillfish-governor-smu.service nginx.service \
   >/dev/null 2>&1 || :
-if command -v ollama >/dev/null 2>&1 && \
-   systemctl cat ollama.service >/dev/null 2>&1; then
+ollama_bin="$(command -v ollama 2>/dev/null || :)"
+if [ -z "$ollama_bin" ] && [ -x /usr/local/bin/ollama ]; then
+  ollama_bin=/usr/local/bin/ollama
+fi
+if [ -z "$ollama_bin" ] && [ -x /usr/bin/ollama ]; then
+  ollama_bin=/usr/bin/ollama
+fi
+if [ -n "$ollama_bin" ] && systemctl cat ollama.service >/dev/null 2>&1; then
   systemctl enable --now ollama.service >/dev/null 2>&1 || :
 else
   echo "Ollama is not installed. Run: sudo bc250-install-ollama"

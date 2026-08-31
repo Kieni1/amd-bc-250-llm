@@ -37,11 +37,11 @@ then follow [`docs/RAG.md`](docs/RAG.md). Operator documents live under `/srv/bc
 ## Models
 
 ```bash
-bc250-model list production
-bc250-model list experiments
-bc250-model list task
-bc250-model list agentic
-bc250-model list embedding
+sudo bc250-model list production
+sudo bc250-model list experiments
+sudo bc250-model list task
+sudo bc250-model list agentic
+sudo bc250-model list embedding
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
 

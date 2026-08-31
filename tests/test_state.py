@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 import os
 import sys
 import tempfile
@@ -150,6 +152,37 @@ class StateTests(unittest.TestCase):
             self.assertTrue(output.exists())
             self.assertTrue(sidecar.exists())
             self.assertFalse(runtime_file.exists())
+
+    def test_remote_ocr_keep_gguf_explains_ollama_managed_source(self) -> None:
+        model = {
+            "id": "m",
+            "name": "exp-vision",
+            "provider": "ollama-hf",
+            "from": "hf.co/example/vision:Q8_0",
+            "gguf": "vision.gguf",
+        }
+        args = SimpleNamespace(yes=True, keep_gguf=True)
+        capture = StringIO()
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "ollama_identity", return_value=(1, 1)),
+            patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+            patch.object(
+                modelctl,
+                "run_as_ollama",
+                return_value=SimpleNamespace(returncode=0),
+            ),
+            redirect_stdout(capture),
+        ):
+            self.assertEqual(
+                modelctl.cleanup_models(
+                    {"ollama_host": "127.0.0.1:11434"}, [model], args
+                ),
+                0,
+            )
+        text = capture.getvalue()
+        self.assertIn("no manager-owned GGUF/state to retain", text)
+        self.assertIn("multimodal source/projector blobs are Ollama-managed", text)
 
     def test_normal_cleanup_still_removes_local_gguf_and_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

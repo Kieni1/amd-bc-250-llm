@@ -212,6 +212,41 @@ class CategoryPolicyTests(unittest.TestCase):
             (True, True),
         )
 
+        strict_case = {
+            "id": "strict",
+            "validator": "python",
+            "required": ["raise ValueError"],
+            "raw_only": True,
+        }
+        self.assertEqual(
+            category.validate_agent_output("```python\nraise ValueError\n```", strict_case)[:2],
+            (True, False),
+        )
+        safe_bash = {
+            "id": "safe",
+            "validator": "bash",
+            "required": ["find"],
+            "required_any": [["-printf", "-print0"]],
+        }
+        self.assertEqual(
+            category.validate_agent_output("find . -maxdepth 1 -print", safe_bash)[:2],
+            (True, False),
+        )
+        typed_json = {
+            "id": "typed",
+            "validator": "json",
+            "json_keys": ["files", "commands"],
+            "json_array_keys": ["files", "commands"],
+        }
+        self.assertEqual(
+            category.validate_agent_output('{"files":[],"commands":[]}', typed_json)[:2],
+            (True, True),
+        )
+        self.assertEqual(
+            category.validate_agent_output('{"files":"bad","commands":[]}', typed_json)[:2],
+            (True, False),
+        )
+
     def test_usecase_acceptance_checks_required_any_and_forbidden(self) -> None:
         case = {
             "required": ["AB-42"],

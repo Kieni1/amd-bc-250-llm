@@ -129,7 +129,7 @@ of replacing its template just to suppress reasoning.
 | Embedding | `embed-jina-v5-small-retrieval-q4-k-m` | 32,768 |
 | Embedding alternative | `embed-qwen3-0.6b-q8-0` | 32,768 |
 | Task | `task-gemma3-1b-unsloth-ud-q4-k-xl` | 4,096 |
-| Agentic/coding | `agentic-ornith15-9b-ornith-q5-k-m` | 32,768 |
+| Agentic/coding | `agentic-qwen25-coder7b-unsloth-q5-k-m` | 32,768 |
 
 ### Where model settings belong
 
@@ -164,7 +164,8 @@ Gemma 4 thinking is enabled only when its Modelfile `SYSTEM` starts with
 | `prod-gpt-oss20b-ggml-org-mxfp4` | Workspace model preset → Advanced Parameters | `think`: Default | Ollama defaults GPT-OSS to medium reasoning. Use `low`, `medium` or `high` only for deliberate latency/quality comparisons. Leave Open WebUI's separate Reasoning Effort field unset for local Ollama. |
 | `task-gemma3-1b-unsloth-ud-q4-k-xl` | Admin Settings → Experience → Interface | selected as Local Task Model | Current smallest default; do not expose as a normal office-chat preset. |
 | `task-lfm25-2.6b-liquidai-q6-k` | Admin Settings → Experience → Interface | task-model comparison | Multilingual challenger; benchmark before replacing Gemma 3 1B. |
-| `agentic-ornith15-9b-ornith-q5-k-m` | Agent connection + Workspace model preset | Reasoning Tags: Default; `think`: leave unset/default | Ornith emits native `<think>` reasoning. Enable only the tools required by the coding-agent workflow. The agent service is intended for exclusive use, not concurrently with a large main model. |
+| `agentic-qwen25-coder7b-unsloth-q5-k-m` | Agent connection + Workspace model preset | `think`: leave unset/default | Current coding-helper default after passing all three packaged Bash/Python/JSON acceptance cases. Enable only the tools required by the coding-agent workflow. The agent service is intended for exclusive use, not concurrently with a large main model. |
+| `agentic-ornith15-9b-ornith-q5-k-m` | Agent connection experiment | Reasoning Tags: Default; `think`: leave unset/default | Native-reasoning comparison model; the 2026-08-31 compact agent run reached a final answer in only one of three cases within the shared cap. |
 | `embed-jina-v5-small-retrieval-q4-k-m` | Admin Settings → Documents | embedding model + Jina prefixes | Not a chat/task model. Reindex when changing model or prefixes. |
 | `embed-qwen3-0.6b-q8-0` | Admin Settings → Documents | embedding model + Qwen query instruction | Alternative embedding backend; content prefix stays empty. Reindex when switching from Jina. |
 

@@ -25,13 +25,13 @@ a large main-model workload on the BC-250 unified-memory pool.
 ## List, install, replace
 
 ```bash
-bc250-model list
-bc250-model list production
-bc250-model list experiments
-bc250-model list task
-bc250-model list agentic
-bc250-model list embedding
-bc250-model list mtp --all
+sudo bc250-model list
+sudo bc250-model list production
+sudo bc250-model list experiments
+sudo bc250-model list task
+sudo bc250-model list agentic
+sudo bc250-model list embedding
+sudo bc250-model list mtp --all
 
 sudo bc250-model install production MODEL
 sudo bc250-model install experiments MODEL
@@ -99,7 +99,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
 | `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
 | `task-lfm25-2.6b-liquidai-q6-k` | multilingual task-model challenger to Gemma 3 1B |
-| `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding baseline against native-reasoning Ornith |
+| `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding starting point; rerun the tightened static-semantic agent fixture before promotion |
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,

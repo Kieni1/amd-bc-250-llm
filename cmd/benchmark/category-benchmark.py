@@ -552,11 +552,13 @@ def clean_code_output(text: str) -> str:
 
 
 def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, str]:
+    stripped = text.strip()
     body = clean_code_output(text)
     if not body:
         return False, False, "empty final answer"
     validator = case["validator"]
     error = ""
+    parsed_json: dict[str, Any] | None = None
     try:
         if validator == "python":
             compile(body, f"<{case['id']}>", "exec")
@@ -572,8 +574,10 @@ def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, 
             if result.returncode:
                 raise ValueError(result.stderr.strip() or "bash -n failed")
         elif validator == "json":
-            if not isinstance(json.loads(body), dict):
+            value = json.loads(body)
+            if not isinstance(value, dict):
                 raise ValueError("top-level JSON is not an object")
+            parsed_json = value
         else:
             raise ValueError(f"unknown validator: {validator}")
         syntax_ok = True
@@ -584,10 +588,27 @@ def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, 
         subprocess.TimeoutExpired,
     ) as exc:
         syntax_ok, error = False, str(exc)
+
     folded = body.casefold()
     requirements_ok = all(
         term.casefold() in folded for term in case.get("required", [])
     )
+    any_groups = case.get("required_any", [])
+    requirements_ok = requirements_ok and all(
+        any(term.casefold() in folded for term in group) for group in any_groups
+    )
+    requirements_ok = requirements_ok and not any(
+        term.casefold() in folded for term in case.get("forbidden", [])
+    )
+    if case.get("raw_only"):
+        # The fixture explicitly asked for raw code/JSON. Keep fenced output
+        # syntactically inspectable, but do not call it requirement-compliant.
+        requirements_ok = requirements_ok and not stripped.startswith("```")
+    if parsed_json is not None:
+        for key in case.get("json_keys", []):
+            requirements_ok = requirements_ok and key in parsed_json
+        for key in case.get("json_array_keys", []):
+            requirements_ok = requirements_ok and isinstance(parsed_json.get(key), list)
     return syntax_ok, requirements_ok, error
 
 

@@ -62,22 +62,25 @@ selects a reviewed version.
 ## Models
 
 ```text
-bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
+sudo bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
-bc250-model install CATEGORY [SELECTION] [OPTIONS]
-bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--list] [--yes]
+sudo bc250-model install CATEGORY [SELECTION] [OPTIONS]
+sudo bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--list] [--yes]
 ```
 
-Categories are `production`, `experiments`, `task`, `agentic`, `embedding` and
-`mtp`. Accepted aliases include `experimental`, `tasker`, `coding`, `embed` and
-`embedded`. MTP is the only TOML-backed, download-only category; the other
-categories are discovered from strict Modelfiles. Four OCR experiments use a
+Categories are `production`, `experiments`, `task`, `agentic`, `embedding`,
+`mtp` and `all`. Legacy category aliases are intentionally not accepted. `all`
+combines the discovered categories for status/install/cleanup operations;
+`cleanup all --keep-gguf` removes registrations/runtime copies across every
+category while retaining manager-owned GGUF/state pairs. MTP is the only
+TOML-backed, download-only category; the other categories are discovered from strict Modelfiles. Four OCR experiments use a
 strict experimental `hf.co/...` FROM exception so Ollama can manage their paired
 vision projector and model blobs.
 
 With no category, `list` shows every Ollama-backed category as one catalog with
 global indexes. A category filters the same catalog without renumbering it.
-MTP remains separate and must be requested explicitly.
+`list all` also includes the enabled MTP catalog; add `--all` to include disabled
+MTP entries.
 
 For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
 registration/runtime Modelfile while retaining the local GGUF and its state
@@ -86,11 +89,14 @@ Ollama remains responsible for pruning registration manifests and unreferenced
 blob data, so shared blobs are not deleted manually.
 
 Every Ollama entry reports its definition origin, download state and whether it
-is registered on the category's Ollama instance. `download unknown` means the
-model is not registered and the current user cannot inspect its protected GGUF
-path; use `sudo bc250-model list` for an exact source-file check. For remote
-experimental vision definitions, `download unknown` while unregistered means the
-source is Ollama-managed rather than a separately inspectable GGUF. Registrations
+is registered on the category's Ollama instance. Listing requires `sudo` because
+manager-owned GGUF/state directories remain intentionally protected (`0750`). A
+GGUF retained with `cleanup --keep-gguf` therefore reports `downloaded` even
+after its Ollama registration is removed; the next install still verifies the
+sidecar/checksum before reuse. Remote experimental vision definitions instead display `source Ollama-managed (main+projector)`
+because their main model and projector live in Ollama's blob store rather than
+as a manager-owned GGUF/state pair. `cleanup --keep-gguf` cannot retain a
+package-local OCR source that does not exist; it reports this explicitly. Registrations
 without a current Modelfile are reported separately as unmanaged models; known
 models found on the wrong Ollama instance are reported as misplaced.
 
@@ -177,7 +183,10 @@ bc250-ocr test glm|ovis IMAGE
 ```
 
 OCR models stay in the normal `experiments` category and main Ollama instance;
-there is no OCR daemon or separate model store. The helper tests one image and
+there is no OCR daemon or separate model store. GLM/Ovis use remote `hf.co/...`
+imports so Ollama can manage the required vision projector; unlike text-only
+models, their source files therefore live in the Ollama blob store rather than
+`/var/lib/bc250-llm-server/gguf/`. The helper tests one image and
 prints extracted text/Markdown for comparison. GLM is the measured fidelity
 leader and OvisOCR2 remains the faster structured-document alternative. Test DE/FR/EN
 letters, invoices, forms and table-heavy scans before using OCR output for RAG.
@@ -264,7 +273,7 @@ BENCH_PROFILE=conservative bc250-benchmark
 bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
 bc250-benchmark ocr                     # office OCR fixtures
 bc250-benchmark task                    # Open WebUI 0.11.2-compatible task behavior
-bc250-benchmark agent                   # coding correctness, defaults to port 11436
+bc250-benchmark agent                   # syntax + narrow static coding requirements, port 11436
 bc250-benchmark usecase                 # one role-defining case per production model
 bc250-benchmark rag                     # embedding eviction + answer-model reload cycle
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL

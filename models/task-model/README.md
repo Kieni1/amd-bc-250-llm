@@ -18,9 +18,12 @@ store. With no selection it lists task Modelfiles and prompts. The service uses
 
 Current candidates:
 
-- `task-gemma3-1b-unsloth-ud-q4-k-xl` — smallest baseline and current default;
-- `task-lfm25-2.6b-liquidai-q6-k` — multilingual DE/FR/EN comparison after the
-  Gemma 3 1B run showed weak language adherence.
+- `task-gemma3-1b-unsloth-ud-q4-k-xl` — current default: the 2026-08-31
+  Open WebUI 0.11.2 fixture produced usable structure/JSON in all 6 cases,
+  although language adherence remained weak (2/6 matched the requested language);
+- `task-lfm25-2.6b-liquidai-q6-k` — multilingual comparison candidate, but the
+  same run produced usable output only for the 2 title cases and returned empty
+  output for the 4 tag/query cases, so it is not a default replacement yet.
 
 Both Modelfiles deliberately omit a fixed `SYSTEM` prompt: Open WebUI supplies a
 different task prompt for title, tags and query rewriting. Run

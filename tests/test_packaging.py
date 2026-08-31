@@ -153,6 +153,12 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Environment=ENABLE_AUTOCOMPLETE_GENERATION=false", quadlet)
         self.assertIn("Environment=ENABLE_SEARCH_QUERY_GENERATION=false", quadlet)
 
+    def test_rpm_post_detects_official_usr_local_ollama(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("[ -x /usr/local/bin/ollama ]", spec)
+        self.assertIn("ollama_bin=/usr/local/bin/ollama", spec)
+        self.assertIn('if [ -n "$ollama_bin" ] && systemctl cat ollama.service', spec)
+
     def test_package_standard_ollama_is_0332(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = (ROOT / "install").read_text(encoding="utf-8")

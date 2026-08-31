@@ -99,6 +99,18 @@ class VerifyTests(unittest.TestCase):
             self.assertIn(expected, source)
 
 
+class DiagnoseTests(unittest.TestCase):
+    def test_static_no_load_run_does_not_warn_about_expected_absence_of_resident_model(self) -> None:
+        source = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
+        self.assertIn("no model resident (--no-load requested; residency test skipped)", source)
+        self.assertNotIn('wn "no model resident (start it, or run without --no-load)"', source)
+
+    def test_mesa_reference_delta_is_informational_not_a_package_failure(self) -> None:
+        source = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
+        self.assertIn("package does not pin Mesa", source)
+        self.assertNotIn('wn "${mv:-Mesa ?}  (ref Mesa 26.1.4)"', source)
+
+
 class RuntimeConvenienceTests(unittest.TestCase):
     def test_temperature_watch_is_default_and_once_is_available(self) -> None:
         source = (ROOT / "cmd/monitoring/check-temp.sh").read_text(encoding="utf-8")

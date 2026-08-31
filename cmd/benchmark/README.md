@@ -53,7 +53,9 @@ answer. The moderate latency test therefore keeps 96 tokens for explicit
 non-thinking (`think=false`) profiles but uses 512 for reasoning-capable/unset
 policies; the conservative profile uses 64/384. LFM2.5 stays on the larger
 latency budget even during an explicit `think=false` experiment because the
-measured Ollama/model path continued to emit native reasoning. `NUM_PREDICT_LATENCY` keeps its
+2026-08-31 Ollama 0.33.2/model comparison produced the same native reasoning
+with `think` omitted and with `think=false`; the boolean therefore is not treated
+as a suppression control for this LFM profile. `NUM_PREDICT_LATENCY` keeps its
 legacy behavior as an override for both unless `NUM_PREDICT_LATENCY_THINKING` is
 set separately. Throughput, context and thermal caps are unchanged. CSV/JSONL
 now record `answer_started`, `answer_chars` and `thinking_chars`: TTFC means first
@@ -154,14 +156,15 @@ useful for this short background workload.
 
 ```bash
 bc250-benchmark agent
-bc250-benchmark agent agentic-ornith15-9b-ornith-q5-k-m
+bc250-benchmark agent agentic-qwen25-coder7b-unsloth-q5-k-m
 ```
 
 This lane defaults to `http://127.0.0.1:11436`. Stop/avoid a large main-model
-workload while using it. The small fixture set checks Bash syntax, Python syntax
-and required structured output without executing model-generated code. A response
-passes only when a non-empty final answer has valid syntax/structure and the
-fixture's required elements both pass. Native model reasoning is not globally
+workload while using it. The small fixture set checks Bash/Python syntax plus deliberately narrow static
+semantic requirements and JSON shape without executing model-generated code. A
+response passes only when a non-empty final answer has valid syntax/structure,
+uses the requested raw-output format, and satisfies the fixture's required
+patterns (including space-safe Bash handling and explicit Python range rejection). Native model reasoning is not globally
 forced off. The cases provide 768-1024 shared output tokens so reasoning-oriented
 models have room to reach final code, and JSONL records thinking/final character
 counts, `eval_count` and `done_reason` for starvation diagnosis. The lane also leaves

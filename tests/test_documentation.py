@@ -68,6 +68,16 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("bc250-maintenance model-baseline", settings)
         self.assertIn("custom_params.think=false", maintenance)
 
+    def test_model_admin_docs_use_canonical_categories_and_sudo_listing(self) -> None:
+        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        models = (ROOT / "models/README.md").read_text(encoding="utf-8")
+        self.assertIn("`mtp` and `all`", commands)
+        self.assertIn("Legacy category aliases are intentionally not accepted", commands)
+        self.assertIn("sudo bc250-model cleanup all --keep-gguf", models)
+        for text in (commands, models):
+            for legacy in ("`tasker`", "`coding`", "`embedded`", "`embed`"):
+                self.assertNotIn(legacy, text)
+
     def test_internal_markdown_links_resolve(self) -> None:
         for path in ROOT.rglob("*.md"):
             relative = path.relative_to(ROOT)
@@ -110,7 +120,7 @@ class DocumentationTests(unittest.TestCase):
             "prod-gpt-oss20b-ggml-org-mxfp4",
             "embed-jina-v5-small-retrieval-q4-k-m",
             "task-gemma3-1b-unsloth-ud-q4-k-xl",
-            "agentic-ornith15-9b-ornith-q5-k-m",
+            "agentic-qwen25-coder7b-unsloth-q5-k-m",
         )
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         for name in recommended:

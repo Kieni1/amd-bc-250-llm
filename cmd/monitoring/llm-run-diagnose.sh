@@ -99,7 +99,10 @@ if [[ $DO_LOAD -eq 1 ]]; then
   curl -s "$OLLAMA/api/generate" -d "{\"model\":\"$MODEL\",\"prompt\":\"hi\",\"stream\":false,\"options\":{\"num_predict\":1}}" >/dev/null 2>&1
 fi
 ps=$(ollama ps 2>/dev/null | tail -n +2)
-if [[ -z "$ps" ]]; then wn "no model resident (start it, or run without --no-load)"
+if [[ -z "$ps" && $DO_LOAD -eq 0 ]]; then
+  echo "  [info] no model resident (--no-load requested; residency test skipped)"
+elif [[ -z "$ps" ]]; then
+  wn "no model resident after load request"
 elif grep -q '100% GPU' <<<"$ps"; then ok "$(echo "$ps" | sed 's/  */ /g')"
 else fl "NOT 100% GPU: $(echo "$ps" | sed 's/  */ /g')  <- lower num_ctx or fix ttm (check 1)"; fi
 
@@ -154,7 +157,13 @@ elif [[ -n "$ov" ]]; then wn "ollama=$ov (package standard 0.33.2; compare resul
 else wn "Ollama version unavailable"; fi
 if have vulkaninfo; then
   mv=$(vulkaninfo --summary 2>/dev/null | grep -m1 -i driverInfo | grep -oE 'Mesa [0-9.]+')
-  [[ "$mv" == "Mesa 26.1.4" ]] && ok "$mv" || wn "${mv:-Mesa ?}  (ref Mesa 26.1.4)"
+  if [[ "$mv" == "Mesa 26.1.4" ]]; then
+    ok "$mv"
+  elif [[ -n "$mv" ]]; then
+    echo "  [info] $mv (reference boards used Mesa 26.1.4; package does not pin Mesa)"
+  else
+    wn "Mesa version unavailable from vulkaninfo"
+  fi
 fi
 gv=$(cyan-skillfish-governor-smu --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 [[ "$gv" == "0.4.12" ]] && ok "governor=$gv" || wn "governor=${gv:-?}  (packaged 0.4.12)"

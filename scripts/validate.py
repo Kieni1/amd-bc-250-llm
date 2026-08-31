@@ -244,7 +244,9 @@ def check_dispatcher_and_runtime_contracts() -> None:
     checks = {
         "install": (
             "--exclude=ollama",
-            "dnf_action=reinstall",
+            'readonly BC250_OLLAMA_VERSION="0.33.2"',
+            "Already current:",
+            "skipping RPM transaction",
             "rpm -e --test ollama",
             "packages-added.txt",
             "firewall-http-before",
@@ -284,10 +286,13 @@ def check_dispatcher_and_runtime_contracts() -> None:
             'command_path("script")',
             "OPERATOR_MODEL_DIR",
             "discover_models",
+            'CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")',
+            "sudo bc250-model list",
         ),
         "packaging/bc250-llm-server.spec": (
             "Requires:       zram-generator",
             "Requires:       util-linux-script",
+            "/usr/local/bin/ollama",
             "systemctl try-restart tika.service open-webui.service",
         ),
     }

@@ -7,13 +7,13 @@ remove models.
 ## Commands
 
 ```bash
-bc250-model list
-bc250-model list production
-bc250-model list experiments
-bc250-model list task
-bc250-model list agentic
-bc250-model list embedding
-bc250-model list mtp --all
+sudo bc250-model list
+sudo bc250-model list production
+sudo bc250-model list experiments
+sudo bc250-model list task
+sudo bc250-model list agentic
+sudo bc250-model list embedding
+sudo bc250-model list mtp --all
 
 sudo bc250-model install production MODEL-NAME
 sudo bc250-model install production MODEL-NAME --refresh
@@ -23,14 +23,15 @@ sudo bc250-model cleanup production MODEL-NAME
 
 The category-free list shows all Ollama-backed models with one global index,
 download state and registration state. Category filters keep those global
-indexes, so a number means the same model in list, install and cleanup. MTP has
-its own local indexes. Selections accept a full name, displayed index, comma
+indexes, so a number means the same model in list, install and cleanup. `all`
+adds MTP to the combined operations with globally unique displayed indexes. Selections accept a full name, displayed index, comma
 list, range such as `0,2-4`, or `all`. With no selection, a terminal prompts and
 Enter cancels. Prefer full names in scripts.
 
-`download unknown` means an unregistered model's protected source path is not
-readable by the current user. Run `sudo bc250-model list` when an exact
-downloaded-but-not-registered check is needed. A registration without a current
+Model listing requires `sudo` because the local GGUF/state trees are intentionally
+protected. This avoids misleading `download unknown` results after
+`cleanup --keep-gguf`; a retained local source is visible as `downloaded` while
+its registration is shown as `not set up`. A registration without a current
 Modelfile is shown as unmanaged; a known model on the wrong Ollama instance is
 shown as misplaced.
 
@@ -42,9 +43,10 @@ shown as misplaced.
 | `agentic` | `agentic-` | `127.0.0.1:11436` | `gguf/agent` |
 | `embedding` | `embed-` | `127.0.0.1:11434` | `gguf/embedding` |
 
-`experimental`, `tasker`, `coding`, `embed` and `embedded` are accepted aliases.
-MTP is the only exception: download-only entries remain in a TOML runtime
-catalog because they have no Ollama model or Modelfile.
+The public categories are `production`, `experiments`, `task`, `agentic`,
+`embedding`, `mtp` and `all`; legacy aliases are intentionally not accepted. MTP
+is the only exception to Modelfile discovery: its download-only entries remain in
+a TOML runtime catalog because they have no Ollama model or Modelfile.
 
 ## Add or override a model
 
@@ -56,14 +58,14 @@ sudo install -m0644 \
   /usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example \
   /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
 sudoedit /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
-bc250-model list experiments
+sudo bc250-model list experiments
 sudo bc250-model install experiments exp-example-source-q4-k-m
 ```
 
 Required header:
 
 ```text
-# BC250 category: production|experimental|task|agentic|embedding
+# BC250 category: production|experiments|task|agentic|embedding
 # Ollama model: NAME
 # Source: OWNER/REPOSITORY @ REVISION
 # GGUF: FILE.gguf
@@ -94,9 +96,12 @@ therefore regenerate the Ollama registration without downloading again. Use
 such as `latest`.
 
 For experimental OCR definitions with remote `hf.co/...` FROM, Ollama owns the
-source blobs and projector in its normal model store; `bc250-model` therefore
-reports source download state as unknown until that model is registered and does
-not create a duplicate source GGUF.
+main model blob and required vision projector in its normal model store.
+`bc250-model` therefore labels the source `Ollama-managed (main+projector)` rather than pretending
+there is a manager-owned source GGUF under `/var/lib/bc250-llm-server/gguf/`.
+This is intentionally different from text-only local-GGUF models: preserving
+only the main OCR GGUF would not provide a reliable restore path for the paired
+projector on Ollama 0.33.2.
 
 Hugging Face authentication is requested only when a manager download needs it. `HF_TOKEN` or
 `--token-file PATH` is validated as the `ollama` account. Missing or rejected
@@ -122,9 +127,10 @@ logical model size rather than total appliance use.
 
 Prefer `bc250-model cleanup` over deleting one side manually. For ordinary
 local-GGUF definitions it removes the selected Ollama registration, source GGUF,
-state and rendered Modelfile while retaining the source template. For remote OCR
-definitions it removes the registration/rendered Modelfile; there is no separate
-manager-owned source GGUF to delete.
+state and rendered Modelfile while retaining the source template. For remote OCR definitions it removes the registration/rendered Modelfile;
+there is no separate manager-owned GGUF/state pair to retain or delete. With
+`--keep-gguf`, the command says so explicitly instead of implying that an OCR
+source file was preserved.
 
 See [`../docs/COMMANDS.md`](../docs/COMMANDS.md) for every option and
 [`../docs/openwebui-settings.md`](../docs/openwebui-settings.md) for current
@@ -132,9 +138,10 @@ model roles.
 
 ## Cleanup without re-downloading later
 
-`bc250-model cleanup CATEGORY SELECTION --keep-gguf --yes` removes the Ollama
+`sudo bc250-model cleanup CATEGORY SELECTION --keep-gguf --yes` removes the Ollama
 registration (allowing Ollama to prune unreferenced manifest/blob data) and the
 runtime Modelfile while retaining the local GGUF plus its `.bc250.json`
 state sidecar. A later install can therefore reuse the checked source file.
-Without `--keep-gguf`, cleanup also removes the local GGUF/state as before. Never
-manually purge Ollama's shared blob directory for one model.
+Without `--keep-gguf`, cleanup also removes the local GGUF/state as before.
+`sudo bc250-model cleanup all --keep-gguf` applies the retained-source cleanup to
+every category. Never manually purge Ollama's shared blob directory for one model.

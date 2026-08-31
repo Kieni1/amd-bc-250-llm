@@ -33,7 +33,7 @@ already the package's retrieval recommendation:
 ```bash
 sudo bc250-model install production prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
-bc250-model list
+sudo bc250-model list
 ```
 
 The packaged Jina Q4_K_M file is the upstream refresh that includes

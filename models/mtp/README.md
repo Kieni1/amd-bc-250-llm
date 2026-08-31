@@ -6,7 +6,7 @@ or Modelfile.
 
 ```bash
 sudoedit /etc/bc250-llm-server/mtp-models.toml
-bc250-model list mtp --all
+sudo bc250-model list mtp --all
 sudo bc250-fetch-mtp
 LLAMACPP=/path/to/llama-server bc250-run-mtp 27b
 ```

@@ -1,7 +1,7 @@
 # Experimental models
 
 ```bash
-bc250-model list experiments
+sudo bc250-model list experiments
 sudo bc250-model install experiments
 bc250-benchmark
 ```
@@ -34,10 +34,26 @@ redundant remain available until that measured comparison is complete. Newer
 Granite 4.2 3B/8B and Ling 3.0 Tiny definitions extend the architecture and
 size coverage without changing production defaults.
 
+The 2026-08-31 BC-250 generation rerun makes three of the new candidates easier
+to place: Qwen3.8 4B Distill averaged about 74.5 tok/s with ~1.8 s warm TTFA and
+~4.0 GiB resident size; Granite 4.2 3B averaged about 91.5 tok/s with ~2.9 s
+warm TTFA and ~4.1 GiB resident size; Granite 4.2 8B averaged about 50.3 tok/s
+with ~4.1 s warm TTFA and ~8.3 GiB resident size. Ling 3.0 Tiny decoded at about
+144 tok/s but usually spent the 512-token shared cap in reasoning before a
+usable final answer, so raw decode speed is not a promotion case by itself.
+
 Local-GGUF source revisions may be commits, tags, branches or `latest`. Moving
 revisions favor flexibility over reproducibility; use `--refresh` to download
-those manager-owned sources again. Vision/OCR `hf.co/...` sources are
-Ollama-managed instead.
+those manager-owned sources again. Vision/OCR `hf.co/...` sources are Ollama-managed instead because these
+models require a vision projector in addition to the main GGUF. They therefore
+do not appear as manager-owned source files under `/var/lib/bc250-llm-server/gguf/`;
+`bc250-model list` labels their source as `Ollama-managed (main+projector)`. This
+is intentional in 0.10: GLM-OCR is a ~950 MB main GGUF plus a ~484 MB projector,
+and OvisOCR2 likewise requires a separate projector. Ollama 0.33.2 does not offer
+a reliable local Modelfile import path for attaching an arbitrary separate
+projector, so copying only the main OCR GGUF into the package source tree would
+create a backup that cannot be safely restored. Keep these two OCR models in the
+Ollama store until that local multimodal import path is dependable.
 
 Compare answer quality, full GPU residency, cold load, context scaling,
 temperature and sustained correctness before promoting an experiment. Very large
@@ -54,7 +70,9 @@ sudo bc250-ocr install glm
 bc250-ocr test glm PAGE.png
 ```
 
-The packaged OCR set is GLM-OCR Q8_0 plus OvisOCR2 Q8_0. GLM was the clear
-text-fidelity winner on the packaged office fixture; Ovis remains as the faster
+The packaged OCR set is GLM-OCR Q8_0 plus OvisOCR2 Q8_0. On the 2026-08-31
+three-document office fixture, GLM remained the clear fidelity winner (about
+0.996 mean word F1 with perfect field recall) while Ovis was faster but much
+less precise (about 0.735 mean word F1). Ovis remains a speed-oriented
 structured-page alternative. They stay experiments on the main Ollama instance.
 Always verify representative DE/FR/EN scans before choosing an ingestion path.

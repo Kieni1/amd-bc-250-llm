@@ -5,16 +5,21 @@
 ```bash
 sudo bc250-setup-coding-agent
 
-# Current reasoning-oriented starting point
-sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
+# Current measured coding-helper starting point
+sudo bc250-setup-coding-agent agentic-qwen25-coder7b-unsloth-q5-k-m
 ```
 
 The helper creates `ollama-agent.service` on port `11436` with its own model
 store. Current choices are:
 
+- `agentic-qwen25-coder7b-unsloth-q5-k-m` — current coding-helper starting
+  point because it consistently reaches a final answer without reasoning-token
+  starvation. The 2026-08-31 run exposed that the old static benchmark was too
+  permissive: its Bash answer used whitespace-splitting `xargs` despite the
+  space-safe requirement and its Python answer silently ignored out-of-range
+  ports. The tightened fixture now checks those requirements explicitly;
 - `agentic-ornith15-9b-ornith-q5-k-m` — native-reasoning agent/coding candidate;
-- `agentic-qwen25-coder7b-unsloth-q5-k-m` — Qwen2.5-Coder non-native-reasoning coding
-  baseline for command/code correctness comparisons.
+- `agentic-qwable9b-empero-q6-k` — native-reasoning comparison candidate.
 
 With no selection, the helper lists the choices and prompts. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to
@@ -33,9 +38,10 @@ CODING_AGENT_MODEL=agentic-qwen25-coder7b-unsloth-q5-k-m \
 
 Modes are `generate`, `refactor`, `review`, `document`, `test` and `commit`.
 Generated output is never applied automatically; review it and run the real test
-suite. `bc250-benchmark agent` checks final Bash/Python/JSON correctness without
-executing model-generated code and records native thinking separately when the
-runtime exposes it.
+suite. `bc250-benchmark agent` checks Bash/Python syntax and small static semantic
+requirements without executing model-generated code, including raw-output
+format, space-safe Bash patterns, explicit Python range rejection and JSON key
+shapes. It records native thinking separately when the runtime exposes it.
 
 ## Local commits and Gitea review
 

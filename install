@@ -8,9 +8,9 @@ readonly SCRIPT_DIR="$(dirname -- "$SCRIPT_PATH")"
 readonly ORIGINAL_ARGS=("$@")
 readonly LOG_FILE="${BC250_INSTALL_LOG:-/var/log/bc250-llm-install.log}"
 readonly STATE_DIR="/var/lib/bc250-llm-server/install"
-# Source-tree runtime pins; installed helpers use /usr/share/bc250-llm-server/runtime.env.
-# shellcheck disable=SC1091
-source "$SCRIPT_DIR/config/runtime.env"
+# Keep the guided installer self-contained so it can be copied beside the RPM.
+# Runtime pins used only by installed package helpers remain package-owned.
+readonly BC250_OLLAMA_VERSION="0.33.2"
 RPM_PATH=""
 PACKAGE_BASELINE=""
 INSTALL_MODE="full"
@@ -274,20 +274,23 @@ find_binary_rpm() {
 
 step_3_install_rpm() {
   heading "3. INSTALL BC-250 RPM"
-  local binary_rpm candidate_nevra installed_nevra="" installed_after dnf_action=install
+  local binary_rpm candidate_nevra installed_nevra="" installed_after
   binary_rpm="$(find_binary_rpm)"
   candidate_nevra="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$binary_rpm")"
   if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1; then
     installed_nevra="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' \
       bc250-llm-server.x86_64)"
-    [[ "$installed_nevra" != "$candidate_nevra" ]] || dnf_action=reinstall
   fi
-  echo "${dnf_action^}ing: $binary_rpm"
-  # This package provides its own ollama account through sysusers. Do not pull
-  # Fedora's older Ollama and its large ROCm dependency set.
-  dnf "$dnf_action" -y --setopt=install_weak_deps=False \
-    --exclude=ollama "$binary_rpm"
-  hash -r
+  if [[ "$installed_nevra" == "$candidate_nevra" ]]; then
+    echo "Already current: $candidate_nevra (skipping RPM transaction)"
+  else
+    echo "Installing selected RPM: $binary_rpm"
+    # This package provides its own ollama account through sysusers. Do not pull
+    # Fedora's older Ollama and its large ROCm dependency set.
+    dnf install -y --setopt=install_weak_deps=False \
+      --exclude=ollama "$binary_rpm"
+    hash -r
+  fi
   installed_after="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' \
     bc250-llm-server.x86_64)"
   printf 'Installed package: %s\n' "$installed_after"

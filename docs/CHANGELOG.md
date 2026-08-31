@@ -35,6 +35,26 @@ role acceptance lane plus a main-instance RAG model-switch latency lane, and fix
 the 128-MiB application / 256-MiB nginx upload documentation and stale experiment
 catalog prose.
 
+Final installer/model-manager hardening makes the guided `install` script
+self-contained when copied beside the RPM, skips the RPM transaction when the
+exact package NEVRA is already installed, and lets the RPM post script detect the
+official `/usr/local/bin/ollama`. Model administration now exposes only canonical
+categories plus `all`; `sudo bc250-model cleanup all --keep-gguf` applies the
+retained-source cleanup across every catalog, while `sudo bc250-model list`
+reports protected retained GGUFs accurately. Static `--no-load` diagnostics no
+longer warn about the deliberately absent resident model, and unpinned Mesa
+version differences are reported as reference information rather than package
+configuration warnings.
+
+Use the final 2026-08-31 benchmark rerun to tighten interpretation without
+changing deployed defaults: GLM-OCR remains the office OCR fidelity leader; the
+harder embedding fixture leaves Jina/Qwen tied at 11/13 Recall@1 with the same
+two near-duplicate misses; LFM2.5 2.6B is retained as a task challenger after
+returning empty tag/query output; and the agent validator now checks small
+static semantic requirements instead of calling merely compilable code correct.
+Clarify that remote OCR sources remain Ollama-managed main+projector bundles in
+0.33.2 rather than misleadingly placing only the main GGUF in the package source
+tree.
 
 ## 0.9.7-0.9.testing - 2026-08-31
 

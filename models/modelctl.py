@@ -29,14 +29,7 @@ PACKAGED_MODEL_DIR = INSTALLED_SHARE / "modelfiles"
 OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
-CATEGORY_ALIASES = {name: name for name in (*OLLAMA_CATEGORIES, "mtp")} | {
-    "experimental": "experiments",
-    "tasker": "task",
-    "coding": "agentic",
-    "embedded": "embedding",
-    "embed": "embedding",
-}
-CATEGORIES = tuple(CATEGORY_ALIASES)
+CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 CATEGORY_PREFIXES = {
     "production": "prod-",
     "experiments": "exp-",
@@ -88,10 +81,18 @@ class ModelError(RuntimeError):
 
 
 def canonical_category(value: str) -> str:
-    try:
-        return CATEGORY_ALIASES[value]
-    except KeyError as error:
-        raise ModelError(f"unsupported model category: {value}") from error
+    if value not in CATEGORIES:
+        raise ModelError(f"unsupported model category: {value}")
+    return value
+
+
+def modelfile_category(value: str) -> str:
+    # Keep reading existing operator/package metadata while exposing only the
+    # canonical CLI vocabulary. Historical Modelfiles used singular experimental.
+    normalized = "experiments" if value == "experimental" else value
+    if normalized not in OLLAMA_CATEGORIES:
+        raise ModelError(f"unsupported Modelfile category: {value}")
+    return normalized
 
 
 def require_string(
@@ -200,7 +201,7 @@ def load_modelfile(path: Path) -> dict:
             raise ModelError(f"{path}: expected exactly one {marker.strip()!r} line")
     if sum(line.startswith("# SHA256:") for line in text.splitlines()) > 1:
         raise ModelError(f"{path}: expected at most one '# SHA256:' line")
-    category = canonical_category(metadata["category"])
+    category = modelfile_category(metadata["category"])
     if category not in OLLAMA_CATEGORIES:
         raise ModelError(f"{path}: MTP entries cannot use Modelfiles")
     if metadata["name"] != name:
@@ -358,6 +359,32 @@ def load_models(
     return defaults, models
 
 
+def load_all_catalogs(
+    *,
+    directories: list[Path] | None = None,
+    source: Path | None = None,
+) -> list[tuple[dict, list[dict]]]:
+    """Return every catalog with globally unique display/selection indexes."""
+    discovered = discover_models(model_directories(directories))
+    catalogs: list[tuple[dict, list[dict]]] = []
+    next_index = len(discovered)
+    for category in OLLAMA_CATEGORIES:
+        defaults = dict(CATEGORY_DEFAULTS[category])
+        defaults["category"] = category
+        models = [model for model in discovered if model["category"] == category]
+        catalogs.append((defaults, models))
+    mtp_defaults, mtp_models = load_mtp_catalog(source or default_mtp_catalog())
+    normalized_mtp: list[dict] = []
+    for model in mtp_models:
+        value = dict(model)
+        value["category"] = "mtp"
+        value["index"] = next_index
+        next_index += 1
+        normalized_mtp.append(value)
+    catalogs.append((mtp_defaults, normalized_mtp))
+    return catalogs
+
+
 def select_models(models: list[dict], selection: str) -> list[dict]:
     if not models:
         return []
@@ -413,7 +440,7 @@ def print_models(
         provider = model["provider"]
         if provider == "ollama-hf":
             setup = None if registered is None else model["name"] in registered
-            source = True if setup else None
+            source = None
         else:
             try:
                 source = model_path(defaults, model, destination).stat().st_size > 0
@@ -436,7 +463,10 @@ def print_models(
             False: "not downloaded",
             None: "download unknown",
         }
-        details = [provider, origin, download[source]]
+        if provider == "ollama-hf":
+            details = [provider, origin, "source Ollama-managed (main+projector)"]
+        else:
+            details = [provider, origin, download[source]]
         if provider.startswith("ollama"):
             details.append(
                 {True: "set up", False: "not set up", None: "setup unknown"}[setup]
@@ -490,6 +520,25 @@ def print_all_models(directories: list[Path]) -> None:
         print("Misplaced Ollama models (registered on the wrong instance):")
         for host, name, wanted in misplaced:
             print(f"    - {name:<56} [{host}, expected {wanted}]")
+
+
+def print_catalogs(catalogs: list[tuple[dict, list[dict]]], *, include_disabled_mtp: bool = False) -> None:
+    """Print mixed catalogs while preserving each category's runtime/status rules."""
+    registrations = {
+        defaults["ollama_host"]: registered_models(defaults["ollama_host"])
+        for defaults, _models in catalogs
+        if defaults.get("ollama_host")
+    }
+    for defaults, models in catalogs:
+        category = defaults["category"]
+        available = (
+            models
+            if category != "mtp" or include_disabled_mtp
+            else [model for model in models if model["enabled"]]
+        )
+        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        host = defaults.get("ollama_host")
+        print_models(defaults, available, registrations.get(host) if host else None)
 
 
 def state_path(output: Path) -> Path:
@@ -998,6 +1047,11 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 retained.extend((output, state_path(output)))
             else:
                 paths.extend((output, state_path(output)))
+        elif args.keep_gguf:
+            print(
+                "    no manager-owned GGUF/state to retain; "
+                "multimodal source/projector blobs are Ollama-managed"
+            )
         destination = defaults.get("modelfile_destination")
         if destination and model.get("modelfile"):
             paths.append(Path(destination) / model["modelfile"])
@@ -1014,7 +1068,11 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             if path.exists():
                 print(f"    retained local source {path}")
         removed += 1
-    suffix = " Local GGUF/state retained." if args.keep_gguf else " Local GGUF/state removed."
+    suffix = (
+        " Manager-owned local GGUF/state retained where present."
+        if args.keep_gguf
+        else " Manager-owned local GGUF/state removed where present."
+    )
     print(f"\nRemoved {removed} model(s). Source Modelfiles were retained.{suffix}")
     if failures:
         print(f"Failed: {' '.join(failures)}", file=sys.stderr)
@@ -1040,7 +1098,10 @@ def catalog_arguments(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bc250-model", description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    listing = commands.add_parser("list", help="list discovered templates")
+    listing = commands.add_parser(
+        "list",
+        help="list discovered templates (run with sudo to inspect protected GGUF state)",
+    )
     catalog_arguments(listing, category_optional=True)
     listing.add_argument(
         "--all", action="store_true", help="include disabled MTP entries"
@@ -1066,7 +1127,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="include disabled MTP entries for this invocation",
     )
     installing.add_argument("--refresh", action="store_true")
-    cleaning = commands.add_parser("cleanup", help="remove selected deployed models")
+    cleaning = commands.add_parser(
+        "cleanup", help="remove selected deployed models (requires sudo)"
+    )
     catalog_arguments(cleaning)
     cleaning.add_argument("selection", nargs="?")
     cleaning.add_argument("--list", action="store_true")
@@ -1079,23 +1142,131 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def require_admin_status(command: str) -> None:
+    if command == "list" and os.geteuid() != 0:
+        raise ModelError(
+            "run 'sudo bc250-model list ...'; local GGUF/state directories are intentionally protected"
+        )
+
+
+def all_available_models(
+    catalogs: list[tuple[dict, list[dict]]], *, command: str, include_disabled: bool
+) -> list[dict]:
+    available: list[dict] = []
+    for defaults, models in catalogs:
+        category = defaults["category"]
+        if category == "mtp" and command != "cleanup" and not include_disabled:
+            available.extend(model for model in models if model["enabled"])
+        else:
+            available.extend(models)
+    return available
+
+
+def run_all_catalog_operation(
+    catalogs: list[tuple[dict, list[dict]]],
+    selected: list[dict],
+    args: argparse.Namespace,
+) -> int:
+    selected_ids = {(model["category"], model["id"]) for model in selected}
+    if args.command == "cleanup" and not args.yes:
+        names = ", ".join(model.get("name", model["id"]) for model in selected)
+        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
+            print("Cleanup cancelled.")
+            return 0
+    status = 0
+    for defaults, models in catalogs:
+        chosen = [
+            model
+            for model in models
+            if (model["category"], model["id"]) in selected_ids
+        ]
+        if not chosen:
+            continue
+        group_args = argparse.Namespace(**vars(args))
+        if args.command == "cleanup":
+            group_args.yes = True
+            result = cleanup_models(defaults, chosen, group_args)
+        else:
+            result = install_models(defaults, chosen, group_args)
+        status = max(status, result)
+    return status
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure:
             reconfigure(line_buffering=True)
     args = build_parser().parse_args(argv)
+    require_admin_status(args.command)
+
+    source = args.source or (
+        Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None
+    )
+    directories = args.modelfile_dir
+
     if args.command == "list" and args.category is None:
-        if args.source or args.all:
-            raise ModelError("--source and --all require the MTP category")
-        print_all_models(model_directories(args.modelfile_dir))
+        if source or args.all:
+            raise ModelError("--source and --all require the MTP or all category")
+        print_all_models(model_directories(directories))
         return 0
+
     category = canonical_category(args.category)
+    if category == "all":
+        catalogs = load_all_catalogs(directories=directories, source=source)
+        if args.command == "list":
+            print_catalogs(catalogs, include_disabled_mtp=args.all)
+            return 0
+        if args.command == "resolve":
+            for defaults, models in catalogs:
+                for model in models:
+                    if model["id"] != args.id:
+                        continue
+                    if defaults["category"] == "mtp" and not model["enabled"]:
+                        continue
+                    resolved = (
+                        model["from"]
+                        if model["provider"] == "ollama-hf"
+                        else model_path(defaults, model)
+                    )
+                    print(
+                        f"{resolved}\t{model.get('context', '')}\t{model.get('draft', '')}"
+                    )
+                    return 0
+            raise ModelError(f"model id not found: {args.id}")
+
+        available = all_available_models(
+            catalogs,
+            command=args.command,
+            include_disabled=getattr(args, "include_disabled", False),
+        )
+        print("Available all models:")
+        print_catalogs(
+            catalogs,
+            include_disabled_mtp=(
+                args.command == "cleanup" or getattr(args, "include_disabled", False)
+            ),
+        )
+        if args.list:
+            return 0
+        if not available:
+            print("No selectable models were found.")
+            return 0
+        selection = args.selection
+        if selection is None and args.command == "cleanup":
+            selection = "all"
+        elif selection is None:
+            selection = prompt_line("Models (id/index/range; Enter to cancel): ")
+        if not selection:
+            print("No models selected.")
+            return 0
+        selected = select_models(available, selection)
+        return run_all_catalog_operation(catalogs, selected, args)
+
     defaults, models = load_models(
         category,
-        directories=args.modelfile_dir,
-        source=args.source
-        or (Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None),
+        directories=directories,
+        source=source,
     )
 
     if args.command == "list":
@@ -1111,12 +1282,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "resolve":
         for model in models:
             if model["id"] == args.id and (category != "mtp" or model["enabled"]):
-                source = (
+                resolved = (
                     model["from"]
                     if model["provider"] == "ollama-hf"
                     else model_path(defaults, model)
                 )
-                print(f"{source}\t{model.get('context', '')}\t{model.get('draft', '')}")
+                print(
+                    f"{resolved}\t{model.get('context', '')}\t{model.get('draft', '')}"
+                )
                 return 0
         raise ModelError(f"model id not found: {args.id}")
 

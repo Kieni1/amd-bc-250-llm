@@ -1,7 +1,7 @@
 # Embedding models
 
 ```bash
-bc250-model list embedding
+sudo bc250-model list embedding
 sudo bc250-model install embedding
 sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
 ```
@@ -15,6 +15,12 @@ Jina is CC-BY-NC-4.0; review that restriction before commercial use. The
 fresh Open WebUI RAG baseline uses Jina `Query: ` / `Document: ` prefixes. Qwen
 is Apache-2.0 and should use an English task instruction on queries with no
 content prefix. Changing the embedding model or prefixes requires reindexing.
+
+The harder 2026-08-31 fixture no longer saturates completely: both Jina and Qwen
+ranked the intended target first on 11/13 queries and second on the same two
+near-duplicate cases (current-vs-archived lease policy and invoice 4821-vs-4822).
+That is a useful tie rather than a reason to churn the RAG default; keep Jina as
+the reviewed baseline and use Qwen when its Apache-2.0 license is preferable.
 
 See `/usr/share/doc/bc250-llm-server/RAG.md` (source: `docs/RAG.md`) for the
 German/French/English office-document pilot.
