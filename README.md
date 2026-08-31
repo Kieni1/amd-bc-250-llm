@@ -71,9 +71,12 @@ WebUI administrator immediately. The default endpoint is unencrypted HTTP; see
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
-The packaged comparison catalog also includes `task-lfm25-2.6b-liquidai-q6-k`,
-`agentic-qwen25-coder7b-unsloth-q5-k-m` and `exp-qwen38-4b-distill-empero-q6-k`;
-they are benchmark challengers, not silent replacements for the defaults above.
+The packaged comparison catalog also retains the operator's broader experiment
+set and adds `task-lfm25-2.6b-liquidai-q6-k`,
+`agentic-qwen25-coder7b-unsloth-q5-k-m`, `exp-qwen38-4b-distill-empero-q6-k`,
+`exp-granite42-3b-ibm-q6-k`, `exp-granite42-8b-ibm-q5-k-m`, and
+`exp-ling30-tiny-bloomer-q5-k-m`; they are benchmark challengers, not silent
+replacements for the defaults above.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,

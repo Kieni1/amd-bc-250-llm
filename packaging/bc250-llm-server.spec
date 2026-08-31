@@ -230,8 +230,8 @@ fi
 %changelog
 * Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.8.testing
 - Fix task JSON compatibility, LFM latency budgeting and agent reasoning-starvation diagnostics.
-- Add harder multilingual retrieval fixtures and prune redundant measured model experiments.
-- Add Qwen3.8 4B, LFM2.5 2.6B task and Qwen2.5 Coder 7B comparison Modelfiles.
+- Add harder multilingual retrieval fixtures and retain the operator comparison model pool.
+- Add Qwen3.8 4B, Granite 4.2 3B/8B, Ling 3.0 Tiny, LFM2.5 2.6B task and Qwen2.5 Coder 7B comparison Modelfiles.
 
 * Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.7.testing
 - Give reasoning-capable latency runs enough shared num_predict budget to reach final content.

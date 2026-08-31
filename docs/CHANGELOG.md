@@ -13,10 +13,11 @@ shared budget for native reasoning, reject empty final code, and capture thinkin
 answer presence, `eval_count` and `done_reason`. Make the embedding fixture harder
 with multilingual near-duplicate/conflicting office facts.
 
-Prune redundant/losing experimental model definitions and add compact comparison
-Modelfiles for Qwen3.8 4B Distill Q6_K, LFM2.5 2.6B Q6_K as a task challenger,
-and Qwen2.5-Coder 7B Q5_K_M (single-file Unsloth GGUF) as a coding baseline. Retain GLM-OCR and
-OvisOCR2 as the packaged OCR comparison pair.
+Retain the operator's broader experimental comparison pool for the next full
+rerun and add compact Modelfiles for Qwen3.8 4B Distill Q6_K, Granite 4.2 3B/8B,
+Ling 3.0 Tiny, LFM2.5 2.6B Q6_K as a task challenger, and Qwen2.5-Coder 7B
+Q5_K_M (single-file Unsloth GGUF) as a coding baseline. GLM-OCR and OvisOCR2
+remain the packaged OCR comparison pair.
 
 ## 0.9.7-0.7.testing - 2026-08-30
 

@@ -87,19 +87,22 @@ syntax see [`docs/COMMANDS.md`](docs/COMMANDS.md).
 
 ## Current comparison policy
 
-The catalog is intentionally pruned rather than accumulating every trending GGUF.
 Production roles stay stable until a measured replacement wins its real use case.
-For the next comparison cycle the useful additional definitions are:
+The current operator comparison pool intentionally retains older Qwen/Gemma/GPT
+variants alongside newer candidates so the next full BC-250 run can make the
+cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
 | `exp-qwen38-4b-distill-empero-q6-k` | compact native-reasoning Qwen comparison |
+| `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
+| `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
+| `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
 | `task-lfm25-2.6b-liquidai-q6-k` | multilingual task-model challenger to Gemma 3 1B |
 | `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding baseline against native-reasoning Ornith |
 
-The two packaged Gemma 4 12B experiments provide aligned vs. modified 12B
-coverage without adding more E4B variants. GLM-OCR and OvisOCR2 cover quality vs.
-speed on scanned office pages. Do not infer fit from GGUF size alone on the
-BC-250: the 16 GB CPU/GPU pool must also hold KV/cache, runtime and the OS.
-Draft/MTP heads are not standalone models and stay in the dedicated MTP workflow.
+GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
+from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,
+runtime and the OS. Draft/MTP heads are not standalone models and stay in the
+dedicated MTP workflow.
 

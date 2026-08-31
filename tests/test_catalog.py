@@ -26,14 +26,14 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         models = modelctl.discover_models([MODELFILES])
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
-        self.assertEqual(len(models), 19)
+        self.assertEqual(len(models), 28)
 
     def test_current_model_set_and_dedicated_instances_are_preserved(self) -> None:
         expected = {
             "production": (5, "127.0.0.1:11434"),
-            "experiments": (8, "127.0.0.1:11434"),
+            "experiments": (16, "127.0.0.1:11434"),
             "task": (2, "127.0.0.1:11435"),
-            "agentic": (2, "127.0.0.1:11436"),
+            "agentic": (3, "127.0.0.1:11436"),
             "embedding": (2, "127.0.0.1:11434"),
         }
         for category, (count, host) in expected.items():
