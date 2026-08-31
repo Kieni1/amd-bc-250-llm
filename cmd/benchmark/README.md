@@ -109,15 +109,15 @@ bc250-benchmark task
 ```
 
 The task suite targets `http://127.0.0.1:11435` by default and mirrors the
-relevant Open WebUI **0.11.1** task behavior in compact fixtures: title uses the
+relevant Open WebUI **0.11.2** task behavior in compact fixtures: title uses the
 latest two messages, tags the latest six (with the short-chat `General` fallback),
 and retrieval-query generation the latest six plus the current date. It parses
-the JSON object the same tolerant way Open WebUI 0.11.1 does (including fenced or
+the JSON object the same tolerant way Open WebUI 0.11.2 does (including fenced or
 surrounded JSON), while separately reporting `strict_json`. It checks structure,
 simple content relevance, latency and an informational DE/FR/EN `language_hint`;
 the language hint is not a hard correctness gate. Requests use
 `keep_alive=0`, matching the isolated task service. The Open WebUI container
-leaves 0.11.1 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
+leaves 0.11.2 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
 reason to tune it. Its CSV deliberately keeps only the small telemetry subset
 useful for this short background workload.
 

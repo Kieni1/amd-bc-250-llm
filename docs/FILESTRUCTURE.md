@@ -71,3 +71,5 @@ separately confirmed full purge; read [`UNINSTALL.md`](UNINSTALL.md) first.
 
 [`RPM-LAYOUT.md`](RPM-LAYOUT.md) documents the source-to-RPM mapping for
 maintainers.
+
+- `config/runtime.env`: authoritative runtime version/digest pins.

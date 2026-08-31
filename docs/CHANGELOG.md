@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.7-0.10.testing - 2026-08-31
+
+Upgrade the digest-pinned Open WebUI image to v0.11.2, including its reasoning
+streaming/tool-state/security fixes. Declare the main/task/agent Ollama backends,
+show only production chat models on the enabled main connection, disable direct
+browser connections/frontmatter pip installs, and enforce bounded office upload
+size/count/extensions. Ollama services created or normalized by the install/setup
+helpers set `OLLAMA_NO_CLOUD=1`; older optional task/agent services are left untouched
+until their setup helper is rerun.
+
+Make the BC-250 fresh-machine profile explicitly set `amdgpu.gttsize=14750`,
+`ttm.pages_limit=4194304`, `ttm.page_pool_size=4194304`, and
+`amdgpu.ppfeaturemask=0xffffffff`. Verification now flags `amd_iommu=on`, lingering
+`nomodeset`, and community-documented bad kernel ranges. The 16-GiB TTM setting is
+kept because it is the project-tested profile, while external BC-250 guidance is
+documented alongside it.
+
+Add `bc250-model cleanup --keep-gguf` so Ollama registration/unreferenced blob data
+can be removed while the local GGUF/state is retained for reuse. Remove
+the redundant production/experiment/embedding `bc250-fetch-*` aliases (MTP keeps
+its distinct fetch workflow), retire the `apply-safe` memory alias, centralize
+runtime pins in `config/runtime.env`, and stop testing an arbitrary total model
+count. The operator-selected Modelfile catalog itself remains unchanged.
+
+
 ## 0.9.7-0.9.testing - 2026-08-31
 
 Make **Ollama 0.33.2** the package-standard runtime while keeping the BC-250 on

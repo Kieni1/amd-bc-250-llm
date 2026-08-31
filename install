@@ -8,6 +8,9 @@ readonly SCRIPT_DIR="$(dirname -- "$SCRIPT_PATH")"
 readonly ORIGINAL_ARGS=("$@")
 readonly LOG_FILE="${BC250_INSTALL_LOG:-/var/log/bc250-llm-install.log}"
 readonly STATE_DIR="/var/lib/bc250-llm-server/install"
+# Source-tree runtime pins; installed helpers use /usr/share/bc250-llm-server/runtime.env.
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/config/runtime.env"
 RPM_PATH=""
 PACKAGE_BASELINE=""
 INSTALL_MODE="full"
@@ -359,7 +362,7 @@ wait_for_ollama() {
 step_4_install_ollama() {
   heading "4. INSTALL OFFICIAL OLLAMA"
   local requested installed="" run_installer=0 official=/usr/local/bin/ollama
-  requested="${OLLAMA_VERSION:-0.33.2}"
+  requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
 
@@ -402,12 +405,28 @@ step_4_install_ollama() {
 step_5_memory_and_swap() {
   heading "5. APPLY MEMORY AND SWAP PROFILES"
   rpm -q zram-generator >/dev/null 2>&1 || dnf install -y zram-generator
-  if ! grep -qw 'ttm.pages_limit=4194304' /proc/cmdline; then
-    if ! grubby --info=ALL | grep 'ttm.pages_limit=4194304' >/dev/null; then
-      BC250_ASSUME_YES=1 bc250-memory-profile apply-full
-    else
-      echo "Memory profile is configured but is not active yet."
-    fi
+  local memory_args=(
+    amdgpu.gttsize=14750
+    ttm.pages_limit=4194304
+    ttm.page_pool_size=4194304
+    amdgpu.ppfeaturemask=0xffffffff
+  )
+  local configured=1 token args_line
+  local -a kernel_args=()
+  mapfile -t kernel_args < <(grubby --info=ALL | sed -n 's/^args="\(.*\)"$/\1/p')
+  ((${#kernel_args[@]})) || configured=0
+  for args_line in "${kernel_args[@]}"; do
+    for token in "${memory_args[@]}"; do
+      case " $args_line " in
+        *" $token "*) ;;
+        *) configured=0 ;;
+      esac
+    done
+  done
+  if ((configured == 0)); then
+    BC250_ASSUME_YES=1 bc250-memory-profile apply-full
+  elif ! bc250-memory-profile status --quiet >/dev/null 2>&1; then
+    echo "Memory profile is configured but is not active yet."
   fi
   if [[ ! -s /var/lib/bc250-llm-server/swap/bc250-llm.swap ]]; then
     BC250_ASSUME_YES=1 bc250-swap-profile apply
@@ -416,7 +435,7 @@ step_5_memory_and_swap() {
   fi
   record_added_packages
 
-  if ! grep -qw 'ttm.pages_limit=4194304' /proc/cmdline; then
+  if ! bc250-memory-profile status --quiet >/dev/null 2>&1; then
     echo
     echo "The memory profile requires a reboot. Then rerun:"
     echo "  sudo reboot"

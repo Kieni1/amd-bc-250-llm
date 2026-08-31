@@ -45,9 +45,9 @@ bc250-model list embedding
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
 
-sudo bc250-fetch-models
-sudo bc250-fetch-experiments
-sudo bc250-fetch-embeddings
+sudo bc250-model install production
+sudo bc250-model install experiments
+sudo bc250-model install embedding
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 

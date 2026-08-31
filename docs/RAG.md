@@ -31,8 +31,8 @@ For this non-commercial test branch, Jina v5 remains the default because it is
 already the package's retrieval recommendation:
 
 ```bash
-sudo bc250-fetch-models prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
+sudo bc250-model install production prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
 bc250-model list
 ```
 
@@ -45,7 +45,7 @@ Jina v5 uses `CC-BY-NC-4.0`. If the deployment later needs unrestricted
 commercial use, select the packaged Apache-2.0 Qwen alternative instead:
 
 ```bash
-sudo bc250-fetch-embeddings embed-qwen3-0.6b-q8-0
+sudo bc250-model install embedding embed-qwen3-0.6b-q8-0
 ```
 
 Do not mix embedding models or prefix schemes inside one existing index. Changing
@@ -230,7 +230,7 @@ sudo bc250-rag-import sync /srv/bc250-documents \
   --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
-The sync uses Open WebUI v0.11.1's incremental knowledge API. The packaged
+The sync uses Open WebUI v0.11.2's incremental knowledge API. The packaged
 baseline keeps `ENABLE_KNOWLEDGE_FILE_RETENTION=false`, so removal from a knowledge
 base remains disposable and `/srv/bc250-documents` stays authoritative. Treat these
 four generated knowledge-base name patterns as importer-managed: do not add unrelated
@@ -288,7 +288,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: important Open WebUI v0.11.1 behavior
+## 7. Retrieval mode: important Open WebUI v0.11.2 behavior
 
 Use **Focused Retrieval** for the growing library. Use **Full Context** only for
 one short document that comfortably fits the model context.
@@ -303,8 +303,8 @@ For the most predictable baseline with the relatively small local Gemma model:
 5. **Attach the knowledge base in the chat**, choose Focused Retrieval, and ask
    the evaluation questions.
 
-This detail matters on Open WebUI v0.11.1: knowledge permanently attached to a
-model in Native function-calling mode is accessed through knowledge tools. 0.11.1
+This detail matters on Open WebUI v0.11.2: knowledge permanently attached to a
+model in Native function-calling mode is accessed through knowledge tools. 0.11.2
 also fixes knowledge-vector rebuild so a knowledge-base rebuild includes its files.
 If Builtin Tools are disabled at the same time, that model-bound knowledge is not
 retrieved. If you want a permanently model-bound knowledge base, keep Native
@@ -421,3 +421,12 @@ without a demonstrated benefit for this single-machine pilot.
 - [Qwen3 Embedding 0.6B GGUF model card](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF)
 - [GLM-OCR GGUF](https://huggingface.co/ggml-org/GLM-OCR-GGUF)
 - [OvisOCR2 GGUF](https://huggingface.co/Abiray/OvisOCR2-GGUF)
+
+## Upload resource limits
+
+The Open WebUI container limits ad-hoc office uploads to 128 MiB and 20 files per
+request/chat and allowlists common office/text/document formats through
+`RAG_ALLOWED_FILE_EXTENSIONS`. Knowledge-base synchronization is still intended
+for curated bulk content and has its own lifecycle. `RAG_EMBEDDING_BATCH_SIZE`
+remains 1 until the BC-250 embedding benchmark demonstrates that larger Ollama
+batches improve throughput without memory or compatibility regressions.

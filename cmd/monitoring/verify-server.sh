@@ -2,6 +2,13 @@
 set -uo pipefail
 
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
+runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
+if [[ ! -r "$runtime_env" ]]; then runtime_env="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/runtime.env"; fi
+if [[ -r "$runtime_env" ]]; then # shellcheck disable=SC1090
+  source "$runtime_env"
+else
+  BC250_OLLAMA_VERSION=0.33.2
+fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
 PASS=0
 WARN=0
@@ -107,6 +114,8 @@ pool="$(read_param /sys/module/ttm/parameters/page_pool_size)"
 info "amdgpu.gttsize: $gtt"
 info "ttm.pages_limit: $pages"
 info "ttm.page_pool_size: $pool"
+ppmask="$(read_param /sys/module/amdgpu/parameters/ppfeaturemask)"
+info "amdgpu.ppfeaturemask: $ppmask"
 if [[ "$pages" =~ ^[0-9]+$ ]]; then
   gib="$(awk -v p="$pages" 'BEGIN {printf "%.2f", p*4096/1024/1024/1024}')"
   info "TTM pages_limit capacity: approximately ${gib} GiB"
@@ -118,12 +127,14 @@ fi
 
 cmdline="$(cat /proc/cmdline 2>/dev/null || true)"
 info "kernel arguments: $cmdline"
-grep -qw 'ttm.pages_limit=4194304' <<< "$cmdline" && \
-  ok "reviewed 16 GiB TTM limit is active" || \
-  warn "ttm.pages_limit=4194304 is not present on the active kernel command line"
-for token in amdgpu.gttsize ttm.page_pool_size amdgpu.ppfeaturemask; do
-  grep -qE "(^| )${token}=" <<< "$cmdline" && warn "obsolete kernel argument remains active: $token"
+for token in amdgpu.gttsize=14750 ttm.pages_limit=4194304 ttm.page_pool_size=4194304 amdgpu.ppfeaturemask=0xffffffff; do
+  grep -qE "(^| )${token//./\.}( |$)" <<< "$cmdline" && ok "kernel profile: $token" || warn "missing reviewed kernel profile argument: $token"
 done
+grep -qE '(^| )amd_iommu=on( |$)' <<< "$cmdline" && bad "amd_iommu=on is active; BC-250 community documentation requires IOMMU disabled" || ok "amd_iommu=on is not active"
+grep -qE '(^| )nomodeset( |$)' <<< "$cmdline" && bad "nomodeset is still active and prevents normal GPU acceleration" || ok "nomodeset is not active"
+case "$kernel" in
+  6.15.[0-6]-*|6.15.[0-6]|6.17.[89]-*|6.17.10-*|6.17.[89]|6.17.10) warn "running kernel is in a BC-250 community-documented regression range" ;;
+esac
 
 section "GFX1013 compute queues"
 gfx1013_root=/opt/bc250-gfx1013
@@ -306,10 +317,10 @@ if command -v ollama >/dev/null 2>&1; then
   ollama_version="$(ollama --version 2>&1 | head -1 || true)"
   info "Ollama version: ${ollama_version:-unknown}"
   ollama_semver="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$ollama_version" | head -1 || true)"
-  if [[ "$ollama_semver" == "0.33.2" ]]; then
-    ok "Ollama matches the package standard 0.33.2"
+  if [[ "$ollama_semver" == "$BC250_OLLAMA_VERSION" ]]; then
+    ok "Ollama matches the package standard $BC250_OLLAMA_VERSION"
   elif [[ -n "$ollama_semver" ]]; then
-    warn "Ollama $ollama_semver differs from package standard 0.33.2; treat this as a deliberate runtime test"
+    warn "Ollama $ollama_semver differs from package standard $BC250_OLLAMA_VERSION; treat this as a deliberate runtime test"
   fi
 else
   warn "Ollama executable is missing; version could not be reported"
@@ -325,10 +336,15 @@ else
 fi
 ollama_env="$(systemctl show ollama.service -p Environment --value 2>/dev/null || true)"
 for key in OLLAMA_CONTEXT_LENGTH OLLAMA_KV_CACHE_TYPE OLLAMA_FLASH_ATTENTION \
-  OLLAMA_NUM_PARALLEL OLLAMA_MAX_LOADED_MODELS OLLAMA_HOST OLLAMA_MODELS; do
+  OLLAMA_NUM_PARALLEL OLLAMA_MAX_LOADED_MODELS OLLAMA_HOST OLLAMA_MODELS OLLAMA_NO_CLOUD; do
   value="$(grep -oE "${key}=[^ ]+" <<< "$ollama_env" | tail -1 || true)"
   [[ -n "$value" ]] && info "$value" || warn "$key is not visible in the effective service environment"
 done
+if grep -qE '(^| )OLLAMA_NO_CLOUD=1( |$)' <<< "$ollama_env"; then
+  ok "main Ollama cloud features are disabled"
+else
+  bad "main Ollama is missing OLLAMA_NO_CLOUD=1"
+fi
 
 if command -v journalctl >/dev/null 2>&1; then
   ollama_log="$(journalctl -b --no-pager -n 1000 \

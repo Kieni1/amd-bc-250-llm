@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -107,7 +108,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("model", result.stdout.splitlines())
         self.assertIn("uninstall", result.stdout.splitlines())
         self.assertIn("status", result.stdout.splitlines())
-        self.assertIn("fetch-embeddings", result.stdout.splitlines())
+        self.assertNotIn("fetch-embeddings", result.stdout.splitlines())
+        self.assertIn("fetch-mtp", result.stdout.splitlines())
         self.assertIn("ocr", result.stdout.splitlines())
         self.assertIn("models/ocr/bc250-ocr.sh\t{libexec}/ocr.sh", manifest)
         for entry in (
@@ -132,7 +134,8 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("pull-embedding-model", dispatcher)
         self.assertNotIn("install-cu-manager", dispatcher)
         self.assertNotIn("log_sensors.sh", manifest)
-        self.assertIn("modelctl|install|embedding", dispatcher)
+        self.assertNotIn("fetch-embeddings|", dispatcher)
+        self.assertIn("models/modelctl.py\t{libexec}/modelctl", manifest)
         self.assertIn(
             "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
             quadlet,
@@ -147,9 +150,41 @@ class PackagingTests(unittest.TestCase):
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = (ROOT / "install").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
-        self.assertIn('VERSION="${OLLAMA_VERSION:-0.33.2}"', helper)
-        self.assertIn('requested="${OLLAMA_VERSION:-0.33.2}"', installer)
-        self.assertIn("package standard 0.33.2", verify)
+        self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
+        self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
+        self.assertIn("BC250_OLLAMA_VERSION=0.33.2", (ROOT / "config/runtime.env").read_text())
+        self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
+
+    def test_ollama_instances_are_local_only(self) -> None:
+        main = (ROOT / "cmd/system/ollama.service.d-override.conf").read_text(encoding="utf-8")
+        instances = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
+        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', main)
+        self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', instances)
+        self.assertIn('OLLAMA_NO_CLOUD=1', verify)
+
+    def test_open_webui_connection_config_is_valid_and_matches_packaged_roles(self) -> None:
+        sys.path.insert(0, str(ROOT / "models"))
+        import modelctl
+
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        line = next(
+            line for line in quadlet.splitlines() if line.startswith('Environment="OLLAMA_API_CONFIGS=')
+        )
+        encoded = line.removeprefix('Environment="OLLAMA_API_CONFIGS=').removesuffix('"')
+        api_configs = json.loads(encoded.replace('\\"', '"'))
+        self.assertEqual(set(api_configs), {"0", "1", "2"})
+
+        production = {f'{m["name"]}:latest' for m in modelctl.load_models("production", directories=[ROOT / "models/modelfiles"])[1]}
+        task = {f'{m["name"]}:latest' for m in modelctl.load_models("task", directories=[ROOT / "models/modelfiles"])[1]}
+        agentic = {f'{m["name"]}:latest' for m in modelctl.load_models("agentic", directories=[ROOT / "models/modelfiles"])[1]}
+        self.assertTrue(api_configs["0"]["enable"])
+        self.assertEqual(set(api_configs["0"]["model_ids"]), production)
+        self.assertFalse(api_configs["1"]["enable"])
+        self.assertEqual(set(api_configs["1"]["model_ids"]), task)
+        self.assertFalse(api_configs["2"]["enable"])
+        self.assertEqual(set(api_configs["2"]["model_ids"]), agentic)
+        self.assertTrue(all("prefix_id" not in value for value in api_configs.values()))
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")
@@ -172,17 +207,17 @@ class PackagingTests(unittest.TestCase):
             r"(?ms)^\[gpu-usage\]\s*$.*?^fix-metrics = true\s*$.*?^fix-freq = false\s*$.*?^method = \"busy-flag\"",
         )
 
-    def test_open_webui_v0111_is_digest_pinned(self) -> None:
+    def test_open_webui_v0112_is_digest_pinned(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn("# v0.11.1, pinned OCI index digest.", quadlet)
+        self.assertIn("# v0.11.2, pinned OCI index digest.", quadlet)
         self.assertIn(
             "Image=ghcr.io/open-webui/open-webui@sha256:"
-            "6bb1fbe8ab0a3e0456067f493044ffb66a30a65a34be47f6a5862176a370dd16",
+            "77ff490214a4b2699b309aa8d39bf4b42eca05f62d2742ef669ff846fcd10355",
             quadlet,
         )
-        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.1)$")
+        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.2)$")
 
     def test_open_webui_fresh_install_privacy_features_are_disabled(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
@@ -196,11 +231,21 @@ class PackagingTests(unittest.TestCase):
         ):
             self.assertIn(f"Environment={setting}", quadlet)
 
-    def test_open_webui_v0111_new_controls_stay_conservative(self) -> None:
+    def test_open_webui_v0112_new_controls_stay_conservative(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
         self.assertIn('Environment="TASK_MODEL_PARAMS={}"', quadlet)
+        self.assertIn("Environment=ENABLE_DIRECT_CONNECTIONS=false", quadlet)
+        self.assertIn("Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false", quadlet)
+        self.assertIn("Environment=RAG_FILE_MAX_SIZE=128", quadlet)
+        self.assertIn("Environment=RAG_FILE_MAX_COUNT=20", quadlet)
+        self.assertIn(
+            "Environment=\"RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub\"",
+            quadlet,
+        )
+        self.assertNotIn("RAG_ALLOWED_FILE_EXTENSIONS=.", quadlet)
+        self.assertIn("OLLAMA_API_CONFIGS=", quadlet)
         self.assertIn("Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false", quadlet)
         self.assertIn("Environment=TIKA_SERVER_VERSION=3", quadlet)
         self.assertNotIn("Environment=ENABLE_ORJSON=true", quadlet)
@@ -282,6 +327,35 @@ class PackagingTests(unittest.TestCase):
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertNotIn("bc250-gfx1013", upstreams + manifest)
         self.assertNotRegex(spec, r"(?m)^Source[0-9]+:.*gfx1013")
+
+    def test_runtime_pins_match_container_and_ollama_helpers(self) -> None:
+        values = {}
+        for line in (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines():
+            if line and not line.startswith("#"):
+                key, value = line.split("=", 1)
+                values[key] = value
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.33.2")
+        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.2")
+        self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.2")
+        self.assertIn(f'# v{values["BC250_OPEN_WEBUI_VERSION"]}, pinned OCI index digest.', quadlet)
+        self.assertIn(values["BC250_OPEN_WEBUI_IMAGE_DIGEST"], quadlet)
+        self.assertIn(values["BC250_TIKA_VERSION"], tika)
+        self.assertIn(values["BC250_TIKA_IMAGE_DIGEST"], tika)
+        self.assertIn("config/runtime.env\t{share}/runtime.env", (ROOT / "packaging/install-manifest.tsv").read_text())
+
+    def test_fresh_machine_memory_profile_keeps_required_bc250_arguments(self) -> None:
+        profile = (ROOT / "cmd/system/memory-profile.sh").read_text(encoding="utf-8")
+        installer = (ROOT / "install").read_text(encoding="utf-8")
+        for token in (
+            "amdgpu.gttsize=14750", "ttm.pages_limit=4194304",
+            "ttm.page_pool_size=4194304", "amdgpu.ppfeaturemask=0xffffffff",
+        ):
+            self.assertIn(token, profile)
+            self.assertIn(token, installer)
+        self.assertIn("mapfile -t kernel_args", installer)
+        self.assertNotIn("apply-safe", profile)
 
 
 if __name__ == "__main__":

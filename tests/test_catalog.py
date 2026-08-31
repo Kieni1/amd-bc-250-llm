@@ -26,21 +26,28 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         models = modelctl.discover_models([MODELFILES])
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
-        self.assertEqual(len(models), 28)
 
     def test_current_model_set_and_dedicated_instances_are_preserved(self) -> None:
-        expected = {
-            "production": (5, "127.0.0.1:11434"),
-            "experiments": (16, "127.0.0.1:11434"),
-            "task": (2, "127.0.0.1:11435"),
-            "agentic": (3, "127.0.0.1:11436"),
-            "embedding": (2, "127.0.0.1:11434"),
+        expected_hosts = {
+            "production": "127.0.0.1:11434",
+            "experiments": "127.0.0.1:11434",
+            "task": "127.0.0.1:11435",
+            "agentic": "127.0.0.1:11436",
+            "embedding": "127.0.0.1:11434",
         }
-        for category, (count, host) in expected.items():
+        for category, host in expected_hosts.items():
             with self.subTest(category=category):
                 defaults, models = load(category)
-                self.assertEqual(len(models), count)
+                self.assertTrue(models, f"{category} catalog must not be empty")
                 self.assertEqual(defaults["ollama_host"], host)
+        required = {
+            "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+            "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+            "prod-gpt-oss20b-ggml-org-mxfp4",
+            "prod-lfm25-8b-a1b-liquidai-q6-k",
+            "prod-qwen35-9b-unsloth-q6-k",
+        }
+        self.assertTrue(required <= {model["name"] for model in load("production")[1]})
 
     def test_all_modelfiles_keep_required_bc250_gpu_and_context_settings(self) -> None:
         for path in MODELFILES.glob("*.Modelfile"):

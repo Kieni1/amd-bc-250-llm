@@ -17,9 +17,6 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-compare-mtp` | Compare an Ollama baseline with a running llama.cpp MTP server |
 | `bc250-cu-status` | Kernel, RADV and live-routing CU summary |
 | `bc250-cu-live-manager` | Pinned interactive live WGP manager |
-| `bc250-fetch-embeddings` | Install discovered embedding models |
-| `bc250-fetch-experiments` | Install discovered experiment models |
-| `bc250-fetch-models` | Install discovered production models |
 | `bc250-fetch-mtp` | Download enabled MTP catalog entries |
 | `bc250-gitea-review` | Generate an optional Gitea pull-request review |
 | `bc250-install-ollama` | Install or normalize official Ollama |
@@ -68,7 +65,7 @@ selects a reviewed version.
 bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 bc250-model install CATEGORY [SELECTION] [OPTIONS]
-bc250-model cleanup CATEGORY [SELECTION] [--list] [--yes]
+bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--list] [--yes]
 ```
 
 Categories are `production`, `experiments`, `task`, `agentic`, `embedding` and
@@ -81,6 +78,12 @@ vision projector and model blobs.
 With no category, `list` shows every Ollama-backed category as one catalog with
 global indexes. A category filters the same catalog without renumbering it.
 MTP remains separate and must be requested explicitly.
+
+For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
+registration/runtime Modelfile while retaining the local GGUF and its state
+sidecar for fast reuse. Without it, cleanup also deletes the local GGUF/state.
+Ollama remains responsible for pruning registration manifests and unreferenced
+blob data, so shared blobs are not deleted manually.
 
 Every Ollama entry reports its definition origin, download state and whether it
 is registered on the category's Ollama instance. `download unknown` means the
@@ -127,9 +130,9 @@ Tokens are not persisted by the manager.
 Convenience commands:
 
 ```bash
-sudo bc250-fetch-models [SELECTION]
-sudo bc250-fetch-experiments [SELECTION]
-sudo bc250-fetch-embeddings [SELECTION]
+sudo bc250-model install production [SELECTION]
+sudo bc250-model install experiments [SELECTION]
+sudo bc250-model install embedding [SELECTION]
 sudo bc250-fetch-mtp [SELECTION]
 sudo bc250-setup-task-model [SELECTION]
 sudo bc250-setup-coding-agent [SELECTION]
@@ -190,13 +193,13 @@ See [`../MODEL.md`](../MODEL.md) for model roles/swapping and
 ## Runtime profiles
 
 ```text
-bc250-memory-profile {status|recommend|apply-full|apply-safe|remove}
+bc250-memory-profile {status|recommend|apply-full|remove}
 bc250-swap-profile {status|apply|remove}
 bc250-ollama-profile {status|balanced|max-context|reset}
 ```
 
-- The full memory profile applies `ttm.pages_limit=4194304` and removes legacy
-  BC-250 boot arguments. It does not reboot automatically.
+- The full memory profile applies the four required BC-250 LLM kernel arguments,
+  replacing older values for those same keys. It does not reboot automatically.
 - The swap profile defaults to 2 GiB zram and a 16 GiB disk swap file.
   `ZRAM_MIB`, `SWAP_GIB` and optional `SWAPPINESS=0..200` override it.
 - The balanced Ollama profile uses 32K context and q8_0 KV cache. Max-context
@@ -260,7 +263,7 @@ BENCH_MODE=production bc250-benchmark
 BENCH_PROFILE=conservative bc250-benchmark
 bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
 bc250-benchmark ocr                     # office OCR fixtures
-bc250-benchmark task                    # Open WebUI 0.11.1-compatible task behavior
+bc250-benchmark task                    # Open WebUI 0.11.2-compatible task behavior
 bc250-benchmark agent                   # coding correctness, defaults to port 11436
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```

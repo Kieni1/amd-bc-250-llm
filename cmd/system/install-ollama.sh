@@ -8,7 +8,15 @@ umask 0022
   exit 1
 }
 
-VERSION="${OLLAMA_VERSION:-0.33.2}"
+runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
+if [[ ! -r "$runtime_env" ]]; then
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  runtime_env="$script_dir/../../config/runtime.env"
+fi
+[[ -r "$runtime_env" ]] || { echo "ERROR: runtime metadata missing: $runtime_env" >&2; exit 1; }
+# shellcheck disable=SC1090
+source "$runtime_env"
+VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"
 URL="https://ollama.com/install.sh"
 
 confirm_install() {

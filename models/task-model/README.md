@@ -26,7 +26,7 @@ Both Modelfiles deliberately omit a fixed `SYSTEM` prompt: Open WebUI supplies a
 different task prompt for title, tags and query rewriting. Run
 `bc250-benchmark task MODEL...` before changing the Open WebUI local task model.
 The benchmark accepts the same fenced/surrounded JSON shape that Open WebUI
-0.11.1 extracts, while also reporting whether the response was strict raw JSON
+0.11.2 extracts, while also reporting whether the response was strict raw JSON
 and an informational language-adherence hint.
 
 Keep port `11435` blocked from untrusted networks. Add

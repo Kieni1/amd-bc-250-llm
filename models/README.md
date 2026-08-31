@@ -129,3 +129,12 @@ manager-owned source GGUF to delete.
 See [`../docs/COMMANDS.md`](../docs/COMMANDS.md) for every option and
 [`../docs/openwebui-settings.md`](../docs/openwebui-settings.md) for current
 model roles.
+
+## Cleanup without re-downloading later
+
+`bc250-model cleanup CATEGORY SELECTION --keep-gguf --yes` removes the Ollama
+registration (allowing Ollama to prune unreferenced manifest/blob data) and the
+runtime Modelfile while retaining the local GGUF plus its `.bc250.json`
+state sidecar. A later install can therefore reuse the checked source file.
+Without `--keep-gguf`, cleanup also removes the local GGUF/state as before. Never
+manually purge Ollama's shared blob directory for one model.

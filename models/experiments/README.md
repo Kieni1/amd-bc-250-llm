@@ -2,7 +2,7 @@
 
 ```bash
 bc250-model list experiments
-sudo bc250-fetch-experiments
+sudo bc250-model install experiments
 bc250-benchmark
 ```
 

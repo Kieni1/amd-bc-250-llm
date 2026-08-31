@@ -99,6 +99,7 @@ ProtectSystem=full
 NoNewPrivileges=true
 Environment="HOME=/var/lib/ollama"
 Environment="OLLAMA_VULKAN=1"
+Environment="OLLAMA_NO_CLOUD=1"
 Environment="GGML_VK_VISIBLE_DEVICES=0"
 Environment="OLLAMA_IGPU_ENABLE=1"
 Environment="OLLAMA_HOST=$bind:$port"
@@ -146,3 +147,4 @@ echo
 echo "Installed $label on $bind:$port."
 echo "Keep TCP port $port blocked from the LAN."
 echo "Open WebUI connection: http://host.containers.internal:$port"
+echo "Open WebUI predeclares this isolated connection disabled; enable it under Admin Settings -> Connections when you want Open WebUI to use it."

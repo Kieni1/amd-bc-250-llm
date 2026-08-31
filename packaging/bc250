@@ -16,9 +16,6 @@ ROUTES=(
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
   "cu-status|$LIBEXEC/cu-status.sh"
-  "fetch-experiments|$LIBEXEC/modelctl|install|experiments"
-  "fetch-embeddings|$LIBEXEC/modelctl|install|embedding"
-  "fetch-models|$LIBEXEC/modelctl|install|production"
   "fetch-mtp|$LIBEXEC/modelctl|install|mtp"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install-ollama|$LIBEXEC/install-ollama.sh"
@@ -57,7 +54,7 @@ usage() {
 Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
-  model, ocr, rag-import, fetch-models, fetch-experiments, fetch-embeddings, fetch-mtp
+  model, ocr, rag-import, fetch-mtp
   setup-task-model, setup-coding-agent
 
 Operation:

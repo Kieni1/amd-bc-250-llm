@@ -3,6 +3,7 @@ dir	0755	-	{libexec}
 dir	0755	-	{libexec}/40cu
 dir	0755	-	{libexec}/coding-agent
 dir	0755	-	{share}
+file	0644	config/runtime.env	{share}/runtime.env
 dir	0755	-	{share}/40cu
 dir	0755	-	{share}/cu-live-manager
 dir	0755	-	{share}/examples

@@ -32,7 +32,7 @@ for the same generic generation workload (production-configuration comparison).
 Category suites:
   embeddings  DE/FR/EN retrieval quality (Recall@1/@3, MRR) + throughput
   ocr         office-page extraction quality + runtime
-  task        Open WebUI 0.11.1-compatible title/tag/retrieval-query tasks
+  task        Open WebUI 0.11.2-compatible title/tag/retrieval-query tasks
   agent       syntax/structure correctness for coding/agent output (port 11436)
 
 Generation, embedding and OCR lanes record the full resource set; task and agent

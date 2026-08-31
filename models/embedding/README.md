@@ -2,8 +2,8 @@
 
 ```bash
 bc250-model list embedding
-sudo bc250-fetch-embeddings
-sudo bc250-fetch-embeddings embed-jina-v5-small-retrieval-q4-k-m
+sudo bc250-model install embedding
+sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
 ```
 
 Embeddings use the main Ollama instance on port `11434`. Current choices are:

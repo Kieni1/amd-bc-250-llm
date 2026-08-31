@@ -991,9 +991,13 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                     continue
         paths: list[Path] = []
         output = None
+        retained: list[Path] = []
         if model["provider"] != "ollama-hf":
             output = model_path(defaults, model)
-            paths.extend((output, state_path(output)))
+            if args.keep_gguf:
+                retained.extend((output, state_path(output)))
+            else:
+                paths.extend((output, state_path(output)))
         destination = defaults.get("modelfile_destination")
         if destination and model.get("modelfile"):
             paths.append(Path(destination) / model["modelfile"])
@@ -1001,13 +1005,17 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             if path.exists():
                 path.unlink()
                 print(f"    removed {path}")
-        if output is not None:
+        if output is not None and not args.keep_gguf:
             try:
                 output.parent.rmdir()
             except OSError:
                 pass
+        for path in retained:
+            if path.exists():
+                print(f"    retained local source {path}")
         removed += 1
-    print(f"\nRemoved {removed} model(s). Source Modelfiles were retained.")
+    suffix = " Local GGUF/state retained." if args.keep_gguf else " Local GGUF/state removed."
+    print(f"\nRemoved {removed} model(s). Source Modelfiles were retained.{suffix}")
     if failures:
         print(f"Failed: {' '.join(failures)}", file=sys.stderr)
         return 2
@@ -1063,6 +1071,11 @@ def build_parser() -> argparse.ArgumentParser:
     cleaning.add_argument("selection", nargs="?")
     cleaning.add_argument("--list", action="store_true")
     cleaning.add_argument("--yes", action="store_true")
+    cleaning.add_argument(
+        "--keep-gguf",
+        action="store_true",
+        help="remove Ollama registration/runtime Modelfile but retain local GGUF and state sidecar",
+    )
     return parser
 
 

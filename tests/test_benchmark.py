@@ -215,7 +215,7 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertLess(noisy[3], exact[3])  # normalized character similarity
         self.assertEqual(noisy[4], 1.0)  # exact required fields still present
 
-    def test_task_prompts_follow_open_webui_0111_windows_and_shapes(self) -> None:
+    def test_task_prompts_follow_open_webui_0112_windows_and_shapes(self) -> None:
         messages = [{"role": "user", "content": f"m{i}"} for i in range(7)]
         title = category.task_prompt({"type": "title", "messages": messages})
         tags = category.task_prompt({"type": "tags", "messages": messages})

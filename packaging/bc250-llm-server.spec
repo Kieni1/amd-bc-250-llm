@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.9.7
-Release:        0.9.testing%{?dist}
+Release:        0.10.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.10.testing
+- Upgrade the digest-pinned Open WebUI baseline to v0.11.2 and declare local-only Ollama connections.
+- Make the full BC-250 GTT/TTM/ppfeaturemask profile first-class on fresh machines and add setup hazard checks.
+- Add RAG upload hardening, dynamic catalog validation, centralized runtime pins and GGUF-preserving model cleanup.
+
 * Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.9.testing
 - Standardize the BC-250 runtime and benchmark request baseline on Ollama 0.33.2.
 - Keep prefill/context benchmark points cold across the 0.33.x prompt-cache changes.

@@ -32,6 +32,9 @@ class RagBaselineTests(unittest.TestCase):
             "Environment=TIKA_SERVER_URL=http://tika:9998",
             "Environment=TIKA_SERVER_VERSION=3",
             "Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false",
+            "Environment=RAG_FILE_MAX_SIZE=128",
+            "Environment=RAG_FILE_MAX_COUNT=20",
+            "Environment=RAG_EMBEDDING_BATCH_SIZE=1",
         )
         for line in expected:
             self.assertIn(line, quadlet)
@@ -53,8 +56,6 @@ class RagBaselineTests(unittest.TestCase):
             self.assertIn(name, model_names)
             self.assertIn(name, guide)
         for command in (
-            "bc250-fetch-models",
-            "bc250-fetch-embeddings",
             "bc250-model",
             "bc250-ocr",
             "bc250-rag-import",

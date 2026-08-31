@@ -5,7 +5,7 @@ application accounts and model behavior remain operator-managed. The Quadlet
 explicitly disables community sharing, code execution, the code interpreter and
 memories. Operators can deliberately re-enable those features later.
 
-Package baseline: **Open WebUI v0.11.1** with standard **Ollama v0.33.2**.
+Package baseline: **Open WebUI v0.11.2** with standard **Ollama v0.33.2**. Runtime pins are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 ## First login and connections
 
@@ -20,8 +20,10 @@ network.
 | Agent Ollama | `http://host.containers.internal:11436` |
 | Tika | `http://tika:9998` |
 
-The main Ollama and Tika connections are packaged. Add task and agent only when
-their services are installed. Tika must not be exposed as a host/LAN listener.
+The main Ollama and Tika connections are packaged. Task and agent Ollama are
+predeclared but disabled; after installing either isolated service, enable its
+existing connection under **Admin Settings → Connections**. Tika must not be
+exposed as a host/LAN listener.
 
 ## Recommended baseline
 
@@ -34,8 +36,7 @@ their services are installed. Tika must not be exposed as a host/LAN listener.
   hybrid search off and async embedding off.
 - The **conservative** alternative is 1000/100/Top-K-5 when model/context headroom
   is tighter or when deliberately testing smaller retrieval chunks.
-- Jina's fresh-install prefixes are `Query: ` and `Document: `. The packaged
-  The packaged Jina GGUF carries upstream `pooling_type` metadata. Reindex after
+- Jina's fresh-install prefixes are `Query: ` and `Document: `. The packaged Jina GGUF carries upstream `pooling_type` metadata. Reindex after
   replacing the older package GGUF, and whenever changing embedding model,
   prefixes or chunking. Extraction-engine/source-text changes require re-uploading
   or re-syncing content.
@@ -71,7 +72,9 @@ kept as separate Open WebUI knowledge bases.
 
 ## Task model
 
-Under **Admin Settings → Experience → Interface**, set the local task model to:
+After the task Ollama service is installed and its predeclared connection is
+enabled, under **Admin Settings → Experience → Interface** set the local task
+model to:
 
 ```text
 task-gemma3-1b-unsloth-ud-q4-k-xl:latest
@@ -92,7 +95,7 @@ improves retrieval enough to justify another model invocation. Autocomplete can
 repeatedly load the task model while a larger chat model is still warm, so keep it
 off unless the latency and memory behavior are acceptable.
 
-Open WebUI 0.11.1 adds `TASK_MODEL_PARAMS`. The package explicitly leaves it at
+Open WebUI 0.11.2 adds `TASK_MODEL_PARAMS`. The package explicitly leaves it at
 `{}` so upstream task limits/behavior remain unchanged until measured on the
 dedicated Gemma 3 1B service. Tune it only after `bc250-benchmark task`; the packaged LFM2.5 2.6B task
 candidate exists specifically to compare multilingual adherence without changing
@@ -173,7 +176,7 @@ models can stay hidden until a benchmark justifies promotion.
 
 ## Upgrades
 
-Open WebUI v0.11.1 is pinned by OCI digest. Before changing the image on a host
+Open WebUI v0.11.2 is pinned by OCI digest. Before changing the image on a host
 with existing data:
 
 ```bash
@@ -186,12 +189,30 @@ sudo systemctl start open-webui.service
 The container applies database migrations at startup. A regular maintenance
 configuration backup is not a substitute for this complete snapshot.
 
-For the 0.11.1 upgrade, smoke-test one normal chat, a multi-turn Ollama reasoning
+For the 0.11.2 upgrade, smoke-test one normal chat, a multi-turn Ollama reasoning
 chat, title/tag generation, one RAG upload/search/rebuild and Workspace → Knowledge.
-Open WebUI 0.11.1 substantially changed streaming and reasoning-history handling.
-Upstream issue #29035 reports a frontend streaming failure with some thinking-model
-responses, so treat GPT-OSS/Ornith streaming as an upgrade acceptance check and use
-the pre-upgrade snapshot if it reproduces on the appliance. Avoid switching models
-inside an existing reasoning-heavy conversation when the provider uses opaque,
-model-specific reasoning state. Keep Tika on major version 3
+Open WebUI 0.11.2 fixes the 0.11.1 thinking-stream stall tracked as #29035 and also
+fixes stale tool/skill state when switching pinned models. Keep GPT-OSS/Ornith
+streaming and one pinned-model switch in the acceptance smoke test so those fixes
+are verified on the appliance. Avoid switching models inside an existing
+reasoning-heavy conversation when the provider uses opaque, model-specific
+reasoning state. Keep Tika on major version 3
 (`TIKA_SERVER_VERSION=3`) and knowledge-file retention disabled for this appliance.
+
+## Declarative local Ollama connections
+
+Fresh installs define the main (11434), task (11435), and agent (11436) Ollama
+connections through `OLLAMA_BASE_URLS`/`OLLAMA_API_CONFIGS`. The main connection
+is enabled and allowlists only the five production chat models; task and agent
+connections are predeclared but disabled until their isolated services are set
+up. OCR, embedding and experiment models therefore do not clutter the normal UI.
+
+These variables are Open WebUI ConfigVars. Existing databases may retain an
+operator-edited connection configuration across upgrades; the package deliberately
+does not use `RESET_CONFIG_ON_START`, because that would overwrite persistent UI
+configuration. Review Admin Settings after an upgrade if you want to adopt the
+new baseline on an existing database.
+
+The fresh-install hardening baseline also disables direct browser connections and
+frontmatter-driven pip installation. Code execution/interpreter, memories and
+community sharing remain disabled.

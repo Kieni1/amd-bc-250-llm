@@ -75,15 +75,17 @@ echo "############################################################"
 
 # ---------------------------------------------------------------------------
 sec "1. GPU MEMORY CEILING  (the 4x-slowdown bug - check this first)"
-exp "ttm.pages_limit = 4194304.  A substantially lower limit can make the model spill to CPU and fall to ~22 tok/s."
+exp "BC-250 LLM kernel profile: gttsize=14750, pages_limit=4194304, page_pool_size=4194304, ppfeaturemask=0xffffffff."
 tl=$(cat /sys/module/ttm/parameters/pages_limit 2>/dev/null || echo 0)
 if [[ "$tl" == "4194304" ]]; then ok "ttm.pages_limit=$tl"
 elif [[ "$tl" =~ ^[0-9]+$ && "$tl" -lt 3000000 ]]; then fl "ttm.pages_limit=$tl  <- add 'ttm.pages_limit=4194304' to the kernel cmdline + reboot"
 else wn "ttm.pages_limit=$tl (non-standard)"; fi
 pool=$(cat /sys/module/ttm/parameters/page_pool_size 2>/dev/null || echo '?')
 gttsize=$(cat /sys/module/amdgpu/parameters/gttsize 2>/dev/null || echo '?')
-[[ "$pool" == "0" ]] && ok "ttm.page_pool_size=$pool (kernel-managed)" || wn "ttm.page_pool_size=$pool (expected kernel default 0)"
-[[ "$gttsize" == "-1" ]] && ok "amdgpu.gttsize=$gttsize (automatic)" || wn "amdgpu.gttsize=$gttsize (expected kernel default -1)"
+[[ "$pool" == "4194304" ]] && ok "ttm.page_pool_size=$pool" || wn "ttm.page_pool_size=$pool (expected 4194304)"
+[[ "$gttsize" == "14750" ]] && ok "amdgpu.gttsize=$gttsize" || wn "amdgpu.gttsize=$gttsize (expected 14750)"
+ppmask=$(cat /sys/module/amdgpu/parameters/ppfeaturemask 2>/dev/null || echo '?')
+case "${ppmask,,}" in 0xffffffff|4294967295) ok "amdgpu.ppfeaturemask=$ppmask" ;; *) wn "amdgpu.ppfeaturemask=$ppmask (expected 0xffffffff)" ;; esac
 if have dmesg; then
   gtt=$(dmesg 2>/dev/null | grep -m1 'GTT memory ready' | grep -oE '[0-9]+M')
   [[ -n "$gtt" ]] && echo "  GTT reported=$gtt" || wn "GTT line not in dmesg buffer (rotated?)"
@@ -144,7 +146,7 @@ else wn "dmesg unavailable (need sudo)"; fi
 
 # ---------------------------------------------------------------------------
 sec "6. VERSIONS  (compare these when investigating a performance delta)"
-exp "Mesa 26.1.4 | governor 0.4.12 | package-standard Ollama 0.33.2.  Other Ollama versions are explicit comparison runs."
+exp "Mesa 26.1.4 | governor 0.4.12 | package-standard Ollama 0.33.2. Other Ollama versions are explicit comparison runs."
 k=$(uname -r); echo "  kernel: $k"
 ov=$(ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 if [[ "$ov" == "0.33.2" ]]; then ok "ollama=$ov (package standard)"

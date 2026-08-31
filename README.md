@@ -88,9 +88,9 @@ non-commercial license; review every model's current license before use.
 ```bash
 # Models
 bc250-model list production
-sudo bc250-fetch-models
-sudo bc250-fetch-experiments
-sudo bc250-fetch-embeddings
+sudo bc250-model install production
+sudo bc250-model install experiments
+sudo bc250-model install embedding
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
 sudo bc250-setup-task-model
@@ -124,7 +124,7 @@ The complete installed interface and its exact syntax are in
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
 | Ollama v0.33.2 | Package-standard official runtime, Vulkan-oriented service defaults and three isolated stores |
-| Open WebUI v0.11.1 and Tika | Digest-pinned local UI and document extraction |
+| Open WebUI v0.11.2 and Tika | Digest-pinned local UI, reasoning-stream fixes and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
@@ -198,3 +198,5 @@ Exact carried revisions and licensing notes are in
 
 Repository integration code and documentation are GPL-2.0-only. Pinned sources
 and model weights retain their own licenses.
+
+The Ollama services set `OLLAMA_NO_CLOUD=1`; this appliance intentionally uses local inference only.

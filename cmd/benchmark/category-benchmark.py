@@ -302,7 +302,7 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
     return 0
 
 
-# Mirrors the behavior/shape of Open WebUI v0.11.1's default title/tag/query
+# Mirrors the behavior/shape of Open WebUI v0.11.2's default title/tag/query
 # task templates without vendoring the full upstream prose into this package.
 def task_prompt(case: dict[str, Any]) -> str:
     messages = case.get("messages") or [
@@ -320,7 +320,7 @@ def task_prompt(case: dict[str, Any]) -> str:
 Generate a concise title summarizing the chat history.
 Keep it to 2-4 words when possible, use the chat's primary language, and do not use emojis or decorative formatting.
 Return only one raw JSON object: {{\"title\": \"short title\"}}
-### Chat History (Open WebUI 0.11.1: latest 2 messages):
+### Chat History (Open WebUI 0.11.2: latest 2 messages):
 <chat_history>
 {history(2)}
 </chat_history>"""
@@ -329,7 +329,7 @@ Return only one raw JSON object: {{\"title\": \"short title\"}}
 Generate 1-3 broad theme tags plus 1-3 specific subtopic tags in the chat's primary language.
 If the chat has fewer than 3 messages or is too diverse, return only {{\"tags\": [\"General\"]}}.
 Otherwise return only one raw JSON object: {{\"tags\": [\"tag1\", \"tag2\"]}}
-### Chat History (Open WebUI 0.11.1: latest 6 messages):
+### Chat History (Open WebUI 0.11.2: latest 6 messages):
 <chat_history>
 {history(6)}
 </chat_history>"""
@@ -338,7 +338,7 @@ Otherwise return only one raw JSON object: {{\"tags\": [\"tag1\", \"tag2\"]}}
 Generate 1-3 broad, relevant retrieval queries in the language of the chat when useful; err on the side of generating useful queries.
 If no useful retrieval is possible, return an empty list. Today's date is {current_date}.
 Return only one raw JSON object: {{\"queries\": [\"query1\", \"query2\"]}}
-### Chat History (Open WebUI 0.11.1: latest 6 messages):
+### Chat History (Open WebUI 0.11.2: latest 6 messages):
 <chat_history>
 {history(6)}
 </chat_history>"""
@@ -439,12 +439,12 @@ def benchmark_task(args: argparse.Namespace) -> int:
             scores: list[float] = []
             for case in cases:
                 prompt = task_prompt(case)
-                # Open WebUI v0.11.1 uses chat completions for task prompts. The
+                # Open WebUI v0.11.2 uses chat completions for task prompts. The
                 # isolated service has OLLAMA_KEEP_ALIVE=0; keep_alive=0 here
                 # deliberately reproduces its load/unload behaviour.
                 options: dict[str, Any] = {}
                 if case["type"] == "title":
-                    # v0.11.1 with empty TASK_MODEL_PARAMS supplies a
+                    # v0.11.2 with empty TASK_MODEL_PARAMS supplies a
                     # generous title max-token cap.
                     options["num_predict"] = 1000
                 else:
@@ -994,7 +994,7 @@ def main() -> int:
         "--repeats", type=int, default=int(os.environ.get("EMBED_REPEATS", "2"))
     )
     task = sub.add_parser(
-        "task", help="Open WebUI 0.11.1-compatible title/tag/query tasks"
+        "task", help="Open WebUI 0.11.2-compatible title/tag/query tasks"
     )
     add_common(task, "http://127.0.0.1:11435")
     agent = sub.add_parser(
