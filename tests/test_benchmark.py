@@ -174,6 +174,24 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertEqual(
             {case["validator"] for case in agent}, {"bash", "python", "json"}
         )
+        usecase = json.loads(
+            (ROOT / "examples/benchmark/usecase-office.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(len(usecase), 5)
+        self.assertEqual(
+            {case["model"] for case in usecase},
+            {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+                "prod-lfm25-8b-a1b-liquidai-q6-k",
+                "prod-qwen35-9b-unsloth-q6-k",
+                "prod-gpt-oss20b-ggml-org-mxfp4",
+            },
+        )
+        qwen = next(case for case in usecase if "qwen35" in case["model"])
+        self.assertIs(qwen["think"], False)
+        lfm = next(case for case in usecase if "lfm25" in case["model"])
+        self.assertNotIn("translate", lfm["prompt"].casefold())
 
     def test_agent_validators_check_syntax_and_requirements_without_execution(
         self,
@@ -193,6 +211,15 @@ class CategoryPolicyTests(unittest.TestCase):
             category.validate_agent_output('{"summary":"ok"}', json_case)[:2],
             (True, True),
         )
+
+    def test_usecase_acceptance_checks_required_any_and_forbidden(self) -> None:
+        case = {
+            "required": ["AB-42"],
+            "required_any": ["vendredi", "documents"],
+            "forbidden": ["Unterlagen bis Freitag"],
+        }
+        self.assertTrue(category._acceptance_ok("Documents vendredi AB-42", case)[0])
+        self.assertFalse(category._acceptance_ok("AB-42 Unterlagen bis Freitag", case)[0])
 
     def test_ocr_score_tracks_required_field_order(self) -> None:
         case = {"expected_text": "A B C", "required_fields": ["A", "B", "C"]}

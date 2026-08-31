@@ -8,7 +8,7 @@ GEN="$SCRIPT_DIR/generation-benchmark.py"
 CATEGORY="$SCRIPT_DIR/category-benchmark.py"
 
 case "${1:-}" in
-  embeddings|embedding|ocr|task|agent|coding)
+  embeddings|embedding|ocr|task|agent|coding|usecase|acceptance|rag|rag-cycle)
     exec python3 "$CATEGORY" "$@"
     ;;
   generation)
@@ -23,6 +23,8 @@ Usage:
   bc250-benchmark ocr [MODEL ...]
   bc250-benchmark task [MODEL ...]
   bc250-benchmark agent [MODEL ...]
+  bc250-benchmark usecase [MODEL ...]
+  bc250-benchmark rag [EMBED_MODEL ANSWER_MODEL]
 
 Generation defaults to BENCH_MODE=neutral: one per-request neutral SYSTEM
 and deterministic sampling for comparable model/runtime measurements.
@@ -34,6 +36,8 @@ Category suites:
   ocr         office-page extraction quality + runtime
   task        Open WebUI 0.11.2-compatible title/tag/retrieval-query tasks
   agent       syntax/structure correctness for coding/agent output (port 11436)
+  usecase     five small role-acceptance checks for the production model set
+  rag         embedding eviction + answer-model reload cycle on main Ollama
 
 Generation, embedding and OCR lanes record the full resource set; task and agent
 lanes intentionally keep a smaller latency/correctness-oriented telemetry set.

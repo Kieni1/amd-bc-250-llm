@@ -105,6 +105,8 @@ sudo bc250-40cu status
 # Optional maintenance / storage
 sudo bc250-status
 sudo bc250-maintenance setup --defaults
+# After first Open WebUI admin login + API-key creation:
+sudo bc250-maintenance model-baseline
 sudo bc250-maintenance clean-cache
 
 # Compare models and specialized model categories
@@ -113,6 +115,8 @@ bc250-benchmark embeddings
 bc250-benchmark ocr
 bc250-benchmark task
 bc250-benchmark agent
+bc250-benchmark usecase
+bc250-benchmark rag
 ```
 
 The complete installed interface and its exact syntax are in

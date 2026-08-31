@@ -174,6 +174,10 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("German-, French-, and English-speaking users", qwen)
         self.assertIn("PARAMETER temperature 0.7", qwen)
         self.assertIn("PARAMETER top_p 0.8", qwen)
+        lfm = (MODELFILES / "prod-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("dedicated professional German↔French translator", lfm)
+        self.assertIn("provides German text without another explicit task", lfm)
+        self.assertNotIn("Do not assume that a German or French input should be translated", lfm)
         fable = (
             MODELFILES / "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile"
         ).read_text(encoding="utf-8")

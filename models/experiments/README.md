@@ -28,7 +28,7 @@ exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m
 exp-qwen38-4b-distill-empero-q6-k
 ```
 
-The 0.9.7-0.8 catalog deliberately retains the operator's broader comparison
+The 0.9.7-0.10 catalog deliberately retains the operator's broader comparison
 pool for the next full BC-250 rerun. Qwen/Gemma derivatives that may prove
 redundant remain available until that measured comparison is complete. Newer
 Granite 4.2 3B/8B and Ling 3.0 Tiny definitions extend the architecture and

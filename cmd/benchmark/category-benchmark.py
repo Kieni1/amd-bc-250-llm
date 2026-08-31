@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Category-specific BC-250 benchmarks for embeddings, OCR, task, and agent models."""
+"""Category-specific BC-250 benchmarks for retrieval, OCR, tasks, agents, and acceptance."""
 
 from __future__ import annotations
 
@@ -953,6 +953,285 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
     return 0
 
 
+
+def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
+    folded = text.casefold()
+    missing = [
+        term for term in case.get("required", []) if term.casefold() not in folded
+    ]
+    choices = case.get("required_any", [])
+    if choices and not any(term.casefold() in folded for term in choices):
+        missing.append("one of: " + " | ".join(choices))
+    present_forbidden = [
+        term for term in case.get("forbidden", []) if term.casefold() in folded
+    ]
+    problems = [f"missing {term}" for term in missing]
+    problems.extend(f"forbidden {term}" for term in present_forbidden)
+    return not problems, problems
+
+
+def benchmark_usecase(args: argparse.Namespace) -> int:
+    client = OllamaClient(args.ollama_url, args.timeout)
+    fixture = Path(args.fixture or FIXTURE_ROOT / "usecase-office.json")
+    cases = json.loads(fixture.read_text(encoding="utf-8"))
+    requested = {model.removesuffix(":latest") for model in args.models}
+    if requested:
+        cases = [
+            case
+            for case in cases
+            if case["model"].removesuffix(":latest") in requested
+        ]
+    if not cases:
+        raise BenchmarkError("no production acceptance cases selected")
+
+    available = {
+        str(row.get("name") or row.get("model") or "").removesuffix(":latest")
+        for row in client.tags()
+    }
+    missing_models = sorted(
+        {
+            case["model"]
+            for case in cases
+            if case["model"].removesuffix(":latest") not in available
+        }
+    )
+    if missing_models:
+        raise BenchmarkError(
+            "acceptance models are not registered: " + ", ".join(missing_models)
+        )
+
+    models = list(dict.fromkeys(case["model"] for case in cases))
+    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+    csv_path = Path(args.output or f"results_usecase_{stamp}.csv")
+    jsonl_path = csv_path.with_suffix(".jsonl")
+    meta_path = csv_path.with_suffix(".meta.json")
+    write_meta(meta_path, client, "usecase", models, fixture)
+    fields = [
+        "timestamp",
+        "case_id",
+        "model",
+        "passed",
+        "answer_started",
+        "answer_chars",
+        "thinking_chars",
+        "wall_s",
+        "load_s",
+        "done_reason",
+        "problems",
+    ]
+    passed = 0
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        for case in cases:
+            model = case["model"]
+            print(f"\n=== usecase: {case['id']} ({model}) ===")
+            client.ensure_unloaded(model)
+            try:
+                payload: dict[str, Any] = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": case["prompt"]}],
+                    "stream": False,
+                    "keep_alive": KEEP_ALIVE,
+                    "options": {"num_predict": 512},
+                }
+                if "think" in case:
+                    payload["think"] = case["think"]
+                sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
+                start = time.monotonic()
+                try:
+                    response = client.json_request("/api/chat", payload)
+                finally:
+                    wall = time.monotonic() - start
+                    telemetry = sampler.stop()
+
+                message = (
+                    response.get("message")
+                    if isinstance(response.get("message"), dict)
+                    else {}
+                )
+                content = str(message.get("content") or "")
+                thinking = str(
+                    message.get("thinking") or response.get("thinking") or ""
+                )
+                ok, problems = _acceptance_ok(content, case)
+                passed += int(ok)
+                row = {
+                    "timestamp": iso_now(),
+                    "case_id": case["id"],
+                    "model": model,
+                    "passed": int(ok),
+                    "answer_started": int(bool(content.strip())),
+                    "answer_chars": len(content),
+                    "thinking_chars": len(thinking),
+                    "wall_s": f"{wall:.3f}",
+                    "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
+                    "done_reason": response.get("done_reason", ""),
+                    "problems": "; ".join(problems),
+                }
+                writer.writerow(row)
+                handle.flush()
+                append_jsonl(
+                    jsonl_path,
+                    {
+                        **row,
+                        "category": "usecase",
+                        "prompt": case["prompt"],
+                        "response": content,
+                        "thinking": thinking,
+                        "telemetry": telemetry,
+                    },
+                )
+                print(
+                    f"  pass={ok} wall={wall:.2f}s "
+                    f"problems={row['problems'] or 'none'}"
+                )
+            finally:
+                try:
+                    client.ensure_unloaded(model)
+                except BenchmarkError as exc:
+                    print(f"WARNING: {exc}", file=sys.stderr)
+
+    print(f"\nAcceptance: {passed}/{len(cases)} passed")
+    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    return 0 if passed == len(cases) else 3
+
+
+def benchmark_rag_cycle(args: argparse.Namespace) -> int:
+    client = OllamaClient(args.ollama_url, args.timeout)
+    fixture = Path(args.fixture or FIXTURE_ROOT / "rag-cycle.json")
+    case = json.loads(fixture.read_text(encoding="utf-8"))
+    if args.models and len(args.models) != 2:
+        raise BenchmarkError(
+            "rag requires zero models or exactly EMBED_MODEL ANSWER_MODEL"
+        )
+    embed_model = (
+        args.models[0]
+        if args.models
+        else os.environ.get(
+            "RAG_EMBED_MODEL", "embed-jina-v5-small-retrieval-q4-k-m"
+        )
+    )
+    answer_model = (
+        args.models[1]
+        if args.models
+        else os.environ.get(
+            "RAG_ANSWER_MODEL", "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"
+        )
+    )
+    models = [embed_model, answer_model]
+    available = {
+        str(row.get("name") or row.get("model") or "").removesuffix(":latest")
+        for row in client.tags()
+    }
+    for model in models:
+        if model.removesuffix(":latest") not in available:
+            raise BenchmarkError(f"RAG-cycle model is not registered: {model}")
+
+    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
+    csv_path = Path(args.output or f"results_rag_cycle_{stamp}.csv")
+    jsonl_path = csv_path.with_suffix(".jsonl")
+    meta_path = csv_path.with_suffix(".meta.json")
+    write_meta(meta_path, client, "rag-cycle", models, fixture)
+
+    client.ensure_unloaded(embed_model)
+    client.ensure_unloaded(answer_model)
+    sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
+    try:
+        warm_payload = {
+            "model": answer_model,
+            "messages": [{"role": "user", "content": "Reply only: ready"}],
+            "stream": False,
+            "keep_alive": KEEP_ALIVE,
+            "options": {"num_predict": 16},
+        }
+        prime = client.json_request("/api/chat", warm_payload)
+        warm_start = time.monotonic()
+        warm = client.json_request("/api/chat", warm_payload)
+        warm_wall = time.monotonic() - warm_start
+
+        query_prefix, _doc_prefix, scheme = embedding_scheme(embed_model)
+        cycle_start = time.monotonic()
+        embed_start = time.monotonic()
+        emb = embed(client, embed_model, [query_prefix + case["query"]])
+        embed_wall = time.monotonic() - embed_start
+        answer_evicted = not client.model_loaded(answer_model)
+
+        prompt = (
+            "Use only this retrieved context:\n"
+            f"{case['retrieved_context']}\n\nQuestion: {case['question']}"
+        )
+        answer_start = time.monotonic()
+        answer = client.json_request(
+            "/api/chat",
+            {
+                "model": answer_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "keep_alive": KEEP_ALIVE,
+                "options": {"num_predict": 256},
+            },
+        )
+        answer_wall = time.monotonic() - answer_start
+        cycle_wall = time.monotonic() - cycle_start
+        telemetry = sampler.stop()
+    except Exception:
+        sampler.stop()
+        raise
+    finally:
+        for model in (embed_model, answer_model):
+            try:
+                client.ensure_unloaded(model)
+            except BenchmarkError as exc:
+                print(f"WARNING: {exc}", file=sys.stderr)
+
+    content = str((answer.get("message") or {}).get("content") or "")
+    ok = all(
+        term.casefold() in content.casefold() for term in case.get("required", [])
+    )
+    row = {
+        "timestamp": iso_now(),
+        "embed_model": embed_model,
+        "answer_model": answer_model,
+        "embedding_scheme": scheme,
+        "initial_answer_load_s": round(ns_to_s(prime.get("load_duration")), 3),
+        "warm_answer_wall_s": round(warm_wall, 3),
+        "warm_answer_load_s": round(ns_to_s(warm.get("load_duration")), 3),
+        "embed_wall_s": round(embed_wall, 3),
+        "embed_load_s": round(ns_to_s(emb.get("load_duration")), 3),
+        "answer_evicted_after_embed": answer_evicted,
+        "post_embed_answer_wall_s": round(answer_wall, 3),
+        "post_embed_answer_load_s": round(ns_to_s(answer.get("load_duration")), 3),
+        "cycle_wall_s": round(cycle_wall, 3),
+        "answer_ok": ok,
+        "answer_chars": len(content),
+        "temp_max_c": telemetry.get("temp_max_c"),
+        "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
+    }
+    fields = list(row)
+    with csv_path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer.writeheader()
+        writer.writerow(row)
+    append_jsonl(
+        jsonl_path,
+        {
+            **row,
+            "category": "rag-cycle",
+            "query": case["query"],
+            "retrieved_context": case["retrieved_context"],
+            "response": content,
+            "telemetry": telemetry,
+        },
+    )
+    print(
+        f"RAG cycle: warm-answer={warm_wall:.2f}s embed={embed_wall:.2f}s "
+        f"post-embed-answer={answer_wall:.2f}s total={cycle_wall:.2f}s "
+        f"evicted={answer_evicted} answer_ok={ok}"
+    )
+    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    return 0 if ok else 3
+
 def fmt(value: Any, suffix: str) -> str:
     if value is None or value == "":
         return "n/a"
@@ -1005,6 +1284,14 @@ def main() -> int:
         "ocr", help="office OCR accuracy + runtime on packaged fixtures"
     )
     add_common(ocr, "http://127.0.0.1:11434")
+    usecase = sub.add_parser(
+        "usecase", aliases=["acceptance"], help="one role-defining acceptance case per production model"
+    )
+    add_common(usecase, "http://127.0.0.1:11434")
+    rag = sub.add_parser(
+        "rag", aliases=["rag-cycle"], help="measure embedding eviction and answer-model reload on the main instance"
+    )
+    add_common(rag, "http://127.0.0.1:11434")
     args = parser.parse_args()
 
     try:
@@ -1016,6 +1303,10 @@ def main() -> int:
             return benchmark_agent(args)
         if args.category == "ocr":
             return benchmark_ocr(args)
+        if args.category in {"usecase", "acceptance"}:
+            return benchmark_usecase(args)
+        if args.category in {"rag", "rag-cycle"}:
+            return benchmark_rag_cycle(args)
     except (BenchmarkError, OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1

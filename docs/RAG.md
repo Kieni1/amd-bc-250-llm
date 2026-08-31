@@ -369,6 +369,20 @@ the answer model and questions can evict the embedding model. Record cold-start
 latency before considering more resident models; the unified-memory budget is
 more important than avoiding every model switch.
 
+### Measure the one-runner model-switch cost
+
+The balanced main Ollama profile intentionally keeps `OLLAMA_MAX_LOADED_MODELS=1`,
+so an embedding request can evict the answer model. Measure that tradeoff directly:
+
+```bash
+bc250-benchmark rag
+```
+
+The lane records a warm Gemma E4B request, the Jina embedding load, whether Gemma
+was evicted, the post-embedding Gemma reload, and the complete embedding→answer
+cycle. It isolates runner switching; it does not replace the retrieval-quality
+benchmark or the real-document pilot above.
+
 ## 10. Second phase: hybrid search
 
 Only after recording the vector-only baseline, enable Hybrid Search and repeat

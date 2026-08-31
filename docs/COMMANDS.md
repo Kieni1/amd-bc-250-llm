@@ -250,7 +250,7 @@ directory. The default generation lane uses `BENCH_MODE=neutral`: a per-request
 neutral SYSTEM override and deterministic sampling for comparable model/runtime
 measurements. `BENCH_MODE=production` is the production-configuration
 comparison: it keeps the registered Modelfile SYSTEM and sampling while running the same generic workload.
-Role-specific Office/RAG/translation use-case fixtures are intentionally deferred.
+`bc250-benchmark usecase` adds one compact role acceptance case per production model; `bc250-benchmark rag` separately measures the main-instance embedding/answer model-switch cost.
 `THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
 larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
 not routinely starved by thinking; LFM2.5 keeps that larger cap even in an
@@ -265,6 +265,8 @@ bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
 bc250-benchmark ocr                     # office OCR fixtures
 bc250-benchmark task                    # Open WebUI 0.11.2-compatible task behavior
 bc250-benchmark agent                   # coding correctness, defaults to port 11436
+bc250-benchmark usecase                 # one role-defining case per production model
+bc250-benchmark rag                     # embedding eviction + answer-model reload cycle
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```
 
@@ -284,6 +286,7 @@ bc250-maintenance setup [--defaults]
 bc250-maintenance status
 bc250-maintenance run {backup|prune|all}
 bc250-maintenance clean-cache
+bc250-maintenance model-baseline
 bc250-maintenance disable
 ```
 
@@ -291,6 +294,7 @@ bc250-maintenance disable
 confirmation and removes only rebuildable Hugging Face cache, dangling Podman
 images and old **system-wide** journal archives; model and Open WebUI data are
 retained.
+`model-baseline` uses an Open WebUI administrator API key to enforce request-level `think=false` on the production Qwen3.5 base-model profile while preserving other stored model parameters.
 Interactive setup can also configure dry-run upload pruning, model warm-up and
 an after-hours power action. Configuration is stored in root-readable
 `/etc/bc250-llm-server/maintenance.env`. See

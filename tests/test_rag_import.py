@@ -154,6 +154,36 @@ class RagImportTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "unsupported YAML indentation"):
                 rag.front_matter(path)
 
+    def test_knowledge_lookup_follows_pagination_and_checks_exact_name(self) -> None:
+        api = rag.OpenWebUI("http://example.invalid", "token")
+        pages = {
+            1: {"items": [{"id": "other", "name": "Other"}], "total": 2},
+            2: {"items": [{"id": "wanted", "name": "Wanted", "write_access": True}], "total": 2},
+        }
+
+        def fake_request(method, path, payload=None, headers=None):
+            self.assertEqual(method, "GET")
+            page = int(path.rsplit("page=", 1)[1])
+            return pages[page]
+
+        with patch.object(api, "_request", side_effect=fake_request):
+            result = api.find_knowledge("Wanted")
+        self.assertEqual(result["id"], "wanted")
+
+    def test_knowledge_lookup_rejects_duplicate_exact_names_across_pages(self) -> None:
+        api = rag.OpenWebUI("http://example.invalid", "token")
+        pages = {
+            1: {"items": [{"id": "a", "name": "Wanted"}], "total": 2},
+            2: {"items": [{"id": "b", "name": "Wanted"}], "total": 2},
+        }
+        with patch.object(
+            api,
+            "_request",
+            side_effect=lambda _method, path, _payload=None, _headers=None: pages[int(path.rsplit("page=", 1)[1])],
+        ):
+            with self.assertRaisesRegex(RuntimeError, "multiple knowledge bases"):
+                api.find_knowledge("Wanted")
+
     def test_main_handles_invalid_sync_response_type_without_traceback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             stderr = io.StringIO()

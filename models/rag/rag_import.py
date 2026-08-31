@@ -352,15 +352,32 @@ class OpenWebUI:
         return json.loads(raw) if raw else {}
 
     def find_knowledge(self, name: str) -> dict[str, object] | None:
-        result = self._request(
-            "GET", f"/api/v1/knowledge/search?query={quote(name)}&page=1"
-        )
-        items = result.get("items", []) if isinstance(result, dict) else []
-        exact = [
-            item
-            for item in items
-            if isinstance(item, dict) and item.get("name") == name
-        ]
+        exact: list[dict[str, object]] = []
+        page = 1
+        seen = 0
+        while True:
+            result = self._request(
+                "GET", f"/api/v1/knowledge/search?query={quote(name)}&page={page}"
+            )
+            items = result.get("items", []) if isinstance(result, dict) else []
+            if not isinstance(items, list):
+                raise TypeError("invalid knowledge search response")
+            exact.extend(
+                item
+                for item in items
+                if isinstance(item, dict) and item.get("name") == name
+            )
+            seen += len(items)
+            total_raw = result.get("total") if isinstance(result, dict) else None
+            try:
+                total = int(total_raw) if total_raw is not None else seen
+            except (TypeError, ValueError):
+                total = seen
+            if not items or seen >= total:
+                break
+            page += 1
+            if page > 10000:
+                raise RuntimeError("knowledge search pagination exceeded safety limit")
         if len(exact) > 1:
             raise RuntimeError(f"multiple knowledge bases have the exact name {name!r}")
         if not exact:

@@ -54,6 +54,22 @@ sudo systemctl start open-webui.service
 Restore helpers require confirmation, verify checksum sidecars and create
 rollback data before replacement.
 
+## Open WebUI production model baseline
+
+Ollama 0.33.2 exposes Qwen3.5 reasoning through the request-level `think` field;
+it is not a safe Modelfile parameter to emulate by replacing the native renderer.
+After the first Open WebUI administrator login, create an administrator API key
+and run:
+
+```bash
+sudo bc250-maintenance model-baseline
+```
+
+The command uses the stored `OWUI_API_KEY` when available, otherwise prompts for
+one without echoing it. It creates or updates
+`prod-qwen35-9b-unsloth-q6-k:latest`, preserves unrelated existing metadata and
+parameters, and sets `custom_params.think=false`.
+
 ## Storage and retention
 
 ```bash
@@ -72,8 +88,9 @@ models or Open WebUI data. The journal vacuum affects archived logs for the
 whole host, not only BC-250 services.
 
 Model weights are never deleted automatically. Use `bc250-model cleanup` to
-remove a selected registration, source GGUF, state file and rendered
-Modelfile together.
+remove a selected registration, source GGUF, state file and rendered Modelfile
+together. Add `--keep-gguf` when reclaiming Ollama registration/blob storage but
+retaining the manager-owned GGUF plus integrity state for a quick reinstall.
 
 Upload pruning calls Open WebUI's authenticated delete API so database, file
 and vector state stay aligned. It starts with `DRY_RUN=1`; review the journal

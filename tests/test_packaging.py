@@ -118,6 +118,8 @@ class PackagingTests(unittest.TestCase):
             "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
             "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
             "examples/benchmark/agent-cases.json\t{share}/benchmark/agent-cases.json",
+            "examples/benchmark/usecase-office.json\t{share}/benchmark/usecase-office.json",
+            "examples/benchmark/rag-cycle.json\t{share}/benchmark/rag-cycle.json",
             "examples/benchmark/ocr/manifest.json\t{share}/benchmark/ocr/manifest.json",
             "MODEL.md\t{docdir}/MODEL.md",
         ):
@@ -145,6 +147,11 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Environment=CHUNK_OVERLAP=200", quadlet)
         self.assertIn("Environment=RAG_TOP_K=8", quadlet)
         self.assertIn("Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false", quadlet)
+        self.assertIn("Environment=ENABLE_TITLE_GENERATION=true", quadlet)
+        self.assertIn("Environment=ENABLE_TAGS_GENERATION=true", quadlet)
+        self.assertIn("Environment=ENABLE_FOLLOW_UP_GENERATION=false", quadlet)
+        self.assertIn("Environment=ENABLE_AUTOCOMPLETE_GENERATION=false", quadlet)
+        self.assertIn("Environment=ENABLE_SEARCH_QUERY_GENERATION=false", quadlet)
 
     def test_package_standard_ollama_is_0332(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")

@@ -24,6 +24,17 @@ its distinct fetch workflow), retire the `apply-safe` memory alias, centralize
 runtime pins in `config/runtime.env`, and stop testing an arbitrary total model
 count. The operator-selected Modelfile catalog itself remains unchanged.
 
+Post-audit corrections make the production roles executable rather than merely
+documented: restore LFM2.5 as a dedicated implicit DE↔FR translator; add
+`bc250-maintenance model-baseline` to store request-level `think=false` for the
+production Qwen3.5 base model in Open WebUI without replacing Ollama's native
+renderer/parser; and explicitly disable follow-up, autocomplete, web-search-query
+and retrieval-query task generation while keeping titles/tags enabled. Paginate
+Open WebUI knowledge lookup across all search pages, add a five-case production
+role acceptance lane plus a main-instance RAG model-switch latency lane, and fix
+the 128-MiB application / 256-MiB nginx upload documentation and stale experiment
+catalog prose.
+
 
 ## 0.9.7-0.9.testing - 2026-08-31
 

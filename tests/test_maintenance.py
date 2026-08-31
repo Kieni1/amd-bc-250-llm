@@ -32,6 +32,18 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("NIGHT_POWER_ACTION=poweroff", defaults)
         self.assertIn("REQUIRE_WOL=0", defaults)
 
+    def test_open_webui_model_baseline_enforces_qwen_non_thinking(self) -> None:
+        helper = (ROOT / "cmd/maintenance/owui-model-baseline.py").read_text(encoding="utf-8")
+        maintenance = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertIn('QWEN_MODEL = "prod-qwen35-9b-unsloth-q6-k:latest"', helper)
+        self.assertIn('custom["think"] = False', helper)
+        self.assertIn('/api/v1/models/model/update', helper)
+        self.assertIn('/api/v1/models/create', helper)
+        self.assertIn('"access_grants":', helper)
+        self.assertIn('model-baseline', maintenance)
+        self.assertIn('cmd/maintenance/owui-model-baseline.py\t{libexec}/owui-model-baseline.py', manifest)
+
     def test_backups_are_persistent_and_serialized(self) -> None:
         config_timer = (ROOT / "cmd/maintenance/owui-backup-config.timer").read_text()
         users_timer = (ROOT / "cmd/maintenance/owui-backup-users.timer").read_text()

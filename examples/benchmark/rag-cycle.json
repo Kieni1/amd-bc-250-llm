@@ -1,0 +1,6 @@
+{
+  "query": "Welche Frist gilt für die Einreichung der Reisekostenbelege?",
+  "retrieved_context": "Richtlinie TR-24: Reisekostenbelege müssen innerhalb von 10 Kalendertagen nach Ende der Reise eingereicht werden.",
+  "question": "Welche Frist gilt? Antworte kurz auf Deutsch und nenne TR-24.",
+  "required": ["10", "TR-24"]
+}

@@ -44,7 +44,7 @@ exposed as a host/LAN listener.
   defaults **off** for private office data unless local policy explicitly enables
   them.
 - Disable arbitrary tools, functions and pipelines for ordinary users.
-- Keep uploads at or below nginx's 256 MiB limit.
+- Open WebUI enforces **128 MiB per file**; nginx has a larger **256 MiB reverse-proxy ceiling**. The application limit is reached first.
 - Leave request concurrency to the packaged one-parallel/one-loaded-model
   Ollama profile.
 
@@ -85,9 +85,9 @@ task-gemma3-1b-unsloth-ud-q4-k-xl:latest
 | Title generation | On |
 | Tags generation | On |
 | Retrieval-query generation | **Off for the baseline; test later** |
-| Follow-up generation | Off initially |
-| Autocomplete | Off |
-| Web-search query generation | Off unless configured |
+| Follow-up generation | Off (packaged baseline) |
+| Autocomplete | Off (packaged baseline) |
+| Web-search query generation | Off (packaged baseline) |
 
 Keep retrieval-query generation off while establishing the raw embedding/chunking
 baseline; enabling it later deliberately tests whether task-model query rewriting
@@ -101,6 +101,21 @@ dedicated Gemma 3 1B service. Tune it only after `bc250-benchmark task`; the pac
 candidate exists specifically to compare multilingual adherence without changing
 the default. Note that setting a non-empty object replaces Open WebUI's built-in task token-limit behavior,
 so include an explicit `max_tokens` if you later set other task parameters.
+
+## Production model baseline
+
+After the first Open WebUI administrator login, create an administrator API key
+and run:
+
+```bash
+sudo bc250-maintenance model-baseline
+```
+
+This is required for the intended production Qwen3.5 profile. Ollama 0.33.2
+controls Qwen3.5 reasoning with the request-level `think` field, so the helper
+creates or updates the exact Open WebUI base-model record with `think=false`.
+The package deliberately keeps Ollama's native Qwen3.5 renderer/parser instead
+of replacing its template just to suppress reasoning.
 
 ## Model roles
 
@@ -144,8 +159,8 @@ Gemma 4 thinking is enabled only when its Modelfile `SYSTEM` starts with
 |---|---|---|---|
 | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` | Workspace model preset | `think`: leave unset/default | Non-thinking is selected by the packaged Modelfile. File Context optional; Memory, Web Search and Code Interpreter off initially. |
 | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` | Workspace model preset | `think`: leave unset/default | Same Gemma 4 non-thinking behavior. Enable File Context for RAG. Keep Builtin Tools off for chat-attached knowledge; if knowledge is permanently bound to the preset, enable only the Knowledge Base builtin-tool category. |
-| `prod-lfm25-8b-a1b-liquidai-q6-k` | Workspace model preset | Reasoning Tags: Default; `think`: leave unset/default | LFM2.5 emits native reasoning before the final answer; Open WebUI's default `<think>` parsing is sufficient. For the translation preset keep Builtin Tools, Memory and Web Search off. |
-| `prod-qwen35-9b-unsloth-q6-k` | Workspace model preset → Advanced Parameters | `think`: **Off** | The packaged sampling profile is the Qwen3.5 non-thinking profile. Do not enable thinking on this production preset; use a separate experimental preset/Modelfile when testing Qwen3.5 reasoning. |
+| `prod-lfm25-8b-a1b-liquidai-q6-k` | Workspace model preset | Reasoning Tags: Default; `think`: leave unset/default | Dedicated DE↔FR translator. A pasted German passage translates to French and a pasted French passage translates to German unless another task/direction is explicitly requested. Keep Builtin Tools, Memory and Web Search off. |
+| `prod-qwen35-9b-unsloth-q6-k` | Base model with package model baseline | `think`: **Off** | Ollama 0.33.2 treats `think` as a request-level control and Qwen3.5 otherwise defaults to thinking. After first login/API-key creation, run `sudo bc250-maintenance model-baseline`; it creates/updates the Open WebUI base-model record with `think=false` while retaining Ollama's native renderer/parser. |
 | `prod-gpt-oss20b-ggml-org-mxfp4` | Workspace model preset → Advanced Parameters | `think`: Default | Ollama defaults GPT-OSS to medium reasoning. Use `low`, `medium` or `high` only for deliberate latency/quality comparisons. Leave Open WebUI's separate Reasoning Effort field unset for local Ollama. |
 | `task-gemma3-1b-unsloth-ud-q4-k-xl` | Admin Settings → Experience → Interface | selected as Local Task Model | Current smallest default; do not expose as a normal office-chat preset. |
 | `task-lfm25-2.6b-liquidai-q6-k` | Admin Settings → Experience → Interface | task-model comparison | Multilingual challenger; benchmark before replacing Gemma 3 1B. |

@@ -57,6 +57,17 @@ class DocumentationTests(unittest.TestCase):
                 for suffix in re.findall(r"\bbc250-([a-z0-9-]+)\b", block):
                     self.assertIn(suffix, allowed, f"{relative}: bc250-{suffix}")
 
+    def test_open_webui_limits_and_current_catalog_prose_are_consistent(self) -> None:
+        settings = (ROOT / "docs/openwebui-settings.md").read_text(encoding="utf-8")
+        experiments = (ROOT / "models/experiments/README.md").read_text(encoding="utf-8")
+        maintenance = (ROOT / "docs/MAINTENANCE.md").read_text(encoding="utf-8")
+        self.assertIn("128 MiB per file", settings)
+        self.assertIn("256 MiB reverse-proxy ceiling", settings)
+        self.assertIn("0.9.7-0.10 catalog", experiments)
+        self.assertNotIn("0.9.7-0.8 catalog", experiments)
+        self.assertIn("bc250-maintenance model-baseline", settings)
+        self.assertIn("custom_params.think=false", maintenance)
+
     def test_internal_markdown_links_resolve(self) -> None:
         for path in ROOT.rglob("*.md"):
             relative = path.relative_to(ROOT)

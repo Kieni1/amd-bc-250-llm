@@ -56,6 +56,8 @@ dir	0755	-	{share}/benchmark/ocr
 file	0644	examples/benchmark/embedding-office.json	{share}/benchmark/embedding-office.json
 file	0644	examples/benchmark/task-cases.json	{share}/benchmark/task-cases.json
 file	0644	examples/benchmark/agent-cases.json	{share}/benchmark/agent-cases.json
+file	0644	examples/benchmark/usecase-office.json	{share}/benchmark/usecase-office.json
+file	0644	examples/benchmark/rag-cycle.json	{share}/benchmark/rag-cycle.json
 file	0644	examples/benchmark/ocr/manifest.json	{share}/benchmark/ocr/manifest.json
 file	0644	examples/benchmark/ocr/office-de.png	{share}/benchmark/ocr/office-de.png
 file	0644	examples/benchmark/ocr/office-fr.png	{share}/benchmark/ocr/office-fr.png
@@ -74,6 +76,7 @@ file	0755	cmd/monitoring/verify-server.sh	{libexec}/verify.sh
 file	0755	cmd/monitoring/verify-lan.sh	{libexec}/verify-lan.sh
 file	0755	examples/raspi-wol/enable-wol.sh	{libexec}/enable-wol.sh
 file	0755	cmd/maintenance/*.sh	{libexec}/
+file	0755	cmd/maintenance/owui-model-baseline.py	{libexec}/owui-model-baseline.py
 file	0755	models/coding-agent/coding-agent.sh	{libexec}/coding-agent/coding-agent.sh
 file	0755	models/coding-agent/commit-agent.sh	{libexec}/coding-agent/commit-agent.sh
 file	0755	models/coding-agent/gitea-review.sh	{libexec}/coding-agent/gitea-review.sh

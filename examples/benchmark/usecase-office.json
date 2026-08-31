@@ -1,0 +1,41 @@
+[
+  {
+    "id": "office-draft-e2b",
+    "model": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+    "prompt": "Draft a concise German office email to Frau Keller confirming that document REF-81 will be sent on 4 September 2026. Return only the email body.",
+    "required": ["Frau Keller", "REF-81", "4. September 2026"],
+    "forbidden": []
+  },
+  {
+    "id": "grounded-rag-e4b",
+    "model": "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+    "prompt": "Use only this supplied source: Richtlinie P-17: Belege sind innerhalb von 10 Tagen einzureichen. Ein Höchstbetrag ist in diesem Auszug nicht genannt. Frage: Welche Frist und welcher Höchstbetrag gelten? Antworte kurz auf Deutsch und nenne P-17.",
+    "required": ["P-17", "10"],
+    "required_any": ["nicht genannt", "nicht angegeben", "keine Angabe", "nicht enthalten"],
+    "forbidden": ["CHF 500", "CHF 1000", "1'000"]
+  },
+  {
+    "id": "implicit-de-fr-translation",
+    "model": "prod-lfm25-8b-a1b-liquidai-q6-k",
+    "prompt": "Bitte senden Sie die Unterlagen bis Freitag, 4. September 2026, mit Referenz AB-42 zurück.",
+    "required": ["4 septembre 2026", "AB-42"],
+    "required_any": ["vendredi", "documents", "dossiers"],
+    "forbidden": ["Bitte senden Sie", "Unterlagen bis Freitag"]
+  },
+  {
+    "id": "technical-office-qwen",
+    "model": "prod-qwen35-9b-unsloth-q6-k",
+    "prompt": "Give exactly three concise steps for validating a local backup before deleting the original. Include the words backup, checksum, and restore.",
+    "think": false,
+    "required": ["backup", "checksum", "restore"],
+    "forbidden": []
+  },
+  {
+    "id": "reasoning-gpt-oss",
+    "model": "prod-gpt-oss20b-ggml-org-mxfp4",
+    "prompt": "A report is due two working days after Monday. There are no holidays. State the due weekday and give one short reason.",
+    "think": "medium",
+    "required": ["Wednesday"],
+    "forbidden": ["Tuesday", "Thursday"]
+  }
+]

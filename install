@@ -599,6 +599,7 @@ main() {
     echo "40-CU support is prepared but disabled; maintenance timers were not changed."
   fi
   echo "Next: sudo bc250-40cu  # test a stable CU configuration for this board"
+  echo "After first Open WebUI admin login/API-key creation: sudo bc250-maintenance model-baseline"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

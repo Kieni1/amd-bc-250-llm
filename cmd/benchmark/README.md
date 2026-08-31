@@ -31,7 +31,7 @@ generic generation workload; it is not yet the deferred role-specific Office/RAG
 translation use-case suite.
 
 `THINK_MODE=auto` preserves the package's model-family policy: GPT-OSS uses
-`medium`, packaged stock Qwen3.5/Qwen3-4B non-thinking profiles use `false`, and
+`medium`, the intended production Qwen3.5/Qwen3-4B profiles use request-level `false`, and
 Gemma4/native-reasoning families leave `think` unset. Explicit
 `THINK_MODE=omit|false|true|low|medium|high|max` is available for a deliberate
 comparison. These values match Ollama 0.33.2's request API.
@@ -68,6 +68,35 @@ latency records because they preserve Ollama's separate `thinking` and final
 inside the raw `/api/generate` response; those generate lanes remain intended for
 throughput/prefill/runtime measurements. Context-capacity truncation warnings and
 near-limit notes are persisted in the JSONL sidecar as well as printed.
+
+
+## Production role acceptance
+
+```bash
+bc250-benchmark usecase
+```
+
+This is a deliberately small acceptance suite, not another ranking framework. It
+runs one role-defining case for each production model: office drafting (E2B),
+evidence-grounded synthesis (E4B), implicit DE→FR translation (LFM2.5), a compact
+technical office task (Qwen3.5 with `think=false`), and constrained reasoning
+(GPT-OSS). It preserves each registered Modelfile SYSTEM/sampling and only bounds
+output length. A failed required/forbidden-content check exits non-zero.
+
+## Main-instance RAG model-switch cycle
+
+```bash
+bc250-benchmark rag
+# Optional explicit pair:
+bc250-benchmark rag EMBED_MODEL ANSWER_MODEL
+```
+
+The packaged default sequences Jina → Gemma E4B on the main Ollama instance. It
+first records a warm answer-model request, then embeds a query and records whether
+the answer model was evicted, then measures the answer-model reload and final
+answer. This isolates the `OLLAMA_MAX_LOADED_MODELS=1` model-switch cost; it does
+**not** score Open WebUI/vector-database retrieval quality. Override the pair with
+`RAG_EMBED_MODEL` / `RAG_ANSWER_MODEL` or positional model names.
 
 ## Embeddings
 

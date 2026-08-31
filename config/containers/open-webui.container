@@ -51,6 +51,11 @@ Environment=RAG_RELEVANCE_THRESHOLD=0
 Environment="RAG_TEMPLATE=Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
 Environment=ENABLE_RAG_HYBRID_SEARCH=false
 Environment=ENABLE_ASYNC_EMBEDDING=false
+Environment=ENABLE_TITLE_GENERATION=true
+Environment=ENABLE_TAGS_GENERATION=true
+Environment=ENABLE_FOLLOW_UP_GENERATION=false
+Environment=ENABLE_AUTOCOMPLETE_GENERATION=false
+Environment=ENABLE_SEARCH_QUERY_GENERATION=false
 Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false
 # Keep removed knowledge files disposable; local authoritative sources remain under /srv.
 Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false
