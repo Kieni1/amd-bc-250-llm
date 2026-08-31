@@ -27,7 +27,9 @@ configuration, `models/` for Modelfiles and model workflows, and `examples/`
 for operator-adapted integrations. Only MTP retains a TOML model catalog.
 
 `scripts/prepare-sources.py` stages the governor, offline Cargo vendor tree,
-40-CU source and live-manager source from the reusable `sources/` cache.
+40-CU source and live-manager source from the reusable `sources/` cache. Each
+cached archive has a local `.sha256` sidecar; reuse and `make sources-check`
+verify the current bytes before they are copied into the RPM build tree.
 
 ## Policy boundaries
 
@@ -49,3 +51,7 @@ sections instead of creating a general packaging language.
 
 See [`../docs/REPACKAGING.md`](../docs/REPACKAGING.md) for source refresh and
 release checks.
+
+CI runs the same Fedora 44 build on manual dispatch, push and pull request. Ruff
+and ShellCheck are CI/build-environment tools only and are not runtime package
+dependencies.

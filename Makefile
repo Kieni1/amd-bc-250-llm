@@ -10,7 +10,7 @@ UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 help:
 	@printf '%s\n' \
 	  'make sources    Download pinned governor and CU-tool sources' \
-	  'make sources-check  Check the local source cache without downloading' \
+	  'make sources-check  Verify the local source cache and SHA-256 sidecars' \
 	  'make validate   Run deterministic RPM preflight checks' \
 	  'make source-tar Create the project source archive' \
 	  'make srpm       Build the source RPM' \
@@ -52,6 +52,6 @@ clean:
 	rm -rf build dist rpmbuild
 
 clean-sources:
-	rm -f sources/*.tar.gz sources/*.tar.xz
+	rm -f sources/*.tar.gz sources/*.tar.xz sources/*.sha256
 
 distclean: clean clean-sources

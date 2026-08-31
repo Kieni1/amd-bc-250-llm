@@ -10,7 +10,7 @@ PARAMETER num_gpu 99
 PARAMETER num_keep 256
 # Leave headroom for the 8.47 GB model and its reasoning output.
 PARAMETER num_ctx 16384
-PARAMETER temperature 0.8
+PARAMETER temperature 1.0
 PARAMETER top_p 0.95
 PARAMETER top_k 20
 

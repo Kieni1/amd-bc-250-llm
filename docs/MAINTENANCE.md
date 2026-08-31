@@ -33,7 +33,8 @@ sudo bc250-maintenance disable
 
 `backup-config` uses SQLite's online backup API, verifies integrity and writes a
 SHA-256 sidecar. It includes Open WebUI accounts, settings and chats but excludes
-bulky uploads, vector data and caches. `backup-users` is a selective identity
+bulky uploads, vector data and caches. It is therefore **not a complete RAG
+backup** and cannot restore an ingested document library by itself. `backup-users` is a selective identity
 export and contains password hashes, API keys and access-control data.
 
 Backups under `/var/backups/bc250-llm-server` are root-only but remain on the

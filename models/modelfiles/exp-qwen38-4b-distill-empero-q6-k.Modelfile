@@ -1,0 +1,25 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen38-4b-distill-empero-q6-k
+# Source: empero-ai/Qwen3.8-4B-Distill-GGUF @ latest
+# GGUF: Qwen3.8-4B-Q6_K.gguf
+# License: Apache-2.0
+# Role: compact native-reasoning comparison; requires current Qwen3.5/Gated-DeltaNet runtime support.
+#
+# Intended role:
+# - Compact reasoning comparison
+# - Office/technical quality vs Qwen3.5 9B and GPT-OSS
+# - Successor candidate for older 4B Qwen experiments
+#
+# Upstream describes this as a native reasoning model. Do not force a generic
+# think:false policy during evaluation.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-4b-distill-empero-q6-k/Qwen3.8-4B-Q6_K.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental reasoning assistant for office, technical, coding, and analytical tasks. Follow the user's requested format, distinguish facts from inference, and answer in the requested language or the language of the latest request."""

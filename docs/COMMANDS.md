@@ -14,7 +14,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
 | `bc250-code` | Local generate/refactor/review/document/test helper |
 | `bc250-code-commit` | Propose and optionally create a local Git commit |
-| `bc250-compare-experiments` | Compare experiment responses with a baseline |
+| `bc250-compare-mtp` | Compare an Ollama baseline with a running llama.cpp MTP server |
 | `bc250-cu-status` | Kernel, RADV and live-routing CU summary |
 | `bc250-cu-live-manager` | Pinned interactive live WGP manager |
 | `bc250-fetch-embeddings` | Install discovered embedding models |
@@ -22,14 +22,13 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-fetch-models` | Install discovered production models |
 | `bc250-fetch-mtp` | Download enabled MTP catalog entries |
 | `bc250-gitea-review` | Generate an optional Gitea pull-request review |
-| `bc250-install-cu-manager` | Verify the packaged live manager is available |
 | `bc250-install-ollama` | Install or normalize official Ollama |
 | `bc250-maintenance` | Backups, retention and optional power schedules |
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
 | `bc250-model` | Unified model discovery, installation and cleanup |
 | `bc250-ocr` | Experimental office OCR model list/install/test helper |
+| `bc250-rag-import` | Validate and incrementally sync the operator document tree |
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
-| `bc250-pull-embedding-model` | Compatibility alias for embedding installation |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
 | `bc250-setup-coding-agent` | Configure the isolated agent Ollama instance |
 | `bc250-setup-task-model` | Configure the isolated task Ollama instance |
@@ -115,10 +114,12 @@ Remote experimental `hf.co/...` definitions do not accept `--revision`,
 `--sha256` or `--destination`; Ollama owns those source blobs.
 
 Authentication is requested only when a download is required. A validated GGUF
-is reused only while its recorded repository, revision and filename still
-match. Modelfile-only edits such as SYSTEM or PARAMETER changes therefore
-rebuild the Ollama registration without downloading again; changed source
-provenance downloads the requested bytes. `HF_TOKEN` or `--token-file` is
+is reused only while its recorded repository, revision and filename match and
+its schema-2 size/mtime/ctime metadata is unchanged. If those stat values or a
+legacy sidecar differ, the manager recalculates SHA-256 before reuse.
+Modelfile-only edits such as SYSTEM or PARAMETER changes therefore rebuild the
+Ollama registration without downloading again; changed source provenance
+downloads the requested bytes. `HF_TOKEN` or `--token-file` is
 validated as the `ollama` account; an empty or rejected token falls back to
 anonymous access.
 Tokens are not persisted by the manager.
@@ -134,20 +135,48 @@ sudo bc250-setup-task-model [SELECTION]
 sudo bc250-setup-coding-agent [SELECTION]
 ```
 
+For office document retrieval, use the existing embedding workflow with
+Open WebUI/Tika; see [`RAG.md`](RAG.md). There is no separate RAG daemon or
+vector store. `bc250-rag-import` is only a metadata-aware Open WebUI sync client.
+
+## Documents / RAG import
+
+```text
+sudo bc250-rag-import plan [ROOT]
+sudo bc250-rag-import sync [ROOT] --token-file FILE [--prune]
+```
+
+The default root is `/srv/bc250-documents`. The supported layout is
+`public|confidential/COLLECTION/{active,sources}`. Only Markdown files directly
+inside `active/` are sent to Open WebUI; PDFs in `sources/` remain the local
+authoritative evidence and their SHA-256 is checked against each Markdown
+header before sync. `source_file` is a filename, not a path; the importer rejects
+`../`/absolute references and symlinked active/source files or directories that
+could leave the collection boundary. Front matter is a strict small YAML subset
+documented in `RAG.md`; malformed indentation, duplicate keys and unknown fields
+fail the plan before network access.
+
+German originals are routed to `[SCOPE] COLLECTION — Originals`; French
+translation pairs are routed to `[SCOPE] COLLECTION — Français`. `plan` makes no
+network request. `sync` uses Open WebUI's v0.11 incremental knowledge API,
+skips unchanged files and replaces changed files only after the new upload
+succeeds. Files removed locally remain in Open WebUI unless `--prune` is
+explicitly supplied. The API key is never packaged; read it from a protected
+file or `OPEN_WEBUI_API_KEY`.
+
 ## Experimental OCR
 
 ```text
 bc250-ocr list
-sudo bc250-ocr install glm|dots|ovis|chandra
-bc250-ocr show glm|dots|ovis|chandra
-bc250-ocr test glm|dots|ovis|chandra IMAGE
+sudo bc250-ocr install glm|ovis
+bc250-ocr show glm|ovis
+bc250-ocr test glm|ovis IMAGE
 ```
 
 OCR models stay in the normal `experiments` category and main Ollama instance;
 there is no OCR daemon or separate model store. The helper tests one image and
-prints extracted text/Markdown for comparison. GLM is the lightweight baseline,
-dots.ocr and OvisOCR2 are structured-document experiments, and Chandra remains
-a compatibility probe until real BC-250 image inference is verified. Test DE/FR/EN
+prints extracted text/Markdown for comparison. GLM is the measured fidelity
+leader and OvisOCR2 remains the faster structured-document alternative. Test DE/FR/EN
 letters, invoices, forms and table-heavy scans before using OCR output for RAG.
 
 Task setup creates `ollama-task.service` on port `11435`; agentic setup creates
@@ -155,8 +184,8 @@ Task setup creates `ollama-task.service` on port `11435`; agentic setup creates
 can also be supplied through `TASK_MODEL_SELECTION` or
 `CODING_AGENT_SELECTION`. Revision and checksum overrides require one model.
 
-See [`../models/README.md`](../models/README.md) for the Modelfile contract and
-storage behavior.
+See [`../MODEL.md`](../MODEL.md) for model roles/swapping and
+[`../models/README.md`](../models/README.md) for the detailed Modelfile contract.
 
 ## Runtime profiles
 
@@ -177,7 +206,6 @@ bc250-ollama-profile {status|balanced|max-context|reset}
 
 ```text
 bc250-cu-status
-bc250-install-cu-manager
 bc250-40cu
 bc250-40cu {status|verify|prepare|enable|disable|restore}
 bc250-40cu {live-status|live-full|live-stock}
@@ -214,14 +242,37 @@ internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
 runs on a client; `HTTP_PORT` changes its expected web port.
 
-The benchmark writes a timestamped CSV and metadata file in the current
-directory. Context curves warn when `prompt_eval_count` stops growing, which can
-indicate silent context truncation. Treat SMU/PPT power as an uncalibrated
-comparison signal. Around 13 GiB of model weights is a practical BC-250 planning
-ceiling, not a hard limit; context/KV cache and resident services reduce available
-headroom. Important overrides include `OLLAMA_URL`, `THINK_MODE`, `REPEATS`,
-`RUN_LATENCY`, `NUM_PREDICT_SHORT`, `NUM_PREDICT_LONG`, `CTX_POINTS` and
-`THROTTLE_WINDOWS`.
+The benchmark writes timestamped CSV, JSONL and metadata files in the current
+directory. The default generation lane uses `BENCH_MODE=neutral`: a per-request
+neutral SYSTEM override and deterministic sampling for comparable model/runtime
+measurements. `BENCH_MODE=production` is the production-configuration
+comparison: it keeps the registered Modelfile SYSTEM and sampling while running the same generic workload.
+Role-specific Office/RAG/translation use-case fixtures are intentionally deferred.
+`THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
+larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
+not routinely starved by thinking; LFM2.5 keeps that larger cap even in an
+explicit `think=false` experiment because measured native reasoning persisted.
+`NUM_PREDICT_LATENCY_THINKING` can override that cap separately.
+
+```bash
+bc250-benchmark                         # generation, neutral mode
+BENCH_MODE=production bc250-benchmark
+BENCH_PROFILE=conservative bc250-benchmark
+bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
+bc250-benchmark ocr                     # office OCR fixtures
+bc250-benchmark task                    # Open WebUI 0.11.1-compatible task behavior
+bc250-benchmark agent                   # coding correctness, defaults to port 11436
+OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
+```
+
+Generation, embedding and OCR record the full request-time thermal/GPU/UMA
+telemetry set from one selected AMD DRM device; use `BC250_DRM_CARD=cardN` only
+when automatic boot-GPU selection is wrong. Task and agent runs intentionally
+keep the smaller subset useful for those short correctness/latency workloads. `RUN_THERMAL=1` applies to the
+generation lane. Treat resource figures as overlapping UMA signals, not
+independent pools. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
+for metrics, fixtures and Ollama 0.32.15 request policy. The installed copy is
+`/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
 
 ## Maintenance
 
@@ -248,7 +299,7 @@ an after-hours power action. Configuration is stored in root-readable
 bc250-code MODE INPUT [OUTPUT] [TASK...]
 bc250-code-commit [--yes]
 bc250-gitea-review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
-bc250-compare-experiments
+bc250-compare-mtp
 bc250-run-mtp {27b|4b|ID}
 ```
 
@@ -257,8 +308,10 @@ bc250-run-mtp {27b|4b|ID}
 `OLLAMA_HOST`/`OLLAMA_URL` override its endpoint. Coding helpers do not stage,
 push, approve or merge without the command's explicit local action.
 
-Experiment comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
-`NUM_PREDICT` and `PROMPT`. MTP requires a compatible external llama.cpp
+The quick MTP comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
+`NUM_PREDICT` and `PROMPT`. It is a speed-oriented Ollama-vs-llama.cpp helper;
+use `bc250-benchmark` for category quality/correctness comparisons. MTP requires
+a compatible external llama.cpp
 server binary through `LLAMACPP`; `PORT`, `CTX` and `DRAFT_N_MAX` override its
 runtime values. When supported, the runner passes `--cache-ram 0` and
 `--no-cache-idle-slots` to avoid shared serialized prompt-cache state and its

@@ -1,13 +1,13 @@
 # BC250 category: embedding
 # Ollama model: embed-jina-v5-small-retrieval-q4-k-m
-# Source: jinaai/jina-embeddings-v5-text-small-retrieval @ 06b0656fe9babb86d4a8a8fc45bcad9bd2611499
+# Source: jinaai/jina-embeddings-v5-text-small-retrieval @ e9137ac0a9d41c851de69bea36babc029b7f5fc9
 # GGUF: v5-small-retrieval-Q4_K_M.gguf
-# SHA256: e1f1d72ead1c23cbc20815f59a88f16b0757cf4ee11a8bc48793686248f08053
+# SHA256: 9440cf89f3e8a7a31a42e11b87e106dd5b344af4e0e3b6b21a96136cc8686e21
 # License: CC-BY-NC-4.0
 #
 # Retrieval embedding model:
 # 677M parameters, 1024-d embeddings, 32768-token context,
-# last-token pooling.
+# with upstream GGUF pooling metadata required by Ollama 0.32.15 embedding detection.
 
 FROM /var/lib/bc250-llm-server/gguf/embedding/v5-small-retrieval-Q4_K_M.gguf
 

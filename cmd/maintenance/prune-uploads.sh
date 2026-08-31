@@ -25,24 +25,57 @@ log(){ printf '%s %s\n' "$(date '+%F %T')" "$*"; }
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
-json="$tmpdir/files.json"
 rows_file="$tmpdir/files.tsv"
 
-curl --fail --silent --show-error --retry 3 --retry-all-errors \
-  --connect-timeout 10 --max-time 60 "${AUTH[@]}" \
-  "${OWUI_URL}/api/v1/files/?content=false" > "$json"
-
-if ! python3 - "$json" > "$rows_file" <<'PY_FILES'
-import datetime, json, sys
+page=1; fetched=0; expected_total=-1
+while :; do
+  json="$tmpdir/page-${page}.json"
+  curl --fail --silent --show-error --retry 3 --retry-all-errors \
+    --connect-timeout 10 --max-time 60 "${AUTH[@]}" \
+    "${OWUI_URL}/api/v1/files/?content=false&page=${page}" > "$json"
+  summary="$(python3 - "$json" <<'PY_PAGE'
+import json, sys
 with open(sys.argv[1], encoding="utf-8") as f:
     data = json.load(f)
 if isinstance(data, dict):
-    if isinstance(data.get("items"), list):
-        data = data["items"]
-    else:
-        data = data.get("files")
-if not isinstance(data, list):
+    items = data.get("items") if isinstance(data.get("items"), list) else data.get("files")
+    total = data.get("total", -1)
+else:
+    items, total = data, -1
+if not isinstance(items, list):
     raise SystemExit("API response is not a file list")
+try:
+    total = int(total)
+except (TypeError, ValueError):
+    total = -1
+print(len(items), total)
+PY_PAGE
+)" || { log "ERROR: invalid Open WebUI file-list JSON; aborting without deletion."; exit 1; }
+  read -r page_count page_total <<< "$summary"
+  if (( page_total >= 0 )); then
+    if (( expected_total < 0 )); then
+      expected_total=$page_total
+    elif (( page_total != expected_total )); then
+      log "ERROR: Open WebUI file total changed while listing; aborting without deletion."
+      exit 1
+    fi
+  fi
+  ((page_count > 0)) || break
+  fetched=$((fetched + page_count))
+  ((expected_total >= 0 && fetched >= expected_total)) && break
+  if ((page_count < 50)); then
+    if ((expected_total >= 0 && fetched < expected_total)); then
+      log "ERROR: Open WebUI pagination ended before the advertised total; aborting without deletion."
+      exit 1
+    fi
+    break
+  fi
+  page=$((page + 1))
+  ((page <= 10000)) || { log "ERROR: unreasonable Open WebUI pagination depth; aborting."; exit 1; }
+done
+
+if ! python3 - "$tmpdir"/page-*.json > "$rows_file" <<'PY_FILES'
+import datetime, json, sys
 
 def timestamp(value):
     if value is None: return 0
@@ -63,15 +96,23 @@ def byte_size(value):
     except (TypeError, ValueError, OverflowError):
         return -1
 
-rows=[]
-for f in data:
-    if not isinstance(f, dict): continue
-    fid=f.get("id")
-    if not fid: continue
-    ts=timestamp(f.get("created_at"))
-    meta=f.get("meta") if isinstance(f.get("meta"), dict) else {}
-    size=byte_size(meta.get("size", f.get("size")))
-    rows.append((ts, size, str(fid)))
+rows=[]; seen=set()
+for path in sys.argv[1:]:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if isinstance(data, dict):
+        data = data.get("items") if isinstance(data.get("items"), list) else data.get("files")
+    if not isinstance(data, list):
+        raise SystemExit("API response is not a file list")
+    for f in data:
+        if not isinstance(f, dict): continue
+        fid=f.get("id")
+        if not fid or str(fid) in seen: continue
+        seen.add(str(fid))
+        ts=timestamp(f.get("created_at"))
+        meta=f.get("meta") if isinstance(f.get("meta"), dict) else {}
+        size=byte_size(meta.get("size", f.get("size")))
+        rows.append((ts, size, str(fid)))
 for ts, size, fid in sorted(rows, key=lambda row: (row[0] <= 0, row[0], row[2])):
     print(f"{ts}\t{size}\t{fid}")
 PY_FILES

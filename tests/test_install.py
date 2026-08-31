@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INSTALLER = ROOT / "install"
@@ -33,7 +32,7 @@ remove_fedora_ollama
 
 
 def run_model_phase_probe() -> subprocess.CompletedProcess[str]:
-    script = r'''
+    script = r"""
 source "$1"
 script() { :; }
 require_progress_terminal() { printf 'progress-terminal\n'; }
@@ -42,7 +41,7 @@ bc250-setup-task-model() { printf 'task:%s\n' "$*"; }
 bc250-setup-coding-agent() { printf 'agentic:%s\n' "$*"; }
 HF_TOKEN=dummy
 step_7_models
-'''
+"""
     return subprocess.run(
         ["bash", "-c", script, "installer-test", str(INSTALLER)],
         input="0\n0\n\n1\n\n0\n",
@@ -81,6 +80,17 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("Refusing to install a second Ollama copy", result.stdout)
         self.assertNotIn("dnf remove", result.stdout)
 
+    def test_pre_v1_green_field_policy_is_explicit(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("green-field/test appliance", source)
+        self.assertIn("may reapply the reviewed project baseline", source)
+
+    def test_standard_ollama_version_is_used_unless_overridden(self) -> None:
+        helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
+        installer = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('VERSION="${OLLAMA_VERSION:-0.32.15}"', helper)
+        self.assertIn('requested="${OLLAMA_VERSION:-0.32.15}"', installer)
+
     def test_latest_is_not_sent_as_an_upstream_version_query(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         self.assertIn("env -u OLLAMA_VERSION sh", helper)
@@ -107,7 +117,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('bc250-model install "$category" "$selection"', source)
         self.assertIn('bc250-setup-task-model "$selection"', source)
         self.assertIn('bc250-setup-coding-agent "$selection"', source)
-        self.assertIn('bc250-model list mtp --all', source)
+        self.assertIn("bc250-model list mtp --all", source)
         self.assertIn('bc250-model install mtp "$selection" --include-disabled', source)
 
     def test_model_categories_prompt_and_run_as_separate_phases(self) -> None:
@@ -134,21 +144,29 @@ class InstallerTests(unittest.TestCase):
     def test_unattended_model_setup_defaults_to_anonymous_hugging_face(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn('if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then', source)
-        self.assertIn('export BC250_HF_ANONYMOUS=1', source)
+        self.assertIn("export BC250_HF_ANONYMOUS=1", source)
         self.assertIn("HF_TOKEN is unset; using anonymous", source)
 
-    def test_progress_terminal_is_required_only_for_selected_model_downloads(self) -> None:
+    def test_progress_terminal_is_required_only_for_selected_model_downloads(
+        self,
+    ) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
         self.assertIn("Fedora package: util-linux-script", source)
         self.assertIn("command -v script >/dev/null 2>&1; then", source)
         self.assertNotIn("require_progress_terminal\n  start_transcript", source)
-        self.assertLess(source.index("require_progress_terminal", source.index("run_model_phase()")),
-                        source.index("prepare_hf_authentication", source.index("run_model_phase()")))
+        self.assertLess(
+            source.index(
+                "require_progress_terminal", source.index("run_model_phase()")
+            ),
+            source.index(
+                "prepare_hf_authentication", source.index("run_model_phase()")
+            ),
+        )
 
     def test_tooling_helpers_require_an_explicit_model_selection(self) -> None:
         helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
         self.assertIn("[MODEL-SELECTION]", helper)
-        self.assertNotIn('SELECTION:-all', helper)
+        self.assertNotIn("SELECTION:-all", helper)
         self.assertIn('[[ -z "$selection" ]] || manager_args+=("$selection")', helper)
 
     def test_installer_prepares_40cu_for_the_exact_running_kernel(self) -> None:
@@ -156,12 +174,17 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('kernel="$(uname -r)"', source)
         self.assertIn('dnf install -y "kernel-devel-$kernel"', source)
         self.assertIn("bc250-40cu prepare", source)
-        self.assertLess(source.index("step_6_prepare_40cu"), source.index("step_7_models"))
+        self.assertLess(
+            source.index("step_6_prepare_40cu"), source.index("step_7_models")
+        )
         self.assertNotIn("BC250_ASSUME_YES=1 bc250-40cu enable", source)
 
     def test_rpm_action_distinguishes_upgrade_from_same_nevra_reinstall(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn('[[ "$installed_nevra" != "$candidate_nevra" ]] || dnf_action=reinstall', source)
+        self.assertIn(
+            '[[ "$installed_nevra" != "$candidate_nevra" ]] || dnf_action=reinstall',
+            source,
+        )
         self.assertIn('[[ "$installed_after" == "$candidate_nevra" ]]', source)
 
     def test_verification_runs_both_reports_before_returning_failure(self) -> None:

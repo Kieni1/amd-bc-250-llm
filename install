@@ -24,10 +24,11 @@ Usage: sudo ./install [--rpm FILE-OR-DIRECTORY]
        sudo ./install --models-only
 
 The binary bc250-llm-server x86_64 RPM is expected beside this script. Use
---rpm only to select a different RPM file or directory. The script grows the
-root filesystem, updates Fedora, installs the RPM, normalizes official Ollama,
-applies memory/swap profiles, prepares 40-CU support, offers model setup and
-runs verification.
+--rpm only to select a different RPM file or directory. Before 1.0 this installer
+assumes a green-field/test appliance and may reapply the reviewed project baseline
+instead of preserving unrelated host tuning. It grows the root filesystem, updates
+Fedora, installs the RPM, normalizes official Ollama, applies memory/swap profiles,
+prepares 40-CU support, offers model setup and runs verification.
 
 Run the same command again after a requested reboot. The installer prepares but
 does not enable experimental CUs; that remains an explicit operator action.
@@ -37,7 +38,7 @@ Use --models-only to resume optional production, task, agentic, embedding,
 experiment and MTP model prompts without repeating system setup.
 
 Set BC250_UPDATE_OLLAMA=1 to explicitly refresh an existing official Ollama.
-Set OLLAMA_VERSION to install a particular version instead of latest.
+The package standard is Ollama 0.32.15; set OLLAMA_VERSION only for a deliberate test override.
 USAGE
 }
 
@@ -358,7 +359,7 @@ wait_for_ollama() {
 step_4_install_ollama() {
   heading "4. INSTALL OFFICIAL OLLAMA"
   local requested installed="" run_installer=0 official=/usr/local/bin/ollama
-  requested="${OLLAMA_VERSION:-latest}"
+  requested="${OLLAMA_VERSION:-0.32.15}"
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
 
@@ -501,6 +502,10 @@ run_model_phase() {
     mtp) bc250-model install mtp "$selection" --include-disabled ;;
     *) bc250-model install "$category" "$selection" ;;
   esac
+  if [[ "$category" == embedding ]]; then
+    echo "RAG is ready for configuration. Keep source documents operator-managed under /srv/bc250-documents/."
+    echo "See /usr/share/doc/bc250-llm-server/RAG.md; bulk libraries can start with: sudo bc250-rag-import plan"
+  fi
 }
 
 step_7_models() {

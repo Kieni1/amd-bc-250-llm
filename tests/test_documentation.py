@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 import re
 import subprocess
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_DOC_TREES = {
@@ -42,6 +41,7 @@ class DocumentationTests(unittest.TestCase):
         allowed = dispatcher_aliases() | {
             "coding-agent",
             "cu-live-manager",
+            "documents",
             "gfx1013",
             "llm-server",
             "night-shutdown",
@@ -57,6 +57,21 @@ class DocumentationTests(unittest.TestCase):
                 for suffix in re.findall(r"\bbc250-([a-z0-9-]+)\b", block):
                     self.assertIn(suffix, allowed, f"{relative}: bc250-{suffix}")
 
+    def test_internal_markdown_links_resolve(self) -> None:
+        for path in ROOT.rglob("*.md"):
+            relative = path.relative_to(ROOT)
+            if any(part in EXCLUDED_DOC_TREES for part in relative.parts):
+                continue
+            text = path.read_text(encoding="utf-8")
+            for target in re.findall(r"\[[^]]*\]\(([^)]+)\)", text):
+                if target.startswith(("http://", "https://", "mailto:", "#")):
+                    continue
+                local = target.split("#", 1)[0]
+                if local:
+                    self.assertTrue(
+                        (path.parent / local).exists(), f"{relative}: {target}"
+                    )
+
     def test_documented_model_sets_match_current_modelfiles(self) -> None:
         names = set()
         for path in (ROOT / "models/modelfiles").glob("*.Modelfile"):
@@ -70,8 +85,12 @@ class DocumentationTests(unittest.TestCase):
         experiment_doc = (ROOT / "models/experiments/README.md").read_text(
             encoding="utf-8"
         )
-        documented_experiments = set(re.findall(r"(?m)^exp-[a-z0-9.-]+$", experiment_doc))
-        self.assertEqual(documented_experiments, {name for name in names if name.startswith("exp-")})
+        documented_experiments = set(
+            re.findall(r"(?m)^exp-[a-z0-9.-]+$", experiment_doc)
+        )
+        self.assertEqual(
+            documented_experiments, {name for name in names if name.startswith("exp-")}
+        )
 
         recommended = (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",

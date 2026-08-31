@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -104,10 +103,13 @@ class RuntimeConvenienceTests(unittest.TestCase):
     def test_temperature_watch_is_default_and_once_is_available(self) -> None:
         source = (ROOT / "cmd/monitoring/check-temp.sh").read_text(encoding="utf-8")
         self.assertIn('""|-w|--watch)', source)
-        self.assertIn('--once) show_temps', source)
+        self.assertIn("--once) show_temps", source)
         result = subprocess.run(
             [str(ROOT / "cmd/monitoring/check-temp.sh"), "--help"],
-            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("continuous watch is the default", result.stdout)
@@ -124,11 +126,76 @@ class RuntimeConvenienceTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn('[[ -d "$cpu" ]] || continue', source)
 
-    def test_benchmark_flags_context_plateau_and_uncalibrated_power(self) -> None:
-        benchmark = (ROOT / "cmd/benchmark/compare-models.sh").read_text(encoding="utf-8")
-        sensors = (ROOT / "cmd/benchmark/log_sensors.sh").read_text(encoding="utf-8")
-        self.assertIn("prompt_eval_count stopped growing", benchmark)
-        self.assertIn("uncalibrated", sensors)
+    def test_benchmark_dispatches_structured_suites_and_records_resource_peaks(
+        self,
+    ) -> None:
+        wrapper = (ROOT / "cmd/benchmark/compare-models.sh").read_text(encoding="utf-8")
+        generation = (ROOT / "cmd/benchmark/generation-benchmark.py").read_text(
+            encoding="utf-8"
+        )
+        categories = (ROOT / "cmd/benchmark/category-benchmark.py").read_text(
+            encoding="utf-8"
+        )
+        common = (ROOT / "cmd/benchmark/benchmark_common.py").read_text(
+            encoding="utf-8"
+        )
+        for expected in (
+            "embeddings|embedding|ocr|task|agent|coding",
+            "generation-benchmark.py",
+            "Ollama 0.32.15",
+        ):
+            self.assertIn(expected, wrapper)
+        for expected in (
+            "BENCH_MODE",
+            "NEUTRAL_SYSTEM",
+            'payload["system"] = NEUTRAL_SYSTEM',
+            "THINK_MODE",
+            "resolve_think_policy",
+            "done_reason=stop",
+            "RUN_THERMAL",
+            "temp_max_c",
+            "mem_available_min_mib",
+            "swap_used_max_mib",
+            "vram_used_max_bytes",
+            "gtt_used_max_bytes",
+            "client.digest(model)",
+        ):
+            self.assertIn(expected, generation)
+        self.assertNotIn('"think": false', generation.lower())
+        for expected in (
+            "recall_at_1",
+            "cross_mrr",
+            "OCR_PROMPTS",
+            "word_precision",
+            "word_f1",
+            "char_similarity",
+            "field_order_score",
+            "task_prompt",
+            "benchmark_agent",
+            "validate_agent_output",
+            '"keep_alive": 0',
+        ):
+            self.assertIn(expected, categories)
+        for expected in (
+            "mem_info_vram_used",
+            "mem_info_gtt_used",
+            "seconds_ge_85c",
+            "gpu_clock_min_mhz",
+            "discover_amdgpu_device",
+            "amdgpu_edge_temperature",
+        ):
+            self.assertIn(expected, common)
+        result = subprocess.run(
+            [str(ROOT / "cmd/benchmark/compare-models.sh"), "--help"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("BENCH_MODE=neutral", result.stdout)
+        self.assertIn("Ollama 0.32.15", result.stdout)
+        self.assertIn("bc250-benchmark agent", result.stdout)
 
 
 class CuStatusTests(unittest.TestCase):

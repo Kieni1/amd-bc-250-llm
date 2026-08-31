@@ -1,0 +1,9 @@
+case_id	document_placeholder	question_language	source_language	question	correct_source_retrieved	correct_passage	answer_matches_passage	refused_if_unavailable	response_language	response_time_s	notes
+01	[GERMAN_SEARCHABLE_PDF]	de	de	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[de]	[SECONDS]	[NOTES]
+02	[FRENCH_SEARCHABLE_PDF]	fr	fr	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[fr]	[SECONDS]	[NOTES]
+03	[FRENCH_SOURCE_GERMAN_QUERY]	de	fr	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[de]	[SECONDS]	[NOTES]
+04	[GERMAN_SOURCE_FRENCH_QUERY]	fr	de	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[fr]	[SECONDS]	[NOTES]
+05	[INVOICE_OR_REFERENCE_NUMBERS]	de|fr|en	de|fr|en	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[LANG]	[SECONDS]	[NOTES]
+06	[CONFLICTING_OR_OUTDATED_VERSION]	de|fr|en	de|fr|en	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[LANG]	[SECONDS]	[NOTES]
+07	[UNANSWERED_CONTROL]	de|fr|en	-	[QUESTION_NOT_ANSWERED_BY_LIBRARY]	[N/A]	[N/A]	[N/A]	[Y/N]	[LANG]	[SECONDS]	[NOTES]
+08	[SCANNED_PDF_AFTER_OCR]	de|fr|en	de|fr|en	[QUESTION]	[Y/N]	[Y/N]	[Y/N]	[N/A]	[LANG]	[SECONDS]	[NOTES]

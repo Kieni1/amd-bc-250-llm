@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import glob
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
-import tomllib
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
+import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging/bc250-llm-server.spec"
@@ -40,13 +40,16 @@ def fail(message: str) -> None:
 def included_files():
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
-        if path.is_file() and not any(part in EXCLUDED_TREES for part in relative.parts):
+        if path.is_file() and not any(
+            part in EXCLUDED_TREES for part in relative.parts
+        ):
             yield relative, path
 
 
 def check_required_inputs() -> None:
     required = (
         "VERSION",
+        "MODEL.md",
         "Makefile",
         "install",
         "uninstall.sh",
@@ -61,7 +64,9 @@ def check_required_inputs() -> None:
         "cmd/system/40cu-module.sh",
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "models/mtp/models.toml",
+        "examples/benchmark/agent-cases.json",
         "docs/FILESTRUCTURE.md",
+        "docs/RAG.md",
         "docs/GFX1013-COMPUTE-QUEUES.md",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
@@ -110,7 +115,9 @@ def check_version() -> None:
         return
     version_match = re.search(r"^Version:\s*(\S+)\s*$", spec, re.MULTILINE)
     release_match = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
-    changelog_match = re.search(r"^%changelog\s*$\n\*[^\n]* - (\S+)\s*$", spec, re.MULTILINE)
+    changelog_match = re.search(
+        r"^%changelog\s*$\n\*[^\n]* - (\S+)\s*$", spec, re.MULTILINE
+    )
     if not version:
         fail("VERSION is empty")
     elif version_match is None or version_match.group(1) != version:
@@ -149,7 +156,16 @@ def check_configuration() -> None:
 
 
 def check_layout_and_docs() -> None:
-    for relative in ("cmd", "config", "docs", "examples", "models", "packaging", "scripts", "tests"):
+    for relative in (
+        "cmd",
+        "config",
+        "docs",
+        "examples",
+        "models",
+        "packaging",
+        "scripts",
+        "tests",
+    ):
         if not (ROOT / relative).is_dir():
             fail(f"required source group is missing: {relative}/")
     for relative, path in included_files():
@@ -189,18 +205,39 @@ def check_dispatcher_and_runtime_contracts() -> None:
     result = subprocess.run(
         [str(ROOT / "packaging/bc250"), "--list-aliases"],
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=False,
     )
     aliases = result.stdout.splitlines()
     required = {
-        "40cu", "benchmark", "check-temp", "code", "code-commit",
-        "compare-experiments", "cu-status", "fetch-embeddings", "fetch-experiments", "fetch-models",
-        "fetch-mtp", "gitea-review", "install-cu-manager", "install-ollama",
-        "maintenance", "memory-profile", "model", "ocr", "ollama-profile", "pull-embedding-model",
-        "run-mtp", "setup-coding-agent", "setup-task-model", "status", "swap-profile",
-        "uninstall", "uninstall-info", "verify", "verify-lan",
+        "40cu",
+        "benchmark",
+        "check-temp",
+        "code",
+        "code-commit",
+        "compare-mtp",
+        "cu-status",
+        "fetch-embeddings",
+        "fetch-experiments",
+        "fetch-models",
+        "fetch-mtp",
+        "gitea-review",
+        "install-ollama",
+        "maintenance",
+        "memory-profile",
+        "model",
+        "ocr",
+        "rag-import",
+        "ollama-profile",
+        "run-mtp",
+        "setup-coding-agent",
+        "setup-task-model",
+        "status",
+        "swap-profile",
+        "uninstall",
+        "uninstall-info",
+        "verify",
+        "verify-lan",
     }
     if result.returncode != 0:
         fail(f"dispatcher alias listing failed: {result.stderr.strip()}")
@@ -316,12 +353,13 @@ def check_upstream_manifest() -> None:
     spec = SPEC.read_text(encoding="utf-8")
     for source in sources:
         if isinstance(source, dict) and source.get("commit") not in spec:
-            fail(f"upstream pin is not referenced by the RPM spec: {source.get('id', 'unknown')}")
+            fail(
+                f"upstream pin is not referenced by the RPM spec: {source.get('id', 'unknown')}"
+            )
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts/prepare-sources.py"), "--print-files"],
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=False,
     )
     if result.returncode != 0:

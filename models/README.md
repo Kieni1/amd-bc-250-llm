@@ -84,12 +84,14 @@ same-name operator file overrides the packaged template and survives upgrades.
 ## Download state and authentication
 
 After a successful manager-downloaded GGUF, an adjacent `*.bc250.json` file
-records source identity and calculated SHA-256. A non-empty GGUF with a recorded valid digest
-is reused only when repository, revision and GGUF filename still match.
-Modelfile-only changes therefore regenerate the Ollama registration without
-re-downloading. Use `--refresh` to
-re-fetch a matching source deliberately, including a moving revision such as
-`latest`.
+records source identity, calculated SHA-256 and file stat metadata. Unchanged
+size/mtime/ctime use a fast reuse path. Legacy state or changed stat metadata
+forces a full SHA-256 check before the existing GGUF can be reused, so modified
+or corrupted bytes are not accepted merely because the sidecar still exists.
+Repository, revision and GGUF filename must also match. Modelfile-only changes
+therefore regenerate the Ollama registration without downloading again. Use
+`--refresh` to deliberately fetch new source bytes, including a moving revision
+such as `latest`.
 
 For experimental OCR definitions with remote `hf.co/...` FROM, Ollama owns the
 source blobs and projector in its normal model store; `bc250-model` therefore
@@ -103,8 +105,10 @@ tokens continue anonymously and are not persisted. Use
 
 ## Storage and cleanup
 
-Source GGUFs remain below `/var/lib/bc250-llm-server/gguf/`. Ollama imports
-model layers into one of these separate stores:
+Source GGUFs remain below `/var/lib/bc250-llm-server/gguf/`. `bc250-model cleanup`
+removes local source/state only after an Ollama-backed registration is confirmed
+removed; a failed `ollama rm` leaves the local source intact and returns failure.
+Ollama imports model layers into one of these separate stores:
 
 ```text
 /var/lib/bc250-llm-server/ollama/main

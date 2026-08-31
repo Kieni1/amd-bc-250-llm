@@ -10,8 +10,8 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.9.6
-Release:        0.4.testing%{?dist}
+Version:        0.9.7
+Release:        0.8.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -228,6 +228,61 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.8.testing
+- Fix task JSON compatibility, LFM latency budgeting and agent reasoning-starvation diagnostics.
+- Add harder multilingual retrieval fixtures and retain the operator comparison model pool.
+- Add Qwen3.8 4B, Granite 4.2 3B/8B, Ling 3.0 Tiny, LFM2.5 2.6B task and Qwen2.5 Coder 7B comparison Modelfiles.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.7.testing
+- Give reasoning-capable latency runs enough shared num_predict budget to reach final content.
+- Remove semantic request-id prompt noise and record answer/thinking presence explicitly.
+- Persist context-truncation diagnostics in JSONL and clarify qualitative chat capture semantics.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.6.testing
+- Pin Open WebUI v0.11.1 and retain the tested Tika 3/local RAG architecture.
+- Expose 0.11.1 task parameters without speculative tuning and keep knowledge retention off.
+- Refresh Open WebUI task/RAG documentation and upgrade smoke-test guidance.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.5.testing
+- Harden model/source integrity, cold benchmark state and RAG provenance validation
+- Debloat compatibility commands, rename MTP quick comparison and add CI linting
+- Harden RAG error handling, manifest source containment and cache-free source archives
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.4.testing
+- Fix Jina embedding metadata source, complete upload pruning pagination and agent unload policy.
+- Bind benchmark telemetry to the selected AMD DRM device and improve OCR hallucination scoring.
+- Align task fixtures with Open WebUI 0.11.0 behavior and harden fresh-install privacy defaults.
+- Add focused cleanup/dimension/reasoning regressions and clarify production-configuration benchmarking.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.3.testing
+- Add a compact agent/coding correctness benchmark on the isolated agent service.
+- Harden benchmark telemetry cleanup and add OCR key-field reading-order scoring.
+- Refresh model/install/benchmark documentation and add the pre-1.0 MODEL.md guide.
+
+* Sun Aug 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.2.testing
+- Split benchmarking into neutral/production generation, embedding, OCR and task suites.
+- Add request-time thermal/UMA telemetry, model digests and JSONL response sidecars.
+- Align benchmark request shapes with Ollama 0.32.15 and model-specific think policies.
+- Correct Qwen3.6 FableVibes sampling and the production Qwen3.5 multilingual SYSTEM prompt.
+- Add a source-grounded Open WebUI RAG template and model-specific OCR prompts.
+
+* Thu Aug 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.7.testing
+- Standardize the tested Ollama runtime on 0.32.15 while retaining explicit comparison overrides.
+- Overhaul model benchmarking with moderate/conservative profiles, prefill/context/headroom metrics and embedding-specific tests.
+- Make the moderate Open WebUI RAG baseline 1500/200/Top-K-8 and disable retrieval-query rewriting for the measured baseline.
+- Clean temporary Ollama-HF backing registrations and allow explicit pruning of an emptied generated RAG language lane.
+
+* Wed Aug 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.6.testing
+- Add metadata-aware incremental RAG import for the public/confidential COLLECTION/active layout.
+- Route authoritative German originals and French translations into separate Open WebUI knowledge bases.
+- Verify Markdown source PDF checksums locally; keep remote pruning explicit.
+
+* Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.5.testing
+- Add a privacy-oriented Open WebUI/Tika RAG baseline for German/French/English office documents
+- Package deterministic chunking/retrieval defaults and Jina query/document prefixes for fresh installs
+- Report RAG embedding/extraction configuration without loading the embedding model
+- Add a document-free pilot evaluation template and explicit full-backup/hardening guidance
+
 * Tue Aug 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.6-0.4.testing
 - Fix OCR alias validation and rename the GLM experiment to reflect its ggml-org source
 - Explicitly disable llama.cpp idle-slot prompt caching for MTP when supported

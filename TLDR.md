@@ -16,7 +16,9 @@ sudo ./install --models-only
 
 The model stage asks separately for production, task, agentic, embedding,
 experiment and MTP models. Enter skips only the current category; MTP entries
-remain disabled by default outside an explicit guided selection.
+remain disabled by default outside an explicit guided selection. Before 1.0 the
+installer assumes a green-field/test appliance and may reapply project defaults.
+See [`MODEL.md`](MODEL.md) before keeping local model overrides.
 
 ## Verify and open the UI
 
@@ -29,6 +31,9 @@ bc250-verify-lan SERVER_IP
 Open `http://SERVER_IP/` from the trusted LAN and register the first
 administrator. HTTP is not encrypted.
 
+For a document/RAG pilot, install the document answer model and embedding model,
+then follow [`docs/RAG.md`](docs/RAG.md). Operator documents live under `/srv/bc250-documents`; run `sudo bc250-rag-import plan` before any bulk sync.
+
 ## Models
 
 ```bash
@@ -38,6 +43,7 @@ bc250-model list task
 bc250-model list agentic
 bc250-model list embedding
 bc250-ocr list
+sudo bc250-rag-import plan /srv/bc250-documents
 
 sudo bc250-fetch-models
 sudo bc250-fetch-experiments
@@ -71,7 +77,12 @@ see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 ## Operations
 
 ```bash
-bc250-benchmark
+bc250-benchmark                       # neutral generation comparison
+BENCH_MODE=production bc250-benchmark    # generic workload + deployed config
+bc250-benchmark embeddings
+bc250-benchmark ocr
+bc250-benchmark task
+bc250-benchmark agent                 # dedicated agent correctness lane, port 11436
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
 

@@ -5,7 +5,7 @@
 #
 # Intended role:
 # - Fast office/general assistant
-# - Candidate replacement for prod-qwen3-4b-lmstudio-q6-k
+# - Experimental small-model comparison against the current production assistants
 #
 # IMPORTANT:
 # - This profile uses Qwen3.5 NON-THINKING sampling.

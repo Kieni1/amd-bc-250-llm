@@ -6,8 +6,8 @@ Wants=network-online.target tika.service
 
 [Container]
 ContainerName=open-webui
-# v0.11.0, pinned OCI index digest.
-Image=ghcr.io/open-webui/open-webui@sha256:72c0ba641ba75e7aa52655cb242570906ececd09b1140fb736483038a22b3228
+# v0.11.1, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:6bb1fbe8ab0a3e0456067f493044ffb66a30a65a34be47f6a5862176a370dd16
 Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
@@ -20,10 +20,37 @@ DropCapability=all
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 Environment=ENABLE_OPENAI_API=false
+# Fresh-install privacy baseline. Operators can deliberately re-enable these
+# application features later if their local policy/use case requires them.
+Environment=ENABLE_COMMUNITY_SHARING=false
+Environment=ENABLE_CODE_EXECUTION=false
+Environment=ENABLE_CODE_INTERPRETER=false
+Environment=ENABLE_MEMORIES=false
+# Open WebUI 0.11.1 task parameters are intentionally left at upstream defaults
+# until the dedicated Gemma 3 1B task benchmark justifies a tuned profile.
+Environment="TASK_MODEL_PARAMS={}"
 Environment=RAG_EMBEDDING_ENGINE=ollama
 Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m
+Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11434
+# Moderate BC-250 RAG baseline; conservative 1000/100/Top-K-5 is documented.
+Environment=RAG_TEXT_SPLITTER=token
+Environment=CHUNK_SIZE=1500
+Environment=CHUNK_OVERLAP=200
+Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true
+Environment=RAG_TOP_K=8
+Environment=RAG_RELEVANCE_THRESHOLD=0
+# Office/RAG baseline: do not silently replace missing document evidence with model knowledge.
+Environment="RAG_TEMPLATE=Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
+Environment=ENABLE_RAG_HYBRID_SEARCH=false
+Environment=ENABLE_ASYNC_EMBEDDING=false
+Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false
+# Keep removed knowledge files disposable; local authoritative sources remain under /srv.
+Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false
+Environment="RAG_EMBEDDING_QUERY_PREFIX=Query: "
+Environment="RAG_EMBEDDING_CONTENT_PREFIX=Document: "
 Environment=CONTENT_EXTRACTION_ENGINE=tika
 Environment=TIKA_SERVER_URL=http://tika:9998
+Environment=TIKA_SERVER_VERSION=3
 Environment=SCARF_NO_ANALYTICS=true
 Environment=DO_NOT_TRACK=true
 

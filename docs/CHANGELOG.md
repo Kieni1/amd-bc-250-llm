@@ -1,5 +1,193 @@
 # Changelog
 
+## 0.9.7-0.8.testing - 2026-08-31
+
+Use the first full 0.9.7-0.7 production/category run to tighten benchmark
+interpretation rather than changing production model profiles. Keep LFM2.5 on
+the reasoning-capable latency budget even during explicit `think=false` tests,
+reduce natural-stop warning noise, and bump generation metadata to 7.3.
+
+Match Open WebUI 0.11.1 task JSON extraction while retaining a separate strict
+raw-JSON signal and an informational language hint. Give agent fixtures enough
+shared budget for native reasoning, reject empty final code, and capture thinking,
+answer presence, `eval_count` and `done_reason`. Make the embedding fixture harder
+with multilingual near-duplicate/conflicting office facts.
+
+Retain the operator's broader experimental comparison pool for the next full
+rerun and add compact Modelfiles for Qwen3.8 4B Distill Q6_K, Granite 4.2 3B/8B,
+Ling 3.0 Tiny, LFM2.5 2.6B Q6_K as a task challenger, and Qwen2.5-Coder 7B
+Q5_K_M (single-file Unsloth GGUF) as a coding baseline. GLM-OCR and OvisOCR2
+remain the packaged OCR comparison pair.
+
+## 0.9.7-0.7.testing - 2026-08-30
+
+Correct generation-latency interpretation for reasoning-capable models after the
+first full JSONL review. Keep the existing 96/64-token latency cap for explicit
+non-thinking profiles, but use 512/384 for policies where reasoning can consume
+the shared Ollama `num_predict` budget. Preserve `NUM_PREDICT_LATENCY` as a global
+override and add an optional `NUM_PREDICT_LATENCY_THINKING` split override.
+
+Remove the semantic `[reqid ...]` cache-busting text in favor of harmless leading
+blank-line prompt variants. Record whether a streamed final answer actually
+started plus answer/thinking character counts, warn when a latency request reaches
+`done_reason=length` without final content, and persist context-truncation warnings
+and near-limit notes in JSONL. Clarify that streamed `/api/chat` records are the
+preferred qualitative source for families whose raw `/api/generate` output may
+contain native reasoning markers. Generation benchmark metadata is now 7.2.
+
+## 0.9.7-0.6.testing - 2026-08-30
+
+Upgrade the digest-pinned Open WebUI baseline from v0.11.0 to v0.11.1 for its
+security/access-control, RAG/knowledge, streaming and native Ollama reasoning-history
+fixes while retaining the existing three-Ollama/Tika architecture. Keep Tika on
+major version 3 and explicitly leave knowledge-file retention disabled.
+
+Expose the new `TASK_MODEL_PARAMS` control at `{}` rather than introducing an
+unmeasured task-sampling profile. Refresh the task benchmark compatibility labels,
+RAG/upgrade documentation and smoke-test guidance without changing the compact task
+prompts or enabling ORJSON/new agentic Open WebUI features.
+
+## 0.9.7-0.5.testing - 2026-08-30
+
+Harden manager-owned GGUF reuse with schema-2 state metadata: unchanged size,
+mtime and ctime use the fast path; changed/legacy state is SHA-256 verified before
+reuse. Model cleanup now retains local source files when an Ollama registration
+cannot be removed.
+
+Require confirmed model unload before measurements labelled cold, normalize
+scheme-less Ollama hosts, and let agent benchmarks inherit deployed sampling by
+default (`AGENT_TEMPERATURE` remains an explicit deterministic override).
+
+Make RAG front matter a strict documented YAML subset, require `source_file` to
+remain inside its collection's `sources/` directory, and reject active/source
+symlink escapes. Protect reusable RPM source archives and the generated Cargo
+vendor archive with local SHA-256 sidecars; `sources-check` now verifies them.
+
+Remove the dead sensor logger and obsolete `install-cu-manager` /
+`pull-embedding-model` compatibility commands. Rename the narrow speed-only
+experiment helper to `bc250-compare-mtp`. CI now runs on pushes and pull requests
+and adds Fedora Ruff/ShellCheck before the RPM build. Follow-up hardening catches
+malformed Open WebUI sync response types cleanly, rejects tab-indented RAG metadata,
+keeps install-manifest sources inside the source tree, and excludes Ruff/Python caches
+from handoff/source archives.
+
+## 0.9.7-0.4.testing - 2026-08-30
+
+Fix the reviewed Jina embedding source to the upstream Q4_K_M GGUF carrying
+`pooling_type` metadata, paginate the complete Open WebUI upload inventory before
+pruning, and make the agent benchmark respect the isolated service residency
+policy with guaranteed immediate unload.
+
+Bind benchmark thermal/GPU/VRAM/GTT sampling to one selected AMD DRM device,
+use its edge/on-die temperature for the 80/83/85 C thresholds, and bump generation
+benchmark metadata to 7.1 for the changed telemetry semantics. Add embedding
+dimension validation and exception-safe per-model unload cleanup.
+
+Make OCR quality scoring penalize hallucinated output with token precision/F1 and
+normalized character similarity while retaining exact required-field/order checks.
+Align compact task fixtures with Open WebUI 0.11.0 message-window/tag/query
+behavior, remove the legacy experiment helper's global `think:false`, and set a
+fresh-install Open WebUI privacy baseline for sharing, code execution/interpreter
+and memories. Clarify that `BENCH_MODE=production` remains a generic
+production-configuration comparison; role-specific use-case benchmarking stays
+deferred.
+
+## 0.9.7-0.3.testing - 2026-08-30
+
+Add a compact `bc250-benchmark agent` lane for the isolated port-11436 service.
+The deterministic fixtures validate Bash/Python syntax and required structured
+output without executing model-generated code. This keeps coding correctness
+visible without adding a separate benchmark framework or dependency.
+
+Harden embedding/OCR telemetry cleanup so sampler threads are stopped on request
+errors. OCR now also reports required-field reading-order score. Task telemetry
+and lighter category metadata remain intentionally unchanged.
+
+Refresh benchmark, model and installation documentation, correct the source-tree
+benchmark link, add `MODEL.md`, and document the pre-1.0 green-field installer
+policy and intentionally flexible model revisions.
+
+## 0.9.7-0.2.testing - 2026-08-30
+
+Refactor `bc250-benchmark` into a thin dispatcher with stdlib-only Python suites
+for generation, embeddings, OCR and the isolated Open WebUI task model. Generation
+now separates a neutral cross-model mode from production Modelfile behavior, uses
+model-family `think` policies compatible with Ollama 0.32.15, records response
+JSONL and model digests, and treats short `done_reason=stop` separately from a
+normal `length` limit.
+
+Add request-time BC-250 telemetry for peak/p95 temperature, time at 80/83/85 C,
+GPU busy/clock range, AMDGPU VRAM/GTT counters, minimum `MemAvailable`, maximum
+swap use and Ollama allocation. `RUN_THERMAL=1` adds sustained decode windows.
+Resource values are documented as overlapping UMA signals rather than independent
+pools.
+
+Add multilingual office fixtures and quality metrics for Jina/Qwen embeddings,
+GLM/dots/Ovis/Chandra OCR and Open WebUI 0.11-style title/tag/retrieval-query
+tasks. OCR prompts are model-specific and preserve source language.
+
+Correct Qwen3.6 FableVibes to upstream `1.0 / 0.95 / 20` sampling, replace the
+production Qwen3.5 stale experimental SYSTEM with the multilingual office prompt,
+and add a source-grounded Open WebUI RAG template that reports insufficient
+document evidence instead of silently falling back to model knowledge.
+
+## 0.9.6-0.7.testing - 2026-08-27
+
+Make Ollama **0.32.15** the package-standard runtime for BC-250 smoke tests; the
+official installer helper now requests that version unless an operator deliberately
+sets `OLLAMA_VERSION`. Verification and diagnostics warn, rather than fail, when a
+different Ollama runtime is being compared.
+
+Overhaul `bc250-benchmark` around useful BC-250/office measurements instead of a
+single generation tok/s figure. The default `moderate` profile now separates cold
+model-switch latency, warm latency, loaded decode throughput, document-prefill
+throughput, context-capacity/truncation behavior, loaded Ollama allocation and host
+memory/swap headroom. `conservative` is a shorter lower-context pass. Optional
+embedding benchmarking uses `/api/embed` with a multilingual office batch; OCR
+remains a real-page quality test through `bc250-ocr`. Dedicated task/agent stores
+can be measured by pointing `OLLAMA_URL` at ports 11435/11436.
+
+Make the fresh-install RAG baseline **moderate** at 1500-token chunks, 200 overlap
+and Top K 8. Keep 1000/100/5 as the documented conservative alternative. Retrieval
+query generation is disabled for the baseline so embedding/chunking quality is
+measured before task-model query rewriting is introduced. Documentation now
+distinguishes reindexing from source re-upload/re-sync.
+
+`modelctl.py` removes redundant temporary `hf.co/...` OCR registrations after a
+friendly packaged alias is created, while retaining safe status handling if cleanup
+cannot occur. `bc250-rag-import --prune` can also clear the final stale remote file
+when a generated Originals/Français lane has become locally empty.
+
+## 0.9.6-0.6.testing - 2026-08-26
+
+Add `bc250-rag-import` for the operator-owned `/srv/bc250-documents` tree. It
+validates active Markdown front matter and source-PDF SHA-256 provenance, then
+incrementally syncs each collection into separate Originals and Français Open
+WebUI knowledge bases while keeping public/confidential boundaries distinct.
+German originals remain authoritative; French translations are intended for
+French queries. Remote files removed locally are retained unless `--prune` is
+explicitly requested.
+
+The package now creates `/srv/bc250-documents` as `root:root` mode `0750` and
+ships a metadata-only Markdown template. No real office documents or API keys
+are packaged.
+
+## 0.9.6-0.5.testing - 2026-08-25
+
+Add a privacy-oriented Open WebUI/Tika RAG baseline for German/French/English
+office documents without adding another retrieval service or ingesting example
+business data. Fresh installs now start with deterministic 1000/100 token
+chunking, Top K 5, Markdown-header splitting, vector-only search, sequential
+Ollama embeddings and Jina `Query:` / `Document:` prefixes.
+
+`bc250-verify` reports the Open WebUI embedding/extraction defaults and checks
+that the configured embedding model is registered with main Ollama without
+running an embedding request. The installer points operators to the new RAG
+guide after an embedding selection. Documentation covers Open WebUI v0.11.0's
+Native-mode knowledge behavior, DE/FR cross-language evaluation, OCR-first
+scans, reindexing, confidential data paths and complete stopped-instance
+backups. A blank pilot evaluation TSV is packaged; no real documents are.
+
 ## 0.9.6-0.4.testing - 2026-08-25
 
 Correct `bc250-ocr install/show` alias validation so an unknown OCR model exits

@@ -5,20 +5,21 @@
 ```bash
 sudo bc250-setup-coding-agent
 
-# Current recommended model
+# Current reasoning-oriented starting point
 sudo bc250-setup-coding-agent agentic-ornith15-9b-ornith-q5-k-m
 ```
 
 The helper creates `ollama-agent.service` on port `11436` with its own model
 store. Current choices are:
 
-- `agentic-ornith15-9b-ornith-q5-k-m` — recommended starting point;
-- `agentic-qwable9b-empero-q6-k` — comparison model.
+- `agentic-ornith15-9b-ornith-q5-k-m` — native-reasoning agent/coding candidate;
+- `agentic-qwen25-coder7b-unsloth-q5-k-m` — Qwen2.5-Coder non-native-reasoning coding
+  baseline for command/code correctness comparisons.
 
-With no selection, the helper lists the current choices and prompts. Keep port
-`11436` blocked from untrusted networks. Add
-`http://host.containers.internal:11436` to Open WebUI only when interactive
-agent access is wanted.
+With no selection, the helper lists the choices and prompts. Keep port `11436`
+blocked from untrusted networks. Add `http://host.containers.internal:11436` to
+Open WebUI only when interactive agent access is wanted. Use this service
+exclusively rather than alongside a large main-model workload.
 
 ## Local coding helper
 
@@ -26,14 +27,15 @@ agent access is wanted.
 bc250-code review src/app.py review.md
 bc250-code refactor src/app.py src/app.refactored.py \
   "Keep the public API stable"
-CODING_AGENT_MODEL=agentic-qwable9b-empero-q6-k \
+CODING_AGENT_MODEL=agentic-qwen25-coder7b-unsloth-q5-k-m \
   bc250-code document src/app.py docs.md
 ```
 
 Modes are `generate`, `refactor`, `review`, `document`, `test` and `commit`.
-Generated output is never applied automatically; review it and run the real
-test suite. Main, task and agent services share one GPU, so avoid overlapping
-large requests when predictable memory use matters.
+Generated output is never applied automatically; review it and run the real test
+suite. `bc250-benchmark agent` checks final Bash/Python/JSON correctness without
+executing model-generated code and records native thinking separately when the
+runtime exposes it.
 
 ## Local commits and Gitea review
 

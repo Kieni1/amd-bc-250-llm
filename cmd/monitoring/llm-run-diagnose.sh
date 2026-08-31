@@ -144,10 +144,12 @@ else wn "dmesg unavailable (need sudo)"; fi
 
 # ---------------------------------------------------------------------------
 sec "6. VERSIONS  (compare these when investigating a performance delta)"
-exp "Mesa 26.1.4 | governor 0.4.12.  The installed Ollama version is reported without enforcing an old pin."
+exp "Mesa 26.1.4 | governor 0.4.12 | package-standard Ollama 0.32.15.  Other Ollama versions are explicit comparison runs."
 k=$(uname -r); echo "  kernel: $k"
 ov=$(ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-[[ -n "$ov" ]] && ok "ollama=$ov" || wn "Ollama version unavailable"
+if [[ "$ov" == "0.32.15" ]]; then ok "ollama=$ov (package standard)"
+elif [[ -n "$ov" ]]; then wn "ollama=$ov (package standard 0.32.15; compare results as a runtime override)"
+else wn "Ollama version unavailable"; fi
 if have vulkaninfo; then
   mv=$(vulkaninfo --summary 2>/dev/null | grep -m1 -i driverInfo | grep -oE 'Mesa [0-9.]+')
   [[ "$mv" == "Mesa 26.1.4" ]] && ok "$mv" || wn "${mv:-Mesa ?}  (ref Mesa 26.1.4)"

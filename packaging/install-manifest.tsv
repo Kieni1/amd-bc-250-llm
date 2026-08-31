@@ -8,6 +8,7 @@ dir	0755	-	{share}/cu-live-manager
 dir	0755	-	{share}/examples
 dir	0755	-	{share}/examples/coding-agent
 dir	0755	-	{share}/examples/raspi-wol
+dir	0755	-	{share}/examples/rag
 dir	0755	-	{share}/examples/task-model
 dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
@@ -41,16 +42,27 @@ ghost	0600	-	{config}/maintenance.env
 
 file	0755	models/modelctl.py	{libexec}/modelctl
 file	0755	models/ocr/bc250-ocr.sh	{libexec}/ocr.sh
+file	0755	models/rag/rag_import.py	{libexec}/rag-import
 file	0755	models/setup-ollama-instance.sh	{libexec}/setup-ollama-instance.sh
-file	0755	models/experiments/compare-experiments.sh	{libexec}/compare-experiments.sh
+file	0755	models/experiments/compare-mtp.sh	{libexec}/compare-mtp.sh
 file	0755	models/mtp/run-mtp-llamacpp.sh	{libexec}/run-mtp-llamacpp.sh
 file	0755	cmd/benchmark/compare-models.sh	{libexec}/compare-models.sh
-file	0755	cmd/benchmark/log_sensors.sh	{libexec}/log_sensors.sh
+file	0755	cmd/benchmark/generation-benchmark.py	{libexec}/generation-benchmark.py
+file	0755	cmd/benchmark/category-benchmark.py	{libexec}/category-benchmark.py
+file	0755	cmd/benchmark/benchmark_common.py	{libexec}/benchmark_common.py
+dir	0755	-	{share}/benchmark
+dir	0755	-	{share}/benchmark/ocr
+file	0644	examples/benchmark/embedding-office.json	{share}/benchmark/embedding-office.json
+file	0644	examples/benchmark/task-cases.json	{share}/benchmark/task-cases.json
+file	0644	examples/benchmark/agent-cases.json	{share}/benchmark/agent-cases.json
+file	0644	examples/benchmark/ocr/manifest.json	{share}/benchmark/ocr/manifest.json
+file	0644	examples/benchmark/ocr/office-de.png	{share}/benchmark/ocr/office-de.png
+file	0644	examples/benchmark/ocr/office-fr.png	{share}/benchmark/ocr/office-fr.png
+file	0644	examples/benchmark/ocr/invoice-mixed.png	{share}/benchmark/ocr/invoice-mixed.png
 file	0755	cmd/monitoring/check-temp.sh	{libexec}/check-temp.sh
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
 file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
 file	0755	cmd/system/40cu.sh	{libexec}/40cu.sh
-file	0755	cmd/system/install-cu-manager.sh	{libexec}/install-cu-manager.sh
 file	0755	cmd/system/install-ollama.sh	{libexec}/install-ollama.sh
 file	0755	cmd/system/ollama-profile.sh	{libexec}/ollama-profile.sh
 file	0755	cmd/system/memory-profile.sh	{libexec}/memory-profile.sh
@@ -96,9 +108,12 @@ file	0644	examples/raspi-wol/bc250-wake.timer	{share}/examples/raspi-wol/bc250-w
 file	0644	examples/raspi-wol/bc250-wake.env.example	{share}/examples/raspi-wol/bc250-wake.env.example
 file	0644	examples/raspi-wol/bc250-wol.env.example	{share}/examples/raspi-wol/bc250-wol.env.example
 file	0755	examples/raspi-wol/wake-bc250.sh	{share}/examples/raspi-wol/wake-bc250.sh
+file	0644	examples/rag/pilot-evaluation.tsv	{share}/examples/rag/pilot-evaluation.tsv
+file	0644	examples/rag/document-template.md	{share}/examples/rag/document-template.md
 
 file	0644	README.md	{docdir}/README.md
 file	0644	TLDR.md	{docdir}/TLDR.md
+file	0644	MODEL.md	{docdir}/MODEL.md
 file	0644	licenses/THIRD_PARTY_NOTICES.md	{docdir}/THIRD_PARTY_NOTICES.md
 file	0644	docs/*.md	{docdir}/
 file	0644	packaging/README.md	{docdir}/PACKAGING.md

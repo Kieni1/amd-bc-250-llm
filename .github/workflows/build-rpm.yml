@@ -2,6 +2,8 @@ name: Build Fedora RPM
 
 on:
   workflow_dispatch:
+  push:
+  pull_request:
 
 permissions:
   contents: read
@@ -17,11 +19,24 @@ jobs:
         run: |
           dnf install -y \
             bash cargo curl findutils gcc git gzip make \
-            libdrm-devel patch python3 rpm-build rust \
+            libdrm-devel patch python3 rpm-build ruff rust ShellCheck \
             systemd systemd-rpm-macros tar xz
 
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Lint Python
+        run: ruff check .
+
+      - name: Lint shell
+        run: |
+          while IFS= read -r file; do
+            if head -n1 "$file" | grep -qE '^#!.*[ /](ba)?sh([[:space:]]|$)'; then
+              shellcheck --severity=error "$file"
+            fi
+          done < <(find . -type f \
+            -not -path './sources/*' -not -path './build/*' \
+            -not -path './governor-src/*' -not -path './unlock-src/*' -not -path './live-manager-src/*')
 
       - name: Build RPMs
         run: make rpm

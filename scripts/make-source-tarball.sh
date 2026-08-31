@@ -28,6 +28,7 @@ mkdir -p "$stage"
     --exclude='./sources/*.tar.xz' \
     --exclude='./vendor' \
     --exclude='*/__pycache__' \
+    --exclude='./.ruff_cache' \
     --exclude='*.pyc' \
     --exclude='./.git' \
     -cf - .

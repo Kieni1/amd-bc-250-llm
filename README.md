@@ -20,6 +20,10 @@ BC-250. Then run:
 sudo ./install
 ```
 
+Until 1.0 this is a green-field/test-appliance installer: it may reapply the
+reviewed project baseline rather than preserve unrelated host tuning. Operator
+Modelfiles remain overrideable; see [`MODEL.md`](MODEL.md).
+
 The guided installer:
 
 1. grows the root filesystem when possible;
@@ -61,10 +65,18 @@ WebUI administrator immediately. The default endpoint is unencrypted HTTP; see
 | Standard office work | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
 | Documents and RAG | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
 | German–French translation | `prod-lfm25-8b-a1b-liquidai-q6-k` |
+| General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` |
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
+
+The packaged comparison catalog also retains the operator's broader experiment
+set and adds `task-lfm25-2.6b-liquidai-q6-k`,
+`agentic-qwen25-coder7b-unsloth-q5-k-m`, `exp-qwen38-4b-distill-empero-q6-k`,
+`exp-granite42-3b-ibm-q6-k`, `exp-granite42-8b-ibm-q5-k-m`, and
+`exp-ling30-tiny-bloomer-q5-k-m`; they are benchmark challengers, not silent
+replacements for the defaults above.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
@@ -80,6 +92,7 @@ sudo bc250-fetch-models
 sudo bc250-fetch-experiments
 sudo bc250-fetch-embeddings
 bc250-ocr list
+sudo bc250-rag-import plan /srv/bc250-documents
 sudo bc250-setup-task-model
 sudo bc250-setup-coding-agent
 
@@ -93,6 +106,13 @@ sudo bc250-40cu status
 sudo bc250-status
 sudo bc250-maintenance setup --defaults
 sudo bc250-maintenance clean-cache
+
+# Compare models and specialized model categories
+bc250-benchmark
+bc250-benchmark embeddings
+bc250-benchmark ocr
+bc250-benchmark task
+bc250-benchmark agent
 ```
 
 The complete installed interface and its exact syntax are in
@@ -103,10 +123,11 @@ The complete installed interface and its exact syntax are in
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama | Official install, Vulkan-oriented service defaults and three isolated stores |
-| Open WebUI v0.11.0 and Tika | Digest-pinned local UI and document extraction |
+| Ollama v0.32.15 | Package-standard official runtime, Vulkan-oriented service defaults and three isolated stores |
+| Open WebUI v0.11.1 and Tika | Digest-pinned local UI and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
+| RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 
@@ -134,8 +155,10 @@ Repository groups:
 
 - [`TLDR.md`](TLDR.md): short installation and operations sheet.
 - [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
-- [`models/README.md`](models/README.md): model discovery, addition and storage.
+- [`MODEL.md`](MODEL.md): operator model roles, swapping, overrides and cleanup.
+- [`models/README.md`](models/README.md): detailed Modelfile discovery/storage contract.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
+- [`docs/RAG.md`](docs/RAG.md): German/French/English office-document and knowledge-base pilot.
 - [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): backups, retention and power.
 - [`docs/openwebui-settings.md`](docs/openwebui-settings.md): current UI connections and model roles.
 - [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): package, configuration and state paths.

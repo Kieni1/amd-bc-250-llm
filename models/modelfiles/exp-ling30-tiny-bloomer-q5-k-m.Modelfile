@@ -1,0 +1,29 @@
+# BC250 category: experimental
+# Ollama model: exp-ling30-tiny-bloomer-q5-k-m
+# Source: bloomer010/Ling-3.0-tiny-GGUF @ latest
+# GGUF: Ling-3.0-tiny-Q5_K_M.gguf
+# License: MIT
+# Role: efficient MoE reasoning/agentic architecture experiment.
+#
+# Intended role:
+# - Measure 7.9B-total / 1.3B-active MoE behavior on BC-250 Vulkan
+# - Compare reasoning latency/throughput against LFM2.5, Qwen and GPT-OSS
+# - Test coding/agentic capability without committing to the agent service
+#
+# Upstream llama.cpp support for bailingmoe3 landed shortly before Ollama
+# 0.32.15 and upstream validation is CPU/CUDA-focused. Treat BC-250 Vulkan
+# compatibility/performance as experimental until the first load benchmark.
+# Thinking is native and enabled by default; do not globally force think:false.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-ling30-tiny-bloomer-q5-k-m/Ling-3.0-tiny-Q5_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+# Deliberately conservative versus the 128K upstream context claim.
+PARAMETER num_ctx 32768
+# Upstream recommended sampling.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental reasoning and technical assistant. Follow the user's requested output format exactly. Respond in the requested language or the language of the latest request. Preserve technical details, names, dates and numbers, distinguish facts from inference, and prefer correct executable code or commands when coding is requested."""
