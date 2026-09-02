@@ -1,23 +1,170 @@
 [
   {
-    "id":"office-de",
-    "file":"office-de.png",
-    "language":"de",
-    "expected_text":"Personalmitteilung Arbeitszeit Referenz HR-2026-0815 Gültig ab 1. Oktober 2026 Schulung bis 15. September 2026 Verantwortlich Personalabteilung Betrag Reisekosten CHF 1'248.50 Aufgabe Termin Verantwortlich Software aktualisieren 1. September 2026 IT Schulung abschliessen 15. September 2026 Mitarbeitende Richtlinie anwenden 1. Oktober 2026 Abteilungsleitung",
-    "required_fields":["HR-2026-0815","1. Oktober 2026","15. September 2026","CHF 1'248.50","Personalabteilung"]
+    "id": "office-de",
+    "file": "office-de.png",
+    "language": "de",
+    "expected_text": "Personalmitteilung Arbeitszeit Referenz HR-2026-0815 Gültig ab 1. Oktober 2026 Schulung bis 15. September 2026 Verantwortlich Personalabteilung Betrag Reisekosten CHF 1'248.50 Aufgabe Termin Verantwortlich Software aktualisieren 1. September 2026 IT Schulung abschliessen 15. September 2026 Mitarbeitende Richtlinie anwenden 1. Oktober 2026 Abteilungsleitung",
+    "required_fields": [
+      "HR-2026-0815",
+      "1. Oktober 2026",
+      "15. September 2026",
+      "CHF 1'248.50",
+      "Personalabteilung"
+    ],
+    "structure_groups": [
+      [
+        "Software aktualisieren",
+        "1. September 2026",
+        "IT"
+      ],
+      [
+        "Schulung abschliessen",
+        "15. September 2026",
+        "Mitarbeitende"
+      ],
+      [
+        "Richtlinie anwenden",
+        "1. Oktober 2026",
+        "Abteilungsleitung"
+      ]
+    ]
   },
   {
-    "id":"office-fr",
-    "file":"office-fr.png",
-    "language":"fr",
-    "expected_text":"Note de service Maintenance Référence FR-2026-0912 Entrée en vigueur 12 octobre 2026 Échéance 30 septembre 2026 Responsable Service informatique Montant CHF 842.30 Action Date Responsable Mise à jour des postes 12 octobre 2026 Service informatique Fermer les applications 12 octobre 2026 Utilisateurs Rapport de contrôle 16 octobre 2026 Support",
-    "required_fields":["FR-2026-0912","12 octobre 2026","30 septembre 2026","CHF 842.30","Service informatique"]
+    "id": "office-fr",
+    "file": "office-fr.png",
+    "language": "fr",
+    "expected_text": "Note de service Maintenance Référence FR-2026-0912 Entrée en vigueur 12 octobre 2026 Échéance 30 septembre 2026 Responsable Service informatique Montant CHF 842.30 Action Date Responsable Mise à jour des postes 12 octobre 2026 Service informatique Fermer les applications 12 octobre 2026 Utilisateurs Rapport de contrôle 16 octobre 2026 Support",
+    "required_fields": [
+      "FR-2026-0912",
+      "12 octobre 2026",
+      "30 septembre 2026",
+      "CHF 842.30",
+      "Service informatique"
+    ],
+    "structure_groups": [
+      [
+        "Mise à jour des postes",
+        "12 octobre 2026",
+        "Service informatique"
+      ],
+      [
+        "Fermer les applications",
+        "12 octobre 2026",
+        "Utilisateurs"
+      ],
+      [
+        "Rapport de contrôle",
+        "16 octobre 2026",
+        "Support"
+      ]
+    ]
   },
   {
-    "id":"invoice-mixed",
-    "file":"invoice-mixed.png",
-    "language":"de-fr",
-    "expected_text":"Rechnung Facture Nummer Numéro INV-2026-0317 Datum Date 27.08.2026 Fällig Échéance 30.09.2026 Beschreibung Description Menge Quantité Betrag Montant Wartung Maintenance 2 CHF 760.00 Netto Net CHF 1'520.00 MWST TVA 8.1% CHF 123.12 Total CHF 1'643.12",
-    "required_fields":["INV-2026-0317","27.08.2026","30.09.2026","CHF 1'520.00","8.1%","CHF 123.12","CHF 1'643.12"]
+    "id": "invoice-mixed",
+    "file": "invoice-mixed.png",
+    "language": "de-fr",
+    "expected_text": "Rechnung Facture Nummer Numéro INV-2026-0317 Datum Date 27.08.2026 Fällig Échéance 30.09.2026 Beschreibung Description Menge Quantité Betrag Montant Wartung Maintenance 2 CHF 760.00 Netto Net CHF 1'520.00 MWST TVA 8.1% CHF 123.12 Total CHF 1'643.12",
+    "required_fields": [
+      "INV-2026-0317",
+      "27.08.2026",
+      "30.09.2026",
+      "CHF 1'520.00",
+      "8.1%",
+      "CHF 123.12",
+      "CHF 1'643.12"
+    ],
+    "structure_groups": [
+      [
+        "Wartung",
+        "Maintenance",
+        "2",
+        "CHF 760.00"
+      ],
+      [
+        "Netto",
+        "Net",
+        "CHF 1'520.00"
+      ],
+      [
+        "MWST",
+        "TVA",
+        "8.1%",
+        "CHF 123.12"
+      ],
+      [
+        "Total",
+        "CHF 1'643.12"
+      ]
+    ]
+  },
+  {
+    "id": "invoice-mixed-rotated",
+    "file": "invoice-mixed-rotated.png",
+    "language": "de-fr",
+    "expected_text": "Rechnung Facture Nummer Numéro INV-2026-0317 Datum Date 27.08.2026 Fällig Échéance 30.09.2026 Beschreibung Description Menge Quantité Betrag Montant Wartung Maintenance 2 CHF 760.00 Netto Net CHF 1'520.00 MWST TVA 8.1% CHF 123.12 Total CHF 1'643.12",
+    "required_fields": [
+      "INV-2026-0317",
+      "27.08.2026",
+      "30.09.2026",
+      "CHF 1'520.00",
+      "8.1%",
+      "CHF 123.12",
+      "CHF 1'643.12"
+    ],
+    "structure_groups": [
+      [
+        "Wartung",
+        "Maintenance",
+        "2",
+        "CHF 760.00"
+      ],
+      [
+        "Netto",
+        "Net",
+        "CHF 1'520.00"
+      ],
+      [
+        "MWST",
+        "TVA",
+        "8.1%",
+        "CHF 123.12"
+      ],
+      [
+        "Total",
+        "CHF 1'643.12"
+      ]
+    ],
+    "difficulty": "rotated-scan"
+  },
+  {
+    "id": "office-fr-scan",
+    "file": "office-fr-scan.png",
+    "language": "fr",
+    "expected_text": "Note de service Maintenance Référence FR-2026-0912 Entrée en vigueur 12 octobre 2026 Échéance 30 septembre 2026 Responsable Service informatique Montant CHF 842.30 Action Date Responsable Mise à jour des postes 12 octobre 2026 Service informatique Fermer les applications 12 octobre 2026 Utilisateurs Rapport de contrôle 16 octobre 2026 Support",
+    "required_fields": [
+      "FR-2026-0912",
+      "12 octobre 2026",
+      "30 septembre 2026",
+      "CHF 842.30",
+      "Service informatique"
+    ],
+    "structure_groups": [
+      [
+        "Mise à jour des postes",
+        "12 octobre 2026",
+        "Service informatique"
+      ],
+      [
+        "Fermer les applications",
+        "12 octobre 2026",
+        "Utilisateurs"
+      ],
+      [
+        "Rapport de contrôle",
+        "16 octobre 2026",
+        "Support"
+      ]
+    ],
+    "difficulty": "low-contrast-scan"
   }
 ]

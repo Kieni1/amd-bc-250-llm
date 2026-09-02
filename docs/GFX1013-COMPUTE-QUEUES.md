@@ -14,8 +14,10 @@ cat /proc/cmdline
 [`DryhoppedIPA/bc250-gfx1013-fix`](https://github.com/DryhoppedIPA/bc250-gfx1013-fix)
 is an external experimental kernel plus Mesa/RADV patch stack for dedicated ACE
 compute queues. This package only detects it; it does not download, install,
-activate or remove it. Reported gaming improvements do not establish an LLM
-inference benefit.
+activate or remove it. The current external project reports dedicated-queue Vulkan
+CTS coverage and substantial gaming gains, but those results still do not establish
+an Ollama/llama.cpp inference benefit. The appliance therefore keeps this stack
+operator-managed and detection-only.
 
 The kernel and Mesa halves must be used together. Upstream warns that selecting
 the patched Mesa on an unpatched kernel can hang the GPU. The detected layout

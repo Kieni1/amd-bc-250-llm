@@ -67,6 +67,10 @@ voltage = 920
 frequency = 1850
 voltage = 930
 
+# 2026-08-31 revalidation: the upstream performance-mode --on helper selected
+# this 2000 MHz point even though [frequency-range].max is 1850. Keep it only as
+# an explicit operator test point; use --fixed-frequency 1850 for the package's
+# normal fixed-maximum comparison.
 [[safe-points]]
 frequency = 2000
 voltage = 960

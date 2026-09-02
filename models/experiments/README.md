@@ -28,19 +28,21 @@ exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m
 exp-qwen38-4b-distill-empero-q6-k
 ```
 
-The 0.9.7-0.10 catalog deliberately retains the operator's broader comparison
+The 0.9.7-0.11 catalog deliberately retains the operator's broader comparison
 pool for the next full BC-250 rerun. Qwen/Gemma derivatives that may prove
 redundant remain available until that measured comparison is complete. Newer
 Granite 4.2 3B/8B and Ling 3.0 Tiny definitions extend the architecture and
 size coverage without changing production defaults.
 
-The 2026-08-31 BC-250 generation rerun makes three of the new candidates easier
-to place: Qwen3.8 4B Distill averaged about 74.5 tok/s with ~1.8 s warm TTFA and
-~4.0 GiB resident size; Granite 4.2 3B averaged about 91.5 tok/s with ~2.9 s
-warm TTFA and ~4.1 GiB resident size; Granite 4.2 8B averaged about 50.3 tok/s
-with ~4.1 s warm TTFA and ~8.3 GiB resident size. Ling 3.0 Tiny decoded at about
-144 tok/s but usually spent the 512-token shared cap in reasoning before a
-usable final answer, so raw decode speed is not a promotion case by itself.
+The 2026-08-31 BC-250 generation rerun makes several candidates easier to
+place. Qwen3.8 4B Distill (~74.5 tok/s, ~4.0 GiB) and Granite 4.2 3B (~91.5
+tok/s, ~4.1 GiB) remain useful compact comparisons. Granite 4.2 8B (~50.3
+tok/s, ~8.3 GiB) is exhausted as a production-promotion candidate unless a
+future role-quality test shows a large advantage. Ling 3.0 Tiny decoded at about
+144 tok/s but repeatedly spent the shared cap in reasoning before a usable final
+answer, so it is likewise exhausted as an ordinary assistant promotion path.
+The definitions stay packaged for reproducible comparisons; see `MODELS.md` for
+the complete benchmark-status table.
 
 Local-GGUF source revisions may be commits, tags, branches or `latest`. Moving
 revisions favor flexibility over reproducibility; use `--refresh` to download

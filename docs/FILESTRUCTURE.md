@@ -20,9 +20,10 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/libexec/bc250-llm-server/` | Command implementations |
 | `/usr/share/bc250-llm-server/model-management/` | Packaged Modelfiles and operator template |
 | `/usr/share/bc250-llm-server/40cu/` | Pinned unlock patch and source metadata |
-| `/usr/share/doc/bc250-llm-server/` | Installed documentation, including `MODEL.md` and `BENCHMARK.md` |
+| `/usr/share/doc/bc250-llm-server/` | Installed documentation, including `MODELS.md` and `BENCHMARK.md` |
 | `/usr/lib/systemd/system/` | Packaged services and timers |
 | `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
+| `/usr/share/bc250-llm-server/openwebui/` | Versioned additive Open WebUI model presets |
 
 The package also owns its governor, nginx, sensor-module, sysusers, tmpfiles
 and systemd-preset configuration in the standard Fedora directories.
@@ -51,7 +52,8 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/lib/bc250-llm-server/modelfiles/` | Rendered runtime Modelfiles |
 | `/var/lib/bc250-llm-server/ollama/main/` | Main store, port 11434 |
 | `/var/lib/bc250-llm-server/ollama/task/` | Task store, port 11435 |
-| `/var/lib/bc250-llm-server/ollama/agent/` | Agent store, port 11436 |
+| `/var/lib/bc250-llm-server/ollama/embedding/` | Embedding store, port 11437 |
+| `/var/lib/bc250-llm-server/ollama/agent/` | Exclusive agent store, port 11436 |
 | `/var/lib/bc250-llm-server/install/` | Guided-installer records |
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |

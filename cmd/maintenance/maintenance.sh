@@ -18,7 +18,6 @@ Usage: sudo bc250-maintenance setup [--defaults]
        sudo bc250-maintenance status
        sudo bc250-maintenance run backup|prune|all
        sudo bc250-maintenance clean-cache
-       sudo bc250-maintenance model-baseline
        sudo bc250-maintenance disable
 
 Set up and inspect privacy-conscious maintenance for the local office appliance.
@@ -33,8 +32,6 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
   run all           Run backups and then pruning.
   clean-cache       Confirm removal of the Hugging Face cache, dangling Podman
                     images and old system-wide journal archives; models/data stay.
-  model-baseline    Apply package-owned Open WebUI model parameters. Currently
-                    this enforces think=false for the production Qwen3.5 profile.
   disable           Disable all optional maintenance and power timers. Data and
                     configuration are retained.
 
@@ -365,25 +362,6 @@ clean_cache() {
   echo "Cleanup completed; persistent models and office data were retained."
 }
 
-apply_model_baseline() {
-  local token url helper
-  require_root
-  ensure_config
-  token="$(get_setting OWUI_API_KEY '')"
-  if [[ -z "$token" || "$token" == REPLACE_WITH_ADMIN_API_KEY ]]; then
-    read -r -s -p "Open WebUI administrator API key: " token
-    echo
-  fi
-  [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || {
-    echo "ERROR: the API key is empty or contains unsupported characters." >&2
-    exit 1
-  }
-  url="$(get_setting OWUI_URL http://127.0.0.1:3000)"
-  helper="${BC250_OWUI_MODEL_BASELINE:-$(dirname -- "$0")/owui-model-baseline.py}"
-  [[ -x "$helper" ]] || { echo "ERROR: model-baseline helper is missing: $helper" >&2; exit 1; }
-  OWUI_API_KEY="$token" OWUI_URL="$url" "$helper"
-}
-
 disable_all() {
   require_root
   disable_units "${ALL_TIMERS[@]}" bc250-enable-wol.service
@@ -404,7 +382,6 @@ main() {
     status) (($# <= 1)) || { usage >&2; exit 2; }; show_status ;;
     run) (($# == 2)) || { usage >&2; exit 2; }; run_selected "$2" ;;
     clean-cache) (($# == 1)) || { usage >&2; exit 2; }; clean_cache ;;
-    model-baseline) (($# == 1)) || { usage >&2; exit 2; }; apply_model_baseline ;;
     disable) (($# == 1)) || { usage >&2; exit 2; }; disable_all ;;
     -h|--help|help) usage ;;
     *) echo "ERROR: unknown command: $1" >&2; usage >&2; exit 2 ;;

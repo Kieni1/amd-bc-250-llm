@@ -33,7 +33,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             "experiments": "127.0.0.1:11434",
             "task": "127.0.0.1:11435",
             "agentic": "127.0.0.1:11436",
-            "embedding": "127.0.0.1:11434",
+            "embedding": "127.0.0.1:11437",
         }
         for category, host in expected_hosts.items():
             with self.subTest(category=category):
@@ -349,6 +349,7 @@ class StatusTests(unittest.TestCase):
             },
             "127.0.0.1:11435": {"task-gemma3-1b-unsloth-ud-q4-k-xl"},
             "127.0.0.1:11436": {"prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"},
+            "127.0.0.1:11437": set(),
         }
         output = StringIO()
         with (

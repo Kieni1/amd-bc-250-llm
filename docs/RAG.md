@@ -79,7 +79,7 @@ particularly in multilingual use.
 To inspect embedding dimensionality without involving Open WebUI:
 
 ```bash
-curl -fsS http://127.0.0.1:11434/api/embed \
+curl -fsS http://127.0.0.1:11437/api/embed \
   -H 'Content-Type: application/json' \
   -d '{
     "model":"embed-jina-v5-small-retrieval-q4-k-m",
@@ -103,16 +103,19 @@ The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 |---|---:|---:|
 | Extraction engine | Tika | Tika |
 | Embedding engine | Ollama | Ollama |
-| RAG Ollama URL | `http://host.containers.internal:11434` | same |
+| RAG Ollama URL | `http://host.containers.internal:11437` | same |
 | Embedding model | `embed-jina-v5-small-retrieval-q4-k-m` | same |
 | Text splitter | Token | Token |
 | Markdown header splitting | On | On |
+| Chunk min-size target | `0` (disabled) | `0` |
 | Chunk size | `1500` | `1000` |
 | Chunk overlap | `200` | `100` |
 | Top K | `8` | `5` |
 | Relevance threshold | `0` | `0` |
 | Hybrid search | Off initially | Off initially |
+| Embedding batch size | `1` | `1` |
 | Async embedding | Off | Off |
+| RAG system-context injection | Off | Off |
 | Retrieval-query generation | Off for baseline | Off for baseline |
 | Reranker | None | None |
 
@@ -124,9 +127,10 @@ long chat history, tighter memory headroom or a retrieval problem where smaller
 chunks are desirable. These are starting points to measure, not fixed quality
 claims.
 
-Open WebUI persists many Admin settings in `webui.db`. After first launch,
-database values can override packaged `ConfigVar` defaults. Treat the Quadlet as
-a fresh-install baseline and make later changes in **Admin Settings → Documents**.
+Open WebUI persists many Admin settings in `webui.db`. The installer therefore
+offers `bc250-openwebui-setup init`, which applies the reviewed package-owned
+provider/task/RAG state through supported APIs. The Quadlet remains the safe
+bootstrap baseline; later intentional operator overrides are not reset silently.
 
 The fresh-install `RAG_TEMPLATE` is intentionally source-grounded: if the retrieved
 context does not support the requested fact, it asks the answer model to state that
@@ -136,6 +140,41 @@ Keep retrieval-query generation off for the first measured baseline so the user
 query reaches retrieval unchanged. Test task-model query rewriting only after the
 embedding/chunking baseline is recorded. Do not add a reranker until vector-only
 and hybrid-without-reranker results have been measured.
+
+### Measured tuning candidates, not fresh-install defaults
+
+Open WebUI 0.11.3 exposes three settings that are relevant to this appliance but
+remain conservative in the packaged Quadlet:
+
+- `RAG_SYSTEM_CONTEXT=false`: enabling it moves retrieved context to a stable
+  system-message position and can improve Ollama prefix/KV-cache reuse on follow-up
+  questions. Test answer grounding as well as latency before enabling it.
+- `CHUNK_MIN_SIZE_TARGET=0`: with Markdown header splitting enabled, a non-zero
+  target can merge tiny sections into more coherent chunks. Test `750` and `1000`
+  against the package retrieval fixture before reindexing real knowledge bases.
+- `RAG_EMBEDDING_BATCH_SIZE=1`: Ollama accepts batched embedding inputs, but larger
+  batches can increase memory pressure. Compare `1`, `4`, `8` and `16` on the real
+  BC-250 before changing the default.
+
+Changing chunking or the embedding model requires reindexing affected Knowledge
+documents. `RAG_SYSTEM_CONTEXT` changes prompt placement rather than stored
+embeddings, so it should be tested with a repeated multi-turn RAG conversation.
+The package deliberately does not auto-tune these settings.
+
+Use the local quality lanes before and after a tuning experiment:
+
+```bash
+bc250-benchmark embeddings
+bc250-benchmark rag-quality
+RUN_WARM_PREFIX=1 RUN_CONTEXT=0 RUN_THERMAL=0 bc250-benchmark generation \
+  prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+```
+
+The last command measures a byte-identical shared document prefix followed by a
+different suffix; the ordinary prefill/context curve remains cold-runner by design.
+For `RAG_SYSTEM_CONTEXT` specifically, also compare the same follow-up conversation
+through Open WebUI because the standalone Ollama benchmark cannot reproduce Open
+WebUI's message placement.
 
 ## 4. Authoritative document tree and language policy
 
@@ -230,7 +269,7 @@ sudo bc250-rag-import sync /srv/bc250-documents \
   --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
-The sync uses Open WebUI v0.11.2's incremental knowledge API. The packaged
+The sync uses Open WebUI v0.11.3's incremental knowledge API. The packaged
 baseline keeps `ENABLE_KNOWLEDGE_FILE_RETENTION=false`, so removal from a knowledge
 base remains disposable and `/srv/bc250-documents` stays authoritative. Treat these
 four generated knowledge-base name patterns as importer-managed: do not add unrelated
@@ -288,7 +327,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: important Open WebUI v0.11.2 behavior
+## 7. Retrieval mode: important Open WebUI v0.11.3 behavior
 
 Use **Focused Retrieval** for the growing library. Use **Full Context** only for
 one short document that comfortably fits the model context.
@@ -303,9 +342,8 @@ For the most predictable baseline with the relatively small local Gemma model:
 5. **Attach the knowledge base in the chat**, choose Focused Retrieval, and ask
    the evaluation questions.
 
-This detail matters on Open WebUI v0.11.2: knowledge permanently attached to a
-model in Native function-calling mode is accessed through knowledge tools. 0.11.2
-also fixes knowledge-vector rebuild so a knowledge-base rebuild includes its files.
+This detail matters on Open WebUI v0.11.3: knowledge permanently attached to a
+model in Native function-calling mode is accessed through knowledge tools. 0.11.3 retains the knowledge-vector rebuild behavior so so a knowledge-base rebuild includes its files.
 If Builtin Tools are disabled at the same time, that model-bound knowledge is not
 retrieved. If you want a permanently model-bound knowledge base, keep Native
 mode and enable only the **Knowledge Base** builtin-tool category, then verify
@@ -346,7 +384,7 @@ watch -n 2 bc250-status
 In another terminal:
 
 ```bash
-sudo journalctl -fu ollama.service
+sudo journalctl -fu ollama.service -u ollama-embedding.service
 ```
 
 Inspect what Ollama actually keeps resident:
@@ -364,24 +402,24 @@ sudo du -sh /var/lib/open-webui/uploads \
   /var/lib/open-webui/vector_db 2>/dev/null
 ```
 
-The package deliberately keeps `OLLAMA_MAX_LOADED_MODELS=1`. Indexing can evict
-the answer model and questions can evict the embedding model. Record cold-start
-latency before considering more resident models; the unified-memory budget is
-more important than avoiding every model switch.
+Normal 0.10.0 operation separates the answer and embedding runners: main Ollama
+keeps `OLLAMA_MAX_LOADED_MODELS=1` on 11434, while the small embedding model lives
+on dedicated 11437 with a 10-minute keepalive. This prevents indexing from
+evicting the active production answer model while still keeping concurrency
+bounded per process.
 
-### Measure the one-runner model-switch cost
-
-The balanced main Ollama profile intentionally keeps `OLLAMA_MAX_LOADED_MODELS=1`,
-so an embedding request can evict the answer model. Measure that tradeoff directly:
+Inspect both pools when qualifying memory headroom:
 
 ```bash
+curl -fsS http://127.0.0.1:11434/api/ps | jq
+curl -fsS http://127.0.0.1:11437/api/ps | jq
 bc250-benchmark rag
 ```
 
-The lane records a warm Gemma E4B request, the Jina embedding load, whether Gemma
-was evicted, the post-embedding Gemma reload, and the complete embedding→answer
-cycle. It isolates runner switching; it does not replace the retrieval-quality
-benchmark or the real-document pilot above.
+The RAG cycle now records whether a warm Gemma E4B answer model remains resident
+while Jina runs on the dedicated embedding service. GPT-OSS 20B is the likely
+memory-edge production case and was not re-qualified with this new layout before
+0.10.0; rerun production/long-context tests with Jina warm after deployment.
 
 ## 10. Second phase: hybrid search
 

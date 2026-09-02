@@ -16,6 +16,7 @@ d /var/lib/bc250-llm-server/ollama 0750 root ollama -
 d /var/lib/bc250-llm-server/ollama/main 0750 ollama ollama -
 d /var/lib/bc250-llm-server/ollama/task 0750 ollama ollama -
 d /var/lib/bc250-llm-server/ollama/agent 0750 ollama ollama -
+d /var/lib/bc250-llm-server/ollama/embedding 0750 ollama ollama -
 d /var/lib/bc250-llm-server/swap 0750 root root -
 d /var/lib/ollama 0750 ollama ollama -
 d /var/cache/bc250-llm-server 0750 root ollama -

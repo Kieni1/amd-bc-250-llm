@@ -49,7 +49,7 @@ def included_files():
 def check_required_inputs() -> None:
     required = (
         "VERSION",
-        "MODEL.md",
+        "MODELS.md",
         "Makefile",
         "install",
         "uninstall.sh",
@@ -65,6 +65,9 @@ def check_required_inputs() -> None:
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "models/mtp/models.toml",
         "examples/benchmark/agent-cases.json",
+        "examples/benchmark/translation-office.json",
+        "examples/benchmark/rag-quality-office.json",
+        "examples/benchmark/ocr/manifest.json",
         "docs/FILESTRUCTURE.md",
         "docs/RAG.md",
         "docs/GFX1013-COMPUTE-QUEUES.md",
@@ -211,6 +214,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
     aliases = result.stdout.splitlines()
     required = {
         "40cu",
+        "agent-mode",
         "benchmark",
         "check-temp",
         "code",
@@ -226,8 +230,10 @@ def check_dispatcher_and_runtime_contracts() -> None:
         "ocr",
         "rag-import",
         "ollama-profile",
+        "openwebui-setup",
         "run-mtp",
         "setup-coding-agent",
+        "setup-embedding-model",
         "setup-task-model",
         "status",
         "swap-profile",

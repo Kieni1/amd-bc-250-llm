@@ -119,7 +119,7 @@ info "amdgpu.ppfeaturemask: $ppmask"
 if [[ "$pages" =~ ^[0-9]+$ ]]; then
   gib="$(awk -v p="$pages" 'BEGIN {printf "%.2f", p*4096/1024/1024/1024}')"
   info "TTM pages_limit capacity: approximately ${gib} GiB"
-  ((pages >= 4194304)) && ok "TTM limit supports the reviewed full-memory profile" || \
+  ((pages >= 4194304)) && ok "TTM limit supports the reviewed TTM memory profile" || \
     warn "TTM limit is below 4194304 pages; large models may hit an allocation cap"
 else
   warn "kernel does not expose a numeric TTM pages_limit"
@@ -127,8 +127,15 @@ fi
 
 cmdline="$(cat /proc/cmdline 2>/dev/null || true)"
 info "kernel arguments: $cmdline"
-for token in amdgpu.gttsize=14750 ttm.pages_limit=4194304 ttm.page_pool_size=4194304 amdgpu.ppfeaturemask=0xffffffff; do
+for token in ttm.pages_limit=4194304 ttm.page_pool_size=4194304; do
   grep -qE "(^| )${token//./\.}( |$)" <<< "$cmdline" && ok "kernel profile: $token" || warn "missing reviewed kernel profile argument: $token"
+done
+for prefix in amdgpu.gttsize= amdgpu.ppfeaturemask=; do
+  if grep -qE "(^| )${prefix//./\.}[^ ]*( |$)" <<< "$cmdline"; then
+    warn "legacy kernel override remains: ${prefix}...; current reviewed profile uses TTM limits only"
+  else
+    ok "legacy kernel override absent: ${prefix}..."
+  fi
 done
 grep -qE '(^| )amd_iommu=on( |$)' <<< "$cmdline" && bad "amd_iommu=on is active; BC-250 community documentation requires IOMMU disabled" || ok "amd_iommu=on is not active"
 grep -qE '(^| )nomodeset( |$)' <<< "$cmdline" && bad "nomodeset is still active and prevents normal GPU acceleration" || ok "nomodeset is not active"
@@ -272,6 +279,21 @@ if [[ -r "$config" ]]; then
     warn "governor fix-freq is not explicit; v0.4.12 defaults it to false"
   [[ "$usage_method" != '"kernel"' ]] || \
     warn "governor kernel usage method requires a separately patched compatible kernel"
+  active_sclk=""
+  for drm_card in /sys/class/drm/card[0-9]*; do
+    [[ -r "$drm_card/device/vendor" ]] || continue
+    [[ "$(cat "$drm_card/device/vendor")" == 0x1002 ]] || continue
+    [[ -r "$drm_card/device/pp_dpm_sclk" ]] || continue
+    active_sclk="$(grep '\*' "$drm_card/device/pp_dpm_sclk" | grep -oE '[0-9]+Mhz' | tr -d 'A-Za-z' | head -1 || true)"
+    [[ -n "$active_sclk" ]] && break
+  done
+  if [[ "$active_sclk" =~ ^[0-9]+$ && "$max" =~ ^[0-9]+$ ]]; then
+    if ((active_sclk > max)); then
+      warn "active GPU clock ${active_sclk} MHz exceeds configured normal maximum ${max} MHz; check explicit D-Bus/performance override"
+    else
+      info "active GPU clock: ${active_sclk} MHz (configured normal max ${max} MHz)"
+    fi
+  fi
 else
   bad "governor config missing"
 fi
@@ -297,14 +319,44 @@ else
 fi
 
 section "Services"
-for unit in cyan-skillfish-governor-smu.service ollama.service \
-  tika.service open-webui.service nginx.service; do
+agent_active=0
+systemctl is-active --quiet ollama-agent.service 2>/dev/null && agent_active=1
+for unit in cyan-skillfish-governor-smu.service tika.service open-webui.service nginx.service; do
   if systemctl is-active --quiet "$unit" 2>/dev/null; then
     ok "$unit active"
   else
     bad "$unit inactive"
   fi
 done
+if ((agent_active)); then
+  ok "exclusive agent mode is active"
+  OLLAMA_URL="http://127.0.0.1:11436"
+  for unit in ollama.service ollama-task.service ollama-embedding.service; do
+    if systemctl is-active --quiet "$unit" 2>/dev/null; then
+      bad "$unit is active while exclusive agent mode is active"
+    else
+      info "$unit stopped for exclusive agent mode"
+    fi
+  done
+else
+  if systemctl is-active --quiet ollama.service 2>/dev/null; then
+    ok "ollama.service active"
+  else
+    bad "ollama.service inactive"
+  fi
+  for unit in ollama-task.service ollama-embedding.service; do
+    if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q "^$unit"; then
+      systemctl is-active --quiet "$unit" 2>/dev/null && ok "$unit active" || bad "$unit installed but inactive"
+    else
+      info "$unit is not installed (optional model lane not configured)"
+    fi
+  done
+fi
+if systemctl is-enabled --quiet ollama-agent.service 2>/dev/null; then
+  warn "ollama-agent.service is enabled at boot; agent mode is intended to be exclusive and operator-entered"
+else
+  ok "ollama-agent.service is not enabled at boot"
+fi
 if id -nG ollama 2>/dev/null | grep -qw render && \
    id -nG ollama 2>/dev/null | grep -qw video; then
   ok "ollama has render/video access"
@@ -313,26 +365,28 @@ else
 fi
 
 section "Ollama"
-if command -v ollama >/dev/null 2>&1; then
-  ollama_version="$(ollama --version 2>&1 | head -1 || true)"
-  info "Ollama version: ${ollama_version:-unknown}"
-  ollama_semver="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$ollama_version" | head -1 || true)"
-  if [[ "$ollama_semver" == "$BC250_OLLAMA_VERSION" ]]; then
-    ok "Ollama matches the package standard $BC250_OLLAMA_VERSION"
-  elif [[ -n "$ollama_semver" ]]; then
-    warn "Ollama $ollama_semver differs from package standard $BC250_OLLAMA_VERSION; treat this as a deliberate runtime test"
-  fi
+ollama_api_version="$(curl -fsS "$OLLAMA_URL/api/version" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)"
+ollama_version="$ollama_api_version"
+if [[ -z "$ollama_version" && -x /usr/local/bin/ollama ]]; then
+  ollama_version="$(HOME=/var/lib/ollama /usr/local/bin/ollama --version 2>&1 | head -1 || true)"
+fi
+info "Ollama version: ${ollama_version:-unknown}"
+ollama_semver="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$ollama_version" | head -1 || true)"
+if [[ "$ollama_semver" == "$BC250_OLLAMA_VERSION" ]]; then
+  ok "Ollama matches the package standard $BC250_OLLAMA_VERSION"
+elif [[ -n "$ollama_semver" ]]; then
+  warn "Ollama $ollama_semver differs from package standard $BC250_OLLAMA_VERSION; treat this as a deliberate runtime test"
 else
-  warn "Ollama executable is missing; version could not be reported"
+  warn "Ollama version could not be parsed"
 fi
 ollama_tags="$(curl -fsS "$OLLAMA_URL/api/tags" 2>/dev/null || true)"
 if [[ -n "$ollama_tags" ]]; then
-  ok "Ollama API reachable"
+  ok "active Ollama API reachable at $OLLAMA_URL"
   tag_count="$(jq '.models | length' <<< "$ollama_tags" 2>/dev/null || echo '?')"
   loaded_count="$(curl -fsS "$OLLAMA_URL/api/ps" | jq '.models | length' 2>/dev/null || echo '?')"
   info "registered models: $tag_count; currently loaded: $loaded_count"
 else
-  bad "Ollama API unavailable"
+  bad "active Ollama API unavailable at $OLLAMA_URL"
 fi
 ollama_env="$(systemctl show ollama.service -p Environment --value 2>/dev/null || true)"
 for key in OLLAMA_CONTEXT_LENGTH OLLAMA_KV_CACHE_TYPE OLLAMA_FLASH_ATTENTION \
@@ -348,7 +402,7 @@ fi
 
 if command -v journalctl >/dev/null 2>&1; then
   ollama_log="$(journalctl -b --no-pager -n 1000 \
-    -u ollama.service -u ollama-task.service -u ollama-agent.service \
+    -u ollama.service -u ollama-task.service -u ollama-embedding.service -u ollama-agent.service \
     2>/dev/null || true)"
   kernel_log="$(journalctl -k -b --no-pager -n 1000 2>/dev/null || \
     dmesg 2>/dev/null | tail -n 1000 || true)"
@@ -371,22 +425,46 @@ fi
 section "Documents / RAG"
 rag_env="$(podman inspect open-webui --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null || true)"
 rag_embedding_model="$(awk -F= '$1 == "RAG_EMBEDDING_MODEL" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
+rag_embedding_url="$(awk -F= '$1 == "RAG_OLLAMA_BASE_URL" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
 rag_extraction_engine="$(awk -F= '$1 == "CONTENT_EXTRACTION_ENGINE" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
+embedding_tags="$(curl -fsS http://127.0.0.1:11437/api/tags 2>/dev/null || true)"
 if [[ -n "$rag_embedding_model" ]]; then
   info "Open WebUI embedding default: $rag_embedding_model"
-  if [[ -n "$ollama_tags" ]] && jq -e --arg model "$rag_embedding_model" \
+  [[ -n "$rag_embedding_url" ]] && info "Open WebUI embedding endpoint: $rag_embedding_url"
+  if ((agent_active)); then
+    info "embedding registration check deferred while exclusive agent mode stops :11437"
+  elif [[ -n "$embedding_tags" ]] && jq -e --arg model "$rag_embedding_model" \
       'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
-      <<< "$ollama_tags" >/dev/null 2>&1; then
-    ok "default RAG embedding model is registered with main Ollama"
+      <<< "$embedding_tags" >/dev/null 2>&1; then
+    ok "default RAG embedding model is registered with dedicated embedding Ollama"
   else
-    warn "default RAG embedding model is not registered with main Ollama"
+    warn "default RAG embedding model is not registered on dedicated embedding Ollama :11437"
   fi
 else
   warn "Open WebUI RAG embedding model is not visible in the container environment"
 fi
 [[ -n "$rag_extraction_engine" ]] && info "Open WebUI extraction engine: $rag_extraction_engine" || \
   warn "Open WebUI extraction engine is not visible in the container environment"
-info "Open WebUI database settings can override persistent RAG defaults after first launch"
+if command -v bc250-openwebui-setup >/dev/null 2>&1; then
+  if [[ -n "${OWUI_API_KEY:-}" ]]; then
+    owui_drift="$(bc250-openwebui-setup status 2>&1)"
+    owui_rc=$?
+    if ((owui_rc == 0)); then
+      ok "authenticated Open WebUI package-owned desired-state check passed"
+    elif ((owui_rc == 2)); then
+      warn "Open WebUI package-owned settings differ from the reviewed baseline; this may be an intentional operator override"
+      printf '%s\n' "$owui_drift" | sed 's/^/    /'
+    else
+      warn "authenticated Open WebUI desired-state check could not complete"
+      printf '%s\n' "$owui_drift" | sed 's/^/    /'
+    fi
+  else
+    info "authenticated Open WebUI desired-state drift check skipped; set OWUI_API_KEY temporarily to enable"
+  fi
+else
+  warn "bc250-openwebui-setup is not installed; live Open WebUI drift was not checked"
+fi
+info "Open WebUI database settings can override bootstrap environment defaults after first launch"
 
 section "Local endpoints"
 curl -fsS http://127.0.0.1:3000/ >/dev/null && ok "Open WebUI loopback endpoint reachable" || bad "Open WebUI unavailable"
@@ -403,9 +481,18 @@ section "Listeners and firewall"
 listeners="$(ss -H -lnt 2>/dev/null || true)"
 awk '$4 ~ /:80$/ {found=1} END{exit found?0:1}' <<< "$listeners" && ok "HTTP :80 listener exists" || bad "HTTP :80 listener missing"
 awk '$4 ~ /:9998$/ {found=1} END{exit found?0:1}' <<< "$listeners" && bad "host has Tika :9998 listener" || ok "no host Tika :9998 listener"
-for port in 11434 11435 11436; do
+for port in 11434 11435 11436 11437; do
   ollama_listeners="$(awk -v suffix=":$port" 'index($4, suffix) == length($4)-length(suffix)+1 {print $4}' <<< "$listeners")"
-  [[ -n "$ollama_listeners" ]] || { [[ "$port" == 11434 ]] && bad "main Ollama :11434 listener missing" || info "optional Ollama :$port listener absent"; continue; }
+  if [[ -z "$ollama_listeners" ]]; then
+    if ((agent_active)) && [[ "$port" == 11436 ]]; then
+      bad "agent Ollama :11436 listener missing in exclusive agent mode"
+    elif ((!agent_active)) && [[ "$port" == 11434 ]]; then
+      bad "main Ollama :11434 listener missing in normal mode"
+    else
+      info "Ollama :$port listener absent as allowed for the current mode/configuration"
+    fi
+    continue
+  fi
   if grep -Evq "^(\*|0\.0\.0\.0|\[::\]):$port$" <<< "$ollama_listeners"; then
     warn "Ollama :$port has an unexpected bind: $(tr '\n' ' ' <<< "$ollama_listeners")"
   else
@@ -432,8 +519,8 @@ if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewa
     rich="$(firewall-cmd --zone="$zone" --list-rich-rules 2>/dev/null || true)"
     grep -qw http <<< "$services" && http_open=1
     grep -Eq 'service name="http".*accept' <<< "$rich" && http_open=1
-    if grep -Eq '(^|[^0-9])(11434|11435|11436|3000|9998)(/|[^0-9]|$)' <<< "$ports" ||
-       grep -E 'port port="(11434|11435|11436|3000|9998)(-[0-9]+)?"' <<< "$rich" | grep -qE '(^| )accept( |$)'; then
+    if grep -Eq '(^|[^0-9])(11434|11435|11436|11437|3000|9998)(/|[^0-9]|$)' <<< "$ports" ||
+       grep -E 'port port="(11434|11435|11436|11437|3000|9998)(-[0-9]+)?"' <<< "$rich" | grep -qE '(^| )accept( |$)'; then
       bad "internal port explicitly allowed in active firewalld zone $zone"
       internal_open=1
     fi

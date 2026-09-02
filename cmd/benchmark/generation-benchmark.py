@@ -577,6 +577,8 @@ def main() -> int:
     num_prefill = int(os.environ.get("NUM_PREDICT_PREFILL", defaults["prefill"]))
     num_context = int(os.environ.get("NUM_PREDICT_CONTEXT", defaults["context"]))
     num_long = int(os.environ.get("NUM_PREDICT_LONG", defaults["long"]))
+    num_warm_prefix = int(os.environ.get("NUM_PREDICT_WARM_PREFIX", "24"))
+    warm_prefix_sentences = int(os.environ.get("WARM_PREFIX_SENTENCES", "352"))
     latency_override = os.environ.get("NUM_PREDICT_LATENCY")
     num_latency = int(latency_override or defaults["latency"])
     num_latency_thinking = int(
@@ -610,6 +612,7 @@ def main() -> int:
     run_thermal = bool_setting(
         "RUN_THERMAL", False, interactive_prompt="Run sustained-load thermal test too?"
     )
+    run_warm_prefix = bool_setting("RUN_WARM_PREFIX", False)
     thermal_windows = int(os.environ.get("THROTTLE_WINDOWS", "3"))
 
     client = OllamaClient(
@@ -636,7 +639,7 @@ def main() -> int:
     meta = {
         "started_at": started,
         "category": "generation",
-        "benchmark_version": "7.4",
+        "benchmark_version": "7.5",
         "bench_mode": mode,
         "ollama_url": client.base_url,
         "ollama_version": version,
@@ -651,6 +654,9 @@ def main() -> int:
         "run_latency": run_latency,
         "run_context": run_context,
         "run_thermal": run_thermal,
+        "run_warm_prefix": run_warm_prefix,
+        "warm_prefix_sentences": warm_prefix_sentences,
+        "warm_prefix_num_predict": num_warm_prefix,
         "latency_num_predict_non_thinking": num_latency,
         "latency_num_predict_reasoning_capable": num_latency_thinking,
         "prefill_cache_mode": "cold-runner",
@@ -891,6 +897,38 @@ def main() -> int:
                             context_warning,
                         )
                         previous_prompt_count = prompt_count
+
+                if run_warm_prefix:
+                    # This lane deliberately keeps the runner loaded and changes
+                    # only the suffix after a byte-identical office-document prefix.
+                    # It complements the cold-runner prefill/context curve rather
+                    # than contaminating it with Ollama prefix-cache reuse.
+                    shared_prefix = make_filler(warm_prefix_sentences)
+                    client.ensure_unloaded(model)
+                    cold_prompt = (
+                        shared_prefix
+                        + "\n\nQuestion A: State one concise risk when a policy document is outdated."
+                    )
+                    warm_prompt = (
+                        shared_prefix
+                        + "\n\nQuestion B: State one concise benefit of checking the current policy version."
+                    )
+                    metrics, _telemetry, detail = run_generate(
+                        client, model, cold_prompt, num_warm_prefix, mode,
+                        think_policy, keep_alive, telemetry_interval,
+                    )
+                    record(
+                        model, "prefix_cold", 1, metrics, detail,
+                        num_warm_prefix, think_policy,
+                    )
+                    metrics, _telemetry, detail = run_generate(
+                        client, model, warm_prompt, num_warm_prefix, mode,
+                        think_policy, keep_alive, telemetry_interval,
+                    )
+                    record(
+                        model, "prefix_warm", 1, metrics, detail,
+                        num_warm_prefix, think_policy,
+                    )
 
                 if run_thermal:
                     window_tokens = max(1, num_long // max(1, thermal_windows))

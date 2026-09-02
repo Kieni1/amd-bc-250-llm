@@ -119,9 +119,11 @@ class PackagingTests(unittest.TestCase):
             "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
             "examples/benchmark/agent-cases.json\t{share}/benchmark/agent-cases.json",
             "examples/benchmark/usecase-office.json\t{share}/benchmark/usecase-office.json",
+            "examples/benchmark/translation-office.json\t{share}/benchmark/translation-office.json",
             "examples/benchmark/rag-cycle.json\t{share}/benchmark/rag-cycle.json",
+            "examples/benchmark/rag-quality-office.json\t{share}/benchmark/rag-quality-office.json",
             "examples/benchmark/ocr/manifest.json\t{share}/benchmark/ocr/manifest.json",
-            "MODEL.md\t{docdir}/MODEL.md",
+            "MODELS.md\t{docdir}/MODELS.md",
         ):
             self.assertIn(entry, manifest)
 
@@ -177,27 +179,17 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('OLLAMA_NO_CLOUD=1', verify)
 
     def test_open_webui_connection_config_is_valid_and_matches_packaged_roles(self) -> None:
-        sys.path.insert(0, str(ROOT / "models"))
-        import modelctl
-
-        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
-        line = next(
-            line for line in quadlet.splitlines() if line.startswith('Environment="OLLAMA_API_CONFIGS=')
-        )
-        encoded = line.removeprefix('Environment="OLLAMA_API_CONFIGS=').removesuffix('"')
-        api_configs = json.loads(encoded.replace('\\"', '"'))
-        self.assertEqual(set(api_configs), {"0", "1", "2"})
-
-        production = {f'{m["name"]}:latest' for m in modelctl.load_models("production", directories=[ROOT / "models/modelfiles"])[1]}
-        task = {f'{m["name"]}:latest' for m in modelctl.load_models("task", directories=[ROOT / "models/modelfiles"])[1]}
-        agentic = {f'{m["name"]}:latest' for m in modelctl.load_models("agentic", directories=[ROOT / "models/modelfiles"])[1]}
-        self.assertTrue(api_configs["0"]["enable"])
-        self.assertEqual(set(api_configs["0"]["model_ids"]), production)
-        self.assertFalse(api_configs["1"]["enable"])
-        self.assertEqual(set(api_configs["1"]["model_ids"]), task)
-        self.assertFalse(api_configs["2"]["enable"])
-        self.assertEqual(set(api_configs["2"]["model_ids"]), agentic)
-        self.assertTrue(all("prefix_id" not in value for value in api_configs.values()))
+        helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
+        models = (ROOT / "config/openwebui/models.json").read_text(encoding="utf-8")
+        self.assertIn('MAIN_URL = "http://host.containers.internal:11434"', helper)
+        self.assertIn('TASK_URL = "http://host.containers.internal:11435"', helper)
+        self.assertIn('EMBED_URL = "http://host.containers.internal:11437"', helper)
+        self.assertIn('"OLLAMA_BASE_URLS": [MAIN_URL, TASK_URL]', helper)
+        self.assertIn('"tags": ["production"]', helper)
+        self.assertIn('"tags": ["task"]', helper)
+        self.assertNotIn('http://host.containers.internal:11436', helper)
+        self.assertIn('"bc250-office-standard"', models)
+        self.assertIn('"bc250-office-deep-reasoning"', models)
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")
@@ -220,17 +212,17 @@ class PackagingTests(unittest.TestCase):
             r"(?ms)^\[gpu-usage\]\s*$.*?^fix-metrics = true\s*$.*?^fix-freq = false\s*$.*?^method = \"busy-flag\"",
         )
 
-    def test_open_webui_v0112_is_digest_pinned(self) -> None:
+    def test_open_webui_v0113_is_digest_pinned(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn("# v0.11.2, pinned OCI index digest.", quadlet)
+        self.assertIn("# v0.11.3, pinned OCI index digest.", quadlet)
         self.assertIn(
             "Image=ghcr.io/open-webui/open-webui@sha256:"
-            "77ff490214a4b2699b309aa8d39bf4b42eca05f62d2742ef669ff846fcd10355",
+            "751b617714b91e4cfd0186a509c72480c858e012976103b09a30dad053c36175",
             quadlet,
         )
-        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.2)$")
+        self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.11\.3)$")
 
     def test_open_webui_fresh_install_privacy_features_are_disabled(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
@@ -244,7 +236,7 @@ class PackagingTests(unittest.TestCase):
         ):
             self.assertIn(f"Environment={setting}", quadlet)
 
-    def test_open_webui_v0112_new_controls_stay_conservative(self) -> None:
+    def test_open_webui_v0113_new_controls_stay_conservative(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
@@ -258,8 +250,13 @@ class PackagingTests(unittest.TestCase):
             quadlet,
         )
         self.assertNotIn("RAG_ALLOWED_FILE_EXTENSIONS=.", quadlet)
-        self.assertIn("OLLAMA_API_CONFIGS=", quadlet)
+        self.assertIn("Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434", quadlet)
+        helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
+        self.assertIn('/ollama/config/update', helper)
         self.assertIn("Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false", quadlet)
+        self.assertIn("Environment=RAG_SYSTEM_CONTEXT=false", quadlet)
+        self.assertIn("Environment=CHUNK_MIN_SIZE_TARGET=0", quadlet)
+        self.assertIn("Environment=RAG_EMBEDDING_BATCH_SIZE=1", quadlet)
         self.assertIn("Environment=TIKA_SERVER_VERSION=3", quadlet)
         self.assertNotIn("Environment=ENABLE_ORJSON=true", quadlet)
 
@@ -350,23 +347,26 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
         self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.33.2")
-        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.2")
-        self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.2")
+        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.3")
+        self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.3")
         self.assertIn(f'# v{values["BC250_OPEN_WEBUI_VERSION"]}, pinned OCI index digest.', quadlet)
         self.assertIn(values["BC250_OPEN_WEBUI_IMAGE_DIGEST"], quadlet)
         self.assertIn(values["BC250_TIKA_VERSION"], tika)
         self.assertIn(values["BC250_TIKA_IMAGE_DIGEST"], tika)
         self.assertIn("config/runtime.env\t{share}/runtime.env", (ROOT / "packaging/install-manifest.tsv").read_text())
 
-    def test_fresh_machine_memory_profile_keeps_required_bc250_arguments(self) -> None:
+    def test_fresh_machine_memory_profile_is_ttm_only_and_cleans_legacy_overrides(self) -> None:
         profile = (ROOT / "cmd/system/memory-profile.sh").read_text(encoding="utf-8")
         installer = (ROOT / "install").read_text(encoding="utf-8")
-        for token in (
-            "amdgpu.gttsize=14750", "ttm.pages_limit=4194304",
-            "ttm.page_pool_size=4194304", "amdgpu.ppfeaturemask=0xffffffff",
-        ):
-            self.assertIn(token, profile)
+        canonical = "ttm.pages_limit=4194304 ttm.page_pool_size=4194304"
+        self.assertIn(f'FULL_MEMORY_ARGS="{canonical}"', profile)
+        for token in ("ttm.pages_limit=4194304", "ttm.page_pool_size=4194304"):
             self.assertIn(token, installer)
+        self.assertNotIn("amdgpu.gttsize=14750", installer)
+        self.assertNotIn("amdgpu.ppfeaturemask=0xffffffff", installer)
+        self.assertIn("amdgpu.gttsize", profile)
+        self.assertIn("amdgpu.ppfeaturemask", profile)
+        self.assertIn("legacy", profile.lower())
         self.assertIn("mapfile -t kernel_args", installer)
         self.assertNotIn("apply-safe", profile)
 

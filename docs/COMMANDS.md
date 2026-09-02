@@ -10,6 +10,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 |---|---|
 | `bc250` | Canonical multicall dispatcher |
 | `bc250-40cu` | Replacement-module and live CU controls |
+| `bc250-agent-mode` | Enter/leave/status exclusive coding-agent mode |
 | `bc250-benchmark` | Interactive Ollama performance benchmark |
 | `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
 | `bc250-code` | Local generate/refactor/review/document/test helper |
@@ -26,8 +27,10 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-ocr` | Experimental office OCR model list/install/test helper |
 | `bc250-rag-import` | Validate and incrementally sync the operator document tree |
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
+| `bc250-openwebui-setup` | Initialize/apply/check package-owned Open WebUI state |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
-| `bc250-setup-coding-agent` | Configure the isolated agent Ollama instance |
+| `bc250-setup-coding-agent` | Configure the exclusive agent Ollama instance |
+| `bc250-setup-embedding-model` | Configure the dedicated embedding Ollama instance |
 | `bc250-setup-task-model` | Configure the isolated task Ollama instance |
 | `bc250-status` | Concise read-only appliance status |
 | `bc250-swap-profile` | Inspect or change zram/disk-swap policy |
@@ -73,8 +76,8 @@ Categories are `production`, `experiments`, `task`, `agentic`, `embedding`,
 combines the discovered categories for status/install/cleanup operations;
 `cleanup all --keep-gguf` removes registrations/runtime copies across every
 category while retaining manager-owned GGUF/state pairs. MTP is the only
-TOML-backed, download-only category; the other categories are discovered from strict Modelfiles. Four OCR experiments use a
-strict experimental `hf.co/...` FROM exception so Ollama can manage their paired
+TOML-backed, download-only category; the other categories are discovered from strict Modelfiles. The packaged OCR comparison pair uses a
+strict experimental `hf.co/...` FROM exception so Ollama can manage each model's paired
 vision projector and model blobs.
 
 With no category, `list` shows every Ollama-backed category as one catalog with
@@ -138,7 +141,7 @@ Convenience commands:
 ```bash
 sudo bc250-model install production [SELECTION]
 sudo bc250-model install experiments [SELECTION]
-sudo bc250-model install embedding [SELECTION]
+sudo bc250-setup-embedding-model [SELECTION]
 sudo bc250-fetch-mtp [SELECTION]
 sudo bc250-setup-task-model [SELECTION]
 sudo bc250-setup-coding-agent [SELECTION]
@@ -191,12 +194,14 @@ prints extracted text/Markdown for comparison. GLM is the measured fidelity
 leader and OvisOCR2 remains the faster structured-document alternative. Test DE/FR/EN
 letters, invoices, forms and table-heavy scans before using OCR output for RAG.
 
-Task setup creates `ollama-task.service` on port `11435`; agentic setup creates
-`ollama-agent.service` on `11436`. Each has its own model store. Setup selection
+Task setup creates `ollama-task.service` on `11435`; embedding setup creates
+`ollama-embedding.service` on `11437` with a 10-minute keepalive. Agentic setup
+creates `ollama-agent.service` on `11436`, disabled at boot and intended only for
+exclusive `bc250-agent-mode enter|leave` operation. Each has its own model store. Setup selection
 can also be supplied through `TASK_MODEL_SELECTION` or
 `CODING_AGENT_SELECTION`. Revision and checksum overrides require one model.
 
-See [`../MODEL.md`](../MODEL.md) for model roles/swapping and
+See [`../MODELS.md`](../MODELS.md) for model roles/swapping and
 [`../models/README.md`](../models/README.md) for the detailed Modelfile contract.
 
 ## Runtime profiles
@@ -207,8 +212,9 @@ bc250-swap-profile {status|apply|remove}
 bc250-ollama-profile {status|balanced|max-context|reset}
 ```
 
-- The full memory profile applies the four required BC-250 LLM kernel arguments,
-  replacing older values for those same keys. It does not reboot automatically.
+- The reviewed memory profile applies only the two TTM limits and removes the
+  older package-managed `amdgpu.gttsize` / full `amdgpu.ppfeaturemask` overrides.
+  It does not reboot automatically.
 - The swap profile defaults to 2 GiB zram and a 16 GiB disk swap file.
   `ZRAM_MIB`, `SWAP_GIB` and optional `SWAPPINESS=0..200` override it.
 - The balanced Ollama profile uses 32K context and q8_0 KV cache. Max-context
@@ -259,7 +265,7 @@ directory. The default generation lane uses `BENCH_MODE=neutral`: a per-request
 neutral SYSTEM override and deterministic sampling for comparable model/runtime
 measurements. `BENCH_MODE=production` is the production-configuration
 comparison: it keeps the registered Modelfile SYSTEM and sampling while running the same generic workload.
-`bc250-benchmark usecase` adds one compact role acceptance case per production model; `bc250-benchmark rag` separately measures the main-instance embedding/answer model-switch cost.
+`bc250-benchmark usecase` adds one compact role acceptance case per production model; `bc250-benchmark translation` checks DE↔FR office preservation; `bc250-benchmark rag-quality` performs a small retrieval→grounded-answer acceptance chain; and `bc250-benchmark rag` checks answer-model residency while the dedicated embedding lane runs.
 `THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
 larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
 not routinely starved by thinking; LFM2.5 keeps that larger cap even in an
@@ -272,10 +278,15 @@ BENCH_MODE=production bc250-benchmark
 BENCH_PROFILE=conservative bc250-benchmark
 bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
 bc250-benchmark ocr                     # office OCR fixtures
-bc250-benchmark task                    # Open WebUI 0.11.2-compatible task behavior
-bc250-benchmark agent                   # syntax + narrow static coding requirements, port 11436
+bc250-benchmark task                    # Open WebUI 0.11.3-compatible task behavior
+sudo bc250-agent-mode enter
+bc250-benchmark agent                   # exclusive syntax/static coding lane, port 11436
+sudo bc250-agent-mode leave
 bc250-benchmark usecase                 # one role-defining case per production model
-bc250-benchmark rag                     # embedding eviction + answer-model reload cycle
+bc250-benchmark rag                     # dedicated embedding + warm answer coexistence
+bc250-benchmark translation             # DE↔FR office translation acceptance
+bc250-benchmark rag-quality             # retrieval -> grounded-answer acceptance
+RUN_WARM_PREFIX=1 bc250-benchmark        # separate repeated-prefix/cache pair
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```
 
@@ -283,10 +294,37 @@ Generation, embedding and OCR record the full request-time thermal/GPU/UMA
 telemetry set from one selected AMD DRM device; use `BC250_DRM_CARD=cardN` only
 when automatic boot-GPU selection is wrong. Task and agent runs intentionally
 keep the smaller subset useful for those short correctness/latency workloads. `RUN_THERMAL=1` applies to the
-generation lane. Treat resource figures as overlapping UMA signals, not
+generation lane. For a real thermal-soak qualification, choose a representative
+large model and repeat a sustained generation workload for at least 20–30 minutes;
+the short built-in thermal wave is a regression signal, not an equilibrium test. Treat resource figures as overlapping UMA signals, not
 independent pools. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
 for metrics, fixtures and Ollama 0.33.2 request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
+
+## Open WebUI setup
+
+```text
+sudo bc250-openwebui-setup init
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
+bc250-openwebui-setup status
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
+```
+
+`init` can create the first administrator or sign in an existing administrator,
+then applies the package-owned main/task provider, dedicated embedding, task/RAG
+and additive model-preset baseline. Credentials/tokens are not stored. Unrelated
+operator models, users, prompts and knowledge are not synchronized away.
+
+Agent mode is separate from Open WebUI:
+
+```text
+sudo bc250-agent-mode status
+sudo bc250-agent-mode enter
+sudo bc250-agent-mode leave
+```
+
+Entering agent mode stops main/task/embedding and starts only the 11436 coding
+backend; leaving restores normal mode.
 
 ## Maintenance
 
@@ -295,7 +333,6 @@ bc250-maintenance setup [--defaults]
 bc250-maintenance status
 bc250-maintenance run {backup|prune|all}
 bc250-maintenance clean-cache
-bc250-maintenance model-baseline
 bc250-maintenance disable
 ```
 
@@ -303,7 +340,6 @@ bc250-maintenance disable
 confirmation and removes only rebuildable Hugging Face cache, dangling Podman
 images and old **system-wide** journal archives; model and Open WebUI data are
 retained.
-`model-baseline` uses an Open WebUI administrator API key to enforce request-level `think=false` on the production Qwen3.5 base-model profile while preserving other stored model parameters.
 Interactive setup can also configure dry-run upload pruning, model warm-up and
 an after-hours power action. Configuration is stored in root-readable
 `/etc/bc250-llm-server/maintenance.env`. See

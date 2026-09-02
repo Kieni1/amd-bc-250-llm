@@ -69,7 +69,10 @@ latency records because they preserve Ollama's separate `thinking` and final
 `content` fields. Some model/template families can expose native reasoning markers
 inside the raw `/api/generate` response; those generate lanes remain intended for
 throughput/prefill/runtime measurements. Context-capacity truncation warnings and
-near-limit notes are persisted in the JSONL sidecar as well as printed.
+near-limit notes are persisted in the JSONL sidecar as well as printed. Set
+`RUN_WARM_PREFIX=1` for a separate cold-prefix/warm-prefix pair that keeps a
+byte-identical document prefix and changes only the suffix; this measures practical
+0.33.x prefix-cache reuse without contaminating the normal cold-runner curve.
 
 
 ## Production role acceptance
@@ -85,6 +88,23 @@ technical office task (Qwen3.5 with `think=false`), and constrained reasoning
 (GPT-OSS). It preserves each registered Modelfile SYSTEM/sampling and only bounds
 output length. A failed required/forbidden-content check exits non-zero.
 
+## German/French translation acceptance
+
+```bash
+bc250-benchmark translation
+# optional comparison model:
+bc250-benchmark translation MODEL
+```
+
+This lane exercises the registered production translation behavior without a
+neutral SYSTEM override. The packaged cases cover DE->FR and FR->DE office text,
+formal address, negation, dates, amounts, invoice/reference numbers and terms that
+must remain unchanged. It deliberately avoids BLEU/COMET dependencies: pass/fail
+is based on deterministic required/forbidden/preserved content, while a small
+language hint remains diagnostic rather than pretending to be a full linguistic
+quality metric. Human review is still required before changing the production
+translation model.
+
 ## Main-instance RAG model-switch cycle
 
 ```bash
@@ -99,6 +119,26 @@ the answer model was evicted, then measures the answer-model reload and final
 answer. This isolates the `OLLAMA_MAX_LOADED_MODELS=1` model-switch cost; it does
 **not** score Open WebUI/vector-database retrieval quality. Override the pair with
 `RAG_EMBED_MODEL` / `RAG_ANSWER_MODEL` or positional model names.
+
+## End-to-end RAG quality acceptance
+
+```bash
+bc250-benchmark rag-quality
+# optional pair:
+bc250-benchmark rag-quality EMBED_MODEL ANSWER_MODEL
+```
+
+This lane uses the packaged multilingual office corpus, embeds the real query,
+ranks the documents, passes the retrieved Top-K context to the answer model and
+checks the grounded answer. It specifically includes the difficult current-vs-
+archived Zürich lease and near-identical invoice references that exposed the two
+shared Recall@1 misses in the 2026-08-31 embedding comparison. The default pair is
+Jina v5 plus production Gemma E4B. It is intentionally small and stdlib-only.
+
+This is still not a clone of Open WebUI's database/vector implementation; use it
+as a package/model acceptance layer, then validate Open WebUI-specific settings
+(`RAG_SYSTEM_CONTEXT`, chunk merging, batching) through the actual UI/API before
+changing fresh-install defaults.
 
 ## Embeddings
 
@@ -126,7 +166,9 @@ bc250-ocr test glm /PATH/TO/REAL-PAGE.png
 
 The benchmark uses deterministic German, French and mixed office-page images and
 checks token precision/recall/F1, normalized character similarity, exact required-
-field recall, key-field reading order and runtime. The packaged comparison set
+field recall, key-field reading order, local row/field association, a table-markup
+signal and runtime. Two deterministic harder variants add a slight rotation and
+a low-contrast/blurred scan without turning the suite into a large OCR corpus. The packaged comparison set
 is GLM-OCR plus OvisOCR2; the scorer keeps model-specific prompt support for
 operator-added OCR experiments. OCR must preserve the source language; review
 and clean the result before putting canonical Markdown under the RAG `active/`
@@ -140,15 +182,18 @@ bc250-benchmark task
 ```
 
 The task suite targets `http://127.0.0.1:11435` by default and mirrors the
-relevant Open WebUI **0.11.2** task behavior in compact fixtures: title uses the
+relevant Open WebUI **0.11.3** task behavior in compact fixtures: title uses the
 latest two messages, tags the latest six (with the short-chat `General` fallback),
 and retrieval-query generation the latest six plus the current date. It parses
-the JSON object the same tolerant way Open WebUI 0.11.2 does (including fenced or
+the JSON object the same tolerant way Open WebUI 0.11.3 does (including fenced or
 surrounded JSON), while separately reporting `strict_json`. It checks structure,
-simple content relevance, latency and an informational DE/FR/EN `language_hint`;
-the language hint is not a hard correctness gate. Requests use
+simple content relevance, latency and DE/FR/EN `language_hint` plus explicit
+`language_required`/`language_pass` reporting. Titles and retrieval queries require
+the requested language for the report; tags remain informational. Language does
+not change the process exit code yet, so one weak multilingual task model cannot
+turn a routine benchmark into a package-build failure. Requests use
 `keep_alive=0`, matching the isolated task service. The Open WebUI container
-leaves 0.11.2 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
+leaves 0.11.3 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
 reason to tune it. Its CSV deliberately keeps only the small telemetry subset
 useful for this short background workload.
 
@@ -172,6 +217,28 @@ temperature/top-p/top-k to the deployed Modelfile by default; set
 `AGENT_TEMPERATURE=0` only for an explicit deterministic comparison. It does not
 override the agent service keep-alive and unloads each benchmarked model after
 the run.
+
+## Sustained thermal qualification
+
+The built-in `RUN_THERMAL=1` wave is intentionally short and is best treated as
+a regression signal. For a real board/cooling qualification, repeat the same
+representative generation workload for at least 20-30 minutes and compare the
+first and final decode rate, edge-temperature p95/max, active clock, swap and
+AMDGPU/Vulkan error logs. One simple operator recipe is:
+
+```bash
+end=$((SECONDS + 1800))
+while (( SECONDS < end )); do
+  RUN_LATENCY=0 RUN_CONTEXT=0 RUN_THERMAL=1 \
+    THROTTLE_WINDOWS=3 NUM_PREDICT_LONG=6000 \
+    bc250-benchmark generation MODEL || break
+done
+```
+
+This deliberately stays manual: cooling, room temperature and model stopping
+behavior differ between boards, so the package does not turn a long thermal soak
+into an install/build gate. Preserve the generated result files and the board
+conditions when comparing runs.
 
 ## Telemetry and outputs
 

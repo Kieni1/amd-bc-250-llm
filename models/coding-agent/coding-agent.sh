@@ -59,6 +59,12 @@ for cmd in curl jq mktemp; do
   }
 done
 
+if ! curl -fsS --connect-timeout 2 --max-time 3 "${OLLAMA_URL}/api/tags" >/dev/null 2>&1; then
+  echo "ERROR: exclusive coding-agent backend is not active at ${OLLAMA_URL}." >&2
+  echo "Enter agent mode first: sudo bc250-agent-mode enter" >&2
+  exit 1
+fi
+
 input_file="$(mktemp)"
 response_file="$(mktemp)"
 prompt_file="$(mktemp)"

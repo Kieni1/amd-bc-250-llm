@@ -1,0 +1,75 @@
+[
+  {
+    "id": "de-fr-reference-date",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Bitte senden Sie die Unterlagen bis Freitag, 4. September 2026, mit Referenz AB-42 zurück.",
+    "required": ["AB-42", "4 septembre 2026"],
+    "preserve": ["AB-42"],
+    "forbidden": ["Bitte senden Sie", "Unterlagen bis Freitag"]
+  },
+  {
+    "id": "de-fr-invoice",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Rechnung INV-4821: Gesamtbetrag CHF 319.50, Kundenreferenz ZH-204. Die Zahlung ist bis 31. August 2026 fällig.",
+    "required": ["INV-4821", "CHF 319.50", "ZH-204", "31 août 2026"],
+    "preserve": ["INV-4821", "CHF 319.50", "ZH-204"],
+    "forbidden": ["Gesamtbetrag", "Zahlung ist bis"]
+  },
+  {
+    "id": "de-fr-negation",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Vertrauliche Personaldaten dürfen nicht in öffentlichen Cloud-Diensten gespeichert werden.",
+    "required_any": ["ne doivent pas", "ne peuvent pas", "n'est pas autorisé", "ne sont pas autorisés"],
+    "required": ["Cloud"],
+    "preserve": [],
+    "forbidden": ["dürfen nicht", "Personaldaten"]
+  },
+  {
+    "id": "de-fr-formal-office",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Sehr geehrte Frau Keller, bitte bestätigen Sie den Erhalt von Vertrag REF-81 bis zum 12. Oktober 2026.",
+    "required": ["Frau Keller", "REF-81", "12 octobre 2026"],
+    "preserve": ["Frau Keller", "REF-81"],
+    "forbidden": ["Sehr geehrte", "bitte bestätigen"]
+  },
+  {
+    "id": "fr-de-reference-date",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Veuillez renvoyer les documents avant le vendredi 4 septembre 2026 avec la référence AB-42.",
+    "required": ["AB-42", "4. September 2026"],
+    "preserve": ["AB-42"],
+    "forbidden": ["Veuillez renvoyer", "les documents avant"]
+  },
+  {
+    "id": "fr-de-lease",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Le délai de résiliation du bureau de Genève est de six mois pour la fin d'un trimestre.",
+    "required": ["Genf", "sechs Monate", "Quartalsende"],
+    "preserve": [],
+    "forbidden": ["Le délai", "six mois"]
+  },
+  {
+    "id": "fr-de-invoice",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Facture INV-9007, montant CHF 10 450.00, centre de coûts IT-22. Une seconde approbation est requise.",
+    "required": ["INV-9007", "CHF 10 450.00", "IT-22"],
+    "preserve": ["INV-9007", "CHF 10 450.00", "IT-22"],
+    "forbidden": ["Facture", "approbation est requise"]
+  },
+  {
+    "id": "fr-de-negation",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Les données RH confidentielles ne peuvent pas être stockées dans des services cloud publics.",
+    "required": ["nicht", "öffentlichen", "Cloud"],
+    "preserve": [],
+    "forbidden": ["ne peuvent pas", "données RH"]
+  }
+]

@@ -70,7 +70,7 @@ CATEGORY_DEFAULTS = {
         "destination": "/var/lib/bc250-llm-server/gguf/embedding",
         "download_namespace": "embedding",
         "modelfile_destination": "/var/lib/bc250-llm-server/modelfiles/embedding",
-        "ollama_host": "127.0.0.1:11434",
+        "ollama_host": "127.0.0.1:11437",
         "min_free_bytes": 0,
     },
 }

@@ -10,8 +10,8 @@
 %global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.9.7
-Release:        0.10.testing%{?dist}
+Version:        0.10.0
+Release:        0.1.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -84,11 +84,13 @@ Requires(postun): systemd
 A testing-oriented Fedora integration package for using an AMD BC-250 as a
 small local LLM server. It installs the reviewed Cyan Skillfish SMU governor,
 Ollama Vulkan defaults, Open WebUI and Tika Quadlets, an HTTP reverse proxy,
-model and experiment templates, maintenance tools, benchmarks and isolated
-task and coding-agent helpers. The live CU manager and experimental 40-CU source
-helper are installed, but the RPM never changes CU routing automatically.
-Ollama remains an external operator-installed prerequisite. Model weights,
-Open WebUI settings, HTTPS and CU changes remain operator-controlled.
+model and experiment templates, maintenance tools, benchmarks and separated
+production, task, embedding and exclusive coding-agent Ollama workflows. Open
+WebUI can be initialized through its supported admin APIs without storing the
+operator credential. The live CU manager and experimental 40-CU source helper
+are installed, but the RPM never changes CU routing automatically. Ollama
+remains an external operator-installed prerequisite. Model weights, users,
+operator-created Open WebUI state, HTTPS and CU changes remain operator-controlled.
 
 %prep
 %setup -q
@@ -172,13 +174,16 @@ Open http://SERVER_IP/ on a trusted LAN and register the first admin immediately
 HTTP is unencrypted. Read /usr/share/doc/bc250-llm-server/HTTPS.md before wider use.
 No chat model is downloaded until an operator selects a discovered Modelfile.
 Optional helpers: bc250-install-ollama, bc250-ollama-profile,
-bc250-memory-profile, bc250-swap-profile, bc250-setup-task-model and
-bc250-setup-coding-agent. Run llm-run-diagnose for a performance capture.
+bc250-memory-profile, bc250-swap-profile, bc250-setup-task-model,
+bc250-setup-embedding-model and bc250-openwebui-setup. Coding/agent work uses
+exclusive bc250-agent-mode enter/leave. Run llm-run-diagnose for a capture.
 EOF_POST
 
 %preun
 if [ "$1" -eq 0 ]; then
-  systemctl stop open-webui.service tika.service >/dev/null 2>&1 || :
+  systemctl stop open-webui.service tika.service \
+    ollama-task.service ollama-embedding.service ollama-agent.service \
+    >/dev/null 2>&1 || :
   systemctl disable --now %{bc250_units} >/dev/null 2>&1 || :
 fi
 %systemd_preun %{bc250_units}
@@ -196,7 +201,7 @@ BC-250 LLM server package removed. Persistent data was not deleted.
 Review /etc/bc250-llm-server, /etc/cyan-skillfish-governor-smu,
 /var/lib/bc250-llm-server, /var/cache/bc250-llm-server,
 /var/lib/open-webui, /var/backups/bc250-llm-server,
-operator-added HTTPS/CU/task-model/coding-agent files, memory/swap and
+operator-added HTTPS/CU/task/embedding/coding-agent files, memory/swap and
 Ollama profile overrides, firewalld/SELinux changes and .rpmsave files. Ollama installed separately is not removed.
 EOF_POSTUN
 fi
@@ -220,6 +225,7 @@ fi
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/ollama
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/main
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/task
+%ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/embedding
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/ollama/agent
 %ghost %dir %attr(0750,root,root) /var/lib/bc250-llm-server/swap
 %ghost %dir %attr(0750,root,ollama) /var/cache/bc250-llm-server
@@ -234,6 +240,18 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Tue Sep 01 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.1.testing
+- Separate normal production/task/embedding Ollama lanes and make coding/agent mode explicitly exclusive.
+- Upgrade the digest-pinned Open WebUI baseline to v0.11.3 and configure package-owned state through supported admin APIs.
+- Add interactive/noninteractive Open WebUI initialization, additive model presets, local/offline defaults and optional desired-state drift checks.
+- Keep Fedora Mesa, Ollama 0.33.2, TTM-only memory policy, 1850-MHz busy-flag governor and deferred RAG-system-context tuning unchanged.
+
+* Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.11.testing
+- Simplify the measured BC-250 fresh-machine boot profile to TTM limits only and clean legacy AMDGPU overrides.
+- Keep 350-1850 MHz busy-flag governor defaults, harden verification, and document the measured 2000-MHz performance-mode override.
+- Add opt-in translation, grounded RAG, OCR-structure, multilingual task and warm-prefix benchmark coverage without adding hardware/model work to build validation.
+- Refresh model benchmark conclusions, Open WebUI tuning guidance, installer behavior and operator documentation.
+
 * Mon Aug 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.7-0.10.testing
 - Upgrade the digest-pinned Open WebUI baseline to v0.11.2 and declare local-only Ollama connections.
 - Make the full BC-250 GTT/TTM/ppfeaturemask profile first-class on fresh machines and add setup hazard checks.

@@ -111,7 +111,7 @@ confirm_purge() {
 This permanently deletes:
   - all downloaded GGUF files, Ollama models and rendered Modelfiles;
   - Open WebUI accounts, settings, uploads and all appliance backups;
-  - task/agent services, containers, caches and appliance configuration;
+  - task/embedding/agent services, containers, caches and appliance configuration;
   - official Ollama installed by this setup and its service account;
   - memory, swap, CU boot routing and verified replacement-module changes;
   - RPM packages recorded as absent before the guided setup installed them.
@@ -139,7 +139,7 @@ WARNING
 stop_services() {
   heading "1. STOP APPLIANCE SERVICES"
   systemctl disable --now \
-    ollama-task.service ollama-agent.service \
+    ollama-task.service ollama-embedding.service ollama-agent.service \
     open-webui.service tika.service \
     cyan-skillfish-governor-smu.service \
     bc250-cu-live-manager.service \
@@ -374,11 +374,13 @@ remove_official_ollama() {
 
 remove_setup_files() {
   heading "9. REMOVE APPLIANCE DATA AND LOCAL FILES"
-  systemctl disable --now ollama-task.service ollama-agent.service >/dev/null 2>&1 || true
+  systemctl disable --now ollama-task.service ollama-embedding.service ollama-agent.service >/dev/null 2>&1 || true
   rm -f -- \
     /etc/systemd/system/ollama-task.service \
+    /etc/systemd/system/ollama-embedding.service \
     /etc/systemd/system/ollama-agent.service \
     /etc/systemd/system/multi-user.target.wants/ollama-task.service \
+    /etc/systemd/system/multi-user.target.wants/ollama-embedding.service \
     /etc/systemd/system/multi-user.target.wants/ollama-agent.service \
     /etc/systemd/system/bc250-enable-wol.service \
     /etc/systemd/system/bc250-night-shutdown.service \

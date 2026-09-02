@@ -41,7 +41,7 @@ shown as misplaced.
 | `experiments` | `exp-` | `127.0.0.1:11434` | `gguf/experiments` |
 | `task` | `task-` | `127.0.0.1:11435` | `gguf/task` |
 | `agentic` | `agentic-` | `127.0.0.1:11436` | `gguf/agent` |
-| `embedding` | `embed-` | `127.0.0.1:11434` | `gguf/embedding` |
+| `embedding` | `embed-` | `127.0.0.1:11437` | `gguf/embedding` |
 
 The public categories are `production`, `experiments`, `task`, `agentic`,
 `embedding`, `mtp` and `all`; legacy aliases are intentionally not accepted. MTP
@@ -118,6 +118,7 @@ Ollama imports model layers into one of these separate stores:
 ```text
 /var/lib/bc250-llm-server/ollama/main
 /var/lib/bc250-llm-server/ollama/task
+/var/lib/bc250-llm-server/ollama/embedding
 /var/lib/bc250-llm-server/ollama/agent
 ```
 
@@ -145,3 +146,11 @@ state sidecar. A later install can therefore reuse the checked source file.
 Without `--keep-gguf`, cleanup also removes the local GGUF/state as before.
 `sudo bc250-model cleanup all --keep-gguf` applies the retained-source cleanup to
 every category. Never manually purge Ollama's shared blob directory for one model.
+
+
+## Runtime lane ownership
+
+Normal mode uses main 11434, task 11435 and embedding 11437. Install embedding
+models with `bc250-setup-embedding-model` so registration targets the dedicated
+store/service. Agent 11436 is disabled at boot and runs only through exclusive
+`bc250-agent-mode enter|leave`; do not register production/embedding models there.

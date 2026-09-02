@@ -54,21 +54,19 @@ sudo systemctl start open-webui.service
 Restore helpers require confirmation, verify checksum sidecars and create
 rollback data before replacement.
 
-## Open WebUI production model baseline
+## Open WebUI package baseline
 
-Ollama 0.33.2 exposes Qwen3.5 reasoning through the request-level `think` field;
-it is not a safe Modelfile parameter to emulate by replacing the native renderer.
-After the first Open WebUI administrator login, create an administrator API key
-and run:
+Open WebUI package-owned provider/task/RAG/model-preset state is now managed by
+`bc250-openwebui-setup`, not the maintenance scheduler:
 
 ```bash
-sudo bc250-maintenance model-baseline
+sudo bc250-openwebui-setup init
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
-The command uses the stored `OWUI_API_KEY` when available, otherwise prompts for
-one without echoing it. It creates or updates
-`prod-qwen35-9b-unsloth-q6-k:latest`, preserves unrelated existing metadata and
-parameters, and sets `custom_params.think=false`.
+The Qwen3.5 workspace preset is imported additively with request-level
+`custom_params.think=false`; unrelated operator models and settings are not synchronized away.
+The temporary administrator credential is not stored by this helper.
 
 ## Storage and retention
 
@@ -80,7 +78,7 @@ sudo bc250-maintenance run prune
 sudo journalctl -u owui-maintenance@prune-uploads.service -n 100 --no-pager
 ```
 
-`bc250-status` is the shared storage view for GGUFs, the three Ollama stores,
+`bc250-status` is the shared storage view for GGUFs, the main/task/embedding/agent Ollama stores,
 Hugging Face cache, Open WebUI, Podman and journal usage. `clean-cache` requires
 confirmation and removes rebuildable Hugging Face cache, dangling container
 images and old system-wide journal archives; it does not delete GGUFs, Ollama

@@ -1,5 +1,73 @@
 # Changelog
 
+## 0.10.0-0.1.testing - 2026-09-01
+
+Make the runtime separation explicit around the BC-250's shared-memory limits.
+Normal appliance mode uses main Ollama on 11434, task Ollama on 11435 and a
+dedicated embedding Ollama on 11437 with a 10-minute keepalive. Coding/agent
+work on 11436 is intentionally exclusive: entering agent mode stops the normal
+lanes, and leaving it restores them. This avoids treating four independent
+Ollama processes as if the 16-GB UMA pool could safely host four large models.
+GPT-OSS 20B remains the expected memory-edge production case and should be
+re-benchmarked with the dedicated embedding lane after deployment.
+
+Upgrade the digest-pinned Open WebUI baseline to v0.11.3. Add
+`bc250-openwebui-setup init|apply|status`, which uses supported Open WebUI admin
+APIs to persist the package-owned main/task provider configuration, task model,
+dedicated embedding endpoint, reviewed RAG baseline and additive model presets.
+Fresh interactive installs can create or sign in the administrator and apply the
+baseline without storing credentials. Non-interactive installs never block; an
+operator can provide `OWUI_API_KEY` temporarily or run setup later. Package model
+imports are additive so unrelated operator models, users, prompts and knowledge
+remain operator-owned.
+
+Enable the local/offline Open WebUI application baseline while retaining
+firewalld/nginx as the actual security boundary. Verification understands normal
+versus exclusive-agent mode, checks the embedding model on 11437 and can perform
+an authenticated desired-state comparison only when `OWUI_API_KEY` is supplied.
+The package deliberately leaves `RAG_SYSTEM_CONTEXT=false` for a later real-corpus
+A/B test. Fedora Mesa 26.2+, the external GFX1013 compute-queue stack, ROCm,
+2000-MHz operation and model pruning stay documented as future evaluation items
+rather than being mixed into this release. No pre-v1 Open WebUI database backup
+automation is added.
+
+## 0.9.7-0.11.testing - 2026-08-31
+
+Use the 2026-08-31 reboot-by-reboot Fedora 44 / kernel 7.1.10 revalidation to
+simplify the fresh-machine memory profile to `ttm.pages_limit=4194304` and
+`ttm.page_pool_size=4194304`. Removing the deprecated explicit `amdgpu.gttsize`
+and the full `amdgpu.ppfeaturemask` override did not reduce measured model
+throughput, stability or usable GTT on the tested 40-CU board. The installer now
+converges older four-argument profiles to this TTM-only baseline; status, verify,
+diagnostics and removal keep enough legacy awareness to migrate or clean older
+installs safely. Ollama version verification is API-first so a root/systemd
+environment without `$HOME` no longer produces a false CLI panic.
+
+Keep the normal governor policy at 350-1850 MHz with busy-flag demand tracking.
+The same revalidation found fixed 1750 MHz roughly five percent slower on the
+prefill samples, while fixed 1850 stayed close to busy-flag performance. Upstream
+`cyan-skillfish-performance-mode --on` selected 2000 MHz despite the configured
+1850-MHz normal maximum; the package therefore documents that mode as an explicit
+operator override, recommends `--fixed-frequency 1850` for normal fixed-max
+comparisons, and verification reports an active clock above the configured range.
+
+Add opt-in, fixture-driven benchmark lanes for DE<->FR office translation and a
+small embedding->retrieval->Gemma-E4B grounded-answer acceptance chain. Extend OCR
+scoring with recoverable row/field structure and two deterministic harder scans,
+report task-model language requirements separately from structural compatibility,
+and add an optional cold/warm repeated-prefix generation pair for Ollama 0.33.x
+cache measurement. These model/hardware benchmarks are not part of `make validate`.
+Open WebUI keeps conservative `RAG_SYSTEM_CONTEXT=false`,
+`CHUNK_MIN_SIZE_TARGET=0`, `RAG_EMBEDDING_BATCH_SIZE=1` and asynchronous embedding
+disabled until real appliance measurements justify changing them.
+
+Rename the top-level operator guide to `MODELS.md` and record current benchmark
+conclusions there, including comparison candidates whose promotion case is now
+exhausted without deleting their Modelfiles. Fix the stale OCR-count prose, update
+installer/command/RAG/governor/memory documentation, retain the reviewed 40-CU
+fork pending a provenance-delta audit, and document a real sustained thermal-soak
+procedure separately from the short regression thermal wave.
+
 ## 0.9.7-0.10.testing - 2026-08-31
 
 Upgrade the digest-pinned Open WebUI image to v0.11.2, including its reasoning

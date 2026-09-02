@@ -96,6 +96,15 @@ The package pins and integrates:
 - [WinnieLV/bc250-cu-live-manager](https://github.com/WinnieLV/bc250-cu-live-manager)
   for live WGP routing.
 
+The 2026-08-31 upstream review confirms that `fduraibi/bc250-40cu-unlock` is a
+fork of the active duggasco research tree and that both trees expose Fedora-oriented
+helpers. The current duggasco tree also publishes LLM-prefill evidence for the
+40-CU path. This RPM still keeps its reviewed fduraibi commit because the package
+does not simply run either upstream helper: `bc250-40cu` wraps the pinned patch in
+its own running-kernel build, verified-stock-backup, restore and qualification
+workflow. Change the source pin only after a source-level delta audit shows that a
+newer tree preserves those assumptions; recency alone is not a migration reason.
+
 The external [GFX1013 compute-queue stack](GFX1013-COMPUTE-QUEUES.md) also
 replaces AMDGPU. Choose one reviewed module workflow or maintain a deliberately
 merged patch set; do not layer the two installers independently.

@@ -3,19 +3,19 @@
 The reviewed fresh-machine LLM profile is:
 
 ```text
-amdgpu.gttsize=14750 ttm.pages_limit=4194304 ttm.page_pool_size=4194304 amdgpu.ppfeaturemask=0xffffffff
+ttm.pages_limit=4194304 ttm.page_pool_size=4194304
 ```
 
 Apply it with `sudo bc250-memory-profile apply-full`; the helper uses `grubby`
 for every installed kernel and never reboots automatically. The installer applies
 this profile on green-field systems and pauses for the required reboot.
 
-`amdgpu.gttsize=14750` follows the BC-250 community's large-memory guidance. Current upstream Linux marks the `amdgpu.gttsize` module parameter as deprecated,
-so it should be revisited when Fedora kernels stop honoring it; it remains explicit
-here because the BC-250 profile still depends on it and is tested with it.
-This package keeps its measured 4,194,304-page TTM ceiling/pool (16 GiB at 4 KiB
-pages) rather than the community guide's slightly smaller 3,959,290-page value.
-`amdgpu.ppfeaturemask=0xffffffff` keeps the power/governor controls available.
+The package deliberately no longer adds `amdgpu.gttsize=14750` or
+`amdgpu.ppfeaturemask=0xffffffff`. On Fedora 44 kernel 7.1.10, a controlled
+revalidation showed the TTM-only profile preserved the intended large GTT
+aperture and the tested Ollama/Vulkan performance. `amdgpu.gttsize` is also
+deprecated upstream. Applying the package profile removes those older overrides
+so upgrades converge on one reviewed state.
 
 BC-250 safety checks:
 

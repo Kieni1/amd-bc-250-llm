@@ -22,7 +22,7 @@ sudo ./install
 
 Until 1.0 this is a green-field/test-appliance installer: it may reapply the
 reviewed project baseline rather than preserve unrelated host tuning. Operator
-Modelfiles remain overrideable; see [`MODEL.md`](MODEL.md).
+Modelfiles remain overrideable; see [`MODELS.md`](MODELS.md).
 
 The guided installer:
 
@@ -32,14 +32,21 @@ The guided installer:
 4. applies the reviewed memory and swap profiles;
 5. prepares, but does not enable, optional 40-CU support;
 6. offers production, task, agentic, embedding, experiment and explicitly
-   selected MTP models; and
-7. verifies the result.
+   selected MTP models;
+7. offers interactive Open WebUI API setup without storing credentials; and
+8. verifies the result.
 
 Rerun it after the requested reboot. To resume only model selection, use:
 
 ```bash
 sudo ./install --models-only
 ```
+
+The reviewed fresh-machine memory profile now uses only the two TTM limits
+(`ttm.pages_limit=4194304` and `ttm.page_pool_size=4194304`). A Fedora 44 /
+kernel 7.1.10 reboot-by-reboot revalidation found no stability or throughput
+benefit from retaining the older explicit `amdgpu.gttsize` or full
+`amdgpu.ppfeaturemask` overrides; see [`docs/MEMORY.md`](docs/MEMORY.md).
 
 After installation, start the guided CU/live-manager workflow with
 `sudo bc250-40cu`. The package does not choose a stable CU count: test 40, 38,
@@ -54,8 +61,9 @@ sudo bc250-verify
 bc250-verify-lan SERVER_IP
 ```
 
-Open `http://SERVER_IP/` only from the trusted LAN and register the first Open
-WebUI administrator immediately. The default endpoint is unencrypted HTTP; see
+Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
+create/sign in the administrator and apply the package-owned Open WebUI baseline;
+use `sudo bc250-openwebui-setup init` later if that step was skipped. The default endpoint is unencrypted HTTP; see
 [`docs/HARDENING.md`](docs/HARDENING.md) before using a less trusted network.
 
 ## Recommended starting models
@@ -90,11 +98,14 @@ non-commercial license; review every model's current license before use.
 sudo bc250-model list production
 sudo bc250-model install production
 sudo bc250-model install experiments
-sudo bc250-model install embedding
+sudo bc250-setup-embedding-model
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
 sudo bc250-setup-task-model
+sudo bc250-openwebui-setup init
+sudo bc250-agent-mode enter
 sudo bc250-setup-coding-agent
+sudo bc250-agent-mode leave
 
 # Profiles and hardware
 sudo bc250-memory-profile status
@@ -105,8 +116,8 @@ sudo bc250-40cu status
 # Optional maintenance / storage
 sudo bc250-status
 sudo bc250-maintenance setup --defaults
-# After first Open WebUI admin login + API-key creation:
-sudo bc250-maintenance model-baseline
+# Check/apply package-owned Open WebUI state when needed:
+bc250-openwebui-setup status
 sudo bc250-maintenance clean-cache
 
 # Compare models and specialized model categories
@@ -117,6 +128,8 @@ bc250-benchmark task
 bc250-benchmark agent
 bc250-benchmark usecase
 bc250-benchmark rag
+bc250-benchmark translation
+bc250-benchmark rag-quality
 ```
 
 The complete installed interface and its exact syntax are in
@@ -127,8 +140,8 @@ The complete installed interface and its exact syntax are in
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.33.2 | Package-standard official runtime, Vulkan-oriented service defaults and three isolated stores |
-| Open WebUI v0.11.2 and Tika | Digest-pinned local UI, reasoning-stream fixes and document extraction |
+| Ollama v0.33.2 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Open WebUI v0.11.3 and Tika | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
@@ -140,9 +153,9 @@ headless change is the 0.33.0 prompt-cache/prefill reliability work; 0.33.1/0.33
 also contain MLX/desktop changes that are not enabled on the BC-250 Vulkan path.
 See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
 
-The main Ollama instance uses port `11434`; optional task and agent instances
-use `11435` and `11436`. Keep all three unauthenticated APIs blocked from
-untrusted networks.
+Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.
+Coding/agent mode uses `11436` exclusively and stops the normal lanes. Keep all
+unauthenticated Ollama APIs blocked from untrusted networks.
 
 ## Source and build
 
@@ -164,7 +177,7 @@ Repository groups:
 
 - [`TLDR.md`](TLDR.md): short installation and operations sheet.
 - [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
-- [`MODEL.md`](MODEL.md): operator model roles, swapping, overrides and cleanup.
+- [`MODELS.md`](MODELS.md): operator model roles, swapping, overrides and cleanup.
 - [`models/README.md`](models/README.md): detailed Modelfile discovery/storage contract.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
 - [`docs/RAG.md`](docs/RAG.md): German/French/English office-document and knowledge-base pilot.

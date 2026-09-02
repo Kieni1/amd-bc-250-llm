@@ -31,7 +31,7 @@ The binary bc250-llm-server x86_64 RPM is expected beside this script. Use
 assumes a green-field/test appliance and may reapply the reviewed project baseline
 instead of preserving unrelated host tuning. It grows the root filesystem, updates
 Fedora, installs the RPM, normalizes official Ollama, applies memory/swap profiles,
-prepares 40-CU support, offers model setup and runs verification.
+prepares 40-CU support, offers model setup, can configure Open WebUI through its API, and runs verification.
 
 Run the same command again after a requested reboot. The installer prepares but
 does not enable experimental CUs; that remains an explicit operator action.
@@ -183,6 +183,15 @@ yes_no() {
   fi
   read -r -p "$prompt [y/N]: " answer
   [[ "${answer,,}" == y || "${answer,,}" == yes ]]
+}
+
+yes_no_default_yes() {
+  local prompt="$1" answer
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
+    return 0
+  fi
+  read -r -p "$prompt [Y/n]: " answer
+  [[ -z "$answer" || "${answer,,}" == y || "${answer,,}" == yes ]]
 }
 
 rerun_command() {
@@ -340,6 +349,7 @@ setup_ollama_account() {
   install -d -o ollama -g ollama -m 0750 \
     /var/lib/ollama \
     /var/lib/bc250-llm-server/ollama/main \
+    /var/lib/bc250-llm-server/ollama/embedding \
     /var/lib/bc250-llm-server/gguf/production \
     /var/lib/bc250-llm-server/gguf/embedding \
     /var/cache/bc250-llm-server/huggingface
@@ -409,10 +419,8 @@ step_5_memory_and_swap() {
   heading "5. APPLY MEMORY AND SWAP PROFILES"
   rpm -q zram-generator >/dev/null 2>&1 || dnf install -y zram-generator
   local memory_args=(
-    amdgpu.gttsize=14750
     ttm.pages_limit=4194304
     ttm.page_pool_size=4194304
-    amdgpu.ppfeaturemask=0xffffffff
   )
   local configured=1 token args_line
   local -a kernel_args=()
@@ -425,6 +433,9 @@ step_5_memory_and_swap() {
         *) configured=0 ;;
       esac
     done
+    case " $args_line " in
+      *" amdgpu.gttsize="*|*" amdgpu.ppfeaturemask="*) configured=0 ;;
+    esac
   done
   if ((configured == 0)); then
     BC250_ASSUME_YES=1 bc250-memory-profile apply-full
@@ -521,6 +532,7 @@ run_model_phase() {
   case "$category" in
     task) bc250-setup-task-model "$selection" ;;
     agentic) bc250-setup-coding-agent "$selection" ;;
+    embedding) bc250-setup-embedding-model "$selection" ;;
     mtp) bc250-model install mtp "$selection" --include-disabled ;;
     *) bc250-model install "$category" "$selection" ;;
   esac
@@ -546,8 +558,55 @@ step_7_models() {
   done
 }
 
-step_8_verify() {
-  heading "8. VERIFICATION"
+wait_for_open_webui() {
+  local attempt
+  for attempt in {1..60}; do
+    curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/ >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+step_8_open_webui() {
+  heading "8. CONFIGURE OPEN WEBUI"
+  command -v bc250-openwebui-setup >/dev/null 2>&1 || {
+    echo "Open WebUI setup helper is unavailable; skipping application configuration."
+    return 0
+  }
+  if ! wait_for_open_webui; then
+    echo "Open WebUI is not reachable on 127.0.0.1:3000; configure it later with:"
+    echo "  sudo bc250-openwebui-setup init"
+    return 0
+  fi
+
+  if [[ -n "${OWUI_API_KEY:-}" ]]; then
+    echo "Applying the package-owned Open WebUI baseline with OWUI_API_KEY from the environment."
+    if ! bc250-openwebui-setup apply; then
+      echo "WARNING: Open WebUI API setup failed; no credentials were stored." >&2
+      echo "Retry later with: sudo bc250-openwebui-setup init" >&2
+    fi
+    return 0
+  fi
+
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 || ! -t 0 ]]; then
+    echo "Non-interactive install: Open WebUI administrator setup was not attempted."
+    echo "Run later in an interactive terminal:"
+    echo "  sudo bc250-openwebui-setup init"
+    return 0
+  fi
+
+  if yes_no_default_yes "Configure package-owned Open WebUI providers, tasks, RAG and model presets now?"; then
+    if ! bc250-openwebui-setup init; then
+      echo "WARNING: Open WebUI API setup was not completed; the appliance remains usable." >&2
+      echo "Retry later with: sudo bc250-openwebui-setup init" >&2
+    fi
+  else
+    echo "Skipped. Run later with: sudo bc250-openwebui-setup init"
+  fi
+}
+
+step_9_verify() {
+  heading "9. VERIFICATION"
   local verify_status=0 diagnose_status=0
   bc250-memory-profile status
   bc250-swap-profile status
@@ -566,6 +625,7 @@ run_models_only() {
     exit 1
   }
   step_7_models
+  step_8_open_webui
   echo
   echo "Optional model setup completed."
   echo "Transcript: $LOG_FILE"
@@ -592,7 +652,8 @@ main() {
   step_5_memory_and_swap
   step_6_prepare_40cu
   step_7_models
-  step_8_verify
+  step_8_open_webui
+  step_9_verify
   echo
   echo "Installation and verification completed."
   echo "Transcript: $LOG_FILE"
@@ -602,7 +663,8 @@ main() {
     echo "40-CU support is prepared but disabled; maintenance timers were not changed."
   fi
   echo "Next: sudo bc250-40cu  # test a stable CU configuration for this board"
-  echo "After first Open WebUI admin login/API-key creation: sudo bc250-maintenance model-baseline"
+  echo "Open WebUI desired-state setup/status: sudo bc250-openwebui-setup init|status"
+  echo "Exclusive coding mode: sudo bc250-agent-mode enter; leave with sudo bc250-agent-mode leave"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

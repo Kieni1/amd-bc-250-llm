@@ -8,12 +8,14 @@ dir	0755	-	{share}/40cu
 dir	0755	-	{share}/cu-live-manager
 dir	0755	-	{share}/examples
 dir	0755	-	{share}/examples/coding-agent
+dir	0755	-	{share}/examples/embedding
 dir	0755	-	{share}/examples/raspi-wol
 dir	0755	-	{share}/examples/rag
 dir	0755	-	{share}/examples/task-model
 dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
 dir	0755	-	{share}/ollama-profiles
+dir	0755	-	{share}/openwebui
 dir	0755	-	{config}
 dir	0755	-	{config}/models.d
 dir	0755	-	{sysconfdir}/cyan-skillfish-governor-smu
@@ -45,6 +47,8 @@ file	0755	models/modelctl.py	{libexec}/modelctl
 file	0755	models/ocr/bc250-ocr.sh	{libexec}/ocr.sh
 file	0755	models/rag/rag_import.py	{libexec}/rag-import
 file	0755	models/setup-ollama-instance.sh	{libexec}/setup-ollama-instance.sh
+file	0755	cmd/system/agent-mode.sh	{libexec}/agent-mode.sh
+file	0755	cmd/openwebui/openwebui-setup.py	{libexec}/openwebui-setup.py
 file	0755	models/experiments/compare-mtp.sh	{libexec}/compare-mtp.sh
 file	0755	models/mtp/run-mtp-llamacpp.sh	{libexec}/run-mtp-llamacpp.sh
 file	0755	cmd/benchmark/compare-models.sh	{libexec}/compare-models.sh
@@ -57,11 +61,15 @@ file	0644	examples/benchmark/embedding-office.json	{share}/benchmark/embedding-o
 file	0644	examples/benchmark/task-cases.json	{share}/benchmark/task-cases.json
 file	0644	examples/benchmark/agent-cases.json	{share}/benchmark/agent-cases.json
 file	0644	examples/benchmark/usecase-office.json	{share}/benchmark/usecase-office.json
+file	0644	examples/benchmark/translation-office.json	{share}/benchmark/translation-office.json
 file	0644	examples/benchmark/rag-cycle.json	{share}/benchmark/rag-cycle.json
+file	0644	examples/benchmark/rag-quality-office.json	{share}/benchmark/rag-quality-office.json
 file	0644	examples/benchmark/ocr/manifest.json	{share}/benchmark/ocr/manifest.json
 file	0644	examples/benchmark/ocr/office-de.png	{share}/benchmark/ocr/office-de.png
 file	0644	examples/benchmark/ocr/office-fr.png	{share}/benchmark/ocr/office-fr.png
 file	0644	examples/benchmark/ocr/invoice-mixed.png	{share}/benchmark/ocr/invoice-mixed.png
+file	0644	examples/benchmark/ocr/invoice-mixed-rotated.png	{share}/benchmark/ocr/invoice-mixed-rotated.png
+file	0644	examples/benchmark/ocr/office-fr-scan.png	{share}/benchmark/ocr/office-fr-scan.png
 file	0755	cmd/monitoring/check-temp.sh	{libexec}/check-temp.sh
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
 file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
@@ -76,7 +84,6 @@ file	0755	cmd/monitoring/verify-server.sh	{libexec}/verify.sh
 file	0755	cmd/monitoring/verify-lan.sh	{libexec}/verify-lan.sh
 file	0755	examples/raspi-wol/enable-wol.sh	{libexec}/enable-wol.sh
 file	0755	cmd/maintenance/*.sh	{libexec}/
-file	0755	cmd/maintenance/owui-model-baseline.py	{libexec}/owui-model-baseline.py
 file	0755	models/coding-agent/coding-agent.sh	{libexec}/coding-agent/coding-agent.sh
 file	0755	models/coding-agent/commit-agent.sh	{libexec}/coding-agent/commit-agent.sh
 file	0755	models/coding-agent/gitea-review.sh	{libexec}/coding-agent/gitea-review.sh
@@ -92,6 +99,7 @@ file	0644	unlock-src/README.md	{share}/40cu/README-upstream.md
 text	0644	{unlock_commit}	{share}/40cu/SOURCE-REVISION
 
 file	0644	cmd/system/ollama-profiles/*.conf	{share}/ollama-profiles/
+file	0644	config/openwebui/models.json	{share}/openwebui/models.json
 file	0644	cmd/maintenance/*.service	{unitdir}/
 file	0644	cmd/maintenance/*.timer	{unitdir}/
 file	0644	examples/raspi-wol/bc250-enable-wol.service	{unitdir}/bc250-enable-wol.service
@@ -104,6 +112,7 @@ file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-manag
 
 file	0644	models/task-model/README.md	{share}/examples/task-model/README.md
 file	0755	models/task-model/setup-ollama.sh	{share}/examples/task-model/setup-ollama.sh
+file	0755	models/embedding/setup-ollama.sh	{share}/examples/embedding/setup-ollama.sh
 file	0644	models/coding-agent/README.md	{share}/examples/coding-agent/README.md
 file	0644	models/coding-agent/gitea.env.example	{share}/examples/coding-agent/gitea.env.example
 file	0755	models/coding-agent/setup-ollama.sh	{share}/examples/coding-agent/setup-ollama.sh
@@ -117,7 +126,7 @@ file	0644	examples/rag/document-template.md	{share}/examples/rag/document-templa
 
 file	0644	README.md	{docdir}/README.md
 file	0644	TLDR.md	{docdir}/TLDR.md
-file	0644	MODEL.md	{docdir}/MODEL.md
+file	0644	MODELS.md	{docdir}/MODELS.md
 file	0644	licenses/THIRD_PARTY_NOTICES.md	{docdir}/THIRD_PARTY_NOTICES.md
 file	0644	docs/*.md	{docdir}/
 file	0644	packaging/README.md	{docdir}/PACKAGING.md

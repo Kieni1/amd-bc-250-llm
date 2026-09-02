@@ -14,7 +14,7 @@ sudo systemctl status \
 bc250-verify-lan SERVER_IP
 ```
 
-Open `http://SERVER_IP/` and register the first Open WebUI account immediately;
+Open `http://SERVER_IP/` from the trusted LAN. The guided installer can initialize the Open WebUI administrator and package-owned API baseline;
 it becomes the administrator.
 
 ## Services and ports
@@ -23,13 +23,14 @@ it becomes the administrator.
 |---|---|---|
 | nginx | `SERVER_IP:80` | Trusted-LAN entry point |
 | Open WebUI | `127.0.0.1:3000` | Local UI behind nginx |
-| Ollama main | `0.0.0.0:11434` | Chat, experiments and embeddings |
-| Ollama task | `0.0.0.0:11435` | Optional task model |
-| Ollama agent | `0.0.0.0:11436` | Optional coding/agentic models |
+| Ollama main | `0.0.0.0:11434` | Production chat, experiments and answer models |
+| Ollama task | `0.0.0.0:11435` | Background task model |
+| Ollama embedding | `0.0.0.0:11437` | Dedicated retrieval embeddings |
+| Ollama agent | `0.0.0.0:11436` | Exclusive coding/agentic mode; disabled at boot |
 | Tika | private container network | Document extraction |
 
 The rootful Open WebUI container requires the host Ollama listeners. The RPM
-does not open ports `11434`–`11436` in firewalld; keep them blocked from
+does not open ports `11434`–`11437` in firewalld; keep them blocked from
 untrusted networks. If firewalld is disabled, enabled Ollama instances are
 reachable on all configured host interfaces.
 

@@ -1,13 +1,13 @@
 # Packaged rootful Quadlet. Vendor path: /usr/share/containers/systemd/
 [Unit]
 Description=Open WebUI (BC-250 local LLM front-end)
-After=network-online.target ollama.service tika.service
+After=network-online.target ollama.service ollama-task.service ollama-embedding.service tika.service
 Wants=network-online.target tika.service
 
 [Container]
 ContainerName=open-webui
-# v0.11.2, pinned OCI index digest.
-Image=ghcr.io/open-webui/open-webui@sha256:77ff490214a4b2699b309aa8d39bf4b42eca05f62d2742ef669ff846fcd10355
+# v0.11.3, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:751b617714b91e4cfd0186a509c72480c858e012976103b09a30dad053c36175
 Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
@@ -17,46 +17,54 @@ Memory=2g
 PidsLimit=512
 NoNewPrivileges=true
 DropCapability=all
-Environment="OLLAMA_BASE_URLS=http://host.containers.internal:11434;http://host.containers.internal:11435;http://host.containers.internal:11436"
-Environment="OLLAMA_API_CONFIGS={\"0\":{\"enable\":true,\"model_ids\":[\"prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest\",\"prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest\",\"prod-gpt-oss20b-ggml-org-mxfp4:latest\",\"prod-lfm25-8b-a1b-liquidai-q6-k:latest\",\"prod-qwen35-9b-unsloth-q6-k:latest\"],\"tags\":[\"production\"],\"connection_type\":\"local\"},\"1\":{\"enable\":false,\"model_ids\":[\"task-gemma3-1b-unsloth-ud-q4-k-xl:latest\",\"task-lfm25-2.6b-liquidai-q6-k:latest\"],\"tags\":[\"task\"],\"connection_type\":\"local\"},\"2\":{\"enable\":false,\"model_ids\":[\"agentic-ornith15-9b-ornith-q5-k-m:latest\",\"agentic-qwable9b-empero-q6-k:latest\",\"agentic-qwen25-coder7b-unsloth-q5-k-m:latest\"],\"tags\":[\"agentic\"],\"connection_type\":\"local\"}}"
+# Bootstrap only. bc250-openwebui-setup persists the reviewed main+task provider
+# configuration through Open WebUI's supported admin API after first login.
+Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 Environment=ENABLE_OPENAI_API=false
-# Fresh-install privacy baseline. Operators can deliberately re-enable these
-# application features later if their local policy/use case requires them.
+# Local/offline appliance baseline. This reduces application-initiated outbound
+# requests; firewalld remains the actual network security boundary.
+Environment=OFFLINE_MODE=true
+Environment=HF_HUB_OFFLINE=1
+Environment=RAG_EMBEDDING_MODEL_AUTO_UPDATE=false
+Environment=RAG_RERANKING_MODEL_AUTO_UPDATE=false
+Environment=WHISPER_MODEL_AUTO_UPDATE=false
 Environment=ENABLE_COMMUNITY_SHARING=false
 Environment=ENABLE_CODE_EXECUTION=false
 Environment=ENABLE_CODE_INTERPRETER=false
 Environment=ENABLE_MEMORIES=false
 Environment=ENABLE_DIRECT_CONNECTIONS=false
 Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
-# Open WebUI 0.11.2 task parameters are intentionally left at upstream defaults
-# until the dedicated Gemma 3 1B task benchmark justifies a tuned profile.
+# API setup selects the dedicated 4K task model while preserving upstream
+# prompt templates. These values remain a safe bootstrap if the API step is skipped.
 Environment="TASK_MODEL_PARAMS={}"
-Environment=RAG_EMBEDDING_ENGINE=ollama
-Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m
-Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11434
-# Bound ad-hoc office uploads; curated knowledge sync remains managed separately.
-Environment=RAG_FILE_MAX_SIZE=128
-Environment=RAG_FILE_MAX_COUNT=20
-Environment="RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub"
-Environment=RAG_EMBEDDING_BATCH_SIZE=1
-# Moderate BC-250 RAG baseline; conservative 1000/100/Top-K-5 is documented.
-Environment=RAG_TEXT_SPLITTER=token
-Environment=CHUNK_SIZE=1500
-Environment=CHUNK_OVERLAP=200
-Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true
-Environment=RAG_TOP_K=8
-Environment=RAG_RELEVANCE_THRESHOLD=0
-# Office/RAG baseline: do not silently replace missing document evidence with model knowledge.
-Environment="RAG_TEMPLATE=Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
-Environment=ENABLE_RAG_HYBRID_SEARCH=false
-Environment=ENABLE_ASYNC_EMBEDDING=false
 Environment=ENABLE_TITLE_GENERATION=true
 Environment=ENABLE_TAGS_GENERATION=true
 Environment=ENABLE_FOLLOW_UP_GENERATION=false
 Environment=ENABLE_AUTOCOMPLETE_GENERATION=false
 Environment=ENABLE_SEARCH_QUERY_GENERATION=false
 Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false
+# Dedicated embedding lane: small model, 10 minute Ollama keepalive, no chat exposure.
+Environment=RAG_EMBEDDING_ENGINE=ollama
+Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m
+Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11437
+Environment=RAG_EMBEDDING_BATCH_SIZE=1
+Environment=ENABLE_ASYNC_EMBEDDING=false
+# Bound ad-hoc office uploads; curated knowledge sync remains managed separately.
+Environment=RAG_FILE_MAX_SIZE=128
+Environment=RAG_FILE_MAX_COUNT=20
+Environment="RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub"
+# Measured candidates remain disabled until explicitly benchmarked on the real corpus.
+Environment=CHUNK_MIN_SIZE_TARGET=0
+Environment=RAG_SYSTEM_CONTEXT=false
+Environment=RAG_TEXT_SPLITTER=token
+Environment=CHUNK_SIZE=1500
+Environment=CHUNK_OVERLAP=200
+Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true
+Environment=RAG_TOP_K=8
+Environment=RAG_RELEVANCE_THRESHOLD=0
+Environment="RAG_TEMPLATE=Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
+Environment=ENABLE_RAG_HYBRID_SEARCH=false
 # Keep removed knowledge files disposable; local authoritative sources remain under /srv.
 Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false
 Environment="RAG_EMBEDDING_QUERY_PREFIX=Query: "

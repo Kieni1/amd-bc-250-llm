@@ -35,7 +35,7 @@ sudo firewall-cmd --list-all
 bc250-verify-lan SERVER_IP
 ```
 
-Ollama ports `11434`–`11436` have no authentication and must remain blocked
+Ollama ports `11434`–`11437` have no authentication and must remain blocked
 from untrusted networks. The wildcard host listeners are intentional so the
 rootful Open WebUI container can use `host.containers.internal`; firewalld is
 the LAN boundary. `bc250-verify` warns about unexpected listener shapes or an
@@ -61,7 +61,17 @@ To retain data while stopping the stack:
 ```bash
 sudo systemctl disable --now open-webui.service tika.service nginx.service
 sudo systemctl disable --now ollama.service
-sudo systemctl disable --now ollama-task.service ollama-agent.service
+sudo systemctl disable --now ollama-task.service ollama-embedding.service ollama-agent.service
 ```
 
 Re-enable only the services required by the next test.
+
+
+## Open WebUI local/offline policy
+
+Open WebUI is configured with `OFFLINE_MODE=true` and `HF_HUB_OFFLINE=1`, with
+automatic embedding/reranking/Whisper model updates disabled. This reduces
+application-initiated outbound traffic but is not a network isolation boundary.
+Keep firewalld/nginx policy authoritative. `bc250-openwebui-setup` uses a
+temporary administrator credential only when explicitly run and does not store it.
+Agent/coding mode is exclusive and the agent service remains disabled at boot.

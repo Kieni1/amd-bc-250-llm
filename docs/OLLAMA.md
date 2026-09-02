@@ -29,12 +29,21 @@ OLLAMA_MODELS=/var/lib/bc250-llm-server/ollama/main
 OLLAMA_HOST=0.0.0.0:11434
 ```
 
-Optional task and agent setup create `ollama-task.service` on `11435` and
-`ollama-agent.service` on `11436`, each with a separate store. The task service
-uses `OLLAMA_KEEP_ALIVE=0` so background tasks unload immediately. The main/task
-separation is intentional. The coding-agent service is expected to be used
-exclusively rather than alongside a large main-model request. All instances still
-share the BC-250 unified-memory pool.
+Normal model setup creates separate task and embedding services alongside main:
+
+| Lane | Port | Keepalive | Normal boot | Purpose |
+|---|---:|---|---|---|
+| main | 11434 | production profile | yes | production chat/RAG answers |
+| task | 11435 | `0` | when configured | Open WebUI title/tag tasks |
+| embedding | 11437 | `10m` | when configured | retrieval embeddings only |
+| agent | 11436 | `5m` | **no** | exclusive coding/agent work |
+
+`ollama-agent.service` conflicts with main/task/embedding and is disabled at
+boot. Use `sudo bc250-agent-mode enter` before coding work and
+`sudo bc250-agent-mode leave` afterwards. All lanes share the same BC-250 UMA
+pool; the separation controls lifecycle and eviction, not physical memory.
+GPT-OSS 20B is the expected memory-edge production case with a warm embedding
+model and should be re-benchmarked after 0.10.0 deployment.
 
 ## 0.33.2 runtime notes
 
@@ -84,10 +93,10 @@ a possible quality cost. Service profiles do not modify individual Modelfiles.
 `bc250-benchmark` targets the Ollama **0.33.2** request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
-`low`/`medium`/`high`/`max` as supported by 0.33.2. Embedding tests use
-`/api/embed` with `truncate=false`; model allocation comes from `/api/ps`. The
-dedicated `bc250-benchmark agent` lane uses `/api/chat` on port 11436 and does
-not globally force reasoning off.
+`low`/`medium`/`high`/`max` as supported by 0.33.2. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
+lane; RAG-quality uses 11437 for vectors and 11434 for the answer model. Model
+allocation comes from `/api/ps`. The `bc250-benchmark agent` lane uses `/api/chat`
+on exclusive port 11436 and does not globally force reasoning off.
 
 The benchmark samples BC-250 temperature and memory/AMDGPU counters during each
 request. `RUN_THERMAL=1` adds sustained decode windows; no second `watch` terminal
@@ -100,7 +109,7 @@ and must remain blocked from untrusted networks:
 
 ```bash
 sudo firewall-cmd --list-all
-ss -ltnp | grep -E ':(11434|11435|11436)\b'
+ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 ```
 
 ## Updating safely

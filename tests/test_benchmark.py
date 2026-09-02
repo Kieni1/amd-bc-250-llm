@@ -129,6 +129,8 @@ class GenerationPolicyTests(unittest.TestCase):
         source = (BENCH / "generation-benchmark.py").read_text(encoding="utf-8")
         self.assertIn('"prefill_cache_mode": "cold-runner"', source)
         self.assertGreaterEqual(source.count("client.ensure_unloaded(model)"), 4)
+        self.assertIn('bool_setting("RUN_WARM_PREFIX", False)', source)
+        self.assertIn('"prefix_warm"', source)
 
 
 class CategoryPolicyTests(unittest.TestCase):
@@ -192,6 +194,19 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertIs(qwen["think"], False)
         lfm = next(case for case in usecase if "lfm25" in case["model"])
         self.assertNotIn("translate", lfm["prompt"].casefold())
+        translation = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(encoding="utf-8")
+        )
+        self.assertGreaterEqual(len(translation), 8)
+        self.assertEqual(
+            {(case["source_language"], case["target_language"]) for case in translation},
+            {("de", "fr"), ("fr", "de")},
+        )
+        rag_quality = json.loads(
+            (ROOT / "examples/benchmark/rag-quality-office.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(rag_quality["corpus_file"], "embedding-office.json")
+        self.assertGreaterEqual(len(rag_quality["cases"]), 4)
 
     def test_agent_validators_check_syntax_and_requirements_without_execution(
         self,
@@ -261,6 +276,17 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertEqual(category.ocr_scores("A B C", case)[5], 1.0)
         self.assertLess(category.ocr_scores("C B A", case)[5], 1.0)
 
+    def test_ocr_structure_score_tracks_local_row_association(self) -> None:
+        case = {
+            "expected_text": "Item A 1 September IT Item B 2 September HR",
+            "required_fields": ["Item A", "Item B"],
+            "structure_groups": [["Item A", "1 September", "IT"]],
+            "structure_window": 80,
+        }
+        self.assertEqual(category.ocr_scores("Item A 1 September IT", case)[6], 1.0)
+        self.assertEqual(category.ocr_scores("Item A " + "x " * 100 + "1 September IT", case)[6], 0.0)
+        self.assertEqual(category.ocr_table_signal("<table><tr><td>A</td></tr></table>"), 1.0)
+
     def test_ocr_score_penalizes_hallucinated_extra_text(self) -> None:
         case = {
             "expected_text": "Invoice 4821 Total CHF 319.50",
@@ -297,7 +323,7 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertFalse(category.strict_json_object(fenced))
         self.assertTrue(category.strict_json_object('{"title":"ok"}'))
 
-    def test_task_language_hint_is_informational(self) -> None:
+    def test_task_language_hint_supports_required_language_reporting(self) -> None:
         self.assertEqual(category.task_language_hint("Datenschutz und Dokument Analyse", "de"), "match")
         self.assertEqual(category.task_language_hint("privacy and document analysis", "de"), "other")
 

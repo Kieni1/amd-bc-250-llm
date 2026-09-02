@@ -15,7 +15,7 @@ class RagBaselineTests(unittest.TestCase):
         expected = (
             "Environment=RAG_EMBEDDING_ENGINE=ollama",
             "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
-            "Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11434",
+            "Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11437",
             "Environment=RAG_TEXT_SPLITTER=token",
             "Environment=CHUNK_SIZE=1500",
             "Environment=CHUNK_OVERLAP=200",
@@ -35,6 +35,8 @@ class RagBaselineTests(unittest.TestCase):
             "Environment=RAG_FILE_MAX_SIZE=128",
             "Environment=RAG_FILE_MAX_COUNT=20",
             "Environment=RAG_EMBEDDING_BATCH_SIZE=1",
+            "Environment=CHUNK_MIN_SIZE_TARGET=0",
+            "Environment=RAG_SYSTEM_CONTEXT=false",
         )
         for line in expected:
             self.assertIn(line, quadlet)

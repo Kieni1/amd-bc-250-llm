@@ -22,7 +22,7 @@ available only for deliberate unattended disposal.
 
 It stops services and removes:
 
-- main, task and agent Ollama stores and source GGUFs;
+- main, task, embedding and agent Ollama stores and source GGUFs;
 - Open WebUI accounts, chats, uploads, vector state and containers;
 - Hugging Face caches, maintenance backups and installer records;
 - memory, zram, disk-swap, swappiness and CU persistence created by the setup;

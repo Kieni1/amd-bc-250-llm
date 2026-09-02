@@ -22,6 +22,7 @@ bc250 --help
 | `/etc/bc250-llm-server/` | Operator model drop-ins and MTP/maintenance policy |
 | `/usr/lib/systemd/system/` | Services and timers |
 | `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
+| `/usr/share/bc250-llm-server/openwebui/` | Versioned additive Open WebUI model presets |
 
 `packaging/install-manifest.tsv` is the authoritative source-to-payload map.
 It drives installation and RPM ownership. Keep it limited to simple file,
@@ -51,3 +52,5 @@ Ordinary RPM removal intentionally preserves it.
 
 See [`FILESTRUCTURE.md`](FILESTRUCTURE.md) for the operator-facing path map and
 [`../packaging/README.md`](../packaging/README.md) for maintainer policy.
+
+Dynamic model setup may create `ollama-task.service`, `ollama-embedding.service` and the boot-disabled `ollama-agent.service` under `/etc/systemd/system/`; these are operator/runtime state rather than RPM-owned unit payloads.

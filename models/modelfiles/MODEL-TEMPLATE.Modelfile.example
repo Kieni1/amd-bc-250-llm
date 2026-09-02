@@ -8,7 +8,7 @@
 # Source: OWNER/REPOSITORY @ latest
 # GGUF: MODEL.gguf
 # Optional exact source digest; remove this line when the revision is flexible.
-# SHA256: 
+# SHA256:
 FROM /var/lib/bc250-llm-server/gguf/STORAGE/MODEL.gguf
 
 # Keep num_gpu in every template. Chat templates also require num_keep.

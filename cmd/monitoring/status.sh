@@ -141,7 +141,13 @@ else
 fi
 ollama_status main ollama.service 11434
 ollama_status task ollama-task.service 11435
+ollama_status embedding ollama-embedding.service 11437
 ollama_status agent ollama-agent.service 11436
+if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
+  echo "  Mode:      exclusive agent/coding"
+else
+  echo "  Mode:      normal production/task/embedding"
+fi
 
 section "Web services"
 for unit in open-webui.service tika.service nginx.service; do
@@ -168,6 +174,7 @@ df -h / /boot 2>/dev/null | awk '!seen[$1]++' | sed 's/^/  /'
 directory_usage "GGUF sources" /var/lib/bc250-llm-server/gguf
 directory_usage "Ollama main" /var/lib/bc250-llm-server/ollama/main
 directory_usage "Ollama task" /var/lib/bc250-llm-server/ollama/task
+directory_usage "Ollama embedding" /var/lib/bc250-llm-server/ollama/embedding
 directory_usage "Ollama agent" /var/lib/bc250-llm-server/ollama/agent
 directory_usage "Hugging Face cache" /var/cache/bc250-llm-server/huggingface
 directory_usage "Open WebUI" /var/lib/open-webui

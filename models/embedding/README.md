@@ -2,11 +2,11 @@
 
 ```bash
 sudo bc250-model list embedding
-sudo bc250-model install embedding
-sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
+sudo bc250-setup-embedding-model
+sudo bc250-setup-embedding-model embed-jina-v5-small-retrieval-q4-k-m
 ```
 
-Embeddings use the main Ollama instance on port `11434`. Current choices are:
+Embeddings use the dedicated `ollama-embedding.service` on port `11437`. Current choices are:
 
 - `embed-jina-v5-small-retrieval-q4-k-m` — retrieval recommendation;
 - `embed-qwen3-0.6b-q8-0` — alternative for comparison or licensing needs.
@@ -28,6 +28,12 @@ German/French/English office-document pilot.
 Verify before selecting the exact name in Open WebUI:
 
 ```bash
-curl -fsS http://127.0.0.1:11434/api/embed \
+curl -fsS http://127.0.0.1:11437/api/embed \
   -d '{"model":"embed-jina-v5-small-retrieval-q4-k-m","input":"BC-250 test"}'
 ```
+
+
+The dedicated service uses a 4K context and 10-minute keepalive. It is part of
+normal mode and is stopped automatically when `bc250-agent-mode enter` starts the
+exclusive coding backend. This prevents ordinary RAG indexing from evicting the
+main production answer model while keeping the embedding residency bounded.

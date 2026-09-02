@@ -1,0 +1,61 @@
+{
+  "models": [
+    {
+      "id": "bc250-office-standard",
+      "base_model_id": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
+      "name": "Office - Standard",
+      "meta": {
+        "description": "Fast default for routine office writing and chat on the BC-250.",
+        "tags": [{"name": "BC250"}, {"name": "office"}, {"name": "standard"}]
+      },
+      "params": {},
+      "is_active": true
+    },
+    {
+      "id": "bc250-office-documents",
+      "base_model_id": "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+      "name": "Office - Documents / RAG",
+      "meta": {
+        "description": "Reviewed document and grounded-RAG answer model.",
+        "tags": [{"name": "BC250"}, {"name": "office"}, {"name": "RAG"}]
+      },
+      "params": {},
+      "is_active": true
+    },
+    {
+      "id": "bc250-office-translation",
+      "base_model_id": "prod-lfm25-8b-a1b-liquidai-q6-k:latest",
+      "name": "Office - Translation DE/FR",
+      "meta": {
+        "description": "High-throughput German/French office translation role.",
+        "tags": [{"name": "BC250"}, {"name": "translation"}, {"name": "DE-FR"}]
+      },
+      "params": {},
+      "is_active": true
+    },
+    {
+      "id": "bc250-office-advanced",
+      "base_model_id": "prod-qwen35-9b-unsloth-q6-k:latest",
+      "name": "Office - General / Higher Quality",
+      "meta": {
+        "description": "Higher-quality general model; normal office preset requests non-thinking mode.",
+        "tags": [{"name": "BC250"}, {"name": "office"}, {"name": "advanced"}]
+      },
+      "params": {
+        "custom_params": {"think": false}
+      },
+      "is_active": true
+    },
+    {
+      "id": "bc250-office-deep-reasoning",
+      "base_model_id": "prod-gpt-oss20b-ggml-org-mxfp4:latest",
+      "name": "Office - Deep Reasoning",
+      "meta": {
+        "description": "Large reasoning role. Re-test memory headroom together with the dedicated embedding lane on this 16 GiB UMA appliance.",
+        "tags": [{"name": "BC250"}, {"name": "reasoning"}]
+      },
+      "params": {},
+      "is_active": true
+    }
+  ]
+}

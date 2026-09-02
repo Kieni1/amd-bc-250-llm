@@ -1,0 +1,35 @@
+{
+  "corpus_file": "embedding-office.json",
+  "top_k": 8,
+  "cases": [
+    {
+      "id": "current-zurich-lease",
+      "question": "Welche Kündigungsfrist gilt für den aktuellen Zürcher Büro-Mietvertrag ab 2026?",
+      "target": "de-kuendigung",
+      "required": ["drei Monate"],
+      "forbidden": ["sechs Monate"]
+    },
+    {
+      "id": "invoice-4821",
+      "question": "Welcher Gesamtbetrag und welches Fälligkeitsdatum gehören zur Rechnung INV-4821?",
+      "target": "fr-facture-4821",
+      "required": ["INV-4821", "CHF 319.50", "31. August 2026"],
+      "required_any": ["fr-facture-4821", "[fr-facture-4821]"],
+      "forbidden": ["CHF 391.50", "30. September 2026"]
+    },
+    {
+      "id": "privacy-public-cloud",
+      "question": "May confidential HR data be stored in public cloud services? Answer in English.",
+      "target": "de-datenschutz",
+      "required_any": ["not allowed", "not permitted", "must not"],
+      "forbidden": ["yes,", "may be stored"]
+    },
+    {
+      "id": "geneva-lease-fr",
+      "question": "Quel délai de résiliation s'applique au bureau de Genève ? Répondez en français.",
+      "target": "fr-resiliation",
+      "required": ["six mois"],
+      "forbidden": ["trois mois"]
+    }
+  ]
+}

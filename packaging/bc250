@@ -10,6 +10,7 @@ DOCDIR="${BC250_DOCDIR:-/usr/share/doc/bc250-llm-server}"
 # the command name form the executable argv prefix.
 ROUTES=(
   "40cu|$LIBEXEC/40cu.sh"
+  "agent-mode|$LIBEXEC/agent-mode.sh"
   "benchmark|$LIBEXEC/compare-models.sh"
   "check-temp|$LIBEXEC/check-temp.sh"
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
@@ -25,8 +26,10 @@ ROUTES=(
   "ocr|$LIBEXEC/ocr.sh"
   "rag-import|$LIBEXEC/rag-import"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
+  "openwebui-setup|$LIBEXEC/openwebui-setup.py"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "setup-coding-agent|$SHARE/examples/coding-agent/setup-ollama.sh"
+  "setup-embedding-model|$SHARE/examples/embedding/setup-ollama.sh"
   "setup-task-model|$SHARE/examples/task-model/setup-ollama.sh"
   "status|$LIBEXEC/status.sh"
   "swap-profile|$LIBEXEC/swap-profile.sh"
@@ -55,12 +58,12 @@ Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
   model, ocr, rag-import, fetch-mtp
-  setup-task-model, setup-coding-agent
+  setup-task-model, setup-embedding-model, setup-coding-agent
 
 Operation:
   status, verify, verify-lan, benchmark, check-temp
-  install-ollama, maintenance, ollama-profile, memory-profile, swap-profile
-  40cu, cu-status, uninstall
+  install-ollama, maintenance, ollama-profile, openwebui-setup
+  memory-profile, swap-profile, agent-mode, 40cu, cu-status, uninstall
 
 Optional workflows:
   code, code-commit, gitea-review, compare-mtp, run-mtp

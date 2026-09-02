@@ -40,9 +40,9 @@ find_binary_rpm() { printf '/tmp/bc250-current.x86_64.rpm\n'; }
 rpm() {
   case "$*" in
     "-qp --qf %{NAME}-%{VERSION}-%{RELEASE}.%{ARCH} /tmp/bc250-current.x86_64.rpm")
-      printf 'bc250-llm-server-0.9.7-0.10.testing.fc44.x86_64\n' ;;
+      printf 'bc250-llm-server-0.9.7-0.11.testing.fc44.x86_64\n' ;;
     "-q --qf %{NAME}-%{VERSION}-%{RELEASE}.%{ARCH} bc250-llm-server.x86_64")
-      printf 'bc250-llm-server-0.9.7-0.10.testing.fc44.x86_64\n' ;;
+      printf 'bc250-llm-server-0.9.7-0.11.testing.fc44.x86_64\n' ;;
     "-q --provides bc250-llm-server.x86_64")
       printf 'user(ollama)\ngroup(ollama)\n' ;;
     "-q bc250-llm-server.x86_64") return 0 ;;
@@ -75,6 +75,7 @@ require_progress_terminal() { printf 'progress-terminal\n'; }
 bc250-model() { printf 'model:%s\n' "$*"; }
 bc250-setup-task-model() { printf 'task:%s\n' "$*"; }
 bc250-setup-coding-agent() { printf 'agentic:%s\n' "$*"; }
+bc250-setup-embedding-model() { printf 'embedding:%s\n' "$*"; }
 HF_TOKEN=dummy
 step_7_models
 """
@@ -169,6 +170,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('bc250-model install "$category" "$selection"', source)
         self.assertIn('bc250-setup-task-model "$selection"', source)
         self.assertIn('bc250-setup-coding-agent "$selection"', source)
+        self.assertIn('bc250-setup-embedding-model "$selection"', source)
         self.assertIn("bc250-model list mtp --all", source)
         self.assertIn('bc250-model install mtp "$selection" --include-disabled', source)
 
@@ -183,7 +185,7 @@ class InstallerTests(unittest.TestCase):
             "model:list agentic",
             "Skipping agentic models.",
             "model:list embedding",
-            "model:install embedding 1",
+            "embedding:1",
             "model:list experiments",
             "Skipping experiments models.",
             "model:list mtp --all",

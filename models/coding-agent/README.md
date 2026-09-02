@@ -10,7 +10,8 @@ sudo bc250-setup-coding-agent agentic-qwen25-coder7b-unsloth-q5-k-m
 ```
 
 The helper creates `ollama-agent.service` on port `11436` with its own model
-store. Current choices are:
+store. The service is disabled at boot and is intentionally exclusive with the
+main/task/embedding lanes. Current choices are:
 
 - `agentic-qwen25-coder7b-unsloth-q5-k-m` — current coding-helper starting
   point because it consistently reaches a final answer without reasoning-token
