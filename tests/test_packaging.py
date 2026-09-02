@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 import sys
@@ -347,6 +346,14 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
         self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.33.2")
+        self.assertEqual(
+            values["BC250_OLLAMA_INSTALLER_COMMIT"],
+            "f96e7aa0513b9973a0ccc71be414c2ecb9d65b1a",
+        )
+        self.assertEqual(
+            values["BC250_OLLAMA_INSTALLER_SHA256"],
+            "25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f",
+        )
         self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.3")
         self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.3")
         self.assertIn(f'# v{values["BC250_OPEN_WEBUI_VERSION"]}, pinned OCI index digest.', quadlet)

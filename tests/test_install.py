@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import pty
 import subprocess
 import tempfile
 import unittest
@@ -77,11 +79,17 @@ bc250-setup-task-model() { printf 'task:%s\n' "$*"; }
 bc250-setup-coding-agent() { printf 'agentic:%s\n' "$*"; }
 bc250-setup-embedding-model() { printf 'embedding:%s\n' "$*"; }
 HF_TOKEN=dummy
+BC250_PRODUCTION_SELECTION=0
+BC250_TASK_SELECTION=0
+BC250_AGENTIC_SELECTION=
+BC250_EMBEDDING_SELECTION=1
+BC250_EXPERIMENT_SELECTION=
+BC250_MTP_SELECTION=0
 step_7_models
 """
     return subprocess.run(
         ["bash", "-c", script, "installer-test", str(INSTALLER)],
-        input="0\n0\n\n1\n\n0\n",
+        stdin=subprocess.DEVNULL,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -149,6 +157,20 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("env -u OLLAMA_VERSION sh", helper)
         self.assertIn('OLLAMA_VERSION="$VERSION" sh', helper)
 
+    def test_official_ollama_installer_is_commit_and_hash_pinned(self) -> None:
+        helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
+        runtime = (ROOT / "config/runtime.env").read_text(encoding="utf-8")
+        commit = "f96e7aa0513b9973a0ccc71be414c2ecb9d65b1a"
+        sha256 = "25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f"
+        self.assertIn(f"BC250_OLLAMA_INSTALLER_COMMIT={commit}", runtime)
+        self.assertIn(f"BC250_OLLAMA_INSTALLER_SHA256={sha256}", runtime)
+        self.assertIn("raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT", helper)
+        self.assertIn('[[ "$INSTALLER_COMMIT" =~ ^[0-9a-f]{40}$ ]]', helper)
+        self.assertIn('[[ "$INSTALLER_SHA256" =~ ^[0-9a-f]{64}$ ]]', helper)
+        self.assertIn('[[ "$actual_sha256" != "$INSTALLER_SHA256" ]]', helper)
+        self.assertIn("Ollama installer SHA-256 mismatch", helper)
+        self.assertNotIn('URL="https://ollama.com/install.sh"', helper)
+
     def test_model_setup_does_not_pipe_download_stderr(self) -> None:
         installer = INSTALLER.read_text(encoding="utf-8")
         helper = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
@@ -174,7 +196,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("bc250-model list mtp --all", source)
         self.assertIn('bc250-model install mtp "$selection" --include-disabled', source)
 
-    def test_model_categories_prompt_and_run_as_separate_phases(self) -> None:
+    def test_noninteractive_model_categories_use_environment_selections(self) -> None:
         result = run_model_phase_probe()
         self.assertEqual(result.returncode, 0, result.stdout)
         expected_order = (
@@ -183,11 +205,11 @@ class InstallerTests(unittest.TestCase):
             "model:list task",
             "task:0",
             "model:list agentic",
-            "Skipping agentic models.",
+            "BC250_AGENTIC_SELECTION is unset; agentic models are skipped in non-interactive mode.",
             "model:list embedding",
             "embedding:1",
             "model:list experiments",
-            "Skipping experiments models.",
+            "BC250_EXPERIMENT_SELECTION is unset; experiments models are skipped in non-interactive mode.",
             "model:list mtp --all",
             "model:install mtp 0 --include-disabled",
         )
@@ -197,9 +219,74 @@ class InstallerTests(unittest.TestCase):
 
     def test_unattended_model_setup_defaults_to_anonymous_hugging_face(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn('if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then', source)
+        self.assertIn('! input_is_interactive', source)
         self.assertIn("export BC250_HF_ANONYMOUS=1", source)
         self.assertIn("HF_TOKEN is unset; using anonymous", source)
+
+    def test_original_noninteractive_input_survives_a_transcript_pty(self) -> None:
+        script = r"""
+source "$1"
+heading() { :; }
+bc250-model() { printf 'model:%s\n' "$*"; }
+require_progress_terminal() { printf 'UNEXPECTED-PROGRESS\n'; }
+step_7_models
+"""
+        env = os.environ.copy()
+        env["BC250_INPUT_INTERACTIVE"] = "0"
+        master_fd, slave_fd = pty.openpty()
+        try:
+            os.close(master_fd)
+            result = subprocess.run(
+                ["bash", "-c", script, "installer-test", str(INSTALLER)],
+                stdin=slave_fd,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                timeout=5,
+                check=False,
+            )
+        finally:
+            os.close(slave_fd)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout.count("skipped in non-interactive mode"), 6)
+        self.assertNotIn("UNEXPECTED-PROGRESS", result.stdout)
+
+    def test_transcript_preserves_original_input_mode(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("capture_input_mode\n  start_transcript", source)
+        self.assertIn('BC250_INPUT_INTERACTIVE="$BC250_INPUT_INTERACTIVE"', source)
+        self.assertNotIn("|| ! -t 0", source)
+
+    def test_noninteractive_model_setup_skips_unselected_models_without_reading(self) -> None:
+        script = r"""
+source "$1"
+heading() { :; }
+bc250-model() { printf 'model:%s\n' "$*"; }
+require_progress_terminal() { printf 'UNEXPECTED-PROGRESS\n'; }
+step_7_models
+"""
+        result = subprocess.run(
+            ["bash", "-c", script, "installer-test", str(INSTALLER)],
+            stdin=subprocess.DEVNULL,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout.count("skipped in non-interactive mode"), 6)
+        self.assertNotIn("UNEXPECTED-PROGRESS", result.stdout)
+
+    def test_agent_failure_restoration_reports_restart_failures(self) -> None:
+        setup = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
+        mode = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
+        for source in (setup, mode):
+            self.assertIn("normal-service restoration incomplete", source)
+            self.assertNotIn("start_normal >/dev/null 2>&1 || true", source)
+        self.assertIn("original setup failure status", setup)
+        self.assertIn("incomplete after model registration", setup)
+        self.assertIn("original agent-mode failure status", mode)
 
     def test_progress_terminal_is_required_only_for_selected_model_downloads(
         self,

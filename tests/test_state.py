@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import json
-from contextlib import redirect_stdout
-from io import StringIO
 import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch

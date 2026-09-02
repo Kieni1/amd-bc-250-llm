@@ -40,11 +40,28 @@ wait_api() {
 }
 
 start_normal() {
-  local unit
+  local unit failed=0
   for unit in "${NORMAL_UNITS[@]}"; do
     unit_exists "$unit" || continue
-    systemctl start "$unit"
+    if ! systemctl start "$unit"; then
+      echo "WARNING: could not start $unit while restoring normal mode." >&2
+      failed=1
+    fi
   done
+  return "$failed"
+}
+
+restore_after_failed_enter() {
+  local original_status="$1" restore_failed=0
+  if ! systemctl stop "$AGENT_UNIT"; then
+    echo "WARNING: could not stop $AGENT_UNIT after agent-mode failure." >&2
+    restore_failed=1
+  fi
+  if ! start_normal; then
+    restore_failed=1
+  fi
+  ((restore_failed == 0)) || echo \
+    "WARNING: normal-service restoration incomplete; original agent-mode failure status $original_status is preserved." >&2
 }
 
 enter_agent() {
@@ -53,7 +70,7 @@ enter_agent() {
     echo "ERROR: $AGENT_UNIT is not installed. Run sudo bc250-setup-coding-agent first." >&2
     exit 1
   }
-  trap 'rc=$?; if (( restore )); then systemctl stop "$AGENT_UNIT" >/dev/null 2>&1 || true; start_normal >/dev/null 2>&1 || true; fi; exit "$rc"' ERR
+  trap 'rc=$?; if (( restore )); then restore_after_failed_enter "$rc"; fi; exit "$rc"' ERR
   systemctl stop "${NORMAL_UNITS[@]}" >/dev/null 2>&1 || true
   systemctl start "$AGENT_UNIT"
   wait_api 11436 || {

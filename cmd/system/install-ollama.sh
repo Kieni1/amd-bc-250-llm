@@ -17,7 +17,17 @@ fi
 # shellcheck disable=SC1090
 source "$runtime_env"
 VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"
-URL="https://ollama.com/install.sh"
+INSTALLER_COMMIT="${BC250_OLLAMA_INSTALLER_COMMIT:-}"
+INSTALLER_SHA256="${BC250_OLLAMA_INSTALLER_SHA256:-}"
+[[ "$INSTALLER_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "ERROR: BC250_OLLAMA_INSTALLER_COMMIT must be a full lowercase Git commit." >&2
+  exit 1
+}
+[[ "$INSTALLER_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+  echo "ERROR: BC250_OLLAMA_INSTALLER_SHA256 must be a lowercase SHA-256." >&2
+  exit 1
+}
+URL="https://raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT/scripts/install.sh"
 
 confirm_install() {
   local action="$1" answer
@@ -53,11 +63,18 @@ else
 fi
 
 if ((run_installer)); then
-  printf 'Downloading the official Ollama installer from %s\n' "$URL"
+  printf 'Downloading the commit-pinned official Ollama installer from %s\n' "$URL"
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' EXIT
   curl --fail --silent --show-error --location --retry 3 "$URL" -o "$tmp"
-  echo "Installer SHA-256: $(sha256sum "$tmp" | awk '{print $1}')"
+  actual_sha256="$(sha256sum "$tmp" | awk '{print $1}')"
+  if [[ "$actual_sha256" != "$INSTALLER_SHA256" ]]; then
+    echo "ERROR: Ollama installer SHA-256 mismatch." >&2
+    echo "  expected: $INSTALLER_SHA256" >&2
+    echo "  actual:   $actual_sha256" >&2
+    exit 1
+  fi
+  echo "Verified Ollama installer SHA-256: $actual_sha256"
   chmod 0700 "$tmp"
 
   if [[ "$VERSION" == "latest" ]]; then

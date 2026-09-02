@@ -34,9 +34,11 @@ a backup verified not to contain the unlock marker, runs `depmod` and rebuilds
 that kernel's initramfs. If no verified stock backup exists, it retains the
 files, reports the problem and exits nonzero after the other bounded cleanup.
 
-The purge also restores recorded firewalld HTTP and SELinux states. It never
-runs unbounded `dnf autoremove` and does not delete unrelated operator TLS keys,
-home-directory work or unidentified files.
+The purge also restores explicitly recorded firewalld HTTP and SELinux states.
+If an older install did not record ownership, it preserves the current policy
+and warns instead of guessing. It never runs unbounded `dnf autoremove` and does
+not delete unrelated operator TLS keys, home-directory work or unidentified
+files.
 
 Reboot after a full purge. Root-filesystem growth and Fedora system updates are
 not reversible.

@@ -56,8 +56,12 @@ for production, task, agentic, embedding, experiment and MTP selections.
 
 Useful unattended selections are `BC250_PRODUCTION_SELECTION`,
 `BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION`, `BC250_EMBEDDING_SELECTION`,
-`BC250_EXPERIMENT_SELECTION` and `BC250_MTP_SELECTION`; use them with
-`BC250_ASSUME_YES=1`. Set
+`BC250_EXPERIMENT_SELECTION` and `BC250_MTP_SELECTION`. In a non-TTY
+`--models-only` run, unset selections are skipped and set selections are used
+without prompting. The installer records the original stdin mode before transcript
+capture, so a pseudo-terminal created by `script(1)` cannot turn a pipe or
+`/dev/null` into an interactive prompt. Use `BC250_ASSUME_YES=1` for unattended
+confirmation of host-changing steps in the complete installer. Set
 `BC250_HF_ANONYMOUS=1` to skip the token prompt. `BC250_UPDATE_OLLAMA=1`
 explicitly refreshes an existing Ollama installation, and `OLLAMA_VERSION`
 selects a reviewed version.

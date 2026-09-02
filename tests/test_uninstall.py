@@ -47,6 +47,16 @@ class UninstallerTests(unittest.TestCase):
         self.assertIn("/etc/dracut.conf.d/90-bc250-40cu.conf", source)
         self.assertIn("bc250-cu-live-manager.service", source)
 
+    def test_unknown_network_ownership_is_preserved(self) -> None:
+        source = UNINSTALLER.read_text(encoding="utf-8")
+        installer = (ROOT / "install").read_text(encoding="utf-8")
+        self.assertIn('write_state_once firewall-http-before unknown', installer)
+        self.assertIn('write_state_once selinux-httpd-before unknown', installer)
+        self.assertIn("original firewalld HTTP state is unknown; preserving", source)
+        self.assertIn("original SELinux network state is unknown; preserving", source)
+        self.assertNotIn('[[ "$firewall_before" != enabled ]]', source)
+        self.assertNotIn('[[ "$selinux_before" != on ]]', source)
+
 
 if __name__ == "__main__":
     unittest.main()

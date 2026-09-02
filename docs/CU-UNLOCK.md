@@ -60,6 +60,10 @@ loaded or that all CUs produce correct results.
 
 ## Kernel updates
 
+Fedora 44 currently publishes kernel `7.1.12-200.fc44`. The package does not
+hard-code that release: after any kernel update, boot the intended kernel and
+prepare the replacement AMDGPU module for that exact `uname -r`.
+
 AMDGPU modules are tied to the exact kernel ABI. After every Fedora kernel
 update, boot the new kernel, prepare it again, reapply the intended CU mode and
 verify the running module:

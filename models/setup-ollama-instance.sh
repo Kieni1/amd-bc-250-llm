@@ -145,14 +145,30 @@ else
   systemctl stop ollama.service ollama-task.service ollama-embedding.service >/dev/null 2>&1 || true
   restore_normal=1
   restore_normal_services() {
-    local rc=$?
+    local rc=$? normal restore_failed=0
     if ((restore_normal)); then
-      systemctl stop "$service" >/dev/null 2>&1 || true
+      if ! systemctl stop "$service"; then
+        echo "WARNING: could not stop $service during normal-service restoration." >&2
+        restore_failed=1
+      fi
       for normal in ollama.service ollama-task.service ollama-embedding.service; do
-        systemctl cat "$normal" >/dev/null 2>&1 && systemctl start "$normal" >/dev/null 2>&1 || true
+        systemctl cat "$normal" >/dev/null 2>&1 || continue
+        if ! systemctl start "$normal"; then
+          echo "WARNING: could not restart $normal during normal-service restoration." >&2
+          restore_failed=1
+        fi
       done
+      restore_normal=0
+      if ((restore_failed)); then
+        if ((rc)); then
+          echo "WARNING: normal-service restoration incomplete; original setup failure status $rc is preserved." >&2
+        else
+          echo "ERROR: normal-service restoration incomplete after model registration." >&2
+        fi
+      fi
     fi
-    return "$rc"
+    ((rc != 0)) && return "$rc"
+    return "$restore_failed"
   }
   trap restore_normal_services EXIT
   systemctl start "$service"
@@ -187,12 +203,8 @@ fi
 if ((enable_at_boot)); then
   systemctl restart "$service"
 else
-  systemctl stop "$service"
-  restore_normal=0
+  restore_normal_services
   trap - EXIT
-  for normal in ollama.service ollama-task.service ollama-embedding.service; do
-    systemctl cat "$normal" >/dev/null 2>&1 && systemctl start "$normal" >/dev/null 2>&1 || true
-  done
 fi
 
 echo

@@ -20,6 +20,14 @@ curl -fsS http://127.0.0.1:11434/api/tags
 The helper installs official Ollama under `/usr/local`, normalizes the `ollama`
 account and storage, enables the service and waits for the local API. It avoids
 keeping Fedora-packaged and official Ollama copies side by side.
+The upstream installer itself is fetched from the full Git commit recorded in
+`runtime.env`, so the root-executed script does not come from a moving URL. The
+expected installer-script SHA-256 is pinned there as well and is verified before
+execution. This pins and checks the installer **source artifact**, not every binary
+archive it subsequently downloads: upstream's script still retrieves the requested
+Ollama assets over HTTPS without package-pinned per-asset checksums. Treat that as
+the remaining upstream distribution trust boundary rather than describing this
+helper as full end-to-end verification of every downloaded Ollama asset.
 
 The main service uses:
 

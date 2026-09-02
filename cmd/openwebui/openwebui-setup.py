@@ -226,6 +226,18 @@ def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def require_object(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ApiError(f"{label} response was not an object")
+    return value
+
+
+def require_list(value: Any, label: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise ApiError(f"{label} response was not a list")
+    return value
+
+
 def status(client: Client, authenticated: bool) -> int:
     try:
         client.probe("/")
@@ -238,13 +250,13 @@ def status(client: Client, authenticated: bool) -> int:
         return 0
 
     problems: list[str] = []
-    ollama = client.get("/ollama/config")
+    ollama = require_object(client.get("/ollama/config"), "Ollama config")
     desired = desired_ollama()
     for key in ("ENABLE_OLLAMA_API", "OLLAMA_BASE_URLS", "OLLAMA_API_CONFIGS"):
         if canonical(ollama.get(key)) != canonical(desired[key]):
             problems.append(f"Ollama config differs: {key}")
 
-    task = client.get("/api/v1/tasks/config")
+    task = require_object(client.get("/api/v1/tasks/config"), "task config")
     expected_task = {
         "TASK_MODEL": TASK_MODEL,
         "TASK_MODEL_EXTERNAL": None,
@@ -260,7 +272,9 @@ def status(client: Client, authenticated: bool) -> int:
         if canonical(task.get(key)) != canonical(value):
             problems.append(f"Task config differs: {key}")
 
-    embedding = client.get("/api/v1/retrieval/embedding")
+    embedding = require_object(
+        client.get("/api/v1/retrieval/embedding"), "embedding config"
+    )
     expected_embedding = desired_embedding()
     for key in (
         "RAG_EMBEDDING_ENGINE",
@@ -273,13 +287,13 @@ def status(client: Client, authenticated: bool) -> int:
         if canonical(embedding.get(key)) != canonical(expected_embedding[key]):
             problems.append(f"Embedding config differs: {key}")
 
-    rag = client.get("/api/v1/retrieval/config")
+    rag = require_object(client.get("/api/v1/retrieval/config"), "RAG config")
     for key, value in desired_rag().items():
         if canonical(rag.get(key)) != canonical(value):
             problems.append(f"RAG config differs: {key}")
 
-    exported = client.get("/api/v1/models/export")
-    existing_ids = {item.get("id") for item in exported if isinstance(item, dict)} if isinstance(exported, list) else set()
+    exported = require_list(client.get("/api/v1/models/export"), "model export")
+    existing_ids = {item.get("id") for item in exported if isinstance(item, dict)}
     for model in load_models()["models"]:
         if model["id"] not in existing_ids:
             problems.append(f"Package model preset missing: {model['id']}")

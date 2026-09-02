@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        0.1.testing%{?dist}
+Release:        0.2.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -240,7 +240,14 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Wed Sep 02 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.2.testing
+- Preserve the original installer stdin mode across transcript pseudo-terminals so unattended model/Open WebUI setup never blocks on a read.
+- Keep agent restoration and legacy network-policy ownership hardening, Open WebUI response-shape validation and Ruff cleanup from the release review.
+- Pin and verify the official Ollama v0.33.2 installer script by release commit and SHA-256; document the remaining HTTPS trust boundary for downloaded binary assets.
+- Refresh Fedora 44 kernel guidance for 7.1.12: retain the measured TTM/governor baseline while noting the intervening AMDGPU devcoredump fixes and 7.1.12 network panic fix.
+
 * Tue Sep 01 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.1.testing
+- Harden failure restoration, legacy network-policy ownership, non-TTY model setup, Open WebUI response validation and the Ollama installer source pin.
 - Separate normal production/task/embedding Ollama lanes and make coding/agent mode explicitly exclusive.
 - Upgrade the digest-pinned Open WebUI baseline to v0.11.3 and configure package-owned state through supported admin APIs.
 - Add interactive/noninteractive Open WebUI initialization, additive model presets, local/offline defaults and optional desired-state drift checks.

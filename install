@@ -124,12 +124,12 @@ record_added_packages() {
 capture_install_state() {
   install -d -m0700 "$STATE_DIR"
 
-  # Earlier releases did not record the pre-install state. When upgrading one
-  # of those packages, treat its already-applied network policy as setup
-  # state so a later full purge removes it. Reinstalls keep the first record.
+  # Earlier releases did not record the pre-install state. Do not guess who
+  # owns an already-applied network policy; a later purge must preserve an
+  # unknown state. Reinstalls keep the first record.
   if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 && \
       [[ ! -e "$STATE_DIR/firewall-http-before" ]]; then
-    write_state_once firewall-http-before disabled
+    write_state_once firewall-http-before unknown
   elif command -v firewall-cmd >/dev/null 2>&1 && \
       systemctl is-active --quiet firewalld.service; then
     if firewall-cmd --quiet --permanent --query-service=http; then
@@ -143,7 +143,7 @@ capture_install_state() {
 
   if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 && \
       [[ ! -e "$STATE_DIR/selinux-httpd-before" ]]; then
-    write_state_once selinux-httpd-before off
+    write_state_once selinux-httpd-before unknown
   elif command -v getsebool >/dev/null 2>&1; then
     write_state_once selinux-httpd-before \
       "$(getsebool httpd_can_network_connect 2>/dev/null | awk '{print $3}' || printf unknown)"
@@ -154,17 +154,46 @@ capture_install_state() {
   capture_package_baseline
 }
 
+capture_input_mode() {
+  # Preserve the caller's real stdin mode before util-linux `script` can wrap
+  # the installer in a pseudo-terminal. This keeps unattended installs
+  # unattended even when stdout is a terminal and a transcript PTY is used.
+  if [[ -z "${BC250_INPUT_INTERACTIVE+x}" ]]; then
+    if [[ -t 0 ]]; then
+      export BC250_INPUT_INTERACTIVE=1
+    else
+      export BC250_INPUT_INTERACTIVE=0
+    fi
+  fi
+  [[ "${BC250_INPUT_INTERACTIVE}" == 0 || "${BC250_INPUT_INTERACTIVE}" == 1 ]] || {
+    echo "ERROR: BC250_INPUT_INTERACTIVE must be 0 or 1." >&2
+    exit 2
+  }
+}
+
+input_is_interactive() {
+  if [[ -n "${BC250_INPUT_INTERACTIVE+x}" ]]; then
+    [[ "${BC250_INPUT_INTERACTIVE}" == 1 ]]
+  else
+    [[ -t 0 ]]
+  fi
+}
+
 start_transcript() {
   install -d -m0755 "$(dirname -- "$LOG_FILE")"
   touch "$LOG_FILE"
   chmod 0600 "$LOG_FILE"
 
   # A pseudo-terminal keeps Hugging Face and Ollama progress bars visible while
-  # preserving the installation transcript. The child skips this wrapper.
+  # preserving the installation transcript. BC250_INPUT_INTERACTIVE records the
+  # original stdin mode, so this wrapper cannot accidentally make a pipe or
+  # /dev/null look interactive to the child.
   if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 && -t 1 ]] && command -v script >/dev/null 2>&1; then
     local command
     printf -v command '%q ' \
-      env BC250_INSTALL_TRANSCRIPT=1 bash "$SCRIPT_PATH" "${ORIGINAL_ARGS[@]}"
+      env BC250_INSTALL_TRANSCRIPT=1 \
+      BC250_INPUT_INTERACTIVE="$BC250_INPUT_INTERACTIVE" \
+      bash "$SCRIPT_PATH" "${ORIGINAL_ARGS[@]}"
     exec script --quiet --return --append --command "$command" "$LOG_FILE"
   fi
   if [[ "${BC250_INSTALL_TRANSCRIPT:-0}" != 1 ]]; then
@@ -181,6 +210,7 @@ yes_no() {
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     return 0
   fi
+  input_is_interactive || return 1
   read -r -p "$prompt [y/N]: " answer
   [[ "${answer,,}" == y || "${answer,,}" == yes ]]
 }
@@ -190,6 +220,7 @@ yes_no_default_yes() {
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     return 0
   fi
+  input_is_interactive || return 1
   read -r -p "$prompt [Y/n]: " answer
   [[ -z "$answer" || "${answer,,}" == y || "${answer,,}" == yes ]]
 }
@@ -472,7 +503,7 @@ prepare_hf_authentication() {
     HF_AUTH_PREPARED=1
     return
   }
-  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]] || ! input_is_interactive; then
     echo "HF_TOKEN is unset; using anonymous Hugging Face downloads."
     export BC250_HF_ANONYMOUS=1
     HF_AUTH_PREPARED=1
@@ -512,10 +543,10 @@ run_model_phase() {
   else
     bc250-model list "$category"
   fi
-  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]] || ! input_is_interactive; then
     selection="${!selection_variable:-}"
     if [[ -z "$selection" ]]; then
-      echo "$selection_variable is unset; ${label,,} models are skipped."
+      echo "$selection_variable is unset; ${label,,} models are skipped in non-interactive mode."
       return
     fi
   else
@@ -588,7 +619,7 @@ step_8_open_webui() {
     return 0
   fi
 
-  if [[ "${BC250_ASSUME_YES:-0}" == 1 || ! -t 0 ]]; then
+  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]] || ! input_is_interactive; then
     echo "Non-interactive install: Open WebUI administrator setup was not attempted."
     echo "Run later in an interactive terminal:"
     echo "  sudo bc250-openwebui-setup init"
@@ -634,6 +665,7 @@ run_models_only() {
 main() {
   parse_arguments "$@"
   require_root
+  capture_input_mode
   start_transcript
   if [[ "$INSTALL_MODE" == models ]]; then
     run_models_only

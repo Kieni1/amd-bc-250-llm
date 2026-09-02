@@ -42,11 +42,20 @@ Rerun it after the requested reboot. To resume only model selection, use:
 sudo ./install --models-only
 ```
 
+For unattended runs, the installer preserves the stdin mode of the original
+invocation even when transcript capture uses a pseudo-terminal. Set the existing
+`BC250_*_SELECTION` variables for model choices and `BC250_ASSUME_YES=1` only when
+automatic confirmation of host-changing steps is intended. Unset model categories
+skip rather than prompting.
+
 The reviewed fresh-machine memory profile now uses only the two TTM limits
 (`ttm.pages_limit=4194304` and `ttm.page_pool_size=4194304`). A Fedora 44 /
 kernel 7.1.10 reboot-by-reboot revalidation found no stability or throughput
 benefit from retaining the older explicit `amdgpu.gttsize` or full
-`amdgpu.ppfeaturemask` overrides; see [`docs/MEMORY.md`](docs/MEMORY.md).
+`amdgpu.ppfeaturemask` overrides; see [`docs/MEMORY.md`](docs/MEMORY.md). Fedora
+44 currently ships kernel 7.1.12. Its relevant intervening AMDGPU changes improve
+devcoredump handling after GPU hangs rather than changing the measured memory
+policy, so no BC-250 tuning default is changed for that kernel update.
 
 After installation, start the guided CU/live-manager workflow with
 `sudo bc250-40cu`. The package does not choose a stable CU count: test 40, 38,

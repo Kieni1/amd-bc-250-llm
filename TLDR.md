@@ -16,13 +16,18 @@ sudo ./install --models-only
 
 The model stage asks separately for production, task, agentic, embedding,
 experiment and MTP models. Enter skips only the current category; MTP entries
-remain disabled by default outside an explicit guided selection. Before 1.0 the
-installer assumes a green-field/test appliance and may reapply project defaults.
-See [`MODELS.md`](MODELS.md) before keeping local model overrides.
+remain disabled by default outside an explicit guided selection. Non-TTY input
+stays non-interactive even through transcript PTY capture; set `BC250_*_SELECTION`
+variables for unattended model choices. Before 1.0 the installer assumes a
+green-field/test appliance and may reapply project defaults. See
+[`MODELS.md`](MODELS.md) before keeping local model overrides.
 
 The current reviewed boot-memory profile is TTM-only: `ttm.pages_limit=4194304`
 and `ttm.page_pool_size=4194304`. Older `amdgpu.gttsize` / full
 `amdgpu.ppfeaturemask` overrides are migration cleanup, not fresh-install defaults.
+Fedora 44 kernel 7.1.12 adds useful stable fixes but does not change that measured
+profile. Reprepare optional 40-CU support for the exact running kernel after kernel
+updates.
 
 ## Verify and open the UI
 

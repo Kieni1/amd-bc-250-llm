@@ -300,19 +300,33 @@ restore_network_policy() {
   firewall_before="$(read_state firewall-http-before unknown)"
   selinux_before="$(read_state selinux-httpd-before unknown)"
 
-  if [[ "$firewall_before" != enabled ]] && command -v firewall-cmd >/dev/null 2>&1; then
-    if systemctl is-active --quiet firewalld.service; then
-      firewall-cmd --quiet --permanent --remove-service=http >/dev/null 2>&1 || true
-      firewall-cmd --quiet --reload >/dev/null 2>&1 || \
-        failed "firewalld could not reload after removing HTTP access"
-    else
-      warn "firewalld is inactive; verify that permanent HTTP access is removed"
-    fi
-  fi
-  if [[ "$selinux_before" != on ]] && command -v setsebool >/dev/null 2>&1; then
-    setsebool -P httpd_can_network_connect 0 || \
-      failed "could not restore the SELinux network boolean"
-  fi
+  case "$firewall_before" in
+    enabled) ;;
+    disabled)
+      if ! command -v firewall-cmd >/dev/null 2>&1; then
+        warn "firewall-cmd is unavailable; could not restore the recorded disabled HTTP policy"
+      elif systemctl is-active --quiet firewalld.service; then
+        firewall-cmd --quiet --permanent --remove-service=http >/dev/null 2>&1 || true
+        firewall-cmd --quiet --reload >/dev/null 2>&1 || \
+          failed "firewalld could not reload after removing HTTP access"
+      else
+        warn "firewalld is inactive; verify that permanent HTTP access is removed"
+      fi
+      ;;
+    *) warn "original firewalld HTTP state is unknown; preserving current policy" ;;
+  esac
+  case "$selinux_before" in
+    on) ;;
+    off)
+      if command -v setsebool >/dev/null 2>&1; then
+        setsebool -P httpd_can_network_connect 0 || \
+          failed "could not restore the SELinux network boolean"
+      else
+        warn "setsebool is unavailable; could not restore the recorded disabled SELinux policy"
+      fi
+      ;;
+    *) warn "original SELinux network state is unknown; preserving current policy" ;;
+  esac
 }
 
 remove_main_package() {

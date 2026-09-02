@@ -1,6 +1,42 @@
 # Changelog
 
+## 0.10.0-0.2.testing - 2026-09-02
+
+Close the remaining installer review gap without changing the appliance runtime
+architecture. The guided installer now records whether the **original** stdin was
+interactive before `script(1)` creates its transcript pseudo-terminal, propagates
+that state into the child process, and uses it for model, Hugging Face and Open
+WebUI prompts. A pipe or `/dev/null` therefore stays non-interactive even when the
+transcript child itself owns a PTY. Unattended selections continue to come from
+the existing `BC250_*_SELECTION` variables; unset categories skip cleanly.
+
+Retain the reviewed agent restoration diagnostics, conservative firewalld/SELinux
+ownership handling, Open WebUI response-shape validation and Ruff cleanup from the
+0.10.0 release review. The official Ollama install script remains fetched from the
+immutable v0.33.2 release commit rather than the moving `ollama.com/install.sh`
+entry point, and its expected SHA-256 is now pinned and verified before root
+execution. The verified upstream script still downloads versioned Ollama binary
+archives over HTTPS without repository-pinned per-asset checksums; document that
+remaining boundary instead of overstating it as full end-to-end artifact
+verification.
+
+Fedora 44 now publishes kernel `7.1.12-200.fc44`. The 7.1.12 stable delta itself
+is a networking/GSO fragment-reassembly panic fix. The intervening 7.1.11 stable
+update also contains AMDGPU devcoredump fixes that allocate ring buffers per ring
+and avoid a recursive reservation-lock/self-deadlock while formatting a dump after
+a hung job. Those changes improve failure diagnostics/recovery paths but do not
+provide evidence for changing the measured TTM-only memory profile, 1850-MHz
+governor ceiling, Mesa policy or Ollama settings. The 40-CU workflow remains
+dynamic and must be prepared against the exact running kernel after an update.
+
 ## 0.10.0-0.1.testing - 2026-09-01
+
+Harden the release after validation review. Report failures while restoring
+normal Ollama lanes after an agent setup or mode-switch error, preserve unknown
+legacy firewalld/SELinux ownership during purge, and let non-TTY model-only runs
+use selection variables or skip cleanly. Validate Open WebUI response shapes,
+pin its root-executed Ollama installer helper to the signed v0.33.2 release
+commit, and clear the release's Ruff findings.
 
 Make the runtime separation explicit around the BC-250's shared-memory limits.
 Normal appliance mode uses main Ollama on 11434, task Ollama on 11435 and a

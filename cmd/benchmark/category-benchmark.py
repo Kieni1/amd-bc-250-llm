@@ -1461,7 +1461,6 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
     answer_model = args.models[1] if args.models else os.environ.get(
         "RAG_ANSWER_MODEL", "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"
     )
-    models = [embed_model, answer_model]
     embed_available = {
         str(row.get("name") or row.get("model") or "").removesuffix(":latest")
         for row in embed_client.tags()
