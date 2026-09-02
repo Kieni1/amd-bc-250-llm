@@ -69,6 +69,28 @@ step_3_install_rpm
     )
 
 
+def run_agent_restore_probe(status: int = 0) -> subprocess.CompletedProcess[str]:
+    source = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
+    start = source.index("  restore_normal_services() {")
+    end = source.index("  trap 'restore_normal_services", start)
+    function = source[start:end].strip()
+    script = f"""
+set -Eeuo pipefail
+service=ollama-agent.service
+restore_normal=1
+systemctl() {{ return 0; }}
+{function}
+restore_normal_services {status}
+"""
+    return subprocess.run(
+        ["bash", "-c", script],
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+
 def run_model_phase_probe() -> subprocess.CompletedProcess[str]:
     script = r"""
 source "$1"
@@ -287,6 +309,18 @@ step_7_models
         self.assertIn("original setup failure status", setup)
         self.assertIn("incomplete after model registration", setup)
         self.assertIn("original agent-mode failure status", mode)
+
+    def test_agent_successful_registration_restoration_returns_zero(self) -> None:
+        setup = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
+        self.assertIn("local rc=\"${1:-0}\" normal restore_failed=0", setup)
+        self.assertIn("trap 'restore_normal_services \"$?\"' EXIT", setup)
+        self.assertIn("restore_normal_services 0", setup)
+        result = run_agent_restore_probe(0)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_agent_failed_registration_restoration_preserves_original_status(self) -> None:
+        result = run_agent_restore_probe(7)
+        self.assertEqual(result.returncode, 7, result.stdout)
 
     def test_progress_terminal_is_required_only_for_selected_model_downloads(
         self,

@@ -145,7 +145,7 @@ else
   systemctl stop ollama.service ollama-task.service ollama-embedding.service >/dev/null 2>&1 || true
   restore_normal=1
   restore_normal_services() {
-    local rc=$? normal restore_failed=0
+    local rc="${1:-0}" normal restore_failed=0
     if ((restore_normal)); then
       if ! systemctl stop "$service"; then
         echo "WARNING: could not stop $service during normal-service restoration." >&2
@@ -170,7 +170,7 @@ else
     ((rc != 0)) && return "$rc"
     return "$restore_failed"
   }
-  trap restore_normal_services EXIT
+  trap 'restore_normal_services "$?"' EXIT
   systemctl start "$service"
 fi
 for _ in {1..30}; do
@@ -203,7 +203,7 @@ fi
 if ((enable_at_boot)); then
   systemctl restart "$service"
 else
-  restore_normal_services
+  restore_normal_services 0
   trap - EXIT
 fi
 
