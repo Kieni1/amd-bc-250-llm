@@ -16,5 +16,5 @@ FROM /var/lib/bc250-llm-server/gguf/embedding/Qwen3-Embedding-0.6B-Q8_0.gguf
 # Force GPU offload on BC-250.
 PARAMETER num_gpu 99
 
-# Native supported context.
+# BC-250 packaged context cap; upstream model metadata supports a larger context.
 PARAMETER num_ctx 4096

@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.10.0-0.5.testing - 2026-09-03
+
+- Correct `bc250-revalidate` so benchmark acceptance status `3` remains nonfatal while unexpected benchmark failures propagate to worker recovery; re-establish normal Ollama after the `num_batch` sweep.
+- Report the full live CU routing dashboard and classify routed/problem cells without requiring a universal `40/40` count.
+- Require successful service quiescing for XFS dedupe and surface restoration failures instead of ignoring them.
+- Make `bc250-install` the single owner of Fedora update policy, expand its setup-plan summary, restore source-tree model-setup executability, and clarify the 4K embedding cap comments.
+
+## 0.10.0-0.4.testing - 2026-09-03
+
+Finish the installer/storage pass without widening the runtime architecture. The
+repository-root `install` is now a small bootstrap: update Fedora, install the
+selected RPM, then hand off to the RPM-owned `bc250-install`. RPM `%post` is
+limited to package integration and the persistent Open WebUI signing secret;
+service, firewall and SELinux provisioning happens only in the explicit guided
+installer.
+
+`bc250-install` shows the current setup plan, avoids no-op root-LV growth and
+package/model work where practical, combines Fedora/kernel and TTM preparation
+before one primary reboot, and asks for models once using global indexes, names,
+ranges, `recommended`, `production` or `all`. A second reboot is requested only
+when persistent 40-CU mode is already configured and the prepared replacement
+AMDGPU module is not yet running.
+
+Model registration now skips only when the validated source, rendered Modelfile
+and correct Ollama-instance registration are all current. Large downloads report
+filesystem headroom. New `bc250-storage` tooling reports GGUF/Ollama duplication,
+performs explicitly confirmed XFS `FIDEDUPERANGE` sharing on verified pairs,
+optionally prunes fully verified offline GGUF source copies, and removes 40-CU
+cache trees only for kernels no longer installed. The real XFS experiment
+recovered about 46 GiB while retaining both logical GGUF and Ollama paths, so
+reflink dedupe is now a supported explicit operation rather than a feasibility
+question.
+
+Add `bc250-revalidate` as the packaged, opt-in whole-appliance revalidation
+harness. It uses package-native state paths, keeps phase reports inside the final
+bundle, recovers the main Ollama service between destructive long-prefill
+candidates when needed, and removes transient worker/unit state after a final
+tarball is safely written. This remains a pre-1.0 diagnostic tool rather than a
+mandatory package validation gate.
+
 ## 0.10.0-0.3.testing - 2026-09-03
 
 Tighten the runtime before the installer/storage pass. Bound both dedicated

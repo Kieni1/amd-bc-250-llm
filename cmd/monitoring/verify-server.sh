@@ -251,12 +251,14 @@ else
   cu_output="$(/usr/libexec/bc250-llm-server/cu-status.sh 2>&1 || true)"
 fi
 printf '%s\n' "$cu_output" | sed 's/^/  /'
-if grep -qE 'CUs active[[:space:]]*& routed[[:space:]]*:[[:space:]]*40/40' <<< "$cu_output"; then
-  ok "live CU manager reports 40/40 routed"
-elif grep -qE 'CUs active[[:space:]]*& routed[[:space:]]*:' <<< "$cu_output"; then
-  warn "live CU manager reports a partial CU routing table"
+if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' <<< "$cu_output"; then
+  ok "live CU routing table has routed entries and no off/problem cells"
+elif grep -Fq 'Live routing status     : routed entries present; off/problem cells present' <<< "$cu_output"; then
+  warn "live CU routing table contains off/problem cells; inspect the dashboard above"
+elif grep -Fq 'Live routing status     : no routed cells parsed' <<< "$cu_output"; then
+  warn "live CU routing table contains no parsed routed cells"
 else
-  info "no parseable live CU routing report"
+  info "no parseable live CU routing table"
 fi
 
 section "Governor and sensors"

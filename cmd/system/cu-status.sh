@@ -3,21 +3,21 @@ set -uo pipefail
 
 manager="/usr/bin/bc250-cu-live-manager"
 
-sum_live_manager_cus() {
+routing_cells() {
   awk -F '|' '
     $2 ~ /^[[:space:]]*SE[0-9]+\.SH[0-9]+[[:space:]]*$/ {
-      value = $10
-      gsub(/[[:space:]]/, "", value)
-      if (value ~ /^[0-9]+\/[0-9]+$/) {
-        split(value, count, "/")
-        active += count[1]
-        total += count[2]
-        rows++
+      rows++
+      for (i = 1; i <= NF; i++) {
+        value = $i
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        if (value == "S+") spi++
+        else if (value == "D+") driver++
+        else if (value == "D!") driver_off++
+        else if (value == "--") off++
       }
     }
     END {
-      if (rows > 0)
-        printf "%d/%d", active, total
+      if (rows > 0) printf "%d %d %d %d", spi, driver, driver_off, off
     }
   '
 }
@@ -53,17 +53,24 @@ if [[ -x "$manager" ]]; then
     echo "  Live manager report     : run this command with sudo for register access"
   else
     output="$(timeout 30 "$manager" status 2>&1 || true)"
-    routed="$(sum_live_manager_cus <<< "$output")"
-    if [[ -n "$routed" ]]; then
-      echo "  Live manager report     : CUs active & routed : $routed (summed from routing table)"
+    echo "  Live routing dashboard:"
+    printf '%s\n' "$output" | sed 's/^/    /'
+    cells="$(routing_cells <<< "$output")"
+    if [[ -n "$cells" ]]; then
+      read -r spi driver driver_off off <<< "$cells"
+      routed=$((spi + driver))
+      problems=$((driver_off + off))
+      echo "  Live routing cells      : S+=$spi D+=$driver D!=$driver_off --=$off"
+      if ((routed == 0)); then
+        echo "  Live routing status     : no routed cells parsed"
+      elif ((problems == 0)); then
+        echo "  Live routing status     : routed entries present; no off/problem cells"
+      else
+        echo "  Live routing status     : routed entries present; off/problem cells present ($problems)"
+      fi
     else
-      routed="$(grep -E 'CUs active[[:space:]]*& routed[[:space:]]*:' <<< "$output" | tail -1 | sed 's/^[[:space:]]*//')"
-      [[ -z "$routed" ]] || echo "  Live manager report     : $routed"
+      echo "  Live routing status     : routing table could not be parsed"
     fi
-    [[ -n "$routed" ]] || {
-      echo "  Live manager report     : status could not be parsed"
-      printf '%s\n' "$output" | tail -10 | sed 's/^/    /'
-    }
   fi
 else
   echo "  Live manager            : not installed"
@@ -74,5 +81,5 @@ if command -v vulkaninfo >/dev/null 2>&1; then
   [[ -n "$num_cu" ]] && echo "  RADV report              : $num_cu" || echo "  RADV report              : num_cu not exposed by this build"
 fi
 
-echo "Note: a live-manager 40/40 routing report can coexist with a 24-CU kernel/RADV"
-echo "enumeration. Validate with repeated compute benchmarks and correctness tests."
+echo "Note: kernel/RADV CU counts are diagnostic; judge live routing from the table"
+echo "and investigate D!/-- cells instead of requiring one universal CU total."

@@ -49,7 +49,7 @@ class UninstallerTests(unittest.TestCase):
 
     def test_unknown_network_ownership_is_preserved(self) -> None:
         source = UNINSTALLER.read_text(encoding="utf-8")
-        installer = (ROOT / "install").read_text(encoding="utf-8")
+        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         self.assertIn('write_state_once firewall-http-before unknown', installer)
         self.assertIn('write_state_once selinux-httpd-before unknown', installer)
         self.assertIn("original firewalld HTTP state is unknown; preserving", source)

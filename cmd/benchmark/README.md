@@ -3,6 +3,47 @@
 The package standard is **Ollama 0.33.2**. Keep the Ollama version, model
 revision, CU/governor state and cooling setup fixed when comparing runs.
 
+## Whole-appliance revalidation
+
+`bc250-revalidate` is the opt-in root-only appliance revalidation harness. It is
+separate from `make validate` and the ordinary category benchmarks because it can
+exercise live services and, when explicitly requested, reboot the machine.
+
+```bash
+sudo bc250-revalidate start
+sudo bc250-revalidate status
+sudo bc250-revalidate abort
+
+# Authenticated Open WebUI tuning lanes
+sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+
+# Optional hardware-policy A/B lanes
+sudo bc250-revalidate start --kernel-ab
+sudo bc250-revalidate start --governor-ab
+```
+
+Routine runs do not perform kernel/governor reboot A/B tests. The harness records
+quality exit `3` separately from infrastructure failure, propagates unexpected
+benchmark errors into worker recovery, exercises the promoted
+task/embedding defaults, compares implicit/explicit translation direction, and
+keeps GPT-OSS/long-prefill diagnostics isolated from ordinary build validation. If
+a long-prefill candidate takes down the main Ollama API, the next candidate first
+restarts/waits for the main service rather than turning one OOM into a row of
+connection-refused results. The phase also restores normal Ollama mode after the
+sweep so a final candidate failure cannot poison a later phase.
+
+Persistent result bundles are written below
+`/var/lib/bc250-llm-server/revalidation/results/`. Temporary worker state lives
+under `/var/lib/bc250-llm-server/revalidation/work/` and
+`/run/bc250-llm-server/revalidation/`; after a final tarball is written safely,
+the harness disables/removes its temporary systemd worker and deletes that work
+state automatically. Phase reports are included in the tarball. Supplied Open
+WebUI credentials are not bundled. `cleanup` remains only for abandoned pre-bundle
+runs.
+
+This harness is deliberately a pre-1.0 diagnostic tool. Do not make it a mandatory
+RPM/build gate.
+
 ## Generation
 
 ```bash

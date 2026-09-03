@@ -154,15 +154,18 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Environment=ENABLE_AUTOCOMPLETE_GENERATION=false", quadlet)
         self.assertIn("Environment=ENABLE_SEARCH_QUERY_GENERATION=false", quadlet)
 
-    def test_rpm_post_detects_official_usr_local_ollama(self) -> None:
+    def test_rpm_post_is_small_and_defers_provisioning(self) -> None:
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        self.assertIn("[ -x /usr/local/bin/ollama ]", spec)
-        self.assertIn("ollama_bin=/usr/local/bin/ollama", spec)
-        self.assertIn('if [ -n "$ollama_bin" ] && systemctl cat ollama.service', spec)
+        post = spec[spec.index("%post\n"):spec.index("%preun")]
+        self.assertIn("%tmpfiles_create", post)
+        self.assertIn("WEBUI_SECRET_KEY", post)
+        self.assertIn("sudo bc250-install", post)
+        for forbidden in ("firewall-cmd", "setsebool", "dnf ", "bc250-model", "systemctl enable --now"):
+            self.assertNotIn(forbidden, post)
 
     def test_package_standard_ollama_is_0332(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
-        installer = (ROOT / "install").read_text(encoding="utf-8")
+        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
         self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
@@ -316,11 +319,12 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("Requires(pre):    shadow-utils", spec)
         self.assertNotRegex(spec, r"(?s)%pre\s+.*?useradd.*?%build")
 
-    def test_config_noreplace_and_upgrade_restart_behavior_remain(self) -> None:
+    def test_config_noreplace_and_explicit_install_behavior_remain(self) -> None:
         installer = (ROOT / "scripts/install-manifest.py").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertIn('return f"%config(noreplace) {destination}"', installer)
-        self.assertIn("systemctl try-restart tika.service open-webui.service", spec)
+        self.assertNotIn("systemctl try-restart tika.service open-webui.service", spec)
+        self.assertIn("sudo bc250-install", spec)
         self.assertNotIn("legacy migration", spec.lower())
 
     def test_40cu_helper_is_locally_integrated_and_initramfs_verified(self) -> None:
@@ -375,7 +379,7 @@ class PackagingTests(unittest.TestCase):
 
     def test_fresh_machine_memory_profile_is_ttm_only_and_cleans_legacy_overrides(self) -> None:
         profile = (ROOT / "cmd/system/memory-profile.sh").read_text(encoding="utf-8")
-        installer = (ROOT / "install").read_text(encoding="utf-8")
+        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         canonical = "ttm.pages_limit=4194304 ttm.page_pool_size=4194304"
         self.assertIn(f'FULL_MEMORY_ARGS="{canonical}"', profile)
         for token in ("ttm.pages_limit=4194304", "ttm.page_pool_size=4194304"):

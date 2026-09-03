@@ -33,8 +33,10 @@ verify the current bytes before they are copied into the RPM build tree.
 
 ## Policy boundaries
 
-- RPM scriptlets must not replace AMDGPU, change CU routing, rebuild initramfs,
-  alter memory/swap policy, change governor tuning or reboot.
+- RPM scriptlets are package integration only: no appliance provisioning, model
+  downloads, kernel builds, firewall/SELinux policy changes or reboots.
+- The repository bootstrap installs the selected RPM and hands off; `bc250-install`
+  is the single owner of Fedora update/provisioning policy.
 - The guided installer may prepare a default-off module for the running kernel;
   activation remains `sudo bc250-40cu enable`.
 - Model weights are downloaded only after operator selection.

@@ -451,6 +451,15 @@ class TelemetryTests(unittest.TestCase):
         with self.assertRaisesRegex(common.BenchmarkError, "dimension mismatch"):
             common.cosine([1.0, 2.0], [1.0])
 
+    def test_revalidation_propagates_non_quality_benchmark_failures(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("HARNESS_VERSION=3.5", source)
+        block = source[source.index("run_bench_at() {"):source.index("run_bench() {")]
+        self.assertIn("0|3) return 0", block)
+        self.assertIn('*) return "$rc"', block)
+        num_batch = source[source.index("phase_num_batch() {"):source.index("phase_agent() {")]
+        self.assertIn("api_ready 11434 || ensure_normal_mode", num_batch)
+
 
 if __name__ == "__main__":
     unittest.main()

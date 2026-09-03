@@ -323,6 +323,15 @@ class SelectionTests(unittest.TestCase):
     def test_all_selects_every_entry(self) -> None:
         self.assertEqual(modelctl.select_models(self.models, "all"), self.models)
 
+    def test_named_selection_groups_are_global_and_explicit(self) -> None:
+        catalogs = modelctl.load_all_catalogs(directories=[MODELFILES])
+        models = [model for _defaults, group in catalogs for model in group if model.get("enabled", True)]
+        production = modelctl.select_models(models, "production")
+        recommended = modelctl.select_models(models, "recommended")
+        self.assertTrue(production)
+        self.assertTrue(all(model.get("category") == "production" for model in production))
+        self.assertEqual({m["id"] for m in recommended}, modelctl.RECOMMENDED_MODELS)
+
     def test_catalog_indexes_are_global_and_selectable(self) -> None:
         all_models = modelctl.discover_models([MODELFILES])
         self.assertEqual(

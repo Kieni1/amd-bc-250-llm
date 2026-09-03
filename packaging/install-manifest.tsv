@@ -55,6 +55,7 @@ file	0755	cmd/benchmark/compare-models.sh	{libexec}/compare-models.sh
 file	0755	cmd/benchmark/generation-benchmark.py	{libexec}/generation-benchmark.py
 file	0755	cmd/benchmark/category-benchmark.py	{libexec}/category-benchmark.py
 file	0755	cmd/benchmark/benchmark_common.py	{libexec}/benchmark_common.py
+file	0755	cmd/benchmark/revalidate.sh	{libexec}/revalidate.sh
 dir	0755	-	{share}/benchmark
 dir	0755	-	{share}/benchmark/ocr
 file	0644	examples/benchmark/embedding-office.json	{share}/benchmark/embedding-office.json
@@ -74,7 +75,9 @@ file	0755	cmd/monitoring/check-temp.sh	{libexec}/check-temp.sh
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
 file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
 file	0755	cmd/system/40cu.sh	{libexec}/40cu.sh
+file	0755	cmd/system/install.sh	{libexec}/install.sh
 file	0755	cmd/system/install-ollama.sh	{libexec}/install-ollama.sh
+file	0755	cmd/system/storage.py	{libexec}/storage.py
 file	0755	cmd/system/ollama-profile.sh	{libexec}/ollama-profile.sh
 file	0755	cmd/system/memory-profile.sh	{libexec}/memory-profile.sh
 file	0755	cmd/system/swap-profile.sh	{libexec}/swap-profile.sh

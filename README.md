@@ -12,55 +12,37 @@ assurances.
 
 ## Install
 
-Download the Fedora 44 binary RPM artifact built by the repository's GitHub
-Actions workflow and keep it beside the repository's `install` script on the
-BC-250. Then run:
+Keep the Fedora 44 binary RPM beside the repository bootstrap and run:
 
 ```bash
 sudo ./install
 ```
 
-Until 1.0 this is a green-field/test-appliance installer: it may reapply the
-reviewed project baseline rather than preserve unrelated host tuning. Operator
-Modelfiles remain overrideable; see [`MODELS.md`](MODELS.md).
-
-The guided installer:
-
-1. grows the root filesystem when possible;
-2. updates Fedora and installs the local binary RPM;
-3. installs the official Ollama build;
-4. applies the reviewed memory and swap profiles;
-5. prepares, but does not enable, optional 40-CU support;
-6. offers production, task, agentic, embedding, experiment and explicitly
-   selected MTP models;
-7. offers interactive Open WebUI API setup without storing credentials; and
-8. verifies the result.
-
-Rerun it after the requested reboot. To resume only model selection, use:
+Before 1.0 this remains a green-field/test-appliance workflow. The bootstrap installs the selected RPM, then hands off to the packaged
+`bc250-install`, which owns Fedora update policy. After that, reruns use:
 
 ```bash
-sudo ./install --models-only
+sudo bc250-install
+sudo bc250-install --models-only   # optional model/Open WebUI resume
 ```
 
-For unattended runs, the installer preserves the stdin mode of the original
-invocation even when transcript capture uses a pseudo-terminal. Set the existing
-`BC250_*_SELECTION` variables for model choices and `BC250_ASSUME_YES=1` only when
-automatic confirmation of host-changing steps is intended. Unset model categories
-skip rather than prompting.
+The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
+the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
+TTM activation into one primary reboot. After reboot it prepares 40-CU support
+for the exact running kernel, starts the normal appliance services, presents one
+global model-selection prompt, configures Open WebUI and verifies the result. A
+second reboot is requested only if persistent 40-CU mode was already configured
+and its newly prepared replacement module is not yet loaded.
 
-The reviewed fresh-machine memory profile now uses only the two TTM limits
-(`ttm.pages_limit=4194304` and `ttm.page_pool_size=4194304`). A Fedora 44 /
-kernel 7.1.10 reboot-by-reboot revalidation found no stability or throughput
-benefit from retaining the older explicit `amdgpu.gttsize` or full
-`amdgpu.ppfeaturemask` overrides; see [`docs/MEMORY.md`](docs/MEMORY.md). Fedora
-44 currently ships kernel 7.1.12. Its relevant intervening AMDGPU changes improve
-devcoredump handling after GPU hangs rather than changing the measured memory
-policy, so no BC-250 tuning default is changed for that kernel update.
+The model prompt accepts global indexes, ranges, exact names, `recommended`,
+`production` or `all`; Enter skips. For unattended setup use
+`BC250_MODEL_SELECTION`. Runtime routing remains main 11434, task 11435,
+embedding 11437 and exclusive agent 11436.
 
-After installation, start the guided CU/live-manager workflow with
-`sudo bc250-40cu`. The package does not choose a stable CU count: test 40, 38,
-36 or another available configuration on the individual board. Maintenance
-schedules and HTTPS also remain explicit operator decisions.
+The reviewed fresh-machine memory profile uses only
+`ttm.pages_limit=4194304 ttm.page_pool_size=4194304`; the older explicit
+`amdgpu.gttsize` and full `amdgpu.ppfeaturemask` settings are not defaults.
+40-CU preparation remains dynamically bound to `uname -r`.
 
 ## First checks
 
@@ -68,6 +50,15 @@ schedules and HTTPS also remain explicit operator decisions.
 sudo bc250-status
 sudo bc250-verify
 bc250-verify-lan SERVER_IP
+```
+
+Storage visibility and explicit reclamation:
+
+```bash
+sudo bc250-storage status
+sudo bc250-storage dedupe          # confirmed XFS extent sharing
+sudo bc250-storage prune-sources   # optional verified offline-source removal
+sudo bc250-storage prune-40cu      # removed-kernel build caches only
 ```
 
 Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
@@ -128,6 +119,7 @@ sudo bc250-maintenance setup --defaults
 # Check/apply package-owned Open WebUI state when needed:
 bc250-openwebui-setup status
 sudo bc250-maintenance clean-cache
+sudo bc250-revalidate status          # opt-in appliance revalidation state
 
 # Compare models and specialized model categories
 bc250-benchmark

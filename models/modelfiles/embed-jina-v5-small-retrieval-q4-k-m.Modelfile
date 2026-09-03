@@ -14,5 +14,5 @@ FROM /var/lib/bc250-llm-server/gguf/embedding/v5-small-retrieval-Q4_K_M.gguf
 # Force GPU offload on BC-250.
 PARAMETER num_gpu 99
 
-# Native maximum context supported by this embedding model.
+# BC-250 packaged context cap; upstream model metadata supports a larger context.
 PARAMETER num_ctx 4096

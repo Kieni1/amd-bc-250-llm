@@ -70,10 +70,11 @@ sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL
 ```
 
-Use the manager rather than deleting source GGUFs or Ollama blobs by hand. Local
-GGUF models can occupy both source storage and imported Ollama storage; remote
-OCR registrations are Ollama-managed and therefore have different cleanup
-semantics.
+Use the package tools rather than deleting source GGUFs or Ollama blobs by hand.
+Local GGUF models can occupy both source storage and imported Ollama storage;
+`sudo bc250-storage status` reports verified duplication and `dedupe` can share
+identical XFS extents without deleting either path. `prune-sources` is a separate,
+explicit hash-verified option. Remote OCR registrations remain Ollama-managed.
 
 Changing an embedding model, its GGUF bytes, or its query/document prefix scheme
 requires an explicit RAG reindex. Since 0.9.7-0.4 the packaged Jina Q4_K_M source uses the refreshed upstream

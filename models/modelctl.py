@@ -30,6 +30,17 @@ OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
+RECOMMENDED_MODELS = {
+    "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+    "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+    "prod-lfm25-8b-a1b-liquidai-q6-k",
+    "prod-qwen35-9b-unsloth-q6-k",
+    "prod-gpt-oss20b-ggml-org-mxfp4",
+    "task-gemma3-1b-unsloth-ud-q4-k-xl",
+    "agentic-qwen25-coder7b-unsloth-q5-k-m",
+    "embed-jina-v5-small-retrieval-q4-k-m",
+}
+LOW_FREE_BYTES = 20 * 1024**3
 CATEGORY_PREFIXES = {
     "production": "prod-",
     "experiments": "exp-",
@@ -389,8 +400,6 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
     if not models:
         return []
     value = selection.strip()
-    if value.lower() == "all":
-        return list(models)
     lookup = {
         key: index
         for index, model in enumerate(models)
@@ -399,12 +408,20 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
     selected: list[int] = []
     for item in value.split(","):
         item = item.strip()
-        choices = [item]
-        if match := re.fullmatch(r"([0-9]+)-([0-9]+)", item):
-            first, last = map(int, match.groups())
-            if first > last:
-                first, last = last, first
-            choices = [str(number) for number in range(first, last + 1)]
+        special = item.lower()
+        if special == "all":
+            choices = [model["id"] for model in models]
+        elif special == "production":
+            choices = [model["id"] for model in models if model.get("category") == "production"]
+        elif special == "recommended":
+            choices = [model["id"] for model in models if model["id"] in RECOMMENDED_MODELS]
+        else:
+            choices = [item]
+            if match := re.fullmatch(r"([0-9]+)-([0-9]+)", item):
+                first, last = map(int, match.groups())
+                if first > last:
+                    first, last = last, first
+                choices = [str(number) for number in range(first, last + 1)]
         for choice in choices:
             if choice not in lookup:
                 raise ModelError(f"unknown model selection {choice!r}")
@@ -812,9 +829,26 @@ def remove_hf_backing_registration(ollama_bin: str, host: str, model: dict) -> N
     print(f"    removed temporary HF source registration {source}")
 
 
+
+def registration_current(
+    name: str,
+    registrations: set[str] | None,
+    *,
+    refresh: bool,
+    source_changed: bool,
+    template_changed: bool,
+) -> bool:
+    return (
+        not refresh
+        and not source_changed
+        and not template_changed
+        and registrations is not None
+        and name in registrations
+    )
+
 def render_modelfile(
     source: Path, model: dict, output: Path | None, destination: Path
-) -> None:
+) -> bool:
     rendered: list[str] = []
     for line in source.read_text(encoding="utf-8").splitlines():
         if line.startswith("# Source: "):
@@ -824,13 +858,20 @@ def render_modelfile(
         elif line.startswith("FROM ") and output is not None:
             line = f"FROM {output}"
         rendered.append(line)
+    content = "\n".join(rendered) + "\n"
+    try:
+        if destination.read_text(encoding="utf-8") == content:
+            return False
+    except FileNotFoundError:
+        pass
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(f".{destination.name}.tmp")
     try:
-        temporary.write_text("\n".join(rendered) + "\n", encoding="utf-8")
+        temporary.write_text(content, encoding="utf-8")
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
+    return True
 
 
 def install_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
@@ -850,6 +891,7 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         else ""
     )
     host = ollama_host(defaults, args.host)
+    registrations = registered_models(host) if ollama_bin else None
     hf_home = Path(os.environ.get("HF_HOME", f"/var/cache/{PROJECT}/huggingface"))
     download_root = Path(
         os.environ.get(
@@ -895,16 +937,25 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                     if modelfile_root
                     else model["template"]
                 )
+                template_changed = False
                 if modelfile_root:
-                    render_modelfile(model["template"], model, None, runtime_template)
+                    template_changed = render_modelfile(model["template"], model, None, runtime_template)
                     os.chown(runtime_template, 0, gid)
                     os.chmod(runtime_template, 0o640)
+                if registration_current(
+                    model["name"], registrations, refresh=args.refresh,
+                    source_changed=False, template_changed=template_changed,
+                ):
+                    print("    already current; skipping")
+                    continue
                 result = run_as_ollama(
                     [ollama_bin, "create", model["name"], "-f", str(runtime_template)],
                     {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
                 )
                 if result.returncode != 0:
                     raise ModelError("ollama create failed")
+                if registrations is not None:
+                    registrations.add(model["name"])
                 remove_hf_backing_registration(ollama_bin, host, model)
                 print("    registered with Ollama; source blobs are Ollama-managed")
                 continue
@@ -914,7 +965,9 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             ensure_directory(output.parent, uid, gid)
             metadata = state_path(output)
             state = load_state(metadata)
+            source_changed = True
             if state_matches(state, model, output) and not args.refresh:
+                source_changed = False
                 checksum = state["sha256"]
                 permissions_changed = ensure_file_permissions(output, 0, gid, 0o640)
                 current = output.stat()
@@ -934,6 +987,9 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                     else int(defaults.get("min_free_bytes", 0))
                 )
                 free = shutil.disk_usage(output.parent).free
+                print(f"    filesystem free: {free / 1024**3:.1f} GiB")
+                if free < LOW_FREE_BYTES:
+                    print("    WARNING: low filesystem headroom before model download", file=sys.stderr)
                 if minimum and free < minimum:
                     raise ModelError(
                         f"{free / 1024**3:.1f} GiB free; {minimum / 1024**3:.1f} GiB required"
@@ -981,15 +1037,23 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 if modelfile_root
                 else output.parent / model["modelfile"]
             )
-            render_modelfile(model["template"], model, output, runtime_template)
+            template_changed = render_modelfile(model["template"], model, output, runtime_template)
             os.chown(runtime_template, 0, gid)
             os.chmod(runtime_template, 0o640)
+            if registration_current(
+                model["name"], registrations, refresh=args.refresh,
+                source_changed=source_changed, template_changed=template_changed,
+            ):
+                print("    already current; skipping")
+                continue
             result = run_as_ollama(
                 [ollama_bin, "create", model["name"], "-f", str(runtime_template)],
                 {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
             )
             if result.returncode != 0:
                 raise ModelError("ollama create failed")
+            if registrations is not None:
+                registrations.add(model["name"])
             print("    registered with Ollama")
         except (ModelError, OSError) as error:
             print(f"    ERROR: {error}", file=sys.stderr)
@@ -1256,7 +1320,7 @@ def main(argv: list[str] | None = None) -> int:
         if selection is None and args.command == "cleanup":
             selection = "all"
         elif selection is None:
-            selection = prompt_line("Models (id/index/range; Enter to cancel): ")
+            selection = prompt_line("Models (id/index/range/recommended/production/all; Enter to cancel): ")
         if not selection:
             print("No models selected.")
             return 0
@@ -1315,7 +1379,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     selection = args.selection
     if selection is None:
-        selection = prompt_line("Models (id/index/range; Enter to cancel): ")
+        selection = prompt_line("Models (id/index/range/recommended/production/all; Enter to cancel): ")
     if not selection:
         print("No models selected.")
         return 0

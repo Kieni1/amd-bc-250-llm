@@ -13,7 +13,7 @@
 # REFERENCE DATASETS (prod-gpt-oss20b-ggml-org-mxfp4, num_ctx 16384):
 #   Board A  "good bin"   : 84 tok/s decode | ~134W peak | ~31W idle | edge sensor
 #   Board B  "ok bin"  : 73 tok/s decode | ~144W peak | ~38W idle | Tctl sensor
-#   IDENTICAL on both: mclk 450, fclk 450, socclk 1254, 40/40 CU,
+#   IDENTICAL on both: mclk 450, fclk 450, socclk 1254, fully routed live table,
 #     VBIOS 113-AMDRBN-003, SMU fw 88.6.0, Mesa 26.1.4, gov 0.4.12.
 #
 # THE ONE LAW OF THIS HARDWARE:
@@ -36,21 +36,6 @@ hwmg=/sys/class/drm/card*/device/hwmon/hwmon*
 pass=0; warn=0; fail=0
 have(){ command -v "$1" >/dev/null 2>&1; }
 active(){ cat $1 2>/dev/null | grep '\*' | tr -d ' *'; }   # starred pp_dpm line, cleaned
-sum_live_manager_cus(){
-  awk -F '|' '
-    $2 ~ /^[[:space:]]*SE[0-9]+\.SH[0-9]+[[:space:]]*$/ {
-      value = $10
-      gsub(/[[:space:]]/, "", value)
-      if (value ~ /^[0-9]+\/[0-9]+$/) {
-        split(value, count, "/")
-        active += count[1]
-        total += count[2]
-        rows++
-      }
-    }
-    END { if (rows > 0) printf "%d/%d", active, total }
-  '
-}
 
 # Use the first installed model unless the operator supplied MODEL explicitly.
 if [[ -z "$MODEL" ]] && have ollama; then
@@ -118,22 +103,20 @@ m=$(active $cardg/pp_dpm_mclk); f=$(active $cardg/pp_dpm_fclk); s=$(active $card
 [[ "$s" == *1254Mhz* ]] && ok "socclk=$s" || wn "socclk=$s  (ref 1254Mhz)"
 
 # ---------------------------------------------------------------------------
-sec "4. CU COUNT"
-exp "40 CUs active.  (both ref boards 40/40, no dead-WGP mask)"
-if have bc250-cu-live-manager; then
-  cu_status=$(bc250-cu-live-manager status 2>&1 || true)
+sec "4. CU ROUTING"
+exp "Live SPI/driver routing populated; investigate D!/-- cells. Numeric kernel/RADV CU counts are diagnostic only."
+if have bc250-cu-status; then
+  cu_status=$(bc250-cu-status 2>&1 || true)
   printf '%s\n' "$cu_status" | sed 's/^/  /'
-  cu_total="$(sum_live_manager_cus <<< "$cu_status")"
-  [[ -n "$cu_total" ]] && echo "  CUs active & routed: $cu_total (summed from routing table)"
-  if [[ "$cu_total" == "40/40" ]] || grep -qE 'CUs active[[:space:]]*& routed[[:space:]]*:[[:space:]]*40/40' <<<"$cu_status"; then
-    ok "live manager reports 40/40 active and routed"
-  elif [[ -n "$cu_total" ]] || grep -qE 'CUs active[[:space:]]*& routed[[:space:]]*:' <<<"$cu_status"; then
-    wn "live manager reports a partial CU routing table"
+  if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' <<<"$cu_status"; then
+    ok "live routing table has routed entries and no off/problem cells"
+  elif grep -Fq 'Live routing status     : routed entries present; off/problem cells present' <<<"$cu_status"; then
+    wn "live routing table contains off/problem cells"
   else
-    wn "live-manager status could not be parsed"
+    wn "live routing table could not be qualified"
   fi
 else
-  wn "bc250-cu-live-manager is not installed"
+  wn "bc250-cu-status is not installed"
 fi
 if have dmesg && dmesg 2>/dev/null | grep -qi 'amdgpu.*disable_cu'; then
   wn "amdgpu.disable_cu present - some CUs masked (fine only if this board has dead WGPs)"

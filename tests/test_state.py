@@ -25,6 +25,21 @@ MODEL = {
 
 
 class StateTests(unittest.TestCase):
+    def test_registration_is_current_only_when_all_three_inputs_match(self) -> None:
+        current = {"prod-test"}
+        self.assertTrue(modelctl.registration_current(
+            "prod-test", current, refresh=False, source_changed=False, template_changed=False
+        ))
+        for kwargs in (
+            {"refresh": True, "source_changed": False, "template_changed": False},
+            {"refresh": False, "source_changed": True, "template_changed": False},
+            {"refresh": False, "source_changed": False, "template_changed": True},
+        ):
+            self.assertFalse(modelctl.registration_current("prod-test", current, **kwargs))
+        self.assertFalse(modelctl.registration_current(
+            "prod-test", set(), refresh=False, source_changed=False, template_changed=False
+        ))
+
     def test_matching_state_reuses_moving_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / MODEL["gguf"]

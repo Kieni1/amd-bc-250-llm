@@ -39,14 +39,17 @@ configuration, directory, alias, generated-text and ghost entries.
 ```
 
 Services, tmpfiles and operator commands create content below these paths.
-Ordinary RPM removal intentionally preserves it.
+`bc250-revalidate` keeps final result tarballs below
+`/var/lib/bc250-llm-server/revalidation/results/` and removes its transient worker
+state after finalization. Ordinary RPM removal intentionally preserves persistent
+state.
 
 ## Packaging boundaries
 
 - CU helpers and pinned inputs belong to the main package, but RPM scriptlets
   never replace AMDGPU, change CU routing, rebuild initramfs or reboot.
-- Memory, swap, Ollama and maintenance profiles remain explicit operator or
-  guided-installer actions.
+- RPM `%post` does not provision the appliance. Memory, swap, Ollama, firewall,
+  SELinux, Fedora update policy and service setup remain explicit `bc250-install`/operator actions.
 - Model weights are never part of the RPM.
 - The source RPM is rebuild input and provides no runtime commands.
 

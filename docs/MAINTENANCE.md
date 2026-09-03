@@ -72,6 +72,7 @@ The temporary administrator credential is not stored by this helper.
 
 ```bash
 sudo bc250-status
+sudo bc250-storage status
 sudo bc250-model cleanup production --list
 sudo bc250-maintenance clean-cache
 sudo bc250-maintenance run prune
@@ -85,10 +86,14 @@ images and old system-wide journal archives; it does not delete GGUFs, Ollama
 models or Open WebUI data. The journal vacuum affects archived logs for the
 whole host, not only BC-250 services.
 
-Model weights are never deleted automatically. Use `bc250-model cleanup` to
-remove a selected registration, source GGUF, state file and rendered Modelfile
-together. Add `--keep-gguf` when reclaiming Ollama registration/blob storage but
-retaining the manager-owned GGUF plus integrity state for a quick reinstall.
+Model weights are never deleted automatically. Use `bc250-model cleanup` for
+model lifecycle operations. `bc250-storage dedupe` requires the affected model/UI
+services to quiesce successfully and reports any restoration failure. It retains both a validated
+source GGUF and its Ollama blob while sharing identical XFS extents; `df` shows
+reclaimed physical capacity even if `du` counts both logical files. The separate
+`bc250-storage prune-sources` command removes only hash-verified source copies
+after matching an Ollama blob, and requires explicit confirmation. `prune-40cu`
+removes build caches only for kernels no longer installed.
 
 Upload pruning calls Open WebUI's authenticated delete API so database, file
 and vector state stay aligned. It starts with `DRY_RUN=1`; review the journal

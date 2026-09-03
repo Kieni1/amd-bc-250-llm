@@ -41,13 +41,14 @@ workflow. `bc250-cu-status` reports when preparation belongs to an older kernel.
 `bc250-40cu enable` is the normal activation step; it requires `ENABLE-40CU`
 and reboots.
 
-## Choose the stable CU count
+## Qualify the stable CU routing
 
-BC-250 boards contain harvested GPU hardware, so not every board has 40 usable
-CUs. The operator must determine the stable amount. Start by checking 40 CUs,
-then use the interactive live manager to disable unstable WGP pairs. One WGP is
-two CUs, so masking one pair gives 38 CUs and two pairs give 36 CUs. Use the
-WGP IDs reported on the actual board, not IDs copied from another system.
+BC-250 boards contain harvested GPU hardware, so do not use one driver/RADV CU
+number or one universal routed-cell total as the success criterion. `bc250-cu-status`
+prints the complete live-manager routing dashboard and summarizes `S+`
+(SPI+routed), `D+` (driver+routed), `D!` (driver+off) and `--` (off) cells. Treat
+`D!`/`--` cells as items to inspect rather than declaring every non-40 layout bad.
+Use WGP IDs reported on the actual board, not IDs copied from another system.
 
 Test representative inference output, Vulkan initialization, temperature and
 kernel logs—not only reported CU count or speed. Use the live manager's save
@@ -55,8 +56,8 @@ and service-install workflow only after the routing table is stable, then
 confirm it after reboot with `bc250-cu-live-manager status`.
 
 The replacement module and live WGP routing solve different parts of the
-workflow. A live 40/40 table alone does not prove that the patched module is
-loaded or that all CUs produce correct results.
+workflow. A numerically full routing table alone does not prove that the patched
+module is loaded or that all routed CUs produce correct results.
 
 ## Kernel updates
 

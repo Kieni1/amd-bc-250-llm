@@ -55,6 +55,8 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/lib/bc250-llm-server/ollama/embedding/` | Embedding store, port 11437 |
 | `/var/lib/bc250-llm-server/ollama/agent/` | Exclusive agent store, port 11436 |
 | `/var/lib/bc250-llm-server/install/` | Guided-installer records |
+| `/var/lib/bc250-llm-server/revalidation/results/` | Root-only final whole-appliance revalidation bundles |
+| `/var/lib/bc250-llm-server/secrets/open-webui.env` | Persistent root-only Open WebUI signing secret |
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |
 | `/var/cache/bc250-llm-server/40cu/` | Kernel-specific build cache |

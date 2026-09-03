@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        0.3.testing%{?dist}
+Release:        0.5.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -73,6 +73,7 @@ Requires:       util-linux-script
 Requires:       umr
 Requires:       vulkan-loader
 Requires:       vulkan-tools
+Requires:       xfsprogs
 Requires:       xz
 Requires:       zstd
 Requires:       zram-generator
@@ -144,46 +145,12 @@ if [ ! -s "$secret_env" ]; then
   python3 -c 'import secrets; print("WEBUI_SECRET_KEY=" + secrets.token_hex(32))' > "$secret_env"
 fi
 chmod 0600 "$secret_env"
+if [ "$1" -eq 1 ]; then
+  touch /var/lib/bc250-llm-server/install/fresh-package
+  chmod 0600 /var/lib/bc250-llm-server/install/fresh-package
+fi
 systemctl daemon-reload >/dev/null 2>&1 || :
-
-# This testing package deliberately starts its basic stack immediately.
-systemctl enable --now firewalld.service >/dev/null 2>&1 || :
-if systemctl is-active --quiet firewalld.service; then
-  firewall-cmd --quiet --permanent --add-service=http >/dev/null 2>&1 || :
-  firewall-cmd --quiet --reload >/dev/null 2>&1 || :
-fi
-systemctl enable --now cyan-skillfish-governor-smu.service nginx.service \
-  >/dev/null 2>&1 || :
-ollama_bin="$(command -v ollama 2>/dev/null || :)"
-if [ -z "$ollama_bin" ] && [ -x /usr/local/bin/ollama ]; then
-  ollama_bin=/usr/local/bin/ollama
-fi
-if [ -z "$ollama_bin" ] && [ -x /usr/bin/ollama ]; then
-  ollama_bin=/usr/bin/ollama
-fi
-if [ -n "$ollama_bin" ] && systemctl cat ollama.service >/dev/null 2>&1; then
-  systemctl enable --now ollama.service >/dev/null 2>&1 || :
-else
-  echo "Ollama is not installed. Run: sudo bc250-install-ollama"
-fi
-if [ "$1" -gt 1 ]; then
-  systemctl try-restart tika.service open-webui.service >/dev/null 2>&1 || :
-else
-  systemctl start tika.service open-webui.service >/dev/null 2>&1 || :
-fi
-if command -v setsebool >/dev/null 2>&1; then
-  setsebool -P httpd_can_network_connect 1 >/dev/null 2>&1 || :
-fi
-cat <<'EOF_POST'
-BC-250 LLM server installed (testing profile).
-Open http://SERVER_IP/ on a trusted LAN and register the first admin immediately.
-HTTP is unencrypted. Read /usr/share/doc/bc250-llm-server/HTTPS.md before wider use.
-No chat model is downloaded until an operator selects a discovered Modelfile.
-Optional helpers: bc250-install-ollama, bc250-ollama-profile,
-bc250-memory-profile, bc250-swap-profile, bc250-setup-task-model,
-bc250-setup-embedding-model and bc250-openwebui-setup. Coding/agent work uses
-exclusive bc250-agent-mode enter/leave. Run llm-run-diagnose for a capture.
-EOF_POST
+echo "BC-250 package installed. Run: sudo bc250-install"
 
 %preun
 if [ "$1" -eq 0 ]; then
@@ -215,6 +182,8 @@ fi
 %files -f %{payload_filelist}
 %license licenses/LICENSE governor-src/LICENSE licenses/40CU-LICENSE-NOTICE
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server
+%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation
+%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation/results
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/gguf
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/production
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/bc250-llm-server/gguf/experiments
@@ -246,6 +215,19 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.5.testing
+- Preserve quality-fail benchmark continuation while propagating real revalidation infrastructure failures; recover normal Ollama after num_batch sweeps.
+- Replace fixed 40/40 CU success semantics with full live routing-table reporting and problem-cell diagnostics.
+- Make XFS dedupe service quiescing/restoration fail visibly, simplify the repository bootstrap, and refresh installer planning/docs.
+- Restore source-tree model setup executability and clarify the packaged 4K embedding context cap.
+
+* Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.4.testing
+- Ship bc250-install from the RPM, reduce the external bootstrap, and make normal setup use one primary reboot with unified model selection.
+- Skip genuinely current Ollama registrations and warn on low model-storage headroom.
+- Add explicit verified XFS model dedupe/source-prune reporting plus obsolete 40-CU cache pruning; keep all destructive storage actions opt-in.
+- Keep RPM post-install integration small and move service/firewall/SELinux provisioning into the explicit installer.
+- Package bc250-revalidate as an opt-in reboot-safe benchmark harness; retain only final result bundles after automatic work-state cleanup.
+
 * Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.3.testing
 - Bound dedicated embedding Modelfiles to 4K context, matching the service policy and reducing avoidable UMA/GTT pressure before GPT-OSS coexistence revalidation.
 - Persist the Open WebUI signing secret across container recreation and fix static-vs-enabled agent verification.

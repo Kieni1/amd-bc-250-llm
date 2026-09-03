@@ -223,6 +223,31 @@ class CuStatusTests(unittest.TestCase):
         self.assertIn("stale: prepared for", source)
         self.assertIn("sudo bc250-40cu prepare", source)
 
+    def test_cu_status_keeps_full_routing_table_without_fixed_count_success(self) -> None:
+        status = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
+        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        diagnose = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
+        self.assertIn("Live routing dashboard", status)
+        self.assertIn('value == "S+"', status)
+        self.assertIn('value == "D!"', status)
+        self.assertIn("no off/problem cells", verify)
+        self.assertNotIn("40/40 routed", verify)
+        self.assertNotIn("partial CU routing table", verify)
+        self.assertNotIn("40/40 active and routed", diagnose)
+
+    def test_cu_routing_cell_parser_classifies_dashboard_states(self) -> None:
+        source = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
+        start = source.index("routing_cells() {")
+        end = source.index("\nread_param() {", start)
+        function = source[start:end]
+        sample = "| SE0.SH0 | W0 | S+ | D+ | D! | -- |\n"
+        result = subprocess.run(
+            ["bash", "-c", function + "\nrouting_cells",],
+            input=sample, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout.strip(), "1 1 1 1")
+
 
 class SwapProfileTests(unittest.TestCase):
     def test_swappiness_override_is_optional_and_reversible(self) -> None:

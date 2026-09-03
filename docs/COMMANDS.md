@@ -12,14 +12,16 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-40cu` | Replacement-module and live CU controls |
 | `bc250-agent-mode` | Enter/leave/status exclusive coding-agent mode |
 | `bc250-benchmark` | Interactive Ollama performance benchmark |
+| `bc250-revalidate` | Opt-in whole-appliance revalidation harness |
 | `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
 | `bc250-code` | Local generate/refactor/review/document/test helper |
 | `bc250-code-commit` | Propose and optionally create a local Git commit |
 | `bc250-compare-mtp` | Compare an Ollama baseline with a running llama.cpp MTP server |
-| `bc250-cu-status` | Kernel, RADV and live-routing CU summary |
+| `bc250-cu-status` | Kernel/RADV diagnostics plus the full live-routing dashboard |
 | `bc250-cu-live-manager` | Pinned interactive live WGP manager |
 | `bc250-fetch-mtp` | Download enabled MTP catalog entries |
 | `bc250-gitea-review` | Generate an optional Gitea pull-request review |
+| `bc250-install` | Apply/resume the packaged appliance setup |
 | `bc250-install-ollama` | Install or normalize official Ollama |
 | `bc250-maintenance` | Backups, retention and optional power schedules |
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
@@ -33,6 +35,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-setup-embedding-model` | Configure the dedicated embedding Ollama instance |
 | `bc250-setup-task-model` | Configure the isolated task Ollama instance |
 | `bc250-status` | Concise read-only appliance status |
+| `bc250-storage` | Report/dedupe/prune package-owned storage |
 | `bc250-swap-profile` | Inspect or change zram/disk-swap policy |
 | `bc250-uninstall` | Explicit full appliance purge |
 | `bc250-uninstall-info` | Print the full purge policy |
@@ -45,26 +48,37 @@ host or service-owned data normally require `sudo`.
 
 ## Guided installer
 
+Repository bootstrap:
+
 ```text
-sudo ./install [--rpm FILE-OR-DIRECTORY]
-sudo ./install --models-only
+sudo ./install [RPM-FILE-OR-DIRECTORY]
 ```
 
-Normal mode performs the complete host-to-verification workflow. It may pause
-for a reboot and should then be rerun. `--models-only` skips host setup and asks
-for production, task, agentic, embedding, experiment and MTP selections.
+The bootstrap does only two things: local RPM install/update, then
+`exec bc250-install`. Fedora update policy belongs to the packaged installer. The RPM itself does not run the appliance installer
+from `%post`.
 
-Useful unattended selections are `BC250_PRODUCTION_SELECTION`,
-`BC250_TASK_SELECTION`, `BC250_AGENTIC_SELECTION`, `BC250_EMBEDDING_SELECTION`,
-`BC250_EXPERIMENT_SELECTION` and `BC250_MTP_SELECTION`. In a non-TTY
-`--models-only` run, unset selections are skipped and set selections are used
-without prompting. The installer records the original stdin mode before transcript
-capture, so a pseudo-terminal created by `script(1)` cannot turn a pipe or
-`/dev/null` into an interactive prompt. Use `BC250_ASSUME_YES=1` for unattended
-confirmation of host-changing steps in the complete installer. Set
-`BC250_HF_ANONYMOUS=1` to skip the token prompt. `BC250_UPDATE_OLLAMA=1`
-explicitly refreshes an existing Ollama installation, and `OLLAMA_VERSION`
-selects a reviewed version.
+Packaged orchestrator:
+
+```text
+sudo bc250-install
+sudo bc250-install --models-only
+```
+
+Normal mode prints a setup plan covering root growth, Fedora/package/Ollama,
+TTM/swap, 40-CU, storage headroom, models, Open WebUI and reboot state; it applies
+only pending work where practical and
+combines kernel update plus TTM configuration before the primary reboot. After
+that reboot it prepares 40-CU support for the exact running kernel. A second
+reboot is requested only when persistent 40-CU mode is already configured and
+the prepared replacement module is not yet running.
+
+The installer presents one model catalog and one selection query. Use global
+indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips.
+For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
+across transcript PTY creation, so unattended runs never become interactive by
+accident. `BC250_HF_ANONYMOUS=1` suppresses the optional Hugging Face token prompt;
+`BC250_UPDATE_OLLAMA=1` explicitly refreshes official Ollama.
 
 ## Models
 
@@ -108,9 +122,9 @@ without a current Modelfile are reported separately as unmanaged models; known
 models found on the wrong Ollama instance are reported as misplaced.
 
 `SELECTION` accepts a full model name, displayed global catalog index, comma
-list, range such as `0,2-4`, or `all`. The same index is used by filtered lists,
-install and cleanup. MTP retains its own local indexes. With no selection, a
-terminal prompts and Enter cancels. Prefer full names in automation.
+list, range such as `0,2-4`, `recommended`, `production`, or `all`. The named
+groups are convenience expansions; lane routing is unchanged. With no selection,
+a terminal prompts and Enter cancels. Prefer full names in long-lived automation.
 
 Important install options:
 
@@ -133,8 +147,9 @@ Authentication is requested only when a download is required. A validated GGUF
 is reused only while its recorded repository, revision and filename match and
 its schema-2 size/mtime/ctime metadata is unchanged. If those stat values or a
 legacy sidecar differ, the manager recalculates SHA-256 before reuse.
-Modelfile-only edits such as SYSTEM or PARAMETER changes therefore rebuild the
-Ollama registration without downloading again; changed source provenance
+If source state, rendered Modelfile and the registration on the correct Ollama
+instance all match, installation prints `already current; skipping`. Modelfile-only
+edits rebuild the registration without downloading again; changed source provenance
 downloads the requested bytes. `HF_TOKEN` or `--token-file` is
 validated as the `ollama` account; an empty or rejected token falls back to
 anonymous access.
@@ -208,6 +223,28 @@ can also be supplied through `TASK_MODEL_SELECTION` or
 See [`../MODELS.md`](../MODELS.md) for model roles/swapping and
 [`../models/README.md`](../models/README.md) for the detailed Modelfile contract.
 
+
+## Storage
+
+```text
+sudo bc250-storage status
+sudo bc250-storage dedupe [--yes]
+sudo bc250-storage prune-sources [--yes]
+sudo bc250-storage prune-40cu [--yes]
+```
+
+`status` reports root headroom, logical GGUF/Ollama usage, verified dedupe
+candidates and 40-CU caches belonging to removed kernels. `dedupe` requires XFS
+with `reflink=1`; it verifies manager state/source hashes and uses kernel-verified
+`FIDEDUPERANGE` sharing while retaining both paths. Normal interactive use requires
+typing `DEDUPLICATE`; `--yes` is for deliberate automation. Compare `df` before
+and after because `du` may still account a shared extent to both logical files.
+
+`prune-sources` is a separate, destructive alternative: it hashes both source and
+registered Ollama blob before removing an offline manager-owned GGUF/state pair,
+never MTP download-only sources. `prune-40cu` removes only cache directories whose
+kernel no longer exists under `/usr/lib/modules`. No storage cleanup is automatic.
+
 ## Runtime profiles
 
 ```text
@@ -254,7 +291,18 @@ sudo llm-run-diagnose --no-load
 MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 bc250-check-temp --once
 bc250-benchmark
+sudo bc250-revalidate status
 ```
+
+`bc250-revalidate` is the root-only, detached revalidation harness. A routine
+`sudo bc250-revalidate start` stays on the current kernel/governor policy; use
+`--kernel-ab`, `--governor-ab` or `--keepalive-expiry` only when those expensive
+lanes are needed. Authenticated Open WebUI tuning accepts
+`--owui-token-file FILE`. Final bundles are retained under
+`/var/lib/bc250-llm-server/revalidation/results/`; temporary worker/unit state is
+removed automatically after the bundle is written. Benchmark exit `3` is recorded
+as quality data; other unexpected benchmark failures enter worker recovery. `abort` restores temporary
+state before stopping, while `cleanup` is for abandoned pre-bundle state.
 
 `bc250-status` is a short overview including CPU topology/power-state exposure,
 RAM, memory pressure, zram, disk swap, swappiness and appliance storage.

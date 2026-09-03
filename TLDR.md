@@ -2,32 +2,28 @@
 
 ## Install
 
-Keep the binary RPM beside the repository's installer, then run:
+Keep the binary RPM beside the repository bootstrap:
 
 ```bash
 sudo ./install
 ```
 
-Rerun it after the requested reboot. Resume only model selection with:
+The bootstrap installs the RPM and invokes the packaged `bc250-install`,
+which owns Fedora update policy. Rerun after the requested primary reboot with:
 
 ```bash
-sudo ./install --models-only
+sudo bc250-install
 ```
 
-The model stage asks separately for production, task, agentic, embedding,
-experiment and MTP models. Enter skips only the current category; MTP entries
-remain disabled by default outside an explicit guided selection. Non-TTY input
-stays non-interactive even through transcript PTY capture; set `BC250_*_SELECTION`
-variables for unattended model choices. Before 1.0 the installer assumes a
-green-field/test appliance and may reapply project defaults. See
-[`MODELS.md`](MODELS.md) before keeping local model overrides.
+Use `sudo bc250-install --models-only` to resume only models/Open WebUI. There is
+one model prompt; select global indexes/ranges/names or `recommended`,
+`production`, `all`, and press Enter to skip. Unattended selection uses
+`BC250_MODEL_SELECTION`.
 
-The current reviewed boot-memory profile is TTM-only: `ttm.pages_limit=4194304`
-and `ttm.page_pool_size=4194304`. Older `amdgpu.gttsize` / full
-`amdgpu.ppfeaturemask` overrides are migration cleanup, not fresh-install defaults.
-Fedora 44 kernel 7.1.12 adds useful stable fixes but does not change that measured
-profile. Reprepare optional 40-CU support for the exact running kernel after kernel
-updates.
+Before 1.0 this is intentionally a green-field appliance flow. Kernel update and
+the TTM-only profile are prepared before one primary reboot; 40-CU is then built
+for the exact running kernel. A second reboot is requested only when an already
+persistent 40-CU configuration needs the prepared module loaded.
 
 ## Verify and open the UI
 
@@ -36,6 +32,14 @@ sudo bc250-status
 sudo bc250-verify
 bc250-verify-lan SERVER_IP
 ```
+
+```bash
+sudo bc250-storage status
+sudo bc250-storage dedupe
+```
+
+`dedupe` preserves both logical files and shares verified identical XFS extents;
+`df` reflects reclaimed capacity even when `du` still counts shared extents twice.
 
 Open `http://SERVER_IP/` from the trusted LAN. The installer can initialize the
 Open WebUI administrator/API baseline interactively; if skipped, run
@@ -98,6 +102,7 @@ bc250-benchmark agent                 # exclusive agent correctness lane, port 1
 sudo bc250-agent-mode leave
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
+sudo bc250-revalidate status
 
 sudo bc250-maintenance setup --defaults
 sudo bc250-maintenance run backup
@@ -147,6 +152,8 @@ bc250-benchmark ocr
 bc250-benchmark task
 ```
 
-See `cmd/benchmark/README.md` / installed `BENCHMARK.md` for the optional warm-prefix,
-RAG tuning and sustained thermal qualification procedures.
+For a full live-appliance pass use `sudo bc250-revalidate start`; it is opt-in,
+root-only, and stores its final tarball under `/var/lib/bc250-llm-server/revalidation/results/`.
+See `cmd/benchmark/README.md` / installed `BENCHMARK.md` for revalidation, optional
+warm-prefix, RAG tuning and sustained thermal qualification procedures.
 
