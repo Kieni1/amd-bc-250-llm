@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import time
+import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
@@ -418,6 +419,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
         "case_id",
         "task",
         "language",
+        "passed",
         "valid_json",
         "strict_json",
         "structure_ok",
@@ -433,6 +435,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
         "mem_available_min_mib",
         "swap_used_max_mib",
     ]
+    total = passed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -500,6 +503,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
                             and all(isinstance(x, str) for x in queries)
                         )
                 score = keyword_score(content, case.get("keywords", []))
+                ok = structure_ok and language_pass
+                total += 1
+                passed += int(ok)
                 scores.append(score if structure_ok else 0.0)
                 writer.writerow(
                     {
@@ -508,6 +514,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
                         "case_id": case["id"],
                         "task": case["type"],
                         "language": case["language"],
+                        "passed": int(ok),
                         "valid_json": int(valid_json),
                         "strict_json": int(strict_json),
                         "structure_ok": int(structure_ok),
@@ -538,6 +545,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
                         "language_hint": language_hint,
                         "language_required": language_required,
                         "language_pass": language_pass,
+                        "passed": ok,
                         "keyword_score": score,
                         "wall_s": wall,
                         "telemetry": telemetry,
@@ -545,13 +553,14 @@ def benchmark_task(args: argparse.Namespace) -> int:
                 )
                 print(
                     f"  {case['id']}: json={valid_json} strict={strict_json} structure={structure_ok} "
-                    f"lang={language_hint} required={language_required} pass={language_pass} "
+                    f"lang={language_hint} required={language_required} pass={ok} "
                     f"keyword={score:.2f} wall={wall:.2f}s "
                     f"Tmax={fmt(telemetry.get('temp_max_c'), 'C')}"
                 )
             print(f"  mean task score: {mean(scores):.3f}")
-    print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
-    return 0
+    print(f"\nTask acceptance: {passed}/{total} passed")
+    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    return 0 if passed == total else 3
 
 
 def clean_code_output(text: str) -> str:
@@ -609,7 +618,7 @@ def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, 
         any(term.casefold() in folded for term in group) for group in any_groups
     )
     requirements_ok = requirements_ok and not any(
-        term.casefold() in folded for term in case.get("forbidden", [])
+        acceptance_text(term) in folded for term in case.get("forbidden", [])
     )
     if case.get("raw_only"):
         # The fixture explicitly asked for raw code/JSON. Keep fenced output
@@ -663,6 +672,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
         "mem_available_min_mib",
         "swap_used_max_mib",
     ]
+    total = passed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -694,6 +704,8 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                         content, case
                     )
                     correctness_ok = syntax_ok and requirements_ok
+                    total += 1
+                    passed += int(correctness_ok)
                     writer.writerow(
                         {
                             "timestamp": iso_now(),
@@ -750,8 +762,9 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                     client.ensure_unloaded(model)
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
-    print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
-    return 0
+    print(f"\nAgent acceptance: {passed}/{total} passed")
+    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    return 0 if passed == total else 3
 
 
 OCR_PROMPTS = {
@@ -1038,7 +1051,7 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
         term for term in case.get("required", []) if term.casefold() not in folded
     ]
     choices = case.get("required_any", [])
-    if choices and not any(term.casefold() in folded for term in choices):
+    if choices and not any(acceptance_text(term) in folded for term in choices):
         missing.append("one of: " + " | ".join(choices))
     present_forbidden = [
         term for term in case.get("forbidden", []) if term.casefold() in folded
@@ -1046,6 +1059,23 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
     problems = [f"missing {term}" for term in missing]
     problems.extend(f"forbidden {term}" for term in present_forbidden)
     return not problems, problems
+
+
+def acceptance_text(text: str) -> str:
+    text = unicodedata.normalize("NFKC", text).translate(
+        str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
+    )
+    text = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", text)
+    return " ".join(text.casefold().split())
+
+
+def translation_prompt(case: dict[str, Any]) -> str:
+    if os.environ.get("TRANSLATION_EXPLICIT_DIRECTION", "").casefold() not in {"1", "true", "yes"}:
+        return case["input"]
+    names = {"de": "German", "fr": "French", "en": "English"}
+    source = names.get(case["source_language"], case["source_language"])
+    target = names.get(case["target_language"], case["target_language"])
+    return f"Translate from {source} to {target}. Return only the translation.\n\n{case['input']}"
 
 
 def benchmark_translation(args: argparse.Namespace) -> int:
@@ -1086,7 +1116,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     total += 1
                     payload = {
                         "model": model,
-                        "messages": [{"role": "user", "content": case["input"]}],
+                        "messages": [{"role": "user", "content": translation_prompt(case)}],
                         "stream": False,
                         "keep_alive": KEEP_ALIVE,
                         "options": {"num_predict": int(case.get("num_predict", 512))},
@@ -1105,9 +1135,9 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     )
                     content = str(message.get("content") or "")
                     thinking = str(message.get("thinking") or "")
-                    folded = content.casefold()
+                    folded = acceptance_text(content)
                     required_ok = all(
-                        term.casefold() in folded for term in case.get("required", [])
+                        acceptance_text(term) in folded for term in case.get("required", [])
                     )
                     choices = case.get("required_any", [])
                     if choices:
@@ -1118,10 +1148,16 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         term.casefold() in folded for term in case.get("forbidden", [])
                     )
                     preserved_ok = all(
-                        term.casefold() in folded for term in case.get("preserve", [])
+                        acceptance_text(term) in folded for term in case.get("preserve", [])
                     )
                     language_hint = task_language_hint(content, case["target_language"])
-                    ok = bool(content.strip()) and required_ok and forbidden_ok and preserved_ok
+                    ok = (
+                        bool(content.strip())
+                        and required_ok
+                        and forbidden_ok
+                        and preserved_ok
+                        and language_hint != "other"
+                    )
                     passed += int(ok)
                     row = {
                         "timestamp": iso_now(),

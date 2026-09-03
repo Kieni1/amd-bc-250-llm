@@ -351,6 +351,29 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertNotIn('"keep_alive": KEEP_ALIVE', agent)
         self.assertIn("client.ensure_unloaded(model)", agent)
 
+    def test_translation_acceptance_normalizes_hyphens_and_locale_numbers(self) -> None:
+        actual = "Facture INV‑4821 : CHF 319,50; référence ZH‑204."
+        self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
+        self.assertIn(category.acceptance_text("CHF 319.50"), category.acceptance_text(actual))
+        self.assertIn(category.acceptance_text("ZH-204"), category.acceptance_text(actual))
+
+    def test_translation_direction_can_be_made_explicit_for_ab_comparison(self) -> None:
+        case = {"source_language": "fr", "target_language": "de", "input": "Bonjour."}
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TRANSLATION_EXPLICIT_DIRECTION", None)
+            self.assertEqual(category.translation_prompt(case), "Bonjour.")
+        with patch.dict(os.environ, {"TRANSLATION_EXPLICIT_DIRECTION": "1"}, clear=False):
+            prompt = category.translation_prompt(case)
+            self.assertIn("French to German", prompt)
+            self.assertTrue(prompt.endswith("Bonjour."))
+
+    def test_task_and_agent_benchmarks_return_quality_status(self) -> None:
+        source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
+        task = source.split("def benchmark_task", 1)[1].split("def clean_code_output", 1)[0]
+        agent = source.split("def benchmark_agent", 1)[1].split("OCR_PROMPTS", 1)[0]
+        self.assertIn("return 0 if passed == total else 3", task)
+        self.assertIn("return 0 if passed == total else 3", agent)
+
     def test_client_normalizes_ollama_host_and_falls_back_when_cli_stop_fails(
         self,
     ) -> None:

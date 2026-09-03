@@ -1,4 +1,5 @@
 d /var/lib/bc250-llm-server 0750 root ollama -
+d /var/lib/bc250-llm-server/secrets 0700 root root -
 d /var/lib/bc250-llm-server/gguf 0750 root ollama -
 d /var/lib/bc250-llm-server/gguf/production 0750 ollama ollama -
 d /var/lib/bc250-llm-server/gguf/experiments 0750 ollama ollama -

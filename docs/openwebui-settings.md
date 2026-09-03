@@ -11,7 +11,11 @@ The package uses two layers deliberately:
    Open WebUI's supported administrator APIs after authentication.
 
 The package never edits `webui.db` directly and does not store the administrator
-password or the temporary API/session token used for setup.
+password or the temporary API/session token used for setup. It does persist a
+generated Open WebUI signing secret in the root-only
+`/var/lib/bc250-llm-server/secrets/open-webui.env`; this is application key
+material, not an administrator credential, and keeps sessions/tokens valid when
+the container is recreated.
 
 ## First setup
 

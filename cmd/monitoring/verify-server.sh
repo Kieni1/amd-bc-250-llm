@@ -352,10 +352,11 @@ else
     fi
   done
 fi
-if systemctl is-enabled --quiet ollama-agent.service 2>/dev/null; then
+agent_unit_state="$(systemctl show -p UnitFileState --value ollama-agent.service 2>/dev/null || true)"
+if [[ $agent_unit_state == enabled || $agent_unit_state == enabled-runtime ]]; then
   warn "ollama-agent.service is enabled at boot; agent mode is intended to be exclusive and operator-entered"
 else
-  ok "ollama-agent.service is not enabled at boot"
+  ok "ollama-agent.service is not enabled at boot (${agent_unit_state:-unknown})"
 fi
 if id -nG ollama 2>/dev/null | grep -qw render && \
    id -nG ollama 2>/dev/null | grep -qw video; then

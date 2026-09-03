@@ -75,6 +75,12 @@ class VerifyTests(unittest.TestCase):
             r"\b[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.fc44(?:\.[A-Za-z0-9_]+)?\b",
         )
 
+    def test_verify_treats_static_agent_unit_as_not_boot_enabled(self) -> None:
+        source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn("UnitFileState", source)
+        self.assertIn("enabled-runtime", source)
+        self.assertNotIn("is-enabled --quiet ollama-agent.service", source)
+
     def test_verify_detects_optional_compute_stack_and_vulkan_failures(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         for expected in (

@@ -21,6 +21,7 @@ DropCapability=all
 # configuration through Open WebUI's supported admin API after first login.
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
+EnvironmentFile=/var/lib/bc250-llm-server/secrets/open-webui.env
 Environment=ENABLE_OPENAI_API=false
 # Local/offline appliance baseline. This reduces application-initiated outbound
 # requests; firewalld remains the actual network security boundary.

@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        0.2.testing%{?dist}
+Release:        0.3.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -138,6 +138,12 @@ python3 scripts/install-manifest.py \
 %post
 %systemd_post %{bc250_units}
 %tmpfiles_create bc250-llm-server.conf
+secret_env=/var/lib/bc250-llm-server/secrets/open-webui.env
+if [ ! -s "$secret_env" ]; then
+  umask 077
+  python3 -c 'import secrets; print("WEBUI_SECRET_KEY=" + secrets.token_hex(32))' > "$secret_env"
+fi
+chmod 0600 "$secret_env"
 systemctl daemon-reload >/dev/null 2>&1 || :
 
 # This testing package deliberately starts its basic stack immediately.
@@ -240,6 +246,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.3.testing
+- Bound dedicated embedding Modelfiles to 4K context, matching the service policy and reducing avoidable UMA/GTT pressure before GPT-OSS coexistence revalidation.
+- Persist the Open WebUI signing secret across container recreation and fix static-vs-enabled agent verification.
+- Make task/agent benchmark acceptance return quality-fail status and improve translation equivalence/direction diagnostics.
+
 * Wed Sep 02 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.2.testing
 - Preserve the original installer stdin mode across transcript pseudo-terminals so unattended model/Open WebUI setup never blocks on a read.
 - Keep agent restoration and legacy network-policy ownership hardening, Open WebUI response-shape validation and Ruff cleanup from the release review.

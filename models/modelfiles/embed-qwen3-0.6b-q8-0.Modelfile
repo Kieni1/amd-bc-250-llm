@@ -17,4 +17,4 @@ FROM /var/lib/bc250-llm-server/gguf/embedding/Qwen3-Embedding-0.6B-Q8_0.gguf
 PARAMETER num_gpu 99
 
 # Native supported context.
-PARAMETER num_ctx 32768
+PARAMETER num_ctx 4096

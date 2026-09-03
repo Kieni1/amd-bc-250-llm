@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.10.0-0.3.testing - 2026-09-03
+
+Tighten the runtime before the installer/storage pass. Bound both dedicated
+embedding Modelfiles to the service's 4096-token context so an existing 32K
+model definition no longer defeats the small embedding lane. Keep Jina as the
+default pending the required same-board retrieval and GPT-OSS coexistence rerun.
+
+Persist Open WebUI's signing secret in package state so container recreation does
+not invalidate existing sessions/API credentials. Fix agent boot-state verification
+to inspect `UnitFileState`, accepting `static` as the intended non-boot-enabled
+state. The already-integrated explicit agent restoration-status handling remains
+unchanged.
+
+Make benchmark process status match benchmark meaning: task and agent acceptance
+failures now return the existing quality-fail status `3`; translation comparison
+normalizes harmless Unicode dash and locale-number formatting, and supports an
+explicit source/target direction A/B without changing the production LFM role.
+
 ## 0.10.0-0.2.testing - 2026-09-02
 
 Close the remaining installer review gap without changing the appliance runtime

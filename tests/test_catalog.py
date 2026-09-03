@@ -99,6 +99,15 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             text,
         )
 
+    def test_embedding_modelfiles_are_bounded_to_dedicated_4k_lane(self) -> None:
+        for name in (
+            "embed-jina-v5-small-retrieval-q4-k-m.Modelfile",
+            "embed-qwen3-0.6b-q8-0.Modelfile",
+        ):
+            text = (MODELFILES / name).read_text(encoding="utf-8")
+            self.assertIn("PARAMETER num_ctx 4096", text)
+            self.assertNotIn("PARAMETER num_ctx 32768", text)
+
     def test_jina_embedding_uses_pooling_metadata_revision(self) -> None:
         text = (
             MODELFILES / "embed-jina-v5-small-retrieval-q4-k-m.Modelfile"

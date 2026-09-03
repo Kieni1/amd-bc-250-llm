@@ -33,7 +33,8 @@ curl -fsS http://127.0.0.1:11437/api/embed \
 ```
 
 
-The dedicated service uses a 4K context and 10-minute keepalive. It is part of
-normal mode and is stopped automatically when `bc250-agent-mode enter` starts the
-exclusive coding backend. This prevents ordinary RAG indexing from evicting the
-main production answer model while keeping the embedding residency bounded.
+The dedicated service and packaged embedding Modelfiles use a 4K context and
+10-minute keepalive. After upgrading an older 32K registration, rerun
+`sudo bc250-setup-embedding-model` to recreate the selected embedding model. The
+lane is stopped automatically in exclusive agent mode, keeping normal RAG
+residency bounded.

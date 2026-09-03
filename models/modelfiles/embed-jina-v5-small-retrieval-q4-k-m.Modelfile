@@ -15,4 +15,4 @@ FROM /var/lib/bc250-llm-server/gguf/embedding/v5-small-retrieval-Q4_K_M.gguf
 PARAMETER num_gpu 99
 
 # Native maximum context supported by this embedding model.
-PARAMETER num_ctx 32768
+PARAMETER num_ctx 4096

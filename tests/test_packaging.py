@@ -177,6 +177,17 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', instances)
         self.assertIn('OLLAMA_NO_CLOUD=1', verify)
 
+    def test_open_webui_signing_secret_persists_across_container_recreation(self) -> None:
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        path = "/var/lib/bc250-llm-server/secrets/open-webui.env"
+        self.assertIn(f"EnvironmentFile={path}", quadlet)
+        self.assertIn("d /var/lib/bc250-llm-server/secrets 0700 root root -", tmpfiles)
+        self.assertIn('if [ ! -s "$secret_env" ]; then', spec)
+        self.assertIn("secrets.token_hex(32)", spec)
+        self.assertIn('chmod 0600 "$secret_env"', spec)
+
     def test_open_webui_connection_config_is_valid_and_matches_packaged_roles(self) -> None:
         helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
         models = (ROOT / "config/openwebui/models.json").read_text(encoding="utf-8")
