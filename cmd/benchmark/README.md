@@ -1,6 +1,6 @@
 # Benchmark
 
-The package standard is **Ollama 0.33.2**. Keep the Ollama version, model
+The package standard is **Ollama 0.33.3**. Keep the Ollama version, model
 revision, CU/governor state and cooling setup fixed when comparing runs.
 
 ## Whole-appliance revalidation
@@ -75,7 +75,7 @@ translation use-case suite.
 `medium`, the intended production Qwen3.5/Qwen3-4B profiles use request-level `false`, and
 Gemma4/native-reasoning families leave `think` unset. Explicit
 `THINK_MODE=omit|false|true|low|medium|high|max` is available for a deliberate
-comparison. These values match Ollama 0.33.2's request API.
+comparison. These values match Ollama 0.33.3's request API.
 
 The standard generation suite records cold/warm chat latency, loaded decode,
 document prefill and a context-capacity curve. The prefill request and every
@@ -89,7 +89,7 @@ load. `RUN_THERMAL=1` adds sustained decode windows. Early-stop warnings are emi
 finishes normally is not treated as suspicious. Reaching the requested limit with
 `done_reason=length` is not an early-EOS failure.
 
-Ollama 0.33.2 uses one shared `num_predict` cap for reasoning plus the final
+Ollama 0.33.3 uses one shared `num_predict` cap for reasoning plus the final
 answer. The moderate latency test therefore keeps 96 tokens for explicit
 non-thinking (`think=false`) profiles but uses 512 for reasoning-capable/unset
 policies; the conservative profile uses 64/384. LFM2.5 stays on the larger

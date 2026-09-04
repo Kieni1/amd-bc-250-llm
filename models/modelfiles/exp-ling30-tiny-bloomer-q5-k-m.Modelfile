@@ -10,7 +10,7 @@
 # - Compare reasoning latency/throughput against LFM2.5, Qwen and GPT-OSS
 # - Test coding/agentic capability without committing to the agent service
 #
-# Ollama 0.33.2 carries a newer llama.cpp baseline, but bailingmoe3 validation
+# Ollama 0.33.3 carries a newer llama.cpp baseline, but bailingmoe3 validation
 # remains much stronger on CPU/CUDA than this GFX1013 Vulkan path. Treat BC-250
 # compatibility/performance as experimental until a full-offload load benchmark.
 # Thinking is native and enabled by default; do not globally force think:false.

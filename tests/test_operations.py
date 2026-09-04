@@ -160,7 +160,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         for expected in (
             "embeddings|embedding|ocr|task|agent|coding",
             "generation-benchmark.py",
-            "Ollama 0.33.2",
+            "Ollama 0.33.3",
         ):
             self.assertIn(expected, wrapper)
         for expected in (
@@ -212,7 +212,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("BENCH_MODE=neutral", result.stdout)
-        self.assertIn("Ollama 0.33.2", result.stdout)
+        self.assertIn("Ollama 0.33.3", result.stdout)
         self.assertIn("bc250-benchmark agent", result.stdout)
 
 

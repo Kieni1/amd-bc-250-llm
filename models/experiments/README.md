@@ -51,7 +51,7 @@ models require a vision projector in addition to the main GGUF. They therefore
 do not appear as manager-owned source files under `/var/lib/bc250-llm-server/gguf/`;
 `bc250-model list` labels their source as `Ollama-managed (main+projector)`. This
 is intentional in 0.10: GLM-OCR is a ~950 MB main GGUF plus a ~484 MB projector,
-and OvisOCR2 likewise requires a separate projector. Ollama 0.33.2 does not offer
+and OvisOCR2 likewise requires a separate projector. Ollama 0.33.3 does not offer
 a reliable local Modelfile import path for attaching an arbitrary separate
 projector, so copying only the main OCR GGUF into the package source tree would
 create a backup that cannot be safely restored. Keep these two OCR models in the

@@ -103,7 +103,7 @@ main model blob and required vision projector in its normal model store.
 there is a manager-owned source GGUF under `/var/lib/bc250-llm-server/gguf/`.
 This is intentionally different from text-only local-GGUF models: preserving
 only the main OCR GGUF would not provide a reliable restore path for the paired
-projector on Ollama 0.33.2.
+projector on Ollama 0.33.3.
 
 Hugging Face authentication is requested only when a manager download needs it. `HF_TOKEN` or
 `--token-file PATH` is validated as the `ollama` account. Missing or rejected

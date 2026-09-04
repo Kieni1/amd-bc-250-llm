@@ -170,15 +170,15 @@ class PackagingTests(unittest.TestCase):
         for forbidden in ("firewall-cmd", "setsebool", "dnf ", "bc250-model", "systemctl enable --now"):
             self.assertNotIn(forbidden, post)
 
-    def test_package_standard_ollama_is_0332(self) -> None:
+    def test_package_standard_ollama_is_0333(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
         self.assertIn('source "$runtime_env"', installer)
-        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.2"', installer)
+        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.3"', installer)
         self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
-        self.assertIn("BC250_OLLAMA_VERSION=0.33.2", (ROOT / "config/runtime.env").read_text())
+        self.assertIn("BC250_OLLAMA_VERSION=0.33.3", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
@@ -309,7 +309,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Environment=RAG_SYSTEM_CONTEXT=false", quadlet)
         self.assertEqual(desired["rag"]["CHUNK_MIN_SIZE_TARGET"], 0)
         self.assertEqual(desired["embedding"]["RAG_EMBEDDING_BATCH_SIZE"], 1)
-        self.assertEqual(desired["rag"]["TIKA_SERVER_VERSION"], "3")
+        self.assertEqual(desired["rag"]["TIKA_SERVER_VERSION"], "4")
         self.assertNotIn("CHUNK_MIN_SIZE_TARGET=", quadlet)
         self.assertNotIn("RAG_EMBEDDING_BATCH_SIZE=", quadlet)
         self.assertNotIn("Environment=ENABLE_ORJSON=true", quadlet)
@@ -401,10 +401,10 @@ class PackagingTests(unittest.TestCase):
                 values[key] = value
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.33.2")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.33.3")
         self.assertEqual(
             values["BC250_OLLAMA_INSTALLER_COMMIT"],
-            "f96e7aa0513b9973a0ccc71be414c2ecb9d65b1a",
+            "b79067b0db7417f20108363bc22adb97f35c966a",
         )
         self.assertEqual(
             values["BC250_OLLAMA_INSTALLER_SHA256"],
@@ -412,10 +412,20 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.3")
         self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.3")
+        self.assertEqual(values["BC250_TIKA_VERSION"], "4.0.0-full")
+        self.assertEqual(
+            values["BC250_TIKA_IMAGE_DIGEST"],
+            "sha256:80072bb73dd320a9de9709beb0b16d14dd6d2680376f8d31e498f55b633ba593",
+        )
         self.assertIn(f'# v{values["BC250_OPEN_WEBUI_VERSION"]}, pinned OCI index digest.', quadlet)
         self.assertIn(values["BC250_OPEN_WEBUI_IMAGE_DIGEST"], quadlet)
         self.assertIn(values["BC250_TIKA_VERSION"], tika)
         self.assertIn(values["BC250_TIKA_IMAGE_DIGEST"], tika)
+        upstreams = (ROOT / "packaging/upstreams.toml").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        live_manager_commit = "a929085d791f126ce76a60eb609610820fb08066"
+        self.assertIn(f'commit = "{live_manager_commit}"', upstreams)
+        self.assertIn(f"%global live_manager_commit {live_manager_commit}", spec)
         self.assertIn("config/runtime.env\t{share}/runtime.env", (ROOT / "packaging/install-manifest.tsv").read_text())
 
     def test_fresh_machine_memory_profile_is_ttm_only_and_cleans_legacy_overrides(self) -> None:

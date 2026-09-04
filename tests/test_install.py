@@ -34,7 +34,7 @@ class InstallerTests(unittest.TestCase):
         source = INSTALLER.read_text()
         self.assertIn("pre-1.0", source)
         self.assertIn('source "$runtime_env"', source)
-        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.2"', source)
+        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.3"', source)
         result = subprocess.run(["bash", str(INSTALLER), "--help"], text=True, stdout=subprocess.PIPE, check=False)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("sudo bc250-install", result.stdout)

@@ -11,7 +11,7 @@
 # - RAG/document-answering experiment
 # - Lightweight reasoning/tool-use capability check
 #
-# Granite 4.2 has native thinking and is current-generation for Ollama 0.33.2.
+# Granite 4.2 has native thinking and is current-generation for Ollama 0.33.3.
 # Keep num_ctx explicit: Granite 4.2 GGUF metadata advertises 128K context and
 # upstream 0.33.x reports show auto/full-context OOMs on <=16 GB shared-memory
 # systems. Verify load/template/think behavior on BC-250 before role promotion.

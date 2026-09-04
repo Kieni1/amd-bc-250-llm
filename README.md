@@ -153,17 +153,18 @@ The complete installed interface and its exact syntax are in
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.33.2 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.11.3 and Tika | Digest-pinned local UI, API-driven baseline setup and document extraction |
+| Ollama v0.33.3 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Open WebUI v0.11.3 and Tika v4.0.0 | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 
-Ollama 0.33.2 is the tested runtime baseline for this release. The relevant
-headless change is the 0.33.0 prompt-cache/prefill reliability work; 0.33.1/0.33.2
-also contain MLX/desktop changes that are not enabled on the BC-250 Vulkan path.
+Ollama 0.33.3 is the package runtime baseline. In addition to the 0.33.0
+prompt-cache/prefill reliability work, 0.33.3 refreshes llama.cpp, reports cached
+prompt tokens and honors GGUF-defined default parameters. Re-run the normal
+BC-250 Vulkan smoke/revalidation after the runtime refresh.
 See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.

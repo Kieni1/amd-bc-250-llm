@@ -1,7 +1,7 @@
 %global governor_version 0.4.12
 %global governor_commit be9537fc36f24b17570088cafa8c79365f80fee8
 %global unlock_commit 6c3969ddee40e894297869e6ca30537f274619cb
-%global live_manager_commit 8eb45f07810af738f3e4945ea0cc29d399e378a6
+%global live_manager_commit a929085d791f126ce76a60eb609610820fb08066
 %global source_date_epoch_from_changelog 1
 %global project_libexec %{_libexecdir}/bc250-llm-server
 %global project_share %{_datadir}/bc250-llm-server
@@ -217,6 +217,7 @@ fi
 - Make one packaged Open WebUI desired-state file authoritative for persisted providers, task, embedding and RAG application settings.
 - Simplify agent-mode switching around the static systemd conflict topology.
 - Correct remaining command privilege/RAG benchmark documentation and make dedupe restoration exception-safe without a blind catch.
+- Refresh runtime/source pins to Ollama 0.33.3, Apache Tika 4.0.0-full and the current CU live-manager revision; keep Open WebUI 0.11.3 and governor 0.4.12.
 
 * Fri Sep 04 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.6.testing
 - Package the complete main/task/embedding/agent Ollama service topology; the upstream installer now supplies the binary only.

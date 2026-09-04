@@ -7,7 +7,7 @@ if [[ ! -r "$runtime_env" ]]; then runtime_env="$(cd -- "$(dirname -- "${BASH_SO
 if [[ -r "$runtime_env" ]]; then # shellcheck disable=SC1090
   source "$runtime_env"
 else
-  BC250_OLLAMA_VERSION=0.33.2
+  BC250_OLLAMA_VERSION=0.33.3
 fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
 PASS=0
