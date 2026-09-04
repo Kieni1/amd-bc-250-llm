@@ -286,6 +286,32 @@ class CategoryInterfaceTests(unittest.TestCase):
             {("production", "p"), ("mtp", "m")},
         )
 
+    def test_all_install_switches_modes_around_agent_models(self) -> None:
+        catalogs = [
+            ({"category": "production"}, [{"category": "production", "id": "p", "name": "prod-p"}]),
+            ({"category": "task"}, [{"category": "task", "id": "t", "name": "task-t"}]),
+            ({"category": "embedding"}, [{"category": "embedding", "id": "e", "name": "embed-e"}]),
+            ({"category": "agentic"}, [{"category": "agentic", "id": "a", "name": "agentic-a"}]),
+            ({"category": "mtp"}, [{"category": "mtp", "id": "m", "name": "mtp-m"}]),
+        ]
+        selected = [model for _defaults, models in catalogs for model in models]
+        args = modelctl.argparse.Namespace(command="install")
+        operations = []
+        modes = []
+
+        def operate(defaults, models, _args):
+            operations.append(defaults["category"])
+            return 0
+
+        with (
+            patch.object(modelctl, "set_appliance_mode", side_effect=modes.append),
+            patch.object(modelctl, "operate_models", side_effect=operate),
+        ):
+            self.assertEqual(modelctl.run_all_catalog_operation(catalogs, selected, args), 0)
+
+        self.assertEqual(modes, ["normal", "agent", "normal"])
+        self.assertEqual(operations, ["production", "task", "embedding", "agentic", "mtp"])
+
     def test_all_cleanup_dispatches_each_selected_category(self) -> None:
         catalogs = [
             (
@@ -299,7 +325,10 @@ class CategoryInterfaceTests(unittest.TestCase):
         ]
         selected = [catalogs[0][1][0], catalogs[1][1][0]]
         args = modelctl.argparse.Namespace(command="cleanup", yes=True)
-        with patch.object(modelctl, "cleanup_models", return_value=0) as cleanup:
+        with (
+            patch.object(modelctl, "set_appliance_mode"),
+            patch.object(modelctl, "cleanup_models", return_value=0) as cleanup,
+        ):
             self.assertEqual(
                 modelctl.run_all_catalog_operation(catalogs, selected, args), 0
             )

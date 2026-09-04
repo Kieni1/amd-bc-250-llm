@@ -31,7 +31,7 @@ A normal update has one primary reboot after Fedora/kernel + memory setup. A
 second reboot is requested only when persistent 40-CU mode is already configured
 and a newly prepared replacement module is not yet running.
 
-Use --models-only to run only model selection and Open WebUI setup.
+Use --models-only to reconcile runtime topology, models and Open WebUI without system/kernel setup.
 Set BC250_MODEL_SELECTION for unattended model selection; Enter skips models.
 Set BC250_UPDATE_OLLAMA=1 to refresh official Ollama explicitly.
 USAGE
@@ -304,10 +304,8 @@ setup_ollama_account() {
     /var/lib/bc250-llm-server /var/cache/bc250-llm-server
   install -d -o ollama -g ollama -m 0750 \
     /var/lib/ollama \
-    /var/lib/bc250-llm-server/ollama/main \
-    /var/lib/bc250-llm-server/ollama/embedding \
-    /var/lib/bc250-llm-server/gguf/production \
-    /var/lib/bc250-llm-server/gguf/embedding \
+    /var/lib/bc250-llm-server/ollama/{main,task,embedding,agent} \
+    /var/lib/bc250-llm-server/gguf/{production,experiments,task,embedding,agent} \
     /var/cache/bc250-llm-server/huggingface
   restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
     /var/cache/bc250-llm-server 2>/dev/null || true
@@ -456,34 +454,64 @@ step_5_prepare_40cu() {
   fi
 }
 
+step_6_runtime_topology() {
+  heading "6. ESTABLISH OLLAMA RUNTIME TOPOLOGY"
+  local unit fragment
+  systemctl daemon-reload
+  for unit in ollama-task.service ollama-embedding.service ollama-agent.service; do
+    systemctl cat "$unit" >/dev/null 2>&1 || {
+      echo "ERROR: required package unit is missing: $unit" >&2
+      return 1
+    }
+    fragment="$(systemctl show -p FragmentPath --value "$unit" 2>/dev/null || true)"
+    if [[ "$fragment" != "/usr/lib/systemd/system/$unit" ]]; then
+      echo "ERROR: $unit is overridden by ${fragment:-an unknown unit file}." >&2
+      echo "This pre-1.0 greenfield release requires the package-owned static lane unit." >&2
+      return 1
+    fi
+  done
+  systemctl enable ollama.service ollama-task.service ollama-embedding.service
+  systemctl disable ollama-agent.service >/dev/null 2>&1 || true
+  bc250-agent-mode leave
+}
+
 step_7_models() {
-  heading "7. OPTIONAL MODELS"
+  heading "7. MODELS"
+  require_progress_terminal
+  prepare_hf_authentication
+
+  echo "Ensuring baseline Open WebUI infrastructure models."
+  bc250-model install all \
+    "task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m"
+
+  echo
+  echo "Optional production, experiment, agent and additional model selection:"
   bc250-model list all --all
   local selection="${BC250_MODEL_SELECTION:-}"
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 ]]; then
-    read -r -p "Models (index/range/name/recommended/production/all; Enter to skip): " selection
+    read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
   elif [[ -z "$selection" ]]; then
-    echo "BC250_MODEL_SELECTION is unset; model setup skipped in non-interactive mode."
+    echo "BC250_MODEL_SELECTION is unset; no additional models selected in non-interactive mode."
+    echo "Baseline task + embedding models are installed."
     return 0
   fi
-  [[ -n "$selection" ]] || { echo "Skipping optional models."; return 0; }
-  require_progress_terminal
-  prepare_hf_authentication
+  [[ -n "$selection" ]] || { echo "Skipping additional models; baseline models are installed."; return 0; }
   bc250-model install all "$selection" --include-disabled
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
 }
 
-
-step_6_services() {
-  heading "6. START APPLIANCE SERVICES"
-  systemctl enable --now firewalld.service cyan-skillfish-governor-smu.service nginx.service
+step_8_application_services() {
+  heading "8. START APPLICATION SERVICES"
+  systemctl enable --now firewalld.service cyan-skillfish-governor-smu.service
   if systemctl is-active --quiet firewalld.service; then
     firewall-cmd --quiet --permanent --add-service=http
     firewall-cmd --quiet --reload
   fi
   command -v setsebool >/dev/null 2>&1 && setsebool -P httpd_can_network_connect 1 || true
   systemctl start tika.service open-webui.service
+  systemctl enable --now nginx.service
 }
+
 
 show_plan() {
   heading "BC-250 SETUP PLAN"
@@ -508,8 +536,8 @@ show_plan() {
   printf '  swap                  %s\n' "$swap"
   printf '  40-CU                 %s\n' "$cu"
   printf '  storage headroom      %s available\n' "$(df -h --output=avail /var/lib/bc250-llm-server 2>/dev/null | awk 'NR==2{print $1}' || echo unknown)"
-  printf '  models                one optional selection\n'
-  printf '  Open WebUI            apply/status after services\n'
+  printf '  models                baseline task+embedding + one optional selection\n'
+  printf '  Open WebUI            start after models, then apply/status\n'
   printf '  primary reboot        %s\n' "$reboot"
 }
 
@@ -522,8 +550,8 @@ wait_for_open_webui() {
   return 1
 }
 
-step_8_open_webui() {
-  heading "8. CONFIGURE OPEN WEBUI"
+step_9_open_webui() {
+  heading "9. CONFIGURE OPEN WEBUI"
   command -v bc250-openwebui-setup >/dev/null 2>&1 || {
     echo "Open WebUI setup helper is unavailable; skipping application configuration."
     return 0
@@ -560,8 +588,8 @@ step_8_open_webui() {
   fi
 }
 
-step_9_verify() {
-  heading "9. VERIFICATION"
+step_10_verify() {
+  heading "10. VERIFICATION"
   local verify_status=0 diagnose_status=0
   bc250-memory-profile status
   bc250-swap-profile status
@@ -579,10 +607,12 @@ run_models_only() {
     echo "ERROR: bc250-model is unavailable; install the binary RPM first." >&2
     exit 1
   }
+  step_6_runtime_topology
   step_7_models
-  step_8_open_webui
+  step_8_application_services
+  step_9_open_webui
   echo
-  echo "Optional model setup completed."
+  echo "Model and Open WebUI reconciliation completed."
   echo "Transcript: $LOG_FILE"
 }
 
@@ -605,10 +635,11 @@ main() {
   step_4_memory_and_swap
   request_primary_reboot_if_needed
   step_5_prepare_40cu
-  step_6_services
+  step_6_runtime_topology
   step_7_models
-  step_8_open_webui
-  step_9_verify
+  step_8_application_services
+  step_9_open_webui
+  step_10_verify
   echo
   echo "Installation and verification completed."
   echo "Transcript: $LOG_FILE"

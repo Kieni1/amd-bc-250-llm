@@ -35,6 +35,9 @@ file	0644	cmd/system/99-sensors.conf	{modulesloaddir}/99-bc250-sensors.conf
 file	0644	cmd/system/options-sensors.conf	{modprobedir}/99-bc250-sensors.conf
 file	0644	cmd/system/ollama.service.d-override.conf	{unitdir}/ollama.service.d/50-bc250-llm-server.conf
 file	0644	cmd/system/ollama-profiles/balanced.conf	{unitdir}/ollama.service.d/60-bc250-runtime-profile.conf
+file	0644	config/systemd/ollama-task.service	{unitdir}/ollama-task.service
+file	0644	config/systemd/ollama-embedding.service	{unitdir}/ollama-embedding.service
+file	0644	config/systemd/ollama-agent.service	{unitdir}/ollama-agent.service
 
 file	0644	config/containers/*	{datadir}/containers/systemd/
 config	0644	config/nginx/bc250-llm-server.conf	{sysconfdir}/nginx/default.d/bc250-llm-server.conf
@@ -46,7 +49,6 @@ ghost	0600	-	{config}/maintenance.env
 file	0755	models/modelctl.py	{libexec}/modelctl
 file	0755	models/ocr/bc250-ocr.sh	{libexec}/ocr.sh
 file	0755	models/rag/rag_import.py	{libexec}/rag-import
-file	0755	models/setup-ollama-instance.sh	{libexec}/setup-ollama-instance.sh
 file	0755	cmd/system/agent-mode.sh	{libexec}/agent-mode.sh
 file	0755	cmd/openwebui/openwebui-setup.py	{libexec}/openwebui-setup.py
 file	0755	models/experiments/compare-mtp.sh	{libexec}/compare-mtp.sh

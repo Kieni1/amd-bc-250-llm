@@ -3,7 +3,7 @@
 ## Setup and verify
 
 ```bash
-sudo bc250-setup-task-model task-gemma3-1b-unsloth-ud-q4-k-xl
+sudo bc250-model install task task-gemma3-1b-unsloth-ud-q4-k-xl
 
 curl -fsS http://127.0.0.1:11435/api/chat \
   -H 'Content-Type: application/json' \
@@ -12,8 +12,8 @@ sleep 2
 OLLAMA_HOST=127.0.0.1:11435 ollama ps
 ```
 
-The helper creates `ollama-task.service` on port `11435` with a separate model
-store. With no selection it lists task Modelfiles and prompts. The service uses
+The package ships `ollama-task.service` statically on port `11435` with a separate model
+store. It is part of required normal mode. With no selection `bc250-model install task` lists task Modelfiles and prompts. The service uses
 `OLLAMA_KEEP_ALIVE=0`; the final command should show no resident task model.
 
 Current candidates:

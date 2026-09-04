@@ -172,7 +172,7 @@ def dedupe(yes: bool) -> int:
                     subprocess.run(["xfs_io", "-c", f"dedupe -q {alias} {offset} {offset} {length}", str(blob)], check=True)
                 print(f"  [{index}/{len(pairs)}] {source.name}")
         os.sync()
-    except (OSError, ValueError) as exc:
+    except Exception as exc:
         error = exc
     failed = restore_services(active)
     if failed:

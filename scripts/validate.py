@@ -234,9 +234,6 @@ def check_dispatcher_and_runtime_contracts() -> None:
         "ollama-profile",
         "openwebui-setup",
         "run-mtp",
-        "setup-coding-agent",
-        "setup-embedding-model",
-        "setup-task-model",
         "status",
         "storage",
         "swap-profile",
@@ -285,11 +282,17 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "env -u OLLAMA_VERSION sh",
             'OLLAMA_VERSION="$VERSION" sh',
         ),
-        "models/setup-ollama-instance.sh": (
-            "TASK_PORT:-11435",
-            "CODING_AGENT_PORT:-11436",
-            "/var/lib/bc250-llm-server/ollama/task",
-            "/var/lib/bc250-llm-server/ollama/agent",
+        "config/systemd/ollama-task.service": (
+            "OLLAMA_HOST=0.0.0.0:11435",
+            "Conflicts=ollama-agent.service",
+        ),
+        "config/systemd/ollama-embedding.service": (
+            "OLLAMA_HOST=0.0.0.0:11437",
+            "OLLAMA_CONTEXT_LENGTH=4096",
+        ),
+        "config/systemd/ollama-agent.service": (
+            "OLLAMA_HOST=0.0.0.0:11436",
+            "Conflicts=ollama.service ollama-task.service ollama-embedding.service",
         ),
         "models/modelctl.py": (
             "OLLAMA_HOST",

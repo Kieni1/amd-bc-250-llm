@@ -56,4 +56,4 @@ state.
 See [`FILESTRUCTURE.md`](FILESTRUCTURE.md) for the operator-facing path map and
 [`../packaging/README.md`](../packaging/README.md) for maintainer policy.
 
-Dynamic model setup may create `ollama-task.service`, `ollama-embedding.service` and the boot-disabled `ollama-agent.service` under `/etc/systemd/system/`; these are operator/runtime state rather than RPM-owned unit payloads.
+The RPM statically owns `ollama-task.service`, `ollama-embedding.service` and `ollama-agent.service` under `/usr/lib/systemd/system/`. `bc250-install` enables the required task/embedding normal lanes after the official Ollama binary is installed; the agent unit remains static and exclusive.

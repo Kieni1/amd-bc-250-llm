@@ -453,7 +453,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_propagates_non_quality_benchmark_failures(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=3.5", source)
+        self.assertIn("HARNESS_VERSION=3.6", source)
         block = source[source.index("run_bench_at() {"):source.index("run_bench() {")]
         self.assertIn("0|3) return 0", block)
         self.assertIn('*) return "$rc"', block)

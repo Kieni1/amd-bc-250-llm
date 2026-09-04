@@ -151,6 +151,6 @@ every category. Never manually purge Ollama's shared blob directory for one mode
 ## Runtime lane ownership
 
 Normal mode uses main 11434, task 11435 and embedding 11437. Install embedding
-models with `bc250-setup-embedding-model` so registration targets the dedicated
+models with `bc250-model install embedding` so registration targets the dedicated
 store/service. Agent 11436 is disabled at boot and runs only through exclusive
 `bc250-agent-mode enter|leave`; do not register production/embedding models there.

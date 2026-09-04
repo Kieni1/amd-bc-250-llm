@@ -23,14 +23,19 @@ Before 1.0 this remains a green-field/test-appliance workflow. The bootstrap ins
 
 ```bash
 sudo bc250-install
-sudo bc250-install --models-only   # optional model/Open WebUI resume
+sudo bc250-install --models-only   # model/Open WebUI reconciliation
 ```
+
+Because the 0.x line is greenfield, `bc250-install` refuses legacy full-unit overrides for the task, embedding or agent Ollama lanes instead of attempting an in-place migration.
 
 The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
 the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
 TTM activation into one primary reboot. After reboot it prepares 40-CU support
-for the exact running kernel, starts the normal appliance services, presents one
-global model-selection prompt, configures Open WebUI and verifies the result. A
+for the exact running kernel, establishes the static main/task/embedding normal
+mode, installs the promoted task and Jina embedding infrastructure models, then
+presents one global prompt for additional models. Open WebUI starts only after
+that model infrastructure is ready, and the installer finishes by applying its
+desired state and verifying the appliance. A
 second reboot is requested only if persistent 40-CU mode was already configured
 and its newly prepared replacement module is not yet loaded.
 
@@ -98,13 +103,13 @@ non-commercial license; review every model's current license before use.
 sudo bc250-model list production
 sudo bc250-model install production
 sudo bc250-model install experiments
-sudo bc250-setup-embedding-model
+sudo bc250-model install embedding
+sudo bc250-model install task
+sudo bc250-model install agentic   # temporarily switches to agent mode, then restores normal
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
-sudo bc250-setup-task-model
 sudo bc250-openwebui-setup init
-sudo bc250-agent-mode enter
-sudo bc250-setup-coding-agent
+sudo bc250-agent-mode enter         # use the registered coding model exclusively
 sudo bc250-agent-mode leave
 
 # Profiles and hardware

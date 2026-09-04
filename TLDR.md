@@ -15,10 +15,13 @@ which owns Fedora update policy. Rerun after the requested primary reboot with:
 sudo bc250-install
 ```
 
-Use `sudo bc250-install --models-only` to resume only models/Open WebUI. There is
-one model prompt; select global indexes/ranges/names or `recommended`,
-`production`, `all`, and press Enter to skip. Unattended selection uses
+Use `sudo bc250-install --models-only` to reconcile models/Open WebUI without the
+system-update stages. The promoted task and Jina embedding models are baseline
+infrastructure; one additional-model prompt accepts global indexes/ranges/names
+or `recommended`, `production`, `all`, and Enter skips extra models. Unattended selection uses
 `BC250_MODEL_SELECTION`.
+
+Legacy full-unit overrides for the task/embedding/agent Ollama lanes are not migrated; the installer stops rather than mixing old dynamic units with the package-owned topology.
 
 Before 1.0 this is intentionally a green-field appliance flow. Kernel update and
 the TTM-only profile are prepared before one primary reboot; 40-CU is then built
@@ -61,10 +64,10 @@ sudo bc250-rag-import plan /srv/bc250-documents
 
 sudo bc250-model install production
 sudo bc250-model install experiments
-sudo bc250-setup-embedding-model
-sudo bc250-setup-task-model
+sudo bc250-model install embedding
+sudo bc250-model install task
 sudo bc250-openwebui-setup init
-sudo bc250-setup-coding-agent
+sudo bc250-model install agentic
 
 # Review before removing source GGUF and Ollama registration
 sudo bc250-model cleanup production --list

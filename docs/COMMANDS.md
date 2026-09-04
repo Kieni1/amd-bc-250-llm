@@ -31,9 +31,9 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
 | `bc250-openwebui-setup` | Initialize/apply/check package-owned Open WebUI state |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
-| `bc250-setup-coding-agent` | Configure the exclusive agent Ollama instance |
-| `bc250-setup-embedding-model` | Configure the dedicated embedding Ollama instance |
-| `bc250-setup-task-model` | Configure the isolated task Ollama instance |
+| `bc250-model install agentic` | Register agent model(s), switching temporarily to exclusive agent mode |
+| `bc250-model install embedding` | Register embedding model(s) on the required dedicated lane |
+| `bc250-model install task` | Register task model(s) on the required dedicated lane |
 | `bc250-status` | Concise read-only appliance status |
 | `bc250-storage` | Report/dedupe/prune package-owned storage |
 | `bc250-swap-profile` | Inspect or change zram/disk-swap policy |
@@ -160,10 +160,10 @@ Convenience commands:
 ```bash
 sudo bc250-model install production [SELECTION]
 sudo bc250-model install experiments [SELECTION]
-sudo bc250-setup-embedding-model [SELECTION]
+sudo bc250-model install embedding [SELECTION]
 sudo bc250-fetch-mtp [SELECTION]
-sudo bc250-setup-task-model [SELECTION]
-sudo bc250-setup-coding-agent [SELECTION]
+sudo bc250-model install task [SELECTION]
+sudo bc250-model install agentic [SELECTION]
 ```
 
 For office document retrieval, use the existing embedding workflow with
@@ -213,12 +213,13 @@ prints extracted text/Markdown for comparison. GLM is the measured fidelity
 leader and OvisOCR2 remains the faster structured-document alternative. Test DE/FR/EN
 letters, invoices, forms and table-heavy scans before using OCR output for RAG.
 
-Task setup creates `ollama-task.service` on `11435`; embedding setup creates
-`ollama-embedding.service` on `11437` with a 10-minute keepalive. Agentic setup
-creates `ollama-agent.service` on `11436`, disabled at boot and intended only for
-exclusive `bc250-agent-mode enter|leave` operation. Each has its own model store. Setup selection
-can also be supplied through `TASK_MODEL_SELECTION` or
-`CODING_AGENT_SELECTION`. Revision and checksum overrides require one model.
+The RPM statically owns `ollama-task.service` on `11435`,
+`ollama-embedding.service` on `11437` and exclusive `ollama-agent.service` on
+`11436`. Normal mode requires main + task + embedding. `bc250-model` switches
+modes automatically for package-managed agent registration and restores normal
+mode afterwards; `bc250-agent-mode enter|leave` is the explicit runtime switch.
+Each lane keeps its own model store. Revision/checksum overrides still require
+one selected model.
 
 See [`../MODELS.md`](../MODELS.md) for model roles/swapping and
 [`../models/README.md`](../models/README.md) for the detailed Modelfile contract.

@@ -3,14 +3,14 @@
 ## Setup
 
 ```bash
-sudo bc250-setup-coding-agent
+sudo bc250-model install agentic
 
 # Current measured coding-helper starting point
-sudo bc250-setup-coding-agent agentic-qwen25-coder7b-unsloth-q5-k-m
+sudo bc250-model install agentic agentic-qwen25-coder7b-unsloth-q5-k-m
 ```
 
-The helper creates `ollama-agent.service` on port `11436` with its own model
-store. The service is disabled at boot and is intentionally exclusive with the
+The package ships static `ollama-agent.service` on port `11436` with its own model
+store. It has no boot enablement and is intentionally exclusive with the
 main/task/embedding lanes. Current choices are:
 
 - `agentic-qwen25-coder7b-unsloth-q5-k-m` — current coding-helper starting
@@ -22,7 +22,7 @@ main/task/embedding lanes. Current choices are:
 - `agentic-ornith15-9b-ornith-q5-k-m` — native-reasoning agent/coding candidate;
 - `agentic-qwable9b-empero-q6-k` — native-reasoning comparison candidate.
 
-With no selection, the helper lists the choices and prompts. Keep port `11436`
+With no selection, `bc250-model install agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to
 Open WebUI only when interactive agent access is wanted. Use this service
 exclusively rather than alongside a large main-model workload.

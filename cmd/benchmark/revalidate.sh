@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v3.5
+# BC-250 package revalidation harness v3.6
 #
 # Intended target: bc250-llm-server 0.10.0 on Fedora 44; release suffix is not hard-coded.
 # `start` launches a systemd worker that spans reboots. The kernel lane dynamically
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=3.5
+HARNESS_VERSION=3.6
 TARGET_VERSION=0.10.0
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
@@ -1315,20 +1315,17 @@ warm_embedding() {
 }
 
 ensure_normal_mode() {
-  if systemctl cat ollama-agent.service >/dev/null 2>&1; then
-    bc250-agent-mode leave >/dev/null 2>&1 || true
-  fi
-  systemctl start ollama.service >/dev/null
-  systemctl cat ollama-task.service >/dev/null 2>&1 && systemctl start ollama-task.service >/dev/null || true
-  systemctl cat ollama-embedding.service >/dev/null 2>&1 && systemctl start ollama-embedding.service >/dev/null || true
+  for unit in ollama-task.service ollama-embedding.service ollama-agent.service; do
+    systemctl cat "$unit" >/dev/null 2>&1 || {
+      echo "ERROR: required package unit is missing: $unit" >&2
+      return 1
+    }
+  done
+  bc250-agent-mode leave >/dev/null
   systemctl start tika.service open-webui.service nginx.service >/dev/null
   wait_api 11434 45 || return 1
-  if systemctl cat ollama-task.service >/dev/null 2>&1; then
-    wait_api 11435 45 || return 1
-  fi
-  if systemctl cat ollama-embedding.service >/dev/null 2>&1; then
-    wait_api 11437 45 || return 1
-  fi
+  wait_api 11435 45 || return 1
+  wait_api 11437 45 || return 1
   local i
   for i in {1..60}; do
     curl -fsS --connect-timeout 2 --max-time 4 http://127.0.0.1:3000/ >/dev/null 2>&1 && break
@@ -1395,7 +1392,8 @@ phase_pipeline() {
     # Alternate embedding comparisons belong in an explicit model-evaluation run.
     run_bench embeddings bc250-benchmark embeddings "$EMBED_MODEL"
   else
-    echo "SKIP: $EMBED_MODEL is not registered on 11437" > "$RAW/pipeline/embeddings-skipped.txt"
+    echo "ERROR: required baseline embedding model $EMBED_MODEL is not registered on 11437" >&2
+    return 1
   fi
 
   if api_ready 11435 && model_registered 11435 "$TASK_MODEL"; then
@@ -1403,7 +1401,8 @@ phase_pipeline() {
     # test the actual promoted Open WebUI task model instead of repeating it.
     run_bench task bc250-benchmark task "$TASK_MODEL"
   else
-    echo "SKIP: promoted task model $TASK_MODEL is not available on 11435" > "$RAW/pipeline/task-skipped.txt"
+    echo "ERROR: required baseline task model $TASK_MODEL is not available on 11435" >&2
+    return 1
   fi
 
   if model_registered 11434 prod-lfm25-8b-a1b-liquidai-q6-k; then
@@ -1528,9 +1527,13 @@ phase_agent() {
   set_phase agent "testing exclusive coding/agent mode"
   local agent_model dir="$RAW/agent" port
   install -d -m 0700 "$dir"
-  if ((!RUN_AGENT)) || ! systemctl cat ollama-agent.service >/dev/null 2>&1; then
-    echo "SKIP: agent lane not installed or RUN_AGENT=0" > "$dir/skipped.txt"
+  if ((!RUN_AGENT)); then
+    echo "SKIP: RUN_AGENT=0" > "$dir/skipped.txt"
   else
+    systemctl cat ollama-agent.service >/dev/null 2>&1 || {
+      echo "ERROR: required package unit is missing: ollama-agent.service" >&2
+      return 1
+    }
     bc250-agent-mode enter > "$dir/agent-mode-enter.txt" 2>&1
     wait_api 11436 45
     for port in 11434 11435 11437; do
@@ -1549,8 +1552,8 @@ phase_agent() {
     fi
     bc250-agent-mode leave > "$dir/agent-mode-leave.txt" 2>&1
     wait_api 11434 45
-    systemctl cat ollama-task.service >/dev/null 2>&1 && wait_api 11435 45 || true
-    systemctl cat ollama-embedding.service >/dev/null 2>&1 && wait_api 11437 45 || true
+    wait_api 11435 45
+    wait_api 11437 45
     [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]
   fi
   snapshot agent/restored

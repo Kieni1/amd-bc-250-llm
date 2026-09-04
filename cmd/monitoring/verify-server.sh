@@ -347,13 +347,26 @@ else
     bad "ollama.service inactive"
   fi
   for unit in ollama-task.service ollama-embedding.service; do
-    if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q "^$unit"; then
-      systemctl is-active --quiet "$unit" 2>/dev/null && ok "$unit active" || bad "$unit installed but inactive"
+    if ! systemctl cat "$unit" >/dev/null 2>&1; then
+      bad "$unit missing; normal appliance mode requires main + task + embedding"
+    elif systemctl is-active --quiet "$unit" 2>/dev/null; then
+      ok "$unit active"
     else
-      info "$unit is not installed (optional model lane not configured)"
+      bad "$unit inactive; normal appliance mode requires main + task + embedding"
     fi
   done
 fi
+if ((agent_active == 0)); then
+  task_tags="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null || true)"
+  if [[ -n "$task_tags" ]] && jq -e --arg model "task-gemma3-1b-unsloth-ud-q4-k-xl" \
+      'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
+      <<< "$task_tags" >/dev/null 2>&1; then
+    ok "default Open WebUI task model is registered on dedicated task Ollama"
+  else
+    bad "default Open WebUI task model is not registered on dedicated task Ollama :11435"
+  fi
+fi
+
 agent_unit_state="$(systemctl show -p UnitFileState --value ollama-agent.service 2>/dev/null || true)"
 if [[ $agent_unit_state == enabled || $agent_unit_state == enabled-runtime ]]; then
   warn "ollama-agent.service is enabled at boot; agent mode is intended to be exclusive and operator-entered"
@@ -441,7 +454,7 @@ if [[ -n "$rag_embedding_model" ]]; then
       <<< "$embedding_tags" >/dev/null 2>&1; then
     ok "default RAG embedding model is registered with dedicated embedding Ollama"
   else
-    warn "default RAG embedding model is not registered on dedicated embedding Ollama :11437"
+    bad "default RAG embedding model is not registered on dedicated embedding Ollama :11437"
   fi
 else
   warn "Open WebUI RAG embedding model is not visible in the container environment"

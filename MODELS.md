@@ -24,6 +24,8 @@ to avoid unnecessary chat-model eviction during document work. Agent/coding is
 **exclusive**: `bc250-agent-mode enter` stops main/task/embedding and starts only
 11436; `leave` restores normal mode.
 
+The package owns all four Ollama service definitions statically. Normal mode requires main, task and embedding; model registration automatically switches into temporary agent mode when an agentic selection is included and restores normal mode afterwards.
+
 ## List, install, replace
 
 ```bash
@@ -37,9 +39,9 @@ sudo bc250-model list mtp --all
 
 sudo bc250-model install production MODEL
 sudo bc250-model install experiments MODEL
-sudo bc250-setup-embedding-model MODEL
-sudo bc250-setup-task-model MODEL
-sudo bc250-setup-coding-agent MODEL
+sudo bc250-model install embedding MODEL
+sudo bc250-model install task MODEL
+sudo bc250-model install agentic MODEL
 ```
 
 Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer

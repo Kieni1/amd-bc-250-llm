@@ -390,9 +390,6 @@ remove_setup_files() {
   heading "9. REMOVE APPLIANCE DATA AND LOCAL FILES"
   systemctl disable --now ollama-task.service ollama-embedding.service ollama-agent.service >/dev/null 2>&1 || true
   rm -f -- \
-    /etc/systemd/system/ollama-task.service \
-    /etc/systemd/system/ollama-embedding.service \
-    /etc/systemd/system/ollama-agent.service \
     /etc/systemd/system/multi-user.target.wants/ollama-task.service \
     /etc/systemd/system/multi-user.target.wants/ollama-embedding.service \
     /etc/systemd/system/multi-user.target.wants/ollama-agent.service \

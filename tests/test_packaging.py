@@ -172,13 +172,23 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("BC250_OLLAMA_VERSION=0.33.2", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
-    def test_ollama_instances_are_local_only(self) -> None:
+    def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
         main = (ROOT / "cmd/system/ollama.service.d-override.conf").read_text(encoding="utf-8")
-        instances = (ROOT / "models/setup-ollama-instance.sh").read_text(encoding="utf-8")
-        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
-        self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', main)
-        self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', instances)
-        self.assertIn('OLLAMA_NO_CLOUD=1', verify)
+        task = (ROOT / "config/systemd/ollama-task.service").read_text(encoding="utf-8")
+        embedding = (ROOT / "config/systemd/ollama-embedding.service").read_text(encoding="utf-8")
+        agent = (ROOT / "config/systemd/ollama-agent.service").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        for unit in (task, embedding, agent):
+            self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', unit)
+            self.assertIn("/usr/local/bin/ollama serve", unit)
+        self.assertIn("Conflicts=ollama-agent.service", main)
+        self.assertIn("Conflicts=ollama-agent.service", task)
+        self.assertIn("Conflicts=ollama-agent.service", embedding)
+        self.assertIn("Conflicts=ollama.service ollama-task.service ollama-embedding.service", agent)
+        self.assertNotIn("[Install]", agent)
+        for name in ("ollama-task.service", "ollama-embedding.service", "ollama-agent.service"):
+            self.assertIn(name, manifest)
+        self.assertFalse((ROOT / "models/setup-ollama-instance.sh").exists())
 
     def test_open_webui_signing_secret_persists_across_container_recreation(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")

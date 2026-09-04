@@ -7,11 +7,11 @@
 %global project_share %{_datadir}/bc250-llm-server
 %global project_config %{_sysconfdir}/bc250-llm-server
 %global payload_filelist %{_builddir}/%{name}-%{version}.files
-%global bc250_units cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
+%global bc250_units ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        0.5.testing%{?dist}
+Release:        0.6.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -215,6 +215,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.6.testing
+- Make main, task and embedding a required normal-mode topology with a statically packaged exclusive agent service.
+- Make unified model operations mode-aware so normal and agent registrations can share one selection safely.
+- Install the promoted task and Jina embedding models as appliance infrastructure before Open WebUI starts.
+- Remove dynamic Ollama lane-service generation and align installer, verification, revalidation and documentation with the greenfield topology.
+
 * Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.5.testing
 - Preserve quality-fail benchmark continuation while propagating real revalidation infrastructure failures; recover normal Ollama after num_batch sweeps.
 - Replace fixed 40/40 CU success semantics with full live routing-table reporting and problem-cell diagnostics.

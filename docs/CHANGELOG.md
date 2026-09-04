@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0-0.6.testing - 2026-09-03
+
+- Package task, embedding and exclusive agent Ollama units statically instead of generating service files during model setup.
+- Define normal mode as main + task + embedding and make unified model operations switch temporarily into agent mode when needed.
+- Treat Gemma 3 1B task and Jina retrieval embedding as baseline Open WebUI infrastructure installed before the application starts.
+- Remove the dynamic lane-provisioning path and align installer, verification, revalidation and operator docs with the greenfield topology.
+
 ## 0.10.0-0.5.testing - 2026-09-03
 
 - Correct `bc250-revalidate` so benchmark acceptance status `3` remains nonfatal while unexpected benchmark failures propagate to worker recovery; re-establish normal Ollama after the `num_batch` sweep.

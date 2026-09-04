@@ -37,17 +37,16 @@ OLLAMA_MODELS=/var/lib/bc250-llm-server/ollama/main
 OLLAMA_HOST=0.0.0.0:11434
 ```
 
-Normal model setup creates separate task and embedding services alongside main:
+The package owns a fixed four-lane service topology. A completed normal appliance runs main, task and embedding; agent remains static/inactive until explicitly entered:
 
 | Lane | Port | Keepalive | Normal boot | Purpose |
 |---|---:|---|---|---|
 | main | 11434 | production profile | yes | production chat/RAG answers |
-| task | 11435 | `0` | when configured | Open WebUI title/tag tasks |
-| embedding | 11437 | `10m` | when configured | retrieval embeddings only |
+| task | 11435 | `0` | yes | Open WebUI title/tag tasks |
+| embedding | 11437 | `10m` | yes | retrieval embeddings only |
 | agent | 11436 | `5m` | **no** | exclusive coding/agent work |
 
-`ollama-agent.service` conflicts with main/task/embedding and is disabled at
-boot. Use `sudo bc250-agent-mode enter` before coding work and
+`ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250-agent-mode enter` before coding work and
 `sudo bc250-agent-mode leave` afterwards. All lanes share the same BC-250 UMA
 pool; the separation controls lifecycle and eviction, not physical memory.
 GPT-OSS 20B is the expected memory-edge production case with a warm embedding

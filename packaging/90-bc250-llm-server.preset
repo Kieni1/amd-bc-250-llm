@@ -1,3 +1,6 @@
+disable ollama-task.service
+disable ollama-embedding.service
+disable ollama-agent.service
 enable cyan-skillfish-governor-smu.service
 disable owui-backup-config.timer
 disable owui-backup-users.timer

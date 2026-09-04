@@ -30,9 +30,6 @@ ROUTES=(
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "openwebui-setup|$LIBEXEC/openwebui-setup.py"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
-  "setup-coding-agent|$SHARE/examples/coding-agent/setup-ollama.sh"
-  "setup-embedding-model|$SHARE/examples/embedding/setup-ollama.sh"
-  "setup-task-model|$SHARE/examples/task-model/setup-ollama.sh"
   "status|$LIBEXEC/status.sh"
   "storage|$LIBEXEC/storage.py"
   "swap-profile|$LIBEXEC/swap-profile.sh"
@@ -61,7 +58,6 @@ Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
   model, ocr, rag-import, fetch-mtp
-  setup-task-model, setup-embedding-model, setup-coding-agent
 
 Operation:
   status, verify, verify-lan, benchmark, revalidate, check-temp

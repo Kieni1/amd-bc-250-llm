@@ -64,7 +64,7 @@ sudo systemctl disable --now ollama.service
 sudo systemctl disable --now ollama-task.service ollama-embedding.service ollama-agent.service
 ```
 
-Re-enable only the services required by the next test.
+For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250-agent-mode leave`; use `enter` only for exclusive coding tests.
 
 
 ## Open WebUI local/offline policy

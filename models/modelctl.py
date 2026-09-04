@@ -29,6 +29,7 @@ PACKAGED_MODEL_DIR = INSTALLED_SHARE / "modelfiles"
 OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
+NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 RECOMMENDED_MODELS = {
     "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
@@ -89,6 +90,25 @@ CATEGORY_DEFAULTS = {
 
 class ModelError(RuntimeError):
     """A concise error suitable for command-line output."""
+
+
+def set_appliance_mode(mode: str) -> None:
+    """Switch the package-defined Ollama topology before registration work."""
+    if mode not in {"normal", "agent"}:
+        raise ModelError(f"unsupported appliance mode: {mode}")
+    command = os.environ.get("BC250_AGENT_MODE") or shutil.which("bc250-agent-mode")
+    if not command:
+        raise ModelError("bc250-agent-mode is required for package-managed model registration")
+    action = "leave" if mode == "normal" else "enter"
+    result = subprocess.run([command, action], check=False)
+    if result.returncode:
+        raise ModelError(f"could not enter {mode} appliance mode (rc={result.returncode})")
+
+
+def operate_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
+    if args.command == "cleanup":
+        return cleanup_models(defaults, models, args)
+    return install_models(defaults, models, args)
 
 
 def canonical_category(value: str) -> str:
@@ -1237,23 +1257,69 @@ def run_all_catalog_operation(
         if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
             print("Cleanup cancelled.")
             return 0
-    status = 0
+
+    groups: dict[str, tuple[dict, list[dict]]] = {}
     for defaults, models in catalogs:
         chosen = [
             model
             for model in models
             if (model["category"], model["id"]) in selected_ids
         ]
-        if not chosen:
-            continue
+        if chosen:
+            groups[defaults["category"]] = (defaults, chosen)
+
+    status = 0
+    normal_selected = any(category in groups for category in NORMAL_CATEGORIES)
+    agent_selected = "agentic" in groups
+
+    if normal_selected:
+        set_appliance_mode("normal")
+        for category in NORMAL_CATEGORIES:
+            group = groups.get(category)
+            if not group:
+                continue
+            group_args = argparse.Namespace(**vars(args))
+            if args.command == "cleanup":
+                group_args.yes = True
+            status = max(status, operate_models(*group, group_args))
+
+    if agent_selected:
+        set_appliance_mode("agent")
+        try:
+            defaults, chosen = groups["agentic"]
+            group_args = argparse.Namespace(**vars(args))
+            if args.command == "cleanup":
+                group_args.yes = True
+            status = max(status, operate_models(defaults, chosen, group_args))
+        finally:
+            set_appliance_mode("normal")
+
+    if "mtp" in groups:
+        defaults, chosen = groups["mtp"]
         group_args = argparse.Namespace(**vars(args))
         if args.command == "cleanup":
             group_args.yes = True
-            result = cleanup_models(defaults, chosen, group_args)
-        else:
-            result = install_models(defaults, chosen, group_args)
-        status = max(status, result)
+        status = max(status, operate_models(defaults, chosen, group_args))
+
     return status
+
+
+def run_category_operation(
+    defaults: dict, selected: list[dict], args: argparse.Namespace
+) -> int:
+    category = defaults["category"]
+    if category == "mtp" or getattr(args, "host", None):
+        return operate_models(defaults, selected, args)
+    if category in NORMAL_CATEGORIES:
+        set_appliance_mode("normal")
+        return operate_models(defaults, selected, args)
+    if category == "agentic":
+        set_appliance_mode("agent")
+        try:
+            return operate_models(defaults, selected, args)
+        finally:
+            set_appliance_mode("normal")
+    return operate_models(defaults, selected, args)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1384,9 +1450,7 @@ def main(argv: list[str] | None = None) -> int:
         print("No models selected.")
         return 0
     selected = select_models(available, selection)
-    if args.command == "cleanup":
-        return cleanup_models(defaults, selected, args)
-    return install_models(defaults, selected, args)
+    return run_category_operation(defaults, selected, args)
 
 
 if __name__ == "__main__":
