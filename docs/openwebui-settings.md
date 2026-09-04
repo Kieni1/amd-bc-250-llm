@@ -1,6 +1,6 @@
 # Open WebUI settings
 
-Package baseline: **Open WebUI v0.11.3** with **Ollama v0.33.2**. Runtime pins
+Package baseline: **Open WebUI v0.11.3** with **Ollama v0.33.3** and **Apache Tika v4.0.0**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -120,7 +120,9 @@ preserves upstream prompt templates.
 The dedicated embedding lane uses Jina on `11437`, a 10-minute Ollama keepalive,
 batch size 1 and asynchronous embedding disabled. The reviewed retrieval baseline
 remains token splitting, 1500-token chunks, 200-token overlap, Markdown-header
-splitting, Top K 8, hybrid search off and Tika extraction.
+splitting, Top K 8, hybrid search off and Tika extraction. Open WebUI is explicitly
+set to `TIKA_SERVER_VERSION=4` so it uses the Tika 4 API; smoke-test representative
+office/PDF extraction after this major Tika refresh.
 
 `RAG_SYSTEM_CONTEXT=false` remains deliberate for 0.10.0. Test it later with a
 real repeated-turn RAG acceptance run before changing the default. Likewise keep

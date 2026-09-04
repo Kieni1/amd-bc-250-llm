@@ -372,7 +372,7 @@ generation lane. For a real thermal-soak qualification, choose a representative
 large model and repeat a sustained generation workload for at least 20–30 minutes;
 the short built-in thermal wave is a regression signal, not an equilibrium test. Treat resource figures as overlapping UMA signals, not
 independent pools. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
-for metrics, fixtures and Ollama 0.33.2 request policy. The installed copy is
+for metrics, fixtures and Ollama 0.33.3 request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
 
 ## Open WebUI setup

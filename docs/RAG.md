@@ -3,8 +3,9 @@
 This is the recommended **local, privacy-oriented pilot** for searchable German,
 French and English office documents. It uses the package's existing Open WebUI
 and Tika, the main answer lane on `11434`, and the dedicated embedding lane on
-`11437`. It adds no separate vector service or RAG daemon; document
-synchronization remains an explicit operator action.
+`11437`. The current package uses Apache Tika 4.0.0 for extraction and tells
+Open WebUI to use its Tika-4 API contract. It adds no separate vector service or
+RAG daemon; document synchronization remains an explicit operator action.
 
 **Never put confidential documents in this repository.** Keep authoritative
 source files under `/srv/bc250-documents/`, Open WebUI-managed copies under

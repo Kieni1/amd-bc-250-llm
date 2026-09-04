@@ -29,6 +29,7 @@ class RagBaselineTests(unittest.TestCase):
         self.assertFalse(rag["ENABLE_RAG_HYBRID_SEARCH"])
         self.assertEqual(rag["CHUNK_MIN_SIZE_TARGET"], 0)
         self.assertEqual(rag["CONTENT_EXTRACTION_ENGINE"], "tika")
+        self.assertEqual(rag["TIKA_SERVER_VERSION"], "4")
 
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         for line in (
