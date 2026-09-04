@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Optional helper for installing or normalizing the official Ollama service.
+# Install the pinned official Ollama binary and restore the package-owned main service.
 set -Eeuo pipefail
 umask 0022
 
@@ -102,15 +102,38 @@ install -d -o root -g ollama -m 0750 \
   /var/lib/bc250-llm-server /var/cache/bc250-llm-server
 install -d -o ollama -g ollama -m 0750 \
   /var/lib/ollama \
-  /var/lib/bc250-llm-server/ollama/main \
-  /var/lib/bc250-llm-server/gguf/production \
-  /var/lib/bc250-llm-server/gguf/embedding \
+  /var/lib/bc250-llm-server/ollama/{main,task,embedding,agent} \
+  /var/lib/bc250-llm-server/gguf/{production,experiments,task,embedding,agent} \
   /var/cache/bc250-llm-server/huggingface
 restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
   /var/cache/bc250-llm-server 2>/dev/null || true
 
+# The upstream installer owns the binary download only. The RPM owns the
+# complete main service definition, so remove only the recognizable upstream
+# unit that the official installer creates and refuse unrelated overrides.
+etc_unit=/etc/systemd/system/ollama.service
+package_unit=/usr/lib/systemd/system/ollama.service
+[[ -r "$package_unit" ]] || {
+  echo "ERROR: package-owned Ollama service is missing: $package_unit" >&2
+  exit 1
+}
+if [[ -e "$etc_unit" || -L "$etc_unit" ]]; then
+  if grep -Fq 'Description=Ollama Service' "$etc_unit" 2>/dev/null && \
+      grep -Fq 'ExecStart=/usr/local/bin/ollama serve' "$etc_unit" 2>/dev/null; then
+    rm -f -- "$etc_unit"
+  else
+    echo "ERROR: refusing to replace custom Ollama service override: $etc_unit" >&2
+    exit 1
+  fi
+fi
+
 systemctl daemon-reload
-systemctl enable ollama.service
+fragment="$(systemctl show -p FragmentPath --value ollama.service 2>/dev/null || true)"
+[[ "$fragment" == "$package_unit" ]] || {
+  echo "ERROR: ollama.service is not using the package-owned unit: ${fragment:-unknown}" >&2
+  exit 1
+}
+systemctl reenable ollama.service >/dev/null
 systemctl restart ollama.service
 
 for _ in {1..30}; do

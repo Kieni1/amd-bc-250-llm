@@ -69,9 +69,12 @@ Normal mode prints a setup plan covering root growth, Fedora/package/Ollama,
 TTM/swap, 40-CU, storage headroom, models, Open WebUI and reboot state; it applies
 only pending work where practical and
 combines kernel update plus TTM configuration before the primary reboot. After
-that reboot it prepares 40-CU support for the exact running kernel. A second
-reboot is requested only when persistent 40-CU mode is already configured and
-the prepared replacement module is not yet running.
+that reboot it prepares 40-CU support for the exact running kernel. The base
+Open WebUI Quadlet is intentionally dormant across the primary reboot; after
+baseline task/Jina registration the installer adds its small `[Install]` drop-in,
+reloads systemd and starts Open WebUI. A second reboot is requested only when
+persistent 40-CU mode is already configured and the prepared replacement module
+is not yet running.
 
 The installer presents one model catalog and one selection query. Use global
 indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips.
@@ -213,7 +216,7 @@ prints extracted text/Markdown for comparison. GLM is the measured fidelity
 leader and OvisOCR2 remains the faster structured-document alternative. Test DE/FR/EN
 letters, invoices, forms and table-heavy scans before using OCR output for RAG.
 
-The RPM statically owns `ollama-task.service` on `11435`,
+The RPM statically owns `ollama.service` on `11434`, `ollama-task.service` on `11435`,
 `ollama-embedding.service` on `11437` and exclusive `ollama-agent.service` on
 `11436`. Normal mode requires main + task + embedding. `bc250-model` switches
 modes automatically for package-managed agent registration and restores normal

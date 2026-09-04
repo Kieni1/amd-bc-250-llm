@@ -7,7 +7,7 @@
 %global project_share %{_datadir}/bc250-llm-server
 %global project_config %{_sysconfdir}/bc250-llm-server
 %global payload_filelist %{_builddir}/%{name}-%{version}.files
-%global bc250_units ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
+%global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
 Version:        0.10.0
@@ -89,8 +89,7 @@ model and experiment templates, maintenance tools, benchmarks and separated
 production, task, embedding and exclusive coding-agent Ollama workflows. Open
 WebUI can be initialized through its supported admin APIs without storing the
 operator credential. The live CU manager and experimental 40-CU source helper
-are installed, but the RPM never changes CU routing automatically. Ollama
-remains an external operator-installed prerequisite. Model weights, users,
+are installed, but the RPM never changes CU routing automatically. The Ollama binary remains an upstream payload installed by the guided helper; the RPM owns the complete four-lane systemd topology. Model weights, users,
 operator-created Open WebUI state, HTTPS and CU changes remain operator-controlled.
 
 %prep
@@ -155,18 +154,18 @@ echo "BC-250 package installed. Run: sudo bc250-install"
 %preun
 if [ "$1" -eq 0 ]; then
   systemctl stop open-webui.service tika.service \
-    ollama-task.service ollama-embedding.service ollama-agent.service \
+    ollama.service ollama-task.service ollama-embedding.service ollama-agent.service \
     >/dev/null 2>&1 || :
   systemctl disable --now %{bc250_units} >/dev/null 2>&1 || :
+  rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
+  rmdir /etc/containers/systemd/open-webui.container.d >/dev/null 2>&1 || :
+  systemctl daemon-reload >/dev/null 2>&1 || :
 fi
 %systemd_preun %{bc250_units}
 
 %postun
 %systemd_postun_with_restart %{bc250_units}
 systemctl daemon-reload >/dev/null 2>&1 || :
-if systemctl cat ollama.service >/dev/null 2>&1; then
-  systemctl try-restart ollama.service >/dev/null 2>&1 || :
-fi
 systemctl reload nginx.service >/dev/null 2>&1 || :
 if [ "$1" -eq 0 ]; then
   cat <<'EOF_POSTUN'
@@ -215,11 +214,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
-* Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.6.testing
-- Make main, task and embedding a required normal-mode topology with a statically packaged exclusive agent service.
+* Fri Sep 04 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.6.testing
+- Package the complete main/task/embedding/agent Ollama service topology; the upstream installer now supplies the binary only.
+- Keep Open WebUI dormant across the primary reboot and enable its Quadlet only after baseline task/Jina registration.
 - Make unified model operations mode-aware so normal and agent registrations can share one selection safely.
-- Install the promoted task and Jina embedding models as appliance infrastructure before Open WebUI starts.
-- Remove dynamic Ollama lane-service generation and align installer, verification, revalidation and documentation with the greenfield topology.
+- Add a lightweight fresh-install lifecycle acceptance test covering the reboot boundary and model-before-Open-WebUI order.
 
 * Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.5.testing
 - Preserve quality-fail benchmark continuation while propagating real revalidation infrastructure failures; recover normal Ollama after num_batch sweeps.

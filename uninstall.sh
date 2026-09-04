@@ -404,6 +404,7 @@ remove_setup_files() {
     /etc/systemd/system/owui-maintenance@.service \
     /etc/default/bc250-wol \
     /etc/containers/systemd/open-webui.container \
+    /etc/containers/systemd/open-webui.container.d/90-enable.conf \
     /etc/containers/systemd/tika.container \
     /etc/containers/systemd/llm.network \
     /etc/nginx/default.d/bc250-llm-server.conf \
@@ -415,6 +416,7 @@ remove_setup_files() {
     /var/log/bc250-llm-install.log
   rm -rf -- \
     /etc/systemd/system/bc250-night-shutdown.timer.d \
+    /etc/containers/systemd/open-webui.container.d \
     /etc/bc250-llm-server \
     /etc/cyan-skillfish-governor-smu \
     /var/lib/bc250-llm-server \

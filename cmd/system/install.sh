@@ -293,80 +293,16 @@ ollama_version() {
   "$1" --version 2>/dev/null | awk '{print $NF}' | sed 's/^v//'
 }
 
-setup_ollama_account() {
-  getent group ollama >/dev/null || groupadd -r ollama
-  id ollama >/dev/null 2>&1 || \
-    useradd -r -g ollama -d /var/lib/ollama -s /usr/sbin/nologin -M ollama
-  for group in render video; do
-    getent group "$group" >/dev/null && usermod -aG "$group" ollama
-  done
-  install -d -o root -g ollama -m 0750 \
-    /var/lib/bc250-llm-server /var/cache/bc250-llm-server
-  install -d -o ollama -g ollama -m 0750 \
-    /var/lib/ollama \
-    /var/lib/bc250-llm-server/ollama/{main,task,embedding,agent} \
-    /var/lib/bc250-llm-server/gguf/{production,experiments,task,embedding,agent} \
-    /var/cache/bc250-llm-server/huggingface
-  restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
-    /var/cache/bc250-llm-server 2>/dev/null || true
-}
-
-wait_for_ollama() {
-  local attempt
-  for attempt in {1..30}; do
-    if curl --fail --silent --connect-timeout 2 \
-        http://127.0.0.1:11434/api/tags >/dev/null; then
-      return 0
-    fi
-    sleep 1
-  done
-  systemctl status ollama.service --no-pager -l || true
-  journalctl -u ollama.service -b --no-pager -n 80 || true
-  echo "ERROR: Ollama did not become reachable on 127.0.0.1:11434." >&2
-  return 1
-}
-
 step_3_install_ollama() {
   heading "3. INSTALL OFFICIAL OLLAMA"
-  local requested installed="" run_installer=0 official=/usr/local/bin/ollama
+  local requested
   requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
-
   remove_fedora_ollama
-  if [[ -x "$official" ]]; then
-    installed="$(ollama_version "$official")"
-  else
-    run_installer=1
-  fi
-  if [[ "${BC250_UPDATE_OLLAMA:-0}" == 1 ]]; then
-    run_installer=1
-  elif [[ "$requested" != latest && "$installed" != "${requested#v}" ]]; then
-    run_installer=1
-  elif ! systemctl cat ollama.service 2>/dev/null | \
-      grep -F '/usr/local/bin/ollama' >/dev/null; then
-    run_installer=1
-  fi
-
-  if ((run_installer)); then
-    echo "Installing official Ollama ${requested}."
-    BC250_ASSUME_YES=1 OLLAMA_VERSION="$requested" bc250-install-ollama
-  else
-    echo "Keeping official Ollama $installed."
-  fi
-
-  echo "Setting up the Ollama service account and data directories."
-  setup_ollama_account
-  systemctl daemon-reload
-  systemctl enable --now ollama.service
+  echo "Reconciling official Ollama ${requested} with the package-owned main service."
+  BC250_ASSUME_YES=1 OLLAMA_VERSION="$requested" bc250-install-ollama
   hash -r
-  [[ -x "$official" ]] || {
-    echo "ERROR: official Ollama was not installed at $official." >&2
-    exit 1
-  }
-  wait_for_ollama
-  ollama --version
-  echo "Ollama API is ready at http://127.0.0.1:11434."
 }
 
 step_4_memory_and_swap() {
@@ -458,7 +394,7 @@ step_6_runtime_topology() {
   heading "6. ESTABLISH OLLAMA RUNTIME TOPOLOGY"
   local unit fragment
   systemctl daemon-reload
-  for unit in ollama-task.service ollama-embedding.service ollama-agent.service; do
+  for unit in ollama.service ollama-task.service ollama-embedding.service ollama-agent.service; do
     systemctl cat "$unit" >/dev/null 2>&1 || {
       echo "ERROR: required package unit is missing: $unit" >&2
       return 1
@@ -500,6 +436,17 @@ step_7_models() {
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
 }
 
+enable_open_webui_boot() {
+  local source="${BC250_OWUI_ENABLE_SOURCE:-/usr/share/bc250-llm-server/openwebui/open-webui-enable.conf}"
+  local target="${BC250_OWUI_ENABLE_DROPIN:-/etc/containers/systemd/open-webui.container.d/90-enable.conf}"
+  [[ -r "$source" ]] || {
+    echo "ERROR: Open WebUI enablement template is missing: $source" >&2
+    return 1
+  }
+  install -D -m0644 "$source" "$target"
+  systemctl daemon-reload
+}
+
 step_8_application_services() {
   heading "8. START APPLICATION SERVICES"
   systemctl enable --now firewalld.service cyan-skillfish-governor-smu.service
@@ -508,6 +455,7 @@ step_8_application_services() {
     firewall-cmd --quiet --reload
   fi
   command -v setsebool >/dev/null 2>&1 && setsebool -P httpd_can_network_connect 1 || true
+  enable_open_webui_boot
   systemctl start tika.service open-webui.service
   systemctl enable --now nginx.service
 }

@@ -59,12 +59,13 @@ first-registration page before creating the administrator account.
 To retain data while stopping the stack:
 
 ```bash
-sudo systemctl disable --now open-webui.service tika.service nginx.service
-sudo systemctl disable --now ollama.service
-sudo systemctl disable --now ollama-task.service ollama-embedding.service ollama-agent.service
+sudo rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
+sudo systemctl daemon-reload
+sudo systemctl stop open-webui.service tika.service nginx.service
+sudo systemctl disable --now ollama.service ollama-task.service ollama-embedding.service ollama-agent.service
 ```
 
-For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250-agent-mode leave`; use `enter` only for exclusive coding tests.
+For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250-agent-mode leave`; use `enter` only for exclusive coding tests. Rerun `sudo bc250-install` to restore Open WebUI boot enablement after deliberately removing its Quadlet drop-in.
 
 
 ## Open WebUI local/offline policy

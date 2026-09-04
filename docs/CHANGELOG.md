@@ -1,11 +1,11 @@
 # Changelog
 
-## 0.10.0-0.6.testing - 2026-09-03
+## 0.10.0-0.6.testing - 2026-09-04
 
-- Package task, embedding and exclusive agent Ollama units statically instead of generating service files during model setup.
+- Package all four Ollama lane units, including the main service; the pinned upstream installer supplies the binary but no longer owns service policy.
+- Keep Open WebUI non-boot-enabled until the resumed installer has established normal topology and registered the baseline task/Jina models.
 - Define normal mode as main + task + embedding and make unified model operations switch temporarily into agent mode when needed.
-- Treat Gemma 3 1B task and Jina retrieval embedding as baseline Open WebUI infrastructure installed before the application starts.
-- Remove the dynamic lane-provisioning path and align installer, verification, revalidation and operator docs with the greenfield topology.
+- Add a lightweight fresh-install lifecycle acceptance test for the primary reboot boundary and model-before-Open-WebUI activation order.
 
 ## 0.10.0-0.5.testing - 2026-09-03
 

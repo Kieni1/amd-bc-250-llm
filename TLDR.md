@@ -128,8 +128,10 @@ curl -fsS http://127.0.0.1:11437/api/tags
 ```
 
 Normal mode uses task `11435` and embedding `11437` alongside main `11434`.
-Agent `11436` is exclusive and disabled at boot. Keep ports `11434`–`11437`
-blocked from untrusted networks.
+Agent `11436` is exclusive and disabled at boot. Open WebUI is also deliberately
+not boot-enabled by the base Quadlet; `bc250-install` enables it only after the
+baseline task/Jina models are registered. Keep ports `11434`–`11437` blocked
+from untrusted networks.
 
 ## Remove
 

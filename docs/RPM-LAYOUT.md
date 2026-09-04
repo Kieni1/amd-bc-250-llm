@@ -56,4 +56,14 @@ state.
 See [`FILESTRUCTURE.md`](FILESTRUCTURE.md) for the operator-facing path map and
 [`../packaging/README.md`](../packaging/README.md) for maintainer policy.
 
-The RPM statically owns `ollama-task.service`, `ollama-embedding.service` and `ollama-agent.service` under `/usr/lib/systemd/system/`. `bc250-install` enables the required task/embedding normal lanes after the official Ollama binary is installed; the agent unit remains static and exclusive.
+The RPM statically owns all four lane units (`ollama.service`, `ollama-task.service`, `ollama-embedding.service`, `ollama-agent.service`) under `/usr/lib/systemd/system/`. The pinned upstream Ollama installer supplies `/usr/local/bin/ollama`; `bc250-install-ollama` removes only the recognizable upstream-generated base unit and re-enables the RPM-owned main service. Task/embedding become required normal lanes after the primary reboot; agent remains static and exclusive.
+
+
+Open WebUI uses a two-part Quadlet enablement contract. The RPM-owned base
+`open-webui.container` has no `[Install]` section, so merely installing the RPM
+cannot start the UI at the primary reboot. After normal Ollama topology and the
+baseline task/Jina registrations are ready, `bc250-install` copies the packaged
+`open-webui-enable.conf` to
+`/etc/containers/systemd/open-webui.container.d/90-enable.conf`, reloads
+systemd, and starts the service. Full package removal deletes that installer-owned
+enablement drop-in.

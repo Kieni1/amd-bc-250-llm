@@ -173,22 +173,34 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
-        main = (ROOT / "cmd/system/ollama.service.d-override.conf").read_text(encoding="utf-8")
-        task = (ROOT / "config/systemd/ollama-task.service").read_text(encoding="utf-8")
-        embedding = (ROOT / "config/systemd/ollama-embedding.service").read_text(encoding="utf-8")
-        agent = (ROOT / "config/systemd/ollama-agent.service").read_text(encoding="utf-8")
+        units = {
+            name: (ROOT / f"config/systemd/{name}").read_text(encoding="utf-8")
+            for name in ("ollama.service", "ollama-task.service", "ollama-embedding.service", "ollama-agent.service")
+        }
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        for unit in (task, embedding, agent):
+        preset = (ROOT / "packaging/90-bc250-llm-server.preset").read_text(encoding="utf-8")
+        for name, unit in units.items():
             self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', unit)
             self.assertIn("/usr/local/bin/ollama serve", unit)
-        self.assertIn("Conflicts=ollama-agent.service", main)
-        self.assertIn("Conflicts=ollama-agent.service", task)
-        self.assertIn("Conflicts=ollama-agent.service", embedding)
-        self.assertIn("Conflicts=ollama.service ollama-task.service ollama-embedding.service", agent)
-        self.assertNotIn("[Install]", agent)
-        for name in ("ollama-task.service", "ollama-embedding.service", "ollama-agent.service"):
             self.assertIn(name, manifest)
+        for name in ("ollama.service", "ollama-task.service", "ollama-embedding.service"):
+            self.assertIn("Conflicts=ollama-agent.service", units[name])
+        self.assertIn("Conflicts=ollama.service ollama-task.service ollama-embedding.service", units["ollama-agent.service"])
+        self.assertNotIn("[Install]", units["ollama-agent.service"])
+        self.assertIn("disable ollama.service", preset)
+        self.assertFalse((ROOT / "cmd/system/ollama.service.d-override.conf").exists())
         self.assertFalse((ROOT / "models/setup-ollama-instance.sh").exists())
+
+    def test_open_webui_boot_enablement_is_deferred_to_installer(self) -> None:
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        enable = (ROOT / "config/openwebui/open-webui-enable.conf").read_text(encoding="utf-8")
+        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertNotIn("[Install]", quadlet)
+        self.assertIn("[Install]", enable)
+        self.assertIn("WantedBy=multi-user.target", enable)
+        self.assertIn("enable_open_webui_boot", installer)
+        self.assertIn("open-webui-enable.conf", manifest)
 
     def test_open_webui_signing_secret_persists_across_container_recreation(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")

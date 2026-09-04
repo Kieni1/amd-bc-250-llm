@@ -51,6 +51,8 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("BC250_OLLAMA_INSTALLER_SHA256=", runtime)
         self.assertIn("raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT", helper)
         self.assertIn("Ollama installer SHA-256 mismatch", helper)
+        self.assertIn("package-owned Ollama service is missing", helper)
+        self.assertIn("refusing to replace custom Ollama service override", helper)
         self.assertNotIn('URL="https://ollama.com/install.sh"', helper)
 
     def test_one_unified_model_selection_is_used_after_required_baseline(self) -> None:
@@ -116,7 +118,7 @@ input_is_interactive && exit 9 || exit 0
         )]
         self.assertEqual(order, sorted(order))
         topology = source[source.index("step_6_runtime_topology() {"):source.index("step_7_models() {")]
-        self.assertIn("ollama-task.service ollama-embedding.service ollama-agent.service", topology)
+        self.assertIn("ollama.service ollama-task.service ollama-embedding.service ollama-agent.service", topology)
         self.assertIn("systemctl enable ollama.service ollama-task.service ollama-embedding.service", topology)
         self.assertIn('FragmentPath --value "$unit"', topology)
         self.assertIn('/usr/lib/systemd/system/$unit', topology)
@@ -161,6 +163,86 @@ input_is_interactive && exit 9 || exit 0
                 "systemctl:start ollama.service ollama-task.service ollama-embedding.service",
                 calls,
             )
+
+
+    def test_fresh_install_lifecycle_defers_open_webui_until_models(self) -> None:
+        # First invocation reaches the primary reboot boundary before topology,
+        # model or application phases. This is a hermetic lifecycle contract,
+        # not a VM/reboot integration framework.
+        first = source_probe('''
+require_root() { :; }
+capture_input_mode() { :; }
+start_transcript() { :; }
+capture_install_state() { :; }
+show_plan() { printf 'phase:plan\n'; }
+step_1_grow_root_filesystem() { printf 'phase:grow\n'; }
+record_added_packages() { :; }
+step_2_update_fedora() { printf 'phase:update\n'; }
+capture_package_baseline() { :; }
+step_3_install_ollama() { printf 'phase:ollama\n'; }
+step_4_memory_and_swap() { printf 'phase:memory\n'; }
+request_primary_reboot_if_needed() { printf 'phase:reboot\n'; exit 10; }
+step_5_prepare_40cu() { printf 'UNEXPECTED:40cu\n'; }
+step_6_runtime_topology() { printf 'UNEXPECTED:topology\n'; }
+step_7_models() { printf 'UNEXPECTED:models\n'; }
+step_8_application_services() { printf 'UNEXPECTED:applications\n'; }
+main
+''')
+        self.assertEqual(first.returncode, 10, first.stdout)
+        self.assertIn("phase:reboot", first.stdout)
+        self.assertNotIn("UNEXPECTED:", first.stdout)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            log = tmpdir / "lifecycle.log"
+            enable_target = tmpdir / "open-webui.container.d" / "90-enable.conf"
+            enable_source = ROOT / "config/openwebui/open-webui-enable.conf"
+            body = r'''
+systemctl() {
+  printf 'systemctl:%s\n' "$*" >> "$BC250_TEST_LOG"
+  case "${1:-}" in
+    cat) return 0 ;;
+    show) printf '/usr/lib/systemd/system/%s\n' "${!#}"; return 0 ;;
+    is-active) return 0 ;;
+  esac
+  return 0
+}
+bc250-agent-mode() { printf 'mode:%s\n' "$*" >> "$BC250_TEST_LOG"; }
+bc250-model() { printf 'model:%s\n' "$*" >> "$BC250_TEST_LOG"; }
+firewall-cmd() { printf 'firewall:%s\n' "$*" >> "$BC250_TEST_LOG"; }
+setsebool() { :; }
+require_progress_terminal() { :; }
+prepare_hf_authentication() { :; }
+input_is_interactive() { return 1; }
+step_6_runtime_topology
+step_7_models
+step_8_application_services
+'''
+            env = {
+                "PATH": "/usr/bin:/bin",
+                "BC250_TEST_LOG": str(log),
+                "BC250_OWUI_ENABLE_SOURCE": str(enable_source),
+                "BC250_OWUI_ENABLE_DROPIN": str(enable_target),
+            }
+            resumed = subprocess.run(
+                ["bash", "-c", 'source "$1"\n' + body, "lifecycle-test", str(INSTALLER)],
+                stdin=subprocess.DEVNULL,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                check=False,
+            )
+            self.assertEqual(resumed.returncode, 0, resumed.stdout)
+            calls = log.read_text()
+            baseline = calls.index(
+                "model:install all task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m"
+            )
+            owui = calls.index("systemctl:start tika.service open-webui.service")
+            self.assertLess(baseline, owui)
+            self.assertIn("mode:leave", calls)
+            self.assertTrue(enable_target.is_file())
+            self.assertIn("WantedBy=multi-user.target", enable_target.read_text())
 
     def test_setup_plan_covers_resume_decision_points(self) -> None:
         source = INSTALLER.read_text()

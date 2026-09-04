@@ -26,15 +26,14 @@ sudo bc250-install
 sudo bc250-install --models-only   # model/Open WebUI reconciliation
 ```
 
-Because the 0.x line is greenfield, `bc250-install` refuses legacy full-unit overrides for the task, embedding or agent Ollama lanes instead of attempting an in-place migration.
+Because the 0.x line is greenfield, the RPM owns all four Ollama lane units. `bc250-install` refuses unrelated full-unit overrides instead of attempting an in-place migration; the pinned upstream installer is used for the Ollama binary only.
 
 The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
 the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
 TTM activation into one primary reboot. After reboot it prepares 40-CU support
 for the exact running kernel, establishes the static main/task/embedding normal
 mode, installs the promoted task and Jina embedding infrastructure models, then
-presents one global prompt for additional models. Open WebUI starts only after
-that model infrastructure is ready, and the installer finishes by applying its
+presents one global prompt for additional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
 desired state and verifying the appliance. A
 second reboot is requested only if persistent 40-CU mode was already configured
 and its newly prepared replacement module is not yet loaded.

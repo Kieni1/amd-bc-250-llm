@@ -1,10 +1,21 @@
 [Unit]
-After=cyan-skillfish-governor-smu.service
-Wants=cyan-skillfish-governor-smu.service
+Description=BC-250 main Ollama instance
+After=network-online.target cyan-skillfish-governor-smu.service
+Wants=network-online.target cyan-skillfish-governor-smu.service
 Conflicts=ollama-agent.service
 
 [Service]
+Type=simple
+User=ollama
+Group=ollama
 SupplementaryGroups=render video
+ExecStart=/usr/local/bin/ollama serve
+Restart=always
+RestartSec=3
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+NoNewPrivileges=true
 StateDirectory=ollama
 StateDirectoryMode=0750
 Environment="HOME=/var/lib/ollama"
@@ -18,3 +29,6 @@ Environment="OLLAMA_MAX_LOADED_MODELS=1"
 Environment="OLLAMA_NUM_PARALLEL=1"
 Environment="OLLAMA_KEEP_ALIVE=20m"
 Environment="OLLAMA_FLASH_ATTENTION=1"
+
+[Install]
+WantedBy=multi-user.target

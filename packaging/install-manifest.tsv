@@ -33,7 +33,7 @@ file	0644	packaging/bc250-llm-server.sysusers	{sysusersdir}/bc250-llm-server.con
 file	0644	packaging/90-bc250-llm-server.preset	{presetdir}/90-bc250-llm-server.preset
 file	0644	cmd/system/99-sensors.conf	{modulesloaddir}/99-bc250-sensors.conf
 file	0644	cmd/system/options-sensors.conf	{modprobedir}/99-bc250-sensors.conf
-file	0644	cmd/system/ollama.service.d-override.conf	{unitdir}/ollama.service.d/50-bc250-llm-server.conf
+file	0644	config/systemd/ollama.service	{unitdir}/ollama.service
 file	0644	cmd/system/ollama-profiles/balanced.conf	{unitdir}/ollama.service.d/60-bc250-runtime-profile.conf
 file	0644	config/systemd/ollama-task.service	{unitdir}/ollama-task.service
 file	0644	config/systemd/ollama-embedding.service	{unitdir}/ollama-embedding.service
@@ -105,6 +105,7 @@ text	0644	{unlock_commit}	{share}/40cu/SOURCE-REVISION
 
 file	0644	cmd/system/ollama-profiles/*.conf	{share}/ollama-profiles/
 file	0644	config/openwebui/models.json	{share}/openwebui/models.json
+file	0644	config/openwebui/open-webui-enable.conf	{share}/openwebui/open-webui-enable.conf
 file	0644	cmd/maintenance/*.service	{unitdir}/
 file	0644	cmd/maintenance/*.timer	{unitdir}/
 file	0644	examples/raspi-wol/bc250-enable-wol.service	{unitdir}/bc250-enable-wol.service
