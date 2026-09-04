@@ -23,7 +23,7 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/share/doc/bc250-llm-server/` | Installed documentation, including `MODELS.md` and `BENCHMARK.md` |
 | `/usr/lib/systemd/system/` | Packaged services and timers |
 | `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
-| `/usr/share/bc250-llm-server/openwebui/` | Versioned additive Open WebUI model presets |
+| `/usr/share/bc250-llm-server/openwebui/` | Open WebUI desired state and additive model presets |
 
 The package also owns its governor, nginx, sensor-module, sysusers, tmpfiles
 and systemd-preset configuration in the standard Fedora directories.
@@ -54,7 +54,6 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/lib/bc250-llm-server/ollama/task/` | Task store, port 11435 |
 | `/var/lib/bc250-llm-server/ollama/embedding/` | Embedding store, port 11437 |
 | `/var/lib/bc250-llm-server/ollama/agent/` | Exclusive agent store, port 11436 |
-| `/var/lib/bc250-llm-server/install/` | Guided-installer records |
 | `/var/lib/bc250-llm-server/revalidation/results/` | Root-only final whole-appliance revalidation bundles |
 | `/var/lib/bc250-llm-server/secrets/open-webui.env` | Persistent root-only Open WebUI signing secret |
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
@@ -70,8 +69,8 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/backups/bc250-llm-server/` | Maintenance backups |
 | `/var/log/bc250-llm-install.log` | Guided-installer transcript |
 
-Ordinary DNF removal retains persistent state. `sudo bc250-uninstall` is the
-separately confirmed full purge; read [`UNINSTALL.md`](UNINSTALL.md) first.
+Ordinary DNF removal retains persistent state. `sudo bc250-reset` is the
+separately confirmed greenfield appliance reset; `bc250-uninstall` remains an alias. Read [`UNINSTALL.md`](UNINSTALL.md) first.
 
 [`RPM-LAYOUT.md`](RPM-LAYOUT.md) documents the source-to-RPM mapping for
 maintainers.

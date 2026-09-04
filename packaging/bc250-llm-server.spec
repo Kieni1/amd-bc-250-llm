@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        0.6.testing%{?dist}
+Release:        0.7.testing%{?dist}
 Summary:        Testing local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -144,10 +144,6 @@ if [ ! -s "$secret_env" ]; then
   python3 -c 'import secrets; print("WEBUI_SECRET_KEY=" + secrets.token_hex(32))' > "$secret_env"
 fi
 chmod 0600 "$secret_env"
-if [ "$1" -eq 1 ]; then
-  touch /var/lib/bc250-llm-server/install/fresh-package
-  chmod 0600 /var/lib/bc250-llm-server/install/fresh-package
-fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 echo "BC-250 package installed. Run: sudo bc250-install"
 
@@ -214,6 +210,14 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 04 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.7.testing
+- Preflight custom Ollama /etc service overrides before the pinned upstream installer and reject modified upstream-like units.
+- Remove pre-1.0 installer-history bookkeeping and simplify full reset to a declared appliance-owned-state contract.
+- Add idempotent memory/swap ensure operations and make the guided installer delegate component-state reconciliation.
+- Make one packaged Open WebUI desired-state file authoritative for persisted providers, task, embedding and RAG application settings.
+- Simplify agent-mode switching around the static systemd conflict topology.
+- Correct remaining command privilege/RAG benchmark documentation and make dedupe restoration exception-safe without a blind catch.
+
 * Fri Sep 04 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.6.testing
 - Package the complete main/task/embedding/agent Ollama service topology; the upstream installer now supplies the binary only.
 - Keep Open WebUI dormant across the primary reboot and enable its Quadlet only after baseline task/Jina registration.

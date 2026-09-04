@@ -29,6 +29,43 @@ INSTALLER_SHA256="${BC250_OLLAMA_INSTALLER_SHA256:-}"
 }
 URL="https://raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT/scripts/install.sh"
 
+is_upstream_generated_unit() {
+  local unit="$1"
+  [[ -f "$unit" && ! -L "$unit" ]] || return 1
+  awk '
+    /^[[:space:]]*$/ || /^[[:space:]]*[#;]/ {next}
+    $0 == "[Unit]" ||
+    $0 == "Description=Ollama Service" ||
+    $0 == "After=network-online.target" ||
+    $0 == "[Service]" ||
+    $0 == "ExecStart=/usr/local/bin/ollama serve" ||
+    $0 == "ExecStart=/usr/bin/ollama serve" ||
+    $0 == "User=ollama" ||
+    $0 == "Group=ollama" ||
+    $0 == "Restart=always" ||
+    $0 == "RestartSec=3" ||
+    $0 ~ /^Environment="PATH=[^"]*"$/ ||
+    $0 == "[Install]" ||
+    $0 == "WantedBy=default.target" ||
+    $0 == "WantedBy=multi-user.target" {next}
+    {bad=1}
+    END {exit bad}
+  ' "$unit" || return 1
+  grep -Fxq 'Description=Ollama Service' "$unit" &&
+    grep -Eq '^ExecStart=/(usr/local|usr)/bin/ollama serve$' "$unit" &&
+    grep -Fxq 'User=ollama' "$unit" &&
+    grep -Fxq 'Group=ollama' "$unit"
+}
+
+etc_unit=/etc/systemd/system/ollama.service
+package_unit=/usr/lib/systemd/system/ollama.service
+if [[ -e "$etc_unit" || -L "$etc_unit" ]]; then
+  is_upstream_generated_unit "$etc_unit" || {
+    echo "ERROR: refusing to run the upstream Ollama installer while a custom service override exists: $etc_unit" >&2
+    exit 1
+  }
+fi
+
 confirm_install() {
   local action="$1" answer
   [[ "${BC250_ASSUME_YES:-0}" == 1 ]] && return 0
@@ -108,23 +145,18 @@ install -d -o ollama -g ollama -m 0750 \
 restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
   /var/cache/bc250-llm-server 2>/dev/null || true
 
-# The upstream installer owns the binary download only. The RPM owns the
-# complete main service definition, so remove only the recognizable upstream
-# unit that the official installer creates and refuse unrelated overrides.
-etc_unit=/etc/systemd/system/ollama.service
-package_unit=/usr/lib/systemd/system/ollama.service
+# The upstream installer owns binary installation only. Normalize the service
+# back to the RPM-owned unit and refuse any unexpected /etc override.
 [[ -r "$package_unit" ]] || {
   echo "ERROR: package-owned Ollama service is missing: $package_unit" >&2
   exit 1
 }
 if [[ -e "$etc_unit" || -L "$etc_unit" ]]; then
-  if grep -Fq 'Description=Ollama Service' "$etc_unit" 2>/dev/null && \
-      grep -Fq 'ExecStart=/usr/local/bin/ollama serve' "$etc_unit" 2>/dev/null; then
-    rm -f -- "$etc_unit"
-  else
-    echo "ERROR: refusing to replace custom Ollama service override: $etc_unit" >&2
+  is_upstream_generated_unit "$etc_unit" || {
+    echo "ERROR: upstream Ollama installation left an unexpected service override: $etc_unit" >&2
     exit 1
-  fi
+  }
+  rm -f -- "$etc_unit"
 fi
 
 systemctl daemon-reload

@@ -5,13 +5,13 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-UNINSTALLER = ROOT / "uninstall.sh"
+RESET = ROOT / "uninstall.sh"
 
 
-class UninstallerTests(unittest.TestCase):
-    def test_help_is_available_without_running_the_purge(self) -> None:
+class ResetTests(unittest.TestCase):
+    def test_help_is_available_without_running_reset(self) -> None:
         result = subprocess.run(
-            [str(UNINSTALLER), "--help"],
+            [str(RESET), "--help"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -19,12 +19,14 @@ class UninstallerTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("PURGE-BC250-LLM", result.stdout)
+        self.assertIn("bc250-reset", result.stdout)
 
-    def test_full_purge_has_bounded_destructive_targets(self) -> None:
-        source = UNINSTALLER.read_text(encoding="utf-8")
-        self.assertIn("packages-added.txt", source)
+    def test_greenfield_reset_has_bounded_destructive_targets(self) -> None:
+        source = RESET.read_text(encoding="utf-8")
+        self.assertNotIn("packages-added.txt", source)
+        self.assertNotIn("firewall-http-before", source)
+        self.assertNotIn("selinux-httpd-before", source)
         self.assertIn("dnf remove -y bc250-llm-server.x86_64", source)
-        self.assertIn('dnf remove -y "${installed[@]}"', source)
         self.assertNotIn("dnf autoremove", source)
         self.assertNotIn("podman system prune", source)
         self.assertNotIn("rm -rf -- / ", source)
@@ -33,29 +35,26 @@ class UninstallerTests(unittest.TestCase):
             "/var/cache/bc250-llm-server",
             "/var/lib/open-webui",
             "/var/backups/bc250-llm-server",
-            "/var/lib/ollama",
         ):
             self.assertIn(path, source)
+        self.assertIn("/srv/bc250-documents", source)
 
     def test_40cu_restore_requires_a_verified_stock_backup(self) -> None:
-        source = UNINSTALLER.read_text(encoding="utf-8")
+        source = RESET.read_text(encoding="utf-8")
         self.assertIn("module_has_unlock", source)
         self.assertIn("no verifiable stock AMDGPU backup", source)
         self.assertIn("depmod -a", source)
         self.assertIn("dracut --force --kver", source)
         self.assertIn("/etc/modprobe.d/bc250-40cu.conf", source)
-        self.assertIn("/etc/dracut.conf.d/90-bc250-40cu.conf", source)
         self.assertIn("bc250-cu-live-manager.service", source)
 
-    def test_unknown_network_ownership_is_preserved(self) -> None:
-        source = UNINSTALLER.read_text(encoding="utf-8")
-        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
-        self.assertIn('write_state_once firewall-http-before unknown', installer)
-        self.assertIn('write_state_once selinux-httpd-before unknown', installer)
-        self.assertIn("original firewalld HTTP state is unknown; preserving", source)
-        self.assertIn("original SELinux network state is unknown; preserving", source)
-        self.assertNotIn('[[ "$firewall_before" != enabled ]]', source)
-        self.assertNotIn('[[ "$selinux_before" != on ]]', source)
+    def test_reset_delegates_component_profiles_and_declares_network_ownership(self) -> None:
+        source = RESET.read_text(encoding="utf-8")
+        self.assertIn("bc250-memory-profile remove", source)
+        self.assertIn("bc250-swap-profile remove", source)
+        self.assertIn("--remove-service=http", source)
+        self.assertIn("setsebool -P httpd_can_network_connect 0", source)
+        self.assertIn("Fedora upgrades and filesystem growth were not reversed", source)
 
 
 if __name__ == "__main__":

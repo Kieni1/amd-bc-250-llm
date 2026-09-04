@@ -12,16 +12,18 @@ ttm.page_pool_size=4194304
 Apply/review:
 
 ```bash
-sudo bc250-memory-profile recommend
-sudo bc250-memory-profile apply-full
-sudo reboot
 sudo bc250-memory-profile status
+sudo bc250-memory-profile ensure      # idempotent; used by bc250-install
+sudo bc250-memory-profile recommend
+sudo bc250-memory-profile apply-full  # confirmed interactive equivalent
+sudo reboot
 ```
 
-`apply-full` removes older package-managed `amdgpu.gttsize=...` and
-`amdgpu.ppfeaturemask=...` overrides before applying the two TTM limits. The
-helper still knows those legacy argument names so uninstall/migration cleanup is
-complete.
+`ensure` owns the desired-state check: it removes `amdgpu.gttsize=...` and
+`amdgpu.ppfeaturemask=...` overrides before applying the two TTM limits only when
+needed. `bc250-install` delegates this decision to the helper instead of carrying a
+second kernel-argument state machine. `apply-full` adds an operator confirmation to
+the same reconciliation path.
 
 ## 2026-08-31 Fedora 44 revalidation
 

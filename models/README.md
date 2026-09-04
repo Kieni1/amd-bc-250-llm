@@ -1,8 +1,10 @@
 # Model management
 
-The guided installer asks separately for production, task, agentic, embedding,
-experiment and MTP selections. Use the commands below later to add, refresh or
-remove models.
+The guided installer establishes the required task and embedding baseline, then
+offers one unified optional model selection across production, experiments,
+agentic, embedding, task and MTP entries. The model manager keeps lane routing
+and exclusive agent-mode transitions internal. Use the commands below later to
+add, refresh or remove models.
 
 ## Commands
 

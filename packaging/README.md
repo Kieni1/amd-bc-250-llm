@@ -40,10 +40,10 @@ verify the current bytes before they are copied into the RPM build tree.
 - The guided installer may prepare a default-off module for the running kernel;
   activation remains `sudo bc250-40cu enable`.
 - Model weights are downloaded only after operator selection.
-- Ordinary RPM removal preserves state; `bc250-uninstall` is the separately
-  confirmed full purge.
-- Dependency cleanup is limited to packages recorded as newly added by the
-  guided installer; never use unbounded `dnf autoremove`.
+- Ordinary RPM removal preserves state; `bc250-reset` is the separately confirmed
+  greenfield appliance reset (`bc250-uninstall` remains an alias).
+- Pre-1.0 setup keeps no package-baseline/network-before-state database. Reset
+  removes only declared appliance-owned state and never uses unbounded autoremove.
 - Configuration that operators may change uses `%config(noreplace)` or lives
   outside RPM ownership.
 

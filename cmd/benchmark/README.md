@@ -146,7 +146,7 @@ language hint remains diagnostic rather than pretending to be a full linguistic
 quality metric. Human review is still required before changing the production
 translation model.
 
-## Main-instance RAG model-switch cycle
+## Dedicated-embedding RAG coexistence cycle
 
 ```bash
 bc250-benchmark rag
@@ -154,12 +154,13 @@ bc250-benchmark rag
 bc250-benchmark rag EMBED_MODEL ANSWER_MODEL
 ```
 
-The packaged default sequences Jina → Gemma E4B on the main Ollama instance. It
-first records a warm answer-model request, then embeds a query and records whether
-the answer model was evicted, then measures the answer-model reload and final
-answer. This isolates the `OLLAMA_MAX_LOADED_MODELS=1` model-switch cost; it does
-**not** score Open WebUI/vector-database retrieval quality. Override the pair with
-`RAG_EMBED_MODEL` / `RAG_ANSWER_MODEL` or positional model names.
+The packaged default keeps Gemma E4B on the main answer lane (`11434`) while
+Jina runs on the dedicated embedding lane (`11437`). It records a warm answer
+request, performs embedding work on the dedicated lane while the answer model
+remains resident, then measures the final answer request and the resulting UMA/GTT
+pressure. This checks main+embedding coexistence; it does **not** score Open WebUI/vector-database
+retrieval quality. Override the pair with `RAG_EMBED_MODEL` / `RAG_ANSWER_MODEL`
+or positional model names.
 
 ## End-to-end RAG quality acceptance
 
@@ -230,9 +231,10 @@ the JSON object the same tolerant way Open WebUI 0.11.3 does (including fenced o
 surrounded JSON), while separately reporting `strict_json`. It checks structure,
 simple content relevance, latency and DE/FR/EN `language_hint` plus explicit
 `language_required`/`language_pass` reporting. Titles and retrieval queries require
-the requested language for the report; tags remain informational. Language does
-not change the process exit code yet, so one weak multilingual task model cannot
-turn a routine benchmark into a package-build failure. Requests use
+the requested language for the report; tags remain informational. Required task
+acceptance contributes to the benchmark result: quality failure returns `3`, which
+the revalidation harness records as quality data rather than infrastructure
+failure. Requests use
 `keep_alive=0`, matching the isolated task service. The Open WebUI container
 leaves 0.11.3 `TASK_MODEL_PARAMS` at `{}` until this benchmark demonstrates a
 reason to tune it. Its CSV deliberately keeps only the small telemetry subset

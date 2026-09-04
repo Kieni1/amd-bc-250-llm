@@ -22,7 +22,7 @@ bc250 --help
 | `/etc/bc250-llm-server/` | Operator model drop-ins and MTP/maintenance policy |
 | `/usr/lib/systemd/system/` | Services and timers |
 | `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
-| `/usr/share/bc250-llm-server/openwebui/` | Versioned additive Open WebUI model presets |
+| `/usr/share/bc250-llm-server/openwebui/` | Open WebUI desired state and additive model presets |
 
 `packaging/install-manifest.tsv` is the authoritative source-to-payload map.
 It drives installation and RPM ownership. Keep it limited to simple file,
@@ -42,7 +42,7 @@ Services, tmpfiles and operator commands create content below these paths.
 `bc250-revalidate` keeps final result tarballs below
 `/var/lib/bc250-llm-server/revalidation/results/` and removes its transient worker
 state after finalization. Ordinary RPM removal intentionally preserves persistent
-state.
+state; the explicit `bc250-reset` command owns destructive greenfield cleanup.
 
 ## Packaging boundaries
 
@@ -67,3 +67,8 @@ baseline task/Jina registrations are ready, `bc250-install` copies the packaged
 `/etc/containers/systemd/open-webui.container.d/90-enable.conf`, reloads
 systemd, and starts the service. Full package removal deletes that installer-owned
 enablement drop-in.
+
+Open WebUI process bootstrap remains in the Quadlet. Persisted provider, task,
+embedding and RAG application settings are defined once in
+`/usr/share/bc250-llm-server/openwebui/desired-state.json` and applied by
+`bc250-openwebui-setup` through supported APIs.

@@ -40,6 +40,59 @@ class StateTests(unittest.TestCase):
             "prod-test", set(), refresh=False, source_changed=False, template_changed=False
         ))
 
+    def test_failed_hf_download_is_rejected_even_if_file_is_left_behind(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            destination = base / "models"
+            download_root = base / "downloads"
+            model = {
+                "id": "download-test",
+                "name": "download-test",
+                "provider": "download-only",
+                "repository": "example/model",
+                "revision": "latest",
+                "gguf": "model.gguf",
+                "sha256": "",
+            }
+            defaults = {
+                "destination": str(destination),
+                "layout": "flat",
+                "download_namespace": "test",
+                "min_free_bytes": 0,
+                "ollama_host": "127.0.0.1:11434",
+            }
+            args = SimpleNamespace(
+                revision=None, sha256=None, destination=None, min_free_bytes=0,
+                token_file=None, refresh=False, host=None,
+            )
+
+            def failed_download(command, environment, *, terminal=False):
+                staged = download_root / model["id"] / model["gguf"]
+                staged.parent.mkdir(parents=True, exist_ok=True)
+                staged.write_bytes(b"partial-but-present")
+                return SimpleNamespace(returncode=1)
+
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "DOWNLOAD_DIR": str(download_root),
+                        "HF_HOME": str(base / "hf"),
+                        "BC250_HF_ANONYMOUS": "1",
+                    },
+                    clear=False,
+                ),
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(modelctl, "ollama_identity", return_value=(1, 1)),
+                patch.object(modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"),
+                patch.object(modelctl.os, "chown"),
+                patch.object(modelctl, "run_as_ollama", side_effect=failed_download),
+            ):
+                self.assertEqual(modelctl.install_models(defaults, [model], args), 2)
+
+            self.assertFalse((destination / model["gguf"]).exists())
+            self.assertFalse(modelctl.state_path(destination / model["gguf"]).exists())
+
     def test_matching_state_reuses_moving_revision(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / MODEL["gguf"]

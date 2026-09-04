@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Switch between the package-defined normal Ollama topology and the exclusive agent lane.
+# Switch the fixed package topology between normal and exclusive agent mode.
 set -Eeuo pipefail
 
 NORMAL_UNITS=(ollama.service ollama-task.service ollama-embedding.service)
@@ -9,26 +9,18 @@ usage() {
   cat <<'USAGE'
 Usage: sudo bc250-agent-mode enter|leave|status
 
-enter   Start the exclusive agent; systemd conflicts stop all normal Ollama lanes.
-leave   Stop the agent and restore main + task + embedding normal mode.
-status  Show the four package-defined lane states.
+enter   Start exclusive agent mode; systemd conflicts stop normal lanes.
+leave   Start main + task + embedding; systemd conflicts stop the agent.
+status  Show package lane states and the derived appliance mode.
 USAGE
 }
 
-need_root() {
-  [[ ${EUID:-$(id -u)} -eq 0 ]] || {
-    echo "ERROR: run this command with sudo." >&2
-    exit 1
-  }
-}
+need_root() { [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo "ERROR: run this command with sudo." >&2; exit 1; }; }
 
 require_units() {
   local unit
   for unit in "${NORMAL_UNITS[@]}" "$AGENT_UNIT"; do
-    systemctl cat "$unit" >/dev/null 2>&1 || {
-      echo "ERROR: required package unit is missing: $unit" >&2
-      return 1
-    }
+    systemctl cat "$unit" >/dev/null 2>&1 || { echo "ERROR: required package unit is missing: $unit" >&2; return 1; }
   done
 }
 
@@ -42,7 +34,6 @@ wait_api() {
 }
 
 start_normal() {
-  systemctl stop "$AGENT_UNIT" >/dev/null 2>&1 || true
   systemctl start "${NORMAL_UNITS[@]}"
   wait_api 11434 && wait_api 11435 && wait_api 11437 || {
     echo "ERROR: normal Ollama topology did not become ready on 11434/11435/11437." >&2
@@ -51,51 +42,38 @@ start_normal() {
 }
 
 enter_agent() {
-  local rc=0
   require_units
-  systemctl start "$AGENT_UNIT" || rc=$?
-  ((rc != 0)) || wait_api 11436 || rc=$?
-  if ((rc == 0)); then
-    echo "Agent mode active: 11436 only; main/task/embedding are stopped by unit conflicts."
+  if systemctl start "$AGENT_UNIT" && wait_api 11436; then
+    echo "Agent mode active: 11436 only."
     return 0
   fi
   systemctl status "$AGENT_UNIT" --no-pager -l || true
-  echo "ERROR: agent Ollama did not become ready; restoring normal mode." >&2
+  echo "ERROR: agent mode failed; restoring normal mode." >&2
   start_normal || echo "WARNING: normal mode restoration also failed." >&2
-  return "$rc"
+  return 1
 }
 
 leave_agent() {
   require_units
   start_normal
-  echo "Normal mode active: main/task/embedding are ready; agent is stopped."
+  echo "Normal mode active: main/task/embedding are ready; agent is stopped by unit conflicts."
 }
 
 status_agent() {
-  local unit state normal_active=0 normal_inactive=0
+  local unit state normal_active=0
   for unit in "${NORMAL_UNITS[@]}" "$AGENT_UNIT"; do
-    if systemctl cat "$unit" >/dev/null 2>&1; then
-      state="$(systemctl is-active "$unit" 2>/dev/null || true)"
-      printf '%-25s %s\n' "$unit" "${state:-unknown}"
-    else
-      printf '%-25s missing\n' "$unit"
-    fi
+    state="$(systemctl is-active "$unit" 2>/dev/null || true)"
+    printf '%-25s %s\n' "$unit" "${state:-unknown}"
   done
-  systemctl is-active --quiet "$AGENT_UNIT" 2>/dev/null && { echo 'mode=agent'; return; }
+  systemctl is-active --quiet "$AGENT_UNIT" 2>/dev/null && { echo mode=agent; return; }
   for unit in "${NORMAL_UNITS[@]}"; do
-    if systemctl is-active --quiet "$unit" 2>/dev/null; then
-      normal_active=$((normal_active + 1))
-    else
-      normal_inactive=$((normal_inactive + 1))
-    fi
+    systemctl is-active --quiet "$unit" 2>/dev/null && normal_active=$((normal_active + 1))
   done
-  if ((normal_active == 3 && normal_inactive == 0)); then
-    echo 'mode=normal'
-  elif ((normal_active == 0)); then
-    echo 'mode=stopped'
-  else
-    echo 'mode=degraded'
-  fi
+  case "$normal_active" in
+    3) echo mode=normal ;;
+    0) echo mode=stopped ;;
+    *) echo mode=degraded ;;
+  esac
 }
 
 case "${1:-}" in

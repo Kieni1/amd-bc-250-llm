@@ -158,7 +158,6 @@ def dedupe(yes: bool) -> int:
         print("Cancelled."); return 0
     before = shutil.disk_usage(GGUF).free
     active = quiesce_services()
-    error: Exception | None = None
     try:
         with tempfile.TemporaryDirectory(prefix="bc250-dedupe-", dir="/var/tmp") as temp:
             alias = Path(temp, "source")
@@ -172,13 +171,10 @@ def dedupe(yes: bool) -> int:
                     subprocess.run(["xfs_io", "-c", f"dedupe -q {alias} {offset} {offset} {length}", str(blob)], check=True)
                 print(f"  [{index}/{len(pairs)}] {source.name}")
         os.sync()
-    except Exception as exc:
-        error = exc
-    failed = restore_services(active)
-    if failed:
-        raise RuntimeError(f"failed to restore previously active services: {', '.join(failed)}") from error
-    if error:
-        raise error
+    finally:
+        failed = restore_services(active)
+        if failed:
+            raise RuntimeError(f"failed to restore previously active services: {', '.join(failed)}")
     after = shutil.disk_usage(GGUF).free
     print(f"Filesystem capacity recovered: {human(max(0, after - before))}")
     return 0

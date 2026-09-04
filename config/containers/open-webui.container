@@ -1,4 +1,5 @@
-# Packaged rootful Quadlet. Vendor path: /usr/share/containers/systemd/
+# Packaged rootful Quadlet. Application desired state is applied through
+# bc250-openwebui-setup from /usr/share/bc250-llm-server/openwebui/desired-state.json.
 [Unit]
 Description=Open WebUI (BC-250 local LLM front-end)
 After=network-online.target ollama.service ollama-task.service ollama-embedding.service tika.service
@@ -17,14 +18,13 @@ Memory=2g
 PidsLimit=512
 NoNewPrivileges=true
 DropCapability=all
-# Bootstrap only. bc250-openwebui-setup persists the reviewed main+task provider
-# configuration through Open WebUI's supported admin API after first login.
+
+# Process bootstrap only. Persisted providers, task settings, embedding backend
+# and RAG chunking are owned by bc250-openwebui-setup through supported APIs.
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 EnvironmentFile=/var/lib/bc250-llm-server/secrets/open-webui.env
 Environment=ENABLE_OPENAI_API=false
-# Local/offline appliance baseline. This reduces application-initiated outbound
-# requests; firewalld remains the actual network security boundary.
 Environment=OFFLINE_MODE=true
 Environment=HF_HUB_OFFLINE=1
 Environment=RAG_EMBEDDING_MODEL_AUTO_UPDATE=false
@@ -36,43 +36,16 @@ Environment=ENABLE_CODE_INTERPRETER=false
 Environment=ENABLE_MEMORIES=false
 Environment=ENABLE_DIRECT_CONNECTIONS=false
 Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
-# API setup selects the dedicated 4K task model while preserving upstream
-# prompt templates. These values remain a safe bootstrap if the API step is skipped.
-Environment="TASK_MODEL_PARAMS={}"
-Environment=ENABLE_TITLE_GENERATION=true
-Environment=ENABLE_TAGS_GENERATION=true
-Environment=ENABLE_FOLLOW_UP_GENERATION=false
-Environment=ENABLE_AUTOCOMPLETE_GENERATION=false
-Environment=ENABLE_SEARCH_QUERY_GENERATION=false
-Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false
-# Dedicated embedding lane: small model, 10 minute Ollama keepalive, no chat exposure.
-Environment=RAG_EMBEDDING_ENGINE=ollama
-Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m
-Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11437
-Environment=RAG_EMBEDDING_BATCH_SIZE=1
-Environment=ENABLE_ASYNC_EMBEDDING=false
-# Bound ad-hoc office uploads; curated knowledge sync remains managed separately.
+
+# Runtime-only upload/residency controls that are not part of the persisted
+# Open WebUI application desired-state API contract.
 Environment=RAG_FILE_MAX_SIZE=128
 Environment=RAG_FILE_MAX_COUNT=20
 Environment="RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub"
-# Measured candidates remain disabled until explicitly benchmarked on the real corpus.
-Environment=CHUNK_MIN_SIZE_TARGET=0
 Environment=RAG_SYSTEM_CONTEXT=false
-Environment=RAG_TEXT_SPLITTER=token
-Environment=CHUNK_SIZE=1500
-Environment=CHUNK_OVERLAP=200
-Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true
-Environment=RAG_TOP_K=8
-Environment=RAG_RELEVANCE_THRESHOLD=0
-Environment="RAG_TEMPLATE=Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
-Environment=ENABLE_RAG_HYBRID_SEARCH=false
-# Keep removed knowledge files disposable; local authoritative sources remain under /srv.
-Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false
 Environment="RAG_EMBEDDING_QUERY_PREFIX=Query: "
 Environment="RAG_EMBEDDING_CONTENT_PREFIX=Document: "
-Environment=CONTENT_EXTRACTION_ENGINE=tika
-Environment=TIKA_SERVER_URL=http://tika:9998
-Environment=TIKA_SERVER_VERSION=3
+Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false
 Environment=SCARF_NO_ANALYTICS=true
 Environment=DO_NOT_TRACK=true
 
@@ -80,4 +53,3 @@ Environment=DO_NOT_TRACK=true
 Restart=always
 RestartSec=5
 TimeoutStartSec=900
-

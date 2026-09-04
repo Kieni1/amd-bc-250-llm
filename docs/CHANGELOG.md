@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0-0.7.testing - 2026-09-04
+
+- Preflight custom Ollama service overrides before invoking the pinned upstream installer; reject upstream-looking units with operator additions.
+- Remove installer-history/package-baseline/network-before-state bookkeeping under the pre-1.0 greenfield contract.
+- Add `ensure` semantics to memory and swap helpers and delegate those decisions from `bc250-install`.
+- Move persisted Open WebUI providers/task/embedding/RAG settings into one package-owned `desired-state.json` consumed by the supported API helper.
+- Simplify normal/agent mode switching around the four static package units and add `bc250-reset` as the preferred full-appliance reset command.
+- Correct remaining command privilege/RAG benchmark wording and simplify XFS dedupe restoration so failures propagate without a blind exception catch.
+
 ## 0.10.0-0.6.testing - 2026-09-04
 
 - Package all four Ollama lane units, including the main service; the pinned upstream installer supplies the binary but no longer owns service policy.

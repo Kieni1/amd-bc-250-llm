@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import unittest
 from pathlib import Path
@@ -9,37 +10,38 @@ ROOT = Path(__file__).resolve().parent.parent
 
 class RagBaselineTests(unittest.TestCase):
     def test_packaged_open_webui_rag_defaults(self) -> None:
-        quadlet = (ROOT / "config/containers/open-webui.container").read_text(
-            encoding="utf-8"
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
         )
-        expected = (
-            "Environment=RAG_EMBEDDING_ENGINE=ollama",
-            "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
-            "Environment=RAG_OLLAMA_BASE_URL=http://host.containers.internal:11437",
-            "Environment=RAG_TEXT_SPLITTER=token",
-            "Environment=CHUNK_SIZE=1500",
-            "Environment=CHUNK_OVERLAP=200",
-            "Environment=ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER=true",
-            "Environment=RAG_TOP_K=8",
-            "Environment=RAG_RELEVANCE_THRESHOLD=0",
-            'Environment="RAG_TEMPLATE=Answer the user from the supplied context.',
-            "Environment=ENABLE_RAG_HYBRID_SEARCH=false",
-            "Environment=ENABLE_ASYNC_EMBEDDING=false",
-            "Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false",
+        embedding = desired["embedding"]
+        rag = desired["rag"]
+        self.assertEqual(embedding["RAG_EMBEDDING_ENGINE"], "ollama")
+        self.assertEqual(embedding["RAG_EMBEDDING_MODEL"], "embed-jina-v5-small-retrieval-q4-k-m")
+        self.assertEqual(embedding["ollama_config"]["url"], "http://host.containers.internal:11437")
+        self.assertEqual(embedding["RAG_EMBEDDING_BATCH_SIZE"], 1)
+        self.assertFalse(embedding["ENABLE_ASYNC_EMBEDDING"])
+        self.assertEqual(rag["TEXT_SPLITTER"], "token")
+        self.assertEqual(rag["CHUNK_SIZE"], 1500)
+        self.assertEqual(rag["CHUNK_OVERLAP"], 200)
+        self.assertTrue(rag["ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER"])
+        self.assertEqual(rag["TOP_K"], 8)
+        self.assertEqual(rag["RELEVANCE_THRESHOLD"], 0)
+        self.assertFalse(rag["ENABLE_RAG_HYBRID_SEARCH"])
+        self.assertEqual(rag["CHUNK_MIN_SIZE_TARGET"], 0)
+        self.assertEqual(rag["CONTENT_EXTRACTION_ENGINE"], "tika")
+
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        for line in (
             'Environment="RAG_EMBEDDING_QUERY_PREFIX=Query: "',
             'Environment="RAG_EMBEDDING_CONTENT_PREFIX=Document: "',
-            "Environment=CONTENT_EXTRACTION_ENGINE=tika",
-            "Environment=TIKA_SERVER_URL=http://tika:9998",
-            "Environment=TIKA_SERVER_VERSION=3",
             "Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false",
             "Environment=RAG_FILE_MAX_SIZE=128",
             "Environment=RAG_FILE_MAX_COUNT=20",
-            "Environment=RAG_EMBEDDING_BATCH_SIZE=1",
-            "Environment=CHUNK_MIN_SIZE_TARGET=0",
             "Environment=RAG_SYSTEM_CONTEXT=false",
-        )
-        for line in expected:
+        ):
             self.assertIn(line, quadlet)
+        for persisted in ("RAG_EMBEDDING_MODEL=", "CHUNK_SIZE=", "RAG_TOP_K="):
+            self.assertNotIn(persisted, quadlet)
 
     def test_rag_guide_uses_real_packaged_models_and_commands(self) -> None:
         guide = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")

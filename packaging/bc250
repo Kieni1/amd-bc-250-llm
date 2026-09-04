@@ -27,6 +27,7 @@ ROUTES=(
   "model|$LIBEXEC/modelctl"
   "ocr|$LIBEXEC/ocr.sh"
   "rag-import|$LIBEXEC/rag-import"
+  "reset|$LIBEXEC/uninstall.sh"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "openwebui-setup|$LIBEXEC/openwebui-setup.py"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
@@ -34,6 +35,7 @@ ROUTES=(
   "storage|$LIBEXEC/storage.py"
   "swap-profile|$LIBEXEC/swap-profile.sh"
   "uninstall|$LIBEXEC/uninstall.sh"
+  "reset-info|cat|$DOCDIR/UNINSTALL.md"
   "uninstall-info|cat|$DOCDIR/UNINSTALL.md"
   "verify|$LIBEXEC/verify.sh"
   "verify-lan|$LIBEXEC/verify-lan.sh"
@@ -62,7 +64,7 @@ Models:
 Operation:
   status, verify, verify-lan, benchmark, revalidate, check-temp
   install, install-ollama, maintenance, ollama-profile, openwebui-setup, storage
-  memory-profile, swap-profile, agent-mode, 40cu, cu-status, uninstall
+  memory-profile, swap-profile, agent-mode, 40cu, cu-status, reset
 
 Optional workflows:
   code, code-commit, gitea-review, compare-mtp, run-mtp

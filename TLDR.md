@@ -81,7 +81,9 @@ Selections accept a full name, displayed index, range such as `0,2-4`, or
 
 ```bash
 sudo bc250-memory-profile status
+sudo bc250-memory-profile ensure
 sudo bc250-swap-profile status
+sudo bc250-swap-profile ensure
 sudo bc250-ollama-profile status
 sudo bc250-cu-status
 sudo bc250-40cu status
@@ -140,11 +142,14 @@ from untrusted networks.
 sudo dnf remove bc250-llm-server.x86_64
 
 # Explicitly purge the complete appliance setup
-sudo bc250-uninstall
+sudo bc250-reset
 ```
 
+Reset preserves `/srv/bc250-documents` and does not roll back Fedora upgrades or filesystem growth.
+`bc250-uninstall` remains a compatibility alias.
+
 See [`docs/COMMANDS.md`](docs/COMMANDS.md) for every installed command and
-[`docs/UNINSTALL.md`](docs/UNINSTALL.md) before a full purge.
+[`docs/UNINSTALL.md`](docs/UNINSTALL.md) before a destructive reset.
 
 ## Benchmark quick checks
 

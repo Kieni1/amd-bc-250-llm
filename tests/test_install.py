@@ -30,10 +30,11 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn("bc250-memory-profile", source)
         self.assertLess(len(source.splitlines()), 50)
 
-    def test_packaged_installer_is_pre_v1_greenfield_and_self_contained(self) -> None:
+    def test_packaged_installer_is_pre_v1_greenfield_and_uses_package_runtime_pins(self) -> None:
         source = INSTALLER.read_text()
         self.assertIn("pre-1.0", source)
-        self.assertIn('readonly BC250_OLLAMA_VERSION="0.33.2"', source)
+        self.assertIn('source "$runtime_env"', source)
+        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.2"', source)
         result = subprocess.run(["bash", str(INSTALLER), "--help"], text=True, stdout=subprocess.PIPE, check=False)
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("sudo bc250-install", result.stdout)
@@ -52,8 +53,53 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT", helper)
         self.assertIn("Ollama installer SHA-256 mismatch", helper)
         self.assertIn("package-owned Ollama service is missing", helper)
-        self.assertIn("refusing to replace custom Ollama service override", helper)
+        self.assertIn("refusing to run the upstream Ollama installer while a custom service override exists", helper)
         self.assertNotIn('URL="https://ollama.com/install.sh"', helper)
+
+    def test_ollama_unit_recognizer_rejects_upstream_like_customization(self) -> None:
+        helper = (ROOT / "cmd/system/install-ollama.sh").read_text()
+        start = helper.index("is_upstream_generated_unit() {")
+        end = helper.index("\netc_unit=", start)
+        function = helper[start:end]
+        upstream = """[Unit]\nDescription=Ollama Service\nAfter=network-online.target\n[Service]\nExecStart=/usr/local/bin/ollama serve\nUser=ollama\nGroup=ollama\nRestart=always\nRestartSec=3\nEnvironment=\"PATH=/usr/local/bin:/usr/bin\"\n[Install]\nWantedBy=default.target\n"""
+        with tempfile.TemporaryDirectory() as tmp:
+            unit = Path(tmp) / "ollama.service"
+            unit.write_text(upstream)
+            accepted = subprocess.run(["bash", "-c", function + '\nis_upstream_generated_unit "$1"', "unit-test", str(unit)], check=False)
+            self.assertEqual(accepted.returncode, 0)
+            unit.write_text(upstream.replace("[Install]", 'Environment=\"OLLAMA_DEBUG=1\"\n[Install]'))
+            rejected = subprocess.run(["bash", "-c", function + '\nis_upstream_generated_unit "$1"', "unit-test", str(unit)], check=False)
+            self.assertNotEqual(rejected.returncode, 0)
+        self.assertLess(helper.index('if [[ -e "$etc_unit"'), helper.index("if ((run_installer))"))
+        self.assertIn('rm -f -- "$etc_unit"', helper)
+
+    def test_installer_update_ollama_flag_reaches_pinned_helper(self) -> None:
+        result = source_probe(r'''
+remove_fedora_ollama() { :; }
+bc250-install-ollama() { printf 'reinstall=%s\n' "${OLLAMA_REINSTALL:-unset}"; }
+BC250_UPDATE_OLLAMA=1
+step_3_install_ollama
+''')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("reinstall=1", result.stdout)
+
+    def test_command_reference_marks_critical_mutations_with_sudo(self) -> None:
+        commands = (ROOT / "docs/COMMANDS.md").read_text()
+        for example in (
+            "sudo bc250-memory-profile ensure",
+            "sudo bc250-swap-profile ensure",
+            "sudo bc250-ollama-profile balanced",
+            "sudo bc250-40cu status",
+            "sudo bc250-40cu verify",
+            "sudo bc250-40cu prepare",
+            "sudo bc250-agent-mode enter",
+            "sudo bc250-storage dedupe",
+            "sudo bc250-maintenance status",
+            "sudo bc250-reset [--yes]",
+        ):
+            self.assertIn(example, commands)
+        self.assertIn("bc250-agent-mode status", commands)
+        self.assertIn("bc250-storage status", commands)
 
     def test_one_unified_model_selection_is_used_after_required_baseline(self) -> None:
         source = INSTALLER.read_text()
@@ -158,7 +204,7 @@ input_is_interactive && exit 9 || exit 0
             self.assertEqual(result.returncode, 0, result.stdout)
             calls = log.read_text()
             self.assertIn("systemctl:start ollama-agent.service", calls)
-            self.assertIn("systemctl:stop ollama-agent.service", calls)
+            self.assertNotIn("systemctl:stop ollama-agent.service", calls)
             self.assertIn(
                 "systemctl:start ollama.service ollama-task.service ollama-embedding.service",
                 calls,
@@ -173,12 +219,9 @@ input_is_interactive && exit 9 || exit 0
 require_root() { :; }
 capture_input_mode() { :; }
 start_transcript() { :; }
-capture_install_state() { :; }
 show_plan() { printf 'phase:plan\n'; }
 step_1_grow_root_filesystem() { printf 'phase:grow\n'; }
-record_added_packages() { :; }
 step_2_update_fedora() { printf 'phase:update\n'; }
-capture_package_baseline() { :; }
 step_3_install_ollama() { printf 'phase:ollama\n'; }
 step_4_memory_and_swap() { printf 'phase:memory\n'; }
 request_primary_reboot_if_needed() { printf 'phase:reboot\n'; exit 10; }
@@ -270,12 +313,12 @@ step_8_application_services
         self.assertIn("vg_free", source)
         self.assertIn("Root LV already uses available volume-group space.", source)
 
-    def test_fresh_marker_allows_safe_ownership_capture(self) -> None:
+    def test_greenfield_installer_has_no_historical_ownership_database(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn('! -e "$STATE_DIR/fresh-package"', source)
-        self.assertIn('rm -f -- "$STATE_DIR/fresh-package"', source)
-        self.assertIn("firewall-http-before", source)
-        self.assertIn("selinux-httpd-before", source)
+        for legacy in ("fresh-package", "packages-added.txt", "firewall-http-before", "selinux-httpd-before", "PACKAGE_BASELINE"):
+            self.assertNotIn(legacy, source)
+        self.assertIn("bc250-memory-profile ensure", source)
+        self.assertIn("bc250-swap-profile ensure", source)
 
     def test_verification_runs_both_reports_before_returning_failure(self) -> None:
         source = INSTALLER.read_text()

@@ -18,7 +18,7 @@ Keep the Fedora 44 binary RPM beside the repository bootstrap and run:
 sudo ./install
 ```
 
-Before 1.0 this remains a green-field/test-appliance workflow. The bootstrap installs the selected RPM, then hands off to the packaged
+Before 1.0 this remains a greenfield/test-appliance workflow. The bootstrap installs the selected RPM, then hands off to the packaged
 `bc250-install`, which owns Fedora update policy. After that, reruns use:
 
 ```bash
@@ -26,7 +26,11 @@ sudo bc250-install
 sudo bc250-install --models-only   # model/Open WebUI reconciliation
 ```
 
-Because the 0.x line is greenfield, the RPM owns all four Ollama lane units. `bc250-install` refuses unrelated full-unit overrides instead of attempting an in-place migration; the pinned upstream installer is used for the Ollama binary only.
+Because the 0.x line is greenfield, the RPM owns all four Ollama lane units.
+`bc250-install-ollama` rejects a custom `/etc/systemd/system/ollama.service` before
+invoking the pinned upstream installer; the upstream installer supplies the binary
+only. Reruns reconcile observable appliance state rather than an installer-history
+database.
 
 The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
 the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
@@ -66,8 +70,10 @@ sudo bc250-storage prune-40cu      # removed-kernel build caches only
 ```
 
 Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
-create/sign in the administrator and apply the package-owned Open WebUI baseline;
-use `sudo bc250-openwebui-setup init` later if that step was skipped. The default endpoint is unencrypted HTTP; see
+create/sign in the administrator and apply the package-owned Open WebUI baseline.
+Persisted providers, task, embedding and RAG settings come from the single packaged
+`openwebui/desired-state.json` through supported APIs; use
+`sudo bc250-openwebui-setup init` later if that step was skipped. The default endpoint is unencrypted HTTP; see
 [`docs/HARDENING.md`](docs/HARDENING.md) before using a less trusted network.
 
 ## Recommended starting models
@@ -124,6 +130,8 @@ sudo bc250-maintenance setup --defaults
 bc250-openwebui-setup status
 sudo bc250-maintenance clean-cache
 sudo bc250-revalidate status          # opt-in appliance revalidation state
+# Destructive greenfield reset (operator documents are preserved):
+# sudo bc250-reset
 
 # Compare models and specialized model categories
 bc250-benchmark
@@ -190,7 +198,7 @@ Repository groups:
 - [`docs/openwebui-settings.md`](docs/openwebui-settings.md): current UI connections and model roles.
 - [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): package, configuration and state paths.
 - [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): services, ports and persistent data.
-- [`docs/UNINSTALL.md`](docs/UNINSTALL.md): RPM removal versus full purge.
+- [`docs/UNINSTALL.md`](docs/UNINSTALL.md): RPM removal versus greenfield appliance reset.
 
 ## Acknowledgements
 

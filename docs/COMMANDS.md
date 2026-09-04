@@ -37,8 +37,10 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-status` | Concise read-only appliance status |
 | `bc250-storage` | Report/dedupe/prune package-owned storage |
 | `bc250-swap-profile` | Inspect or change zram/disk-swap policy |
-| `bc250-uninstall` | Explicit full appliance purge |
-| `bc250-uninstall-info` | Print the full purge policy |
+| `bc250-reset` | Reset the dedicated pre-1.0 appliance configuration |
+| `bc250-reset-info` | Print the reset contract |
+| `bc250-uninstall` | Compatibility alias for `bc250-reset` |
+| `bc250-uninstall-info` | Compatibility alias for `bc250-reset-info` |
 | `bc250-verify` | Detailed local installation verification |
 | `bc250-verify-lan` | Test the web endpoint from another machine |
 | `llm-run-diagnose` | Capture a model-run diagnostic |
@@ -231,7 +233,7 @@ See [`../MODELS.md`](../MODELS.md) for model roles/swapping and
 ## Storage
 
 ```text
-sudo bc250-storage status
+bc250-storage status
 sudo bc250-storage dedupe [--yes]
 sudo bc250-storage prune-sources [--yes]
 sudo bc250-storage prune-40cu [--yes]
@@ -252,14 +254,26 @@ kernel no longer exists under `/usr/lib/modules`. No storage cleanup is automati
 ## Runtime profiles
 
 ```text
-bc250-memory-profile {status|recommend|apply-full|remove}
-bc250-swap-profile {status|apply|remove}
-bc250-ollama-profile {status|balanced|max-context|reset}
+bc250-memory-profile status
+bc250-memory-profile recommend
+sudo bc250-memory-profile ensure
+sudo bc250-memory-profile apply-full
+sudo bc250-memory-profile remove
+
+bc250-swap-profile status
+sudo bc250-swap-profile ensure
+sudo bc250-swap-profile apply
+sudo bc250-swap-profile remove
+
+bc250-ollama-profile status
+sudo bc250-ollama-profile balanced
+sudo bc250-ollama-profile max-context
+sudo bc250-ollama-profile reset
 ```
 
-- The reviewed memory profile applies only the two TTM limits and removes the
-  older package-managed `amdgpu.gttsize` / full `amdgpu.ppfeaturemask` overrides.
-  It does not reboot automatically.
+- `ensure` is the idempotent installer path. The memory helper owns the two TTM
+  limits and removal of `amdgpu.gttsize` / full `amdgpu.ppfeaturemask` overrides;
+  the swap helper owns its complete zram/fstab/swap-file state. Neither reboots.
 - The swap profile defaults to 2 GiB zram and a 16 GiB disk swap file.
   `ZRAM_MIB`, `SWAP_GIB` and optional `SWAPPINESS=0..200` override it.
 - The balanced Ollama profile uses 32K context and q8_0 KV cache. Max-context
@@ -269,12 +283,16 @@ bc250-ollama-profile {status|balanced|max-context|reset}
 
 ```text
 bc250-cu-status
-bc250-40cu
-bc250-40cu {status|verify|prepare|enable|disable|restore}
-bc250-40cu {live-status|live-full|live-stock}
-bc250-40cu {mask|unmask} WGP_ID [WGP_ID ...]
-bc250-40cu health-test [OLLAMA_MODEL]
-bc250-cu-live-manager {menu|status}
+sudo bc250-40cu status
+sudo bc250-40cu verify
+sudo bc250-40cu prepare
+sudo bc250-40cu enable
+sudo bc250-40cu disable
+sudo bc250-40cu restore
+sudo bc250-40cu {live-status|live-full|live-stock}
+sudo bc250-40cu {mask|unmask} WGP_ID [WGP_ID ...]
+sudo bc250-40cu health-test [OLLAMA_MODEL]
+sudo bc250-cu-live-manager {menu|status}
 ```
 
 `bc250-40cu enable` requires the phrase `ENABLE-40CU` and reboots. Live
@@ -374,7 +392,7 @@ operator models, users, prompts and knowledge are not synchronized away.
 Agent mode is separate from Open WebUI:
 
 ```text
-sudo bc250-agent-mode status
+bc250-agent-mode status
 sudo bc250-agent-mode enter
 sudo bc250-agent-mode leave
 ```
@@ -385,11 +403,11 @@ backend; leaving restores normal mode.
 ## Maintenance
 
 ```text
-bc250-maintenance setup [--defaults]
-bc250-maintenance status
-bc250-maintenance run {backup|prune|all}
-bc250-maintenance clean-cache
-bc250-maintenance disable
+sudo bc250-maintenance setup [--defaults]
+sudo bc250-maintenance status
+sudo bc250-maintenance run {backup|prune|all}
+sudo bc250-maintenance clean-cache
+sudo bc250-maintenance disable
 ```
 
 `setup --defaults` enables verified local backups only. `clean-cache` requires
@@ -425,14 +443,18 @@ runtime values. When supported, the runner passes `--cache-ram 0` and
 `--no-cache-idle-slots` to avoid shared serialized prompt-cache state and its
 RAM reservation.
 
-## Uninstall
+## Reset / package removal
 
 ```text
-bc250-uninstall [--yes]
-bc250-uninstall-info
+sudo bc250-reset [--yes]
+bc250-reset-info
+sudo bc250-uninstall [--yes]  # compatibility alias
+bc250-uninstall-info          # compatibility alias
 ```
 
-The full purge removes application data, models, profiles, setup-added
-packages, official Ollama and verified CU changes after dedicated confirmation.
-Ordinary `dnf remove bc250-llm-server.x86_64` retains persistent data. Read
+The greenfield reset removes BC-250-owned runtime state, profiles, official Ollama
+and verified CU changes after dedicated confirmation while preserving
+`/srv/bc250-documents`. It does not reconstruct historical host ownership, roll
+back Fedora upgrades or shrink filesystems. Ordinary
+`dnf remove bc250-llm-server.x86_64` retains persistent data. Read
 [`UNINSTALL.md`](UNINSTALL.md) first.

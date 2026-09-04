@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -134,25 +135,31 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
+        )
         self.assertNotIn("pull-embedding-model", dispatcher)
         self.assertNotIn("install-cu-manager", dispatcher)
         self.assertNotIn("log_sensors.sh", manifest)
         self.assertNotIn("fetch-embeddings|", dispatcher)
         self.assertIn("models/modelctl.py\t{libexec}/modelctl", manifest)
-        self.assertIn(
-            "Environment=RAG_EMBEDDING_MODEL=embed-jina-v5-small-retrieval-q4-k-m",
-            quadlet,
+        self.assertEqual(
+            desired["embedding"]["RAG_EMBEDDING_MODEL"],
+            "embed-jina-v5-small-retrieval-q4-k-m",
         )
-        self.assertIn("Environment=RAG_TEXT_SPLITTER=token", quadlet)
-        self.assertIn("Environment=CHUNK_SIZE=1500", quadlet)
-        self.assertIn("Environment=CHUNK_OVERLAP=200", quadlet)
-        self.assertIn("Environment=RAG_TOP_K=8", quadlet)
-        self.assertIn("Environment=ENABLE_RETRIEVAL_QUERY_GENERATION=false", quadlet)
-        self.assertIn("Environment=ENABLE_TITLE_GENERATION=true", quadlet)
-        self.assertIn("Environment=ENABLE_TAGS_GENERATION=true", quadlet)
-        self.assertIn("Environment=ENABLE_FOLLOW_UP_GENERATION=false", quadlet)
-        self.assertIn("Environment=ENABLE_AUTOCOMPLETE_GENERATION=false", quadlet)
-        self.assertIn("Environment=ENABLE_SEARCH_QUERY_GENERATION=false", quadlet)
+        self.assertEqual(desired["embedding"]["ollama_config"]["url"], "http://host.containers.internal:11437")
+        self.assertEqual(desired["rag"]["TEXT_SPLITTER"], "token")
+        self.assertEqual(desired["rag"]["CHUNK_SIZE"], 1500)
+        self.assertEqual(desired["rag"]["CHUNK_OVERLAP"], 200)
+        self.assertEqual(desired["rag"]["TOP_K"], 8)
+        self.assertFalse(desired["task"]["ENABLE_RETRIEVAL_QUERY_GENERATION"])
+        self.assertTrue(desired["task"]["ENABLE_TITLE_GENERATION"])
+        self.assertTrue(desired["task"]["ENABLE_TAGS_GENERATION"])
+        self.assertFalse(desired["task"]["ENABLE_FOLLOW_UP_GENERATION"])
+        self.assertFalse(desired["task"]["ENABLE_AUTOCOMPLETE_GENERATION"])
+        self.assertFalse(desired["task"]["ENABLE_SEARCH_QUERY_GENERATION"])
+        self.assertNotIn("RAG_EMBEDDING_MODEL=", quadlet)
+        self.assertNotIn("CHUNK_SIZE=", quadlet)
 
     def test_rpm_post_is_small_and_defers_provisioning(self) -> None:
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
@@ -168,6 +175,8 @@ class PackagingTests(unittest.TestCase):
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
+        self.assertIn('source "$runtime_env"', installer)
+        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.2"', installer)
         self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
         self.assertIn("BC250_OLLAMA_VERSION=0.33.2", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
@@ -215,14 +224,19 @@ class PackagingTests(unittest.TestCase):
 
     def test_open_webui_connection_config_is_valid_and_matches_packaged_roles(self) -> None:
         helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
+        )
         models = (ROOT / "config/openwebui/models.json").read_text(encoding="utf-8")
-        self.assertIn('MAIN_URL = "http://host.containers.internal:11434"', helper)
-        self.assertIn('TASK_URL = "http://host.containers.internal:11435"', helper)
-        self.assertIn('EMBED_URL = "http://host.containers.internal:11437"', helper)
-        self.assertIn('"OLLAMA_BASE_URLS": [MAIN_URL, TASK_URL]', helper)
-        self.assertIn('"tags": ["production"]', helper)
-        self.assertIn('"tags": ["task"]', helper)
-        self.assertNotIn('http://host.containers.internal:11436', helper)
+        self.assertEqual(
+            desired["ollama"]["OLLAMA_BASE_URLS"],
+            ["http://host.containers.internal:11434", "http://host.containers.internal:11435"],
+        )
+        self.assertEqual(desired["embedding"]["ollama_config"]["url"], "http://host.containers.internal:11437")
+        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["0"]["tags"], ["production"])
+        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["1"]["tags"], ["task"])
+        self.assertNotIn("http://host.containers.internal:11436", json.dumps(desired))
+        self.assertIn("desired-state.json", helper)
         self.assertIn('"bc250-office-standard"', models)
         self.assertIn('"bc250-office-deep-reasoning"', models)
 
@@ -275,7 +289,10 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn('Environment="TASK_MODEL_PARAMS={}"', quadlet)
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(desired["task"]["TASK_MODEL_PARAMS"], {})
         self.assertIn("Environment=ENABLE_DIRECT_CONNECTIONS=false", quadlet)
         self.assertIn("Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false", quadlet)
         self.assertIn("Environment=RAG_FILE_MAX_SIZE=128", quadlet)
@@ -290,9 +307,11 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('/ollama/config/update', helper)
         self.assertIn("Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false", quadlet)
         self.assertIn("Environment=RAG_SYSTEM_CONTEXT=false", quadlet)
-        self.assertIn("Environment=CHUNK_MIN_SIZE_TARGET=0", quadlet)
-        self.assertIn("Environment=RAG_EMBEDDING_BATCH_SIZE=1", quadlet)
-        self.assertIn("Environment=TIKA_SERVER_VERSION=3", quadlet)
+        self.assertEqual(desired["rag"]["CHUNK_MIN_SIZE_TARGET"], 0)
+        self.assertEqual(desired["embedding"]["RAG_EMBEDDING_BATCH_SIZE"], 1)
+        self.assertEqual(desired["rag"]["TIKA_SERVER_VERSION"], "3")
+        self.assertNotIn("CHUNK_MIN_SIZE_TARGET=", quadlet)
+        self.assertNotIn("RAG_EMBEDDING_BATCH_SIZE=", quadlet)
         self.assertNotIn("Environment=ENABLE_ORJSON=true", quadlet)
 
     def test_compare_mtp_does_not_force_global_think_false(self) -> None:
@@ -404,14 +423,14 @@ class PackagingTests(unittest.TestCase):
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         canonical = "ttm.pages_limit=4194304 ttm.page_pool_size=4194304"
         self.assertIn(f'FULL_MEMORY_ARGS="{canonical}"', profile)
-        for token in ("ttm.pages_limit=4194304", "ttm.page_pool_size=4194304"):
-            self.assertIn(token, installer)
+        self.assertIn("bc250-memory-profile ensure", installer)
+        self.assertNotIn("ttm.pages_limit=4194304", installer)
+        self.assertNotIn("ttm.page_pool_size=4194304", installer)
         self.assertNotIn("amdgpu.gttsize=14750", installer)
         self.assertNotIn("amdgpu.ppfeaturemask=0xffffffff", installer)
         self.assertIn("amdgpu.gttsize", profile)
         self.assertIn("amdgpu.ppfeaturemask", profile)
         self.assertIn("legacy", profile.lower())
-        self.assertIn("mapfile -t kernel_args", installer)
         self.assertNotIn("apply-safe", profile)
 
 

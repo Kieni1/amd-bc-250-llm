@@ -439,14 +439,17 @@ else
 fi
 
 section "Documents / RAG"
-rag_env="$(podman inspect open-webui --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null || true)"
-rag_embedding_model="$(awk -F= '$1 == "RAG_EMBEDDING_MODEL" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
-rag_embedding_url="$(awk -F= '$1 == "RAG_OLLAMA_BASE_URL" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
-rag_extraction_engine="$(awk -F= '$1 == "CONTENT_EXTRACTION_ENGINE" {sub(/^[^=]*=/, ""); print; exit}' <<< "$rag_env")"
+desired_state="${BC250_OWUI_DESIRED_STATE:-/usr/share/bc250-llm-server/openwebui/desired-state.json}"
+if [[ ! -r "$desired_state" ]]; then
+  desired_state="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
+fi
+rag_embedding_model="$(jq -r '.embedding.RAG_EMBEDDING_MODEL // empty' "$desired_state" 2>/dev/null || true)"
+rag_embedding_url="$(jq -r '.embedding.ollama_config.url // empty' "$desired_state" 2>/dev/null || true)"
+rag_extraction_engine="$(jq -r '.rag.CONTENT_EXTRACTION_ENGINE // empty' "$desired_state" 2>/dev/null || true)"
 embedding_tags="$(curl -fsS http://127.0.0.1:11437/api/tags 2>/dev/null || true)"
 if [[ -n "$rag_embedding_model" ]]; then
-  info "Open WebUI embedding default: $rag_embedding_model"
-  [[ -n "$rag_embedding_url" ]] && info "Open WebUI embedding endpoint: $rag_embedding_url"
+  info "Package RAG embedding default: $rag_embedding_model"
+  [[ -n "$rag_embedding_url" ]] && info "Package RAG embedding endpoint: $rag_embedding_url"
   if ((agent_active)); then
     info "embedding registration check deferred while exclusive agent mode stops :11437"
   elif [[ -n "$embedding_tags" ]] && jq -e --arg model "$rag_embedding_model" \
@@ -457,10 +460,10 @@ if [[ -n "$rag_embedding_model" ]]; then
     bad "default RAG embedding model is not registered on dedicated embedding Ollama :11437"
   fi
 else
-  warn "Open WebUI RAG embedding model is not visible in the container environment"
+  bad "package Open WebUI desired state does not define a RAG embedding model"
 fi
-[[ -n "$rag_extraction_engine" ]] && info "Open WebUI extraction engine: $rag_extraction_engine" || \
-  warn "Open WebUI extraction engine is not visible in the container environment"
+[[ -n "$rag_extraction_engine" ]] && info "Package extraction engine: $rag_extraction_engine" || \
+  warn "package Open WebUI desired state does not define an extraction engine"
 if command -v bc250-openwebui-setup >/dev/null 2>&1; then
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
     owui_drift="$(bc250-openwebui-setup status 2>&1)"

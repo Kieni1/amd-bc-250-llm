@@ -6,23 +6,21 @@ umask 0022
 readonly SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
 readonly ORIGINAL_ARGS=("$@")
 readonly LOG_FILE="${BC250_INSTALL_LOG:-/var/log/bc250-llm-install.log}"
-readonly STATE_DIR="/var/lib/bc250-llm-server/install"
-# Keep the guided installer self-contained; runtime-only pins remain package-owned.
-readonly BC250_OLLAMA_VERSION="0.33.2"
-PACKAGE_BASELINE=""
+runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
+if [[ ! -r "$runtime_env" ]]; then
+  runtime_env="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/runtime.env"
+fi
+[[ -r "$runtime_env" ]] || { echo "ERROR: runtime metadata missing: $runtime_env" >&2; exit 1; }
+# shellcheck disable=SC1090
+source "$runtime_env"
 INSTALL_MODE="full"
 HF_AUTH_PREPARED=0
-
-cleanup_temporary_files() {
-  [[ -z "$PACKAGE_BASELINE" ]] || rm -f -- "$PACKAGE_BASELINE"
-}
-trap cleanup_temporary_files EXIT
 
 usage() {
   cat <<'USAGE'
 Usage: sudo bc250-install [--models-only]
 
-Before 1.0 this is a pre-1.0 green-field appliance setup. Apply or resume the packaged BC-250 setup. The command checks current
+Before 1.0 this is a pre-1.0 greenfield appliance setup. Apply or resume the packaged BC-250 setup. The command checks current
 state, avoids completed work where practical, applies the TTM/swap baseline,
 prepares optional 40-CU support for the exact running kernel, offers one unified
 model selection, configures Open WebUI, and verifies the result.
@@ -58,73 +56,6 @@ require_progress_terminal() {
     echo "ERROR: /usr/bin/script is required (Fedora package: util-linux-script)." >&2
     exit 1
   }
-}
-
-write_state_once() {
-  local name="$1" value="$2" path
-  path="$STATE_DIR/$name"
-  [[ -e "$path" ]] && return
-  printf '%s\n' "$value" > "$path"
-  chmod 0600 "$path"
-}
-
-capture_package_baseline() {
-  [[ -z "$PACKAGE_BASELINE" ]] || rm -f -- "$PACKAGE_BASELINE"
-  PACKAGE_BASELINE="$(mktemp /run/bc250-packages-before.XXXXXX)"
-  rpm -qa --qf '%{NAME}\n' | LC_ALL=C sort -u > "$PACKAGE_BASELINE"
-}
-
-record_added_packages() {
-  [[ -n "$PACKAGE_BASELINE" && -s "$PACKAGE_BASELINE" ]] || return
-  local current additions merged
-  current="$(mktemp /run/bc250-packages-current.XXXXXX)"
-  additions="$(mktemp /run/bc250-packages-added.XXXXXX)"
-  merged="$(mktemp "$STATE_DIR/.packages-added.XXXXXX")"
-  rpm -qa --qf '%{NAME}\n' | LC_ALL=C sort -u > "$current"
-  LC_ALL=C comm -13 "$PACKAGE_BASELINE" "$current" | \
-    grep -vx 'bc250-llm-server' > "$additions" || true
-  {
-    [[ ! -r "$STATE_DIR/packages-added.txt" ]] || \
-      cat "$STATE_DIR/packages-added.txt"
-    cat "$additions"
-  } | LC_ALL=C sort -u > "$merged"
-  install -m0600 "$merged" "$STATE_DIR/packages-added.txt"
-  rm -f -- "$current" "$additions" "$merged"
-  capture_package_baseline
-}
-
-capture_install_state() {
-  install -d -m0700 "$STATE_DIR"
-
-  # Earlier releases did not record the pre-install state. Do not guess who
-  # owns an already-applied network policy; a later purge must preserve an
-  # unknown state. Reinstalls keep the first record.
-  if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 && \
-      [[ ! -e "$STATE_DIR/fresh-package" && ! -e "$STATE_DIR/firewall-http-before" ]]; then
-    write_state_once firewall-http-before unknown
-  elif command -v firewall-cmd >/dev/null 2>&1 && \
-      systemctl is-active --quiet firewalld.service; then
-    if firewall-cmd --quiet --permanent --query-service=http; then
-      write_state_once firewall-http-before enabled
-    else
-      write_state_once firewall-http-before disabled
-    fi
-  else
-    write_state_once firewall-http-before unavailable
-  fi
-
-  if rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 && \
-      [[ ! -e "$STATE_DIR/fresh-package" && ! -e "$STATE_DIR/selinux-httpd-before" ]]; then
-    write_state_once selinux-httpd-before unknown
-  elif command -v getsebool >/dev/null 2>&1; then
-    write_state_once selinux-httpd-before \
-      "$(getsebool httpd_can_network_connect 2>/dev/null | awk '{print $3}' || printf unknown)"
-  else
-    write_state_once selinux-httpd-before unavailable
-  fi
-
-  rm -f -- "$STATE_DIR/fresh-package"
-  capture_package_baseline
 }
 
 capture_input_mode() {
@@ -301,44 +232,15 @@ step_3_install_ollama() {
   hash -r
   remove_fedora_ollama
   echo "Reconciling official Ollama ${requested} with the package-owned main service."
-  BC250_ASSUME_YES=1 OLLAMA_VERSION="$requested" bc250-install-ollama
+  BC250_ASSUME_YES=1 OLLAMA_VERSION="$requested" OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" bc250-install-ollama
   hash -r
 }
 
 step_4_memory_and_swap() {
-  heading "4. APPLY MEMORY AND SWAP PROFILES"
+  heading "4. ENSURE MEMORY AND SWAP PROFILES"
   rpm -q zram-generator >/dev/null 2>&1 || dnf install -y zram-generator
-  local memory_args=(
-    ttm.pages_limit=4194304
-    ttm.page_pool_size=4194304
-  )
-  local configured=1 token args_line
-  local -a kernel_args=()
-  mapfile -t kernel_args < <(grubby --info=ALL | sed -n 's/^args="\(.*\)"$/\1/p')
-  ((${#kernel_args[@]})) || configured=0
-  for args_line in "${kernel_args[@]}"; do
-    for token in "${memory_args[@]}"; do
-      case " $args_line " in
-        *" $token "*) ;;
-        *) configured=0 ;;
-      esac
-    done
-    case " $args_line " in
-      *" amdgpu.gttsize="*|*" amdgpu.ppfeaturemask="*) configured=0 ;;
-    esac
-  done
-  if ((configured == 0)); then
-    BC250_ASSUME_YES=1 bc250-memory-profile apply-full
-  elif ! bc250-memory-profile status --quiet >/dev/null 2>&1; then
-    echo "Memory profile is configured but is not active yet."
-  fi
-  if [[ ! -s /var/lib/bc250-llm-server/swap/bc250-llm.swap ]]; then
-    BC250_ASSUME_YES=1 bc250-swap-profile apply
-  else
-    echo "Swap file already exists; keeping it."
-  fi
-  record_added_packages
-
+  bc250-memory-profile ensure
+  bc250-swap-profile ensure
 }
 
 prepare_hf_authentication() {
@@ -377,7 +279,6 @@ step_5_prepare_40cu() {
   kernel="$(uname -r)"
   echo "Installing build files for the exact running kernel: $kernel"
   dnf install -y "kernel-devel-$kernel"
-  record_added_packages
   bc250-40cu prepare
   if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
     echo "Persistent 40-CU mode is configured."
@@ -466,7 +367,7 @@ show_plan() {
   local kernel="" memory="active" swap="pending" cu="prepare for $(uname -r)" ollama="install/update" reboot="no"
   kernel="$(pending_kernel || true)"
   bc250-memory-profile status --quiet >/dev/null 2>&1 || memory="configure/pending reboot"
-  [[ -s /var/lib/bc250-llm-server/swap/bc250-llm.swap ]] && swap="configured"
+  bc250-swap-profile status --quiet >/dev/null 2>&1 && swap="configured"
   if [[ -x /usr/local/bin/ollama ]] && [[ "$(ollama_version /usr/local/bin/ollama)" == "$BC250_OLLAMA_VERSION" ]]; then
     ollama="current ($BC250_OLLAMA_VERSION)"
   fi
@@ -573,12 +474,9 @@ main() {
     run_models_only
     return
   fi
-  capture_install_state
   show_plan
   step_1_grow_root_filesystem
-  record_added_packages
   step_2_update_fedora
-  capture_package_baseline
   step_3_install_ollama
   step_4_memory_and_swap
   request_primary_reboot_if_needed
@@ -596,8 +494,9 @@ main() {
   else
     echo "40-CU support is prepared but disabled; maintenance timers were not changed."
   fi
-  echo "Next: sudo bc250-40cu  # test a stable CU configuration for this board"
-  echo "Open WebUI desired-state setup/status: sudo bc250-openwebui-setup init|status"
+  echo "Optional CU experiment/inspection: sudo bc250-40cu status"
+  echo "Open WebUI initialization: sudo bc250-openwebui-setup init"
+  echo "Open WebUI desired-state status: bc250-openwebui-setup status"
   echo "Exclusive coding mode: sudo bc250-agent-mode enter; leave with sudo bc250-agent-mode leave"
 }
 

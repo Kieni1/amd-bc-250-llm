@@ -78,6 +78,8 @@ class StorageTests(unittest.TestCase):
         self.assertIn('["systemctl", "stop", unit], check=True', source)
         self.assertIn("services still active after stop", source)
         self.assertIn("failed to restore previously active services", source)
+        self.assertIn("finally:", source)
+        self.assertNotIn("error: Exception | None", source)
 
 
 if __name__ == "__main__":

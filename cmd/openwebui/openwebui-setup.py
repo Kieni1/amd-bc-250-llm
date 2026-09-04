@@ -16,29 +16,33 @@ from typing import Any
 DEFAULT_URL = "http://127.0.0.1:3000"
 DEFAULT_MODELS = Path("/usr/share/bc250-llm-server/openwebui/models.json")
 SOURCE_MODELS = Path(__file__).resolve().parents[2] / "config/openwebui/models.json"
-TASK_MODEL = "task-gemma3-1b-unsloth-ud-q4-k-xl:latest"
-EMBED_MODEL = "embed-jina-v5-small-retrieval-q4-k-m"
-MAIN_URL = "http://host.containers.internal:11434"
-TASK_URL = "http://host.containers.internal:11435"
-EMBED_URL = "http://host.containers.internal:11437"
-RAG_TEMPLATE = (
-    "Answer the user from the supplied context. If the requested fact is not supported by the context, "
-    "state that the available documents do not provide sufficient evidence. Do not fill missing document facts "
-    "from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the "
-    "user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use "
-    "inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>"
-)
-PRODUCTION_MODELS = [
-    "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
-    "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
-    "prod-gpt-oss20b-ggml-org-mxfp4:latest",
-    "prod-lfm25-8b-a1b-liquidai-q6-k:latest",
-    "prod-qwen35-9b-unsloth-q6-k:latest",
-]
-TASK_MODELS = [
-    TASK_MODEL,
-    "task-lfm25-2.6b-liquidai-q6-k:latest",
-]
+DEFAULT_DESIRED = Path("/usr/share/bc250-llm-server/openwebui/desired-state.json")
+SOURCE_DESIRED = Path(__file__).resolve().parents[2] / "config/openwebui/desired-state.json"
+
+
+def desired_file() -> Path:
+    override = os.environ.get("BC250_OWUI_DESIRED_STATE")
+    if override:
+        return Path(override)
+    if DEFAULT_DESIRED.is_file():
+        return DEFAULT_DESIRED
+    return SOURCE_DESIRED
+
+
+def load_desired_state() -> dict[str, Any]:
+    path = desired_file()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"cannot read Open WebUI desired state {path}: {exc}") from exc
+    if not isinstance(data, dict) or any(not isinstance(data.get(k), dict) for k in ("ollama", "task", "embedding", "rag")):
+        raise RuntimeError(f"invalid Open WebUI desired state: {path}")
+    return data
+
+
+DESIRED = load_desired_state()
+TASK_MODEL = str(DESIRED["task"]["TASK_MODEL"])
+EMBED_MODEL = str(DESIRED["embedding"]["RAG_EMBEDDING_MODEL"])
 
 
 class ApiError(RuntimeError):
@@ -121,52 +125,19 @@ def load_models() -> dict[str, Any]:
 
 
 def desired_ollama() -> dict[str, Any]:
-    return {
-        "ENABLE_OLLAMA_API": True,
-        "OLLAMA_BASE_URLS": [MAIN_URL, TASK_URL],
-        "OLLAMA_API_CONFIGS": {
-            "0": {
-                "enable": True,
-                "model_ids": PRODUCTION_MODELS,
-                "tags": ["production"],
-                "connection_type": "local",
-            },
-            "1": {
-                "enable": True,
-                "model_ids": TASK_MODELS,
-                "tags": ["task"],
-                "connection_type": "local",
-            },
-        },
-    }
+    return dict(DESIRED["ollama"])
+
+
+def desired_task() -> dict[str, Any]:
+    return dict(DESIRED["task"])
 
 
 def desired_embedding() -> dict[str, Any]:
-    return {
-        "RAG_EMBEDDING_ENGINE": "ollama",
-        "RAG_EMBEDDING_MODEL": EMBED_MODEL,
-        "RAG_EMBEDDING_BATCH_SIZE": 1,
-        "ENABLE_ASYNC_EMBEDDING": False,
-        "RAG_EMBEDDING_CONCURRENT_REQUESTS": 1,
-        "ollama_config": {"url": EMBED_URL, "key": ""},
-    }
+    return dict(DESIRED["embedding"])
 
 
 def desired_rag() -> dict[str, Any]:
-    return {
-        "RAG_TEMPLATE": RAG_TEMPLATE,
-        "TOP_K": 8,
-        "ENABLE_RAG_HYBRID_SEARCH": False,
-        "RELEVANCE_THRESHOLD": 0,
-        "CONTENT_EXTRACTION_ENGINE": "tika",
-        "TIKA_SERVER_URL": "http://tika:9998",
-        "TIKA_SERVER_VERSION": "3",
-        "TEXT_SPLITTER": "token",
-        "ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER": True,
-        "CHUNK_SIZE": 1500,
-        "CHUNK_MIN_SIZE_TARGET": 0,
-        "CHUNK_OVERLAP": 200,
-    }
+    return dict(DESIRED["rag"])
 
 
 def authenticate(client: Client, action: str) -> str:
@@ -203,19 +174,7 @@ def apply(client: Client) -> None:
     task = client.get("/api/v1/tasks/config")
     if not isinstance(task, dict):
         raise ApiError("task config response was not an object")
-    task.update(
-        {
-            "TASK_MODEL": TASK_MODEL,
-            "TASK_MODEL_EXTERNAL": None,
-            "TASK_MODEL_PARAMS": {},
-            "ENABLE_TITLE_GENERATION": True,
-            "ENABLE_TAGS_GENERATION": True,
-            "ENABLE_FOLLOW_UP_GENERATION": False,
-            "ENABLE_AUTOCOMPLETE_GENERATION": False,
-            "ENABLE_SEARCH_QUERY_GENERATION": False,
-            "ENABLE_RETRIEVAL_QUERY_GENERATION": False,
-        }
-    )
+    task.update(desired_task())
     client.post("/api/v1/tasks/config/update", task)
     client.post("/api/v1/retrieval/embedding/update", desired_embedding())
     client.post("/api/v1/retrieval/config/update", desired_rag())
@@ -257,17 +216,7 @@ def status(client: Client, authenticated: bool) -> int:
             problems.append(f"Ollama config differs: {key}")
 
     task = require_object(client.get("/api/v1/tasks/config"), "task config")
-    expected_task = {
-        "TASK_MODEL": TASK_MODEL,
-        "TASK_MODEL_EXTERNAL": None,
-        "TASK_MODEL_PARAMS": {},
-        "ENABLE_TITLE_GENERATION": True,
-        "ENABLE_TAGS_GENERATION": True,
-        "ENABLE_FOLLOW_UP_GENERATION": False,
-        "ENABLE_AUTOCOMPLETE_GENERATION": False,
-        "ENABLE_SEARCH_QUERY_GENERATION": False,
-        "ENABLE_RETRIEVAL_QUERY_GENERATION": False,
-    }
+    expected_task = desired_task()
     for key, value in expected_task.items():
         if canonical(task.get(key)) != canonical(value):
             problems.append(f"Task config differs: {key}")

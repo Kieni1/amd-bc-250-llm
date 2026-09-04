@@ -7,8 +7,9 @@ The package uses two layers deliberately:
 
 1. the Quadlet supplies safe bootstrap/offline defaults so a new database starts
    locally and conservatively;
-2. `bc250-openwebui-setup` applies the package-owned application state through
-   Open WebUI's supported administrator APIs after authentication.
+2. `/usr/share/bc250-llm-server/openwebui/desired-state.json` is the single
+   package authority for persisted providers/task/embedding/RAG settings;
+   `bc250-openwebui-setup` applies it through supported administrator APIs.
 
 The package never edits `webui.db` directly and does not store the administrator
 password or the temporary API/session token used for setup. It does persist a
@@ -41,7 +42,9 @@ reset it.
 
 ## Configuration ownership
 
-The package manages only the settings needed to make the appliance coherent:
+The package manages only the settings needed to make the appliance coherent.
+Those persisted values live in `desired-state.json`, not as duplicate Quadlet
+environment variables:
 
 - normal Open WebUI Ollama providers: main `11434` and task `11435`;
 - the local task model and conservative task-generation toggles;
@@ -150,9 +153,9 @@ networks.
 
 ## Persistent settings and upgrades
 
-Open WebUI persists many settings in its database. That is why the package now
-uses a supported, explicit API setup/drift workflow instead of assuming Quadlet
-environment variables remain authoritative forever. This pre-1.0 release does
+Open WebUI persists many settings in its database. The packaged JSON plus the
+supported API setup/drift workflow are therefore authoritative for package-owned
+application state; the Quadlet is limited to process bootstrap/runtime controls. This pre-1.0 release does
 not add automatic database-backup/migration machinery; treat application data as
 test-appliance state and keep any operator-required backup policy separate.
 
