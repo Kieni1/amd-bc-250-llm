@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0-1.1 - 2026-09-05
+
+- Recreate the Tika and Open WebUI Quadlets after installer firewall/Quadlet reconciliation and skip firewalld reloads when the HTTP policy is already current, preventing stale Podman DNS/host-gateway state after updates.
+- Add `bc250-install --owui-token-file FILE`; Open WebUI setup now offers token-file choice 3, suggests an existing protected `/root/owui-test.key`, and reuses the transient authenticated token for final desired-state verification without persisting it.
+- Split `bc250-verify` container-path diagnostics into private Tika DNS, Tika HTTP, `host.containers.internal` DNS and per-lane Ollama connectivity checks.
+- Advance `bc250-revalidate` to v3.8 with an early Open WebUI private-network preflight before model benchmarks, clearer helper failure output, and a live foreground phase/stage indicator; `--detach` retains immediate-return behavior.
+- Keep the static `llm-run-diagnose --no-load` report model-neutral instead of selecting an arbitrary installed experiment.
+- Reduce update noise by avoiding redundant kernel-devel reconciliation when 40-CU is already prepared and suppressing the redundant full model catalog during baseline task/embedding reconciliation before the single optional selection.
+
 ## 0.10.0-1.0 - 2026-09-05
 
 - Stabilize `bc250-revalidate` v3.7 so child benchmark/sampler failures cannot invoke global recovery, successful workers do not delete/reload their own active systemd unit, and bundles retain the harness journal plus shell error context.

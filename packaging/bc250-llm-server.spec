@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        1.0%{?dist}
+Release:        1.1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.1
+- Recreate Open WebUI/Tika after application-network reconciliation and avoid unnecessary firewalld reloads so Podman DNS/host-gateway connectivity remains valid after updates.
+- Add protected Open WebUI token-file setup/verification, early revalidation network preflight, and foreground revalidation progress with optional --detach.
+- Split verifier diagnostics for private Tika DNS/HTTP and host-gateway Ollama connectivity; keep static parity checks model-neutral.
+
 * Sat Sep 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.0
 - Stabilize whole-appliance revalidation control flow: child benchmarks/samplers cannot own global recovery, finished workers no longer remove/reload themselves, and failure bundles include worker error context plus the harness journal.
 - Run Open WebUI RAG tuning through the package workspace preset, classify tuning outcomes accurately, and skip authenticated A/B work when package-owned OWUI state is drifted.
