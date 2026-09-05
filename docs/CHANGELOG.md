@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.10.0-1.0 - 2026-09-05
+
+- Stabilize `bc250-revalidate` v3.7 so child benchmark/sampler failures cannot invoke global recovery, successful workers do not delete/reload their own active systemd unit, and bundles retain the harness journal plus shell error context.
+- Use the package-facing `bc250-office-documents` Open WebUI workspace model for authenticated chunk/system-context experiments; record helper outcomes and skip tuning when package-owned OWUI state is drifted.
+- Increase the direct `rag-quality` answer budget to 1024 tokens by default, classify retrieval/answer/citation/thinking-budget exhaustion separately, and add a diagnostic default-vs-`think=false` A/B without changing the production preset.
+- Keep noninteractive generic generation benchmarks production-scoped unless experimental models are explicitly named or `BENCH_INCLUDE_EXPERIMENTS=1` is set.
+- Keep experiment documentation validation one-way: documented experiment IDs must exist, but adding another structurally valid `exp-*` Modelfile no longer fails package validation merely because the prose inventory has not yet been expanded.
+- Add the Qwen3.8 9B, Qwythos 9B and TIR Qwen3.5 9B non-thinking experimental definitions while leaving production defaults unchanged.
+- Keep completed revalidation work state inspectable until `cleanup` or the next `start`; `status` now reports the bundle for the current run.
+- Make authenticated OWUI helper errors fail as infrastructure only after their exit/outcome data are written, while quality status `3` remains nonfatal.
+- Improve agent acceptance diagnostics and align the Bash fixture with its stated spaces-in-path requirement rather than an unstated arbitrary-newline requirement.
+
 ## 0.10.0-0.7.testing - 2026-09-04
 
 - Preflight custom Ollama service overrides before invoking the pinned upstream installer; reject upstream-looking units with operator additions.

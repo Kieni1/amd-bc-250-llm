@@ -11,8 +11,8 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        0.7.testing%{?dist}
-Summary:        Testing local LLM server integration for AMD BC-250 hardware
+Release:        1.0%{?dist}
+Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
 Source0:        %{name}-%{version}.tar.gz
@@ -210,6 +210,15 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.0
+- Stabilize whole-appliance revalidation control flow: child benchmarks/samplers cannot own global recovery, finished workers no longer remove/reload themselves, and failure bundles include worker error context plus the harness journal.
+- Run Open WebUI RAG tuning through the package workspace preset, classify tuning outcomes accurately, and skip authenticated A/B work when package-owned OWUI state is drifted.
+- Improve RAG-quality diagnostics for thinking-budget exhaustion, add a default-vs-nonthinking diagnostic A/B, and give the direct grounded-answer lane a larger explicit answer budget.
+- Keep noninteractive generation benchmarking production-scoped unless experimental models are explicitly requested, so catalog growth cannot silently widen automated runs.
+- Let structurally valid experimental catalog additions coexist with a documented experiment subset instead of making prose inventory lag fail package validation.
+- Add Qwen3.8 9B, Qwythos 9B and TIR Qwen3.5 9B non-thinking experimental definitions without changing production roles.
+- Retain completed revalidation state for status/inspection until cleanup or the next run, report the current run bundle, propagate authenticated OWUI infrastructure errors only after recording outcomes, and improve agent validation diagnostics.
+
 * Fri Sep 04 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.7.testing
 - Preflight custom Ollama /etc service overrides before the pinned upstream installer and reject modified upstream-like units.
 - Remove pre-1.0 installer-history bookkeeping and simplify full reset to a declared appliance-owned-state contract.
