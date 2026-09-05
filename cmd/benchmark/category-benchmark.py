@@ -577,7 +577,7 @@ def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, 
     if not body:
         return False, False, "empty final answer"
     validator = case["validator"]
-    error = ""
+    problems: list[str] = []
     parsed_json: dict[str, Any] | None = None
     try:
         if validator == "python":
@@ -607,29 +607,42 @@ def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, 
         json.JSONDecodeError,
         subprocess.TimeoutExpired,
     ) as exc:
-        syntax_ok, error = False, str(exc)
+        syntax_ok = False
+        problems.append(f"syntax: {exc}")
 
     folded = body.casefold()
-    requirements_ok = all(
-        term.casefold() in folded for term in case.get("required", [])
-    )
-    any_groups = case.get("required_any", [])
-    requirements_ok = requirements_ok and all(
-        any(term.casefold() in folded for term in group) for group in any_groups
-    )
-    requirements_ok = requirements_ok and not any(
-        acceptance_text(term) in folded for term in case.get("forbidden", [])
-    )
-    if case.get("raw_only"):
-        # The fixture explicitly asked for raw code/JSON. Keep fenced output
-        # syntactically inspectable, but do not call it requirement-compliant.
-        requirements_ok = requirements_ok and not stripped.startswith("```")
+    missing = [term for term in case.get("required", []) if term.casefold() not in folded]
+    if missing:
+        problems.append("missing required: " + ", ".join(missing))
+    for group in case.get("required_any", []):
+        if not any(term.casefold() in folded for term in group):
+            problems.append("missing one-of: " + " | ".join(group))
+    forbidden = [
+        term
+        for term in case.get("forbidden", [])
+        if acceptance_text(term) in folded
+    ]
+    if forbidden:
+        problems.append("forbidden present: " + ", ".join(forbidden))
+    if case.get("raw_only") and stripped.startswith("```"):
+        # Keep fenced output syntactically inspectable, but report the formatting
+        # failure separately so a useful coding answer is not confused with bad code.
+        problems.append("raw-only response was wrapped in a Markdown fence")
     if parsed_json is not None:
-        for key in case.get("json_keys", []):
-            requirements_ok = requirements_ok and key in parsed_json
-        for key in case.get("json_array_keys", []):
-            requirements_ok = requirements_ok and isinstance(parsed_json.get(key), list)
-    return syntax_ok, requirements_ok, error
+        missing_keys = [key for key in case.get("json_keys", []) if key not in parsed_json]
+        if missing_keys:
+            problems.append("missing JSON keys: " + ", ".join(missing_keys))
+        bad_arrays = [
+            key
+            for key in case.get("json_array_keys", [])
+            if not isinstance(parsed_json.get(key), list)
+        ]
+        if bad_arrays:
+            problems.append("JSON keys are not arrays: " + ", ".join(bad_arrays))
+
+    requirement_problems = [p for p in problems if not p.startswith("syntax:")]
+    requirements_ok = not requirement_problems
+    return syntax_ok, requirements_ok, "; ".join(problems)
 
 
 def agent_options(case: dict[str, Any]) -> dict[str, Any]:
@@ -661,6 +674,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
         "syntax_ok",
         "requirements_ok",
         "correctness_ok",
+        "validation_error",
         "answer_started",
         "answer_chars",
         "thinking_chars",
@@ -715,6 +729,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                             "syntax_ok": int(syntax_ok),
                             "requirements_ok": int(requirements_ok),
                             "correctness_ok": int(correctness_ok),
+                            "validation_error": error,
                             "answer_started": int(answer_started),
                             "answer_chars": len(content),
                             "thinking_chars": len(thinking),
@@ -757,6 +772,8 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                         f"answer={answer_started} think_chars={len(thinking)} "
                         f"done={response.get('done_reason', '')} wall={wall:.2f}s"
                     )
+                    if error:
+                        print(f"    validation: {error}")
             finally:
                 try:
                     client.ensure_unloaded(model)
@@ -1511,8 +1528,14 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
         raise BenchmarkError(f"RAG-quality answer model is not registered on {args.ollama_url}: {answer_model}")
 
     top_k = int(os.environ.get("RAG_QUALITY_TOP_K", str(spec.get("top_k", 8))))
+    default_num_predict = int(os.environ.get("RAG_QUALITY_NUM_PREDICT", "1024"))
+    think_policy = os.environ.get("RAG_QUALITY_THINK", "auto").strip().casefold()
+    if think_policy not in {"auto", "true", "false"}:
+        raise BenchmarkError("RAG_QUALITY_THINK must be auto, true or false")
     if top_k < 1:
         raise BenchmarkError("RAG_QUALITY_TOP_K must be at least 1")
+    if default_num_predict < 1:
+        raise BenchmarkError("RAG_QUALITY_NUM_PREDICT must be at least 1")
     query_prefix, doc_prefix, scheme = embedding_scheme(embed_model)
     embed_client.ensure_unloaded(embed_model)
     answer_client.ensure_unloaded(answer_model)
@@ -1535,12 +1558,14 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
     meta["embedding_ollama_url"] = embed_url
     meta["embedding_ollama_version"] = embed_client.version()
     meta["embedding_model"] = model_meta(embed_client, embed_model)
+    meta["rag_quality_num_predict_default"] = default_num_predict
+    meta["rag_quality_think_policy"] = think_policy
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     fields = [
         "timestamp", "case_id", "embed_model", "answer_model", "embedding_scheme",
         "target_rank", "retrieval_ok", "answer_ok", "source_cited", "passed",
-        "answer_chars", "thinking_chars", "done_reason", "wall_s", "load_s",
-        "temp_max_c", "mem_available_min_mib", "swap_used_max_mib",
+        "failure_kind", "num_predict", "think_policy", "answer_chars", "thinking_chars", "done_reason",
+        "wall_s", "load_s", "temp_max_c", "mem_available_min_mib", "swap_used_max_mib",
     ]
     passed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
@@ -1568,19 +1593,20 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                 "Cite the supporting source id in square brackets.\n\n"
                 f"{context}\n\nQuestion: {case['question']}"
             )
+            num_predict = int(case.get("num_predict", default_num_predict))
             sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
             start = time.monotonic()
+            request = {
+                "model": answer_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "keep_alive": KEEP_ALIVE,
+                "options": {"num_predict": num_predict},
+            }
+            if think_policy != "auto":
+                request["think"] = think_policy == "true"
             try:
-                response = answer_client.json_request(
-                    "/api/chat",
-                    {
-                        "model": answer_model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "stream": False,
-                        "keep_alive": KEEP_ALIVE,
-                        "options": {"num_predict": int(case.get("num_predict", 512))},
-                    },
-                )
+                response = answer_client.json_request("/api/chat", request)
             finally:
                 wall = time.monotonic() - start
                 telemetry = sampler.stop()
@@ -1597,6 +1623,22 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
             if not source_cited:
                 problems.append(f"missing source [{case['target']}]")
             ok = retrieval_ok and answer_ok and source_cited
+            done_reason = str(response.get("done_reason") or "")
+            thinking_exhausted = (
+                not content.strip() and bool(thinking.strip()) and done_reason == "length"
+            )
+            if ok:
+                failure_kind = ""
+            elif not retrieval_ok:
+                failure_kind = "retrieval"
+            elif thinking_exhausted:
+                failure_kind = "thinking-budget-exhausted"
+            elif not answer_ok and not source_cited:
+                failure_kind = "answer-and-citation"
+            elif not answer_ok:
+                failure_kind = "answer"
+            else:
+                failure_kind = "citation"
             passed += int(ok)
             row = {
                 "timestamp": iso_now(),
@@ -1609,9 +1651,12 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                 "answer_ok": int(answer_ok),
                 "source_cited": int(source_cited),
                 "passed": int(ok),
+                "failure_kind": failure_kind,
+                "num_predict": num_predict,
+                "think_policy": think_policy,
                 "answer_chars": len(content),
                 "thinking_chars": len(thinking),
-                "done_reason": response.get("done_reason", ""),
+                "done_reason": done_reason,
                 "wall_s": f"{wall:.3f}",
                 "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
                 "temp_max_c": telemetry.get("temp_max_c"),
@@ -1636,7 +1681,8 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
             )
             print(
                 f"  {case['id']}: rank={target_rank} retrieval={retrieval_ok} "
-                f"answer={answer_ok} cited={source_cited} pass={ok}"
+                f"answer={answer_ok} cited={source_cited} pass={ok} "
+                f"failure={failure_kind or 'none'} think={think_policy}"
             )
     try:
         answer_client.ensure_unloaded(answer_model)

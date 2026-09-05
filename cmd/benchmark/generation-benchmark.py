@@ -430,6 +430,20 @@ def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
     if not names:
         raise BenchmarkError("no generation models found")
     if not sys.stdin.isatty():
+        # Automation/revalidation should never expand just because an operator added
+        # more experimental models. Noninteractive discovery therefore benchmarks
+        # production registrations only unless the caller names models explicitly or
+        # deliberately opts into the full comparison pool.
+        include_experiments = os.environ.get("BENCH_INCLUDE_EXPERIMENTS", "0").casefold() in {
+            "1", "true", "yes", "y", "on"
+        }
+        if not include_experiments:
+            production = [
+                name for name in names
+                if name.rsplit("/", 1)[-1].removesuffix(":latest").startswith("prod-")
+            ]
+            if production:
+                return production
         return names
     print("Available generation models:")
     for index, name in enumerate(names):

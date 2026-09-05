@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v3.6
+# BC-250 package revalidation harness v3.7
 #
 # Intended target: bc250-llm-server 0.10.0 on Fedora 44; release suffix is not hard-coded.
 # `start` launches a systemd worker that spans reboots. The kernel lane dynamically
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=3.6
+HARNESS_VERSION=3.7
 TARGET_VERSION=0.10.0
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
@@ -43,6 +43,8 @@ TARGET_KERNEL_FILE=$WORK/target-kernel
 ORIGINAL_ARGS_FILE=$WORK/original-kernel-args.txt
 FAILURE_RC_FILE=$WORK/failure-rc
 FAILURE_GUARD=$WORK/failure-handler-active
+ERROR_CONTEXT=$WORK/error-context.txt
+SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 PARAM_NAMES='amdgpu.gttsize ttm.pages_limit ttm.page_pool_size amdgpu.ppfeaturemask'
@@ -73,6 +75,7 @@ E2B_MODEL=${E2B_MODEL:-prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl}
 E4B_MODEL=${E4B_MODEL:-prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl}
 EMBED_MODEL=${EMBED_MODEL:-embed-jina-v5-small-retrieval-q4-k-m}
 TASK_MODEL=${TASK_MODEL:-task-gemma3-1b-unsloth-ud-q4-k-xl}
+OWUI_RAG_MODEL=${OWUI_RAG_MODEL:-bc250-office-documents}
 
 usage() {
   cat <<'USAGE'
@@ -93,6 +96,8 @@ at start; there is no release-specific kernel string in the harness.
 
 Routine default: no kernel-profile reboots, no repeated governor A/B, no 10-minute
 keepalive-expiry wait, and no generic warm-prefix lane. Enable those only when needed.
+A completed run keeps its work/unit state for status/debugging; use `cleanup` after
+collecting the bundle, or simply start the next run to replace completed state.
 
 Without an Open WebUI key the core Ollama/service/model tests still run, while
 API-driven OWUI drift, embedding-batch, chunk-min and RAG_SYSTEM_CONTEXT tests
@@ -155,7 +160,7 @@ save_settings() {
     RUN_KEEPALIVE_EXPIRY RUN_PRODUCTION_GENERATION RUN_WARM_PREFIX RUN_NUM_BATCH \
     RUN_AGENT RUN_OWUI_TUNING RUN_EMBED_BATCH_SWEEP RUN_CHUNK_MIN_SWEEP \
     RUN_RAG_SYSTEM_CONTEXT RUN_CONCURRENCY RUN_OCR \
-    GPT_OSS_MODEL E2B_MODEL E4B_MODEL EMBED_MODEL TASK_MODEL; do
+    GPT_OSS_MODEL E2B_MODEL E4B_MODEL EMBED_MODEL TASK_MODEL OWUI_RAG_MODEL; do
     printf '%s=%q\n' "$name" "${!name}" >> "$SETTINGS_FILE"
   done
   chmod 0600 "$SETTINGS_FILE"
@@ -583,7 +588,7 @@ def cmd_embedding_batch(args: argparse.Namespace) -> int:
     finally:
         c.post("/api/v1/retrieval/embedding/update", original)
     Path(args.output).write_text("\n".join(json.dumps(r, sort_keys=True) for r in rows) + "\n")
-    return 0
+    return 0 if all(r.get("status") == "ok" for r in rows) else 1
 
 
 def cmd_chunk_min(args: argparse.Namespace) -> int:
@@ -621,7 +626,7 @@ def cmd_chunk_min(args: argparse.Namespace) -> int:
     finally:
         c.post("/api/v1/retrieval/config/update", original)
     Path(args.output).write_text("\n".join(json.dumps(r, ensure_ascii=False, sort_keys=True) for r in rows) + "\n")
-    return 0
+    return 0 if all(r.get("status") == "ok" for r in rows) else 1
 
 
 def make_sysctx_doc(path: Path) -> None:
@@ -664,7 +669,11 @@ def cmd_rag_sysctx(args: argparse.Namespace) -> int:
         cleanup_kb(c, kb_id, file_id)
     Path(args.output).write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
     print(json.dumps({k:v for k,v in out.items() if k != "turns"}, sort_keys=True))
-    return 0 if out.get("status") == "ok" else 1
+    if out.get("status") == "ok":
+        return 0
+    if out.get("status") == "quality-fail":
+        return 3
+    return 1
 
 
 def main() -> int:
@@ -865,9 +874,14 @@ start_run() {
     echo "ERROR: $UNIT is already running." >&2
     exit 1
   fi
-  if [[ -d $WORK && -f $PHASE_FILE && $(cat "$PHASE_FILE" 2>/dev/null) != "done" && $(cat "$PHASE_FILE" 2>/dev/null) != "failed" ]]; then
-    echo "ERROR: existing unfinished session under $WORK. Use status/abort/cleanup first." >&2
-    exit 1
+  if [[ -d $WORK && -f $PHASE_FILE ]]; then
+    case "$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)" in
+      done|failed|failed-recovered|failed-manual-kernel-recovery) ;;
+      *)
+        echo "ERROR: existing unfinished session under $WORK. Use status/abort/cleanup first." >&2
+        exit 1
+        ;;
+    esac
   fi
 
   rm -rf "$WORK" "$RUN_DIR"
@@ -1086,11 +1100,30 @@ sample_loop() {
 }
 
 SAMPLER_PID=""
+WORKER_BASHPID=""
+
+write_rc_outcome() {
+  local rc="$1" out="$2"
+  case "$rc" in
+    0) printf 'pass\n' > "$out" ;;
+    3) printf 'quality-fail\n' > "$out" ;;
+    124|137) printf 'timeout-or-killed\n' > "$out" ;;
+    130) printf 'interrupted\n' > "$out" ;;
+    141) printf 'signal-sigpipe\n' > "$out" ;;
+    *) printf 'nonzero-%s\n' "$rc" > "$out" ;;
+  esac
+}
 
 start_sampler() {
   local out="$1"
   stop_sampler "${SAMPLER_PID:-}"
-  sample_loop "$out" >/dev/null 2>&1 &
+  # The sampler is a best-effort child. It must never inherit the worker's ERR/
+  # signal handlers or gain authority to restore/remove global run state.
+  (
+    trap - ERR TERM INT
+    set +eE
+    sample_loop "$out"
+  ) >/dev/null 2>&1 &
   SAMPLER_PID=$!
 }
 
@@ -1116,21 +1149,23 @@ run_bench_at() {
   progress "benchmark starting: $scope/$label"
   start_sampler "$dir/sampler.tsv"
   sampler_pid="$SAMPLER_PID"
-  # bc250-benchmark uses nonzero statuses for quality/acceptance failures.
-  # Treat that status as test data, not as a harness infrastructure failure.
-  if (cd "$dir" && timeout 45m "$@") > "$dir/benchmark-console.txt" 2>&1; then
+  # bc250-benchmark uses nonzero statuses for quality/acceptance failures. Child
+  # shells explicitly drop the worker ERR/signal traps: only the parent worker
+  # owns restoration/finalization. This prevents a benchmark signal from deleting
+  # $WORK before the parent has recorded the benchmark status.
+  if (
+    trap - ERR TERM INT
+    set +eE
+    cd "$dir" || exit $?
+    exec timeout --signal=INT --kill-after=30s 45m "$@"
+  ) > "$dir/benchmark-console.txt" 2>&1; then
     rc=0
   else
     rc=$?
   fi
   stop_sampler "$sampler_pid"
   printf '%s\n' "$rc" > "$dir/benchmark-exit-status.txt"
-  case "$rc" in
-    0) printf 'pass\n' > "$dir/benchmark-outcome.txt" ;;
-    3) printf 'quality-fail\n' > "$dir/benchmark-outcome.txt" ;;
-    124|137) printf 'timeout-or-killed\n' > "$dir/benchmark-outcome.txt" ;;
-    *) printf 'nonzero-%s\n' "$rc" > "$dir/benchmark-outcome.txt" ;;
-  esac
+  write_rc_outcome "$rc" "$dir/benchmark-outcome.txt"
   progress "benchmark finished: $scope/$label rc=$rc outcome=$(cat "$dir/benchmark-outcome.txt")"
   case "$rc" in
     0|3) return 0 ;;
@@ -1408,6 +1443,11 @@ phase_pipeline() {
   if model_registered 11437 "$EMBED_MODEL" && model_registered 11434 "$E4B_MODEL"; then
     warm_embedding >/dev/null 2>&1 || true
     run_bench rag-quality bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL"
+    # The last real run retrieved the correct source in every case but often spent
+    # the full answer budget in model thinking. Compare the same deterministic
+    # fixture with thinking explicitly disabled; this is diagnostic only and does
+    # not change the package's Documents/RAG preset.
+    run_bench rag-quality-nonthinking env RAG_QUALITY_THINK=false bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL"
   else
     echo "SKIP: Jina/E4B pair not fully installed" > "$RAW/pipeline/rag-quality-skipped.txt"
   fi
@@ -1442,8 +1482,15 @@ phase_pipeline() {
     progress "testing simultaneous E2B generation + dedicated embedding requests"
     start_sampler "$RAW/pipeline/concurrency-sampler.tsv"
     sampler_pid="$SAMPLER_PID"
-    "$HELPER" concurrency --model "$E2B_MODEL" --embed-model "$EMBED_MODEL" --output "$RAW/pipeline/concurrency.json" > "$RAW/pipeline/concurrency-console.txt" 2>&1 || true
+    local concurrency_rc
+    if "$HELPER" concurrency --model "$E2B_MODEL" --embed-model "$EMBED_MODEL" --output "$RAW/pipeline/concurrency.json" > "$RAW/pipeline/concurrency-console.txt" 2>&1; then
+      concurrency_rc=0
+    else
+      concurrency_rc=$?
+    fi
     stop_sampler "$sampler_pid"
+    echo "$concurrency_rc" > "$RAW/pipeline/concurrency-exit-status.txt"
+    write_rc_outcome "$concurrency_rc" "$RAW/pipeline/concurrency-outcome.txt"
   fi
 
   if ((RUN_OCR)) && [[ -n $(first_registered 11434 exp-glm-ocr-) ]]; then
@@ -1507,6 +1554,7 @@ phase_num_batch() {
       fi
       stop_sampler "$sampler_pid"
       echo "$rc" > "$dir/num-batch-exit-status.txt"
+      write_rc_outcome "$rc" "$dir/num-batch-outcome.txt"
     else
       echo "SKIP: GPT-OSS is not registered; num_batch sweep is not useful on E2B alone" > "$dir/skipped.txt"
     fi
@@ -1605,7 +1653,7 @@ restore_owui_api_config() {
 
 phase_owui() {
   set_phase owui "testing Open WebUI API baseline and RAG tuning candidates"
-  local dir="$RAW/owui" key rc sampler_pid
+  local dir="$RAW/owui" key rc sampler_pid drift_rc
   install -d -m 0700 "$dir"
   if ((!RUN_OWUI_TUNING)) || [[ ! -s $OWUI_TOKEN ]]; then
     echo "SKIP: authenticated OWUI tuning tests require --owui-token-file and RUN_OWUI_TUNING=1" > "$dir/skipped.txt"
@@ -1621,7 +1669,26 @@ phase_owui() {
     return 0
   fi
   key="$(<"$OWUI_TOKEN")"
-  OWUI_API_KEY="$key" bc250-openwebui-setup status > "$dir/package-drift-before.txt" 2>&1 || true
+  printf '%s\n' "$OWUI_RAG_MODEL" > "$dir/owui-rag-model.txt"
+
+  # Tuning results are comparable only against the package-owned OWUI baseline.
+  # Do not silently mutate drifted operator state inside the revalidation harness.
+  if OWUI_API_KEY="$key" bc250-openwebui-setup status > "$dir/package-drift-before.txt" 2>&1; then
+    drift_rc=0
+  else
+    drift_rc=$?
+  fi
+  echo "$drift_rc" > "$dir/package-drift-before-exit-status.txt"
+  if ((drift_rc == 2)); then
+    echo "SKIP: package-owned Open WebUI settings are drifted; run bc250-openwebui-setup apply explicitly before tuning" > "$dir/skipped.txt"
+    snapshot owui/skipped-drift
+    write_phase_report openwebui-rag-tuning-results owui
+    return 0
+  elif ((drift_rc != 0)); then
+    echo "ERROR: could not validate the Open WebUI package baseline before tuning (rc=$drift_rc)" >&2
+    return "$drift_rc"
+  fi
+
   "$HELPER" save-config --token-file "$OWUI_TOKEN" --output "$OWUI_CONFIG_SAVE"
 
   if ((RUN_EMBED_BATCH_SWEEP)); then
@@ -1635,19 +1702,23 @@ phase_owui() {
     fi
     stop_sampler "$sampler_pid"
     echo "$rc" > "$dir/embedding-batch-exit-status.txt"
+    write_rc_outcome "$rc" "$dir/embedding-batch-outcome.txt"
+    ((rc == 0)) || return "$rc"
   fi
 
   if ((RUN_CHUNK_MIN_SWEEP)) && model_registered 11434 "$E4B_MODEL"; then
     progress "Open WebUI CHUNK_MIN_SIZE_TARGET sweep 0/500/750/1000"
     start_sampler "$dir/chunk-min-sampler.tsv"
     sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 60m "$HELPER" chunk-min --token-file "$OWUI_TOKEN" --work "$dir/chunk-min-work" --model "$E4B_MODEL" --output "$dir/chunk-min.jsonl" > "$dir/chunk-min-console.txt" 2>&1; then
+    if timeout --signal=INT --kill-after=30s 60m "$HELPER" chunk-min --token-file "$OWUI_TOKEN" --work "$dir/chunk-min-work" --model "$OWUI_RAG_MODEL" --output "$dir/chunk-min.jsonl" > "$dir/chunk-min-console.txt" 2>&1; then
       rc=0
     else
       rc=$?
     fi
     stop_sampler "$sampler_pid"
     echo "$rc" > "$dir/chunk-min-exit-status.txt"
+    write_rc_outcome "$rc" "$dir/chunk-min-outcome.txt"
+    ((rc == 0)) || return "$rc"
   fi
 
   # Helper sweeps restore their own field, then restore the exact original selected
@@ -1658,31 +1729,43 @@ phase_owui() {
     save_sysctx_state
     progress "RAG_SYSTEM_CONTEXT=false API conversation"
     set_sysctx false
+    if ! validate_owui_token > "$dir/rag-system-context-false-token-recheck.txt" 2>&1; then
+      echo "ERROR: Open WebUI credential became invalid after the false-context restart" >&2
+      return 1
+    fi
     unload_model 11434 "$E4B_MODEL"
     snapshot owui/sysctx-false-before
     start_sampler "$dir/rag-system-context-false-sampler.tsv"
     sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 45m "$HELPER" rag-sysctx --token-file "$OWUI_TOKEN" --work "$dir/sysctx-work" --model "$E4B_MODEL" --label false --output "$dir/rag-system-context-false.json" > "$dir/rag-system-context-false-console.txt" 2>&1; then
+    if timeout --signal=INT --kill-after=30s 45m "$HELPER" rag-sysctx --token-file "$OWUI_TOKEN" --work "$dir/sysctx-work" --model "$OWUI_RAG_MODEL" --label false --output "$dir/rag-system-context-false.json" > "$dir/rag-system-context-false-console.txt" 2>&1; then
       rc=0
     else
       rc=$?
     fi
     stop_sampler "$sampler_pid"
     echo "$rc" > "$dir/rag-system-context-false-exit-status.txt"
+    write_rc_outcome "$rc" "$dir/rag-system-context-false-outcome.txt"
+    case "$rc" in 0|3) ;; *) return "$rc" ;; esac
 
     progress "RAG_SYSTEM_CONTEXT=true API conversation"
     set_sysctx true
+    if ! validate_owui_token > "$dir/rag-system-context-true-token-recheck.txt" 2>&1; then
+      echo "ERROR: Open WebUI credential became invalid after the true-context restart" >&2
+      return 1
+    fi
     unload_model 11434 "$E4B_MODEL"
     snapshot owui/sysctx-true-before
     start_sampler "$dir/rag-system-context-true-sampler.tsv"
     sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 45m "$HELPER" rag-sysctx --token-file "$OWUI_TOKEN" --work "$dir/sysctx-work" --model "$E4B_MODEL" --label true --output "$dir/rag-system-context-true.json" > "$dir/rag-system-context-true-console.txt" 2>&1; then
+    if timeout --signal=INT --kill-after=30s 45m "$HELPER" rag-sysctx --token-file "$OWUI_TOKEN" --work "$dir/sysctx-work" --model "$OWUI_RAG_MODEL" --label true --output "$dir/rag-system-context-true.json" > "$dir/rag-system-context-true-console.txt" 2>&1; then
       rc=0
     else
       rc=$?
     fi
     stop_sampler "$sampler_pid"
     echo "$rc" > "$dir/rag-system-context-true-exit-status.txt"
+    write_rc_outcome "$rc" "$dir/rag-system-context-true-outcome.txt"
+    case "$rc" in 0|3) ;; *) return "$rc" ;; esac
 
     restore_sysctx
     rm -f "$SYSCTX_STATE"
@@ -1690,9 +1773,15 @@ phase_owui() {
   fi
 
   restore_owui_api_config
-  OWUI_API_KEY="$key" bc250-openwebui-setup status > "$dir/package-drift-after.txt" 2>&1 || true
+  if OWUI_API_KEY="$key" bc250-openwebui-setup status > "$dir/package-drift-after.txt" 2>&1; then
+    rc=0
+  else
+    rc=$?
+  fi
+  echo "$rc" > "$dir/package-drift-after-exit-status.txt"
   snapshot owui/restored
   write_phase_report openwebui-rag-tuning-results owui
+  ((rc == 0)) || return "$rc"
 }
 
 create_summary() {
@@ -1723,6 +1812,8 @@ create_summary() {
     echo "- CHUNK_MIN_SIZE_TARGET: prefer 0 unless a nonzero target improves the deterministic cases without losing facts/citations."
     echo "- RAG quality records retrieval_ok, answer/thinking sizes and done_reason separately; length exhaustion with correct retrieval is not a retrieval failure."
     echo "- RAG_SYSTEM_CONTEXT: focus on turns 2/3 prompt_eval_duration and wall_s plus answer/citation correctness; turn 1 includes cold/load noise."
+    echo "- Open WebUI RAG tuning uses workspace preset $OWUI_RAG_MODEL; package-owned drift causes the authenticated A/B lanes to skip rather than self-apply."
+    echo "- Routine revalidation qualifies promoted defaults/production roles only; installed exp-* models are inventory unless an explicit comparison run names them."
     echo "- Agent mode must show only 11436 during its active snapshot and must restore normal lanes afterward."
   } > "$out"
 }
@@ -1730,16 +1821,27 @@ create_summary() {
 FINAL_BUNDLE=""
 
 create_final_bundle() {
-  local bundle tmp
+  local bundle tmp journal_since
   bundle="$REPORT_DIR/$(run_id)-bc250-revalidation-results.tar.gz"
   tmp="${bundle}.tmp.$$"
   create_summary
   progress "creating final bundle"
+  # The service journal is decisive for shell/control-flow failures and contains no
+  # supplied OWUI token material. Limit it to this run when the first event timestamp
+  # is available so repeated same-boot revalidations do not contaminate each bundle.
+  journal_since="$(awk 'NR==1{print $1; exit}' "$EVENTS" 2>/dev/null || true)"
+  if [[ -n $journal_since ]]; then
+    journalctl -b -u "$UNIT" --since "$journal_since" --no-pager > "$SERVICE_JOURNAL" 2>&1 || true
+  else
+    journalctl -b -u "$UNIT" --no-pager > "$SERVICE_JOURNAL" 2>&1 || true
+  fi
   # Do not bundle OWUI_CONFIG_SAVE: a customized provider config could contain a secret.
   local -a items=(events.log phase stage heartbeat run-id settings.env revalidation-summary.txt results phase-reports)
   [[ ! -e $TARGET_KERNEL_FILE ]] || items+=(target-kernel)
   [[ ! -e $ORIGINAL_ARGS_FILE ]] || items+=(original-kernel-args.txt)
   [[ ! -e $FAILURE_RC_FILE ]] || items+=(failure-rc)
+  [[ ! -e $ERROR_CONTEXT ]] || items+=(error-context.txt)
+  [[ ! -e $SERVICE_JOURNAL ]] || items+=(revalidation-service-journal.txt)
   rm -f "$tmp"
   tar -C "$WORK" -czf "$tmp" "${items[@]}"
   chmod 0644 "$tmp"
@@ -1760,15 +1862,18 @@ restore_all() {
 }
 
 disable_worker_for_future_boots() {
-  systemctl disable "$UNIT" >/dev/null 2>&1 || true
+  # Removing the boot wants-link is enough here; avoid a manager reload from the
+  # still-running oneshot. Explicit cleanup performs the later daemon-reload.
+  systemctl disable --no-reload "$UNIT" >/dev/null 2>&1 || true
 }
 
-cleanup_transient_run() {
+finish_worker_session() {
   local bundle="${FINAL_BUNDLE:-}"
+  # Never remove/reload the unit or delete $WORK from inside the executing oneshot.
+  # Doing so can make systemd terminate an otherwise successful worker. Leave the
+  # finished state for `status`; `cleanup` or the next `start` removes it safely.
   disable_worker_for_future_boots
-  rm -f "$OWUI_TOKEN" "$UNIT_PATH"
-  systemctl daemon-reload >/dev/null 2>&1 || true
-  rm -rf "$WORK" "$RUN_DIR"
+  rm -f "$OWUI_TOKEN"
   [[ -z $bundle ]] || echo "Final bundle: $bundle"
 }
 
@@ -1784,7 +1889,7 @@ finish_failed_run() {
   fi
   printf 'failed\n' > "$PHASE_FILE"
   create_final_bundle
-  cleanup_transient_run
+  finish_worker_session
   exit "$rc"
 }
 
@@ -1806,7 +1911,7 @@ recover_kernel_or_finish_failure() {
       progress "CRITICAL: could not restore saved kernel arguments; manual recovery required"
       printf 'failed-manual-kernel-recovery\n' > "$PHASE_FILE"
       create_final_bundle
-      cleanup_transient_run
+      finish_worker_session
       exit "$rc"
     fi
     if kernel_profile_modified; then
@@ -1820,12 +1925,35 @@ recover_kernel_or_finish_failure() {
   finish_failed_run "$rc" "$label" "$((1 - snapshot_taken))"
 }
 
+capture_error_context() {
+  local rc="$1" command="$2" line="$3" bash_lines="$4" functions="$5"
+  {
+    echo "timestamp=$(now)"
+    echo "rc=$rc"
+    echo "phase=$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
+    echo "stage=$(cat "$STAGE_FILE" 2>/dev/null || echo unknown)"
+    echo "worker_bashpid=${WORKER_BASHPID:-}"
+    echo "current_bashpid=$BASHPID"
+    printf 'bash_command=%q\n' "$command"
+    echo "line=$line"
+    echo "bash_lineno=$bash_lines"
+    echo "funcname=$functions"
+  } > "$ERROR_CONTEXT"
+}
+
 worker_fail() {
-  local rc="${1:-1}"
+  local rc="${1:-1}" command="${2:-unknown}" line="${3:-unknown}"
+  local bash_lines="${4:-}" functions="${5:-}"
+  # errtrace can propagate ERR into subshells/functions. Only the top-level worker
+  # owns recovery/finalization; a child may return its status but may never delete
+  # or restore global run state.
+  if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then
+    trap - ERR
+    return "$rc"
+  fi
   trap - ERR TERM INT
   set +e
-  # ERR is inherited into functions/subshells because the harness uses errtrace.
-  # An on-disk guard prevents nested/parent handlers from repeating cleanup.
+  capture_error_context "$rc" "$command" "$line" "$bash_lines" "$functions" || true
   if ! mkdir "$FAILURE_GUARD" 2>/dev/null; then
     exit "$rc"
   fi
@@ -1834,6 +1962,10 @@ worker_fail() {
 }
 
 worker_abort() {
+  if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then
+    trap - TERM INT
+    return 130
+  fi
   trap - ERR TERM INT
   set +e
   printf 'abort\n' > "$WORK/ABORT"
@@ -1855,7 +1987,7 @@ phase_recovery() {
   printf 'failed-recovered\n' > "$PHASE_FILE"
   progress "recovery complete; original kernel profile and normal mode restored"
   create_final_bundle
-  cleanup_transient_run
+  finish_worker_session
   trap - ERR TERM INT
   exit "$rc"
 }
@@ -1882,7 +2014,7 @@ run_pipeline_sequence() {
   printf 'done\n' > "$PHASE_FILE"
   progress "all tests complete; normal mode active; exact kernel/temporary OWUI state restored"
   create_final_bundle
-  cleanup_transient_run
+  finish_worker_session
   trap - ERR TERM INT
 }
 
@@ -1891,7 +2023,8 @@ worker() {
   exec 9>"$LOCK"
   flock -n 9 || { echo "ERROR: another worker holds $LOCK" >&2; exit 1; }
   rm -rf "$FAILURE_GUARD"
-  trap 'worker_fail $?' ERR
+  WORKER_BASHPID=$BASHPID
+  trap 'worker_fail "$?" "$BASH_COMMAND" "$LINENO" "${BASH_LINENO[*]}" "${FUNCNAME[*]}"' ERR
   trap worker_abort TERM INT
   trap worker_exit_cleanup EXIT
   load_settings
@@ -1911,7 +2044,7 @@ worker() {
       run_pipeline_sequence
       ;;
     recovery) phase_recovery ;;
-    done|failed|failed-recovered)
+    done|failed|failed-recovered|failed-manual-kernel-recovery)
       disable_worker_for_future_boots
       echo "Run already stopped at phase=$(cat "$PHASE_FILE")."
       ;;
@@ -1934,7 +2067,8 @@ status_run() {
   echo "service=$(systemctl is-active "$UNIT" 2>/dev/null || true)"
   echo "phase_reports=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" 2>/dev/null | wc -l)"
   echo "latest_phase_report=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
-  echo "latest_bundle=$(find "$REPORT_DIR" -maxdepth 1 -type f -name '*-bc250-revalidation-results.tar.gz' -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
+  echo "latest_bundle=$(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
+  [[ ! -e $ERROR_CONTEXT ]] || echo "error_context=$ERROR_CONTEXT"
   if [[ -f $RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt ]]; then
     cat "$RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt"
   fi

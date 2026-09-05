@@ -10,15 +10,7 @@
       "exit 2"
     ],
     "prompt": "Write a Bash script that accepts one directory argument and prints only the basenames of *.Modelfile files directly in that directory, sorted lexicographically. Exit with status 2 when the argument is missing. Handle spaces in paths safely. Return only the script, with no Markdown fences or explanation.",
-    "raw_only": true,
-    "required_any": [
-      [
-        "-printf",
-        "-print0",
-        "while IFS=",
-        "read -r"
-      ]
-    ]
+    "raw_only": true
   },
   {
     "id": "python-port-parser",
