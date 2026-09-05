@@ -1,0 +1,28 @@
+# BC250 category: experimental
+# Ollama model: exp-qwythos9b-empero-q6-k
+# Source: empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF @ latest
+# GGUF: Qwythos-9B-Claude-Mythos-5-1M-Q6_K.gguf
+# License: Apache-2.0
+# Role: 9B reasoning/tool-use comparison against stock Qwen3.5-9B and GPT-OSS.
+#
+# Text-only baseline: do not attach the vision projector or MTP variant for the
+# first BC-250 comparison. Upstream exposes a 1M YaRN context, but 32K is the
+# deliberate appliance test cap to keep UMA/KV-cache pressure comparable.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwythos9b-empero-q6-k/Qwythos-9B-Claude-Mythos-5-1M-Q6_K.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve initial/system context during eviction.
+PARAMETER num_keep 256
+
+# Practical BC-250 comparison context; do not use the advertised 1M window here.
+PARAMETER num_ctx 32768
+
+# Upstream Qwythos reasoning profile.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER repeat_penalty 1.05
