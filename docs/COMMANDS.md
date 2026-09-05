@@ -65,6 +65,7 @@ Packaged orchestrator:
 ```text
 sudo bc250-install
 sudo bc250-install --models-only
+sudo bc250-install --owui-token-file /root/owui-test.key
 ```
 
 Normal mode prints a setup plan covering root growth, Fedora/package/Ollama,
@@ -78,8 +79,10 @@ reloads systemd and starts Open WebUI. A second reboot is requested only when
 persistent 40-CU mode is already configured and the prepared replacement module
 is not yet running.
 
-The installer presents one model catalog and one selection query. Use global
-indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips.
+The installer ensures the baseline task and embedding models without printing the
+full catalog, then presents one full optional model catalog and one selection query.
+Use global indexes, ranges, exact names, `recommended`, `production` or `all`;
+Enter skips.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
 across transcript PTY creation, so unattended runs never become interactive by
 accident. `BC250_HF_ANONYMOUS=1` suppresses the optional Hugging Face token prompt;
@@ -316,11 +319,16 @@ bc250-benchmark
 sudo bc250-revalidate status
 ```
 
-`bc250-revalidate` is the root-only, detached revalidation harness. A routine
-`sudo bc250-revalidate start` stays on the current kernel/governor policy; use
+`bc250-revalidate` is the root-only systemd-backed revalidation harness. A routine
+`sudo bc250-revalidate start` stays on the current kernel/governor policy and
+follows a live phase/stage indicator in the invoking terminal while the worker
+remains detached from that shell. Ctrl-C detaches the display without stopping
+the run; `--detach` returns immediately. Use
 `--kernel-ab`, `--governor-ab` or `--keepalive-expiry` only when those expensive
 lanes are needed. Authenticated Open WebUI tuning accepts
-`--owui-token-file FILE`. Final bundles are retained under
+`--owui-token-file FILE`. Before expensive model lanes the harness now verifies
+Open WebUI -> private Tika and Open WebUI -> main/task/embedding Ollama connectivity,
+so stale Podman networking fails quickly. Final bundles are retained under
 `/var/lib/bc250-llm-server/revalidation/results/`. Finished worker/unit state is
 kept inspectable after the tarball is written; `sudo bc250-revalidate cleanup`
 removes it after the oneshot exits, and a later `start` replaces completed state.
@@ -385,14 +393,19 @@ for metrics, fixtures and Ollama 0.33.3 request policy. The installed copy is
 
 ```text
 sudo bc250-openwebui-setup init
+sudo bc250-openwebui-setup init --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
+sudo bc250-openwebui-setup status --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
-`init` can create the first administrator or sign in an existing administrator,
-then applies the package-owned main/task provider, dedicated embedding, task/RAG
-and additive model-preset baseline. Credentials/tokens are not stored. Unrelated
+`init` can create the first administrator, sign in an existing administrator or
+use a protected administrator API-key file. The guided installer exposes the same
+choice and suggests `/root/owui-test.key` when it already exists with protected
+permissions. It applies the package-owned main/task provider, dedicated embedding,
+task/RAG and additive model-preset baseline. Credentials/tokens are not persisted
+by the package. Unrelated
 operator models, users, prompts and knowledge are not synchronized away.
 
 Agent mode is separate from Open WebUI:

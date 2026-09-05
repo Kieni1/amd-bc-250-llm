@@ -29,14 +29,20 @@ Manual equivalents:
 
 ```bash
 sudo bc250-openwebui-setup init
+sudo bc250-openwebui-setup init --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
+sudo bc250-openwebui-setup status --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
-`status` without a key checks reachability only. With a temporary administrator
-key it also compares the package-owned settings with the reviewed desired state.
-The key is read from the process environment and is never written by the helper.
+`init` offers create-admin, sign-in, or protected token-file authentication. If
+`/root/owui-test.key` already exists, it is suggested as the third choice rather
+than consumed silently. `status` without a key checks reachability only. With a
+temporary administrator key or `--token-file` it also compares the package-owned
+settings with the reviewed desired state. The helper does not persist credentials;
+the install orchestrator may hold the authenticated token briefly under `/run` so
+its final verification can reuse the same session, then removes it on exit.
 A reported difference may be an intentional operator override; `status` does not
 reset it.
 
