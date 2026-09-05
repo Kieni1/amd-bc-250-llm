@@ -1370,13 +1370,14 @@ def main(argv: list[str] | None = None) -> int:
             command=args.command,
             include_disabled=getattr(args, "include_disabled", False),
         )
-        print("Available all models:")
-        print_catalogs(
-            catalogs,
-            include_disabled_mtp=(
-                args.command == "cleanup" or getattr(args, "include_disabled", False)
-            ),
-        )
+        if os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") != "1":
+            print("Available all models:")
+            print_catalogs(
+                catalogs,
+                include_disabled_mtp=(
+                    args.command == "cleanup" or getattr(args, "include_disabled", False)
+                ),
+            )
         if args.list:
             return 0
         if not available:

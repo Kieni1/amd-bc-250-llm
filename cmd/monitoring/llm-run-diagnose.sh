@@ -37,12 +37,13 @@ pass=0; warn=0; fail=0
 have(){ command -v "$1" >/dev/null 2>&1; }
 active(){ cat $1 2>/dev/null | grep '\*' | tr -d ' *'; }   # starred pp_dpm line, cleaned
 
-# Use the first installed model unless the operator supplied MODEL explicitly.
-if [[ -z "$MODEL" ]] && have ollama; then
+# Select a model only when a load test was requested. Static --no-load parity
+# checks should not display an arbitrary installed experiment as if it were the target.
+if [[ -z "$MODEL" && $DO_LOAD -eq 1 ]] && have ollama; then
   MODEL=$(ollama list 2>/dev/null | awk 'NR > 1 {print $1; exit}')
 fi
 if [[ -z "$MODEL" ]]; then
-  MODEL="<none>"
+  if [[ $DO_LOAD -eq 0 ]]; then MODEL="<not-loaded>"; else MODEL="<none>"; fi
   DO_LOAD=0
 fi
 

@@ -15,10 +15,12 @@ fi
 source "$runtime_env"
 INSTALL_MODE="full"
 HF_AUTH_PREPARED=0
+OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
+OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-install [--models-only]
+Usage: sudo bc250-install [--models-only] [--owui-token-file FILE]
 
 Before 1.0 this is a pre-1.0 greenfield appliance setup. Apply or resume the packaged BC-250 setup. The command checks current
 state, avoids completed work where practical, applies the TTM/swap baseline,
@@ -30,20 +32,55 @@ second reboot is requested only when persistent 40-CU mode is already configured
 and a newly prepared replacement module is not yet running.
 
 Use --models-only to reconcile runtime topology, models and Open WebUI without system/kernel setup.
+Use --owui-token-file FILE to apply/verify Open WebUI with an existing protected admin API-key file.
 Set BC250_MODEL_SELECTION for unattended model selection; Enter skips models.
 Set BC250_UPDATE_OLLAMA=1 to refresh official Ollama explicitly.
+Set BC250_OWUI_TOKEN_FILE to provide the same token-file path non-interactively.
 USAGE
 }
 parse_arguments() {
   while (($#)); do
     case "$1" in
-      --models-only) INSTALL_MODE="models" ;;
+      --models-only) INSTALL_MODE="models"; shift ;;
+      --owui-token-file)
+        (($# >= 2)) || { echo "ERROR: --owui-token-file requires a path" >&2; exit 2; }
+        OWUI_TOKEN_FILE="$2"
+        shift 2
+        ;;
       -h|--help) usage; exit 0 ;;
       *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
     esac
-    shift
   done
 }
+validate_owui_token_file() {
+  local path="$1" mode
+  [[ -f "$path" && -r "$path" && -s "$path" ]] || {
+    echo "ERROR: Open WebUI token file must be a readable, non-empty regular file: $path" >&2
+    return 1
+  }
+  mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
+  [[ "$mode" =~ ^[0-7]{3,4}$ ]] || {
+    echo "ERROR: cannot determine permissions for Open WebUI token file: $path" >&2
+    return 1
+  }
+  if (( (8#$mode) & 077 )); then
+    echo "ERROR: Open WebUI token file must not be group/world accessible: $path (mode $mode)" >&2
+    return 1
+  fi
+}
+
+cleanup_sensitive_runtime() {
+  rm -f "$OWUI_VERIFY_TOKEN_FILE"
+}
+
+owui_token_candidate() {
+  if [[ -n "$OWUI_TOKEN_FILE" ]]; then
+    printf '%s\n' "$OWUI_TOKEN_FILE"
+  elif [[ -f /root/owui-test.key ]]; then
+    printf '%s\n' /root/owui-test.key
+  fi
+}
+
 require_root() {
   [[ ${EUID} -eq 0 ]] || {
     echo "ERROR: run this installer with sudo." >&2
@@ -275,10 +312,16 @@ prepare_hf_authentication() {
 
 step_5_prepare_40cu() {
   heading "5. PREPARE OPTIONAL 40-CU SUPPORT"
-  local kernel
+  local kernel prepared_file=/var/lib/bc250-llm-server/40cu/prepared
   kernel="$(uname -r)"
-  echo "Installing build files for the exact running kernel: $kernel"
-  dnf install -y "kernel-devel-$kernel"
+  if [[ -r "$prepared_file" ]] && grep -Fxq "kernel=$kernel" "$prepared_file"; then
+    echo "40-CU build is already prepared for $kernel; skipping build-prerequisite reconciliation."
+  elif rpm -q "kernel-devel-$kernel" >/dev/null 2>&1; then
+    echo "Build files for the exact running kernel are already installed: $kernel"
+  else
+    echo "Installing build files for the exact running kernel: $kernel"
+    dnf install -y "kernel-devel-$kernel"
+  fi
   bc250-40cu prepare
   if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
     echo "Persistent 40-CU mode is configured."
@@ -318,7 +361,7 @@ step_7_models() {
   prepare_hf_authentication
 
   echo "Ensuring baseline Open WebUI infrastructure models."
-  bc250-model install all \
+  BC250_MODELCTL_SUPPRESS_CATALOG=1 bc250-model install all \
     "task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m"
 
   echo
@@ -350,14 +393,33 @@ enable_open_webui_boot() {
 
 step_8_application_services() {
   heading "8. START APPLICATION SERVICES"
+  local firewall_changed=0 tika_was_active=0 owui_was_active=0
+  systemctl is-active --quiet tika.service 2>/dev/null && tika_was_active=1
+  systemctl is-active --quiet open-webui.service 2>/dev/null && owui_was_active=1
   systemctl enable --now firewalld.service cyan-skillfish-governor-smu.service
   if systemctl is-active --quiet firewalld.service; then
-    firewall-cmd --quiet --permanent --add-service=http
-    firewall-cmd --quiet --reload
+    if ! firewall-cmd --quiet --permanent --query-service=http; then
+      firewall-cmd --quiet --permanent --add-service=http
+      firewall_changed=1
+    fi
+    if ((firewall_changed)); then
+      echo "Applying changed firewalld HTTP policy."
+      firewall-cmd --quiet --reload
+    else
+      echo "firewalld HTTP policy is already current; reload skipped."
+    fi
   fi
   command -v setsebool >/dev/null 2>&1 && setsebool -P httpd_can_network_connect 1 || true
   enable_open_webui_boot
   systemctl start tika.service open-webui.service
+  # On update, recreate already-running private-network containers after
+  # package/Quadlet/firewalld reconciliation. A mere `start` leaves them attached
+  # to stale netavark/DNS state after a firewall reload or unit replacement.
+  if ((tika_was_active || owui_was_active || firewall_changed)); then
+    echo "Re-establishing private Podman application networking after update reconciliation."
+    systemctl restart tika.service
+    systemctl restart open-webui.service
+  fi
   systemctl enable --now nginx.service
 }
 
@@ -411,11 +473,21 @@ step_9_open_webui() {
     return 0
   fi
 
+  rm -f "$OWUI_VERIFY_TOKEN_FILE"
+  if [[ -n "$OWUI_TOKEN_FILE" ]]; then
+    validate_owui_token_file "$OWUI_TOKEN_FILE"
+    echo "Applying the package-owned Open WebUI baseline with token file: $OWUI_TOKEN_FILE"
+    if ! bc250-openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+      echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
+      return 0
+    fi
+    return 0
+  fi
+
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
     echo "Applying the package-owned Open WebUI baseline with OWUI_API_KEY from the environment."
-    if ! bc250-openwebui-setup apply; then
-      echo "WARNING: Open WebUI API setup failed; no credentials were stored." >&2
-      echo "Retry later with: sudo bc250-openwebui-setup init" >&2
+    if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+      echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
     fi
     return 0
   fi
@@ -428,7 +500,18 @@ step_9_open_webui() {
   fi
 
   if yes_no_default_yes "Configure package-owned Open WebUI providers, tasks, RAG and model presets now?"; then
-    if ! bc250-openwebui-setup init; then
+    local candidate=""
+    candidate="$(owui_token_candidate)"
+    if [[ -n "$candidate" ]]; then
+      if validate_owui_token_file "$candidate" 2>/dev/null; then
+        export BC250_OWUI_TOKEN_FILE="$candidate"
+        echo "Detected protected Open WebUI token file; option 3 can reuse: $candidate"
+      else
+        unset BC250_OWUI_TOKEN_FILE || true
+        echo "NOTE: $candidate exists but is not a protected readable token file; it will not be suggested." >&2
+      fi
+    fi
+    if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup was not completed; the appliance remains usable." >&2
       echo "Retry later with: sudo bc250-openwebui-setup init" >&2
     fi
@@ -443,7 +526,11 @@ step_10_verify() {
   bc250-memory-profile status
   bc250-swap-profile status
   bc250-cu-status
-  bc250-verify || verify_status=$?
+  if [[ -s "$OWUI_VERIFY_TOKEN_FILE" ]]; then
+    OWUI_API_KEY="$(<"$OWUI_VERIFY_TOKEN_FILE")" bc250-verify || verify_status=$?
+  else
+    bc250-verify || verify_status=$?
+  fi
   llm-run-diagnose --no-load || diagnose_status=$?
   if ((verify_status != 0 || diagnose_status != 0)); then
     echo "ERROR: verification reported failures; review both reports above." >&2
@@ -470,6 +557,8 @@ main() {
   require_root
   capture_input_mode
   start_transcript
+  trap cleanup_sensitive_runtime EXIT
+  [[ -z "$OWUI_TOKEN_FILE" ]] || validate_owui_token_file "$OWUI_TOKEN_FILE"
   if [[ "$INSTALL_MODE" == models ]]; then
     run_models_only
     return

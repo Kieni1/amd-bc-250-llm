@@ -488,12 +488,45 @@ info "Open WebUI database settings can override bootstrap environment defaults a
 section "Local endpoints"
 curl -fsS http://127.0.0.1:3000/ >/dev/null && ok "Open WebUI loopback endpoint reachable" || bad "Open WebUI unavailable"
 curl -fsS http://127.0.0.1/ >/dev/null && ok "nginx HTTP endpoint reachable" || bad "nginx HTTP endpoint unavailable"
-if podman exec open-webui python -c \
-  'import urllib.request; urllib.request.urlopen("http://tika:9998/version", timeout=10).read()' \
-  >/dev/null 2>&1; then
-  ok "Open WebUI reaches private Tika"
+
+container_http() {
+  local url="$1"
+  podman exec open-webui python -c \
+    'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=10).read()' \
+    "$url" >/dev/null 2>&1
+}
+
+if podman exec open-webui getent hosts tika >/dev/null 2>&1; then
+  ok "Open WebUI resolves private Tika alias"
+  if container_http "http://tika:9998/version"; then
+    ok "Open WebUI reaches private Tika HTTP endpoint"
+  else
+    bad "Open WebUI resolves Tika but cannot reach its HTTP endpoint"
+  fi
 else
-  bad "private Tika connection failed"
+  bad "Open WebUI cannot resolve private Tika alias"
+  info "private Tika HTTP check skipped because container DNS resolution failed"
+fi
+
+if podman exec open-webui getent hosts host.containers.internal >/dev/null 2>&1; then
+  ok "Open WebUI resolves host.containers.internal"
+else
+  bad "Open WebUI cannot resolve host.containers.internal"
+fi
+if ((agent_active)); then
+  if container_http "http://host.containers.internal:11436/api/tags"; then
+    ok "Open WebUI container reaches active agent Ollama host gateway :11436"
+  else
+    bad "Open WebUI container cannot reach active agent Ollama host gateway :11436"
+  fi
+else
+  for port in 11434 11435 11437; do
+    if container_http "http://host.containers.internal:${port}/api/tags"; then
+      ok "Open WebUI container reaches Ollama host gateway :$port"
+    else
+      bad "Open WebUI container cannot reach Ollama host gateway :$port"
+    fi
+  done
 fi
 
 section "Listeners and firewall"

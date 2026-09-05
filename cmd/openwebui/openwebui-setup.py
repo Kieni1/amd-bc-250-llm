@@ -7,6 +7,7 @@ import argparse
 import getpass
 import json
 import os
+import stat
 import sys
 import urllib.error
 import urllib.request
@@ -256,35 +257,102 @@ def status(client: Client, authenticated: bool) -> int:
     return 0
 
 
+
+def read_token_file(path: str) -> str:
+    token_path = Path(path).expanduser()
+    try:
+        st = token_path.stat()
+    except OSError as exc:
+        raise ApiError(f"cannot read token file {token_path}: {exc}") from exc
+    if not stat.S_ISREG(st.st_mode):
+        raise ApiError(f"token file is not a regular file: {token_path}")
+    if st.st_mode & 0o077:
+        raise ApiError(f"token file must not be group/world accessible: {token_path}")
+    try:
+        token = token_path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise ApiError(f"cannot read token file {token_path}: {exc}") from exc
+    if not token:
+        raise ApiError(f"token file is empty: {token_path}")
+    return token
+
+
+def write_token_file(path: str, token: str) -> None:
+    token_path = Path(path)
+    token_path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    fd = os.open(token_path, flags, 0o600)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", closefd=False) as handle:
+            handle.write(token + "\n")
+            handle.flush()
+    finally:
+        os.close(fd)
+
+
+def suggested_token_file() -> str:
+    configured = os.environ.get("BC250_OWUI_TOKEN_FILE", "").strip()
+    if configured:
+        return configured
+    default = Path("/root/owui-test.key")
+    return str(default) if default.is_file() else ""
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("command", choices=("init", "apply", "status"))
     p.add_argument("--url", default=os.environ.get("OWUI_URL", DEFAULT_URL))
+    p.add_argument("--token-file", help="read an administrator API key from a protected file")
+    p.add_argument(
+        "--token-output",
+        help="write the authenticated token to a protected temporary file for the caller",
+    )
     return p
 
 
 def main() -> int:
     args = parser().parse_args()
-    token = os.environ.get("OWUI_API_KEY", "").strip() or None
+    env_token = os.environ.get("OWUI_API_KEY", "").strip() or None
+    token = read_token_file(args.token_file) if args.token_file else env_token
     client = Client(args.url, token)
     if args.command == "status":
         return status(client, bool(token))
     if args.command == "init":
-        if token:
+        if args.token_file:
+            print(f"Using Open WebUI administrator API-key file: {args.token_file}")
+        elif token:
             print("Using OWUI_API_KEY from the environment; interactive sign-in is not required.")
         else:
             if not sys.stdin.isatty():
-                raise ApiError("init requires a TTY or OWUI_API_KEY")
+                raise ApiError("init requires a TTY, --token-file, or OWUI_API_KEY")
+            candidate = suggested_token_file()
             print("Open WebUI initialization")
             print("  1) Create first administrator")
             print("  2) Sign in existing administrator")
-            choice = input("Choose [1/2]: ").strip()
-            if choice not in {"1", "2"}:
-                raise ApiError("choose 1 or 2")
-            token = authenticate(Client(args.url), "create" if choice == "1" else "signin")
+            if candidate:
+                print(f"  3) Use existing administrator API-key file ({candidate})")
+            else:
+                print("  3) Use administrator API-key file")
+            choice = input("Choose [1/2/3]: ").strip()
+            if choice not in {"1", "2", "3"}:
+                raise ApiError("choose 1, 2 or 3")
+            if choice == "3":
+                prompt = f"Token file [{candidate}]: " if candidate else "Token file: "
+                selected = input(prompt).strip() or candidate
+                if not selected:
+                    raise ApiError("a token-file path is required for choice 3")
+                token = read_token_file(selected)
+                print(f"Using Open WebUI administrator API-key file: {selected}")
+            else:
+                token = authenticate(Client(args.url), "create" if choice == "1" else "signin")
             client = Client(args.url, token)
     elif not token:
-        raise ApiError("apply requires OWUI_API_KEY in the environment; the key is never stored")
+        raise ApiError(
+            f"{args.command} requires --token-file or OWUI_API_KEY; the key is never stored by default"
+        )
+
+    if args.token_output and token:
+        write_token_file(args.token_output, token)
 
     apply(client)
     print("Open WebUI package-owned baseline applied through supported APIs.")
