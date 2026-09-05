@@ -1,0 +1,37 @@
+# BC250 category: experimental
+# Ollama model: exp-gpt-oss20b-unsloth-ud-q4-k-xl
+# Source: unsloth/gpt-oss-20b-GGUF @ latest
+# GGUF: gpt-oss-20b-UD-Q4_K_XL.gguf
+# License: Apache-2.0
+#
+# Intended role:
+# - Clean quantization/control comparison against the packaged GPT-OSS 20B variants
+# - Deep reasoning and difficult office/technical questions
+# - Measure quality, residency, prefill, and warm-embedding coexistence on BC-250
+#
+# QUALITY-FIRST profile:
+# - Unsloth Dynamic UD-Q4_K_XL
+# - Text-only comparison
+# - Conservative BC-250 context to preserve UMA headroom
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gpt-oss20b-unsloth-ud-q4-k-xl/gpt-oss-20b-UD-Q4_K_XL.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+
+# 11.9 GB quant: keep context conservative on 16-GB UMA.
+PARAMETER num_ctx 16384
+
+# GPT-OSS sampling profile; keep aligned with the packaged production baseline
+# so the comparison primarily measures the quant/model artifact.
+PARAMETER temperature 1.0
+PARAMETER top_p 1.0
+PARAMETER top_k 0
+
+SYSTEM """You are a reasoning assistant for German-, French-, and English-speaking users.
+Analyze difficult questions carefully. Distinguish facts, assumptions, inference, and uncertainty when relevant. Do not invent facts to fill gaps.
+Respond in the language requested by the user. Otherwise, use the language of the latest request.
+Give the useful conclusion first, followed by the reasoning and evidence needed to support it. Preserve important names, numbers, dates, terminology, and qualifications accurately."""

@@ -1,0 +1,39 @@
+# BC250 category: agentic
+# Ollama model: agentic-gemma4-12b-fable5-tau2-q4-k-m
+# Source: yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF @ latest
+# GGUF: gemma4-v2-Q4_K_M.gguf
+# License: Apache-2.0
+#
+# Intended role:
+# - Coding, terminal, tool-use, and multi-step technical-agent experiment
+# - Compare against Qwen2.5-Coder 7B and Ornith 1.5 9B in the exclusive agent lane
+# - Q4_K_M is the upstream recommended sweet spot
+#
+# Upstream notes:
+# - keep thinking enabled/default
+# - recommended sampling: temp 1.0, top_p 0.95, top_k 64
+# - repetition penalty 1.1 avoids pathological repeating/garbled output
+# - model is specialized for coding/terminal/agentic work and is English-centric
+
+FROM /var/lib/bc250-llm-server/gguf/agent/gemma4-v2-Q4_K_M.gguf
+
+# BC-250: force full GPU offload in the exclusive agent lane.
+PARAMETER num_gpu 99
+
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+
+# Upstream example uses 16K; keep that conservative BC-250 agent baseline.
+PARAMETER num_ctx 16384
+
+# Upstream recommended thinking/agent sampling.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 64
+PARAMETER repeat_penalty 1.1
+
+SYSTEM """You are a precise coding, terminal, and tool-using agent.
+Inspect available state before acting. Prefer read/inspect/grep/list operations before making changes when context is incomplete.
+For repository work, make minimal correct edits, preserve existing conventions, and verify changes with the available tests or commands.
+Never claim a command ran, a file exists, or a change succeeded unless the available evidence shows it.
+When tools are available, use them deliberately and verify the result before concluding."""

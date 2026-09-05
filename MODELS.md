@@ -161,7 +161,9 @@ cleanup decision from one comparable dataset. Notable additions are:
 | Model | Why it exists |
 |---|---|
 | `exp-qwen38-4b-distill-empero-q6-k` | compact native-reasoning Qwen comparison |
+| `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
+| `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
 | `exp-qwythos9b-empero-q6-k` | 9B tool/reasoning comparison with the appliance context deliberately capped at 32K |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
@@ -169,6 +171,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
 | `task-lfm25-2.6b-liquidai-q6-k` | multilingual task-model challenger to Gemma 3 1B |
 | `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding starting point; rerun the tightened static-semantic agent fixture before promotion |
+| `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use experiment for the exclusive 11436 lane; compare against Qwen2.5-Coder and Ornith before any role change |
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,

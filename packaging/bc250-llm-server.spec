@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.10.0
-Release:        1.1%{?dist}
+Release:        1.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.2
+- Improve installer API-key/Hugging Face/40-CU wording and no-op behavior, report an already-installed live CU manager, and finish with concise useful commands.
+- Advance revalidation to v3.9 with a live dashboard, human-readable status separated from --raw script output, recorded run-harness attribution, and quieter startup/preflight output.
+- Treat missing standard cpufreq interfaces as informational when the BC-250 SMU governor is healthy; add protected Open WebUI API-key-file verification and per-lane model counts.
+- Add Gemma 4 12B Fable5/Tau2 agentic, GPT-OSS 20B Unsloth UD-Q4_K_XL, and Qwen3.8 4B Empero Q6_K comparison Modelfiles without changing production defaults or routine benchmark scope.
+
 * Sat Sep 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.1
 - Recreate Open WebUI/Tika after application-network reconciliation and avoid unnecessary firewalld reloads so Podman DNS/host-gateway connectivity remains valid after updates.
 - Add protected Open WebUI token-file setup/verification, early revalidation network preflight, and foreground revalidation progress with optional --detach.

@@ -1,0 +1,34 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen38-4b-empero-q6-k
+# Source: empero-ai/Qwen3.8-4B-Distill-GGUF @ latest
+# GGUF: Qwen3.8-4B-Q6_K.gguf
+# License: Apache-2.0
+#
+# Intended role:
+# - Compact reasoning/general assistant experiment
+# - Compare against task models and larger Qwen3.5/Qwen3.8 candidates
+# - Test whether a ~3.56 GB Q6_K model offers a useful latency/quality point
+#
+# The upstream model is a reasoning model and emits a <think> block by default.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-4b-empero-q6-k/Qwen3.8-4B-Q6_K.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve the SYSTEM prefix when old context is evicted.
+PARAMETER num_keep 256
+
+# Small enough to test a useful 32K window while retaining substantial UMA headroom.
+PARAMETER num_ctx 32768
+
+# Upstream recommended sampling for Qwen3.8-4B.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """You are an experimental multilingual reasoning assistant for German-, French-, and English-speaking users.
+Solve the requested task accurately and completely. Use reasoning when it materially improves the answer, but keep the final answer direct and useful.
+Preserve important names, numbers, dates, terminology, and qualifications. Distinguish source facts from inference and state uncertainty instead of fabricating details.
+Respond in the language requested by the user, or the language of the latest request when unspecified."""
