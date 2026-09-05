@@ -36,9 +36,11 @@ sudo bc250-openwebui-setup status --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
-`init` offers create-admin, sign-in, or protected token-file authentication. If
-`/root/owui-test.key` already exists, it is suggested as the third choice rather
-than consumed silently. `status` without a key checks reachability only. With a
+`init` offers administrator sign-in/create or protected API-key-file authentication.
+When `/root/owui-test.key` is present with protected permissions, it is offered as
+the default choice without asking for the same path a second time. It is never
+consumed silently: the operator still selects whether to use it, sign in, create
+the first administrator, or choose a different API key file. `status` without a key checks reachability only. With a
 temporary administrator key or `--token-file` it also compares the package-owned
 settings with the reviewed desired state. The helper does not persist credentials;
 the install orchestrator may hold the authenticated token briefly under `/run` so

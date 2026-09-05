@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.0-1.2 - 2026-09-05
+
+- Refine the guided installer UX: lazy Hugging Face authentication only when model bytes are actually needed, a defaultable protected Open WebUI administrator API-key-file choice without re-entering the detected path, clearer persistent-vs-live 40-CU wording, live-manager service detection, and a concise successful-completion command summary.
+- Advance `bc250-revalidate` to v3.9 with a compact foreground dashboard showing elapsed time, numbered application phase, stage, heartbeat age and recent benchmark outcomes while the systemd worker remains authoritative; make `status` human-readable by default with `--raw` for scripts, distinguish the installed harness from the harness that produced the recorded run, and keep routine agent qualification pinned to the package-default Qwen model so catalog additions cannot silently widen or change the run.
+- Make revalidation startup quieter by suppressing the transient systemd enable message and replacing duplicate filesystem tables with one storage-headroom line.
+- Add `bc250-verify --owui-token-file FILE`, report model registration by normal lane, and classify absent standard CPU cpufreq interfaces as informational when the package SMU governor is healthy instead of producing two non-actionable warnings.
+- Add `agentic-gemma4-12b-fable5-tau2-q4-k-m`, `exp-gpt-oss20b-unsloth-ud-q4-k-xl`, and `exp-qwen38-4b-empero-q6-k` as opt-in comparison Modelfiles. Experimental catalog growth remains non-blocking for routine package/revalidation runs and production roles are unchanged.
+
 ## 0.10.0-1.1 - 2026-09-05
 
 - Recreate the Tika and Open WebUI Quadlets after installer firewall/Quadlet reconciliation and skip firewalld reloads when the HTTP policy is already current, preventing stale Podman DNS/host-gateway state after updates.

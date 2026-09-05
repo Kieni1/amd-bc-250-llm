@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v3.8
+# BC-250 package revalidation harness v3.9
 #
 # Intended target: bc250-llm-server 0.10.0 on Fedora 44; release suffix is not hard-coded.
 # `start` launches a systemd worker that spans reboots. The kernel lane dynamically
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=3.8
+HARNESS_VERSION=3.9
 TARGET_VERSION=0.10.0
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
@@ -29,6 +29,7 @@ PHASE_FILE=$WORK/phase
 STAGE_FILE=$WORK/stage
 HEARTBEAT_FILE=$WORK/heartbeat
 RUN_ID_FILE=$WORK/run-id
+RUN_HARNESS_VERSION_FILE=$WORK/harness-version
 EVENTS=$WORK/events.log
 RAW=$WORK/results
 PHASE_REPORT_DIR=$WORK/phase-reports
@@ -75,13 +76,14 @@ E2B_MODEL=${E2B_MODEL:-prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl}
 E4B_MODEL=${E4B_MODEL:-prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl}
 EMBED_MODEL=${EMBED_MODEL:-embed-jina-v5-small-retrieval-q4-k-m}
 TASK_MODEL=${TASK_MODEL:-task-gemma3-1b-unsloth-ud-q4-k-xl}
+AGENT_MODEL=${AGENT_MODEL:-agentic-qwen25-coder7b-unsloth-q5-k-m}
 OWUI_RAG_MODEL=${OWUI_RAG_MODEL:-bc250-office-documents}
 
 usage() {
   cat <<'USAGE'
 Usage:
   sudo bc250-revalidate start [--owui-token-file FILE] [--detach] [--kernel-ab] [--governor-ab] [--keepalive-expiry]
-  sudo bc250-revalidate status
+  sudo bc250-revalidate status [--raw]
   sudo bc250-revalidate abort
   sudo bc250-revalidate cleanup
 
@@ -120,7 +122,7 @@ Environment overrides remain available, for example:
 The worker never stores the supplied key itself under /var or inside the final bundle.
 When --owui-token-file is used, only the source FILE PATH is retained under the root-only
 work directory so the key can be re-copied into /run (tmpfs), including after each kernel
-reboot. Keep the source token file until the run is complete, then delete it.
+reboot. Keep the source API key file until the run is complete, then delete it.
 USAGE
 }
 
@@ -165,7 +167,7 @@ save_settings() {
     RUN_KEEPALIVE_EXPIRY RUN_PRODUCTION_GENERATION RUN_WARM_PREFIX RUN_NUM_BATCH \
     RUN_AGENT RUN_OWUI_TUNING RUN_EMBED_BATCH_SWEEP RUN_CHUNK_MIN_SWEEP \
     RUN_RAG_SYSTEM_CONTEXT RUN_CONCURRENCY RUN_OCR \
-    GPT_OSS_MODEL E2B_MODEL E4B_MODEL EMBED_MODEL TASK_MODEL OWUI_RAG_MODEL; do
+    GPT_OSS_MODEL E2B_MODEL E4B_MODEL EMBED_MODEL TASK_MODEL AGENT_MODEL OWUI_RAG_MODEL; do
     printf '%s=%q\n' "$name" "${!name}" >> "$SETTINGS_FILE"
   done
   chmod 0600 "$SETTINGS_FILE"
@@ -439,7 +441,7 @@ def cmd_concurrency(args: argparse.Namespace) -> int:
 def token_from(path: str) -> str:
     token = Path(path).read_text().strip()
     if not token:
-        raise Failure("Open WebUI token file is empty")
+        raise Failure("Open WebUI API key file is empty")
     return token
 
 
@@ -807,7 +809,7 @@ KillMode=mixed
 WantedBy=multi-user.target
 EOFUNIT
   systemctl daemon-reload
-  systemctl enable "$UNIT" >/dev/null
+  systemctl enable "$UNIT" >/dev/null 2>&1
 }
 
 preflight() {
@@ -848,7 +850,9 @@ preflight() {
   [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]] || {
     echo "INFO: agent mode is currently active; start will restore normal mode first."
   }
-  df -h / /var/lib/bc250-llm-server
+  local storage_avail
+  storage_avail="$(df -h --output=avail /var/lib/bc250-llm-server 2>/dev/null | awk 'NR==2{print $1}' || true)"
+  echo "Storage headroom: ${storage_avail:-unknown} available on /var/lib/bc250-llm-server"
 }
 
 owui_container_http() {
@@ -924,31 +928,167 @@ EOF_PREFLIGHT_URLS
   progress "Open WebUI private-network preflight passed"
 }
 
+phase_label() {
+  case "$1" in
+    pipeline-start|initializing) echo "Starting application revalidation" ;;
+    governor-current) echo "Governor qualification" ;;
+    baseline) echo "Baseline restoration and snapshot" ;;
+    preflight) echo "Application network preflight" ;;
+    pipeline) echo "Core model pipeline" ;;
+    num-batch) echo "GPT-OSS num_batch sweep" ;;
+    agent) echo "Exclusive agent mode" ;;
+    owui) echo "Open WebUI tuning" ;;
+    final) echo "Final restoration and snapshot" ;;
+    kernel-baseline) echo "Kernel A/B: current TTM-only baseline" ;;
+    kernel-full) echo "Kernel A/B: historical full profile" ;;
+    kernel-restored) echo "Kernel A/B: restored package profile" ;;
+    recovery) echo "Recovery" ;;
+    done) echo "Complete" ;;
+    failed|failed-recovered|failed-manual-kernel-recovery) echo "Failed" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+phase_position() {
+  local phase="$1" total=7 offset=0 position=""
+  if ((RUN_GOVERNOR_REVALIDATION)); then
+    total=8
+    if [[ "$phase" == governor-current ]]; then
+      echo "1/$total"
+      return 0
+    fi
+    offset=1
+  fi
+  case "$phase" in
+    baseline) position=$((1 + offset)) ;;
+    preflight) position=$((2 + offset)) ;;
+    pipeline) position=$((3 + offset)) ;;
+    num-batch) position=$((4 + offset)) ;;
+    agent) position=$((5 + offset)) ;;
+    owui) position=$((6 + offset)) ;;
+    final|done) position=$((7 + offset)) ;;
+    kernel-baseline) echo "kernel 1/3"; return 0 ;;
+    kernel-full) echo "kernel 2/3"; return 0 ;;
+    kernel-restored) echo "kernel 3/3"; return 0 ;;
+    *) return 0 ;;
+  esac
+  echo "$position/$total"
+}
+
+format_elapsed() {
+  local seconds="${1:-0}"
+  ((seconds < 0)) && seconds=0
+  printf '%02d:%02d:%02d' $((seconds/3600)) $(((seconds%3600)/60)) $((seconds%60))
+}
+
+heartbeat_age() {
+  local value="$1" now_s heartbeat_s age
+  [[ -n "$value" && "$value" != none ]] || { echo "unknown"; return 0; }
+  heartbeat_s="$(date -d "$value" +%s 2>/dev/null || true)"
+  [[ "$heartbeat_s" =~ ^[0-9]+$ ]] || { echo "unknown"; return 0; }
+  now_s="$(date +%s)"
+  age=$((now_s - heartbeat_s))
+  ((age < 0)) && age=0
+  if ((age < 60)); then
+    echo "${age}s ago"
+  elif ((age < 3600)); then
+    echo "$((age/60))m $((age%60))s ago"
+  else
+    echo "$((age/3600))h $(((age%3600)/60))m ago"
+  fi
+}
+
+recent_benchmark_results() {
+  local entry label outcome symbol count=0
+  [[ -r "$EVENTS" ]] || { echo "  (none yet)"; return 0; }
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    label="${entry%%|*}"
+    outcome="${entry#*|}"
+    label="${label#pipeline/}"
+    case "$outcome" in
+      pass) symbol='✓' ;;
+      quality-fail) symbol='!' ;;
+      timeout-or-killed|signal-sigpipe|nonzero-*) symbol='×' ;;
+      *) symbol='·' ;;
+    esac
+    printf '  %-2s %-34s %s\n' "$symbol" "$label" "$outcome"
+    count=$((count + 1))
+  done < <(
+    awk '
+      /benchmark finished:/ {
+        line=$0
+        sub(/^.*benchmark finished: /, "", line)
+        label=line
+        sub(/ rc=.*/, "", label)
+        outcome=line
+        sub(/^.* outcome=/, "", outcome)
+        rows[++n]=label "|" outcome
+      }
+      END {
+        start=n-5
+        if (start < 1) start=1
+        for (i=start; i<=n; i++) print rows[i]
+      }
+    ' "$EVENTS" 2>/dev/null
+  )
+  ((count > 0)) || echo "  (none yet)"
+}
+
+dashboard_text() {
+  local phase stage heartbeat started now_s elapsed position label
+  phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
+  stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
+  heartbeat="$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo none)"
+  stage="${stage//$'\n'/ }"
+  ((${#stage} <= 96)) || stage="${stage:0:93}..."
+  started="$(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s)"
+  now_s="$(date +%s)"
+  elapsed="$(format_elapsed $((now_s - started)))"
+  position="$(phase_position "$phase")"
+  label="$(phase_label "$phase")"
+
+  printf 'BC-250 revalidation  [running %s]\n' "$elapsed"
+  printf 'Run          %s\n' "$(run_id)"
+  if [[ -n "$position" ]]; then
+    printf 'Phase        %-10s %s\n' "$position" "$label"
+  else
+    printf 'Phase        %s\n' "$label"
+  fi
+  printf 'Stage        %s\n' "$stage"
+  printf 'Heartbeat    %s\n' "$(heartbeat_age "$heartbeat")"
+  printf '\nCompleted benchmarks (latest 6)\n'
+  recent_benchmark_results
+  printf '\nCtrl-C detaches; the worker continues under systemd.\n'
+}
+
 follow_run() {
-  local interrupted=0 started now_s elapsed_s elapsed phase stage last="" spinner='|/-\\' tick=0 rc=1
-  started="$(date +%s)"
+  local interrupted=0 phase stage last="" rc=1 dashboard="" drawn_lines=0 new_lines=0
   trap 'interrupted=1' INT
-  echo "Following revalidation progress; Ctrl-C detaches and leaves the systemd worker running."
+  echo
   while ((interrupted == 0)); do
     phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
     stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
-    now_s="$(date +%s)"
-    elapsed_s=$((now_s - started))
-    printf -v elapsed '%02d:%02d:%02d' $((elapsed_s/3600)) $(((elapsed_s%3600)/60)) $((elapsed_s%60))
     if [[ -t 1 ]]; then
-      printf '\r\033[K[%s] %s  phase=%s  %s' "${spinner:tick%4:1}" "$elapsed" "$phase" "$stage"
+      dashboard="$(dashboard_text)"
+      new_lines="$(printf '%s\n' "$dashboard" | awk 'END{print NR}')"
+      if ((drawn_lines > 0)); then
+        printf '\033[%dA' "$drawn_lines"
+      fi
+      while IFS= read -r line; do
+        printf '\033[2K\r%s\n' "$line"
+      done <<< "$dashboard"
+      drawn_lines="$new_lines"
     elif [[ "$phase|$stage" != "$last" ]]; then
-      printf '[%s] phase=%s  %s\n' "$elapsed" "$phase" "$stage"
+      printf '[%s] phase=%s  %s\n' "$(format_elapsed $(( $(date +%s) - $(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s) )))" "$phase" "$stage"
       last="$phase|$stage"
     fi
     case "$phase" in
       done|failed|failed-recovered|failed-manual-kernel-recovery) break ;;
     esac
-    tick=$((tick + 1))
     sleep 2 || true
   done
   trap - INT
-  [[ ! -t 1 ]] || printf '\n'
   if ((interrupted)); then
     echo "Detached. Worker continues in the background."
     echo "Status: sudo bc250-revalidate status"
@@ -991,7 +1131,7 @@ start_run() {
   done
   preflight
   if [[ -n $token_file && ! -r $token_file ]]; then
-    echo "ERROR: cannot read OWUI token file: $token_file" >&2
+    echo "ERROR: cannot read Open WebUI API key file: $token_file" >&2
     exit 1
   fi
   if systemctl is-active --quiet "$UNIT" 2>/dev/null; then
@@ -1018,6 +1158,7 @@ start_run() {
   printf 'start requested\n' > "$STAGE_FILE"
   printf '%s\n' "$(now)" > "$HEARTBEAT_FILE"
   printf '%s-%s\n' "$(date +%Y%m%dT%H%M%S%z)" "$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')" > "$RUN_ID_FILE"
+  printf '%s\n' "$HARNESS_VERSION" > "$RUN_HARNESS_VERSION_FILE"
   if [[ -n $token_file ]]; then
     printf '%s\n' "$(readlink -f -- "$token_file")" > "$OWUI_TOKEN_SOURCE_FILE"
     chmod 0600 "$OWUI_TOKEN_SOURCE_FILE"
@@ -1026,7 +1167,7 @@ start_run() {
     printf '%s\n' "$OWUI_API_KEY" > "$OWUI_TOKEN"
     chmod 0600 "$OWUI_TOKEN"
     if ((RUN_KERNEL_REVALIDATION)); then
-      echo "WARN: OWUI_API_KEY from the environment cannot survive reboot; use --owui-token-file for authenticated OWUI tests." >&2
+      echo "WARN: OWUI_API_KEY from the environment cannot survive reboot; use --owui-token-file with a protected API key file for authenticated OWUI tests." >&2
     fi
   fi
   validate_owui_token
@@ -1066,7 +1207,9 @@ start_run() {
   install_unit
   systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
   systemctl start --no-block "$UNIT"
-  echo "Started run_id=$(run_id)"
+  echo
+  echo "Started BC-250 revalidation run $(run_id) with harness v$HARNESS_VERSION."
+  echo "The worker is owned by systemd; this terminal only follows its progress."
   if ((RUN_KERNEL_REVALIDATION)); then
     echo "The worker will reboot twice while comparing the current TTM-only profile with the historical full profile, then continue with application tests."
     detach=1
@@ -1711,11 +1854,11 @@ phase_agent() {
     done
     bc250-agent-mode status > "$dir/agent-mode-active-status.txt" 2>&1
     snapshot agent/active
-    agent_model="$(first_registered 11436 agentic-)"
-    if [[ -n $agent_model ]]; then
+    if model_registered 11436 "$AGENT_MODEL"; then
+      agent_model="$AGENT_MODEL"
       run_bench_at agent benchmark env OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark agent "$agent_model"
     else
-      echo "SKIP: no registered agentic model on 11436" > "$dir/agent-model-skipped.txt"
+      echo "SKIP: package-default agent model $AGENT_MODEL is not registered on 11436" > "$dir/agent-model-skipped.txt"
     fi
     bc250-agent-mode leave > "$dir/agent-mode-leave.txt" 2>&1
     wait_api 11434 45
@@ -1792,7 +1935,7 @@ phase_owui() {
   local dir="$RAW/owui" key rc sampler_pid drift_rc
   install -d -m 0700 "$dir"
   if ((!RUN_OWUI_TUNING)) || [[ ! -s $OWUI_TOKEN ]]; then
-    echo "SKIP: authenticated OWUI tuning tests require --owui-token-file and RUN_OWUI_TUNING=1" > "$dir/skipped.txt"
+    echo "SKIP: authenticated OWUI tuning tests require --owui-token-file with a protected API key file and RUN_OWUI_TUNING=1" > "$dir/skipped.txt"
     snapshot owui/skipped
     write_phase_report openwebui-rag-tuning-results owui
     return 0
@@ -2193,26 +2336,151 @@ worker() {
   esac
 }
 
-status_run() {
-  need_root
+latest_phase_report_path() {
+  find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-
+}
+
+latest_bundle_path() {
+  find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-
+}
+
+saved_run_harness_version() {
+  local report value=""
+  if [[ -r "$RUN_HARNESS_VERSION_FILE" ]]; then
+    value="$(cat "$RUN_HARNESS_VERSION_FILE" 2>/dev/null || true)"
+  fi
+  if [[ -z "$value" ]]; then
+    report="$(latest_phase_report_path)"
+    if [[ -r "$report" ]]; then
+      value="$(sed -nE 's/^# BC-250 [^ ]+ revalidation v([^ ]+) phase report$/\1/p' "$report" | head -1)"
+    fi
+  fi
+  printf '%s\n' "${value:-unknown}"
+}
+
+status_raw() {
   echo "harness_version=$HARNESS_VERSION"
+  echo "run_harness_version=$(saved_run_harness_version)"
   echo "target_version=$TARGET_VERSION"
   echo "run_id=$(run_id)"
   echo "phase=$(cat "$PHASE_FILE" 2>/dev/null || echo none)"
   echo "stage=$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
   echo "heartbeat=$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo none)"
   echo "kernel=$(uname -r)"
-  echo "target_kernel=$(target_kernel)"
+  [[ -r "$TARGET_KERNEL_FILE" ]] && echo "target_kernel=$(target_kernel)"
   echo "current_relevant_args=$(current_relevant_args | paste -sd' ' -)"
-  echo "saved_original_args=$(saved_original_args | paste -sd' ' -)"
+  [[ -r "$ORIGINAL_ARGS_FILE" ]] && echo "saved_original_args=$(saved_original_args | paste -sd' ' -)"
   echo "service=$(systemctl is-active "$UNIT" 2>/dev/null || true)"
   echo "phase_reports=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" 2>/dev/null | wc -l)"
-  echo "latest_phase_report=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
-  echo "latest_bundle=$(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)"
+  echo "latest_phase_report=$(latest_phase_report_path)"
+  echo "latest_bundle=$(latest_bundle_path)"
   [[ ! -e $ERROR_CONTEXT ]] || echo "error_context=$ERROR_CONTEXT"
   if [[ -f $RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt ]]; then
     cat "$RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt"
   fi
+}
+
+status_run() {
+  need_root
+  load_settings
+  local raw=0 phase stage heartbeat service rid run_version result worker phase_reports report bundle
+  local failure_phase="" failure_stage="" position="" label=""
+  shift || true
+  while (($#)); do
+    case "$1" in
+      --raw) raw=1; shift ;;
+      -h|--help)
+        echo "Usage: sudo bc250-revalidate status [--raw]"
+        return 0
+        ;;
+      *) echo "ERROR: unknown status option: $1" >&2; return 2 ;;
+    esac
+  done
+  ((raw == 0)) || { status_raw; return; }
+
+  rid="$(run_id)"
+  phase="$(cat "$PHASE_FILE" 2>/dev/null || echo none)"
+  stage="$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
+  heartbeat="$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo none)"
+  service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+  run_version="$(saved_run_harness_version)"
+  phase_reports="$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "${rid}-*.txt" 2>/dev/null | wc -l)"
+  report="$(latest_phase_report_path)"
+  bundle="$(latest_bundle_path)"
+  label="$(phase_label "$phase")"
+  position="$(phase_position "$phase")"
+
+  case "$service" in
+    active|activating|reloading) worker="running ($service)" ;;
+    *) worker="not running${service:+ (systemd: $service)}" ;;
+  esac
+  case "$phase" in
+    done) result="PASSED" ;;
+    failed|failed-recovered|failed-manual-kernel-recovery) result="FAILED" ;;
+    none) result="none" ;;
+    *)
+      if [[ "$service" == active || "$service" == activating || "$service" == reloading ]]; then
+        result="RUNNING"
+      else
+        result="INCOMPLETE"
+      fi
+      ;;
+  esac
+
+  if [[ -r "$ERROR_CONTEXT" ]]; then
+    failure_phase="$(awk -F= '$1=="phase"{sub(/^[^=]*=/,""); print; exit}' "$ERROR_CONTEXT")"
+    failure_stage="$(awk -F= '$1=="stage"{sub(/^[^=]*=/,""); print; exit}' "$ERROR_CONTEXT")"
+  fi
+
+  echo "BC-250 revalidation"
+  printf 'Current harness : %s\n' "$HARNESS_VERSION"
+  printf 'Target version  : %s\n' "$TARGET_VERSION"
+  printf 'Worker          : %s\n' "$worker"
+  echo
+  if [[ -z "$rid" ]]; then
+    echo "Last run        : none"
+  else
+    echo "Run"
+    printf '  ID            : %s\n' "$rid"
+    printf '  Harness       : %s\n' "$run_version"
+    printf '  Result        : %s\n' "$result"
+    if [[ "$result" == RUNNING ]]; then
+      if [[ -n "$position" ]]; then
+        printf '  Phase         : %s  %s\n' "$position" "$label"
+      else
+        printf '  Phase         : %s\n' "$label"
+      fi
+      printf '  Stage         : %s\n' "$stage"
+      printf '  Heartbeat     : %s (%s)\n' "$heartbeat" "$(heartbeat_age "$heartbeat")"
+    else
+      printf '  Last phase    : %s\n' "$label"
+      printf '  Finished      : %s\n' "$heartbeat"
+    fi
+    if [[ -n "$failure_phase" ]]; then
+      printf '  Failure phase : %s\n' "$(phase_label "$failure_phase")"
+      [[ -z "$failure_stage" ]] || printf '  Failure stage : %s\n' "$failure_stage"
+    fi
+    printf '  Phase reports : %s\n' "$phase_reports"
+    [[ -z "$report" ]] || printf '  Latest report : %s\n' "$report"
+    [[ -z "$bundle" ]] || printf '  Bundle        : %s\n' "$bundle"
+    [[ ! -e $ERROR_CONTEXT ]] || printf '  Error context : %s\n' "$ERROR_CONTEXT"
+  fi
+  echo
+  echo "System"
+  printf '  Kernel        : %s\n' "$(uname -r)"
+  printf '  Memory profile: %s\n' "$(current_relevant_args | paste -sd' ' -)"
+  if [[ -r "$TARGET_KERNEL_FILE" ]]; then
+    printf '  Target kernel : %s\n' "$(target_kernel)"
+  fi
+  if [[ -f $RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt ]]; then
+    echo
+    echo "Keepalive observation"
+    sed 's/^/  /' "$RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt"
+  fi
+  [[ "$run_version" == unknown || "$run_version" == "$HARNESS_VERSION" || -z "$rid" ]] || {
+    echo
+    echo "Note: the recorded run used harness v$run_version; the installed command is v$HARNESS_VERSION."
+  }
 }
 
 abort_run() {

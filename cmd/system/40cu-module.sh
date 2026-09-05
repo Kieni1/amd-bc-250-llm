@@ -412,7 +412,7 @@ do_prepare() {
         (verify_initramfs "$target") >/dev/null 2>&1; then
       record_prepared "$target"
       info "AMDGPU and its initramfs copy are already prepared for $KVER."
-      info "40-CU support remains disabled until: sudo bc250-40cu enable"
+      info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
       return
     fi
     info "AMDGPU is already patched for $KVER; skipping download and compilation."
@@ -430,8 +430,8 @@ do_prepare() {
   module_vermagic_matches "$target" || die "prepared module vermagic changed unexpectedly"
   verify_initramfs "$target"
   record_prepared "$target"
-  info "40-CU support is prepared but remains disabled."
-  info "Operator action when ready: sudo bc250-40cu enable"
+  info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
+  info "Enable persistent 40-CU boot activation when ready: sudo bc250-40cu enable"
 }
 
 do_enable() {

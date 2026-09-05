@@ -20,7 +20,8 @@ main/task/embedding lanes. Current choices are:
   space-safe requirement and its Python answer silently ignored out-of-range
   ports. The tightened fixture now checks those requirements explicitly;
 - `agentic-ornith15-9b-ornith-q5-k-m` — native-reasoning agent/coding candidate;
-- `agentic-qwable9b-empero-q6-k` — native-reasoning comparison candidate.
+- `agentic-qwable9b-empero-q6-k` — native-reasoning comparison candidate;
+- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — Gemma 4 12B coding/tool-use experiment at Q4_K_M and 16K context; keep it in the exclusive lane and compare its actual agent fixture results before promotion.
 
 With no selection, `bc250-model install agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to

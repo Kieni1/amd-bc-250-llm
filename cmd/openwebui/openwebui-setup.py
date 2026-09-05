@@ -263,17 +263,17 @@ def read_token_file(path: str) -> str:
     try:
         st = token_path.stat()
     except OSError as exc:
-        raise ApiError(f"cannot read token file {token_path}: {exc}") from exc
+        raise ApiError(f"cannot read API key file {token_path}: {exc}") from exc
     if not stat.S_ISREG(st.st_mode):
-        raise ApiError(f"token file is not a regular file: {token_path}")
+        raise ApiError(f"API key file is not a regular file: {token_path}")
     if st.st_mode & 0o077:
-        raise ApiError(f"token file must not be group/world accessible: {token_path}")
+        raise ApiError(f"API key file must not be group/world accessible: {token_path}")
     try:
         token = token_path.read_text(encoding="utf-8").strip()
     except OSError as exc:
-        raise ApiError(f"cannot read token file {token_path}: {exc}") from exc
+        raise ApiError(f"cannot read API key file {token_path}: {exc}") from exc
     if not token:
-        raise ApiError(f"token file is empty: {token_path}")
+        raise ApiError(f"API key file is empty: {token_path}")
     return token
 
 
@@ -319,32 +319,53 @@ def main() -> int:
         return status(client, bool(token))
     if args.command == "init":
         if args.token_file:
-            print(f"Using Open WebUI administrator API-key file: {args.token_file}")
+            print(f"Using Open WebUI administrator API key file: {args.token_file}")
         elif token:
             print("Using OWUI_API_KEY from the environment; interactive sign-in is not required.")
         else:
             if not sys.stdin.isatty():
                 raise ApiError("init requires a TTY, --token-file, or OWUI_API_KEY")
             candidate = suggested_token_file()
-            print("Open WebUI initialization")
-            print("  1) Create first administrator")
-            print("  2) Sign in existing administrator")
+            print("Open WebUI administrator access")
             if candidate:
-                print(f"  3) Use existing administrator API-key file ({candidate})")
+                print()
+                print("A protected administrator API key file was found:")
+                print(f"  {candidate}")
+                print()
+                print("  1) Use this API key file")
+                print("  2) Sign in with an existing administrator")
+                print("  3) Create the first administrator")
+                print("  4) Use a different API key file")
+                choice = input("Choose [1/2/3/4] [1]: ").strip() or "1"
+                if choice not in {"1", "2", "3", "4"}:
+                    raise ApiError("choose 1, 2, 3 or 4")
+                if choice == "1":
+                    selected = candidate
+                    token = read_token_file(selected)
+                    print(f"Using Open WebUI administrator API key file: {selected}")
+                elif choice == "4":
+                    selected = input("API key file: ").strip()
+                    if not selected:
+                        raise ApiError("an API key file path is required")
+                    token = read_token_file(selected)
+                    print(f"Using Open WebUI administrator API key file: {selected}")
+                else:
+                    token = authenticate(Client(args.url), "signin" if choice == "2" else "create")
             else:
-                print("  3) Use administrator API-key file")
-            choice = input("Choose [1/2/3]: ").strip()
-            if choice not in {"1", "2", "3"}:
-                raise ApiError("choose 1, 2 or 3")
-            if choice == "3":
-                prompt = f"Token file [{candidate}]: " if candidate else "Token file: "
-                selected = input(prompt).strip() or candidate
-                if not selected:
-                    raise ApiError("a token-file path is required for choice 3")
-                token = read_token_file(selected)
-                print(f"Using Open WebUI administrator API-key file: {selected}")
-            else:
-                token = authenticate(Client(args.url), "create" if choice == "1" else "signin")
+                print("  1) Sign in with an existing administrator")
+                print("  2) Create the first administrator")
+                print("  3) Use an administrator API key file")
+                choice = input("Choose [1/2/3]: ").strip()
+                if choice not in {"1", "2", "3"}:
+                    raise ApiError("choose 1, 2 or 3")
+                if choice == "3":
+                    selected = input("API key file: ").strip()
+                    if not selected:
+                        raise ApiError("an API key file path is required")
+                    token = read_token_file(selected)
+                    print(f"Using Open WebUI administrator API key file: {selected}")
+                else:
+                    token = authenticate(Client(args.url), "signin" if choice == "1" else "create")
             client = Client(args.url, token)
     elif not token:
         raise ApiError(

@@ -10,9 +10,50 @@ else
   BC250_OLLAMA_VERSION=0.33.3
 fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
+OWUI_TOKEN_FILE=""
 PASS=0
 WARN=0
 FAIL=0
+
+usage() {
+  cat <<'USAGE'
+Usage: sudo bc250-verify [--owui-token-file FILE]
+
+Runs detailed local appliance verification. With --owui-token-file, the protected
+Open WebUI administrator API key is used only for the live package-owned desired-state
+check and is not persisted.
+USAGE
+}
+
+while (($#)); do
+  case "$1" in
+    --owui-token-file)
+      (($# >= 2)) || { echo "ERROR: --owui-token-file requires a path" >&2; exit 2; }
+      OWUI_TOKEN_FILE="$2"
+      shift 2
+      ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "ERROR: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+  esac
+done
+
+if [[ -n "$OWUI_TOKEN_FILE" ]]; then
+  [[ -f "$OWUI_TOKEN_FILE" && -r "$OWUI_TOKEN_FILE" && -s "$OWUI_TOKEN_FILE" ]] || {
+    echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $OWUI_TOKEN_FILE" >&2
+    exit 2
+  }
+  token_mode="$(stat -c '%a' "$OWUI_TOKEN_FILE" 2>/dev/null || true)"
+  [[ "$token_mode" =~ ^[0-7]{3,4}$ ]] || {
+    echo "ERROR: cannot determine permissions for Open WebUI API key file: $OWUI_TOKEN_FILE" >&2
+    exit 2
+  }
+  if (( (8#$token_mode) & 077 )); then
+    echo "ERROR: Open WebUI API key file must not be group/world accessible: $OWUI_TOKEN_FILE (mode $token_mode)" >&2
+    exit 2
+  fi
+  OWUI_API_KEY="$(<"$OWUI_TOKEN_FILE")"
+  export OWUI_API_KEY
+fi
 
 ok() { printf '  [ OK ] %s\n' "$1"; PASS=$((PASS + 1)); }
 warn() { printf '  [WARN] %s\n' "$1"; WARN=$((WARN + 1)); }
@@ -92,8 +133,16 @@ threads="$(nproc 2>/dev/null || printf '0')"
 info "CPU topology: $physical_cores physical cores / $threads online threads"
 cpufreq_driver="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_driver 2>/dev/null | sort -u | paste -sd, -)"
 cpufreq_governor="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | sort -u | paste -sd, -)"
-[[ -n "$cpufreq_driver" ]] && info "cpufreq driver: $cpufreq_driver" || warn "cpufreq driver is not exposed"
-[[ -n "$cpufreq_governor" ]] && info "cpufreq governor: $cpufreq_governor" || warn "cpufreq governor is not exposed"
+if [[ -z "$cpufreq_driver" && -z "$cpufreq_governor" ]]; then
+  if systemctl is-active --quiet cyan-skillfish-governor-smu.service 2>/dev/null; then
+    info "standard CPU cpufreq interfaces are not exposed on this platform; the BC-250 SMU governor is active"
+  else
+    warn "standard CPU cpufreq interfaces are not exposed and the BC-250 SMU governor is not active"
+  fi
+else
+  [[ -n "$cpufreq_driver" ]] && info "cpufreq driver: $cpufreq_driver" || warn "cpufreq driver is not exposed"
+  [[ -n "$cpufreq_governor" ]] && info "cpufreq governor: $cpufreq_governor" || warn "cpufreq governor is not exposed"
+fi
 missing_idle="$(for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
   [[ -d "$cpu" ]] || continue
   [[ -r "$cpu/online" && "$(cat "$cpu/online")" == 0 ]] && continue
@@ -400,7 +449,13 @@ if [[ -n "$ollama_tags" ]]; then
   ok "active Ollama API reachable at $OLLAMA_URL"
   tag_count="$(jq '.models | length' <<< "$ollama_tags" 2>/dev/null || echo '?')"
   loaded_count="$(curl -fsS "$OLLAMA_URL/api/ps" | jq '.models | length' 2>/dev/null || echo '?')"
-  info "registered models: $tag_count; currently loaded: $loaded_count"
+  if ((agent_active)); then
+    info "registered models: agent=$tag_count; currently loaded=$loaded_count"
+  else
+    task_count="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null | jq '.models | length' 2>/dev/null || echo '?')"
+    embedding_count="$(curl -fsS http://127.0.0.1:11437/api/tags 2>/dev/null | jq '.models | length' 2>/dev/null || echo '?')"
+    info "registered models by lane: main=$tag_count task=$task_count embedding=$embedding_count; main currently loaded=$loaded_count"
+  fi
 else
   bad "active Ollama API unavailable at $OLLAMA_URL"
 fi
@@ -617,9 +672,11 @@ else
 fi
 
 printf '\n================ %d ok / %d warn / %d fail ================\n' "$PASS" "$WARN" "$FAIL"
-if ((FAIL == 0)); then
-  echo "Server checks completed. Review warnings before long-running or 40-CU workloads."
+if ((FAIL == 0 && WARN == 0)); then
+  echo "Server verification completed successfully."
+elif ((FAIL == 0)); then
+  echo "Server verification completed with warnings; review the items above."
 else
-  echo "Fix failures before wider use."
+  echo "Verification failed; fix the reported failures before wider use."
 fi
 exit "$FAIL"

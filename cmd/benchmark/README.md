@@ -12,7 +12,8 @@ exercise live services and, when explicitly requested, reboot the machine.
 ```bash
 sudo bc250-revalidate start                 # foreground progress; worker stays systemd-owned
 sudo bc250-revalidate start --detach        # return immediately
-sudo bc250-revalidate status
+sudo bc250-revalidate status              # human-readable current/last-run status
+sudo bc250-revalidate status --raw        # key=value form for scripts
 sudo bc250-revalidate abort
 
 # Authenticated Open WebUI tuning lanes
@@ -40,9 +41,13 @@ Open WebUI chunk/system-context conversations use the package-facing
 drifted, those A/B lanes are skipped with an explicit reason instead of silently
 changing operator state.
 
-By default `start` follows a live phase/stage indicator; Ctrl-C detaches only the
-display, not the worker. Use `--detach` for scripts or immediate return. Kernel A/B
-runs detach automatically because the terminal cannot survive the requested reboots.
+By default `start` follows a compact live dashboard with elapsed time, numbered
+application phase, current stage, heartbeat age and the most recent benchmark
+outcomes. Ctrl-C detaches only the display, not the worker. Use `--detach` for scripts
+or immediate return. Kernel A/B runs detach automatically because the terminal cannot
+survive the requested reboots. `status` separates the currently installed harness and
+worker state from the recorded last run; `status --raw` keeps the machine-readable
+key/value interface.
 
 Persistent result bundles are written below
 `/var/lib/bc250-llm-server/revalidation/results/`. Worker state lives under

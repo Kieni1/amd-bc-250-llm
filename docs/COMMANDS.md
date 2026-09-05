@@ -85,7 +85,9 @@ Use global indexes, ranges, exact names, `recommended`, `production` or `all`;
 Enter skips.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
 across transcript PTY creation, so unattended runs never become interactive by
-accident. `BC250_HF_ANONYMOUS=1` suppresses the optional Hugging Face token prompt;
+accident. `BC250_HF_ANONYMOUS=1` forces anonymous Hugging Face downloads. The model manager
+asks for an optional Hugging Face token only when a download is actually needed;
+a no-op update with current model sources does not ask for one.
 `BC250_UPDATE_OLLAMA=1` explicitly refreshes official Ollama.
 
 ## Models
@@ -310,6 +312,7 @@ pressure. See [`CU-UNLOCK.md`](CU-UNLOCK.md) before changing GPU routing.
 ```bash
 sudo bc250-status
 sudo bc250-verify
+sudo bc250-verify --owui-token-file /root/owui-test.key
 RUN_MODEL_TESTS=1 sudo bc250-verify
 bc250-verify-lan SERVER_IP
 sudo llm-run-diagnose --no-load
@@ -317,13 +320,15 @@ MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 bc250-check-temp --once
 bc250-benchmark
 sudo bc250-revalidate status
+sudo bc250-revalidate status --raw
 ```
 
 `bc250-revalidate` is the root-only systemd-backed revalidation harness. A routine
 `sudo bc250-revalidate start` stays on the current kernel/governor policy and
-follows a live phase/stage indicator in the invoking terminal while the worker
-remains detached from that shell. Ctrl-C detaches the display without stopping
-the run; `--detach` returns immediately. Use
+follows a compact live dashboard in the invoking terminal while the worker remains
+systemd-owned. The dashboard shows elapsed time, numbered application phase, current
+stage, heartbeat age and recent benchmark outcomes. Ctrl-C detaches the display
+without stopping the run; `--detach` returns immediately. Use
 `--kernel-ab`, `--governor-ab` or `--keepalive-expiry` only when those expensive
 lanes are needed. Authenticated Open WebUI tuning accepts
 `--owui-token-file FILE`. Before expensive model lanes the harness now verifies
@@ -335,9 +340,12 @@ removes it after the oneshot exits, and a later `start` replaces completed state
 Benchmark exit `3` is recorded as quality data; other unexpected benchmark failures
 enter worker recovery. `abort` restores temporary state before stopping.
 
-`bc250-status` is a short overview including CPU topology/power-state exposure,
-RAM, memory pressure, zram, disk swap, swappiness and appliance storage.
-`bc250-verify` is the detailed pass/fail check. `bc250-check-temp` refreshes every
+`bc250-revalidate status` is human-readable by default and separates the installed
+harness/worker state from the recorded last-run result; `--raw` preserves the
+key/value form for scripts. `bc250-status` is a short overview including CPU
+topology/power-state exposure, RAM, memory pressure, zram, disk swap, swappiness
+and appliance storage. `bc250-verify` is the detailed pass/fail check and accepts
+`--owui-token-file FILE` for the authenticated package-owned Open WebUI drift check. `bc250-check-temp` refreshes every
 second by default; use `--once` only when a single sample is useful. Verification includes kernel/module alignment, CU state, Ollama version,
 internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`

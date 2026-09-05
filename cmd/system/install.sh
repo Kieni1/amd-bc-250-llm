@@ -14,7 +14,6 @@ fi
 # shellcheck disable=SC1090
 source "$runtime_env"
 INSTALL_MODE="full"
-HF_AUTH_PREPARED=0
 OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
 OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
 
@@ -55,16 +54,16 @@ parse_arguments() {
 validate_owui_token_file() {
   local path="$1" mode
   [[ -f "$path" && -r "$path" && -s "$path" ]] || {
-    echo "ERROR: Open WebUI token file must be a readable, non-empty regular file: $path" >&2
+    echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $path" >&2
     return 1
   }
   mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
   [[ "$mode" =~ ^[0-7]{3,4}$ ]] || {
-    echo "ERROR: cannot determine permissions for Open WebUI token file: $path" >&2
+    echo "ERROR: cannot determine permissions for Open WebUI API key file: $path" >&2
     return 1
   }
   if (( (8#$mode) & 077 )); then
-    echo "ERROR: Open WebUI token file must not be group/world accessible: $path (mode $mode)" >&2
+    echo "ERROR: Open WebUI API key file must not be group/world accessible: $path (mode $mode)" >&2
     return 1
   fi
 }
@@ -280,39 +279,10 @@ step_4_memory_and_swap() {
   bc250-swap-profile ensure
 }
 
-prepare_hf_authentication() {
-  ((HF_AUTH_PREPARED == 0)) || return 0
-  [[ -z "${HF_TOKEN:-}" ]] || {
-    echo "Using HF_TOKEN supplied in the environment."
-    HF_AUTH_PREPARED=1
-    return
-  }
-  [[ "${BC250_HF_ANONYMOUS:-0}" != 1 ]] || {
-    echo "Using anonymous Hugging Face downloads."
-    HF_AUTH_PREPARED=1
-    return
-  }
-  if [[ "${BC250_ASSUME_YES:-0}" == 1 ]] || ! input_is_interactive; then
-    echo "HF_TOKEN is unset; using anonymous Hugging Face downloads."
-    export BC250_HF_ANONYMOUS=1
-    HF_AUTH_PREPARED=1
-    return 0
-  fi
-  local token=""
-  read -r -s -p "HF_TOKEN (optional; Enter for anonymous downloads): " token
-  echo
-  if [[ -n "$token" ]]; then
-    export HF_TOKEN="$token"
-    unset BC250_HF_ANONYMOUS || true
-  else
-    export BC250_HF_ANONYMOUS=1
-  fi
-  HF_AUTH_PREPARED=1
-}
-
 step_5_prepare_40cu() {
   heading "5. PREPARE OPTIONAL 40-CU SUPPORT"
   local kernel prepared_file=/var/lib/bc250-llm-server/40cu/prepared
+  local live_manager=bc250-cu-live-manager.service live_state="" live_enable=""
   kernel="$(uname -r)"
   if [[ -r "$prepared_file" ]] && grep -Fxq "kernel=$kernel" "$prepared_file"; then
     echo "40-CU build is already prepared for $kernel; skipping build-prerequisite reconciliation."
@@ -322,15 +292,22 @@ step_5_prepare_40cu() {
     echo "Installing build files for the exact running kernel: $kernel"
     dnf install -y "kernel-devel-$kernel"
   fi
+  if systemctl cat "$live_manager" >/dev/null 2>&1; then
+    live_state="$(systemctl is-active "$live_manager" 2>/dev/null || true)"
+    live_enable="$(systemctl is-enabled "$live_manager" 2>/dev/null || true)"
+    echo "Live CU manager service is already installed (${live_enable:-unknown}; ${live_state:-unknown})."
+  fi
   bc250-40cu prepare
   if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-    echo "Persistent 40-CU mode is configured."
+    echo "Persistent 40-CU boot activation is configured."
     if [[ ! -r /sys/module/amdgpu/parameters/bc250_cc_write_mode ]]; then
       echo "The prepared persistent AMDGPU module needs one activation reboot."
       echo "  sudo reboot"
       printf '  '; rerun_command
       exit 12
     fi
+  else
+    echo "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
   fi
 }
 
@@ -358,7 +335,6 @@ step_6_runtime_topology() {
 step_7_models() {
   heading "7. MODELS"
   require_progress_terminal
-  prepare_hf_authentication
 
   echo "Ensuring baseline Open WebUI infrastructure models."
   BC250_MODELCTL_SUPPRESS_CATALOG=1 bc250-model install all \
@@ -447,7 +423,7 @@ show_plan() {
   printf '  swap                  %s\n' "$swap"
   printf '  40-CU                 %s\n' "$cu"
   printf '  storage headroom      %s available\n' "$(df -h --output=avail /var/lib/bc250-llm-server 2>/dev/null | awk 'NR==2{print $1}' || echo unknown)"
-  printf '  models                baseline task+embedding + one optional selection\n'
+  printf '  models                ensure baseline + optional model selection\n'
   printf '  Open WebUI            start after models, then apply/status\n'
   printf '  primary reboot        %s\n' "$reboot"
 }
@@ -476,7 +452,7 @@ step_9_open_webui() {
   rm -f "$OWUI_VERIFY_TOKEN_FILE"
   if [[ -n "$OWUI_TOKEN_FILE" ]]; then
     validate_owui_token_file "$OWUI_TOKEN_FILE"
-    echo "Applying the package-owned Open WebUI baseline with token file: $OWUI_TOKEN_FILE"
+    echo "Applying the package-owned Open WebUI baseline with the supplied administrator API key file."
     if ! bc250-openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
       return 0
@@ -505,10 +481,9 @@ step_9_open_webui() {
     if [[ -n "$candidate" ]]; then
       if validate_owui_token_file "$candidate" 2>/dev/null; then
         export BC250_OWUI_TOKEN_FILE="$candidate"
-        echo "Detected protected Open WebUI token file; option 3 can reuse: $candidate"
       else
         unset BC250_OWUI_TOKEN_FILE || true
-        echo "NOTE: $candidate exists but is not a protected readable token file; it will not be suggested." >&2
+        echo "NOTE: $candidate exists but is not a protected readable Open WebUI API key file; it will not be suggested." >&2
       fi
     fi
     if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
@@ -527,7 +502,7 @@ step_10_verify() {
   bc250-swap-profile status
   bc250-cu-status
   if [[ -s "$OWUI_VERIFY_TOKEN_FILE" ]]; then
-    OWUI_API_KEY="$(<"$OWUI_VERIFY_TOKEN_FILE")" bc250-verify || verify_status=$?
+    bc250-verify --owui-token-file "$OWUI_VERIFY_TOKEN_FILE" || verify_status=$?
   else
     bc250-verify || verify_status=$?
   fi
@@ -576,17 +551,21 @@ main() {
   step_9_open_webui
   step_10_verify
   echo
-  echo "Installation and verification completed."
+  echo "Installation and verification completed successfully."
   echo "Transcript: $LOG_FILE"
   if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-    echo "Persistent 40-CU mode is configured; maintenance timers were not changed."
+    echo "Persistent 40-CU boot activation is configured; maintenance timers were not changed."
   else
-    echo "40-CU support is prepared but disabled; maintenance timers were not changed."
+    echo "Persistent 40-CU boot activation is not enabled; live CU routing remains separately managed."
   fi
-  echo "Optional CU experiment/inspection: sudo bc250-40cu status"
-  echo "Open WebUI initialization: sudo bc250-openwebui-setup init"
-  echo "Open WebUI desired-state status: bc250-openwebui-setup status"
-  echo "Exclusive coding mode: sudo bc250-agent-mode enter; leave with sudo bc250-agent-mode leave"
+  echo
+  echo "Useful commands:"
+  echo "  Appliance status:       sudo bc250-status"
+  echo "  Open WebUI status:      bc250-openwebui-setup status"
+  echo "  Reconfigure Open WebUI: sudo bc250-openwebui-setup init"
+  echo "  40-CU status:           sudo bc250-40cu status"
+  echo "  Revalidation:           sudo bc250-revalidate start"
+  echo "  Agent mode:             sudo bc250-agent-mode enter"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
