@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v3.7
+# BC-250 package revalidation harness v3.8
 #
 # Intended target: bc250-llm-server 0.10.0 on Fedora 44; release suffix is not hard-coded.
 # `start` launches a systemd worker that spans reboots. The kernel lane dynamically
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=3.7
+HARNESS_VERSION=3.8
 TARGET_VERSION=0.10.0
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
@@ -80,7 +80,7 @@ OWUI_RAG_MODEL=${OWUI_RAG_MODEL:-bc250-office-documents}
 usage() {
   cat <<'USAGE'
 Usage:
-  sudo bc250-revalidate start [--owui-token-file FILE] [--kernel-ab] [--governor-ab] [--keepalive-expiry]
+  sudo bc250-revalidate start [--owui-token-file FILE] [--detach] [--kernel-ab] [--governor-ab] [--keepalive-expiry]
   sudo bc250-revalidate status
   sudo bc250-revalidate abort
   sudo bc250-revalidate cleanup
@@ -89,6 +89,11 @@ Recommended authenticated start:
   sudo install -m 600 /dev/null /root/owui-test.key
   sudoedit /root/owui-test.key  # paste a temporary Open WebUI admin API key
   sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+
+By default `start` follows the detached systemd worker with a live phase/stage
+indicator. Ctrl-C detaches from the display without stopping the worker. Use
+`--detach` for the previous immediate-return behavior. Kernel A/B runs always
+detach because the terminal cannot remain attached across host reboots.
 
 With RUN_KERNEL_REVALIDATION=1, the worker performs a focused two-reboot A/B:
 current TTM-only baseline -> historical full profile -> exact original profile. The exact running kernel is selected
@@ -846,9 +851,126 @@ preflight() {
   df -h / /var/lib/bc250-llm-server
 }
 
+owui_container_http() {
+  local url="$1"
+  podman exec open-webui python -c \
+    'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=8).read()' \
+    "$url" >/dev/null 2>&1
+}
+
+phase_application_preflight() {
+  set_phase preflight "checking Open WebUI private-network connectivity"
+  local dir="$RAW/preflight" attempt failed=0 url label
+  install -d -m 0700 "$dir"
+  : > "$dir/connectivity.txt"
+
+  for unit in tika.service open-webui.service ollama.service ollama-task.service ollama-embedding.service; do
+    if systemctl is-active --quiet "$unit" 2>/dev/null; then
+      printf 'PASS service %s active\n' "$unit" >> "$dir/connectivity.txt"
+    else
+      printf 'FAIL service %s inactive\n' "$unit" >> "$dir/connectivity.txt"
+      failed=1
+    fi
+  done
+
+  # Give freshly recreated Quadlets a short readiness window, but do not repair
+  # networking here. Revalidation should fail early on stale Podman/netavark state
+  # instead of discovering it after the expensive model lanes.
+  for attempt in {1..30}; do
+    if podman exec open-webui getent hosts tika >/dev/null 2>&1 && \
+       podman exec open-webui getent hosts host.containers.internal >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+  if podman exec open-webui getent hosts tika >/dev/null 2>&1; then
+    echo 'PASS dns tika' >> "$dir/connectivity.txt"
+  else
+    echo 'FAIL dns tika' >> "$dir/connectivity.txt"
+    failed=1
+  fi
+  if podman exec open-webui getent hosts host.containers.internal >/dev/null 2>&1; then
+    echo 'PASS dns host.containers.internal' >> "$dir/connectivity.txt"
+  else
+    echo 'FAIL dns host.containers.internal' >> "$dir/connectivity.txt"
+    failed=1
+  fi
+
+  while read -r label url; do
+    [[ -n "$label" && -n "$url" ]] || continue
+    for attempt in {1..30}; do
+      owui_container_http "$url" && break
+      sleep 1
+    done
+    if owui_container_http "$url"; then
+      printf 'PASS http %s %s\n' "$label" "$url" >> "$dir/connectivity.txt"
+    else
+      printf 'FAIL http %s %s\n' "$label" "$url" >> "$dir/connectivity.txt"
+      failed=1
+    fi
+  done <<'EOF_PREFLIGHT_URLS'
+tika http://tika:9998/version
+ollama-main http://host.containers.internal:11434/api/tags
+ollama-task http://host.containers.internal:11435/api/tags
+ollama-embedding http://host.containers.internal:11437/api/tags
+EOF_PREFLIGHT_URLS
+
+  if ((failed)); then
+    echo "ERROR: Open WebUI private-network preflight failed:" >&2
+    sed 's/^/  /' "$dir/connectivity.txt" >&2
+    echo "Repair the application/container network before rerunning; no benchmark lanes were started." >&2
+    return 1
+  fi
+  progress "Open WebUI private-network preflight passed"
+}
+
+follow_run() {
+  local interrupted=0 started now_s elapsed_s elapsed phase stage last="" spinner='|/-\\' tick=0 rc=1
+  started="$(date +%s)"
+  trap 'interrupted=1' INT
+  echo "Following revalidation progress; Ctrl-C detaches and leaves the systemd worker running."
+  while ((interrupted == 0)); do
+    phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
+    stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
+    now_s="$(date +%s)"
+    elapsed_s=$((now_s - started))
+    printf -v elapsed '%02d:%02d:%02d' $((elapsed_s/3600)) $(((elapsed_s%3600)/60)) $((elapsed_s%60))
+    if [[ -t 1 ]]; then
+      printf '\r\033[K[%s] %s  phase=%s  %s' "${spinner:tick%4:1}" "$elapsed" "$phase" "$stage"
+    elif [[ "$phase|$stage" != "$last" ]]; then
+      printf '[%s] phase=%s  %s\n' "$elapsed" "$phase" "$stage"
+      last="$phase|$stage"
+    fi
+    case "$phase" in
+      done|failed|failed-recovered|failed-manual-kernel-recovery) break ;;
+    esac
+    tick=$((tick + 1))
+    sleep 2 || true
+  done
+  trap - INT
+  [[ ! -t 1 ]] || printf '\n'
+  if ((interrupted)); then
+    echo "Detached. Worker continues in the background."
+    echo "Status: sudo bc250-revalidate status"
+    return 0
+  fi
+  phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
+  if [[ "$phase" == done ]]; then
+    echo "Revalidation completed successfully."
+    echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)"
+    return 0
+  fi
+  [[ -r "$FAILURE_RC_FILE" ]] && rc="$(cat "$FAILURE_RC_FILE")"
+  [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
+  echo "Revalidation stopped at phase=$phase (rc=$rc)." >&2
+  [[ ! -e $ERROR_CONTEXT ]] || echo "Error context: $ERROR_CONTEXT" >&2
+  echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)" >&2
+  return "$rc"
+}
+
 start_run() {
   need_root
-  local token_file=""
+  local token_file="" detach=0
   shift || true
   while (($#)); do
     case "$1" in
@@ -861,6 +983,8 @@ start_run() {
         RUN_GOVERNOR_REVALIDATION=1; shift ;;
       --keepalive-expiry)
         RUN_KEEPALIVE_EXPIRY=1; shift ;;
+      --detach)
+        detach=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) echo "ERROR: unknown start option: $1" >&2; usage >&2; exit 2 ;;
     esac
@@ -945,10 +1069,12 @@ start_run() {
   echo "Started run_id=$(run_id)"
   if ((RUN_KERNEL_REVALIDATION)); then
     echo "The worker will reboot twice while comparing the current TTM-only profile with the historical full profile, then continue with application tests."
+    detach=1
   fi
-  echo "Status: sudo bash $HARNESS_COPY status"
+  echo "Status: sudo bc250-revalidate status"
   echo "Journal: sudo journalctl -fu $UNIT"
   echo "Final bundles: $REPORT_DIR"
+  ((detach)) || follow_run
 }
 
 capture_cmd() {
@@ -1651,6 +1777,16 @@ restore_owui_api_config() {
   "$HELPER" restore-config --token-file "$OWUI_TOKEN" --input "$OWUI_CONFIG_SAVE" >/dev/null 2>&1 || true
 }
 
+report_helper_failure() {
+  local label="$1" rc="$2" console="$3"
+  echo "ERROR: $label failed (rc=$rc). Last helper output:" >&2
+  if [[ -s "$console" ]]; then
+    tail -n 30 "$console" | sed 's/^/  /' >&2
+  else
+    echo "  <no helper console output>" >&2
+  fi
+}
+
 phase_owui() {
   set_phase owui "testing Open WebUI API baseline and RAG tuning candidates"
   local dir="$RAW/owui" key rc sampler_pid drift_rc
@@ -1703,7 +1839,10 @@ phase_owui() {
     stop_sampler "$sampler_pid"
     echo "$rc" > "$dir/embedding-batch-exit-status.txt"
     write_rc_outcome "$rc" "$dir/embedding-batch-outcome.txt"
-    ((rc == 0)) || return "$rc"
+    if ((rc != 0)); then
+      report_helper_failure "Open WebUI embedding batch sweep" "$rc" "$dir/embedding-batch-console.txt"
+      return "$rc"
+    fi
   fi
 
   if ((RUN_CHUNK_MIN_SWEEP)) && model_registered 11434 "$E4B_MODEL"; then
@@ -1994,6 +2133,8 @@ phase_recovery() {
 
 run_pipeline_sequence() {
   phase_baseline
+  check_abort
+  phase_application_preflight
   check_abort
   phase_pipeline
   check_abort

@@ -10,7 +10,8 @@ separate from `make validate` and the ordinary category benchmarks because it ca
 exercise live services and, when explicitly requested, reboot the machine.
 
 ```bash
-sudo bc250-revalidate start
+sudo bc250-revalidate start                 # foreground progress; worker stays systemd-owned
+sudo bc250-revalidate start --detach        # return immediately
 sudo bc250-revalidate status
 sudo bc250-revalidate abort
 
@@ -22,7 +23,10 @@ sudo bc250-revalidate start --kernel-ab
 sudo bc250-revalidate start --governor-ab
 ```
 
-Routine runs do not perform kernel/governor reboot A/B tests. The harness records
+Routine runs do not perform kernel/governor reboot A/B tests. Before model work,
+the harness checks Open WebUI private-Tika DNS/HTTP and host-gateway access to the
+main/task/embedding Ollama lanes so stale container networking fails early. The
+harness records
 quality exit `3` separately from infrastructure failure, propagates unexpected
 benchmark errors into worker recovery, exercises the promoted
 task/embedding defaults, compares implicit/explicit translation direction, and
@@ -35,6 +39,10 @@ Open WebUI chunk/system-context conversations use the package-facing
 `bc250-office-documents` workspace preset. If package-owned OWUI settings are
 drifted, those A/B lanes are skipped with an explicit reason instead of silently
 changing operator state.
+
+By default `start` follows a live phase/stage indicator; Ctrl-C detaches only the
+display, not the worker. Use `--detach` for scripts or immediate return. Kernel A/B
+runs detach automatically because the terminal cannot survive the requested reboots.
 
 Persistent result bundles are written below
 `/var/lib/bc250-llm-server/revalidation/results/`. Worker state lives under
