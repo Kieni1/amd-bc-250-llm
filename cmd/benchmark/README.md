@@ -30,16 +30,21 @@ keeps GPT-OSS/long-prefill diagnostics isolated from ordinary build validation. 
 a long-prefill candidate takes down the main Ollama API, the next candidate first
 restarts/waits for the main service rather than turning one OOM into a row of
 connection-refused results. The phase also restores normal Ollama mode after the
-sweep so a final candidate failure cannot poison a later phase.
+sweep so a final candidate failure cannot poison a later phase. Authenticated
+Open WebUI chunk/system-context conversations use the package-facing
+`bc250-office-documents` workspace preset. If package-owned OWUI settings are
+drifted, those A/B lanes are skipped with an explicit reason instead of silently
+changing operator state.
 
 Persistent result bundles are written below
-`/var/lib/bc250-llm-server/revalidation/results/`. Temporary worker state lives
-under `/var/lib/bc250-llm-server/revalidation/work/` and
-`/run/bc250-llm-server/revalidation/`; after a final tarball is written safely,
-the harness disables/removes its temporary systemd worker and deletes that work
-state automatically. Phase reports are included in the tarball. Supplied Open
-WebUI credentials are not bundled. `cleanup` remains only for abandoned pre-bundle
-runs.
+`/var/lib/bc250-llm-server/revalidation/results/`. Worker state lives under
+`/var/lib/bc250-llm-server/revalidation/work/` and
+`/run/bc250-llm-server/revalidation/`. A finished worker disables future boot
+activation but deliberately leaves its unit/work state in place so `status` and
+failure investigation remain useful; `cleanup` (or the next `start`) removes that
+state after the oneshot has exited. Phase reports, the revalidation-service journal
+and top-level shell error context are included in the tarball when available.
+Supplied Open WebUI credentials are not bundled.
 
 This harness is deliberately a pre-1.0 diagnostic tool. Do not make it a mandatory
 RPM/build gate.
@@ -48,6 +53,9 @@ RPM/build gate.
 
 ```bash
 # Cross-model comparison: neutral SYSTEM override + deterministic sampling
+# Interactive use can select any registered generation model. Noninteractive
+# discovery is production-only so newly installed experiments do not silently
+# widen automated runs.
 bc250-benchmark
 
 # Faster/lower-context pass
@@ -56,8 +64,11 @@ BENCH_PROFILE=conservative bc250-benchmark
 # Production-configuration comparison: keep registered SYSTEM and sampling
 BENCH_MODE=production bc250-benchmark
 
-# Specific registered models
+# Specific registered models (including experiments)
 bc250-benchmark generation MODEL_A MODEL_B
+
+# Deliberately include the full discovered generation pool in noninteractive use
+BENCH_INCLUDE_EXPERIMENTS=1 bc250-benchmark
 
 # Generic generation on the agent store (performance comparison only)
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
@@ -166,16 +177,25 @@ or positional model names.
 
 ```bash
 bc250-benchmark rag-quality
+RAG_QUALITY_THINK=false bc250-benchmark rag-quality
 # optional pair:
 bc250-benchmark rag-quality EMBED_MODEL ANSWER_MODEL
 ```
 
 This lane uses the packaged multilingual office corpus, embeds the real query,
 ranks the documents, passes the retrieved Top-K context to the answer model and
-checks the grounded answer. It specifically includes the difficult current-vs-
-archived Zürich lease and near-identical invoice references that exposed the two
-shared Recall@1 misses in the 2026-08-31 embedding comparison. The default pair is
-Jina v5 plus production Gemma E4B. It is intentionally small and stdlib-only.
+checks the grounded answer. The direct answer budget defaults to 1024 tokens
+(`RAG_QUALITY_NUM_PREDICT` overrides it) because a 512-token run showed that
+model thinking could consume the entire cap before a final answer appeared.
+`RAG_QUALITY_THINK=auto|true|false` controls only this diagnostic request; routine
+revalidation now records both the normal/default behavior and a `think=false`
+comparison without changing the package's Documents/RAG preset. The CSV/JSONL
+distinguish retrieval, answer, citation and `thinking-budget-exhausted` failures
+and record the selected thinking policy. It specifically includes the difficult
+current-vs-archived Zürich lease and near-identical invoice references that exposed
+the two shared Recall@1 misses in the 2026-08-31 embedding comparison. The default
+pair is Jina v5 plus production Gemma E4B. It is intentionally small and
+stdlib-only.
 
 This is still not a clone of Open WebUI's database/vector implementation; use it
 as a package/model acceptance layer, then validate Open WebUI-specific settings
@@ -254,8 +274,10 @@ response passes only when a non-empty final answer has valid syntax/structure,
 uses the requested raw-output format, and satisfies the fixture's required
 patterns (including space-safe Bash handling and explicit Python range rejection). Native model reasoning is not globally
 forced off. The cases provide 768-1024 shared output tokens so reasoning-oriented
-models have room to reach final code, and JSONL records thinking/final character
-counts, `eval_count` and `done_reason` for starvation diagnosis. The lane also leaves
+models have room to reach final code. CSV/JSONL and console output now include the
+specific validation reason, separating syntax errors from missing required behavior
+and raw-format violations such as Markdown fences. JSONL also records thinking/final
+character counts, `eval_count` and `done_reason` for starvation diagnosis. The lane also leaves
 temperature/top-p/top-k to the deployed Modelfile by default; set
 `AGENT_TEMPERATURE=0` only for an explicit deterministic comparison. It does not
 override the agent service keep-alive and unloads each benchmarked model after
@@ -309,6 +331,6 @@ Task and agent CSVs intentionally keep a smaller telemetry subset.
 Useful overrides include `OLLAMA_URL`, `BENCH_MODE`, `THINK_MODE`,
 `BENCH_PROFILE`, `RUN_LATENCY`, `RUN_CONTEXT`, `RUN_THERMAL`, `REPEATS`,
 `TELEMETRY_INTERVAL`, `BC250_DRM_CARD`, `KEEP_ALIVE`, `CTX_POINTS`,
-`AGENT_TEMPERATURE`, `NUM_PREDICT_LATENCY_THINKING` and the other `NUM_PREDICT_*`
-values. `KEEP_ALIVE` applies to the generation/embedding/OCR
+`AGENT_TEMPERATURE`, `RAG_QUALITY_THINK`, `RAG_QUALITY_NUM_PREDICT`,
+`NUM_PREDICT_LATENCY_THINKING` and the other `NUM_PREDICT_*` values. `KEEP_ALIVE` applies to the generation/embedding/OCR
 paths; task keeps `0` and the agent lane relies on its service policy then unloads.

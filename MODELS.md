@@ -113,9 +113,11 @@ The 2026-08-31 production run predates the dedicated 11437 embedding service.
 Jina is small and normal main+task+embedding concurrency is the intended 0.10.0
 layout, but GPT-OSS 20B is the likely memory-edge case. After deploying 0.10.0,
 rerun the production/use-case and long-context measurements with the embedding
-model warm. Do not infer a regression or change the keepalive until that same-board
-measurement exists. Agentic/coding results are separate because agent mode is
-exclusive by design.
+model warm. A 2026-09-05 script-validation run reached GPT-OSS + 4K Jina coexistence
+without the previous global OOM, but that run also exposed harness issues and is
+therefore provisional rather than a final device-policy measurement. Do not change
+the keepalive from that single run. Agentic/coding results are separate because
+agent mode is exclusive by design.
 
 ### Exhausted comparison candidates
 
@@ -159,6 +161,9 @@ cleanup decision from one comparable dataset. Notable additions are:
 | Model | Why it exists |
 |---|---|
 | `exp-qwen38-4b-distill-empero-q6-k` | compact native-reasoning Qwen comparison |
+| `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
+| `exp-qwythos9b-empero-q6-k` | 9B tool/reasoning comparison with the appliance context deliberately capped at 32K |
+| `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
 | `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
 | `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |

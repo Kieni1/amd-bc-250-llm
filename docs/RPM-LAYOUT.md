@@ -40,8 +40,10 @@ configuration, directory, alias, generated-text and ghost entries.
 
 Services, tmpfiles and operator commands create content below these paths.
 `bc250-revalidate` keeps final result tarballs below
-`/var/lib/bc250-llm-server/revalidation/results/` and removes its transient worker
-state after finalization. Ordinary RPM removal intentionally preserves persistent
+`/var/lib/bc250-llm-server/revalidation/results/`. Completed worker state remains
+under the package revalidation work path for `status`/debugging until explicit
+`cleanup` or the next run; the active worker never removes/reloads its own unit.
+Ordinary RPM removal intentionally preserves persistent
 state; the explicit `bc250-reset` command owns destructive greenfield cleanup.
 
 ## Packaging boundaries

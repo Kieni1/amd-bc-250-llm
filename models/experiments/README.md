@@ -26,13 +26,19 @@ exp-qwen35-9b-davidau-defiant-fable-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
 exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m
 exp-qwen38-4b-distill-empero-q6-k
+exp-qwen38-9b-empero-q6-k
+exp-qwythos9b-empero-q6-k
+exp-tir-qwen35-9b-nonthinking-v2-q6-k
 ```
 
-The 0.9.7-0.11 catalog deliberately retains the operator's broader comparison
+The 0.10.0-1.0 catalog deliberately retains the operator's broader comparison
 pool for the next full BC-250 rerun. Qwen/Gemma derivatives that may prove
 redundant remain available until that measured comparison is complete. Newer
 Granite 4.2 3B/8B and Ling 3.0 Tiny definitions extend the architecture and
-size coverage without changing production defaults.
+size coverage without changing production defaults. The 0.10.0-1.0 pool also
+adds Qwen3.8 9B, Qwythos 9B and a TIR Qwen3.5 9B non-thinking fine-tune so the
+next same-board run can compare native reasoning, tool-oriented reasoning and
+direct/non-thinking behavior at roughly the same model size.
 
 The 2026-08-31 BC-250 generation rerun makes several candidates easier to
 place. Qwen3.8 4B Distill (~74.5 tok/s, ~4.0 GiB) and Granite 4.2 3B (~91.5

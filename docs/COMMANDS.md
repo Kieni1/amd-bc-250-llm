@@ -321,10 +321,11 @@ sudo bc250-revalidate status
 `--kernel-ab`, `--governor-ab` or `--keepalive-expiry` only when those expensive
 lanes are needed. Authenticated Open WebUI tuning accepts
 `--owui-token-file FILE`. Final bundles are retained under
-`/var/lib/bc250-llm-server/revalidation/results/`; temporary worker/unit state is
-removed automatically after the bundle is written. Benchmark exit `3` is recorded
-as quality data; other unexpected benchmark failures enter worker recovery. `abort` restores temporary
-state before stopping, while `cleanup` is for abandoned pre-bundle state.
+`/var/lib/bc250-llm-server/revalidation/results/`. Finished worker/unit state is
+kept inspectable after the tarball is written; `sudo bc250-revalidate cleanup`
+removes it after the oneshot exits, and a later `start` replaces completed state.
+Benchmark exit `3` is recorded as quality data; other unexpected benchmark failures
+enter worker recovery. `abort` restores temporary state before stopping.
 
 `bc250-status` is a short overview including CPU topology/power-state exposure,
 RAM, memory pressure, zram, disk swap, swappiness and appliance storage.
@@ -337,9 +338,13 @@ runs on a client; `HTTP_PORT` changes its expected web port.
 The benchmark writes timestamped CSV, JSONL and metadata files in the current
 directory. The default generation lane uses `BENCH_MODE=neutral`: a per-request
 neutral SYSTEM override and deterministic sampling for comparable model/runtime
-measurements. `BENCH_MODE=production` is the production-configuration
+measurements. Interactive discovery can select any registered generation model;
+noninteractive discovery is production-only so installing a new `exp-*` model does
+not silently widen automation. Name experiments explicitly or set
+`BENCH_INCLUDE_EXPERIMENTS=1` for a deliberate full-pool run.
+`BENCH_MODE=production` is the production-configuration
 comparison: it keeps the registered Modelfile SYSTEM and sampling while running the same generic workload.
-`bc250-benchmark usecase` adds one compact role acceptance case per production model; `bc250-benchmark translation` checks DE↔FR office preservation; `bc250-benchmark rag-quality` performs a small retrieval→grounded-answer acceptance chain; and `bc250-benchmark rag` checks answer-model residency while the dedicated embedding lane runs.
+`bc250-benchmark usecase` adds one compact role acceptance case per production model; `bc250-benchmark translation` checks DE↔FR office preservation; `bc250-benchmark rag-quality` performs a small retrieval→grounded-answer acceptance chain and accepts `RAG_QUALITY_THINK=auto|true|false` for diagnostic thinking-policy comparisons; and `bc250-benchmark rag` checks answer-model residency while the dedicated embedding lane runs. Routine revalidation records both default and `think=false` RAG-quality behavior without changing the production preset.
 `THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
 larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
 not routinely starved by thinking; LFM2.5 keeps that larger cap even in an
@@ -360,6 +365,7 @@ bc250-benchmark usecase                 # one role-defining case per production 
 bc250-benchmark rag                     # dedicated embedding + warm answer coexistence
 bc250-benchmark translation             # DE↔FR office translation acceptance
 bc250-benchmark rag-quality             # retrieval -> grounded-answer acceptance
+RAG_QUALITY_THINK=false bc250-benchmark rag-quality  # diagnostic non-thinking comparison
 RUN_WARM_PREFIX=1 bc250-benchmark        # separate repeated-prefix/cache pair
 OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
 ```
