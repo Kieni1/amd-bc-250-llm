@@ -147,7 +147,8 @@ class CategoryPolicyTests(unittest.TestCase):
         prompt = category.OCR_PROMPTS["ovis"].lower()
         self.assertIn("preserve", prompt)
         self.assertIn("translat", prompt)
-        self.assertIn("tables as html", prompt)
+        self.assertIn("table row", prompt)
+        self.assertNotIn("tables as html", prompt)
         self.assertEqual(set(category.OCR_PROMPTS), {"glm", "ovis"})
 
     def test_fixtures_cover_multilingual_office_categories(self) -> None:
@@ -233,10 +234,11 @@ class CategoryPolicyTests(unittest.TestCase):
             "required": ["raise ValueError"],
             "raw_only": True,
         }
-        self.assertEqual(
-            category.validate_agent_output("```python\nraise ValueError\n```", strict_case)[:2],
-            (True, False),
-        )
+        strict = category.evaluate_agent_output("```python\nraise ValueError\n```", strict_case)
+        self.assertTrue(strict["syntax_ok"])
+        self.assertTrue(strict["requirements_ok"])
+        self.assertFalse(strict["format_ok"])
+        self.assertFalse(strict["accepted"])
         safe_bash = {
             "id": "safe",
             "validator": "bash",
@@ -261,6 +263,180 @@ class CategoryPolicyTests(unittest.TestCase):
             category.validate_agent_output('{"files":"bad","commands":[]}', typed_json)[:2],
             (True, False),
         )
+
+    def test_agent_python_contract_is_scoped_to_requested_function(self) -> None:
+        case = next(
+            item
+            for item in json.loads(
+                (ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8")
+            )
+            if item["id"] == "python-port-parser"
+        )
+        adversarial = """\
+def parse_ports(value: str) -> list[int]:
+    return [80]
+
+def split():
+    pass
+
+split()
+sorted([])
+raise ValueError
+"""
+        result = category.evaluate_agent_output(adversarial, case)
+        self.assertTrue(result["syntax_ok"])
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("missing call: split", result["problems"])
+        self.assertIn("missing comparison boundary: 65535", result["problems"])
+
+        nested = """\
+def parse_ports(value: str) -> list[int]:
+    def dead():
+        value.split(",")
+        sorted([])
+        if not 1 <= 2 <= 65535:
+            raise ValueError
+        return set()
+    return [80]
+"""
+        nested_result = category.evaluate_agent_output(nested, case)
+        self.assertFalse(nested_result["requirements_ok"])
+        self.assertIn("missing duplicate removal", nested_result["problems"])
+
+    def test_agent_python_contract_requires_dedup_and_associated_range_raise(self) -> None:
+        case = next(
+            item
+            for item in json.loads(
+                (ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8")
+            )
+            if item["id"] == "python-port-parser"
+        )
+        duplicate_preserving = """\
+def parse_ports(value: str) -> list[int]:
+    out = []
+    for item in value.split(","):
+        if not item:
+            continue
+        port = int(item)
+        if not 1 <= port <= 65535:
+            raise ValueError
+        out.append(port)
+    return sorted(out)
+"""
+        result = category.evaluate_agent_output(duplicate_preserving, case)
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("missing duplicate removal", result["problems"])
+
+        unrelated_raise = """\
+def parse_ports(value: str) -> list[int]:
+    ports = set()
+    for item in value.split(","):
+        port = int(item)
+        if 1 <= port <= 65535:
+            ports.add(port)
+    if value == "never":
+        raise ValueError
+    return sorted(ports)
+"""
+        result = category.evaluate_agent_output(unrelated_raise, case)
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("missing associated range guard", " ".join(result["problems"]))
+
+        inverted_range = """\
+def parse_ports(value: str) -> list[int]:
+    ports = set()
+    for item in value.split(","):
+        port = int(item)
+        if 1 <= port <= 65535:
+            raise ValueError
+        ports.add(port)
+    return sorted(ports)
+"""
+        result = category.evaluate_agent_output(inverted_range, case)
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("missing associated range guard", " ".join(result["problems"]))
+
+        good = """\
+def parse_ports(value: str) -> list[int]:
+    ports = set()
+    for item in value.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        port = int(item)
+        if not 1 <= port <= 65535:
+            raise ValueError
+        ports.add(port)
+    return sorted(ports)
+"""
+        self.assertTrue(category.evaluate_agent_output(good, case)["accepted"])
+
+    def test_agent_bash_contract_rejects_token_only_false_positive(self) -> None:
+        case = next(
+            item
+            for item in json.loads(
+                (ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8")
+            )
+            if item["id"] == "bash-model-list"
+        )
+        bad = '#!/usr/bin/env bash\necho "$1/*.Modelfile" | sort\nexit 2\n'
+        result = category.evaluate_agent_output(bad, case)
+        self.assertTrue(result["syntax_ok"])
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("missing guarded argument check with exit 2", result["problems"])
+        self.assertIn("missing basename extraction", result["problems"])
+
+        detached_exit = """\
+#!/usr/bin/env bash
+if [ -n "$1" ]; then
+    echo ok >/dev/null
+fi
+dir="$1"
+shopt -s nullglob
+for path in "$dir"/*.Modelfile; do
+    basename "$path"
+done | sort
+exit 2
+"""
+        result = category.evaluate_agent_output(detached_exit, case)
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("missing guarded argument check with exit 2", result["problems"])
+
+        unsafe_empty_glob = """\
+#!/usr/bin/env bash
+if [ "$#" -ne 1 ]; then
+    exit 2
+fi
+dir="$1"
+for path in "$dir"/*.Modelfile; do
+    basename "$path"
+done | sort
+"""
+        result = category.evaluate_agent_output(unsafe_empty_glob, case)
+        self.assertFalse(result["requirements_ok"])
+        self.assertIn("glob is not safe when no Modelfile matches", result["problems"])
+
+        good = """\
+#!/usr/bin/env bash
+if [ "$#" -ne 1 ]; then
+    exit 2
+fi
+dir="$1"
+shopt -s nullglob
+for path in "$dir"/*.Modelfile; do
+    basename "$path"
+done | sort
+"""
+        self.assertTrue(category.evaluate_agent_output(good, case)["accepted"])
+
+        find_good = """\
+#!/usr/bin/env bash
+if [ "$#" -ne 1 ]; then
+    exit 2
+fi
+find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
+"""
+        self.assertTrue(category.evaluate_agent_output(find_good, case)["accepted"])
 
     def test_usecase_acceptance_checks_required_any_and_forbidden(self) -> None:
         case = {
@@ -302,6 +478,78 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertLess(noisy[2], exact[2])  # F1
         self.assertLess(noisy[3], exact[3])  # normalized character similarity
         self.assertEqual(noisy[4], 1.0)  # exact required fields still present
+
+
+    def test_task_semantic_groups_gate_relevance_without_wrapper_text(self) -> None:
+        parsed = {"queries": ["privacy policy", "cloud storage confidentiality"]}
+        value = category.task_value_text(parsed, "query")
+        matched, total = category.semantic_groups_score(
+            value, [["personaldaten", "personenbezogen"], ["cloud"], ["datenschutz"]]
+        )
+        self.assertEqual((matched, total), (1, 3))
+        self.assertEqual(category.task_language_hint(value, "de"), "other")
+
+    def test_translation_identifier_fragment_is_not_meaningful_translation(self) -> None:
+        fragment = "AB-42 4 septembre 2026"
+        self.assertLess(len(common.normalize_words(fragment)), 6)
+        self.assertEqual(category.task_language_hint(fragment, "fr"), "unknown")
+
+    def test_usecase_weekday_reasoning_allows_valid_intermediate_tuesday(self) -> None:
+        cases = json.loads((ROOT / "examples/benchmark/usecase-office.json").read_text(encoding="utf-8"))
+        case = next(item for item in cases if item["id"] == "reasoning-gpt-oss")
+        self.assertTrue(
+            category._acceptance_ok(
+                "Wednesday. Tuesday is the first working day; Wednesday is the second.",
+                case,
+            )[0]
+        )
+
+    def test_usecase_common_record_construction_has_no_duplicate_keys(self) -> None:
+        case = {"id": "office", "prompt": "Prompt"}
+        row = {
+            "timestamp": "2026-09-06T12:00:00+02:00",
+            "case_id": "office",
+            "model": "prod-test",
+        }
+        record = category._usecase_result_record(
+            case=case,
+            model="prod-test",
+            row=row,
+            ok=True,
+            problems=[],
+            content="answer",
+            thinking="",
+            telemetry={},
+            wall=1.25,
+            done_reason="stop",
+        )
+        self.assertEqual(record["case_id"], "office")
+        self.assertEqual(record["model"], "prod-test")
+        self.assertEqual(record["outcome"], "pass")
+
+    def test_embedding_qualification_uses_fixture_aggregate_policy(self) -> None:
+        fixture = json.loads(
+            (ROOT / "examples/benchmark/embedding-office.json").read_text(encoding="utf-8")
+        )
+        policy = fixture["qualification"]
+        measured = {"recall_at_3": 1.0, "mrr": 0.9231, "hard_recall_at_1": 0.5}
+        self.assertTrue(all(category.embedding_qualification_checks(measured, policy).values()))
+        degraded = dict(measured, mrr=0.70)
+        self.assertFalse(category.embedding_qualification_checks(degraded, policy)["mrr"])
+        source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
+        self.assertNotIn("query_ok = rank <= 3", source)
+        self.assertNotIn('checks={"target_in_top3": rank <= 3}', source)
+        self.assertIn('"target_in_top3": rank <= 3', source)
+
+    def test_ocr_markup_is_canonicalized_for_text_fidelity_only(self) -> None:
+        plain = "Invoice 4821 Total CHF 319.50"
+        marked = "## Invoice 4821\n<table><tr><td>Total</td><td>CHF 319.50</td></tr></table>"
+        case = {"expected_text": plain, "required_fields": ["4821", "319.50"]}
+        plain_score = category.ocr_scores(plain, case)
+        marked_score = category.ocr_scores(marked, case)
+        self.assertAlmostEqual(plain_score[2], marked_score[2])
+        self.assertAlmostEqual(plain_score[3], marked_score[3])
+        self.assertEqual(category.ocr_table_signal(marked), 1.0)
 
     def test_task_prompts_follow_open_webui_0113_windows_and_shapes(self) -> None:
         messages = [{"role": "user", "content": f"m{i}"} for i in range(7)]
@@ -356,6 +604,16 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("CHF 319.50"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("ZH-204"), category.acceptance_text(actual))
+
+    def test_translation_source_leakage_is_not_mislabeled_as_language(self) -> None:
+        failures = category.translation_failure_kinds(
+            "Texte français avec une phrase source.",
+            language_ok=True,
+            source_leakage_ok=False,
+            semantic_ok=True,
+            preserved_ok=True,
+        )
+        self.assertEqual(failures, ["source-leakage"])
 
     def test_translation_direction_can_be_made_explicit_for_ab_comparison(self) -> None:
         case = {"source_language": "fr", "target_language": "de", "input": "Bonjour."}
@@ -446,6 +704,58 @@ class TelemetryTests(unittest.TestCase):
             self.assertIn("card1/amdgpu/edge", label)
             self.assertEqual(temp, 72.0)
             self.assertEqual(common.current_gpu_clock_mhz(selected), 1200.0)
+
+
+    def test_common_result_summary_separates_failures_from_diagnostics(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            rows = [
+                common.result_record(category="task", model="m", case_id="a", outcome="pass"),
+                common.result_record(
+                    category="task", model="m", case_id="b", outcome="quality-fail",
+                    failure_kinds=["language"], diagnostics=["output-budget"],
+                ),
+            ]
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            summary_json, summary_txt = common.write_result_summary(path, category="task")
+            summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            self.assertEqual(summary["quality"], "mixed")
+            self.assertEqual(summary["failure_kinds"], {"language": 1})
+            self.assertEqual(summary["diagnostics"], {"output-budget": 1})
+            self.assertIn("Quality        MIXED", summary_txt.read_text(encoding="utf-8"))
+
+    def test_result_sidecars_are_replaced_for_reused_output_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            csv_path = Path(temporary) / "task.csv"
+            jsonl_path = common.prepare_result_sidecars(csv_path)
+            jsonl_path.write_text(
+                json.dumps(
+                    common.result_record(
+                        category="task", model="m", case_id="old", outcome="pass"
+                    )
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            jsonl_path.with_suffix(".summary.json").write_text("old\n", encoding="utf-8")
+            jsonl_path.with_suffix(".summary.txt").write_text("old\n", encoding="utf-8")
+            reset = common.prepare_result_sidecars(csv_path)
+            self.assertEqual(reset, jsonl_path)
+            self.assertFalse(jsonl_path.exists())
+            self.assertFalse(jsonl_path.with_suffix(".summary.json").exists())
+            self.assertFalse(jsonl_path.with_suffix(".summary.txt").exists())
+
+    def test_common_result_summary_rejects_corrupt_canonical_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            path.write_text('{"schema_version":1,"outcome":"pass"}\nnot-json\n', encoding="utf-8")
+            with self.assertRaises(common.BenchmarkError):
+                common.write_result_summary(path, category="task")
+
+    def test_telemetry_records_swap_start_peak_end_and_delta(self) -> None:
+        fields = common.empty_telemetry()
+        for name in ("swap_used_start_mib", "swap_used_max_mib", "swap_used_end_mib", "swap_peak_delta_mib"):
+            self.assertIn(name, fields)
 
     def test_cosine_rejects_mismatched_embedding_dimensions(self) -> None:
         with self.assertRaisesRegex(common.BenchmarkError, "dimension mismatch"):

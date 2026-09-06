@@ -4,26 +4,47 @@
     "validator": "bash",
     "num_predict": 1024,
     "required": [
-      "find",
       "*.Modelfile",
       "sort",
       "exit 2"
     ],
     "prompt": "Write a Bash script that accepts one directory argument and prints only the basenames of *.Modelfile files directly in that directory, sorted lexicographically. Exit with status 2 when the argument is missing. Handle spaces in paths safely. Return only the script, with no Markdown fences or explanation.",
-    "raw_only": true
+    "raw_only": true,
+    "bash_contract": "modelfile-list",
+    "required_any": [
+      [
+        "-maxdepth 1",
+        "/*.Modelfile"
+      ]
+    ]
   },
   {
     "id": "python-port-parser",
     "validator": "python",
     "num_predict": 1024,
-    "required": [
-      "def parse_ports",
-      "split",
-      "sort",
-      "raise ValueError"
-    ],
+    "required": [],
     "prompt": "Write Python 3 code defining parse_ports(value: str) -> list[int]. It must parse comma-separated TCP ports, ignore blank items, reject values outside 1..65535 with ValueError, remove duplicates, and return ascending ports. Use only the standard library. Return only code, with no Markdown fences or explanation.",
-    "raw_only": true
+    "raw_only": true,
+    "python_function": "parse_ports",
+    "python_calls": [
+      "split",
+      "sorted"
+    ],
+    "python_raises": [
+      "ValueError"
+    ],
+    "python_compare_constants": [
+      1,
+      65535
+    ],
+    "python_require_dedup": true,
+    "python_range_guard": {
+      "bounds": [
+        1,
+        65535
+      ],
+      "exception": "ValueError"
+    }
   },
   {
     "id": "json-repo-plan",

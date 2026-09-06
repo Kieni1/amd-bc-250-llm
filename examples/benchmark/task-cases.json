@@ -1,68 +1,259 @@
 [
   {
-    "id":"title-de",
-    "type":"title",
-    "language":"de",
-    "messages":[
-      {"role":"user","content":"Wie kann ich in Open WebUI deutsche und französische PDF-Dokumente durchsuchen?"},
-      {"role":"assistant","content":"Mit lokaler Extraktion, Embeddings und einer getrennten RAG-Dokumentbibliothek."}
+    "id": "title-de",
+    "type": "title",
+    "language": "de",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Wie kann ich in Open WebUI deutsche und französische PDF-Dokumente durchsuchen?"
+      },
+      {
+        "role": "assistant",
+        "content": "Mit lokaler Extraktion, Embeddings und einer getrennten RAG-Dokumentbibliothek."
+      }
     ],
-    "keywords":["webui","pdf","dokument","rag","suche"]
+    "keywords": [
+      "webui",
+      "pdf",
+      "dokument",
+      "rag",
+      "suche"
+    ],
+    "semantic_groups": [
+      [
+        "webui"
+      ],
+      [
+        "pdf",
+        "dokument",
+        "dokumente"
+      ],
+      [
+        "suche",
+        "durchsuchen",
+        "rag"
+      ]
+    ],
+    "min_semantic_groups": 2
   },
   {
-    "id":"title-fr",
-    "type":"title",
-    "language":"fr",
-    "messages":[
-      {"role":"user","content":"Je dois préparer une traduction fidèle d'un règlement interne allemand vers le français."},
-      {"role":"assistant","content":"Je conserverai le registre, les dates, les montants et la terminologie du document."}
+    "id": "title-fr",
+    "type": "title",
+    "language": "fr",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Je dois préparer une traduction fidèle d'un règlement interne allemand vers le français."
+      },
+      {
+        "role": "assistant",
+        "content": "Je conserverai le registre, les dates, les montants et la terminologie du document."
+      }
     ],
-    "keywords":["traduction","règlement","allemand","français"]
+    "keywords": [
+      "traduction",
+      "règlement",
+      "allemand",
+      "français"
+    ],
+    "semantic_groups": [
+      [
+        "traduction",
+        "traduire"
+      ],
+      [
+        "règlement",
+        "reglement"
+      ],
+      [
+        "allemand",
+        "allemande"
+      ],
+      [
+        "français",
+        "francaise",
+        "francais"
+      ]
+    ],
+    "min_semantic_groups": 2
   },
   {
-    "id":"tags-en",
-    "type":"tags",
-    "language":"en",
-    "messages":[
-      {"role":"user","content":"We need to compare local OCR models."},
-      {"role":"assistant","content":"Which documents matter most?"},
-      {"role":"user","content":"Scanned invoices, tables and multilingual office documents."},
-      {"role":"assistant","content":"Then field accuracy and reading order should be scored as well as text fidelity."}
+    "id": "tags-en",
+    "type": "tags",
+    "language": "en",
+    "messages": [
+      {
+        "role": "user",
+        "content": "We need to compare local OCR models."
+      },
+      {
+        "role": "assistant",
+        "content": "Which documents matter most?"
+      },
+      {
+        "role": "user",
+        "content": "Scanned invoices, tables and multilingual office documents."
+      },
+      {
+        "role": "assistant",
+        "content": "Then field accuracy and reading order should be scored as well as text fidelity."
+      }
     ],
-    "keywords":["ocr","invoice","document","table"]
+    "keywords": [
+      "ocr",
+      "invoice",
+      "document",
+      "table"
+    ],
+    "semantic_groups": [
+      [
+        "ocr"
+      ],
+      [
+        "invoice",
+        "invoices"
+      ],
+      [
+        "document",
+        "documents"
+      ],
+      [
+        "table",
+        "tables"
+      ]
+    ],
+    "min_semantic_groups": 2
   },
   {
-    "id":"tags-de",
-    "type":"tags",
-    "language":"de",
-    "messages":[
-      {"role":"user","content":"Wir analysieren interne Verträge."},
-      {"role":"assistant","content":"Welche Angaben sind besonders wichtig?"},
-      {"role":"user","content":"Kündigungsfristen, Zahlungsbedingungen und Vertragsnummern."},
-      {"role":"assistant","content":"Diese Felder sollten bei der Dokumentanalyse exakt erhalten bleiben."}
+    "id": "tags-de",
+    "type": "tags",
+    "language": "de",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Wir analysieren interne Verträge."
+      },
+      {
+        "role": "assistant",
+        "content": "Welche Angaben sind besonders wichtig?"
+      },
+      {
+        "role": "user",
+        "content": "Kündigungsfristen, Zahlungsbedingungen und Vertragsnummern."
+      },
+      {
+        "role": "assistant",
+        "content": "Diese Felder sollten bei der Dokumentanalyse exakt erhalten bleiben."
+      }
     ],
-    "keywords":["vertrag","kündigung","zahlung","dokument"]
+    "keywords": [
+      "vertrag",
+      "kündigung",
+      "zahlung",
+      "dokument"
+    ],
+    "semantic_groups": [
+      [
+        "vertrag",
+        "verträge",
+        "vertrags"
+      ],
+      [
+        "kündigung",
+        "kündigungsfristen"
+      ],
+      [
+        "zahlung",
+        "zahlungsbedingungen"
+      ],
+      [
+        "dokument",
+        "dokumentanalyse"
+      ]
+    ],
+    "min_semantic_groups": 2
   },
   {
-    "id":"query-fr",
-    "type":"query",
-    "language":"fr",
-    "messages":[
-      {"role":"user","content":"Je cherche la règle interne sur les frais de voyage."},
-      {"role":"assistant","content":"Quelle partie faut-il retrouver dans les documents ?"},
-      {"role":"user","content":"Qui doit approuver les frais supérieurs à 500 CHF et dans quel délai faut-il fournir les justificatifs ?"}
+    "id": "query-fr",
+    "type": "query",
+    "language": "fr",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Je cherche la règle interne sur les frais de voyage."
+      },
+      {
+        "role": "assistant",
+        "content": "Quelle partie faut-il retrouver dans les documents ?"
+      },
+      {
+        "role": "user",
+        "content": "Qui doit approuver les frais supérieurs à 500 CHF et dans quel délai faut-il fournir les justificatifs ?"
+      }
     ],
-    "keywords":["500","frais","voyage","justificatifs","approbation"]
+    "keywords": [
+      "500",
+      "frais",
+      "voyage",
+      "justificatifs",
+      "approbation"
+    ],
+    "semantic_groups": [
+      [
+        "500"
+      ],
+      [
+        "frais",
+        "voyage"
+      ],
+      [
+        "justificatifs"
+      ],
+      [
+        "approbation",
+        "approuver"
+      ]
+    ],
+    "min_semantic_groups": 3
   },
   {
-    "id":"query-de",
-    "type":"query",
-    "language":"de",
-    "messages":[
-      {"role":"user","content":"Ich suche unsere Datenschutzvorgaben."},
-      {"role":"assistant","content":"Welche konkrete Regel soll die Dokumentensuche finden?"},
-      {"role":"user","content":"Welche Richtlinie sagt, ob vertrauliche Personaldaten in öffentlichen Cloud-Diensten gespeichert werden dürfen?"}
+    "id": "query-de",
+    "type": "query",
+    "language": "de",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Ich suche unsere Datenschutzvorgaben."
+      },
+      {
+        "role": "assistant",
+        "content": "Welche konkrete Regel soll die Dokumentensuche finden?"
+      },
+      {
+        "role": "user",
+        "content": "Welche Richtlinie sagt, ob vertrauliche Personaldaten in öffentlichen Cloud-Diensten gespeichert werden dürfen?"
+      }
     ],
-    "keywords":["personaldaten","cloud","datenschutz"]
+    "keywords": [
+      "personaldaten",
+      "cloud",
+      "datenschutz"
+    ],
+    "semantic_groups": [
+      [
+        "personaldaten",
+        "personenbezogen"
+      ],
+      [
+        "cloud",
+        "cloudspeicher"
+      ],
+      [
+        "datenschutz",
+        "schutz"
+      ]
+    ],
+    "min_semantic_groups": 2
   }
 ]

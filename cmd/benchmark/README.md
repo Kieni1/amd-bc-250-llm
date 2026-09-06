@@ -165,10 +165,11 @@ This lane exercises the registered production translation behavior without a
 neutral SYSTEM override. The packaged cases cover DE->FR and FR->DE office text,
 formal address, negation, dates, amounts, invoice/reference numbers and terms that
 must remain unchanged. It deliberately avoids BLEU/COMET dependencies: pass/fail
-is based on deterministic required/forbidden/preserved content, while a small
-language hint remains diagnostic rather than pretending to be a full linguistic
-quality metric. Human review is still required before changing the production
-translation model.
+is based on deterministic required/forbidden/preserved content, minimum meaningful
+content and target-language adherence. The language heuristic remains deliberately
+small and inspectable; it is a qualification signal for these bounded fixtures, not
+a general linguistic quality metric. Human review is still required before changing
+the production translation model.
 
 ## Dedicated-embedding RAG coexistence cycle
 
@@ -223,9 +224,13 @@ bc250-benchmark embeddings embed-jina-v5-small-retrieval-q4-k-m embed-qwen3-0.6b
 ```
 
 The packaged DE/FR/EN office fixture measures Recall@1, Recall@3, MRR,
-cross-language retrieval and warm input throughput. It also includes near-duplicate
-current/archived lease facts and similar invoice references so a model cannot pass
-only by separating unrelated topics. Jina uses `Query:` /
+cross-language retrieval, warm input throughput and target-vs-best-competitor cosine
+margin. Hard near-duplicate lease/invoice cases are reported separately. Per-query
+JSONL rows are observations: rank, target margin and `target_in_top3` are metrics, not
+individual qualification checks. Only the synthetic `case_id=qualification` record
+for the package-default Jina model applies the aggregate fixture policy. Margins are
+within-model separation diagnostics, not calibrated confidence values and should not
+be treated as a universal score across embedding families. Jina uses `Query:` /
 `Document:`; Qwen3 Embedding uses the documented English retrieval instruction
 on queries and no content prefix. The packaged Jina GGUF includes upstream
 `pooling_type` metadata required for reliable embedding-model detection. Use the
@@ -242,7 +247,9 @@ bc250-ocr test glm /PATH/TO/REAL-PAGE.png
 The benchmark uses deterministic German, French and mixed office-page images and
 checks token precision/recall/F1, normalized character similarity, exact required-
 field recall, key-field reading order, local row/field association, a table-markup
-signal and runtime. Two deterministic harder variants add a slight rotation and
+signal and runtime. Markdown/HTML is canonicalized to plain text for fidelity scoring,
+while structure is scored from the original output so markup does not unfairly lower
+text fidelity or erase table/row evidence. Two deterministic harder variants add a slight rotation and
 a low-contrast/blurred scan without turning the suite into a large OCR corpus. The packaged comparison set
 is GLM-OCR plus OvisOCR2; the scorer keeps model-specific prompt support for
 operator-added OCR experiments. OCR must preserve the source language; review
@@ -261,10 +268,12 @@ relevant Open WebUI **0.11.3** task behavior in compact fixtures: title uses the
 latest two messages, tags the latest six (with the short-chat `General` fallback),
 and retrieval-query generation the latest six plus the current date. It parses
 the JSON object the same tolerant way Open WebUI 0.11.3 does (including fenced or
-surrounded JSON), while separately reporting `strict_json`. It checks structure,
-simple content relevance, latency and DE/FR/EN `language_hint` plus explicit
-`language_required`/`language_pass` reporting. Titles and retrieval queries require
-the requested language for the report; tags remain informational. Required task
+surrounded JSON), while separately reporting `strict_json`. It checks structure, semantic-group relevance on the parsed title/tag/query values,
+latency and DE/FR/EN `language_hint` plus explicit `language_required`/
+`language_pass` reporting. Relevance is now an acceptance gate instead of a diagnostic
+keyword score, and wrapper JSON/fences do not contribute language or relevance text.
+Short language-indeterminate values can only use the deterministic target-language
+semantic groups as fallback evidence. Required task
 acceptance contributes to the benchmark result: quality failure returns `3`, which
 the revalidation harness records as quality data rather than infrastructure
 failure. Requests use
@@ -285,11 +294,15 @@ workload while using it. The small fixture set checks Bash/Python syntax plus de
 semantic requirements and JSON shape without executing model-generated code. A
 response passes only when a non-empty final answer has valid syntax/structure,
 uses the requested raw-output format, and satisfies the fixture's required
-patterns (including space-safe Bash handling and explicit Python range rejection). Native model reasoning is not globally
+patterns. The Modelfile-list fixture requires branch-local missing-argument handling,
+no-match-safe direct-directory enumeration and basename sorting. The Python port fixture
+ignores nested definitions as evidence and requires recognizable duplicate removal plus
+range guards that actually lead to `ValueError`. Native model reasoning is not globally
 forced off. The cases provide 768-1024 shared output tokens so reasoning-oriented
-models have room to reach final code. CSV/JSONL and console output now include the
-specific validation reason, separating syntax errors from missing required behavior
-and raw-format violations such as Markdown fences. JSONL also records thinking/final
+models have room to reach final code. CSV/JSONL and console output report `format_ok`, `syntax_ok`, `requirements_ok` and
+`accepted` separately, so raw-format violations such as Markdown fences are not
+mislabelled as syntax/correctness failures. Python requirements can use safe AST
+inspection; generated code is never executed by the benchmark. JSONL also records thinking/final
 character counts, `eval_count` and `done_reason` for starvation diagnosis. The lane also leaves
 temperature/top-p/top-k to the deployed Modelfile by default; set
 `AGENT_TEMPERATURE=0` only for an explicit deterministic comparison. It does not
@@ -328,7 +341,7 @@ its on-die/edge temperature is used for the 80/83/85 °C thresholds:
 - peak and p95 GPU edge temperature plus time at/above 80/83/85 °C;
 - selected-GPU busy percentage and observed min/max GPU clock;
 - selected AMDGPU `mem_info_vram_used` / `mem_info_gtt_used` peaks when exposed;
-- minimum Linux `MemAvailable` and maximum swap use;
+- minimum Linux `MemAvailable`, swap start/peak/end and peak delta;
 - Ollama `/api/ps` resident size, reported `size_vram` and allocated context.
 
 On the BC-250 these are overlapping views of unified memory. Do **not** add host,
@@ -336,10 +349,15 @@ VRAM and GTT values as separate pools or automatically infer that a larger quant
 will fit. Use them as same-board headroom signals and validate a larger quant
 with an actual run.
 
-Generation produces CSV + JSONL response sidecar + JSON metadata. Category runs
-produce the same three-file pattern. Category metadata is intentionally lighter
-than generation metadata but still records Ollama version and model identity.
-Task and agent CSVs intentionally keep a smaller telemetry subset.
+Existing CSV + JSONL + metadata paths remain compatible. This release begins the
+common-result migration: embeddings, task, agent, translation and production-usecase
+lanes add adjacent `.summary.json` and `.summary.txt` files and use a small common
+JSONL envelope with `outcome`, `failure_kinds`, `diagnostics`, `checks` and `metrics`.
+OCR, RAG and generation retain their existing record shapes until the next staged
+migration rather than being rushed into the new envelope.
+`failure_kinds` describes qualification failures; budget/context/resource observations
+remain diagnostics unless they actually caused failure. Category metadata also records
+the fixture SHA-256. Task and agent CSVs intentionally keep a smaller telemetry subset.
 
 Useful overrides include `OLLAMA_URL`, `BENCH_MODE`, `THINK_MODE`,
 `BENCH_PROFILE`, `RUN_LATENCY`, `RUN_CONTEXT`, `RUN_THERMAL`, `REPEATS`,

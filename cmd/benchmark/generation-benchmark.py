@@ -32,6 +32,7 @@ from benchmark_common import (
     BenchmarkError,
     OllamaClient,
     TelemetrySampler,
+    prepare_result_sidecars,
 )
 
 NEUTRAL_SYSTEM = os.environ.get(
@@ -65,7 +66,10 @@ TELEMETRY_FIELDS = [
     "vram_used_max_bytes",
     "gtt_used_max_bytes",
     "mem_available_min_mib",
+    "swap_used_start_mib",
     "swap_used_max_mib",
+    "swap_used_end_mib",
+    "swap_peak_delta_mib",
 ]
 
 CSV_FIELDS = [
@@ -647,7 +651,7 @@ def main() -> int:
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_generation_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     started = iso_now()
     meta = {

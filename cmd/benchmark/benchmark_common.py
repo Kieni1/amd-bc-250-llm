@@ -25,6 +25,141 @@ STANDARD_OLLAMA_VERSION = "0.33.3"
 DEFAULT_TIMEOUT = 900.0
 DEFAULT_TELEMETRY_INTERVAL = 0.5
 TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
+RESULT_SCHEMA_VERSION = 1
+VALID_OUTCOMES = {"pass", "quality-fail", "infra-fail", "skipped"}
+
+
+def prepare_result_sidecars(csv_path: Path) -> Path:
+    """Start a benchmark invocation with fresh JSONL/summary sidecars.
+
+    CSV and meta files are written with replacement semantics elsewhere. Keep the
+    canonical case stream and derived summaries aligned with that same invocation.
+    """
+    jsonl_path = csv_path.with_suffix(".jsonl")
+    for path in (
+        jsonl_path,
+        jsonl_path.with_suffix(".summary.json"),
+        jsonl_path.with_suffix(".summary.txt"),
+    ):
+        path.unlink(missing_ok=True)
+    return jsonl_path
+
+
+def result_record(
+    *,
+    category: str,
+    model: str,
+    case_id: str,
+    outcome: str,
+    failure_kinds: Iterable[str] = (),
+    diagnostics: Iterable[str] = (),
+    checks: dict[str, Any] | None = None,
+    metrics: dict[str, Any] | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    """Build the small common case envelope used by benchmark JSONL output."""
+    if outcome not in VALID_OUTCOMES:
+        raise ValueError(f"invalid benchmark outcome: {outcome}")
+    record: dict[str, Any] = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "category": category,
+        "model": model,
+        "case_id": case_id,
+        "outcome": outcome,
+        "failure_kinds": list(dict.fromkeys(failure_kinds)),
+        "diagnostics": list(dict.fromkeys(diagnostics)),
+        "checks": checks or {},
+        "metrics": metrics or {},
+    }
+    record.update(extra)
+    return record
+
+
+def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path]:
+    """Write machine/human summaries beside a canonical JSONL case stream."""
+    records: list[dict[str, Any]] = []
+    if jsonl_path.exists():
+        for line_no, line in enumerate(
+            jsonl_path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise BenchmarkError(
+                    f"{jsonl_path}:{line_no}: invalid JSONL record: {exc.msg}"
+                ) from exc
+            if not isinstance(row, dict):
+                raise BenchmarkError(
+                    f"{jsonl_path}:{line_no}: benchmark record is not an object"
+                )
+            if row.get("schema_version") != RESULT_SCHEMA_VERSION:
+                raise BenchmarkError(
+                    f"{jsonl_path}:{line_no}: unsupported result schema version"
+                )
+            for key in ("category", "model", "case_id"):
+                if not isinstance(row.get(key), str) or not row[key]:
+                    raise BenchmarkError(
+                        f"{jsonl_path}:{line_no}: missing/invalid {key}"
+                    )
+            if row.get("outcome") not in VALID_OUTCOMES:
+                raise BenchmarkError(
+                    f"{jsonl_path}:{line_no}: missing/invalid outcome"
+                )
+            for key in ("failure_kinds", "diagnostics"):
+                if not isinstance(row.get(key), list):
+                    raise BenchmarkError(
+                        f"{jsonl_path}:{line_no}: {key} must be an array"
+                    )
+            for key in ("checks", "metrics"):
+                if not isinstance(row.get(key), dict):
+                    raise BenchmarkError(
+                        f"{jsonl_path}:{line_no}: {key} must be an object"
+                    )
+            records.append(row)
+    counts = {name: 0 for name in ("pass", "quality-fail", "infra-fail", "skipped")}
+    failures: dict[str, int] = {}
+    diagnostics: dict[str, int] = {}
+    for row in records:
+        counts[str(row["outcome"])] += 1
+        for name in row.get("failure_kinds", []):
+            failures[str(name)] = failures.get(str(name), 0) + 1
+        for name in row.get("diagnostics", []):
+            diagnostics[str(name)] = diagnostics.get(str(name), 0) + 1
+    quality = "not-run"
+    if counts["pass"] or counts["quality-fail"]:
+        quality = "mixed" if counts["pass"] and counts["quality-fail"] else (
+            "fail" if counts["quality-fail"] else "pass"
+        )
+    summary = {
+        "schema_version": RESULT_SCHEMA_VERSION,
+        "category": category,
+        "cases": len(records),
+        "counts": counts,
+        "quality": quality,
+        "failure_kinds": dict(sorted(failures.items())),
+        "diagnostics": dict(sorted(diagnostics.items())),
+    }
+    summary_json = jsonl_path.with_suffix(".summary.json")
+    summary_txt = jsonl_path.with_suffix(".summary.txt")
+    summary_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    lines = [
+        f"BC-250 benchmark summary: {category}",
+        "",
+        f"Cases          {len(records)}",
+        f"Quality        {quality.upper()}",
+        f"Pass           {counts['pass']}",
+        f"Quality-fail   {counts['quality-fail']}",
+        f"Infra-fail     {counts['infra-fail']}",
+        f"Skipped        {counts['skipped']}",
+    ]
+    if failures:
+        lines += ["", "Failure kinds"] + [f"  {name:<20} {count}" for name, count in sorted(failures.items())]
+    if diagnostics:
+        lines += ["", "Diagnostics"] + [f"  {name:<20} {count}" for name, count in sorted(diagnostics.items())]
+    summary_txt.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return summary_json, summary_txt
 
 
 class BenchmarkError(RuntimeError):
@@ -481,7 +616,10 @@ class TelemetrySampler:
             "vram_used_max_bytes": max(vrams) if vrams else None,
             "gtt_used_max_bytes": max(gtts) if gtts else None,
             "mem_available_min_mib": min(mems) if mems else None,
+            "swap_used_start_mib": swaps[0] if swaps else None,
             "swap_used_max_mib": max(swaps) if swaps else None,
+            "swap_used_end_mib": swaps[-1] if swaps else None,
+            "swap_peak_delta_mib": (max(swaps) - swaps[0]) if swaps else None,
         }
 
 
@@ -501,7 +639,10 @@ def empty_telemetry() -> dict[str, Any]:
         "vram_used_max_bytes": None,
         "gtt_used_max_bytes": None,
         "mem_available_min_mib": None,
+        "swap_used_start_mib": None,
         "swap_used_max_mib": None,
+        "swap_used_end_mib": None,
+        "swap_peak_delta_mib": None,
     }
 
 

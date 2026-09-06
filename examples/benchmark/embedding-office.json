@@ -1,4 +1,10 @@
 {
+  "qualification": {
+    "model": "embed-jina-v5-small-retrieval-q4-k-m",
+    "min_recall_at_3": 0.92,
+    "min_mrr": 0.85,
+    "min_hard_recall_at_1": 0.25
+  },
   "documents": [
     {
       "id": "de-kuendigung",
@@ -62,91 +68,104 @@
       "language": "de",
       "kind": "same",
       "target": "de-kuendigung",
-      "text": "Welche Kündigungsfrist gilt für das Büro in Zürich?"
+      "text": "Welche Kündigungsfrist gilt für das Büro in Zürich?",
+      "hard": false
     },
     {
       "id": "q2",
       "language": "fr",
       "kind": "cross",
       "target": "de-kuendigung",
-      "text": "Quel est le délai de résiliation du bureau de Zurich ?"
+      "text": "Quel est le délai de résiliation du bureau de Zurich ?",
+      "hard": false
     },
     {
       "id": "q3",
       "language": "fr",
       "kind": "same",
       "target": "fr-resiliation",
-      "text": "Quel délai de résiliation s'applique au bureau de Genève ?"
+      "text": "Quel délai de résiliation s'applique au bureau de Genève ?",
+      "hard": false
     },
     {
       "id": "q4",
       "language": "de",
       "kind": "cross",
       "target": "fr-maintenance",
-      "text": "Wann beginnt die Aktualisierung der Arbeitsplätze und wer ist verantwortlich?"
+      "text": "Wann beginnt die Aktualisierung der Arbeitsplätze und wer ist verantwortlich?",
+      "hard": false
     },
     {
       "id": "q5",
       "language": "fr",
       "kind": "cross",
       "target": "de-reisekosten",
-      "text": "À partir de quel montant les frais de voyage doivent-ils être approuvés par la direction ?"
+      "text": "À partir de quel montant les frais de voyage doivent-ils être approuvés par la direction ?",
+      "hard": false
     },
     {
       "id": "q6",
       "language": "en",
       "kind": "cross",
       "target": "de-datenschutz",
-      "text": "May confidential HR data be stored in public cloud services?"
+      "text": "May confidential HR data be stored in public cloud services?",
+      "hard": false
     },
     {
       "id": "q7",
       "language": "de",
       "kind": "cross",
       "target": "fr-facture",
-      "text": "Welche zusätzlichen Angaben und Freigaben gelten für Rechnungen über CHF 10 000?"
+      "text": "Welche zusätzlichen Angaben und Freigaben gelten für Rechnungen über CHF 10 000?",
+      "hard": false
     },
     {
       "id": "q8",
       "language": "fr",
       "kind": "cross",
       "target": "en-budget",
-      "text": "Quel budget annuel de maintenance a été approuvé et à quelle date ?"
+      "text": "Quel budget annuel de maintenance a été approuvé et à quelle date ?",
+      "hard": false
     },
     {
       "id": "q9",
       "language": "en",
       "kind": "same",
       "target": "en-meeting",
-      "text": "How quickly should draft meeting minutes be distributed?"
+      "text": "How quickly should draft meeting minutes be distributed?",
+      "hard": false
     },
     {
       "id": "q-current-lease",
       "language": "de",
       "kind": "same",
       "target": "de-kuendigung",
-      "text": "Welche Kündigungsfrist gilt für den aktuellen Zürcher Büro-Mietvertrag ab 2026?"
+      "text": "Welche Kündigungsfrist gilt für den aktuellen Zürcher Büro-Mietvertrag ab 2026?",
+      "hard": true
     },
     {
       "id": "q-old-lease-fr",
       "language": "fr",
       "kind": "cross",
       "target": "de-kuendigung-alt",
-      "text": "Quelle est l'ancienne période de résiliation du bail de Zurich valable jusqu'à fin 2025?"
+      "text": "Quelle est l'ancienne période de résiliation du bail de Zurich valable jusqu'à fin 2025?",
+      "hard": true
     },
     {
       "id": "q-invoice-4821-de",
       "language": "de",
       "kind": "cross",
       "target": "fr-facture-4821",
-      "text": "Welcher Gesamtbetrag und welches Fälligkeitsdatum gehören zur Rechnung INV-4821?"
+      "text": "Welcher Gesamtbetrag und welches Fälligkeitsdatum gehören zur Rechnung INV-4821?",
+      "hard": true
     },
     {
       "id": "q-invoice-4822-en",
       "language": "en",
       "kind": "cross",
       "target": "de-rechnung-4822",
-      "text": "What total amount and payment deadline belong to invoice INV-4822?"
+      "text": "What total amount and payment deadline belong to invoice INV-4822?",
+      "hard": true
     }
   ]
 }

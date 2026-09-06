@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import base64
 import csv
+import hashlib
 import json
 import os
 import re
@@ -15,6 +17,7 @@ import time
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +29,9 @@ from benchmark_common import (
     cosine,
     mean,
     normalize_words,
+    prepare_result_sidecars,
+    result_record,
+    write_result_summary,
 )
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -102,6 +108,7 @@ def write_meta(
         "ollama_version": client.version(),
         "package_standard_ollama_version": STANDARD_OLLAMA_VERSION,
         "fixture": str(fixture),
+        "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
         "models": [model_meta(client, model) for model in models],
         "telemetry_interval_s": TELEMETRY_INTERVAL,
     }
@@ -133,6 +140,17 @@ def embedding_scheme(model: str) -> tuple[str, str, str]:
     return "", "", "none"
 
 
+def embedding_qualification_checks(
+    metrics: dict[str, Any], policy: dict[str, Any]
+) -> dict[str, bool]:
+    return {
+        "recall_at_3": metrics["recall_at_3"] >= float(policy["min_recall_at_3"]),
+        "mrr": metrics["mrr"] >= float(policy["min_mrr"]),
+        "hard_recall_at_1": metrics["hard_recall_at_1"]
+        >= float(policy["min_hard_recall_at_1"]),
+    }
+
+
 def embed(
     client: OllamaClient, model: str, inputs: list[str], keep_alive: Any = KEEP_ALIVE
 ) -> dict[str, Any]:
@@ -154,42 +172,22 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_embeddings_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, client, "embeddings", models, fixture)
-
     fields = [
-        "timestamp",
-        "model",
-        "prefix_scheme",
-        "recall_at_1",
-        "recall_at_3",
-        "mrr",
-        "cross_recall_at_1",
-        "cross_mrr",
-        "documents",
-        "queries",
-        "dimensions",
-        "cold_load_s",
-        "quality_wall_s",
-        "warm_input_tps",
-        "warm_wall_s",
-        "resident_size_bytes",
-        "resident_vram_bytes",
-        "allocated_context",
-        "temp_max_c",
-        "temp_p95_c",
-        "seconds_ge_80c",
-        "seconds_ge_83c",
-        "seconds_ge_85c",
-        "gpu_busy_max_pct",
-        "gpu_clock_min_mhz",
-        "gpu_clock_max_mhz",
-        "vram_used_max_bytes",
-        "gtt_used_max_bytes",
-        "mem_available_min_mib",
-        "swap_used_max_mib",
+        "timestamp", "model", "prefix_scheme", "recall_at_1", "recall_at_3",
+        "mrr", "cross_recall_at_1", "cross_mrr", "hard_recall_at_1",
+        "mean_target_margin", "min_target_margin", "documents", "queries",
+        "dimensions", "cold_load_s", "quality_wall_s", "warm_input_tps",
+        "warm_wall_s", "resident_size_bytes", "resident_vram_bytes",
+        "allocated_context", "temp_max_c", "temp_p95_c", "seconds_ge_80c",
+        "seconds_ge_83c", "seconds_ge_85c", "gpu_busy_max_pct",
+        "gpu_clock_min_mhz", "gpu_clock_max_mhz", "vram_used_max_bytes",
+        "gtt_used_max_bytes", "mem_available_min_mib", "swap_used_start_mib",
+        "swap_used_max_mib", "swap_used_end_mib", "swap_peak_delta_mib",
     ]
+    quality_failed = False
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -209,16 +207,12 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                     doc_vectors = doc_response.get("embeddings", [])
                     query_vectors = query_response.get("embeddings", [])
                     quality_wall_s = time.monotonic() - quality_start
-
-                    if len(doc_vectors) != len(documents) or len(query_vectors) != len(
-                        queries
-                    ):
-                        raise BenchmarkError(
-                            f"{model}: embedding count does not match fixture"
-                        )
-
+                    if len(doc_vectors) != len(documents) or len(query_vectors) != len(queries):
+                        raise BenchmarkError(f"{model}: embedding count does not match fixture")
                     ranks: list[int] = []
                     cross_ranks: list[int] = []
+                    hard_ranks: list[int] = []
+                    margins: list[float] = []
                     for query_item, vector in zip(queries, query_vectors):
                         scored = sorted(
                             (
@@ -230,77 +224,99 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                         ranked_ids = [doc_id for _score, doc_id in scored]
                         rank = ranked_ids.index(query_item["target"]) + 1
                         ranks.append(rank)
-                        if query_item.get("kind") == "cross":
-                            cross_ranks.append(rank)
-                        append_jsonl(
-                            jsonl_path,
-                            {
-                                "timestamp": iso_now(),
-                                "category": "embedding",
-                                "model": model,
-                                "query_id": query_item["id"],
-                                "target": query_item["target"],
+                        if query_item.get("kind") == "cross": cross_ranks.append(rank)
+                        if query_item.get("hard"): hard_ranks.append(rank)
+                        target_score = next(score for score, doc_id in scored if doc_id == query_item["target"])
+                        competitor = max(score for score, doc_id in scored if doc_id != query_item["target"])
+                        margin = target_score - competitor
+                        margins.append(margin)
+                        append_jsonl(jsonl_path, result_record(
+                            category="embedding", model=model, case_id=query_item["id"],
+                            outcome="pass",
+                            metrics={
                                 "rank": rank,
-                                "top3": scored[:3],
-                                "prefix_scheme": scheme,
+                                "target_margin": margin,
+                                "target_in_top3": rank <= 3,
                             },
-                        )
-
+                            timestamp=iso_now(), target=query_item["target"], rank=rank,
+                            top3=scored[:3], prefix_scheme=scheme, hard=bool(query_item.get("hard")),
+                        ))
                     warm_tps: list[float] = []
                     warm_walls: list[float] = []
                     for repeat in range(args.repeats):
-                        start = time.monotonic()
+                        start_time = time.monotonic()
                         response = embed(client, model, doc_inputs)
-                        wall = time.monotonic() - start
+                        wall = time.monotonic() - start_time
                         seconds = process_seconds(response)
                         count = int(response.get("prompt_eval_count") or 0)
                         warm_tps.append(count / seconds if seconds > 0 else 0.0)
                         warm_walls.append(wall)
-                        print(
-                            f"  warm {repeat + 1}/{args.repeats}: {warm_tps[-1]:.1f} input tok/s, {wall:.3f}s"
-                        )
+                        print(f"  warm {repeat + 1}/{args.repeats}: {warm_tps[-1]:.1f} input tok/s, {wall:.3f}s")
                 finally:
                     telemetry = sampler.stop()
                 state = client.runtime_state(model)
                 row = {
-                    "timestamp": iso_now(),
-                    "model": model,
-                    "prefix_scheme": scheme,
+                    "timestamp": iso_now(), "model": model, "prefix_scheme": scheme,
                     "recall_at_1": mean(1.0 if rank <= 1 else 0.0 for rank in ranks),
                     "recall_at_3": mean(1.0 if rank <= 3 else 0.0 for rank in ranks),
                     "mrr": mean(1.0 / rank for rank in ranks),
-                    "cross_recall_at_1": mean(
-                        1.0 if rank <= 1 else 0.0 for rank in cross_ranks
-                    ),
+                    "cross_recall_at_1": mean(1.0 if rank <= 1 else 0.0 for rank in cross_ranks),
                     "cross_mrr": mean(1.0 / rank for rank in cross_ranks),
-                    "documents": len(documents),
-                    "queries": len(queries),
+                    "hard_recall_at_1": mean(1.0 if rank <= 1 else 0.0 for rank in hard_ranks),
+                    "mean_target_margin": mean(margins),
+                    "min_target_margin": min(margins) if margins else 0.0,
+                    "documents": len(documents), "queries": len(queries),
                     "dimensions": len(doc_vectors[0]) if doc_vectors else 0,
-                    "cold_load_s": cold_load_s,
-                    "quality_wall_s": quality_wall_s,
-                    "warm_input_tps": mean(warm_tps),
-                    "warm_wall_s": mean(warm_walls),
-                    **state,
-                    **{key: telemetry.get(key) for key in fields if key in telemetry},
+                    "cold_load_s": cold_load_s, "quality_wall_s": quality_wall_s,
+                    "warm_input_tps": mean(warm_tps), "warm_wall_s": mean(warm_walls),
+                    **state, **{key: telemetry.get(key) for key in fields if key in telemetry},
                 }
-                writer.writerow(row)
-                handle.flush()
+                qualification = corpus.get("qualification")
+                if isinstance(qualification, dict):
+                    policy_model = str(qualification.get("model") or "").removesuffix(":latest")
+                    if model.removesuffix(":latest") == policy_model:
+                        checks = embedding_qualification_checks(row, qualification)
+                        qualified = all(checks.values())
+                        quality_failed = quality_failed or not qualified
+                        append_jsonl(
+                            jsonl_path,
+                            result_record(
+                                category="embedding",
+                                model=model,
+                                case_id="qualification",
+                                outcome="pass" if qualified else "quality-fail",
+                                failure_kinds=[] if qualified else ["retrieval"],
+                                checks=checks,
+                                metrics={
+                                    "recall_at_1": row["recall_at_1"],
+                                    "recall_at_3": row["recall_at_3"],
+                                    "mrr": row["mrr"],
+                                    "hard_recall_at_1": row["hard_recall_at_1"],
+                                },
+                                qualification_policy=qualification,
+                                timestamp=iso_now(),
+                            ),
+                        )
+                writer.writerow(row); handle.flush()
                 print(
-                    f"  quality: R@1={row['recall_at_1']:.3f} R@3={row['recall_at_3']:.3f} "
-                    f"MRR={row['mrr']:.3f} cross-MRR={row['cross_mrr']:.3f}"
+                    f"  quality: R@1={row['recall_at_1']:.3f} "
+                    f"R@3={row['recall_at_3']:.3f} MRR={row['mrr']:.3f} "
+                    f"hard-R@1={row['hard_recall_at_1']:.3f}"
+                )
+                print(
+                    f"  separation: mean-margin={row['mean_target_margin']:.3f} "
+                    f"min-margin={row['min_target_margin']:.3f}"
                 )
                 print(
                     f"  resources: Tmax={fmt(telemetry.get('temp_max_c'), 'C')} "
                     f"MemAvailable-min={fmt(telemetry.get('mem_available_min_mib'), 'MiB')}"
                 )
             finally:
-                try:
-                    client.ensure_unloaded(model)
-                except BenchmarkError as exc:
-                    print(f"WARNING: {exc}", file=sys.stderr)
-
-    print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
-    return 0
+                try: client.ensure_unloaded(model)
+                except BenchmarkError as exc: print(f"WARNING: {exc}", file=sys.stderr)
+    _sj, summary_txt = write_result_summary(jsonl_path, category="embeddings")
+    print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nSummary: {summary_txt}\nMeta:    {meta_path}")
+    return 3 if quality_failed else 0
 
 
 # Mirrors the behavior/shape of Open WebUI v0.11.3's default title/tag/query
@@ -400,6 +416,29 @@ def keyword_score(text: str, keywords: list[str]) -> float:
     return hits / len(keywords) if keywords else 1.0
 
 
+def task_value_text(parsed: dict[str, Any] | None, task_type: str) -> str:
+    if parsed is None:
+        return ""
+    if task_type == "title":
+        value = parsed.get("title")
+        return value if isinstance(value, str) else ""
+    key = "tags" if task_type == "tags" else "queries"
+    value = parsed.get(key)
+    if not isinstance(value, list):
+        return ""
+    return " ".join(item for item in value if isinstance(item, str))
+
+
+def semantic_groups_score(text: str, groups: list[list[str]]) -> tuple[int, int]:
+    folded = acceptance_text(text)
+    matched = sum(
+        1
+        for group in groups
+        if any(acceptance_text(term) in folded for term in group)
+    )
+    return matched, len(groups)
+
+
 def benchmark_task(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "task-cases.json")
@@ -409,31 +448,17 @@ def benchmark_task(args: argparse.Namespace) -> int:
         raise BenchmarkError("no task models found")
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_task_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, client, "task", models, fixture)
 
     fields = [
-        "timestamp",
-        "model",
-        "case_id",
-        "task",
-        "language",
-        "passed",
-        "valid_json",
-        "strict_json",
-        "structure_ok",
-        "language_hint",
-        "language_required",
-        "language_pass",
-        "keyword_score",
-        "wall_s",
-        "load_s",
-        "eval_count",
-        "done_reason",
-        "temp_max_c",
-        "mem_available_min_mib",
-        "swap_used_max_mib",
+        "timestamp", "model", "case_id", "task", "language", "passed",
+        "valid_json", "strict_json", "structure_ok", "language_hint",
+        "language_required", "language_pass", "semantic_groups",
+        "semantic_required", "semantic_ok", "keyword_score", "wall_s",
+        "load_s", "eval_count", "done_reason", "temp_max_c",
+        "mem_available_min_mib", "swap_used_max_mib",
     ]
     total = passed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
@@ -444,16 +469,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
             scores: list[float] = []
             for case in cases:
                 prompt = task_prompt(case)
-                # Open WebUI v0.11.3 uses chat completions for task prompts. The
-                # isolated service has OLLAMA_KEEP_ALIVE=0; keep_alive=0 here
-                # deliberately reproduces its load/unload behaviour.
-                options: dict[str, Any] = {}
-                if case["type"] == "title":
-                    # v0.11.3 with empty TASK_MODEL_PARAMS supplies a
-                    # generous title max-token cap.
-                    options["num_predict"] = 1000
-                else:
-                    options["num_predict"] = 128
+                options: dict[str, Any] = {
+                    "num_predict": 1000 if case["type"] == "title" else 128
+                }
                 payload = {
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
@@ -462,7 +480,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     "options": options,
                 }
                 sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
-                start = time.monotonic()
+                start_time = time.monotonic()
                 try:
                     response = client.json_request("/api/chat", payload)
                 except BaseException:
@@ -470,24 +488,20 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     client.wait_unloaded(model)
                     raise
                 finally:
-                    wall = time.monotonic() - start
+                    wall = time.monotonic() - start_time
                     telemetry = sampler.stop()
-                content = str((response.get("message") or {}).get("content") or "")
+                message = response.get("message") if isinstance(response.get("message"), dict) else {}
+                content = str(message.get("content") or "")
+                thinking = str(message.get("thinking") or response.get("thinking") or "")
                 parsed = parse_json_object(content)
                 valid_json = parsed is not None
                 strict_json = strict_json_object(content)
-                language_hint = task_language_hint(content, case["language"])
-                language_required = bool(
-                    case.get("language_required", case["type"] in {"title", "query"})
-                )
-                language_pass = (not language_required) or language_hint == "match"
+                value_text = task_value_text(parsed, case["type"])
                 structure_ok = False
                 if parsed is not None:
                     if case["type"] == "title":
                         title = parsed.get("title")
-                        structure_ok = (
-                            isinstance(title, str) and 1 <= len(title.split()) <= 8
-                        )
+                        structure_ok = isinstance(title, str) and 1 <= len(title.split()) <= 8
                     elif case["type"] == "tags":
                         tags = parsed.get("tags")
                         structure_ok = (
@@ -499,154 +513,420 @@ def benchmark_task(args: argparse.Namespace) -> int:
                         queries = parsed.get("queries")
                         structure_ok = (
                             isinstance(queries, list)
-                            and len(queries) <= 3
+                            and 1 <= len(queries) <= 3
                             and all(isinstance(x, str) for x in queries)
                         )
-                score = keyword_score(content, case.get("keywords", []))
-                ok = structure_ok and language_pass
+                groups = case.get("semantic_groups", [])
+                semantic_groups, _ = semantic_groups_score(value_text, groups)
+                semantic_required = int(case.get("min_semantic_groups", 0))
+                semantic_ok = semantic_groups >= semantic_required
+                language_hint = task_language_hint(value_text, case["language"])
+                language_required = bool(case.get("language_required", case["type"] in {"title", "query"}))
+                # Short titles can be language-indeterminate. Target-language semantic
+                # groups provide a deterministic fallback without accepting clear other-language output.
+                language_pass = (
+                    (not language_required)
+                    or language_hint == "match"
+                    or (language_hint == "unknown" and semantic_ok)
+                )
+                score = keyword_score(value_text, case.get("keywords", []))
+                ok = structure_ok and language_pass and semantic_ok
                 total += 1
                 passed += int(ok)
                 scores.append(score if structure_ok else 0.0)
-                writer.writerow(
-                    {
-                        "timestamp": iso_now(),
-                        "model": model,
-                        "case_id": case["id"],
-                        "task": case["type"],
-                        "language": case["language"],
-                        "passed": int(ok),
-                        "valid_json": int(valid_json),
-                        "strict_json": int(strict_json),
-                        "structure_ok": int(structure_ok),
-                        "language_hint": language_hint,
-                        "language_required": int(language_required),
-                        "language_pass": int(language_pass),
-                        "keyword_score": f"{score:.3f}",
-                        "wall_s": f"{wall:.3f}",
-                        "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
-                        "eval_count": response.get("eval_count", 0),
-                        "done_reason": response.get("done_reason", ""),
-                        "temp_max_c": telemetry.get("temp_max_c"),
-                        "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
-                        "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
-                    }
-                )
-                append_jsonl(
-                    jsonl_path,
-                    {
-                        "timestamp": iso_now(),
-                        "category": "task",
-                        "model": model,
-                        "case": case,
-                        "response": content,
-                        "valid_json": valid_json,
-                        "strict_json": strict_json,
-                        "structure_ok": structure_ok,
-                        "language_hint": language_hint,
-                        "language_required": language_required,
-                        "language_pass": language_pass,
-                        "passed": ok,
-                        "keyword_score": score,
-                        "wall_s": wall,
-                        "telemetry": telemetry,
-                    },
-                )
+                done_reason = str(response.get("done_reason") or "")
+                failures: list[str] = []
+                if not content.strip():
+                    failures.append("empty-output")
+                elif not valid_json or not structure_ok:
+                    failures.append("format-contract")
+                if not language_pass:
+                    failures.append("language")
+                if not semantic_ok:
+                    failures.append("relevance")
+                diagnostics: list[str] = []
+                if done_reason == "length":
+                    diagnostics.append("output-budget")
+                    if not content.strip() and thinking.strip():
+                        diagnostics.append("thinking-budget")
+                row = {
+                    "timestamp": iso_now(), "model": model, "case_id": case["id"],
+                    "task": case["type"], "language": case["language"],
+                    "passed": int(ok), "valid_json": int(valid_json),
+                    "strict_json": int(strict_json), "structure_ok": int(structure_ok),
+                    "language_hint": language_hint, "language_required": int(language_required),
+                    "language_pass": int(language_pass), "semantic_groups": semantic_groups,
+                    "semantic_required": semantic_required, "semantic_ok": int(semantic_ok),
+                    "keyword_score": f"{score:.3f}", "wall_s": f"{wall:.3f}",
+                    "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
+                    "eval_count": response.get("eval_count", 0), "done_reason": done_reason,
+                    "temp_max_c": telemetry.get("temp_max_c"),
+                    "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
+                    "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
+                }
+                writer.writerow(row)
+                append_jsonl(jsonl_path, result_record(
+                    category="task", model=model, case_id=case["id"],
+                    outcome="pass" if ok else "quality-fail", failure_kinds=failures,
+                    diagnostics=diagnostics,
+                    checks={"structure": structure_ok, "language": language_pass, "relevance": semantic_ok},
+                    metrics={"keyword_score": score, "semantic_groups": semantic_groups, "wall_s": wall, "eval_count": response.get("eval_count", 0)},
+                    timestamp=iso_now(), case=case, response=content, thinking=thinking,
+                    valid_json=valid_json, strict_json=strict_json, language_hint=language_hint,
+                    telemetry=telemetry,
+                ))
                 print(
-                    f"  {case['id']}: json={valid_json} strict={strict_json} structure={structure_ok} "
-                    f"lang={language_hint} required={language_required} pass={ok} "
-                    f"keyword={score:.2f} wall={wall:.2f}s "
-                    f"Tmax={fmt(telemetry.get('temp_max_c'), 'C')}"
+                    f"  {case['id']}: structure={structure_ok} "
+                    f"lang={language_hint}/{language_pass} "
+                    f"semantic={semantic_groups}/{semantic_required} "
+                    f"pass={ok} wall={wall:.2f}s"
                 )
-            print(f"  mean task score: {mean(scores):.3f}")
+            print(f"  mean keyword diagnostic: {mean(scores):.3f}")
+    _summary_json, summary_txt = write_result_summary(jsonl_path, category="task")
     print(f"\nTask acceptance: {passed}/{total} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nSummary: {summary_txt}\nMeta:    {meta_path}")
     return 0 if passed == total else 3
 
-
 def clean_code_output(text: str) -> str:
-    text = re.sub(
-        r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE
-    ).strip()
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE).strip()
     match = re.fullmatch(r"```[^\n]*\n(.*?)\n```", text, flags=re.DOTALL)
     return (match.group(1) if match else text).strip()
 
 
-def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, str]:
+def _executable_ast_nodes(scope: ast.AST) -> list[ast.AST]:
+    """Walk one executable scope without treating nested definitions as evidence."""
+    nodes: list[ast.AST] = []
+
+    class Visitor(ast.NodeVisitor):
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            if node is scope:
+                for statement in node.body:
+                    self.visit(statement)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            if node is scope:
+                for statement in node.body:
+                    self.visit(statement)
+
+        def visit_ClassDef(self, node: ast.ClassDef) -> None:
+            return
+
+        def visit_Lambda(self, node: ast.Lambda) -> None:
+            return
+
+        def generic_visit(self, node: ast.AST) -> None:
+            nodes.append(node)
+            super().generic_visit(node)
+
+    visitor = Visitor()
+    if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        visitor.visit(scope)
+    else:
+        for statement in getattr(scope, "body", []):
+            visitor.visit(statement)
+    return nodes
+
+
+def _raise_name(node: ast.Raise) -> str | None:
+    if node.exc is None:
+        return None
+    exc = node.exc.func if isinstance(node.exc, ast.Call) else node.exc
+    return exc.id if isinstance(exc, ast.Name) else None
+
+
+def _body_raises(statements: list[ast.stmt], exception: str) -> bool:
+    module = ast.Module(body=statements, type_ignores=[])
+    return any(
+        isinstance(node, ast.Raise) and _raise_name(node) == exception
+        for node in _executable_ast_nodes(module)
+    )
+
+
+def _out_of_range_bounds(test: ast.AST, bounds: list[int]) -> set[int]:
+    """Return configured bounds used by a simple out-of-range condition."""
+    if not bounds:
+        return set()
+    lower, upper = min(bounds), max(bounds)
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        constants = {
+            part.value
+            for part in ast.walk(test.operand)
+            if isinstance(part, ast.Constant)
+            and isinstance(part.value, int)
+            and not isinstance(part.value, bool)
+        }
+        if lower in constants and upper in constants:
+            return {lower, upper}
+
+    guarded: set[int] = set()
+    for comparison in ast.walk(test):
+        if not isinstance(comparison, ast.Compare) or len(comparison.ops) != 1:
+            continue
+        left, right = comparison.left, comparison.comparators[0]
+        operator = comparison.ops[0]
+        if isinstance(right, ast.Constant) and right.value == lower and isinstance(operator, ast.Lt):
+            guarded.add(lower)
+        if isinstance(left, ast.Constant) and left.value == lower and isinstance(operator, ast.Gt):
+            guarded.add(lower)
+        if isinstance(right, ast.Constant) and right.value == upper and isinstance(operator, ast.Gt):
+            guarded.add(upper)
+        if isinstance(left, ast.Constant) and left.value == upper and isinstance(operator, ast.Lt):
+            guarded.add(upper)
+    return guarded
+
+
+def _python_has_range_raise(
+    nodes: list[ast.AST], *, bounds: list[int], exception: str
+) -> bool:
+    """Require each configured out-of-range boundary to lead to the exception."""
+    guarded: set[int] = set()
+    for node in nodes:
+        if isinstance(node, ast.If) and _body_raises(node.body, exception):
+            guarded.update(_out_of_range_bounds(node.test, bounds))
+    return all(value in guarded for value in bounds)
+
+
+def _python_has_dedup(nodes: list[ast.AST]) -> bool:
+    """Recognize common duplicate-removal idioms without executing code."""
+    for node in nodes:
+        if isinstance(node, (ast.SetComp, ast.DictComp)):
+            return True
+        if isinstance(node, ast.Compare) and any(
+            isinstance(operator, ast.NotIn) for operator in node.ops
+        ):
+            return True
+        if isinstance(node, ast.Call):
+            if isinstance(node.func, ast.Name) and node.func.id == "set":
+                return True
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "fromkeys"
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "dict"
+            ):
+                return True
+    return False
+
+
+def _python_contract(body: str, case: dict[str, Any]) -> list[str]:
+    problems: list[str] = []
+    try:
+        tree = ast.parse(body)
+    except SyntaxError:
+        return problems
+    required_function = case.get("python_function")
+    function = next(
+        (
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == required_function
+        ),
+        None,
+    )
+    if required_function and function is None:
+        return [f"missing function: {required_function}"]
+
+    scope: ast.AST = function if function is not None else tree
+    nodes = _executable_ast_nodes(scope)
+    calls: set[str] = set()
+    raises: set[str] = set()
+    comparison_constants: set[int] = set()
+    for node in nodes:
+        if isinstance(node, ast.Call):
+            func = node.func
+            if isinstance(func, ast.Name):
+                calls.add(func.id)
+            elif isinstance(func, ast.Attribute):
+                calls.add(func.attr)
+        if isinstance(node, ast.Raise):
+            name = _raise_name(node)
+            if name:
+                raises.add(name)
+        if isinstance(node, ast.Compare):
+            for part in (node.left, *node.comparators):
+                if (
+                    isinstance(part, ast.Constant)
+                    and isinstance(part.value, int)
+                    and not isinstance(part.value, bool)
+                ):
+                    comparison_constants.add(part.value)
+    for name in case.get("python_calls", []):
+        if name not in calls:
+            problems.append(f"missing call: {name}")
+    for name in case.get("python_raises", []):
+        if name not in raises:
+            problems.append(f"missing raise: {name}")
+    for value in case.get("python_compare_constants", []):
+        if int(value) not in comparison_constants:
+            problems.append(f"missing comparison boundary: {value}")
+    range_guard = case.get("python_range_guard")
+    if isinstance(range_guard, dict):
+        bounds = [int(value) for value in range_guard.get("bounds", [])]
+        exception = str(range_guard.get("exception") or "ValueError")
+        if bounds and not _python_has_range_raise(nodes, bounds=bounds, exception=exception):
+            problems.append(
+                "missing associated range guard: "
+                + ", ".join(str(value) for value in bounds)
+                + f" -> {exception}"
+            )
+    if case.get("python_require_dedup") and not _python_has_dedup(nodes):
+        problems.append("missing duplicate removal")
+    return problems
+
+
+def _bash_missing_arg_guard(body: str) -> bool:
+    """Recognize branch-local missing-argument guards used by this fixture."""
+    for match in re.finditer(
+        r"\bif\s+(?P<condition>[\s\S]*?)\bthen\b(?P<branch>[\s\S]*?)\bfi\b",
+        body,
+    ):
+        condition = match.group("condition")
+        branch = match.group("branch")
+        missing = bool(
+            re.search(r"\$#.{0,50}-(?:ne\s+1|eq\s+0|lt\s+1)\b", condition)
+            or re.search(r'-z\s+[\'"]?(?:\$1|\$\{1(?::-[^}]*)?\})', condition)
+        )
+        if missing and re.search(r"\bexit\s+2\b", branch):
+            return True
+    for match in re.finditer(
+        r"\bcase\s+[^\n]*\$#[^\n]*\bin\b(?P<body>[\s\S]*?)\besac\b",
+        body,
+    ):
+        if re.search(
+            r"(?:^|[;\n]\s*)0\s*\)[\s\S]*?\bexit\s+2\b",
+            match.group("body"),
+        ):
+            return True
+    return False
+
+
+def _bash_glob_no_match_safe(body: str) -> bool:
+    if re.search(r"\bshopt\s+-s\s+[^\n]*\bnullglob\b", body):
+        return True
+    return bool(
+        re.search(
+            r"""(?:\[\[?|test)\s+-(?:e|f)\s+['"]?\$[A-Za-z_][A-Za-z0-9_]*['"]?"""
+            r"[^\n]*(?:\|\|\s*continue|&&\s*(?:basename|printf|echo))",
+            body,
+        )
+    )
+
+
+def _bash_contract(body: str, case: dict[str, Any]) -> list[str]:
+    if case.get("bash_contract") != "modelfile-list":
+        return []
+    problems: list[str] = []
+    if not _bash_missing_arg_guard(body):
+        problems.append("missing guarded argument check with exit 2")
+
+    quoted_glob = re.search(
+        r'"\$(?:\{[^}]+\}|[A-Za-z_][A-Za-z0-9_]*|1)"/\*\.Modelfile',
+        body,
+    )
+    find_direct = (
+        re.search(r'\bfind\s+"[^"\n]*\$[^"\n]*"', body)
+        and re.search(r"(?:^|\s)-maxdepth\s+1\b", body)
+        and re.search(r"""(?:^|\s)-name\s+['"]\*\.Modelfile['"]""", body)
+    )
+    if not (quoted_glob or find_direct):
+        problems.append("missing space-safe direct-directory Modelfile selection")
+    elif quoted_glob and not _bash_glob_no_match_safe(body):
+        problems.append("glob is not safe when no Modelfile matches")
+
+    if not (
+        re.search(r"\bbasename\b", body)
+        or re.search(r"%f", body)
+        or re.search(r"\$\{[^}]+##\*/\}", body)
+    ):
+        problems.append("missing basename extraction")
+    if not re.search(r"\bsort\b", body):
+        problems.append("missing sort")
+    if "*.Modelfile" not in body:
+        problems.append("missing *.Modelfile filter")
+    return problems
+
+def evaluate_agent_output(text: str, case: dict[str, Any]) -> dict[str, Any]:
     stripped = text.strip()
     body = clean_code_output(text)
-    if not body:
-        return False, False, "empty final answer"
-    validator = case["validator"]
+    fenced = stripped.startswith("```")
+    format_ok = bool(body) and not (case.get("raw_only") and fenced)
     problems: list[str] = []
+    if not body:
+        problems.append("empty final answer")
+    validator = case["validator"]
     parsed_json: dict[str, Any] | None = None
-    try:
-        if validator == "python":
-            compile(body, f"<{case['id']}>", "exec")
-        elif validator == "bash":
-            result = subprocess.run(
-                ["bash", "-n"],
-                input=body,
-                text=True,
-                capture_output=True,
-                check=False,
-                timeout=5,
-            )
-            if result.returncode:
-                raise ValueError(result.stderr.strip() or "bash -n failed")
-        elif validator == "json":
-            value = json.loads(body)
-            if not isinstance(value, dict):
-                raise ValueError("top-level JSON is not an object")
-            parsed_json = value
-        else:
-            raise ValueError(f"unknown validator: {validator}")
-        syntax_ok = True
-    except (
-        SyntaxError,
-        ValueError,
-        json.JSONDecodeError,
-        subprocess.TimeoutExpired,
-    ) as exc:
-        syntax_ok = False
-        problems.append(f"syntax: {exc}")
-
-    folded = body.casefold()
-    missing = [term for term in case.get("required", []) if term.casefold() not in folded]
+    syntax_ok = False
+    if body:
+        try:
+            if validator == "python":
+                ast.parse(body)
+            elif validator == "bash":
+                result = subprocess.run(
+                    ["bash", "-n"], input=body, text=True, capture_output=True,
+                    check=False, timeout=5
+                )
+                if result.returncode:
+                    raise ValueError(result.stderr.strip() or "bash -n failed")
+            elif validator == "json":
+                value = json.loads(body)
+                if not isinstance(value, dict):
+                    raise ValueError("top-level JSON is not an object")
+                parsed_json = value
+            else:
+                raise ValueError(f"unknown validator: {validator}")
+            syntax_ok = True
+        except (SyntaxError, ValueError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
+            problems.append(f"syntax: {exc}")
+    folded = acceptance_text(body)
+    missing = [term for term in case.get("required", []) if acceptance_text(term) not in folded]
     if missing:
         problems.append("missing required: " + ", ".join(missing))
     for group in case.get("required_any", []):
-        if not any(term.casefold() in folded for term in group):
+        if not any(acceptance_text(term) in folded for term in group):
             problems.append("missing one-of: " + " | ".join(group))
-    forbidden = [
-        term
-        for term in case.get("forbidden", [])
-        if acceptance_text(term) in folded
-    ]
+    forbidden = [term for term in case.get("forbidden", []) if acceptance_text(term) in folded]
     if forbidden:
         problems.append("forbidden present: " + ", ".join(forbidden))
-    if case.get("raw_only") and stripped.startswith("```"):
-        # Keep fenced output syntactically inspectable, but report the formatting
-        # failure separately so a useful coding answer is not confused with bad code.
+    if validator == "python" and syntax_ok:
+        problems.extend(_python_contract(body, case))
+    if validator == "bash" and syntax_ok:
+        problems.extend(_bash_contract(body, case))
+    if case.get("raw_only") and fenced:
         problems.append("raw-only response was wrapped in a Markdown fence")
     if parsed_json is not None:
         missing_keys = [key for key in case.get("json_keys", []) if key not in parsed_json]
         if missing_keys:
             problems.append("missing JSON keys: " + ", ".join(missing_keys))
-        bad_arrays = [
-            key
-            for key in case.get("json_array_keys", [])
-            if not isinstance(parsed_json.get(key), list)
-        ]
+        bad_arrays = [key for key in case.get("json_array_keys", []) if not isinstance(parsed_json.get(key), list)]
         if bad_arrays:
             problems.append("JSON keys are not arrays: " + ", ".join(bad_arrays))
-
-    requirement_problems = [p for p in problems if not p.startswith("syntax:")]
+    requirement_problems = [
+        problem
+        for problem in problems
+        if not problem.startswith("syntax:")
+        and "Markdown fence" not in problem
+        and problem != "empty final answer"
+    ]
     requirements_ok = not requirement_problems
-    return syntax_ok, requirements_ok, "; ".join(problems)
+    accepted = format_ok and syntax_ok and requirements_ok
+    return {
+        "body": body,
+        "format_ok": format_ok,
+        "syntax_ok": syntax_ok,
+        "requirements_ok": requirements_ok,
+        "accepted": accepted,
+        "problems": problems,
+    }
+
+
+def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, str]:
+    """Compatibility wrapper for older callers; prefer evaluate_agent_output()."""
+    result = evaluate_agent_output(text, case)
+    return bool(result["syntax_ok"]), bool(result["requirements_ok"]), "; ".join(result["problems"])
 
 
 def agent_options(case: dict[str, Any]) -> dict[str, Any]:
-    """Use deployed agent sampling unless an explicit benchmark override is requested."""
     options: dict[str, Any] = {"num_predict": int(case.get("num_predict", 384))}
     raw = os.environ.get("AGENT_TEMPERATURE", "").strip()
     if raw:
@@ -663,27 +943,14 @@ def benchmark_agent(args: argparse.Namespace) -> int:
         raise BenchmarkError("no agentic models found")
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_agent_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, client, "agent", models, fixture)
     fields = [
-        "timestamp",
-        "model",
-        "case_id",
-        "validator",
-        "syntax_ok",
-        "requirements_ok",
-        "correctness_ok",
-        "validation_error",
-        "answer_started",
-        "answer_chars",
-        "thinking_chars",
-        "wall_s",
-        "load_s",
-        "eval_count",
-        "done_reason",
-        "temp_max_c",
-        "mem_available_min_mib",
+        "timestamp", "model", "case_id", "validator", "format_ok", "syntax_ok",
+        "requirements_ok", "accepted", "correctness_ok", "validation_error",
+        "answer_started", "answer_chars", "thinking_chars", "wall_s", "load_s",
+        "eval_count", "done_reason", "temp_max_c", "mem_available_min_mib",
         "swap_used_max_mib",
     ]
     total = passed = 0
@@ -695,8 +962,6 @@ def benchmark_agent(args: argparse.Namespace) -> int:
             client.ensure_unloaded(model)
             try:
                 for case in cases:
-                    # Do not override keep_alive here: the isolated agent service
-                    # owns that policy (5m in the packaged service definition).
                     payload = {
                         "model": model,
                         "messages": [{"role": "user", "content": case["prompt"]}],
@@ -704,89 +969,99 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                         "options": agent_options(case),
                     }
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
-                    start = time.monotonic()
+                    start_time = time.monotonic()
                     try:
                         response = client.json_request("/api/chat", payload)
                     finally:
-                        wall = time.monotonic() - start
+                        wall = time.monotonic() - start_time
                         telemetry = sampler.stop()
                     message = response.get("message") if isinstance(response.get("message"), dict) else {}
                     content = str(message.get("content") or "")
                     thinking = str(message.get("thinking") or response.get("thinking") or "")
-                    answer_started = bool(content.strip())
-                    syntax_ok, requirements_ok, error = validate_agent_output(
-                        content, case
-                    )
-                    correctness_ok = syntax_ok and requirements_ok
+                    result = evaluate_agent_output(content, case)
+                    accepted = bool(result["accepted"])
                     total += 1
-                    passed += int(correctness_ok)
-                    writer.writerow(
-                        {
-                            "timestamp": iso_now(),
-                            "model": model,
-                            "case_id": case["id"],
-                            "validator": case["validator"],
-                            "syntax_ok": int(syntax_ok),
-                            "requirements_ok": int(requirements_ok),
-                            "correctness_ok": int(correctness_ok),
-                            "validation_error": error,
-                            "answer_started": int(answer_started),
-                            "answer_chars": len(content),
-                            "thinking_chars": len(thinking),
-                            "wall_s": f"{wall:.3f}",
-                            "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
-                            "eval_count": response.get("eval_count", 0),
-                            "done_reason": response.get("done_reason", ""),
-                            "temp_max_c": telemetry.get("temp_max_c"),
-                            "mem_available_min_mib": telemetry.get(
-                                "mem_available_min_mib"
-                            ),
-                            "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
-                        }
-                    )
-                    handle.flush()
+                    passed += int(accepted)
+                    done_reason = str(response.get("done_reason") or "")
+                    failures: list[str] = []
+                    if not content.strip(): failures.append("empty-output")
+                    if not result["format_ok"] and content.strip(): failures.append("format-contract")
+                    if not result["syntax_ok"] and content.strip(): failures.append("syntax")
+                    if not result["requirements_ok"] and content.strip(): failures.append("requirements")
+                    diagnostics: list[str] = []
+                    if done_reason == "length":
+                        diagnostics.append("output-budget")
+                        if not content.strip() and thinking.strip(): diagnostics.append("thinking-budget")
+                    error = "; ".join(result["problems"])
+                    row = {
+                        "timestamp": iso_now(), "model": model, "case_id": case["id"], "validator": case["validator"],
+                        "format_ok": int(bool(result["format_ok"])), "syntax_ok": int(bool(result["syntax_ok"])),
+                        "requirements_ok": int(bool(result["requirements_ok"])), "accepted": int(accepted),
+                        "correctness_ok": int(accepted), "validation_error": error,
+                        "answer_started": int(bool(content.strip())), "answer_chars": len(content), "thinking_chars": len(thinking),
+                        "wall_s": f"{wall:.3f}", "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
+                        "eval_count": response.get("eval_count", 0), "done_reason": done_reason,
+                        "temp_max_c": telemetry.get("temp_max_c"), "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
+                        "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
+                    }
+                    writer.writerow(row)
                     append_jsonl(
                         jsonl_path,
-                        {
-                            "timestamp": iso_now(),
-                            "category": "agent",
-                            "model": model,
-                            "case": case,
-                            "response": content,
-                            "thinking": thinking,
-                            "answer_started": answer_started,
-                            "answer_chars": len(content),
-                            "thinking_chars": len(thinking),
-                            "eval_count": response.get("eval_count", 0),
-                            "done_reason": response.get("done_reason", ""),
-                            "syntax_ok": syntax_ok,
-                            "requirements_ok": requirements_ok,
-                            "correctness_ok": correctness_ok,
-                            "validation_error": error,
-                            "wall_s": wall,
-                            "telemetry": telemetry,
-                        },
+                        result_record(
+                            category="agent",
+                            model=model,
+                            case_id=case["id"],
+                            outcome="pass" if accepted else "quality-fail",
+                            failure_kinds=failures,
+                            diagnostics=diagnostics,
+                            checks={
+                                "format": bool(result["format_ok"]),
+                                "syntax": bool(result["syntax_ok"]),
+                                "requirements": bool(result["requirements_ok"]),
+                            },
+                            metrics={
+                                "wall_s": wall,
+                                "eval_count": response.get("eval_count", 0),
+                                "answer_chars": len(content),
+                                "thinking_chars": len(thinking),
+                            },
+                            timestamp=iso_now(),
+                            case=case,
+                            response=content,
+                            thinking=thinking,
+                            validation_error=error,
+                            telemetry=telemetry,
+                        ),
                     )
                     print(
-                        f"  {case['id']}: syntax={syntax_ok} requirements={requirements_ok} "
-                        f"answer={answer_started} think_chars={len(thinking)} "
-                        f"done={response.get('done_reason', '')} wall={wall:.2f}s"
+                        f"  {case['id']}: format={result['format_ok']} "
+                        f"syntax={result['syntax_ok']} "
+                        f"requirements={result['requirements_ok']} "
+                        f"accepted={accepted} wall={wall:.2f}s"
                     )
-                    if error:
-                        print(f"    validation: {error}")
             finally:
                 try:
                     client.ensure_unloaded(model)
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
+    _summary_json, summary_txt = write_result_summary(jsonl_path, category="agent")
     print(f"\nAgent acceptance: {passed}/{total} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    print(
+        f"Results: {csv_path}\nDetails: {jsonl_path}\n"
+        f"Summary: {summary_txt}\nMeta:    {meta_path}"
+    )
     return 0 if passed == total else 3
 
 
 OCR_PROMPTS = {
+    # GLM-OCR uses its trained recognition trigger. Ovis accepts a natural-language
+    # extraction instruction. Both are scored against the same text/structure goals.
     "glm": "Text Recognition:",
-    "ovis": """Extract all readable content from the image in natural human reading order and output one Markdown document. Format formulas as LaTeX and tables as HTML. Preserve the original text without translation or paraphrasing.""",
+    "ovis": (
+        "Extract all readable text in natural human reading order. Preserve the "
+        "source exactly without translation or paraphrasing. Preserve table row "
+        "and column associations when possible."
+    ),
 }
 
 
@@ -797,6 +1072,29 @@ def ocr_kind(model: str) -> str:
     if "ovisocr" in lower:
         return "ovis"
     return "generic"
+
+
+class _OCRTextExtractor(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+    def handle_data(self, data: str) -> None:
+        if data.strip():
+            self.parts.append(data)
+
+
+def canonical_ocr_text(text: str) -> str:
+    """Canonical plain text for fidelity scoring; structure uses raw output."""
+    parser = _OCRTextExtractor()
+    try:
+        parser.feed(text)
+        plain = " ".join(parser.parts) if parser.parts else text
+    except (AssertionError, UnicodeError, ValueError):
+        plain = text
+    plain = re.sub(r"```[^\n]*|```", " ", plain)
+    plain = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", plain)
+    plain = plain.replace("|", " ").replace("`", "")
+    return " ".join(plain.split())
 
 
 def normalize_for_match(text: str) -> str:
@@ -859,7 +1157,8 @@ def ocr_table_signal(output: str) -> float:
 def ocr_scores(
     output: str, case: dict[str, Any]
 ) -> tuple[float, float, float, float, float, float, float, float]:
-    output_words = normalize_words(output)
+    canonical_output = canonical_ocr_text(output)
+    output_words = normalize_words(canonical_output)
     expected_words = normalize_words(case["expected_text"])
     overlap = sum((Counter(output_words) & Counter(expected_words)).values())
     word_precision = (
@@ -873,14 +1172,14 @@ def ocr_scores(
         if word_precision + word_recall
         else 0.0
     )
-    normalized_output = normalize_for_match(output)
+    normalized_output = normalize_for_match(canonical_output)
     normalized_expected = normalize_for_match(case["expected_text"])
     edit_distance = levenshtein_distance(normalized_output, normalized_expected)
     char_similarity = 1.0 - edit_distance / max(
         len(normalized_output), len(normalized_expected), 1
     )
     char_similarity = max(0.0, char_similarity)
-    folded = output.casefold()
+    folded = canonical_output.casefold()
     fields = case.get("required_fields", [])
     field_recall = (
         sum(1 for field in fields if field.casefold() in folded) / len(fields)
@@ -919,7 +1218,7 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_ocr_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, client, "ocr", models, manifest)
 
@@ -1063,20 +1362,15 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
 
 
 def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
-    folded = text.casefold()
-    missing = [
-        term for term in case.get("required", []) if term.casefold() not in folded
-    ]
+    folded = acceptance_text(text)
+    missing = [term for term in case.get("required", []) if acceptance_text(term) not in folded]
     choices = case.get("required_any", [])
     if choices and not any(acceptance_text(term) in folded for term in choices):
         missing.append("one of: " + " | ".join(choices))
-    present_forbidden = [
-        term for term in case.get("forbidden", []) if term.casefold() in folded
-    ]
+    present_forbidden = [term for term in case.get("forbidden", []) if acceptance_text(term) in folded]
     problems = [f"missing {term}" for term in missing]
     problems.extend(f"forbidden {term}" for term in present_forbidden)
     return not problems, problems
-
 
 def acceptance_text(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).translate(
@@ -1095,6 +1389,28 @@ def translation_prompt(case: dict[str, Any]) -> str:
     return f"Translate from {source} to {target}. Return only the translation.\n\n{case['input']}"
 
 
+def translation_failure_kinds(
+    content: str,
+    *,
+    language_ok: bool,
+    source_leakage_ok: bool,
+    semantic_ok: bool,
+    preserved_ok: bool,
+) -> list[str]:
+    failures: list[str] = []
+    if not content.strip():
+        failures.append("empty-output")
+    if not language_ok:
+        failures.append("language")
+    if not source_leakage_ok:
+        failures.append("source-leakage")
+    if not semantic_ok:
+        failures.append("semantic")
+    if not preserved_ok:
+        failures.append("preservation")
+    return failures
+
+
 def benchmark_translation(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "translation-office.json")
@@ -1106,20 +1422,41 @@ def benchmark_translation(args: argparse.Namespace) -> int:
         str(row.get("name") or row.get("model") or "").removesuffix(":latest")
         for row in client.tags()
     }
-    missing = [model for model in models if model.removesuffix(":latest") not in available]
+    missing = [
+        model for model in models if model.removesuffix(":latest") not in available
+    ]
     if missing:
-        raise BenchmarkError("translation models are not registered: " + ", ".join(missing))
+        raise BenchmarkError(
+            "translation models are not registered: " + ", ".join(missing)
+        )
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_translation_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, client, "translation", models, fixture)
     fields = [
-        "timestamp", "model", "case_id", "source_language", "target_language",
-        "passed", "required_ok", "forbidden_ok", "preserved_ok", "language_hint",
-        "answer_chars", "thinking_chars", "wall_s", "load_s", "eval_count",
-        "done_reason", "temp_max_c", "mem_available_min_mib", "swap_used_max_mib",
+        "timestamp",
+        "model",
+        "case_id",
+        "source_language",
+        "target_language",
+        "passed",
+        "meaningful_ok",
+        "required_ok",
+        "forbidden_ok",
+        "preserved_ok",
+        "language_hint",
+        "language_ok",
+        "answer_chars",
+        "thinking_chars",
+        "wall_s",
+        "load_s",
+        "eval_count",
+        "done_reason",
+        "temp_max_c",
+        "mem_available_min_mib",
+        "swap_used_max_mib",
     ]
     total = passed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
@@ -1133,18 +1470,23 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     total += 1
                     payload = {
                         "model": model,
-                        "messages": [{"role": "user", "content": translation_prompt(case)}],
+                        "messages": [
+                            {"role": "user", "content": translation_prompt(case)}
+                        ],
                         "stream": False,
                         "keep_alive": KEEP_ALIVE,
-                        "options": {"num_predict": int(case.get("num_predict", 512))},
+                        "options": {
+                            "num_predict": int(case.get("num_predict", 512))
+                        },
                     }
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
-                    start = time.monotonic()
+                    start_time = time.monotonic()
                     try:
                         response = client.json_request("/api/chat", payload)
                     finally:
-                        wall = time.monotonic() - start
+                        wall = time.monotonic() - start_time
                         telemetry = sampler.stop()
+
                     message = (
                         response.get("message")
                         if isinstance(response.get("message"), dict)
@@ -1154,28 +1496,53 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     thinking = str(message.get("thinking") or "")
                     folded = acceptance_text(content)
                     required_ok = all(
-                        acceptance_text(term) in folded for term in case.get("required", [])
+                        acceptance_text(term) in folded
+                        for term in case.get("required", [])
                     )
                     choices = case.get("required_any", [])
                     if choices:
                         required_ok = required_ok and any(
-                            term.casefold() in folded for term in choices
+                            acceptance_text(term) in folded for term in choices
                         )
                     forbidden_ok = not any(
-                        term.casefold() in folded for term in case.get("forbidden", [])
+                        acceptance_text(term) in folded
+                        for term in case.get("forbidden", [])
                     )
                     preserved_ok = all(
-                        acceptance_text(term) in folded for term in case.get("preserve", [])
+                        acceptance_text(term) in folded
+                        for term in case.get("preserve", [])
                     )
-                    language_hint = task_language_hint(content, case["target_language"])
+                    meaningful_ok = len(normalize_words(content)) >= int(
+                        case.get("min_words", 6)
+                    )
+                    language_hint = task_language_hint(
+                        content, case["target_language"]
+                    )
+                    language_ok = language_hint == "match"
+                    semantic_ok = required_ok and meaningful_ok
                     ok = (
                         bool(content.strip())
-                        and required_ok
+                        and language_ok
+                        and semantic_ok
                         and forbidden_ok
                         and preserved_ok
-                        and language_hint != "other"
                     )
                     passed += int(ok)
+
+                    done_reason = str(response.get("done_reason") or "")
+                    failures = translation_failure_kinds(
+                        content,
+                        language_ok=language_ok,
+                        source_leakage_ok=forbidden_ok,
+                        semantic_ok=semantic_ok,
+                        preserved_ok=preserved_ok,
+                    )
+                    diagnostics: list[str] = []
+                    if done_reason == "length":
+                        diagnostics.append("output-budget")
+                        if not content.strip() and thinking.strip():
+                            diagnostics.append("thinking-budget")
+
                     row = {
                         "timestamp": iso_now(),
                         "model": model,
@@ -1183,46 +1550,113 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         "source_language": case["source_language"],
                         "target_language": case["target_language"],
                         "passed": int(ok),
+                        "meaningful_ok": int(meaningful_ok),
                         "required_ok": int(required_ok),
                         "forbidden_ok": int(forbidden_ok),
                         "preserved_ok": int(preserved_ok),
                         "language_hint": language_hint,
+                        "language_ok": int(language_ok),
                         "answer_chars": len(content),
                         "thinking_chars": len(thinking),
                         "wall_s": f"{wall:.3f}",
                         "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
                         "eval_count": response.get("eval_count", 0),
-                        "done_reason": response.get("done_reason", ""),
+                        "done_reason": done_reason,
                         "temp_max_c": telemetry.get("temp_max_c"),
-                        "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
+                        "mem_available_min_mib": telemetry.get(
+                            "mem_available_min_mib"
+                        ),
                         "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
                     }
                     writer.writerow(row)
                     handle.flush()
                     append_jsonl(
                         jsonl_path,
-                        {
-                            **row,
-                            "category": "translation",
-                            "input": case["input"],
-                            "response": content,
-                            "thinking": thinking,
-                            "telemetry": telemetry,
-                        },
+                        result_record(
+                            category="translation",
+                            model=model,
+                            case_id=case["id"],
+                            outcome="pass" if ok else "quality-fail",
+                            failure_kinds=failures,
+                            diagnostics=diagnostics,
+                            checks={
+                                "language": language_ok,
+                                "semantic": semantic_ok,
+                                "preservation": preserved_ok,
+                                "source_leakage": forbidden_ok,
+                            },
+                            metrics={
+                                "wall_s": wall,
+                                "eval_count": response.get("eval_count", 0),
+                                "answer_chars": len(content),
+                            },
+                            timestamp=iso_now(),
+                            source_language=case["source_language"],
+                            target_language=case["target_language"],
+                            response=content,
+                            thinking=thinking,
+                            telemetry=telemetry,
+                        ),
                     )
                     print(
                         f"  {case['id']}: pass={ok} lang={language_hint} "
-                        f"preserve={preserved_ok} wall={wall:.2f}s"
+                        f"semantic={semantic_ok} preserve={preserved_ok} "
+                        f"wall={wall:.2f}s"
                     )
             finally:
                 try:
                     client.ensure_unloaded(model)
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
+
+    _summary_json, summary_txt = write_result_summary(
+        jsonl_path, category="translation"
+    )
     print(f"\nTranslation acceptance: {passed}/{total} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    print(
+        f"Results: {csv_path}\nDetails: {jsonl_path}\n"
+        f"Summary: {summary_txt}\nMeta:    {meta_path}"
+    )
     return 0 if passed == total else 3
 
+
+def _usecase_result_record(
+    *,
+    case: dict[str, Any],
+    model: str,
+    row: dict[str, Any],
+    ok: bool,
+    problems: list[str],
+    content: str,
+    thinking: str,
+    telemetry: dict[str, Any],
+    wall: float,
+    done_reason: str,
+) -> dict[str, Any]:
+    failures = [] if ok else (["empty-output"] if not content.strip() else ["semantic"])
+    diagnostics: list[str] = []
+    if done_reason == "length":
+        diagnostics.append("output-budget")
+        if not content.strip() and thinking.strip():
+            diagnostics.append("thinking-budget")
+    return result_record(
+        category="usecase",
+        model=model,
+        case_id=case["id"],
+        outcome="pass" if ok else "quality-fail",
+        failure_kinds=failures,
+        diagnostics=diagnostics,
+        checks={"acceptance": ok},
+        metrics={"wall_s": wall, "answer_chars": len(content)},
+        timestamp=row["timestamp"],
+        passed=bool(ok),
+        problems=problems,
+        prompt=case["prompt"],
+        response=content,
+        thinking=thinking,
+        telemetry=telemetry,
+        done_reason=done_reason,
+    )
 
 def benchmark_usecase(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
@@ -1257,7 +1691,7 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
     models = list(dict.fromkeys(case["model"] for case in cases))
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_usecase_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, client, "usecase", models, fixture)
     fields = [
@@ -1325,16 +1759,21 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 }
                 writer.writerow(row)
                 handle.flush()
+                done_reason = str(response.get("done_reason") or "")
                 append_jsonl(
                     jsonl_path,
-                    {
-                        **row,
-                        "category": "usecase",
-                        "prompt": case["prompt"],
-                        "response": content,
-                        "thinking": thinking,
-                        "telemetry": telemetry,
-                    },
+                    _usecase_result_record(
+                        case=case,
+                        model=model,
+                        row=row,
+                        ok=ok,
+                        problems=problems,
+                        content=content,
+                        thinking=thinking,
+                        telemetry=telemetry,
+                        wall=wall,
+                        done_reason=done_reason,
+                    ),
                 )
                 print(
                     f"  pass={ok} wall={wall:.2f}s "
@@ -1346,8 +1785,9 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
 
+    _sj, summary_txt = write_result_summary(jsonl_path, category="usecase")
     print(f"\nAcceptance: {passed}/{len(cases)} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nSummary: {summary_txt}\nMeta:    {meta_path}")
     return 0 if passed == len(cases) else 3
 
 
@@ -1390,7 +1830,7 @@ def benchmark_rag_cycle(args: argparse.Namespace) -> int:
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_rag_cycle_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, answer_client, "rag-cycle", [answer_model], fixture)
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
@@ -1551,7 +1991,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
 
     stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
     csv_path = Path(args.output or f"results_rag_quality_{stamp}.csv")
-    jsonl_path = csv_path.with_suffix(".jsonl")
+    jsonl_path = prepare_result_sidecars(csv_path)
     meta_path = csv_path.with_suffix(".meta.json")
     write_meta(meta_path, answer_client, "rag-quality", [answer_model], fixture)
     meta = json.loads(meta_path.read_text(encoding="utf-8"))

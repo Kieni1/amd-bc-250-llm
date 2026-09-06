@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BC-250 package revalidation harness v3.9
 #
-# Intended target: bc250-llm-server 0.10.0 on Fedora 44; release suffix is not hard-coded.
+# Intended target: bc250-llm-server 0.11.0 on Fedora 44; release suffix is not hard-coded.
 # `start` launches a systemd worker that spans reboots. The kernel lane dynamically
 # optionally compares the running/default kernel's TTM-only baseline with the historical
 # full profile, then restores its exact arguments after two normal reboots. Per-phase reports are
@@ -11,7 +11,7 @@ set -Eeuo pipefail
 umask 0077
 
 HARNESS_VERSION=3.9
-TARGET_VERSION=0.10.0
+TARGET_VERSION=0.11.0
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
 
@@ -243,7 +243,7 @@ installed_prod_models() {
 write_helper() {
   cat > "$HELPER" <<'PY'
 #!/usr/bin/env python3
-"""Local-only helpers for the BC-250 0.10.0 revalidation harness."""
+"""Local-only helpers for the BC-250 0.11.0 revalidation harness."""
 from __future__ import annotations
 
 import argparse
@@ -794,7 +794,7 @@ request_reboot() {
 install_unit() {
   cat > "$UNIT_PATH" <<EOFUNIT
 [Unit]
-Description=BC-250 0.10.0 kernel/pipeline/settings revalidation v${HARNESS_VERSION}
+Description=BC-250 0.11.0 kernel/pipeline/settings revalidation v${HARNESS_VERSION}
 After=network-online.target cyan-skillfish-governor-smu.service ollama.service open-webui.service
 Wants=network-online.target
 
@@ -1188,7 +1188,7 @@ start_run() {
     expected="$(canonical_profile_string "$PACKAGE_BASELINE_PROFILE")"
     if [[ $current != "$expected" ]]; then
       {
-        echo 'ERROR: current relevant kernel arguments do not match the 0.10.0 TTM-only package baseline.'
+        echo 'ERROR: current relevant kernel arguments do not match the 0.11.0 TTM-only package baseline.'
         echo 'EXPECTED:'; printf '%s\n' "$expected"
         echo 'CURRENT:'; printf '%s\n' "$current"
       } >&2
@@ -1289,7 +1289,7 @@ write_phase_report() {
   stamp="$(date +%Y%m%dT%H%M%S)"
   file="$PHASE_REPORT_DIR/$(run_id)-${label}-${stamp}.txt"
   {
-    echo "# BC-250 0.10.0 revalidation v${HARNESS_VERSION} phase report"
+    echo "# BC-250 0.11.0 revalidation v${HARNESS_VERSION} phase report"
     echo "generated=$(now)"
     echo "run_id=$(run_id)"
     echo "phase=$(cat "$PHASE_FILE")"
@@ -2069,7 +2069,7 @@ phase_owui() {
 create_summary() {
   local out="$WORK/revalidation-summary.txt"
   {
-    echo "BC-250 0.10.0 revalidation v$HARNESS_VERSION"
+    echo "BC-250 0.11.0 revalidation v$HARNESS_VERSION"
     echo "run_id=$(run_id)"
     echo "finished=$(now)"
     echo "package=$(rpm -q bc250-llm-server 2>/dev/null || true)"
