@@ -10,7 +10,7 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.10.0
+Version:        0.11.0
 Release:        1.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
@@ -210,6 +210,27 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.2
+- Close the remaining agent-evaluator false positives: ignore nested Python definitions, require static duplicate-removal evidence, associate range bounds with ValueError branches, and tighten Bash missing-argument/no-match handling.
+- Clarify embedding JSONL semantics by keeping per-query Top-3 status as an observational metric; only the explicit aggregate Jina qualification record controls embedding quality status.
+
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.1
+- Fix production-usecase common-record serialization, reset reused benchmark sidecars, and make canonical summary parsing fail visibly on malformed schema-managed JSONL.
+- Tighten static agent contracts with function-scoped Python AST checks and fixture-specific Bash requirements without executing generated code.
+- Move embedding qualification to explicit Jina aggregate thresholds, separate translation source leakage from language failures, and add deterministic graveyard-isolation coverage.
+- Clarify that the common result envelope is an initial staged migration and that the active comparison catalog may retain measured controls independently of the source-only graveyard.
+
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.0
+- Begin the pre-1.0 benchmark/revalidation redesign: add a common benchmark result schema and human/machine summaries while preserving existing CSV/CLI compatibility.
+- Tighten task, translation, production-usecase, agent and OCR evaluator semantics; separate static agent format/syntax/requirements checks and normalize OCR text fidelity independently from structure.
+- Add embedding separation-margin and hard-case diagnostics plus start/peak/end swap telemetry so BC-250 UMA evidence is easier to interpret.
+- Retire measured non-promotion candidates from normal Modelfile discovery into a source-only graveyard that is excluded from package/model lists.
+
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.3
+- Reuse Hugging Face authentication once per model operation, suppress duplicate catalog/Xet noise, and make Ollama/Podman reconciliation no-op aware.
+- Report live 40-CU routing as the availability signal while keeping kernel/RADV CU numbers explicitly diagnostic; align concise appliance status wording with verification semantics.
+- Use compact installer verification, keep detailed parity diagnostics explicit, and accept --owui-token-file as an Open WebUI token-file alias.
+
 * Sat Sep 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-1.2
 - Improve installer API-key/Hugging Face/40-CU wording and no-op behavior, report an already-installed live CU manager, and finish with concise useful commands.
 - Advance revalidation to v3.9 with a live dashboard, human-readable status separated from --raw script output, recorded run-harness attribution, and quieter startup/preflight output.

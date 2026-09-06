@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.11.0-1.2 - 2026-09-06
+
+- Finish the Round-1 agent static-contract correction without executing generated code: nested function/class bodies no longer satisfy Python requirements, `parse_ports` requires recognizable deduplication, and range-bound evidence must be associated with branches that raise `ValueError`.
+- Tighten the Bash Modelfile-list contract so `exit 2` must belong to a recognized missing-argument branch and glob implementations must be safe when no `*.Modelfile` exists (`nullglob` or an explicit existence guard).
+- Treat per-query embedding Top-3 status as an observational metric rather than a qualification check; the aggregate fixture policy remains the only Jina qualification gate.
+- Add adversarial deterministic regressions for duplicate-preserving Python, dead nested AST evidence, unrelated range errors, detached Bash exits, and unsafe empty-directory globbing.
+
+## 0.11.0-1.1 - 2026-09-06
+
+- Fix the production-usecase common-record serialization crash and align reused output paths so CSV, JSONL and generated summaries always describe one invocation.
+- Make schema-managed summary generation fail visibly on malformed canonical records instead of silently dropping them.
+- Tighten agent static qualification without executing generated code: Python requirements are scoped to the requested function and include range-boundary evidence; the Bash Modelfile fixture checks argument guarding, direct-directory selection, basename extraction, sorting and filtering.
+- Move embedding qualification from a hidden per-query Top-3 rule to explicit aggregate Jina policy thresholds in the fixture; experimental embedding comparisons remain measurement-only.
+- Classify translation source-language leakage separately from target-language failure, strengthen graveyard-isolation regression coverage, and clarify the active-control-vs-retired-graveyard policy.
+- Clarify that the common result envelope rollout is staged: embeddings/task/agent/translation/usecase are migrated first; OCR/RAG/generation keep their established record shapes until the next round.
+
+## 0.11.0-1.0 - 2026-09-06
+
+- Start the pre-1.0 benchmark/revalidation cleanup around the three-command boundary: `bc250-verify` checks current health, `bc250-benchmark` discovers candidates, and `bc250-revalidate` qualifies packaged defaults.
+- Add a small common benchmark result envelope (`outcome`, `failure_kinds`, `diagnostics`, `checks`, `metrics`) and adjacent JSON/text summaries without removing the established CSV and JSONL interfaces.
+- Fix demonstrated evaluator defects: task relevance now gates parsed task content, translation requires meaningful target-language output with consistent normalization, production use-case acceptance no longer rejects valid intermediate weekday reasoning, and agent results separate raw format, syntax and requirements.
+- Canonicalize OCR markup for text-fidelity scoring while keeping table/reading-order structure separate; add embedding hard-case and target-margin diagnostics.
+- Record swap start/peak/end plus peak delta so sequential BC-250 UMA runs do not misattribute previously allocated swap to later models.
+- Remove disqualified comparison definitions from normal model discovery while retaining their Modelfiles in a source-only graveyard.
+
+## 0.10.0-1.3 - 2026-09-06
+
+- Make repeated installs quieter and more idempotent: reuse one transient Hugging Face authentication decision across normal and agent model groups, suppress the second full model catalog after selection, disable unsupported Xet advisories, avoid no-op Ollama re-enable/restart churn, and restart private Podman services only when configuration changed or the live path is unhealthy.
+- Correct 40-CU status semantics: live SPI/WGP routing is the availability signal, while kernel/RADV numeric CU counters are labeled diagnostic; `bc250-40cu status` and `bc250-status` now surface the live routed-CU summary instead of implying that the kernel counter is the active total.
+- Align status wording with the verifier for expected BC-250 cpufreq/cpuidle behavior and normal inactive agent mode, and make an unavailable `needs-restarting` helper an explicit unchecked state rather than a pseudo-result.
+- Add compact `bc250-verify --summary` output for installer use and remove the duplicated memory/CU/parity report from routine installation; detailed `bc250-verify` and `llm-run-diagnose` remain explicit troubleshooting commands.
+- Accept `--owui-token-file` as an alias for `--token-file` in `bc250-openwebui-setup` so credential-file naming is consistent across installer, verifier, revalidation and Open WebUI helpers.
+
 ## 0.10.0-1.2 - 2026-09-05
 
 - Refine the guided installer UX: lazy Hugging Face authentication only when model bytes are actually needed, a defaultable protected Open WebUI administrator API-key-file choice without re-entering the detected path, clearer persistent-vs-live 40-CU wording, live-manager service detection, and a concise successful-completion command summary.
