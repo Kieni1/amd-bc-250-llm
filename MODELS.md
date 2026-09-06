@@ -123,21 +123,25 @@ agent mode is exclusive by design.
 
 "Exhausted" here means that the latest comparable benchmark no longer gives the
 model a plausible **promotion case for the role it was testing**. It does not
-mean the GGUF is corrupt or that the model must be deleted. Definitions remain in
-the experiment catalog until an explicit catalog-pruning release, which keeps the
-package useful for reproducibility and operator comparisons.
+mean the GGUF is corrupt or that the model must be deleted. The active comparison
+catalog may retain measured controls even when their promotion path is exhausted.
+The source-only graveyard is reserved for models explicitly retired from routine
+operator-facing discovery because continued comparison no longer justifies their
+catalog presence. Graveyard definitions are not packaged, discovered or listed.
+
+The 0.11.0 pruning pass retired four such definitions to
+`models/modelfiles-graveyard/`. That directory is a source depot only and must
+contain Modelfiles only; it is intentionally outside every model discovery root.
 
 | Model | Why the current promotion path is exhausted |
 |---|---|
 | `exp-granite42-8b-ibm-q5-k-m` | ~8.3 GiB resident for ~50 tok/s and weak long-prompt throughput; no demonstrated office/RAG quality win over the production set |
 | `exp-ling30-tiny-bloomer-q5-k-m` | very high raw decode (~144 tok/s) but the shared reasoning cap was repeatedly consumed before a usable final answer |
 | `exp-qwen35-9b-davidau-defiant-fable-q6-k` | older comparable run had much worse answer-start latency with no throughput/UX case against production Qwen3.5 or GPT-OSS |
-| `task-lfm25-2.6b-liquidai-q6-k` | only the two title cases produced useful final output in the reviewed 6-case task run; not a Gemma 3 1B replacement under the current task contract |
 
 Still-open comparisons include Qwen3.8 4B Distill (compact reasoner), Granite
-4.2 3B (compact architecture baseline), Qwen3.6 14B-A3B (needs one larger shared
-reasoning-budget quality run if retained), both embedding models, OvisOCR2, and
-the agentic models. The latest evidence is not sufficient to call those exhausted.
+4.2 3B (compact architecture baseline), both embedding models, OCR candidates,
+and the agentic models. The latest evidence is not sufficient to call those exhausted.
 
 Use the role-specific lanes before changing defaults:
 
@@ -164,12 +168,10 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
-| `exp-qwythos9b-empero-q6-k` | 9B tool/reasoning comparison with the appliance context deliberately capped at 32K |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
 | `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
 | `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
-| `task-lfm25-2.6b-liquidai-q6-k` | multilingual task-model challenger to Gemma 3 1B |
 | `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding starting point; rerun the tightened static-semantic agent fixture before promotion |
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use experiment for the exclusive 11436 lane; compare against Qwen2.5-Coder and Ornith before any role change |
 

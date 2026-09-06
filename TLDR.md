@@ -86,11 +86,12 @@ sudo bc250-swap-profile status
 sudo bc250-swap-profile ensure
 sudo bc250-ollama-profile status
 sudo bc250-cu-status
-sudo bc250-40cu status
+sudo bc250-40cu status          # module/persistence + live routed-CU summary
 ```
 
 The guided installer applies the memory/swap profiles and prepares the
-kernel-specific 40-CU module, but leaves extra CUs disabled. Start with
+kernel-specific 40-CU module without silently enabling persistent boot mode.
+Live CU routing is reported separately. Start with
 `sudo bc250-40cu`, then test the feasible CU count for the individual board;
 see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 

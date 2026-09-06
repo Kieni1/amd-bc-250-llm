@@ -100,7 +100,11 @@ def set_appliance_mode(mode: str) -> None:
     if not command:
         raise ModelError("bc250-agent-mode is required for package-managed model registration")
     action = "leave" if mode == "normal" else "enter"
-    result = subprocess.run([command, action], check=False)
+    result = subprocess.run(
+        [command, action],
+        check=False,
+        stdout=(subprocess.DEVNULL if os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1" else None),
+    )
     if result.returncode:
         raise ModelError(f"could not enter {mode} appliance mode (rc={result.returncode})")
 
@@ -762,6 +766,9 @@ def hf_environment(token: str, hf_home: Path) -> dict[str, str]:
         "HF_HOME": str(hf_home),
         "HF_HUB_CACHE": str(hf_home / "hub"),
         "HF_HUB_DISABLE_PROGRESS_BARS": "0",
+        # Regular HTTPS is the supported appliance path.  Avoid hf_xet
+        # advisories that suggest unmanaged pip changes on the host.
+        "HF_HUB_DISABLE_XET": "1",
         "PYTHONUNBUFFERED": "1",
     }
 
@@ -792,6 +799,36 @@ def prompt_secret(message: str) -> str:
         return getpass.getpass(message).strip() if sys.stdin.isatty() else ""
 
 
+
+def hf_session_value() -> str | None:
+    path = os.environ.get("BC250_HF_SESSION_FILE", "").strip()
+    if not path:
+        return None
+    try:
+        value = Path(path).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    if value == "anonymous":
+        return ""
+    if value.startswith("token:"):
+        return value.removeprefix("token:")
+    return None
+
+
+def write_hf_session(token: str) -> None:
+    path = os.environ.get("BC250_HF_SESSION_FILE", "").strip()
+    if not path:
+        return
+    target = Path(path)
+    try:
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(f"token:{token}" if token else "anonymous")
+        os.chmod(target, 0o600)
+    except OSError as error:
+        raise ModelError(f"cannot update transient Hugging Face session file {target}: {error}") from error
+
+
 def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
     if token_file:
         try:
@@ -800,6 +837,10 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
             raise ModelError(f"cannot read token file {token_file}: {error}") from error
     else:
         token = os.environ.get("HF_TOKEN", "").strip()
+        if not token:
+            session_token = hf_session_value()
+            if session_token is not None:
+                return session_token
     if not token and os.environ.get("BC250_HF_ANONYMOUS") != "1" and can_prompt():
         token = prompt_secret("HF_TOKEN (optional; Enter for anonymous downloads): ")
     if (
@@ -809,7 +850,8 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
         ).returncode
         == 0
     ):
-        print("Using the validated Hugging Face token.")
+        print("Using the validated Hugging Face token for this installer/model session.")
+        write_hf_session(token)
         return token
     if token:
         print(
@@ -817,7 +859,8 @@ def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
             file=sys.stderr,
         )
     else:
-        print("Using anonymous Hugging Face downloads.")
+        print("Using anonymous Hugging Face downloads for this installer/model session.")
+    write_hf_session("")
     return ""
 
 
@@ -1019,7 +1062,14 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 staged = staging / model["gguf"]
                 staged.unlink(missing_ok=True)
                 if token is None:
-                    token = hf_token(hf_bin, hf_home, args.token_file)
+                    session = getattr(args, "hf_session", None)
+                    if isinstance(session, dict) and session.get("resolved"):
+                        token = str(session.get("token", ""))
+                    else:
+                        token = hf_token(hf_bin, hf_home, args.token_file)
+                        if isinstance(session, dict):
+                            session["resolved"] = True
+                            session["token"] = token
                 command = [hf_bin, "download", model["repository"], model["gguf"]]
                 if model["revision"] != "latest":
                     command.extend(("--revision", model["revision"]))
@@ -1252,6 +1302,14 @@ def run_all_catalog_operation(
     args: argparse.Namespace,
 ) -> int:
     selected_ids = {(model["category"], model["id"]) for model in selected}
+    if (
+        args.command == "install"
+        and os.environ.get("BC250_MODELCTL_SELECTION_SUMMARY") == "1"
+    ):
+        print("Selected models:")
+        for model in selected:
+            print(f"  {model.get('name', model['id'])}")
+        print(f"\nProcessing {len(selected)} selected model(s)...")
     if args.command == "cleanup" and not args.yes:
         names = ", ".join(model.get("name", model["id"]) for model in selected)
         if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
@@ -1284,6 +1342,9 @@ def run_all_catalog_operation(
             status = max(status, operate_models(*group, group_args))
 
     if agent_selected:
+        quiet_mode = os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1"
+        if quiet_mode:
+            print("Switching temporarily to exclusive agent mode for agent model setup.")
         set_appliance_mode("agent")
         try:
             defaults, chosen = groups["agentic"]
@@ -1293,6 +1354,8 @@ def run_all_catalog_operation(
             status = max(status, operate_models(defaults, chosen, group_args))
         finally:
             set_appliance_mode("normal")
+            if quiet_mode:
+                print("Normal mode restored after agent model setup.")
 
     if "mtp" in groups:
         defaults, chosen = groups["mtp"]
@@ -1328,6 +1391,9 @@ def main(argv: list[str] | None = None) -> int:
         if reconfigure:
             reconfigure(line_buffering=True)
     args = build_parser().parse_args(argv)
+    # One transient authentication decision is shared by all selected categories
+    # in this process, including a temporary switch into the agent lane.
+    args.hf_session = {"resolved": False, "token": ""}
     require_admin_status(args.command)
 
     source = args.source or (

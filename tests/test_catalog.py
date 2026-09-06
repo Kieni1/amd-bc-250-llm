@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import sys
@@ -22,6 +23,28 @@ def load(category: str) -> tuple[dict, list[dict]]:
 
 
 class ModelfileDiscoveryTests(unittest.TestCase):
+
+    def test_modelfile_graveyard_contains_only_modelfiles(self) -> None:
+        graveyard = ROOT / "models/modelfiles-graveyard"
+        self.assertTrue(graveyard.is_dir())
+        entries = list(graveyard.iterdir())
+        self.assertTrue(entries)
+        self.assertTrue(all(path.is_file() and path.suffix == ".Modelfile" for path in entries))
+
+    def test_modelfile_graveyard_is_not_packaged_or_discovered(self) -> None:
+        graveyard = ROOT / "models/modelfiles-graveyard"
+        retired = {path.stem for path in graveyard.glob("*.Modelfile")}
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertNotIn("modelfiles-graveyard", manifest)
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("MODELFILE_SOURCE_DIR", None)
+            roots = modelctl.model_directories()
+        self.assertNotIn(graveyard, roots)
+        self.assertTrue(all("graveyard" not in str(path) for path in roots))
+        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
+        self.assertTrue(retired.isdisjoint(active))
+
     def test_every_packaged_modelfile_is_discovered_and_strictly_valid(self) -> None:
         models = modelctl.discover_models([MODELFILES])
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
@@ -124,9 +147,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("PARAMETER temperature 0.6", q38)
         self.assertIn("PARAMETER top_p 0.95", q38)
         self.assertIn("PARAMETER top_k 20", q38)
-        lfm = (MODELFILES / "task-lfm25-2.6b-liquidai-q6-k.Modelfile").read_text()
-        self.assertNotRegex(lfm, r"(?m)^SYSTEM\s")
-        self.assertIn("PARAMETER num_ctx 4096", lfm)
         coder = (MODELFILES / "agentic-qwen25-coder7b-unsloth-q5-k-m.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 32768", coder)
         self.assertIn("PARAMETER temperature 0.7", coder)
@@ -195,12 +215,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("dedicated professional German↔French translator", lfm)
         self.assertIn("provides German text without another explicit task", lfm)
         self.assertNotIn("Do not assume that a German or French input should be translated", lfm)
-        fable = (
-            MODELFILES / "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile"
-        ).read_text(encoding="utf-8")
-        self.assertIn("PARAMETER temperature 1.0", fable)
-        self.assertIn("PARAMETER top_p 0.95", fable)
-        self.assertIn("PARAMETER top_k 20", fable)
 
     def test_task_model_accepts_open_webui_integrated_task_prompts(self) -> None:
         source = MODELFILES / "task-gemma3-1b-unsloth-ud-q4-k-xl.Modelfile"
