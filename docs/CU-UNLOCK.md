@@ -43,9 +43,9 @@ and reboots.
 
 ## Qualify the stable CU routing
 
-BC-250 boards contain harvested GPU hardware, so do not use one driver/RADV CU
-number or one universal routed-cell total as the success criterion. `bc250-cu-status`
-prints the complete live-manager routing dashboard and summarizes `S+`
+BC-250 boards contain harvested GPU hardware, so do not use the kernel/RADV CU
+number as the live availability criterion. `bc250-cu-status` prints the complete
+live-manager routing dashboard and summarizes `S+`
 (SPI+routed), `D+` (driver+routed), `D!` (driver+off) and `--` (off) cells. Treat
 `D!`/`--` cells as items to inspect rather than declaring every non-40 layout bad.
 Use WGP IDs reported on the actual board, not IDs copied from another system.
@@ -61,9 +61,9 @@ module is loaded or that all routed CUs produce correct results.
 
 ## Kernel updates
 
-Fedora 44 currently publishes kernel `7.1.12-200.fc44`. The package does not
-hard-code that release: after any kernel update, boot the intended kernel and
-prepare the replacement AMDGPU module for that exact `uname -r`.
+The package does not hard-code a Fedora kernel release. After any kernel update,
+boot the intended kernel and prepare the replacement AMDGPU module for that exact
+`uname -r`.
 
 AMDGPU modules are tied to the exact kernel ABI. After every Fedora kernel
 update, boot the new kernel, prepare it again, reapply the intended CU mode and

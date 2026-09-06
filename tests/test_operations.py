@@ -47,7 +47,7 @@ class StatusTests(unittest.TestCase):
             "MIN_FREE_GB",
             "CPU power states",
             "cpufreq",
-            "Missing C-states",
+            "CPU idle",
         ):
             self.assertIn(expected, source)
 

@@ -84,7 +84,7 @@ if command -v needs-restarting >/dev/null 2>&1; then
     echo "  Reboot:       recommended after package/kernel updates"
   fi
 else
-  echo "  Reboot:       needs-restarting is not installed"
+  echo "  Reboot:       not checked (needs-restarting helper unavailable)"
 fi
 
 section "CPU power states"
@@ -93,15 +93,26 @@ threads="$(nproc 2>/dev/null || printf '?')"
 printf '  Topology:     %s physical cores / %s online threads\n' "$physical_cores" "$threads"
 cpufreq_driver="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_driver 2>/dev/null | sort -u | paste -sd, -)"
 cpufreq_governor="$(cat /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor 2>/dev/null | sort -u | paste -sd, -)"
-printf '  cpufreq:      driver=%s, governor=%s\n' "$(value_or_unknown "$cpufreq_driver")" "$(value_or_unknown "$cpufreq_governor")"
-missing_idle="$(for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+if [[ -z "$cpufreq_driver" && -z "$cpufreq_governor" ]] && \
+   systemctl is-active --quiet cyan-skillfish-governor-smu.service 2>/dev/null; then
+  echo "  CPU cpufreq:  standard interface not exposed; BC-250 SMU governor active"
+else
+  printf '  CPU cpufreq:  driver=%s, governor=%s\n' \
+    "$(value_or_unknown "$cpufreq_driver")" "$(value_or_unknown "$cpufreq_governor")"
+fi
+missing_idle_lines="$(for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
   [[ -d "$cpu" ]] || continue
   [[ -r "$cpu/online" && "$(cat "$cpu/online")" == 0 ]] && continue
   compgen -G "$cpu/cpuidle/state*" >/dev/null || printf '%s\n' "${cpu##*/}"
-done | paste -sd, -)"
-printf '  Missing C-states: %s\n' "${missing_idle:-none on online CPUs}"
-[[ "$threads" == 16 && -n "$missing_idle" ]] && \
-  echo "  WARNING: 16 threads are active but some CPUs lack C-states"
+done)"
+if [[ -n "$missing_idle_lines" ]]; then
+  missing_idle_count="$(wc -l <<< "$missing_idle_lines" | tr -d ' ')"
+  printf '  CPU idle:     cpuidle states not exposed on %s/%s online CPUs\n' \
+    "$missing_idle_count" "$threads"
+  [[ "$threads" == 16 ]] && echo "  WARNING: 16 threads are active but some CPUs lack C-states"
+else
+  echo "  CPU idle:     cpuidle states exposed on all online CPUs"
+fi
 
 section "Compute and governor"
 cu_helper=""
@@ -111,8 +122,8 @@ elif [[ -x /usr/libexec/bc250-llm-server/cu-status.sh ]]; then
   cu_helper=/usr/libexec/bc250-llm-server/cu-status.sh
 fi
 if [[ -n "$cu_helper" ]]; then
-  cu_report="$("$cu_helper" 2>&1 || true)"
-  cu_summary="$(grep -E 'Live manager report|Kernel active_cu_number|RADV report' \
+  cu_report="$("$cu_helper" --summary 2>&1 || true)"
+  cu_summary="$(grep -E 'Prepared module state|Live routed CUs|Live routing status|Kernel active_cu_number|RADV report' \
     <<< "$cu_report" || true)"
   [[ -n "$cu_summary" ]] && printf '%s\n' "$cu_summary" || echo "  CU status could not be summarized"
 else
@@ -142,7 +153,11 @@ fi
 ollama_status main ollama.service 11434
 ollama_status task ollama-task.service 11435
 ollama_status embedding ollama-embedding.service 11437
-ollama_status agent ollama-agent.service 11436
+if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
+  ollama_status agent ollama-agent.service 11436
+else
+  printf '  %-9s port %-5s %-8s %s\n' agent 11436 inactive '(expected in normal mode)'
+fi
 if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
   echo "  Mode:      exclusive agent/coding"
 else

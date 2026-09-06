@@ -320,11 +320,11 @@ step_8_application_services
         self.assertIn("bc250-memory-profile ensure", source)
         self.assertIn("bc250-swap-profile ensure", source)
 
-    def test_verification_runs_both_reports_before_returning_failure(self) -> None:
+    def test_installer_uses_compact_verifier_without_duplicate_parity_report(self) -> None:
         source = INSTALLER.read_text()
         block = source[source.index("step_10_verify() {"):source.index("run_models_only() {")]
-        self.assertIn("bc250-verify || verify_status=$?", block)
-        self.assertIn("llm-run-diagnose --no-load || diagnose_status=$?", block)
+        self.assertIn("bc250-verify --summary", block)
+        self.assertNotIn("llm-run-diagnose --no-load", block)
 
     def test_models_only_resume_is_public(self) -> None:
         source = INSTALLER.read_text()

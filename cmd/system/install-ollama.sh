@@ -147,6 +147,8 @@ restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
 
 # The upstream installer owns binary installation only. Normalize the service
 # back to the RPM-owned unit and refuse any unexpected /etc override.
+service_reload_needed="$(systemctl show -p NeedDaemonReload --value ollama.service 2>/dev/null || true)"
+override_removed=0
 [[ -r "$package_unit" ]] || {
   echo "ERROR: package-owned Ollama service is missing: $package_unit" >&2
   exit 1
@@ -157,6 +159,7 @@ if [[ -e "$etc_unit" || -L "$etc_unit" ]]; then
     exit 1
   }
   rm -f -- "$etc_unit"
+  override_removed=1
 fi
 
 systemctl daemon-reload
@@ -165,8 +168,27 @@ fragment="$(systemctl show -p FragmentPath --value ollama.service 2>/dev/null ||
   echo "ERROR: ollama.service is not using the package-owned unit: ${fragment:-unknown}" >&2
   exit 1
 }
-systemctl reenable ollama.service >/dev/null
-systemctl restart ollama.service
+enable_state="$(systemctl is-enabled ollama.service 2>/dev/null || true)"
+if [[ "$enable_state" != enabled && "$enable_state" != enabled-runtime ]]; then
+  systemctl enable ollama.service >/dev/null 2>&1
+fi
+
+package_newer_than_service=0
+package_install_epoch="$(rpm -q --qf '%{INSTALLTIME}' bc250-llm-server 2>/dev/null || true)"
+service_started="$(systemctl show -p ActiveEnterTimestamp --value ollama.service 2>/dev/null || true)"
+service_start_epoch="$(date -d "$service_started" +%s 2>/dev/null || true)"
+if [[ "$package_install_epoch" =~ ^[0-9]+$ && "$service_start_epoch" =~ ^[0-9]+$ ]] &&
+   ((package_install_epoch > service_start_epoch)); then
+  package_newer_than_service=1
+fi
+
+if ((run_installer || override_removed || package_newer_than_service)) ||
+   [[ "$service_reload_needed" == yes ]] ||
+   ! systemctl is-active --quiet ollama.service 2>/dev/null; then
+  systemctl restart ollama.service
+else
+  echo "Ollama service topology is already current; restart not required."
+fi
 
 for _ in {1..30}; do
   if curl --fail --silent \

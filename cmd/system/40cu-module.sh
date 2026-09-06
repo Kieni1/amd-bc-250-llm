@@ -412,7 +412,11 @@ do_prepare() {
         (verify_initramfs "$target") >/dev/null 2>&1; then
       record_prepared "$target"
       info "AMDGPU and its initramfs copy are already prepared for $KVER."
-      info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
+      if [[ -f "$CONF40" ]]; then
+        info "Persistent 40-CU boot activation is configured."
+      else
+        info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
+      fi
       return
     fi
     info "AMDGPU is already patched for $KVER; skipping download and compilation."
@@ -430,8 +434,12 @@ do_prepare() {
   module_vermagic_matches "$target" || die "prepared module vermagic changed unexpectedly"
   verify_initramfs "$target"
   record_prepared "$target"
-  info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
-  info "Enable persistent 40-CU boot activation when ready: sudo bc250-40cu enable"
+  if [[ -f "$CONF40" ]]; then
+    info "Persistent 40-CU boot activation is configured."
+  else
+    info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
+    info "Enable persistent 40-CU boot activation when ready: sudo bc250-40cu enable"
+  fi
 }
 
 do_enable() {
@@ -501,6 +509,7 @@ show_load_failure_hint() {
 do_status() {
   require_root
   local target installed running mode cus temporary_status initramfs="not checked"
+  local live_summary routed_line routing_line
   target="$(module_target)"
   module_has_parameter "$target" && installed="patched" || installed="stock"
   if [[ ! -d /sys/module/amdgpu ]]; then
@@ -527,8 +536,15 @@ do_status() {
   printf '  Initramfs module: %s\n' "$initramfs"
   printf '  Running driver:   %s\n' "$running"
   printf '  write_mode:       %s\n' "$mode"
-  [[ -n "$cus" ]] && printf '  Active CUs:       %s\n' "$cus" || \
-    printf '  Active CUs:       not reported by this boot\n'
+  [[ -n "$cus" ]] && printf '  Kernel CU counter: %s (diagnostic; not live routed availability)\n' "$cus" || \
+    printf '  Kernel CU counter: not reported by this boot\n'
+  if [[ -x /usr/bin/bc250-cu-status ]]; then
+    live_summary="$(/usr/bin/bc250-cu-status --summary 2>/dev/null || true)"
+    routed_line="$(grep -E '^[[:space:]]*Live routed CUs[[:space:]]*:' <<< "$live_summary" | head -1 || true)"
+    routing_line="$(grep -E '^[[:space:]]*Live routing status[[:space:]]*:' <<< "$live_summary" | head -1 || true)"
+    [[ -n "$routed_line" ]] && printf '%s\n' "$routed_line"
+    [[ -n "$routing_line" ]] && printf '%s\n' "$routing_line"
+  fi
   [[ -f "$CONF40" ]] && printf '  Persistent mode:  enabled\n' || \
     printf '  Persistent mode:  disabled\n'
   show_load_failure_hint

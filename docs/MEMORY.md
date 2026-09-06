@@ -48,15 +48,15 @@ preserving an obsolete duplicate override. The explicit full power-feature mask 
 fresh-install requirement; operator overclock/experimental power-control work
 remains outside the appliance baseline.
 
-### Fedora 44 kernel 7.1.12 note
+### Fedora 44 kernel note
 
-Fedora 44 now ships `7.1.12-200.fc44`. Keep the measurements above attributed to
-`7.1.10-200.fc44`: they have not been rerun on 7.1.12 yet. The relevant 7.1.11
-AMDGPU stable fixes are in the devcoredump path (per-ring dump-buffer allocation
-and safer reservation locking after a hung job), while 7.1.12 itself fixes a
-network fragment/GSO panic path. None of those changes is evidence for altering
-TTM sizing, `ppfeaturemask`, the governor or Mesa. The installer continues to use
-the exact running kernel dynamically when preparing optional 40-CU support.
+The current appliance testing has progressed beyond the kernel used for the original
+TTM A/B measurements. Keep those measurements attributed to `7.1.10-200.fc44`;
+later application validation on the current Fedora kernel does not retroactively turn
+that earlier run into a kernel-profile comparison. No subsequent observation has
+provided evidence for changing TTM sizing, `ppfeaturemask`, the governor or Mesa.
+The installer always uses the exact running kernel dynamically when preparing
+optional 40-CU support.
 
 The two TTM values describe a 16-GiB ceiling at 4-KiB pages. They do **not**
 reserve 16 GiB at boot and do not mean a 16-GiB GGUF will fit: the OS, Ollama,

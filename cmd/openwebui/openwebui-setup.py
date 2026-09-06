@@ -302,7 +302,10 @@ def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("command", choices=("init", "apply", "status"))
     p.add_argument("--url", default=os.environ.get("OWUI_URL", DEFAULT_URL))
-    p.add_argument("--token-file", help="read an administrator API key from a protected file")
+    p.add_argument(
+        "--token-file", "--owui-token-file", dest="token_file",
+        help="read an administrator API key from a protected file",
+    )
     p.add_argument(
         "--token-output",
         help="write the authenticated token to a protected temporary file for the caller",

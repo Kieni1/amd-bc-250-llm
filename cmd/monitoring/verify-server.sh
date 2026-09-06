@@ -11,22 +11,29 @@ else
 fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
 OWUI_TOKEN_FILE=""
+SUMMARY=0
 PASS=0
 WARN=0
 FAIL=0
+CURRENT_SECTION=""
+SECTION_PASS=0
+SECTION_WARN=0
+SECTION_FAIL=0
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-verify [--owui-token-file FILE]
+Usage: sudo bc250-verify [--summary] [--owui-token-file FILE]
 
-Runs detailed local appliance verification. With --owui-token-file, the protected
-Open WebUI administrator API key is used only for the live package-owned desired-state
-check and is not persisted.
+Runs local appliance verification. --summary keeps the same checks but prints a
+compact section-level result. With --owui-token-file, the protected Open WebUI
+administrator API key is used only for the live package-owned desired-state check
+and is not persisted.
 USAGE
 }
 
 while (($#)); do
   case "$1" in
+    --summary) SUMMARY=1; shift ;;
     --owui-token-file)
       (($# >= 2)) || { echo "ERROR: --owui-token-file requires a path" >&2; exit 2; }
       OWUI_TOKEN_FILE="$2"
@@ -55,11 +62,40 @@ if [[ -n "$OWUI_TOKEN_FILE" ]]; then
   export OWUI_API_KEY
 fi
 
-ok() { printf '  [ OK ] %s\n' "$1"; PASS=$((PASS + 1)); }
-warn() { printf '  [WARN] %s\n' "$1"; WARN=$((WARN + 1)); }
-bad() { printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); }
-info() { printf '  [info] %s\n' "$1"; }
-section() { printf '\n=== %s ===\n' "$1"; }
+finish_section() {
+  ((SUMMARY)) || return 0
+  [[ -n "$CURRENT_SECTION" ]] || return 0
+  local status=OK detail=""
+  local pass_delta=$((PASS - SECTION_PASS)) warn_delta=$((WARN - SECTION_WARN)) fail_delta=$((FAIL - SECTION_FAIL))
+  if ((fail_delta > 0)); then
+    status=FAIL
+  elif ((warn_delta > 0)); then
+    status=WARN
+  elif ((pass_delta == 0)); then
+    status=INFO
+  fi
+  if [[ "$status" == INFO ]]; then
+    detail="informational"
+  else
+    detail="$pass_delta ok"
+    ((warn_delta > 0)) && detail+=" / $warn_delta warn"
+    ((fail_delta > 0)) && detail+=" / $fail_delta fail"
+  fi
+  printf '  %-30s %-4s  (%s)\n' "$CURRENT_SECTION" "$status" "$detail"
+}
+
+ok() { ((SUMMARY)) || printf '  [ OK ] %s\n' "$1"; PASS=$((PASS + 1)); }
+warn() { ((SUMMARY)) && printf '    [WARN] %s\n' "$1" || printf '  [WARN] %s\n' "$1"; WARN=$((WARN + 1)); }
+bad() { ((SUMMARY)) && printf '    [FAIL] %s\n' "$1" || printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); }
+info() { ((SUMMARY)) || printf '  [info] %s\n' "$1"; }
+section() {
+  finish_section
+  CURRENT_SECTION="$1"
+  SECTION_PASS=$PASS
+  SECTION_WARN=$WARN
+  SECTION_FAIL=$FAIL
+  ((SUMMARY)) || printf '\n=== %s ===\n' "$1"
+}
 read_param() { [[ -r "$1" ]] && cat "$1" || printf 'not exposed'; }
 toml_table_value() {
   local table="$1" key="$2" file="$3"
@@ -273,13 +309,13 @@ swappiness="$(sysctl -n vm.swappiness 2>/dev/null || true)"
 [[ -n "$swappiness" ]] && info "vm.swappiness: $swappiness" || \
   warn "vm.swappiness is not readable"
 if swapon --show --noheadings 2>/dev/null | grep -q .; then
-  swapon --show 2>/dev/null | sed 's/^/  /'
+  ((SUMMARY)) || swapon --show 2>/dev/null | sed 's/^/  /'
   ok "swap is active"
 else
   warn "no swap is active"
 fi
 if zramctl --noheadings 2>/dev/null | grep -q .; then
-  zramctl 2>/dev/null | sed 's/^/  /'
+  ((SUMMARY)) || zramctl 2>/dev/null | sed 's/^/  /'
   zram_size="$(zramctl --bytes --noheadings --output DISKSIZE 2>/dev/null | awk '{s+=$1} END{print s+0}')"
   ((zram_size > 4*1024*1024*1024)) && \
     warn "zram exceeds 4 GiB and competes with the unified model-memory pool" || \
@@ -295,11 +331,19 @@ fi
 
 section "Compute units"
 if command -v bc250-cu-status >/dev/null 2>&1; then
-  cu_output="$(bc250-cu-status 2>&1 || true)"
+  if ((SUMMARY)); then
+    cu_output="$(bc250-cu-status --summary 2>&1 || true)"
+  else
+    cu_output="$(bc250-cu-status 2>&1 || true)"
+  fi
 else
-  cu_output="$(/usr/libexec/bc250-llm-server/cu-status.sh 2>&1 || true)"
+  if ((SUMMARY)); then
+    cu_output="$(/usr/libexec/bc250-llm-server/cu-status.sh --summary 2>&1 || true)"
+  else
+    cu_output="$(/usr/libexec/bc250-llm-server/cu-status.sh 2>&1 || true)"
+  fi
 fi
-printf '%s\n' "$cu_output" | sed 's/^/  /'
+((SUMMARY)) || printf '%s\n' "$cu_output" | sed 's/^/  /'
 if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' <<< "$cu_output"; then
   ok "live CU routing table has routed entries and no off/problem cells"
 elif grep -Fq 'Live routing status     : routed entries present; off/problem cells present' <<< "$cu_output"; then
@@ -352,8 +396,11 @@ if command -v sensors >/dev/null 2>&1; then
   sensor_lines="$(sensors 2>/dev/null | \
     grep -Ei 'Tctl:|edge:|junction:|mem:|PPT:|power[0-9]+:|fan[0-9]+:' | \
     head -20 || true)"
-  [[ -n "$sensor_lines" ]] && printf '%s\n' "$sensor_lines" | sed 's/^/  /' || \
+  if [[ -n "$sensor_lines" ]]; then
+    ((SUMMARY)) || printf '%s\n' "$sensor_lines" | sed 's/^/  /'
+  else
     warn "no selected temperature, power or fan readings found"
+  fi
 fi
 mods="$(lsmod 2>/dev/null | awk '{print $1}')"
 if grep -qx nct6683 <<< "$mods" && grep -Eq '^nct6687' <<< "$mods"; then
@@ -671,7 +718,12 @@ else
   info "model tests skipped; set RUN_MODEL_TESTS=1 to enable"
 fi
 
-printf '\n================ %d ok / %d warn / %d fail ================\n' "$PASS" "$WARN" "$FAIL"
+finish_section
+if ((SUMMARY)); then
+  printf '\nVerification: %d ok / %d warn / %d fail\n' "$PASS" "$WARN" "$FAIL"
+else
+  printf '\n================ %d ok / %d warn / %d fail ================\n' "$PASS" "$WARN" "$FAIL"
+fi
 if ((FAIL == 0 && WARN == 0)); then
   echo "Server verification completed successfully."
 elif ((FAIL == 0)); then

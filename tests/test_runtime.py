@@ -32,6 +32,7 @@ class AuthenticationTests(unittest.TestCase):
         environment = modelctl.hf_environment("secret", Path("/cache/hf"))
         self.assertEqual(environment["HF_TOKEN"], "secret")
         self.assertEqual(environment["HF_HUB_DISABLE_PROGRESS_BARS"], "0")
+        self.assertEqual(environment["HF_HUB_DISABLE_XET"], "1")
         self.assertEqual(environment["PYTHONUNBUFFERED"], "1")
 
     def test_hf_download_can_run_in_a_progress_terminal(self) -> None:

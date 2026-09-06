@@ -288,6 +288,7 @@ sudo bc250-ollama-profile reset
 
 ```text
 bc250-cu-status
+bc250-cu-status --summary
 sudo bc250-40cu status
 sudo bc250-40cu verify
 sudo bc250-40cu prepare
@@ -301,8 +302,10 @@ sudo bc250-cu-live-manager {menu|status}
 ```
 
 `bc250-40cu enable` requires the phrase `ENABLE-40CU` and reboots. Live
-mask/unmask operations require `APPLY-WGP-TABLE`. The guided installer prepares
-the module for the running kernel but never enables additional CUs. CPU-core
+mask/unmask operations require `APPLY-WGP-TABLE`. `bc250-40cu status` reports
+module/persistence state plus the live routed-CU summary; kernel/RADV CU counters
+are diagnostic and are not treated as the live available total. The guided installer
+prepares the module for the running kernel without silently enabling persistent boot mode. CPU-core
 unlocking is intentionally avoided: extra CPU cores do not improve the practical
 model-capacity limit of this ~16 GB unified-memory appliance and add power/thermal
 pressure. See [`CU-UNLOCK.md`](CU-UNLOCK.md) before changing GPU routing.
@@ -312,6 +315,7 @@ pressure. See [`CU-UNLOCK.md`](CU-UNLOCK.md) before changing GPU routing.
 ```bash
 sudo bc250-status
 sudo bc250-verify
+sudo bc250-verify --summary
 sudo bc250-verify --owui-token-file /root/owui-test.key
 RUN_MODEL_TESTS=1 sudo bc250-verify
 bc250-verify-lan SERVER_IP
@@ -402,6 +406,7 @@ for metrics, fixtures and Ollama 0.33.3 request policy. The installed copy is
 ```text
 sudo bc250-openwebui-setup init
 sudo bc250-openwebui-setup init --token-file /root/owui-test.key
+sudo bc250-openwebui-setup init --owui-token-file /root/owui-test.key  # alias
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
 sudo bc250-openwebui-setup status --token-file /root/owui-test.key

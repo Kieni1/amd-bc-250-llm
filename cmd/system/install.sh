@@ -16,6 +16,7 @@ source "$runtime_env"
 INSTALL_MODE="full"
 OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
 OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
+HF_SESSION_FILE="/run/bc250-llm-server/install-hf-session"
 
 usage() {
   cat <<'USAGE'
@@ -69,7 +70,7 @@ validate_owui_token_file() {
 }
 
 cleanup_sensitive_runtime() {
-  rm -f "$OWUI_VERIFY_TOKEN_FILE"
+  rm -f "$OWUI_VERIFY_TOKEN_FILE" "$HF_SESSION_FILE"
 }
 
 owui_token_candidate() {
@@ -282,7 +283,7 @@ step_4_memory_and_swap() {
 step_5_prepare_40cu() {
   heading "5. PREPARE OPTIONAL 40-CU SUPPORT"
   local kernel prepared_file=/var/lib/bc250-llm-server/40cu/prepared
-  local live_manager=bc250-cu-live-manager.service live_state="" live_enable=""
+  local live_manager=bc250-cu-live-manager.service live_state="" live_enable="" live_summary="" live_routed="" live_health=""
   kernel="$(uname -r)"
   if [[ -r "$prepared_file" ]] && grep -Fxq "kernel=$kernel" "$prepared_file"; then
     echo "40-CU build is already prepared for $kernel; skipping build-prerequisite reconciliation."
@@ -298,16 +299,18 @@ step_5_prepare_40cu() {
     echo "Live CU manager service is already installed (${live_enable:-unknown}; ${live_state:-unknown})."
   fi
   bc250-40cu prepare
-  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-    echo "Persistent 40-CU boot activation is configured."
-    if [[ ! -r /sys/module/amdgpu/parameters/bc250_cc_write_mode ]]; then
-      echo "The prepared persistent AMDGPU module needs one activation reboot."
-      echo "  sudo reboot"
-      printf '  '; rerun_command
-      exit 12
-    fi
-  else
-    echo "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
+  if systemctl is-active --quiet "$live_manager" 2>/dev/null && command -v bc250-cu-status >/dev/null 2>&1; then
+    live_summary="$(bc250-cu-status --summary 2>/dev/null || true)"
+    live_routed="$(sed -n 's/^[[:space:]]*Live routed CUs[[:space:]]*:[[:space:]]*//p' <<< "$live_summary" | head -1)"
+    live_health="$(sed -n 's/^[[:space:]]*Live routing status[[:space:]]*:[[:space:]]*//p' <<< "$live_summary" | head -1)"
+    [[ -n "$live_routed" ]] && echo "Live CU routing: $live_routed${live_health:+; $live_health}."
+  fi
+  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]] && \
+     [[ ! -r /sys/module/amdgpu/parameters/bc250_cc_write_mode ]]; then
+    echo "The prepared persistent AMDGPU module needs one activation reboot."
+    echo "  sudo reboot"
+    printf '  '; rerun_command
+    exit 12
   fi
 }
 
@@ -335,9 +338,14 @@ step_6_runtime_topology() {
 step_7_models() {
   heading "7. MODELS"
   require_progress_terminal
+  install -d -m0700 /run/bc250-llm-server
+  : > "$HF_SESSION_FILE"
+  chmod 0600 "$HF_SESSION_FILE"
+  export BC250_HF_SESSION_FILE="$HF_SESSION_FILE"
 
   echo "Ensuring baseline Open WebUI infrastructure models."
-  BC250_MODELCTL_SUPPRESS_CATALOG=1 bc250-model install all \
+  BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
+    bc250-model install all \
     "task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m"
 
   echo
@@ -352,7 +360,8 @@ step_7_models() {
     return 0
   fi
   [[ -n "$selection" ]] || { echo "Skipping additional models; baseline models are installed."; return 0; }
-  bc250-model install all "$selection" --include-disabled
+  BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
+    bc250-model install all "$selection" --include-disabled
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
 }
 
@@ -367,11 +376,35 @@ enable_open_webui_boot() {
   systemctl daemon-reload
 }
 
+
+application_network_healthy() {
+  systemctl is-active --quiet tika.service 2>/dev/null || return 1
+  systemctl is-active --quiet open-webui.service 2>/dev/null || return 1
+  command -v podman >/dev/null 2>&1 || return 1
+  podman exec open-webui getent hosts tika >/dev/null 2>&1 || return 1
+  podman exec open-webui getent hosts host.containers.internal >/dev/null 2>&1 || return 1
+  podman exec open-webui python -c '
+import urllib.request
+for url in (
+    "http://tika:9998/version",
+    "http://host.containers.internal:11434/api/tags",
+    "http://host.containers.internal:11435/api/tags",
+    "http://host.containers.internal:11437/api/tags",
+):
+    urllib.request.urlopen(url, timeout=5).read(1)
+' >/dev/null 2>&1
+}
+
 step_8_application_services() {
   heading "8. START APPLICATION SERVICES"
-  local firewall_changed=0 tika_was_active=0 owui_was_active=0
+  local firewall_changed=0 tika_was_active=0 owui_was_active=0 unit_refresh_needed=0
   systemctl is-active --quiet tika.service 2>/dev/null && tika_was_active=1
   systemctl is-active --quiet open-webui.service 2>/dev/null && owui_was_active=1
+  for unit in tika.service open-webui.service; do
+    if [[ "$(systemctl show -p NeedDaemonReload --value "$unit" 2>/dev/null || true)" == yes ]]; then
+      unit_refresh_needed=1
+    fi
+  done
   systemctl enable --now firewalld.service cyan-skillfish-governor-smu.service
   if systemctl is-active --quiet firewalld.service; then
     if ! firewall-cmd --quiet --permanent --query-service=http; then
@@ -388,13 +421,15 @@ step_8_application_services() {
   command -v setsebool >/dev/null 2>&1 && setsebool -P httpd_can_network_connect 1 || true
   enable_open_webui_boot
   systemctl start tika.service open-webui.service
-  # On update, recreate already-running private-network containers after
-  # package/Quadlet/firewalld reconciliation. A mere `start` leaves them attached
-  # to stale netavark/DNS state after a firewall reload or unit replacement.
-  if ((tika_was_active || owui_was_active || firewall_changed)); then
-    echo "Re-establishing private Podman application networking after update reconciliation."
+  # Recreate already-running containers only when package/firewall state changed
+  # or the live private path is unhealthy.  A no-op installer rerun should not
+  # churn healthy application containers.
+  if { ((tika_was_active || owui_was_active)) && ((firewall_changed || unit_refresh_needed)); } || ! application_network_healthy; then
+    echo "Refreshing private Podman application networking after configuration reconciliation."
     systemctl restart tika.service
     systemctl restart open-webui.service
+  else
+    echo "Private application networking is healthy; restart not required."
   fi
   systemctl enable --now nginx.service
 }
@@ -496,21 +531,18 @@ step_9_open_webui() {
 }
 
 step_10_verify() {
-  heading "10. VERIFICATION"
-  local verify_status=0 diagnose_status=0
-  bc250-memory-profile status
-  bc250-swap-profile status
-  bc250-cu-status
+  heading "10. VERIFY INSTALLATION"
+  local verify_status=0
   if [[ -s "$OWUI_VERIFY_TOKEN_FILE" ]]; then
-    bc250-verify --owui-token-file "$OWUI_VERIFY_TOKEN_FILE" || verify_status=$?
+    bc250-verify --summary --owui-token-file "$OWUI_VERIFY_TOKEN_FILE" || verify_status=$?
   else
-    bc250-verify || verify_status=$?
+    bc250-verify --summary || verify_status=$?
   fi
-  llm-run-diagnose --no-load || diagnose_status=$?
-  if ((verify_status != 0 || diagnose_status != 0)); then
-    echo "ERROR: verification reported failures; review both reports above." >&2
+  if ((verify_status != 0)); then
+    echo "ERROR: installation verification reported failures; run sudo bc250-verify for the detailed report." >&2
     return 1
   fi
+  echo "Detailed diagnostics remain available with: sudo bc250-verify"
 }
 
 run_models_only() {
@@ -561,7 +593,12 @@ main() {
   echo
   echo "Useful commands:"
   echo "  Appliance status:       sudo bc250-status"
-  echo "  Open WebUI status:      bc250-openwebui-setup status"
+  completion_owui_token="${OWUI_TOKEN_FILE:-${BC250_OWUI_TOKEN_FILE:-}}"
+  if [[ -n "$completion_owui_token" && -f "$completion_owui_token" && -r "$completion_owui_token" ]]; then
+    echo "  Open WebUI status:      sudo bc250-openwebui-setup status --owui-token-file $completion_owui_token"
+  else
+    echo "  Open WebUI status:      bc250-openwebui-setup status"
+  fi
   echo "  Reconfigure Open WebUI: sudo bc250-openwebui-setup init"
   echo "  40-CU status:           sudo bc250-40cu status"
   echo "  Revalidation:           sudo bc250-revalidate start"
