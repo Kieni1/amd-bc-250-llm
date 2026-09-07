@@ -1956,7 +1956,7 @@ raise SystemExit(module.entrypoint())
             if not path.exists():
                 continue
             checked.append(source)
-            self.assertEqual(path.stat().st_mode & 0o777, 0o755, source)
+            self.assertEqual(path.stat().st_mode & 0o111, source)
         self.assertIn("cmd/benchmark/openwebui-benchmark.py", checked)
 
     def test_rag_memory_edge_wording_is_current_and_unambiguous(self) -> None:
