@@ -11,7 +11,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250` | Canonical multicall dispatcher |
 | `bc250-40cu` | Replacement-module and live CU controls |
 | `bc250-agent-mode` | Enter/leave/status exclusive coding-agent mode |
-| `bc250-benchmark` | Interactive Ollama performance benchmark |
+| `bc250-benchmark` | Explicit model, quality, coexistence and tuning benchmarks |
 | `bc250-revalidate` | Opt-in whole-appliance revalidation harness |
 | `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
 | `bc250-code` | Local generate/refactor/review/document/test helper |
@@ -322,27 +322,33 @@ bc250-verify-lan SERVER_IP
 sudo llm-run-diagnose --no-load
 MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 bc250-check-temp --once
-bc250-benchmark
+bc250-benchmark generation
 sudo bc250-revalidate status
 sudo bc250-revalidate status --raw
 ```
 
-`bc250-revalidate` is the root-only systemd-backed revalidation harness. A routine
-`sudo bc250-revalidate start` stays on the current kernel/governor policy and
-follows a compact live dashboard in the invoking terminal while the worker remains
-systemd-owned. The dashboard shows elapsed time, numbered application phase, current
-stage, heartbeat age and recent benchmark outcomes. Ctrl-C detaches the display
-without stopping the run; `--detach` returns immediately. Use
-`--kernel-ab`, `--governor-ab` or `--keepalive-expiry` only when those expensive
-lanes are needed. Authenticated Open WebUI tuning accepts
-`--owui-token-file FILE`. Before expensive model lanes the harness now verifies
-Open WebUI -> private Tika and Open WebUI -> main/task/embedding Ollama connectivity,
-so stale Podman networking fails quickly. Final bundles are retained under
-`/var/lib/bc250-llm-server/revalidation/results/`. Finished worker/unit state is
-kept inspectable after the tarball is written; `sudo bc250-revalidate cleanup`
-removes it after the oneshot exits, and a later `start` replaces completed state.
-Benchmark exit `3` is recorded as quality data; other unexpected benchmark failures
-enter worker recovery. `abort` restores temporary state before stopping.
+`bc250-revalidate` harness v4.0 is the root-only systemd-backed package
+qualification workflow. A full
+`sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
+dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
+run. The token file must be a protected readable regular file and is authenticated
+before run state is created. The worker remains systemd-owned; Ctrl-C detaches and
+`--detach` returns immediately. The dashboard reports stage elapsed time, worker
+state and the age of the last real progress event rather than treating a periodic
+heartbeat as progress.
+
+Revalidation tests only promoted package defaults. Configuration-decision work
+(`num_batch`, embedding batch, chunk-min, `RAG_SYSTEM_CONTEXT`, thinking-policy,
+keepalive, kernel/governor and experimental-model A/B) belongs to explicit
+benchmark/diagnostic commands. The preflight also requires a healthy complete live
+SPI/WGP routing table with no off/problem cells; it does not hard-code `40/40`.
+
+Benchmark quality exit `3` is recorded and nonfatal. Other benchmark/helper errors
+are infrastructure failures and enter the single top-level restoration/finalization
+path. Authenticated packaged Open WebUI qualification accepts
+`--owui-token-file FILE`. Final bundles remain under
+`/var/lib/bc250-llm-server/revalidation/results/`; completed work remains
+inspectable until `cleanup` or a later `start`.
 
 `bc250-revalidate status` is human-readable by default and separates the installed
 harness/worker state from the recorded last-run result; `--raw` preserves the
@@ -355,50 +361,49 @@ internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
 runs on a client; `HTTP_PORT` changes its expected web port.
 
-The benchmark writes timestamped CSV, JSONL and metadata files in the current
-directory. The default generation lane uses `BENCH_MODE=neutral`: a per-request
-neutral SYSTEM override and deterministic sampling for comparable model/runtime
-measurements. Interactive discovery can select any registered generation model;
-noninteractive discovery is production-only so installing a new `exp-*` model does
-not silently widen automation. Name experiments explicitly or set
-`BENCH_INCLUDE_EXPERIMENTS=1` for a deliberate full-pool run.
-`BENCH_MODE=production` is the production-configuration
-comparison: it keeps the registered Modelfile SYSTEM and sampling while running the same generic workload.
-`bc250-benchmark usecase` adds one compact role acceptance case per production model; `bc250-benchmark translation` checks DE↔FR office preservation; `bc250-benchmark rag-quality` performs a small retrieval→grounded-answer acceptance chain and accepts `RAG_QUALITY_THINK=auto|true|false` for diagnostic thinking-policy comparisons; and `bc250-benchmark rag` checks answer-model residency while the dedicated embedding lane runs. Routine revalidation records both default and `think=false` RAG-quality behavior without changing the production preset.
-`THINK_MODE=auto` applies the package's model-family policy. Latency runs use a
-larger shared `num_predict` cap for reasoning-capable/unset policies so TTFA is
-not routinely starved by thinking; LFM2.5 keeps that larger cap even in an
-explicit `think=false` experiment because measured native reasoning persisted.
-`NUM_PREDICT_LATENCY_THINKING` can override that cap separately.
+Every benchmark invocation writes one isolated result directory containing canonical
+`results.jsonl`, `summary.json`, `summary.txt`, `meta.json` and copied deterministic
+fixtures. Categories with a useful table also write `results.csv`. Existing non-empty
+output directories are rejected; use `--output-dir DIR` to select a path.
+
+Canonical public benchmark commands are explicit; there is no commandless generation
+default and no legacy alias layer:
 
 ```bash
-bc250-benchmark                         # generation, neutral mode
-BENCH_MODE=production bc250-benchmark
-BENCH_PROFILE=conservative bc250-benchmark
-bc250-benchmark embeddings              # DE/FR/EN retrieval quality + speed
-bc250-benchmark ocr                     # office OCR fixtures
-bc250-benchmark task                    # Open WebUI 0.11.3-compatible task behavior
+bc250-benchmark generation --profile compare MODEL...
+bc250-benchmark generation --profile edge --mode production MODEL...
+bc250-benchmark generation --profile thermal MODEL...
+bc250-benchmark embeddings [MODEL ...]
+bc250-benchmark ocr [MODEL ...]
+bc250-benchmark task [MODEL ...]
+bc250-benchmark usecase [MODEL ...]
+bc250-benchmark translation [MODEL ...]
+bc250-benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
+bc250-benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
+bc250-benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
+
 sudo bc250-agent-mode enter
-bc250-benchmark agent                   # exclusive syntax/static coding lane, port 11436
+bc250-benchmark agent MODEL --ollama-url http://127.0.0.1:11436
 sudo bc250-agent-mode leave
-bc250-benchmark usecase                 # one role-defining case per production model
-bc250-benchmark rag                     # dedicated embedding + warm answer coexistence
-bc250-benchmark translation             # DE↔FR office translation acceptance
-bc250-benchmark rag-quality             # retrieval -> grounded-answer acceptance
-RAG_QUALITY_THINK=false bc250-benchmark rag-quality  # diagnostic non-thinking comparison
-RUN_WARM_PREFIX=1 bc250-benchmark        # separate repeated-prefix/cache pair
-OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark generation MODEL
+
+bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
+bc250-benchmark num-batch MODEL [MODEL ...]
+bc250-benchmark owui-rag MODEL --token-file FILE
+bc250-benchmark owui-embedding-batch --token-file FILE
+bc250-benchmark owui-chunk-min MODEL --token-file FILE
+sudo bc250-benchmark owui-system-context MODEL --token-file FILE
 ```
 
-Generation, embedding and OCR record the full request-time thermal/GPU/UMA
-telemetry set from one selected AMD DRM device; use `BC250_DRM_CARD=cardN` only
-when automatic boot-GPU selection is wrong. Task and agent runs intentionally
-keep the smaller subset useful for those short correctness/latency workloads. `RUN_THERMAL=1` applies to the
-generation lane. For a real thermal-soak qualification, choose a representative
-large model and repeat a sustained generation workload for at least 20–30 minutes;
-the short built-in thermal wave is a regression signal, not an equilibrium test. Treat resource figures as overlapping UMA signals, not
-independent pools. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
-for metrics, fixtures and Ollama 0.33.3 request policy. The installed copy is
+The Open WebUI tuning commands are explicit experiments: they save the observed
+package-owned setting, change only the named benchmark setting, use temporary
+knowledge/file state, and restore the original value. Restoration failure is an
+infrastructure failure. Routine revalidation does not run these A/B sweeps.
+
+Generation and coexistence reporting emphasizes resident size, minimum
+`MemAvailable`, swap start/peak/end/delta, temperature and request outcomes. VRAM/GTT
+remain diagnostic Vulkan counters and must not be interpreted as independent additive
+memory pools on the BC-250. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
+for result schema, category contracts and Ollama 0.33.3 request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
 
 ## Open WebUI setup

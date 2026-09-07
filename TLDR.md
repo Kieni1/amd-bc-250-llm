@@ -98,8 +98,8 @@ see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
 ## Operations
 
 ```bash
-bc250-benchmark                       # neutral generation comparison
-BENCH_MODE=production bc250-benchmark    # generic workload + deployed config
+bc250-benchmark generation --profile compare      # neutral generation comparison
+bc250-benchmark generation --profile edge --mode production  # deployed-config edge check
 bc250-benchmark embeddings
 bc250-benchmark ocr
 bc250-benchmark task
@@ -163,8 +163,7 @@ bc250-benchmark ocr
 bc250-benchmark task
 ```
 
-For a full live-appliance pass use `sudo bc250-revalidate start`; it is opt-in,
+For a full live-appliance pass use `sudo bc250-revalidate start --owui-token-file /root/owui-test.key`; it is opt-in,
 root-only, and stores its final tarball under `/var/lib/bc250-llm-server/revalidation/results/`.
-See `cmd/benchmark/README.md` / installed `BENCHMARK.md` for revalidation, optional
-warm-prefix, RAG tuning and sustained thermal qualification procedures.
+See `cmd/benchmark/README.md` / installed `BENCHMARK.md` for canonical result directories, explicit tuning commands, RAG qualification and thermal profiles.
 

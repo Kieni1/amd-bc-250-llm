@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.2%{?dist}
+Release:        1.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,32 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.6
+- Finish Round 2C-2 canonical evidence: category aggregates, complete generation summaries, shared package/kernel/runtime/model/fixture metadata, and precise output-vs-thinking budget diagnostics.
+- Split runtime/coexistence workflows from Open WebUI lifecycle/tuning workflows and remove stale revalidation compatibility/reboot-era helpers.
+- Polish harness v4 operator wording and designate rag-quality --think true/false as the canonical thinking-policy comparison outside revalidation.
+- Add deterministic coverage for metadata, aggregate summaries, budget diagnostics, workflow responsibility boundaries, and stale-code removal.
+- Correct final quality-cause category mapping, chronological UMA swap aggregation, and explicit max-case-p95 temperature wording.
+- Make embedding aggregate evidence canonical, preserve per-model quality causes, complete effective metadata/runtime association, remove legacy agent correctness aliases, and clean failed launch state.
+
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.5
+- Make revalidation role scope immutable and restrict Phase 3 to the exact packaged production roster.
+- Add measurement-versus-qualification result semantics and aggregate benchmark quality causes.
+- Add gross resource-edge qualification gates, secure pre-state OWUI token validation, and final health gates.
+- Verify Open WebUI setting restoration and temporary KB/file cleanup; classify RAG residency loss as infrastructure failure.
+
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.4
+- Finish the common benchmark-result migration for generation, OCR, RAG, coexistence and Open WebUI tuning workflows with one isolated result-directory layout.
+- Remove legacy benchmark aliases and the implicit generation default; public benchmark use is canonical subcommands only.
+- Remove the private revalidation tuning helper and expose coexistence and tuning work as explicit benchmark commands while harness v4 remains qualification-only.
+- Keep CSV as an optional export while results.jsonl, summary.json, summary.txt, meta.json and copied fixtures form the canonical benchmark evidence.
+- Improve generation UMA reporting and multi-cause RAG diagnostics without treating VRAM/GTT counters as additive memory pools.
+
+* Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.3
+- Advance bc250-revalidate to harness v4.0: six package-qualification phases, one explicit quality/infrastructure RC path, machine-readable progress events, and separate run/infrastructure/quality/restoration outcomes.
+- Remove tuning and hardware A/B decisions from routine revalidation; it now exercises only promoted package defaults while preserving systemd ownership, exclusive agent restoration, snapshots and final bundles.
+- Replace heartbeat-as-progress UX with worker state, stage elapsed time and last real event age; add live complete SPI/WGP routing-table health to preflight without hard-coding a universal CU count.
+
 * Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.2
 - Close the remaining agent-evaluator false positives: ignore nested Python definitions, require static duplicate-removal evidence, associate range bounds with ValueError branches, and tighten Bash missing-argument/no-match handling.
 - Clarify embedding JSONL semantics by keeping per-query Top-3 status as an observational metric; only the explicit aggregate Jina qualification record controls embedding quality status.

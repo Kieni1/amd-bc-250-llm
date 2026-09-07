@@ -11,7 +11,7 @@ DOCDIR="${BC250_DOCDIR:-/usr/share/doc/bc250-llm-server}"
 ROUTES=(
   "40cu|$LIBEXEC/40cu.sh"
   "agent-mode|$LIBEXEC/agent-mode.sh"
-  "benchmark|$LIBEXEC/compare-models.sh"
+  "benchmark|$LIBEXEC/benchmark.sh"
   "revalidate|$LIBEXEC/revalidate.sh"
   "check-temp|$LIBEXEC/check-temp.sh"
   "code|$LIBEXEC/coding-agent/coding-agent.sh"

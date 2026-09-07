@@ -140,7 +140,11 @@ corpus.
 Open WebUI enforces **128 MiB per file**. nginx has a larger **256 MiB reverse-proxy ceiling** so multipart/request overhead does not make nginx the accidental
 application limit.
 
-See [`RAG.md`](RAG.md) for ingestion and retrieval acceptance testing.
+See [`RAG.md`](RAG.md) for ingestion and retrieval acceptance testing. Explicit
+setting comparisons use `bc250-benchmark owui-embedding-batch`,
+`bc250-benchmark owui-chunk-min` and the root-only
+`bc250-benchmark owui-system-context`; routine revalidation tests only the packaged
+values and does not choose among candidates.
 
 ## Local/offline application baseline
 

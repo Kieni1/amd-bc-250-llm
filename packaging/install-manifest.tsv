@@ -53,9 +53,11 @@ file	0755	cmd/system/agent-mode.sh	{libexec}/agent-mode.sh
 file	0755	cmd/openwebui/openwebui-setup.py	{libexec}/openwebui-setup.py
 file	0755	models/experiments/compare-mtp.sh	{libexec}/compare-mtp.sh
 file	0755	models/mtp/run-mtp-llamacpp.sh	{libexec}/run-mtp-llamacpp.sh
-file	0755	cmd/benchmark/compare-models.sh	{libexec}/compare-models.sh
+file	0755	cmd/benchmark/benchmark.sh	{libexec}/benchmark.sh
 file	0755	cmd/benchmark/generation-benchmark.py	{libexec}/generation-benchmark.py
 file	0755	cmd/benchmark/category-benchmark.py	{libexec}/category-benchmark.py
+file	0755	cmd/benchmark/runtime-benchmark.py	{libexec}/runtime-benchmark.py
+file	0755	cmd/benchmark/openwebui-benchmark.py	{libexec}/openwebui-benchmark.py
 file	0755	cmd/benchmark/benchmark_common.py	{libexec}/benchmark_common.py
 file	0755	cmd/benchmark/revalidate.sh	{libexec}/revalidate.sh
 dir	0755	-	{share}/benchmark

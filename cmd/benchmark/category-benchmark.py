@@ -26,11 +26,17 @@ from benchmark_common import (
     BenchmarkError,
     OllamaClient,
     TelemetrySampler,
+    append_result,
+    benchmark_metadata,
+    copy_fixtures,
     cosine,
+    finalize_benchmark_metadata,
+    fixture_metadata,
     mean,
     normalize_words,
-    prepare_result_sidecars,
+    prepare_result_dir,
     result_record,
+    write_benchmark_metadata,
     write_result_summary,
 )
 
@@ -90,38 +96,56 @@ def model_meta(client: OllamaClient, model: str) -> dict[str, Any]:
         "family": details.get("family", ""),
         "parameter_size": details.get("parameter_size", ""),
         "quantization_level": details.get("quantization_level", ""),
+        "runtime_url": client.base_url,
     }
-
-
-def append_jsonl(path: Path, data: dict[str, Any]) -> None:
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def write_meta(
-    path: Path, client: OllamaClient, category: str, models: list[str], fixture: Path
+    path: Path,
+    client: OllamaClient,
+    category: str,
+    models: list[str],
+    fixture: Path,
+    *,
+    options: dict[str, Any] | None = None,
 ) -> None:
-    data = {
-        "started_at": iso_now(),
-        "category": category,
-        "ollama_url": client.base_url,
-        "ollama_version": client.version(),
-        "package_standard_ollama_version": STANDARD_OLLAMA_VERSION,
-        "fixture": str(fixture),
-        "fixture_sha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
-        "models": [model_meta(client, model) for model in models],
+    version = client.version()
+    effective_options: dict[str, Any] = {
         "telemetry_interval_s": TELEMETRY_INTERVAL,
+        "request_timeout_s": client.timeout,
+        "keep_alive": KEEP_ALIVE,
     }
-    path.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    effective_options.update(options or {})
+    data = benchmark_metadata(
+        category,
+        benchmark_version="8.0",
+        models=[model_meta(client, model) for model in models],
+        fixtures=fixture_metadata(fixture),
+        options=effective_options,
+        runtimes=[
+            {
+                "kind": "ollama",
+                "url": client.base_url,
+                "version": version,
+                "package_standard_version": STANDARD_OLLAMA_VERSION,
+            }
+        ],
     )
-    if data["ollama_version"] != STANDARD_OLLAMA_VERSION:
+    write_benchmark_metadata(path, data)
+    if version != STANDARD_OLLAMA_VERSION:
         print(
-            f"WARNING: Ollama {data['ollama_version']} differs from package standard {STANDARD_OLLAMA_VERSION}",
+            f"WARNING: Ollama {version} differs from package standard {STANDARD_OLLAMA_VERSION}",
             file=sys.stderr,
         )
 
+
+
+def print_result_paths(paths: Any, summary_txt: Path) -> None:
+    finalize_benchmark_metadata(paths.meta_json)
+    print(
+        f"Result directory: {paths.root}\nCanonical: {paths.results_jsonl}\n"
+        f"Summary: {summary_txt}\nCSV export: {paths.csv_export}"
+    )
 
 def embedding_scheme(model: str) -> tuple[str, str, str]:
     lower = model.lower()
@@ -170,11 +194,17 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
     if not models:
         raise BenchmarkError("no embedding models found")
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_embeddings_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
-    write_meta(meta_path, client, "embeddings", models, fixture)
+    paths = prepare_result_dir("embeddings", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture)
+    write_meta(
+        meta_path, client, "embeddings", models, fixture,
+        options={
+            "repeats": args.repeats,
+            "query_prefix_override": os.environ.get("EMBED_QUERY_PREFIX"),
+            "content_prefix_override": os.environ.get("EMBED_CONTENT_PREFIX"),
+        },
+    )
     fields = [
         "timestamp", "model", "prefix_scheme", "recall_at_1", "recall_at_3",
         "mrr", "cross_recall_at_1", "cross_mrr", "hard_recall_at_1",
@@ -230,9 +260,9 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                         competitor = max(score for score, doc_id in scored if doc_id != query_item["target"])
                         margin = target_score - competitor
                         margins.append(margin)
-                        append_jsonl(jsonl_path, result_record(
-                            category="embedding", model=model, case_id=query_item["id"],
-                            outcome="pass",
+                        append_result(jsonl_path, result_record(
+                            category="embeddings", model=model, case_id=query_item["id"],
+                            outcome="pass", result_type="measurement",
                             metrics={
                                 "rank": rank,
                                 "target_margin": margin,
@@ -271,6 +301,30 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                     "warm_input_tps": mean(warm_tps), "warm_wall_s": mean(warm_walls),
                     **state, **{key: telemetry.get(key) for key in fields if key in telemetry},
                 }
+                aggregate_metric_keys = (
+                    "recall_at_1", "recall_at_3", "mrr",
+                    "cross_recall_at_1", "cross_mrr", "hard_recall_at_1",
+                    "mean_target_margin", "min_target_margin", "documents",
+                    "queries", "dimensions", "cold_load_s", "quality_wall_s",
+                    "warm_input_tps", "warm_wall_s", "resident_size_bytes",
+                    "resident_vram_bytes", "allocated_context", "temp_max_c",
+                    "temp_p95_c", "mem_available_min_mib", "swap_used_start_mib",
+                    "swap_used_max_mib", "swap_used_end_mib",
+                    "swap_peak_delta_mib",
+                )
+                append_result(
+                    jsonl_path,
+                    result_record(
+                        category="embeddings",
+                        model=model,
+                        case_id="aggregate",
+                        outcome="pass",
+                        result_type="measurement",
+                        metrics={key: row.get(key) for key in aggregate_metric_keys},
+                        prefix_scheme=scheme,
+                        timestamp=row["timestamp"],
+                    ),
+                )
                 qualification = corpus.get("qualification")
                 if isinstance(qualification, dict):
                     policy_model = str(qualification.get("model") or "").removesuffix(":latest")
@@ -278,13 +332,14 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                         checks = embedding_qualification_checks(row, qualification)
                         qualified = all(checks.values())
                         quality_failed = quality_failed or not qualified
-                        append_jsonl(
+                        append_result(
                             jsonl_path,
                             result_record(
-                                category="embedding",
+                                category="embeddings",
                                 model=model,
                                 case_id="qualification",
                                 outcome="pass" if qualified else "quality-fail",
+                                result_type="qualification",
                                 failure_kinds=[] if qualified else ["retrieval"],
                                 checks=checks,
                                 metrics={
@@ -315,7 +370,7 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                 try: client.ensure_unloaded(model)
                 except BenchmarkError as exc: print(f"WARNING: {exc}", file=sys.stderr)
     _sj, summary_txt = write_result_summary(jsonl_path, category="embeddings")
-    print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nSummary: {summary_txt}\nMeta:    {meta_path}")
+    print_result_paths(paths, summary_txt)
     return 3 if quality_failed else 0
 
 
@@ -446,10 +501,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
     models = choose_models(client, args.models, "task-")
     if not models:
         raise BenchmarkError("no task models found")
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_task_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
+    paths = prepare_result_dir("task", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture)
     write_meta(meta_path, client, "task", models, fixture)
 
     fields = [
@@ -483,7 +537,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
                 start_time = time.monotonic()
                 try:
                     response = client.json_request("/api/chat", payload)
-                except BaseException:
+                except BenchmarkError:
                     client.stop(model)
                     client.wait_unloaded(model)
                     raise
@@ -565,9 +619,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
                 }
                 writer.writerow(row)
-                append_jsonl(jsonl_path, result_record(
+                append_result(jsonl_path, result_record(
                     category="task", model=model, case_id=case["id"],
-                    outcome="pass" if ok else "quality-fail", failure_kinds=failures,
+                    result_type="qualification", outcome="pass" if ok else "quality-fail", failure_kinds=failures,
                     diagnostics=diagnostics,
                     checks={"structure": structure_ok, "language": language_pass, "relevance": semantic_ok},
                     metrics={"keyword_score": score, "semantic_groups": semantic_groups, "wall_s": wall, "eval_count": response.get("eval_count", 0)},
@@ -584,7 +638,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
             print(f"  mean keyword diagnostic: {mean(scores):.3f}")
     _summary_json, summary_txt = write_result_summary(jsonl_path, category="task")
     print(f"\nTask acceptance: {passed}/{total} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nSummary: {summary_txt}\nMeta:    {meta_path}")
+    print_result_paths(paths, summary_txt)
     return 0 if passed == total else 3
 
 def clean_code_output(text: str) -> str:
@@ -920,12 +974,6 @@ def evaluate_agent_output(text: str, case: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def validate_agent_output(text: str, case: dict[str, Any]) -> tuple[bool, bool, str]:
-    """Compatibility wrapper for older callers; prefer evaluate_agent_output()."""
-    result = evaluate_agent_output(text, case)
-    return bool(result["syntax_ok"]), bool(result["requirements_ok"]), "; ".join(result["problems"])
-
-
 def agent_options(case: dict[str, Any]) -> dict[str, Any]:
     options: dict[str, Any] = {"num_predict": int(case.get("num_predict", 384))}
     raw = os.environ.get("AGENT_TEMPERATURE", "").strip()
@@ -941,14 +989,21 @@ def benchmark_agent(args: argparse.Namespace) -> int:
     models = choose_models(client, args.models, "agentic-")
     if not models:
         raise BenchmarkError("no agentic models found")
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_agent_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
-    write_meta(meta_path, client, "agent", models, fixture)
+    paths = prepare_result_dir("agent", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture)
+    write_meta(
+        meta_path, client, "agent", models, fixture,
+        options={
+            "temperature_override": (
+                float(os.environ["AGENT_TEMPERATURE"])
+                if os.environ.get("AGENT_TEMPERATURE", "").strip() else None
+            )
+        },
+    )
     fields = [
         "timestamp", "model", "case_id", "validator", "format_ok", "syntax_ok",
-        "requirements_ok", "accepted", "correctness_ok", "validation_error",
+        "requirements_ok", "accepted", "validation_error",
         "answer_started", "answer_chars", "thinking_chars", "wall_s", "load_s",
         "eval_count", "done_reason", "temp_max_c", "mem_available_min_mib",
         "swap_used_max_mib",
@@ -997,7 +1052,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                         "timestamp": iso_now(), "model": model, "case_id": case["id"], "validator": case["validator"],
                         "format_ok": int(bool(result["format_ok"])), "syntax_ok": int(bool(result["syntax_ok"])),
                         "requirements_ok": int(bool(result["requirements_ok"])), "accepted": int(accepted),
-                        "correctness_ok": int(accepted), "validation_error": error,
+                        "validation_error": error,
                         "answer_started": int(bool(content.strip())), "answer_chars": len(content), "thinking_chars": len(thinking),
                         "wall_s": f"{wall:.3f}", "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
                         "eval_count": response.get("eval_count", 0), "done_reason": done_reason,
@@ -1005,12 +1060,13 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                         "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
                     }
                     writer.writerow(row)
-                    append_jsonl(
+                    append_result(
                         jsonl_path,
                         result_record(
                             category="agent",
                             model=model,
                             case_id=case["id"],
+                            result_type="qualification",
                             outcome="pass" if accepted else "quality-fail",
                             failure_kinds=failures,
                             diagnostics=diagnostics,
@@ -1046,10 +1102,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                     print(f"WARNING: {exc}", file=sys.stderr)
     _summary_json, summary_txt = write_result_summary(jsonl_path, category="agent")
     print(f"\nAgent acceptance: {passed}/{total} passed")
-    print(
-        f"Results: {csv_path}\nDetails: {jsonl_path}\n"
-        f"Summary: {summary_txt}\nMeta:    {meta_path}"
-    )
+    print_result_paths(paths, summary_txt)
     return 0 if passed == total else 3
 
 
@@ -1216,10 +1269,9 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
     if not models:
         raise BenchmarkError("no packaged OCR models found")
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_ocr_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
+    paths = prepare_result_dir("ocr", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture_dir)
     write_meta(meta_path, client, "ocr", models, manifest)
 
     fields = [
@@ -1325,25 +1377,48 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
                     }
                     writer.writerow(row)
                     handle.flush()
-                    append_jsonl(
+                    append_result(
                         jsonl_path,
-                        {
-                            "timestamp": iso_now(),
-                            "category": "ocr",
-                            "model": model,
-                            "case": case["id"],
-                            "prompt": prompt,
-                            "response": content,
-                            "word_precision": word_precision,
-                            "word_recall": word_recall,
-                            "word_f1": word_f1,
-                            "char_similarity": char_similarity,
-                            "field_recall": field_recall,
-                            "field_order_score": field_order_score,
-                            "structure_score": structure_score,
-                            "table_signal": table_signal,
-                            "telemetry": telemetry,
-                        },
+                        result_record(
+                            category="ocr",
+                            model=model,
+                            case_id=case["id"],
+                            result_type="measurement",
+                            outcome="pass",
+                            diagnostics=(
+                                ["thermal"]
+                                if safe_float(telemetry.get("seconds_ge_80c")) > 0
+                                else []
+                            ),
+                            metrics={
+                                "word_precision": word_precision,
+                                "word_recall": word_recall,
+                                "word_f1": word_f1,
+                                "char_similarity": char_similarity,
+                                "field_recall": field_recall,
+                                "field_order_score": field_order_score,
+                                "structure_score": structure_score,
+                                "table_signal": table_signal,
+                                "wall_s": wall,
+                                "load_s": ns_to_s(response.get("load_duration")),
+                                "prompt_eval_count": response.get("prompt_eval_count", 0),
+                                "eval_count": response.get("eval_count", 0),
+                                "done_reason": response.get("done_reason", ""),
+                                "mem_available_min_mib": telemetry.get(
+                                    "mem_available_min_mib"
+                                ),
+                                "swap_peak_delta_mib": telemetry.get(
+                                    "swap_peak_delta_mib"
+                                ),
+                                "temp_max_c": telemetry.get("temp_max_c"),
+                            },
+                            timestamp=iso_now(),
+                            language=case["language"],
+                            prompt_kind=kind,
+                            prompt_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+                            response=content,
+                            telemetry=telemetry,
+                        ),
                     )
                     print(
                         f"  {case['id']}: word-F1={word_f1:.3f} chars={char_similarity:.3f} "
@@ -1356,7 +1431,8 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
                     client.ensure_unloaded(model)
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
-    print(f"\nResults: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    _summary_json, summary_txt = write_result_summary(jsonl_path, category="ocr")
+    print_result_paths(paths, summary_txt)
     return 0
 
 
@@ -1430,11 +1506,17 @@ def benchmark_translation(args: argparse.Namespace) -> int:
             "translation models are not registered: " + ", ".join(missing)
         )
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_translation_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
-    write_meta(meta_path, client, "translation", models, fixture)
+    paths = prepare_result_dir("translation", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture)
+    write_meta(
+        meta_path, client, "translation", models, fixture,
+        options={
+            "explicit_direction": os.environ.get(
+                "TRANSLATION_EXPLICIT_DIRECTION", ""
+            ).casefold() in {"1", "true", "yes"}
+        },
+    )
     fields = [
         "timestamp",
         "model",
@@ -1570,12 +1652,13 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     }
                     writer.writerow(row)
                     handle.flush()
-                    append_jsonl(
+                    append_result(
                         jsonl_path,
                         result_record(
                             category="translation",
                             model=model,
                             case_id=case["id"],
+                            result_type="qualification",
                             outcome="pass" if ok else "quality-fail",
                             failure_kinds=failures,
                             diagnostics=diagnostics,
@@ -1613,10 +1696,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
         jsonl_path, category="translation"
     )
     print(f"\nTranslation acceptance: {passed}/{total} passed")
-    print(
-        f"Results: {csv_path}\nDetails: {jsonl_path}\n"
-        f"Summary: {summary_txt}\nMeta:    {meta_path}"
-    )
+    print_result_paths(paths, summary_txt)
     return 0 if passed == total else 3
 
 
@@ -1643,6 +1723,7 @@ def _usecase_result_record(
         category="usecase",
         model=model,
         case_id=case["id"],
+        result_type="qualification",
         outcome="pass" if ok else "quality-fail",
         failure_kinds=failures,
         diagnostics=diagnostics,
@@ -1689,10 +1770,9 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
         )
 
     models = list(dict.fromkeys(case["model"] for case in cases))
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_usecase_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
+    paths = prepare_result_dir("usecase", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture)
     write_meta(meta_path, client, "usecase", models, fixture)
     fields = [
         "timestamp",
@@ -1760,7 +1840,7 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 writer.writerow(row)
                 handle.flush()
                 done_reason = str(response.get("done_reason") or "")
-                append_jsonl(
+                append_result(
                     jsonl_path,
                     _usecase_result_record(
                         case=case,
@@ -1787,13 +1867,22 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
 
     _sj, summary_txt = write_result_summary(jsonl_path, category="usecase")
     print(f"\nAcceptance: {passed}/{len(cases)} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nSummary: {summary_txt}\nMeta:    {meta_path}")
+    print_result_paths(paths, summary_txt)
     return 0 if passed == len(cases) else 3
+
+
+def rag_cycle_outcome(answer_ok: bool, answer_model_still_loaded: bool) -> tuple[str, list[str], int]:
+    """Classify RAG coexistence separately from answer quality."""
+    if not answer_model_still_loaded:
+        return "infra-fail", ["coexistence"], 1
+    if not answer_ok:
+        return "quality-fail", ["answer"], 3
+    return "pass", [], 0
 
 
 def benchmark_rag_cycle(args: argparse.Namespace) -> int:
     answer_client = OllamaClient(args.ollama_url, args.timeout)
-    embed_url = os.environ.get("EMBEDDING_OLLAMA_URL", "http://127.0.0.1:11437")
+    embed_url = args.embedding_ollama_url
     embed_client = OllamaClient(embed_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "rag-cycle.json")
     case = json.loads(fixture.read_text(encoding="utf-8"))
@@ -1828,16 +1917,23 @@ def benchmark_rag_cycle(args: argparse.Namespace) -> int:
     if answer_model.removesuffix(":latest") not in answer_available:
         raise BenchmarkError(f"RAG answer model is not registered on {args.ollama_url}: {answer_model}")
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_rag_cycle_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
-    write_meta(meta_path, answer_client, "rag-cycle", [answer_model], fixture)
+    paths = prepare_result_dir("rag-cycle", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture)
+    write_meta(
+        meta_path, answer_client, "rag-cycle", [answer_model], fixture,
+        options={"embedding_ollama_url": embed_url},
+    )
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    meta["embedding_ollama_url"] = embed_url
-    meta["embedding_ollama_version"] = embed_client.version()
-    meta["embedding_model"] = model_meta(embed_client, embed_model)
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    embed_version = embed_client.version()
+    meta.setdefault("runtimes", []).append({
+        "kind": "ollama",
+        "url": embed_client.base_url,
+        "version": embed_version,
+        "package_standard_version": STANDARD_OLLAMA_VERSION,
+    })
+    meta.setdefault("models", []).append(model_meta(embed_client, embed_model))
+    write_benchmark_metadata(meta_path, meta)
 
     embed_client.ensure_unloaded(embed_model)
     answer_client.ensure_unloaded(answer_model)
@@ -1879,11 +1975,8 @@ def benchmark_rag_cycle(args: argparse.Namespace) -> int:
         )
         answer_wall = time.monotonic() - answer_start
         cycle_wall = time.monotonic() - cycle_start
-        telemetry = sampler.stop()
-    except Exception:
-        sampler.stop()
-        raise
     finally:
+        telemetry = sampler.stop()
         for client, model in ((embed_client, embed_model), (answer_client, answer_model)):
             try:
                 client.ensure_unloaded(model)
@@ -1915,28 +2008,45 @@ def benchmark_rag_cycle(args: argparse.Namespace) -> int:
         writer = csv.DictWriter(handle, fieldnames=list(row))
         writer.writeheader()
         writer.writerow(row)
-    append_jsonl(
+    outcome, failure_kinds, exit_rc = rag_cycle_outcome(ok, answer_still_loaded)
+    append_result(
         jsonl_path,
-        {
-            **row,
-            "category": "rag-cycle",
-            "query": case["query"],
-            "retrieved_context": case["retrieved_context"],
-            "response": content,
-            "telemetry": telemetry,
-        },
+        result_record(
+            category="rag-cycle",
+            model=answer_model,
+            case_id=str(case.get("id") or "coexistence"),
+            result_type="qualification",
+            outcome=outcome,
+            failure_kinds=failure_kinds,
+            checks={
+                "answer": ok,
+                "answer_model_still_loaded": answer_still_loaded,
+            },
+            metrics={
+                key: value
+                for key, value in row.items()
+                if key not in {"timestamp", "embed_model", "answer_model"}
+            },
+            timestamp=row["timestamp"],
+            embed_model=embed_model,
+            embedding_scheme=scheme,
+            query=case["query"],
+            response=content,
+            telemetry=telemetry,
+        ),
     )
     print(
         f"RAG cycle: warm-answer={warm_wall:.2f}s embed={embed_wall:.2f}s "
         f"post-embed-answer={answer_wall:.2f}s total={cycle_wall:.2f}s "
         f"answer-still-loaded={answer_still_loaded} answer_ok={ok}"
     )
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
-    return 0 if ok else 3
+    _summary_json, summary_txt = write_result_summary(jsonl_path, category="rag-cycle")
+    print_result_paths(paths, summary_txt)
+    return exit_rc
 
 def benchmark_rag_quality(args: argparse.Namespace) -> int:
     answer_client = OllamaClient(args.ollama_url, args.timeout)
-    embed_url = os.environ.get("EMBEDDING_OLLAMA_URL", "http://127.0.0.1:11437")
+    embed_url = args.embedding_ollama_url
     embed_client = OllamaClient(embed_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "rag-quality-office.json")
     spec = json.loads(fixture.read_text(encoding="utf-8"))
@@ -1969,9 +2079,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
 
     top_k = int(os.environ.get("RAG_QUALITY_TOP_K", str(spec.get("top_k", 8))))
     default_num_predict = int(os.environ.get("RAG_QUALITY_NUM_PREDICT", "1024"))
-    think_policy = os.environ.get("RAG_QUALITY_THINK", "auto").strip().casefold()
-    if think_policy not in {"auto", "true", "false"}:
-        raise BenchmarkError("RAG_QUALITY_THINK must be auto, true or false")
+    think_policy = args.think
     if top_k < 1:
         raise BenchmarkError("RAG_QUALITY_TOP_K must be at least 1")
     if default_num_predict < 1:
@@ -1989,23 +2097,34 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
         raise BenchmarkError("RAG-quality embedding count does not match fixture")
     embed_client.ensure_unloaded(embed_model)
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_rag_quality_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
-    write_meta(meta_path, answer_client, "rag-quality", [answer_model], fixture)
+    paths = prepare_result_dir("rag-quality", args.output_dir)
+    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+    copy_fixtures(paths, fixture, corpus_path)
+    write_meta(
+        meta_path, answer_client, "rag-quality", [answer_model], fixture,
+        options={
+            "embedding_ollama_url": embed_url,
+            "rag_quality_top_k": top_k,
+            "rag_quality_num_predict_default": default_num_predict,
+            "rag_quality_think_policy": think_policy,
+        },
+    )
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    meta["embedding_ollama_url"] = embed_url
-    meta["embedding_ollama_version"] = embed_client.version()
-    meta["embedding_model"] = model_meta(embed_client, embed_model)
-    meta["rag_quality_num_predict_default"] = default_num_predict
-    meta["rag_quality_think_policy"] = think_policy
-    meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    embed_version = embed_client.version()
+    meta.setdefault("runtimes", []).append({
+        "kind": "ollama",
+        "url": embed_client.base_url,
+        "version": embed_version,
+        "package_standard_version": STANDARD_OLLAMA_VERSION,
+    })
+    meta.setdefault("models", []).append(model_meta(embed_client, embed_model))
+    meta["fixtures"] = fixture_metadata(fixture, corpus_path)
+    write_benchmark_metadata(meta_path, meta)
     fields = [
         "timestamp", "case_id", "embed_model", "answer_model", "embedding_scheme",
         "target_rank", "retrieval_ok", "answer_ok", "source_cited", "passed",
-        "failure_kind", "num_predict", "think_policy", "answer_chars", "thinking_chars", "done_reason",
-        "wall_s", "load_s", "temp_max_c", "mem_available_min_mib", "swap_used_max_mib",
+        "failure_kinds", "num_predict", "think_policy", "answer_chars", "thinking_chars", "done_reason",
+        "wall_s", "load_s", "temp_max_c", "mem_available_min_mib", "swap_peak_delta_mib",
     ]
     passed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
@@ -2067,18 +2186,18 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
             thinking_exhausted = (
                 not content.strip() and bool(thinking.strip()) and done_reason == "length"
             )
-            if ok:
-                failure_kind = ""
-            elif not retrieval_ok:
-                failure_kind = "retrieval"
-            elif thinking_exhausted:
-                failure_kind = "thinking-budget-exhausted"
-            elif not answer_ok and not source_cited:
-                failure_kind = "answer-and-citation"
-            elif not answer_ok:
-                failure_kind = "answer"
-            else:
-                failure_kind = "citation"
+            failure_kinds: list[str] = []
+            if not retrieval_ok:
+                failure_kinds.append("retrieval")
+            if not answer_ok:
+                failure_kinds.append("answer")
+            if not source_cited:
+                failure_kinds.append("citation")
+            diagnostics: list[str] = []
+            if thinking_exhausted:
+                diagnostics.extend(["thinking-budget", "output-budget"])
+            elif done_reason == "length":
+                diagnostics.append("output-budget")
             passed += int(ok)
             row = {
                 "timestamp": iso_now(),
@@ -2091,7 +2210,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                 "answer_ok": int(answer_ok),
                 "source_cited": int(source_cited),
                 "passed": int(ok),
-                "failure_kind": failure_kind,
+                "failure_kinds": ";".join(failure_kinds),
                 "num_predict": num_predict,
                 "think_policy": think_policy,
                 "answer_chars": len(content),
@@ -2101,35 +2220,68 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                 "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
                 "temp_max_c": telemetry.get("temp_max_c"),
                 "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
-                "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
+                "swap_peak_delta_mib": telemetry.get("swap_peak_delta_mib"),
             }
             writer.writerow(row)
             handle.flush()
-            append_jsonl(
+            append_result(
                 jsonl_path,
-                {
-                    **row,
-                    "category": "rag-quality",
-                    "question": case["question"],
-                    "target": case["target"],
-                    "top": [(round(score, 6), doc["id"]) for score, doc in selected],
-                    "response": content,
-                    "thinking": thinking,
-                    "problems": problems,
-                    "telemetry": telemetry,
-                },
+                result_record(
+                    category="rag-quality",
+                    model=answer_model,
+                    case_id=case["id"],
+                    result_type="qualification",
+                    outcome="pass" if ok else "quality-fail",
+                    failure_kinds=failure_kinds,
+                    diagnostics=diagnostics,
+                    checks={
+                        "retrieval": retrieval_ok,
+                        "answer": answer_ok,
+                        "citation": source_cited,
+                    },
+                    metrics={
+                        "target_rank": target_rank,
+                        "num_predict": num_predict,
+                        "answer_chars": len(content),
+                        "thinking_chars": len(thinking),
+                        "wall_s": wall,
+                        "load_s": ns_to_s(response.get("load_duration")),
+                        "mem_available_min_mib": telemetry.get(
+                            "mem_available_min_mib"
+                        ),
+                        "swap_peak_delta_mib": telemetry.get(
+                            "swap_peak_delta_mib"
+                        ),
+                        "temp_max_c": telemetry.get("temp_max_c"),
+                    },
+                    timestamp=iso_now(),
+                    embed_model=embed_model,
+                    embedding_scheme=scheme,
+                    think_policy=think_policy,
+                    question=case["question"],
+                    target=case["target"],
+                    top=[(round(score, 6), doc["id"]) for score, doc in selected],
+                    response=content,
+                    thinking=thinking,
+                    problems=problems,
+                    done_reason=done_reason,
+                    telemetry=telemetry,
+                ),
             )
             print(
                 f"  {case['id']}: rank={target_rank} retrieval={retrieval_ok} "
                 f"answer={answer_ok} cited={source_cited} pass={ok} "
-                f"failure={failure_kind or 'none'} think={think_policy}"
+                f"failures={','.join(failure_kinds) or 'none'} think={think_policy}"
             )
     try:
         answer_client.ensure_unloaded(answer_model)
     except BenchmarkError as exc:
         print(f"WARNING: {exc}", file=sys.stderr)
+    _summary_json, summary_txt = write_result_summary(
+        jsonl_path, category="rag-quality"
+    )
     print(f"\nRAG quality acceptance: {passed}/{len(cases)} passed")
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
+    print_result_paths(paths, summary_txt)
     return 0 if passed == len(cases) else 3
 
 
@@ -2155,7 +2307,7 @@ def add_common(parser: argparse.ArgumentParser, default_url: str) -> None:
         "--timeout", type=float, default=float(os.environ.get("REQUEST_TIMEOUT", "900"))
     )
     parser.add_argument("--fixture", help="override packaged fixture/manifest")
-    parser.add_argument("--output", help="CSV output path")
+    parser.add_argument("--output-dir", help="result directory; must be empty")
 
 
 def main() -> int:
@@ -2165,9 +2317,7 @@ def main() -> int:
     )
     sub = parser.add_subparsers(dest="category", required=True)
     emb = sub.add_parser(
-        "embeddings",
-        aliases=["embedding"],
-        help="multilingual retrieval quality + throughput",
+        "embeddings", help="multilingual retrieval quality + throughput"
     )
     add_common(emb, "http://127.0.0.1:11437")
     emb.add_argument(
@@ -2178,7 +2328,7 @@ def main() -> int:
     )
     add_common(task, "http://127.0.0.1:11435")
     agent = sub.add_parser(
-        "agent", aliases=["coding"], help="coding/agent output correctness + runtime"
+        "agent", help="coding/agent output correctness + runtime"
     )
     add_common(agent, "http://127.0.0.1:11436")
     ocr = sub.add_parser(
@@ -2186,39 +2336,51 @@ def main() -> int:
     )
     add_common(ocr, "http://127.0.0.1:11434")
     usecase = sub.add_parser(
-        "usecase", aliases=["acceptance"], help="one role-defining acceptance case per production model"
+        "usecase", help="one role-defining acceptance case per production model"
     )
     add_common(usecase, "http://127.0.0.1:11434")
     translation = sub.add_parser(
-        "translation", aliases=["translate"], help="DE/FR office translation acceptance"
+        "translation", help="DE/FR office translation acceptance"
     )
     add_common(translation, "http://127.0.0.1:11434")
     rag = sub.add_parser(
-        "rag", aliases=["rag-cycle"], help="measure dedicated embedding activity while the main answer model stays resident"
+        "rag-cycle",
+        help="measure dedicated embedding activity while the main answer model stays resident",
     )
     add_common(rag, "http://127.0.0.1:11434")
+    rag.add_argument(
+        "--embedding-ollama-url",
+        default=os.environ.get("EMBEDDING_OLLAMA_URL", "http://127.0.0.1:11437"),
+    )
     rag_quality = sub.add_parser(
-        "rag-quality", aliases=["rag-acceptance"], help="embedding retrieval plus grounded-answer acceptance"
+        "rag-quality", help="embedding retrieval plus grounded-answer acceptance"
     )
     add_common(rag_quality, "http://127.0.0.1:11434")
+    rag_quality.add_argument(
+        "--embedding-ollama-url",
+        default=os.environ.get("EMBEDDING_OLLAMA_URL", "http://127.0.0.1:11437"),
+    )
+    rag_quality.add_argument(
+        "--think", choices=("auto", "true", "false"), default="auto"
+    )
     args = parser.parse_args()
 
     try:
-        if args.category in {"embeddings", "embedding"}:
+        if args.category == "embeddings":
             return benchmark_embeddings(args)
         if args.category == "task":
             return benchmark_task(args)
-        if args.category in {"agent", "coding"}:
+        if args.category == "agent":
             return benchmark_agent(args)
         if args.category == "ocr":
             return benchmark_ocr(args)
-        if args.category in {"usecase", "acceptance"}:
+        if args.category == "usecase":
             return benchmark_usecase(args)
-        if args.category in {"translation", "translate"}:
+        if args.category == "translation":
             return benchmark_translation(args)
-        if args.category in {"rag", "rag-cycle"}:
+        if args.category == "rag-cycle":
             return benchmark_rag_cycle(args)
-        if args.category in {"rag-quality", "rag-acceptance"}:
+        if args.category == "rag-quality":
             return benchmark_rag_quality(args)
     except (BenchmarkError, OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

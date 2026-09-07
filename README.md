@@ -133,13 +133,13 @@ sudo bc250-revalidate status          # opt-in appliance revalidation state
 # sudo bc250-reset
 
 # Compare models and specialized model categories
-bc250-benchmark
+bc250-benchmark generation
 bc250-benchmark embeddings
 bc250-benchmark ocr
 bc250-benchmark task
 bc250-benchmark agent
 bc250-benchmark usecase
-bc250-benchmark rag
+bc250-benchmark rag-cycle
 bc250-benchmark translation
 bc250-benchmark rag-quality
 ```

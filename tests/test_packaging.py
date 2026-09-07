@@ -113,8 +113,11 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("ocr", result.stdout.splitlines())
         self.assertIn("models/ocr/bc250-ocr.sh\t{libexec}/ocr.sh", manifest)
         for entry in (
+            "cmd/benchmark/benchmark.sh\t{libexec}/benchmark.sh",
             "cmd/benchmark/generation-benchmark.py\t{libexec}/generation-benchmark.py",
             "cmd/benchmark/category-benchmark.py\t{libexec}/category-benchmark.py",
+            "cmd/benchmark/runtime-benchmark.py\t{libexec}/runtime-benchmark.py",
+            "cmd/benchmark/openwebui-benchmark.py\t{libexec}/openwebui-benchmark.py",
             "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
             "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
             "examples/benchmark/agent-cases.json\t{share}/benchmark/agent-cases.json",

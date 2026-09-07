@@ -7,16 +7,19 @@ an otherwise minimal Fedora host. API shapes target Ollama 0.33.3.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
 import re
+import shutil
 import statistics
 import subprocess
 import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib import error, request
@@ -27,22 +30,195 @@ DEFAULT_TELEMETRY_INTERVAL = 0.5
 TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
 RESULT_SCHEMA_VERSION = 1
 VALID_OUTCOMES = {"pass", "quality-fail", "infra-fail", "skipped"}
+VALID_RESULT_TYPES = {"measurement", "qualification"}
 
 
-def prepare_result_sidecars(csv_path: Path) -> Path:
-    """Start a benchmark invocation with fresh JSONL/summary sidecars.
+PACKAGE_NAME = "bc250-llm-server"
+BENCHMARK_METADATA_VERSION = 1
 
-    CSV and meta files are written with replacement semantics elsewhere. Keep the
-    canonical case stream and derived summaries aligned with that same invocation.
-    """
-    jsonl_path = csv_path.with_suffix(".jsonl")
-    for path in (
-        jsonl_path,
-        jsonl_path.with_suffix(".summary.json"),
-        jsonl_path.with_suffix(".summary.txt"),
-    ):
-        path.unlink(missing_ok=True)
-    return jsonl_path
+
+def iso_now() -> str:
+    return datetime.now().astimezone().isoformat(timespec="seconds")
+
+
+def package_identity() -> dict[str, str]:
+    """Return installed package identity, falling back to the source tree."""
+    try:
+        result = subprocess.run(
+            [
+                "rpm",
+                "-q",
+                "--qf",
+                "%{NAME}\t%{VERSION}\t%{RELEASE}\t%{ARCH}",
+                PACKAGE_NAME,
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        result = None
+    if result is not None and result.returncode == 0:
+        parts = result.stdout.strip().split("\t")
+        if len(parts) == 4:
+            name, version, release, arch = parts
+            return {
+                "name": name,
+                "version": version,
+                "release": release,
+                "arch": arch,
+                "nevra": f"{name}-{version}-{release}.{arch}",
+            }
+
+    root = Path(__file__).resolve().parents[2]
+    version = "unknown"
+    release = "unknown"
+    try:
+        version = (root / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    try:
+        spec = (root / "packaging" / "bc250-llm-server.spec").read_text(encoding="utf-8")
+        match = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
+        if match:
+            release = match.group(1)
+    except OSError:
+        pass
+    return {
+        "name": PACKAGE_NAME,
+        "version": version,
+        "release": release,
+        "arch": "source",
+        "nevra": f"{PACKAGE_NAME}-{version}-{release}",
+    }
+
+
+def fixture_metadata(*sources: Path) -> list[dict[str, str]]:
+    items: list[dict[str, str]] = []
+    for source in sources:
+        source = Path(source)
+        if source.is_file():
+            try:
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            except OSError:
+                digest = ""
+            items.append({"name": source.name, "sha256": digest})
+    return items
+
+
+def benchmark_metadata(
+    category: str,
+    *,
+    benchmark_version: str,
+    models: list[dict[str, Any]] | None = None,
+    fixtures: list[dict[str, str]] | None = None,
+    options: dict[str, Any] | None = None,
+    runtimes: list[dict[str, Any]] | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    """Build the small common metadata envelope for canonical benchmark evidence."""
+    data: dict[str, Any] = {
+        "metadata_version": BENCHMARK_METADATA_VERSION,
+        "result_schema_version": RESULT_SCHEMA_VERSION,
+        "category": category,
+        "benchmark_version": benchmark_version,
+        "started_at": iso_now(),
+        "finished_at": None,
+        "package": package_identity(),
+        "kernel": os.uname().release,
+        "models": models or [],
+        "fixtures": fixtures or [],
+        "options": options or {},
+        "runtimes": runtimes or [],
+    }
+    data.update(extra)
+    return data
+
+
+def write_benchmark_metadata(path: Path, data: dict[str, Any]) -> None:
+    path.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
+def finalize_benchmark_metadata(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(data, dict):
+        return
+    fixtures_dir = path.parent / "fixtures"
+    if fixtures_dir.is_dir():
+        fixtures: list[dict[str, str]] = []
+        for fixture in sorted(item for item in fixtures_dir.rglob("*") if item.is_file()):
+            try:
+                digest = hashlib.sha256(fixture.read_bytes()).hexdigest()
+            except OSError:
+                digest = ""
+            fixtures.append(
+                {
+                    "name": fixture.relative_to(fixtures_dir).as_posix(),
+                    "sha256": digest,
+                }
+            )
+        data["fixtures"] = fixtures
+    data["finished_at"] = iso_now()
+    write_benchmark_metadata(path, data)
+
+
+@dataclass(frozen=True)
+class BenchmarkPaths:
+    root: Path
+    results_jsonl: Path
+    summary_json: Path
+    summary_txt: Path
+    meta_json: Path
+    csv_export: Path
+    fixtures_dir: Path
+
+
+def prepare_result_dir(category: str, output_dir: str | Path | None = None) -> BenchmarkPaths:
+    """Create one isolated result directory for a benchmark invocation."""
+    if output_dir is None:
+        stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
+        root = Path("bc250-results") / f"{stamp}-{category}"
+    else:
+        root = Path(output_dir)
+    if root.exists() and any(root.iterdir()):
+        raise BenchmarkError(f"result directory is not empty: {root}")
+    root.mkdir(parents=True, exist_ok=True)
+    fixtures = root / "fixtures"
+    fixtures.mkdir(exist_ok=True)
+    return BenchmarkPaths(
+        root=root,
+        results_jsonl=root / "results.jsonl",
+        summary_json=root / "summary.json",
+        summary_txt=root / "summary.txt",
+        meta_json=root / "meta.json",
+        csv_export=root / "results.csv",
+        fixtures_dir=fixtures,
+    )
+
+
+def copy_fixtures(paths: BenchmarkPaths, *sources: Path) -> None:
+    """Copy deterministic benchmark inputs once beside the canonical case stream."""
+    for source in sources:
+        source = Path(source)
+        target = paths.fixtures_dir / source.name
+        if source.is_dir():
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, target)
+
+
+def append_result(path: Path, data: dict[str, Any]) -> None:
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def result_record(
@@ -51,6 +227,7 @@ def result_record(
     model: str,
     case_id: str,
     outcome: str,
+    result_type: str,
     failure_kinds: Iterable[str] = (),
     diagnostics: Iterable[str] = (),
     checks: dict[str, Any] | None = None,
@@ -60,12 +237,15 @@ def result_record(
     """Build the small common case envelope used by benchmark JSONL output."""
     if outcome not in VALID_OUTCOMES:
         raise ValueError(f"invalid benchmark outcome: {outcome}")
+    if result_type not in VALID_RESULT_TYPES:
+        raise ValueError(f"invalid benchmark result type: {result_type}")
     record: dict[str, Any] = {
         "schema_version": RESULT_SCHEMA_VERSION,
         "category": category,
         "model": model,
         "case_id": case_id,
         "outcome": outcome,
+        "result_type": result_type,
         "failure_kinds": list(dict.fromkeys(failure_kinds)),
         "diagnostics": list(dict.fromkeys(diagnostics)),
         "checks": checks or {},
@@ -73,6 +253,275 @@ def result_record(
     }
     record.update(extra)
     return record
+
+
+
+def _number(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _metric_values(records: list[dict[str, Any]], key: str) -> list[float]:
+    values: list[float] = []
+    for row in records:
+        metrics = row.get("metrics")
+        if not isinstance(metrics, dict):
+            continue
+        value = _number(metrics.get(key))
+        if value is not None:
+            values.append(value)
+    return values
+
+
+def chronological_resource_aggregate(
+    records: Iterable[dict[str, Any]], *, nested_metrics: bool = False
+) -> dict[str, float | None]:
+    """Aggregate sequential resource samples without inventing additive UMA pools.
+
+    Swap start/end are chronological run boundaries: the first observed start and
+    last observed end. Peak is the maximum observed peak, and delta is measured
+    from the run start to that peak. Per-case temperature p95 values cannot be
+    merged into a true run-wide p95, so the aggregate names that statistic
+    explicitly as max-case-p95.
+    """
+    rows = list(records)
+
+    def metric(row: dict[str, Any], key: str) -> float | None:
+        source: Any = row.get("metrics") if nested_metrics else row
+        if not isinstance(source, dict):
+            return None
+        return _number(source.get(key))
+
+    def values(key: str) -> list[float]:
+        return [value for row in rows if (value := metric(row, key)) is not None]
+
+    starts = values("swap_used_start_mib")
+    peaks = values("swap_used_max_mib")
+    ends = values("swap_used_end_mib")
+    swap_start = starts[0] if starts else None
+    swap_peak = max(peaks) if peaks else None
+    swap_end = ends[-1] if ends else None
+    swap_delta = (
+        max(0.0, swap_peak - swap_start)
+        if swap_start is not None and swap_peak is not None
+        else None
+    )
+    return {
+        "temp_max_c": max(values("temp_max_c"), default=None),
+        "temp_p95_max_case_c": max(values("temp_p95_c"), default=None),
+        "mem_available_min_mib": min(values("mem_available_min_mib"), default=None),
+        "swap_used_start_mib": swap_start,
+        "swap_used_max_mib": swap_peak,
+        "swap_used_end_mib": swap_end,
+        "swap_peak_delta_mib": swap_delta,
+        "resident_size_bytes": max(values("resident_size_bytes"), default=None),
+        "vram_used_max_bytes": max(values("vram_used_max_bytes"), default=None),
+        "gtt_used_max_bytes": max(values("gtt_used_max_bytes"), default=None),
+        "gpu_clock_min_mhz": min(values("gpu_clock_min_mhz"), default=None),
+        "gpu_clock_max_mhz": max(values("gpu_clock_max_mhz"), default=None),
+    }
+
+
+def category_aggregates(records: list[dict[str, Any]], category: str) -> dict[str, Any]:
+    """Return a small category-specific aggregate section for canonical summaries."""
+    by_model: dict[str, list[dict[str, Any]]] = {}
+    for row in records:
+        by_model.setdefault(str(row.get("model") or "unknown"), []).append(row)
+    aggregates: dict[str, Any] = {}
+
+    if category == "generation":
+        models: dict[str, Any] = {}
+        for model, rows in by_model.items():
+            ok = [row for row in rows if row.get("outcome") == "pass"]
+            short = [row for row in ok if row.get("test") == "short"]
+            short_tps = _metric_values(short, "tokens_per_second")
+            cold = [row for row in ok if row.get("test") == "cold_chat"]
+            warm = [row for row in ok if row.get("test") == "warm_chat"]
+            prefill = [row for row in ok if row.get("test") == "prefill"]
+            resource_rows = ok
+            resources = chronological_resource_aggregate(
+                resource_rows, nested_metrics=True
+            )
+            mean_decode = statistics.fmean(short_tps) if short_tps else None
+            cv = None
+            if len(short_tps) >= 2 and mean_decode and mean_decode > 0:
+                cv = statistics.stdev(short_tps) / mean_decode * 100.0
+            diagnostics: dict[str, int] = {}
+            for row in rows:
+                for name in row.get("diagnostics", []):
+                    diagnostics[str(name)] = diagnostics.get(str(name), 0) + 1
+            models[model] = {
+                "decode_mean_tps": mean_decode,
+                "decode_cv_pct": cv,
+                "cold_wall_s": (_metric_values(cold, "wall_duration_s") or [None])[0],
+                "warm_answer_latency_s": (
+                    statistics.fmean(_metric_values(warm, "time_to_first_answer_s"))
+                    if _metric_values(warm, "time_to_first_answer_s") else None
+                ),
+                "prefill_tps": (
+                    statistics.fmean(_metric_values(prefill, "prompt_tokens_per_second"))
+                    if _metric_values(prefill, "prompt_tokens_per_second") else None
+                ),
+                "resident_size_bytes": resources["resident_size_bytes"],
+                "mem_available_min_mib": resources["mem_available_min_mib"],
+                "swap_start_mib": resources["swap_used_start_mib"],
+                "swap_peak_mib": resources["swap_used_max_mib"],
+                "swap_end_mib": resources["swap_used_end_mib"],
+                "swap_peak_delta_mib": resources["swap_peak_delta_mib"],
+                "temp_max_c": resources["temp_max_c"],
+                "temp_p95_max_case_c": resources["temp_p95_max_case_c"],
+                "diagnostics": dict(sorted(diagnostics.items())),
+            }
+        aggregates["models"] = models
+    elif category == "embeddings":
+        models: dict[str, Any] = {}
+        summary_keys = (
+            "recall_at_1", "recall_at_3", "mrr", "cross_recall_at_1",
+            "cross_mrr", "hard_recall_at_1", "mean_target_margin",
+            "min_target_margin", "cold_load_s", "warm_input_tps",
+            "warm_wall_s", "resident_size_bytes", "allocated_context",
+            "mem_available_min_mib", "swap_used_start_mib",
+            "swap_used_max_mib", "swap_used_end_mib",
+            "swap_peak_delta_mib", "temp_max_c", "temp_p95_c",
+        )
+        for model, rows in by_model.items():
+            aggregate_rows = [row for row in rows if row.get("case_id") == "aggregate"]
+            if aggregate_rows:
+                metrics = aggregate_rows[-1].get("metrics") or {}
+                models[model] = {key: metrics.get(key) for key in summary_keys}
+            else:
+                quals = [row for row in rows if row.get("case_id") == "qualification"]
+                if quals:
+                    metrics = quals[-1].get("metrics") or {}
+                    models[model] = {key: metrics.get(key) for key in (
+                        "recall_at_1", "recall_at_3", "mrr", "hard_recall_at_1"
+                    )}
+                measurements = [row for row in rows if row.get("result_type") == "measurement"]
+                margins = _metric_values(measurements, "target_margin")
+                if margins:
+                    models.setdefault(model, {})["mean_target_margin"] = statistics.fmean(margins)
+                    models[model]["min_target_margin"] = min(margins)
+        aggregates["models"] = models
+    elif category == "ocr":
+        models: dict[str, Any] = {}
+        for model, rows in by_model.items():
+            models[model] = {}
+            for key in ("word_f1", "char_similarity", "field_recall", "field_order_score", "structure_score", "table_signal", "wall_s"):
+                values = _metric_values(rows, key)
+                if values:
+                    models[model][f"mean_{key}"] = statistics.fmean(values)
+        aggregates["models"] = models
+    elif category in {"task", "translation", "agent", "usecase", "rag-quality"}:
+        models: dict[str, Any] = {}
+        for model, rows in by_model.items():
+            quals = [row for row in rows if row.get("result_type") == "qualification"]
+            if not quals:
+                continue
+            model_failures: dict[str, int] = {}
+            model_diagnostics: dict[str, int] = {}
+            for row in quals:
+                for name in row.get("failure_kinds", []):
+                    model_failures[str(name)] = model_failures.get(str(name), 0) + 1
+                for name in row.get("diagnostics", []):
+                    model_diagnostics[str(name)] = model_diagnostics.get(str(name), 0) + 1
+            models[model] = {
+                "passed": sum(row.get("outcome") == "pass" for row in quals),
+                "quality_failed": sum(row.get("outcome") == "quality-fail" for row in quals),
+                "total": len(quals),
+                "failure_kinds": dict(sorted(model_failures.items())),
+                "diagnostics": dict(sorted(model_diagnostics.items())),
+            }
+        aggregates["models"] = models
+    elif category in {"rag-cycle", "concurrency"}:
+        if records:
+            latest = records[-1]
+            aggregates["checks"] = latest.get("checks", {})
+            aggregates["metrics"] = latest.get("metrics", {})
+    elif category == "num-batch":
+        aggregates["candidates"] = [
+            {
+                "model": row.get("model"),
+                "num_batch": row.get("num_batch"),
+                "outcome": row.get("outcome"),
+                "prompt_eval_s": (row.get("metrics") or {}).get("prompt_eval_s"),
+                "wall_s": (row.get("metrics") or {}).get("wall_s"),
+            }
+            for row in records
+            if row.get("case_id", "").startswith("num-batch-")
+        ]
+    elif category == "owui-embedding-batch":
+        aggregates["candidates"] = [
+            {
+                "batch": row.get("batch"),
+                "outcome": row.get("outcome"),
+                "process_wall_s": (row.get("metrics") or {}).get("process_wall_s"),
+            }
+            for row in records
+            if row.get("batch") is not None and "cleanup" not in str(row.get("case_id"))
+        ]
+    elif category in {"owui-chunk-min", "owui-system-context"}:
+        key = "chunk_min_size_target" if category == "owui-chunk-min" else "setting"
+        grouped: dict[str, dict[str, int]] = {}
+        for row in records:
+            value = row.get(key)
+            if value is None:
+                continue
+            bucket = grouped.setdefault(str(value), {"pass": 0, "quality-fail": 0, "infra-fail": 0})
+            outcome = str(row.get("outcome"))
+            if outcome in bucket:
+                bucket[outcome] += 1
+        aggregates["candidates"] = grouped
+    elif records:
+        aggregates["measurement_cases"] = len(
+            [row for row in records if row.get("result_type") == "measurement"]
+        )
+    return aggregates
+
+
+def _fmt_aggregate(value: Any) -> str:
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
+
+
+def aggregate_summary_lines(category: str, aggregates: dict[str, Any]) -> list[str]:
+    if not aggregates:
+        return []
+    lines = ["", "Category aggregates"]
+    models = aggregates.get("models")
+    if isinstance(models, dict):
+        for model, values in models.items():
+            lines.append(f"  {model}")
+            if isinstance(values, dict):
+                for key, value in values.items():
+                    if value is not None and value != {}:
+                        lines.append(f"    {key:<24} {_fmt_aggregate(value)}")
+    else:
+        for key, value in aggregates.items():
+            if isinstance(value, dict):
+                lines.append(f"  {key}")
+                for subkey, subvalue in value.items():
+                    if subvalue is not None:
+                        lines.append(f"    {subkey:<24} {_fmt_aggregate(subvalue)}")
+            elif isinstance(value, list):
+                lines.append(f"  {key}")
+                for item in value:
+                    if isinstance(item, dict):
+                        rendered = " ".join(
+                            f"{name}={_fmt_aggregate(item_value)}"
+                            for name, item_value in item.items()
+                            if item_value is not None
+                        )
+                        lines.append(f"    {rendered}")
+                    else:
+                        lines.append(f"    {_fmt_aggregate(item)}")
+            else:
+                lines.append(f"  {key:<26} {_fmt_aggregate(value)}")
+    return lines
 
 
 def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path]:
@@ -107,6 +556,10 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
                 raise BenchmarkError(
                     f"{jsonl_path}:{line_no}: missing/invalid outcome"
                 )
+            if row.get("result_type") not in VALID_RESULT_TYPES:
+                raise BenchmarkError(
+                    f"{jsonl_path}:{line_no}: missing/invalid result_type"
+                )
             for key in ("failure_kinds", "diagnostics"):
                 if not isinstance(row.get(key), list):
                     raise BenchmarkError(
@@ -119,45 +572,84 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
                     )
             records.append(row)
     counts = {name: 0 for name in ("pass", "quality-fail", "infra-fail", "skipped")}
+    type_counts = {name: 0 for name in ("measurement", "qualification")}
+    qualification_counts = {name: 0 for name in ("pass", "quality-fail", "skipped")}
     failures: dict[str, int] = {}
+    infra_failures: dict[str, int] = {}
     diagnostics: dict[str, int] = {}
     for row in records:
-        counts[str(row["outcome"])] += 1
-        for name in row.get("failure_kinds", []):
-            failures[str(name)] = failures.get(str(name), 0) + 1
+        outcome = str(row["outcome"])
+        result_type = str(row["result_type"])
+        counts[outcome] += 1
+        type_counts[result_type] += 1
+        if result_type == "qualification" and outcome in qualification_counts:
+            qualification_counts[outcome] += 1
+        if result_type == "qualification" and outcome == "quality-fail":
+            for name in row.get("failure_kinds", []):
+                failures[str(name)] = failures.get(str(name), 0) + 1
+        if outcome == "infra-fail":
+            for name in row.get("failure_kinds", []):
+                infra_failures[str(name)] = infra_failures.get(str(name), 0) + 1
         for name in row.get("diagnostics", []):
             diagnostics[str(name)] = diagnostics.get(str(name), 0) + 1
     quality = "not-run"
-    if counts["pass"] or counts["quality-fail"]:
-        quality = "mixed" if counts["pass"] and counts["quality-fail"] else (
-            "fail" if counts["quality-fail"] else "pass"
+    if qualification_counts["pass"] or qualification_counts["quality-fail"]:
+        quality = (
+            "mixed"
+            if qualification_counts["pass"] and qualification_counts["quality-fail"]
+            else ("fail" if qualification_counts["quality-fail"] else "pass")
         )
+    infrastructure = "fail" if counts["infra-fail"] else (
+        "pass" if records else "not-run"
+    )
+    aggregates = category_aggregates(records, category)
     summary = {
         "schema_version": RESULT_SCHEMA_VERSION,
         "category": category,
         "cases": len(records),
         "counts": counts,
+        "result_types": type_counts,
+        "qualification_counts": qualification_counts,
+        "infrastructure": infrastructure,
         "quality": quality,
         "failure_kinds": dict(sorted(failures.items())),
+        "infrastructure_failure_kinds": dict(sorted(infra_failures.items())),
         "diagnostics": dict(sorted(diagnostics.items())),
+        "aggregates": aggregates,
     }
-    summary_json = jsonl_path.with_suffix(".summary.json")
-    summary_txt = jsonl_path.with_suffix(".summary.txt")
-    summary_json.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if jsonl_path.name == "results.jsonl":
+        summary_json = jsonl_path.parent / "summary.json"
+        summary_txt = jsonl_path.parent / "summary.txt"
+    else:
+        summary_json = jsonl_path.with_suffix(".summary.json")
+        summary_txt = jsonl_path.with_suffix(".summary.txt")
+    summary_json.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     lines = [
         f"BC-250 benchmark summary: {category}",
         "",
         f"Cases          {len(records)}",
+        f"Infrastructure {infrastructure.upper()}",
         f"Quality        {quality.upper()}",
         f"Pass           {counts['pass']}",
-        f"Quality-fail   {counts['quality-fail']}",
+        f"Measurements   {type_counts['measurement']}",
+        f"Qualifications {type_counts['qualification']}",
+        f"Qual pass      {qualification_counts['pass']}",
+        f"Quality-fail   {qualification_counts['quality-fail']}",
+        f"Qual skipped   {qualification_counts['skipped']}",
         f"Infra-fail     {counts['infra-fail']}",
-        f"Skipped        {counts['skipped']}",
     ]
     if failures:
-        lines += ["", "Failure kinds"] + [f"  {name:<20} {count}" for name, count in sorted(failures.items())]
+        lines += ["", "Failure kinds"] + [
+            f"  {name:<20} {count}" for name, count in sorted(failures.items())
+        ]
     if diagnostics:
-        lines += ["", "Diagnostics"] + [f"  {name:<20} {count}" for name, count in sorted(diagnostics.items())]
+        lines += ["", "Diagnostics"] + [
+            f"  {name:<20} {count}" for name, count in sorted(diagnostics.items())
+        ]
+    lines += aggregate_summary_lines(category, aggregates)
     summary_txt.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return summary_json, summary_txt
 

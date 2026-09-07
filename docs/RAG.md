@@ -168,15 +168,20 @@ Use the local quality lanes before and after a tuning experiment:
 ```bash
 bc250-benchmark embeddings
 bc250-benchmark rag-quality
-RUN_WARM_PREFIX=1 RUN_CONTEXT=0 RUN_THERMAL=0 bc250-benchmark generation \
+bc250-benchmark rag-quality --think true
+bc250-benchmark rag-quality --think false
+bc250-benchmark generation --profile compare \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+bc250-benchmark owui-embedding-batch --token-file /root/owui-test.key
+bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /root/owui-test.key
+sudo bc250-benchmark owui-system-context OWUI_RAG_MODEL \
+  --token-file /root/owui-test.key
 ```
 
-The last command measures a byte-identical shared document prefix followed by a
-different suffix; the ordinary prefill/context curve remains cold-runner by design.
-For `RAG_SYSTEM_CONTEXT` specifically, also compare the same follow-up conversation
-through Open WebUI because the standalone Ollama benchmark cannot reproduce Open
-WebUI's message placement.
+The Open WebUI tuning commands are explicit experiments and restore the observed
+package-owned setting before returning. `owui-system-context` performs the repeated
+multi-turn comparison through Open WebUI because standalone Ollama generation cannot
+reproduce Open WebUI's message placement.
 
 ## 4. Authoritative document tree and language policy
 
@@ -404,7 +409,7 @@ sudo du -sh /var/lib/open-webui/uploads \
   /var/lib/open-webui/vector_db 2>/dev/null
 ```
 
-Normal 0.10.0 operation separates the answer and embedding runners: main Ollama
+Normal operation separates the answer and embedding runners: main Ollama
 keeps `OLLAMA_MAX_LOADED_MODELS=1` on 11434, while the small embedding model lives
 on dedicated 11437 with a 10-minute keepalive. This prevents indexing from
 evicting the active production answer model while still keeping concurrency
@@ -415,13 +420,14 @@ Inspect both pools when qualifying memory headroom:
 ```bash
 curl -fsS http://127.0.0.1:11434/api/ps | jq
 curl -fsS http://127.0.0.1:11437/api/ps | jq
-bc250-benchmark rag
+bc250-benchmark rag-cycle embed-jina-v5-small-retrieval-q4-k-m \
+  prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 ```
 
 The RAG cycle now records whether a warm Gemma E4B answer model remains resident
 while Jina runs on the dedicated embedding service. GPT-OSS 20B is the likely
-memory-edge production case and was not re-qualified with this new layout before
-0.10.0; rerun production/long-context tests with Jina warm after deployment.
+memory-edge production case and was not re-qualified with this new layout and remains the dedicated memory-edge qualification; rerun it after a candidate
+promotion or material runtime change.
 
 ## 10. Second phase: hybrid search
 

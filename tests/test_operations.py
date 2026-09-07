@@ -144,76 +144,87 @@ class RuntimeConvenienceTests(unittest.TestCase):
             source = (ROOT / relative).read_text(encoding="utf-8")
             self.assertIn('[[ -d "$cpu" ]] || continue', source)
 
-    def test_benchmark_dispatches_structured_suites_and_records_resource_peaks(
-        self,
-    ) -> None:
-        wrapper = (ROOT / "cmd/benchmark/compare-models.sh").read_text(encoding="utf-8")
+    def test_benchmark_dispatches_canonical_suites_and_workflows(self) -> None:
+        wrapper = (ROOT / "cmd/benchmark/benchmark.sh").read_text(encoding="utf-8")
         generation = (ROOT / "cmd/benchmark/generation-benchmark.py").read_text(
             encoding="utf-8"
         )
         categories = (ROOT / "cmd/benchmark/category-benchmark.py").read_text(
             encoding="utf-8"
         )
+        runtime_workflow = (ROOT / "cmd/benchmark/runtime-benchmark.py").read_text(encoding="utf-8")
+        openwebui_workflow = (ROOT / "cmd/benchmark/openwebui-benchmark.py").read_text(encoding="utf-8")
+        workflow = runtime_workflow + "\n" + openwebui_workflow
         common = (ROOT / "cmd/benchmark/benchmark_common.py").read_text(
             encoding="utf-8"
         )
         for expected in (
-            "embeddings|embedding|ocr|task|agent|coding",
-            "generation-benchmark.py",
-            "Ollama 0.33.3",
+            "bc250-benchmark generation",
+            "bc250-benchmark rag-cycle",
+            "bc250-benchmark concurrency",
+            "bc250-benchmark owui-system-context",
         ):
             self.assertIn(expected, wrapper)
+        for legacy in ("embeddings|embedding", "agent|coding", "compare-models.sh"):
+            self.assertNotIn(legacy, wrapper)
         for expected in (
-            "BENCH_MODE",
-            "NEUTRAL_SYSTEM",
-            'payload["system"] = NEUTRAL_SYSTEM',
-            "THINK_MODE",
-            "resolve_think_policy",
-            "done_reason=stop",
-            "RUN_THERMAL",
-            "temp_max_c",
-            "mem_available_min_mib",
-            "swap_used_max_mib",
-            "vram_used_max_bytes",
-            "gtt_used_max_bytes",
+            "prepare_result_dir",
+            'choices=("compare", "edge", "thermal")',
+            "swap_peak_delta_mib",
             "client.digest(model)",
         ):
             self.assertIn(expected, generation)
-        self.assertNotIn('"think": false', generation.lower())
         for expected in (
-            "recall_at_1",
-            "cross_mrr",
-            "OCR_PROMPTS",
-            "word_precision",
-            "word_f1",
-            "char_similarity",
-            "field_order_score",
-            "task_prompt",
-            "benchmark_agent",
-            "validate_agent_output",
-            '"keep_alive": 0',
+            "result_record",
+            "write_result_summary",
+            'category="ocr"',
+            'category="rag-cycle"',
+            'category="rag-quality"',
         ):
             self.assertIn(expected, categories)
         for expected in (
-            "mem_info_vram_used",
-            "mem_info_gtt_used",
-            "seconds_ge_85c",
-            "gpu_clock_min_mhz",
-            "discover_amdgpu_device",
-            "amdgpu_edge_temperature",
+            "cmd_concurrency",
+            "cmd_num_batch",
+            "cmd_owui_rag",
+            "cmd_owui_embedding_batch",
+            "cmd_owui_chunk_min",
+            "cmd_owui_system_context",
+        ):
+            self.assertIn(expected, workflow)
+        for expected in (
+            "BenchmarkPaths",
+            "prepare_result_dir",
+            "results.jsonl",
+            "summary.json",
+            "fixtures",
         ):
             self.assertIn(expected, common)
         result = subprocess.run(
-            [str(ROOT / "cmd/benchmark/compare-models.sh"), "--help"],
+            [str(ROOT / "cmd/benchmark/benchmark.sh"), "--help"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("BENCH_MODE=neutral", result.stdout)
-        self.assertIn("Ollama 0.33.3", result.stdout)
+        self.assertIn("bc250-benchmark generation", result.stdout)
         self.assertIn("bc250-benchmark agent", result.stdout)
+        missing = subprocess.run(
+            [str(ROOT / "cmd/benchmark/benchmark.sh")],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(missing.returncode, 2, missing.stdout)
+        legacy = subprocess.run(
+            [str(ROOT / "cmd/benchmark/benchmark.sh"), "rag"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(legacy.returncode, 2, legacy.stdout)
 
 
 class CuStatusTests(unittest.TestCase):

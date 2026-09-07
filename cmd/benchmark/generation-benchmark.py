@@ -21,9 +21,7 @@ import os
 import statistics
 import sys
 import time
-from collections.abc import Iterable
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from benchmark_common import (
@@ -32,7 +30,15 @@ from benchmark_common import (
     BenchmarkError,
     OllamaClient,
     TelemetrySampler,
-    prepare_result_sidecars,
+    append_result,
+    benchmark_metadata,
+    chronological_resource_aggregate,
+    finalize_benchmark_metadata,
+    fixture_metadata,
+    prepare_result_dir,
+    result_record,
+    write_benchmark_metadata,
+    write_result_summary,
 )
 
 NEUTRAL_SYSTEM = os.environ.get(
@@ -361,11 +367,6 @@ def run_chat_stream(
     return metrics, telemetry, detail
 
 
-def write_jsonl(path: Path, data: dict[str, Any]) -> None:
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(data, ensure_ascii=False, sort_keys=True) + "\n")
-
-
 def csv_row(
     model: str,
     test: str,
@@ -419,6 +420,18 @@ def answer_budget_warning(metrics: dict[str, Any], requested: int) -> str | None
     ):
         return f"no final answer before {requested}-token generation cap"
     return None
+
+
+def budget_diagnostics(
+    metrics: dict[str, Any], requested: int, thinking: str
+) -> list[str]:
+    """Classify output exhaustion without inventing thinking exhaustion."""
+    if not answer_budget_warning(metrics, requested):
+        return []
+    diagnostics = ["output-budget"]
+    if thinking.strip():
+        diagnostics.append("thinking-budget")
+    return diagnostics
 
 
 def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
@@ -503,28 +516,9 @@ def fmt(value: Any, digits: int = 2) -> str:
         return str(value)
 
 
-def aggregate_resource(rows: Iterable[dict[str, Any]]) -> dict[str, float | None]:
-    values = list(rows)
-
-    def extrema(key: str, fn: Any) -> float | None:
-        found = [float(row[key]) for row in values if row.get(key) not in (None, "")]
-        return fn(found) if found else None
-
-    return {
-        "temp_max_c": extrema("temp_max_c", max),
-        "temp_p95_max_c": extrema("temp_p95_c", max),
-        "mem_available_min_mib": extrema("mem_available_min_mib", min),
-        "swap_used_max_mib": extrema("swap_used_max_mib", max),
-        "vram_used_max_bytes": extrema("vram_used_max_bytes", max),
-        "gtt_used_max_bytes": extrema("gtt_used_max_bytes", max),
-        "gpu_clock_min_mhz": extrema("gpu_clock_min_mhz", min),
-        "gpu_clock_max_mhz": extrema("gpu_clock_max_mhz", max),
-    }
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250-benchmark",
+        prog="bc250-benchmark generation",
         description="BC-250 generation benchmark for Ollama 0.33.3.",
     )
     parser.add_argument(
@@ -538,14 +532,27 @@ def main() -> int:
             "OLLAMA_URL", os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
         ),
     )
-    parser.add_argument("--output", help="CSV output path")
+    parser.add_argument("--output-dir", help="result directory; must be empty")
+    parser.add_argument(
+        "--profile",
+        choices=("compare", "edge", "thermal"),
+        default="compare",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("neutral", "production"),
+        default="neutral",
+    )
+    parser.add_argument(
+        "--think",
+        choices=("auto", "omit", "true", "false", "low", "medium", "high", "max"),
+        default="auto",
+    )
     args = parser.parse_args()
 
-    profile = os.environ.get("BENCH_PROFILE", "moderate").casefold()
-    if profile not in {"moderate", "conservative"}:
-        raise BenchmarkError("BENCH_PROFILE must be moderate or conservative")
+    profile = args.profile
     defaults = {
-        "moderate": {
+        "compare": {
             "short": 384,
             "prefill": 32,
             "context": 128,
@@ -557,39 +564,33 @@ def main() -> int:
             "filler": 220,
             "ctx": [44, 176, 352, 704],
         },
-        "conservative": {
+        "edge": {
             "short": 256,
             "prefill": 24,
             "context": 96,
             "long": 2048,
             "latency": 64,
             "latency_thinking": 384,
-            "repeats": 2,
+            "repeats": 1,
             "latency_repeats": 1,
             "filler": 110,
             "ctx": [22, 88, 220],
         },
+        "thermal": {
+            "short": 256,
+            "prefill": 16,
+            "context": 64,
+            "long": 3072,
+            "latency": 64,
+            "latency_thinking": 384,
+            "repeats": 1,
+            "latency_repeats": 1,
+            "filler": 110,
+            "ctx": [220],
+        },
     }[profile]
-    # TODO (future release): production mode currently keeps deployment SYSTEM/sampling
-    # but still uses the generic generation workload. Add role-specific office/RAG/
-    # translation fixtures separately; do not turn the neutral suite into a role benchmark.
-    mode = os.environ.get("BENCH_MODE", "neutral").casefold()
-    if mode not in {"neutral", "production"}:
-        raise BenchmarkError("BENCH_MODE must be neutral or production")
-    think_requested = os.environ.get("THINK_MODE", "auto").casefold()
-    if think_requested not in {
-        "auto",
-        "omit",
-        "true",
-        "false",
-        "low",
-        "medium",
-        "high",
-        "max",
-    }:
-        raise BenchmarkError(
-            "THINK_MODE must be auto, omit, true, false, low, medium, high, or max"
-        )
+    mode = args.mode
+    think_requested = args.think
 
     num_short = int(os.environ.get("NUM_PREDICT_SHORT", defaults["short"]))
     num_prefill = int(os.environ.get("NUM_PREDICT_PREFILL", defaults["prefill"]))
@@ -624,11 +625,13 @@ def main() -> int:
     run_latency = bool_setting("RUN_LATENCY", True)
     run_context = bool_setting(
         "RUN_CONTEXT",
-        profile == "moderate",
+        profile == "compare",
         interactive_prompt="Run context-capacity curve too?",
     )
     run_thermal = bool_setting(
-        "RUN_THERMAL", False, interactive_prompt="Run sustained-load thermal test too?"
+        "RUN_THERMAL",
+        profile == "thermal",
+        interactive_prompt="Run sustained-load thermal test too?",
     )
     run_warm_prefix = bool_setting("RUN_WARM_PREFIX", False)
     thermal_windows = int(os.environ.get("THROTTLE_WINDOWS", "3"))
@@ -649,51 +652,42 @@ def main() -> int:
             "Board/cooling/governor note for this run [optional]: "
         ).strip()
 
-    stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S")
-    csv_path = Path(args.output or f"results_generation_{stamp}.csv")
-    jsonl_path = prepare_result_sidecars(csv_path)
-    meta_path = csv_path.with_suffix(".meta.json")
-    started = iso_now()
-    meta = {
-        "started_at": started,
-        "category": "generation",
-        "benchmark_version": "7.5",
-        "bench_mode": mode,
-        "ollama_url": client.base_url,
-        "ollama_version": version,
-        "package_standard_ollama_version": STANDARD_OLLAMA_VERSION,
-        "neutral_system_prompt": NEUTRAL_SYSTEM if mode == "neutral" else None,
-        "neutral_system_sha256": hashlib.sha256(NEUTRAL_SYSTEM.encode()).hexdigest()
-        if mode == "neutral"
-        else None,
-        "think_mode_requested": think_requested,
-        "telemetry_interval_s": telemetry_interval,
-        "profile": profile,
-        "run_latency": run_latency,
-        "run_context": run_context,
-        "run_thermal": run_thermal,
-        "run_warm_prefix": run_warm_prefix,
-        "warm_prefix_sentences": warm_prefix_sentences,
-        "warm_prefix_num_predict": num_warm_prefix,
-        "latency_num_predict_non_thinking": num_latency,
-        "latency_num_predict_reasoning_capable": num_latency_thinking,
-        "prefill_cache_mode": "cold-runner",
-        "board_note": board_note,
-        "models": [],
-    }
+    paths = prepare_result_dir("generation", args.output_dir)
+    csv_path, jsonl_path, meta_path = (
+        paths.csv_export,
+        paths.results_jsonl,
+        paths.meta_json,
+    )
+    prompt_fixture = paths.fixtures_dir / "generation-prompts.json"
+    prompt_fixture.write_text(
+        json.dumps(
+            {
+                "neutral_system": NEUTRAL_SYSTEM,
+                "short_prompt": SHORT_PROMPT,
+                "chat_prompt": CHAT_PROMPT,
+            },
+            ensure_ascii=False,
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    model_metadata: list[dict[str, Any]] = []
     for model in models:
         try:
             show = client.show(model)
         except BenchmarkError:
             show = {}
         details = show.get("details") if isinstance(show.get("details"), dict) else {}
-        meta["models"].append(
+        model_metadata.append(
             {
                 "model": model,
                 "digest": client.digest(model),
                 "family": details.get("family", ""),
                 "parameter_size": details.get("parameter_size", ""),
                 "quantization_level": details.get("quantization_level", ""),
+                "runtime_url": client.base_url,
                 "think_policy": resolve_think_policy(model, think_requested),
                 "latency_num_predict": latency_budget(
                     num_latency,
@@ -703,10 +697,53 @@ def main() -> int:
                 ),
             }
         )
-    meta_path.write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    meta = benchmark_metadata(
+        "generation",
+        benchmark_version="8.0",
+        models=model_metadata,
+        fixtures=fixture_metadata(prompt_fixture),
+        options={
+            "profile": profile,
+            "mode": mode,
+            "think_mode_requested": think_requested,
+            "telemetry_interval_s": telemetry_interval,
+            "run_latency": run_latency,
+            "run_context": run_context,
+            "run_thermal": run_thermal,
+            "run_warm_prefix": run_warm_prefix,
+            "num_predict_short": num_short,
+            "num_predict_prefill": num_prefill,
+            "num_predict_context": num_context,
+            "num_predict_long": num_long,
+            "repeats": repeats,
+            "latency_repeats": latency_repeats,
+            "prefill_sentences": filler_sentences,
+            "ctx_points": ctx_points,
+            "keep_alive": keep_alive,
+            "early_eos_fraction": early_fraction,
+            "request_timeout_s": client.timeout,
+            "thermal_windows": thermal_windows,
+            "warm_prefix_sentences": warm_prefix_sentences,
+            "warm_prefix_num_predict": num_warm_prefix,
+            "latency_num_predict_non_thinking": num_latency,
+            "latency_num_predict_reasoning_capable": num_latency_thinking,
+            "prefill_cache_mode": "cold-runner",
+            "board_note": board_note,
+        },
+        runtimes=[
+            {
+                "kind": "ollama",
+                "url": client.base_url,
+                "version": version,
+                "package_standard_version": STANDARD_OLLAMA_VERSION,
+            }
+        ],
+        neutral_system_sha256=(
+            hashlib.sha256(NEUTRAL_SYSTEM.encode()).hexdigest()
+            if mode == "neutral" else None
+        ),
     )
+    write_benchmark_metadata(meta_path, meta)
 
     rows: list[dict[str, Any]] = []
     long_prompt = (
@@ -739,21 +776,53 @@ def main() -> int:
             if value
         ]
         warning = "; ".join(warnings) or None
-        write_jsonl(
+        diagnostics: list[str] = []
+        if early_stop_warning(metrics, requested, early_fraction):
+            diagnostics.append("early-stop")
+        diagnostics.extend(
+            budget_diagnostics(metrics, requested, str(detail.get("thinking") or ""))
+        )
+        if extra_warning:
+            diagnostics.append("context-truncation")
+        if float(metrics.get("seconds_ge_80c") or 0) > 0:
+            diagnostics.append("thermal")
+        request = detail.get("request") if isinstance(detail.get("request"), dict) else {}
+        prompt_text = ""
+        if isinstance(request.get("prompt"), str):
+            prompt_text = request["prompt"]
+        elif isinstance(request.get("messages"), list):
+            prompt_text = "\n".join(
+                str(item.get("content") or "")
+                for item in request["messages"]
+                if isinstance(item, dict)
+            )
+        request_meta = {
+            key: value
+            for key, value in request.items()
+            if key not in {"prompt", "messages"}
+        }
+        append_result(
             jsonl_path,
-            {
-                "timestamp": row["timestamp"],
-                "category": "generation",
-                "model": model,
-                "test": test,
-                "run": run,
-                "bench_mode": mode,
-                "think_policy": think_policy,
-                "requested_tokens": requested,
-                "warning": warning,
-                "metrics": metrics,
-                **detail,
-            },
+            result_record(
+                category="generation",
+                model=model,
+                case_id=f"{test}-{run}",
+                result_type="measurement",
+                outcome="pass",
+                diagnostics=diagnostics,
+                metrics=metrics,
+                timestamp=row["timestamp"],
+                test=test,
+                run=run,
+                bench_mode=mode,
+                think_policy=think_policy,
+                requested_tokens=requested,
+                prompt_sha256=hashlib.sha256(prompt_text.encode()).hexdigest(),
+                request=request_meta,
+                response=detail.get("response", ""),
+                thinking=detail.get("thinking", ""),
+                notes=warnings,
+            ),
         )
         suffix = f" WARNING: {warning}" if warning else ""
         print(
@@ -764,6 +833,7 @@ def main() -> int:
             f"MemAvail-min={fmt(metrics.get('mem_available_min_mib'), 0)}MiB{suffix}"
         )
 
+    infra_failed = False
     with csv_path.open("w", newline="", encoding="utf-8") as csv_handle:
         writer = csv.DictWriter(csv_handle, fieldnames=CSV_FIELDS)
         writer.writeheader()
@@ -982,17 +1052,41 @@ def main() -> int:
                             f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s ({drop:+.1f}%)"
                         )
 
+            except BenchmarkError as exc:
+                infra_failed = True
+                error_row = {
+                    "timestamp": iso_now(),
+                    "model": model,
+                    "label": short_name(model),
+                    "test": "runtime",
+                    "run": 0,
+                    "status": "error",
+                    "bench_mode": mode,
+                    "think_policy": think_policy,
+                }
+                rows.append(error_row)
+                writer.writerow(error_row)
+                csv_handle.flush()
+                append_result(
+                    jsonl_path,
+                    result_record(
+                        category="generation",
+                        model=model,
+                        case_id="runtime",
+                        result_type="measurement",
+                        outcome="infra-fail",
+                        failure_kinds=["runtime-api"],
+                        error=str(exc),
+                    ),
+                )
+                print(f"    ERROR: {exc}", file=sys.stderr)
             finally:
                 try:
                     client.ensure_unloaded(model)
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
 
-    meta["finished_at"] = iso_now()
-    meta_path.write_text(
-        json.dumps(meta, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    finalize_benchmark_metadata(meta_path)
 
     print("\n=== Summary ===")
     for model in models:
@@ -1004,22 +1098,80 @@ def main() -> int:
             for row in model_rows
             if row["test"] == "short" and row.get("tokens_per_second") not in (None, "")
         ]
-        resources = aggregate_resource(model_rows)
+        resources = chronological_resource_aggregate(model_rows)
         mean_tps = statistics.fmean(short_tps) if short_tps else 0.0
+        cv = (
+            statistics.stdev(short_tps) / mean_tps * 100.0
+            if len(short_tps) >= 2 and mean_tps > 0
+            else 0.0
+        )
+        cold_rows = [row for row in model_rows if row["test"] == "cold_chat"]
+        cold_wall = cold_rows[0].get("wall_duration_s") if cold_rows else None
+        warm_rows = [row for row in model_rows if row["test"] == "warm_chat"]
+        warm_answer = [
+            float(row["time_to_first_answer_s"])
+            for row in warm_rows
+            if row.get("time_to_first_answer_s") not in (None, "")
+        ]
+        prefill_rows = [row for row in model_rows if row["test"] == "prefill"]
+        prefill_tps = [
+            float(row["prompt_tokens_per_second"])
+            for row in prefill_rows
+            if row.get("prompt_tokens_per_second") not in (None, "")
+        ]
         max_temp = resources["temp_max_c"]
+        p95_temp = resources["temp_p95_max_case_c"]
         thermal_flag = (
             " THERMAL-LIMIT" if max_temp is not None and max_temp >= 85.0 else ""
         )
-        print(
-            f"  {short_name(model):36s} short={mean_tps:7.2f} tok/s  "
-            f"Tmax={fmt(max_temp, 1):>5s}C  MemAvail-min={fmt(resources['mem_available_min_mib'], 0):>6s}MiB  "
-            f"swap-max={fmt(resources['swap_used_max_mib'], 0):>5s}MiB{thermal_flag}"
+        resident_gib = (
+            None
+            if resources["resident_size_bytes"] is None
+            else resources["resident_size_bytes"] / (1024**3)
         )
+        model_records = []
+        if jsonl_path.exists():
+            for line in jsonl_path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                row = json.loads(line)
+                if row.get("model") == model:
+                    model_records.append(row)
+        warning_counts: dict[str, int] = {}
+        for record_row in model_records:
+            for warning in record_row.get("diagnostics", []):
+                warning_counts[str(warning)] = warning_counts.get(str(warning), 0) + 1
+        warning_text = ",".join(
+            f"{name}={count}" for name, count in sorted(warning_counts.items())
+        ) or "none"
+        print(
+            f"  {short_name(model):32s} decode={mean_tps:7.2f} tok/s "
+            f"CV={cv:4.1f}% cold={fmt(cold_wall, 1):>5s}s "
+            f"warm-answer={fmt(statistics.fmean(warm_answer) if warm_answer else None, 2):>5s}s "
+            f"prefill={fmt(statistics.fmean(prefill_tps) if prefill_tps else None, 1):>6s} tok/s"
+        )
+        print(
+            f"    resident={fmt(resident_gib, 2):>5s}GiB "
+            f"Mem-min={fmt(resources['mem_available_min_mib'], 0):>6s}MiB "
+            f"swap={fmt(resources['swap_used_start_mib'], 0)}/"
+            f"{fmt(resources['swap_used_max_mib'], 0)}/"
+            f"{fmt(resources['swap_used_end_mib'], 0)}MiB "
+            f"delta={fmt(resources['swap_peak_delta_mib'], 0)}MiB "
+            f"max-case-p95/max={fmt(p95_temp, 1)}/{fmt(max_temp, 1)}C{thermal_flag}"
+        )
+        print(f"    warnings={warning_text}")
     print(
-        "\nResource headroom is informational on BC-250 unified memory; do not add VRAM/GTT/host figures as independent pools."
+        "\nResource headroom is informational on BC-250 unified memory; "
+        "VRAM/GTT counters are diagnostic, not additive pools."
     )
-    print(f"Results: {csv_path}\nDetails: {jsonl_path}\nMeta:    {meta_path}")
-    return 0
+    _summary_json, summary_txt = write_result_summary(
+        jsonl_path, category="generation"
+    )
+    print(
+        f"Result directory: {paths.root}\nCanonical: {jsonl_path}\n"
+        f"Summary: {summary_txt}\nCSV export: {csv_path}"
+    )
+    return 1 if infra_failed else 0
 
 
 if __name__ == "__main__":

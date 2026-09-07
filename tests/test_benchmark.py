@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -27,6 +29,8 @@ def load_module(name: str, path: Path):
 common = load_module("benchmark_common_test", BENCH / "benchmark_common.py")
 generation = load_module("generation_benchmark_test", BENCH / "generation-benchmark.py")
 category = load_module("category_benchmark_test", BENCH / "category-benchmark.py")
+runtime_workflow = load_module("runtime_benchmark_test", BENCH / "runtime-benchmark.py")
+openwebui_workflow = load_module("openwebui_benchmark_test", BENCH / "openwebui-benchmark.py")
 
 
 class GenerationPolicyTests(unittest.TestCase):
@@ -213,20 +217,21 @@ class CategoryPolicyTests(unittest.TestCase):
         self,
     ) -> None:
         bash_case = {"id": "b", "validator": "bash", "required": ["echo"]}
-        self.assertEqual(
-            category.validate_agent_output("echo ok", bash_case)[:2], (True, True)
-        )
-        self.assertEqual(category.validate_agent_output("if then", bash_case)[0], False)
+        result = category.evaluate_agent_output("echo ok", bash_case)
+        self.assertTrue(result["syntax_ok"])
+        self.assertTrue(result["requirements_ok"])
+        result = category.evaluate_agent_output("if then", bash_case)
+        self.assertFalse(result["syntax_ok"])
+
         py_case = {"id": "p", "validator": "python", "required": ["def run"]}
-        self.assertEqual(
-            category.validate_agent_output("def run():\n    return 1", py_case)[:2],
-            (True, True),
-        )
+        result = category.evaluate_agent_output("def run():\n    return 1", py_case)
+        self.assertTrue(result["syntax_ok"])
+        self.assertTrue(result["requirements_ok"])
+
         json_case = {"id": "j", "validator": "json", "required": ["summary"]}
-        self.assertEqual(
-            category.validate_agent_output('{"summary":"ok"}', json_case)[:2],
-            (True, True),
-        )
+        result = category.evaluate_agent_output('{"summary":"ok"}', json_case)
+        self.assertTrue(result["syntax_ok"])
+        self.assertTrue(result["requirements_ok"])
 
         strict_case = {
             "id": "strict",
@@ -239,30 +244,31 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertTrue(strict["requirements_ok"])
         self.assertFalse(strict["format_ok"])
         self.assertFalse(strict["accepted"])
+
         safe_bash = {
             "id": "safe",
             "validator": "bash",
             "required": ["find"],
             "required_any": [["-printf", "-print0"]],
         }
-        self.assertEqual(
-            category.validate_agent_output("find . -maxdepth 1 -print", safe_bash)[:2],
-            (True, False),
-        )
+        result = category.evaluate_agent_output("find . -maxdepth 1 -print", safe_bash)
+        self.assertTrue(result["syntax_ok"])
+        self.assertFalse(result["requirements_ok"])
+
         typed_json = {
             "id": "typed",
             "validator": "json",
             "json_keys": ["files", "commands"],
             "json_array_keys": ["files", "commands"],
         }
-        self.assertEqual(
-            category.validate_agent_output('{"files":[],"commands":[]}', typed_json)[:2],
-            (True, True),
+        result = category.evaluate_agent_output('{"files":[],"commands":[]}', typed_json)
+        self.assertTrue(result["syntax_ok"])
+        self.assertTrue(result["requirements_ok"])
+        result = category.evaluate_agent_output(
+            '{"files":"bad","commands":[]}', typed_json
         )
-        self.assertEqual(
-            category.validate_agent_output('{"files":"bad","commands":[]}', typed_json)[:2],
-            (True, False),
-        )
+        self.assertTrue(result["syntax_ok"])
+        self.assertFalse(result["requirements_ok"])
 
     def test_agent_python_contract_is_scoped_to_requested_function(self) -> None:
         case = next(
@@ -577,7 +583,9 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
 
     def test_agent_empty_final_is_not_syntax_success_and_budgets_allow_reasoning(self) -> None:
         case = {"id": "b", "validator": "bash", "required": ["echo"]}
-        self.assertEqual(category.validate_agent_output("", case)[:2], (False, False))
+        result = category.evaluate_agent_output("", case)
+        self.assertFalse(result["syntax_ok"])
+        self.assertFalse(result["requirements_ok"])
         cases = json.loads((ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8"))
         self.assertGreaterEqual(min(item["num_predict"] for item in cases), 768)
         source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
@@ -710,40 +718,35 @@ class TelemetryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "results.jsonl"
             rows = [
-                common.result_record(category="task", model="m", case_id="a", outcome="pass"),
+                common.result_record(category="task", model="m", case_id="a", result_type="qualification", outcome="pass"),
                 common.result_record(
-                    category="task", model="m", case_id="b", outcome="quality-fail",
+                    category="task", model="m", case_id="b", result_type="qualification", outcome="quality-fail",
                     failure_kinds=["language"], diagnostics=["output-budget"],
                 ),
             ]
             path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
             summary_json, summary_txt = common.write_result_summary(path, category="task")
             summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            self.assertEqual(summary["infrastructure"], "pass")
             self.assertEqual(summary["quality"], "mixed")
             self.assertEqual(summary["failure_kinds"], {"language": 1})
             self.assertEqual(summary["diagnostics"], {"output-budget": 1})
             self.assertIn("Quality        MIXED", summary_txt.read_text(encoding="utf-8"))
 
-    def test_result_sidecars_are_replaced_for_reused_output_path(self) -> None:
+    def test_result_directory_is_canonical_and_refuses_reuse(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            csv_path = Path(temporary) / "task.csv"
-            jsonl_path = common.prepare_result_sidecars(csv_path)
-            jsonl_path.write_text(
-                json.dumps(
-                    common.result_record(
-                        category="task", model="m", case_id="old", outcome="pass"
-                    )
-                )
-                + "\n",
-                encoding="utf-8",
-            )
-            jsonl_path.with_suffix(".summary.json").write_text("old\n", encoding="utf-8")
-            jsonl_path.with_suffix(".summary.txt").write_text("old\n", encoding="utf-8")
-            reset = common.prepare_result_sidecars(csv_path)
-            self.assertEqual(reset, jsonl_path)
-            self.assertFalse(jsonl_path.exists())
-            self.assertFalse(jsonl_path.with_suffix(".summary.json").exists())
-            self.assertFalse(jsonl_path.with_suffix(".summary.txt").exists())
+            root = Path(temporary) / "task-run"
+            paths = common.prepare_result_dir("task", root)
+            self.assertEqual(paths.root, root)
+            self.assertEqual(paths.results_jsonl, root / "results.jsonl")
+            self.assertEqual(paths.summary_json, root / "summary.json")
+            self.assertEqual(paths.summary_txt, root / "summary.txt")
+            self.assertEqual(paths.meta_json, root / "meta.json")
+            self.assertEqual(paths.csv_export, root / "results.csv")
+            self.assertTrue(paths.fixtures_dir.is_dir())
+            paths.results_jsonl.write_text("{}\n", encoding="utf-8")
+            with self.assertRaises(common.BenchmarkError):
+                common.prepare_result_dir("task", root)
 
     def test_common_result_summary_rejects_corrupt_canonical_records(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -761,14 +764,712 @@ class TelemetryTests(unittest.TestCase):
         with self.assertRaisesRegex(common.BenchmarkError, "dimension mismatch"):
             common.cosine([1.0, 2.0], [1.0])
 
-    def test_revalidation_propagates_non_quality_benchmark_failures(self) -> None:
+    def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=3.9", source)
-        block = source[source.index("run_bench_at() {"):source.index("run_bench() {")]
-        self.assertIn("0|3) return 0", block)
-        self.assertIn('*) return "$rc"', block)
-        num_batch = source[source.index("phase_num_batch() {"):source.index("phase_agent() {")]
-        self.assertIn("api_ready 11434 || ensure_normal_mode", num_batch)
+        self.assertIn("HARNESS_VERSION=4.0", source)
+        start = source.index("run_qualification_sequence() {")
+        sequence = source[start:source.index("\nworker() {", start)]
+        for phase in ("phase_preflight", "phase_roles", "phase_edge", "phase_agent", "phase_owui", "phase_restore_report"):
+            self.assertIn(phase, sequence)
+        for obsolete in ("phase_num_batch", "phase_kernel", "phase_governor", "translation-implicit", "translation-explicit", "rag-quality-nonthinking"):
+            self.assertNotIn(obsolete, sequence)
+
+    def test_revalidation_run_step_separates_quality_from_infrastructure(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        block = source[source.index("run_step() {"):source.index("warm_embedding() {")]
+        self.assertIn('[[ "$kind" == quality && $rc -eq 3 ]]', block)
+        self.assertIn('record_event "$label" quality quality-fail', block)
+        self.assertIn('record_event "$label" infra infra-fail', block)
+        self.assertIn('return "$rc"', block)
+        self.assertNotIn("restore_all", block)
+        self.assertIn("trap - ERR TERM INT", block)
+
+    def test_revalidation_run_step_runtime_rc_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source \"{source}\" help >/dev/null
+RAW=\"{t / 'results'}\"
+EVENTS=\"{t / 'events.tsv'}\"
+PHASE_FILE=\"{t / 'phase'}\"
+STAGE_FILE=\"{t / 'stage'}\"
+STAGE_STARTED_FILE=\"{t / 'stage-started'}\"
+LAST_EVENT_FILE=\"{t / 'last-event'}\"
+mkdir -p \"$RAW\"
+printf 'roles\\n' > \"$PHASE_FILE\"
+: > \"$EVENTS\"
+if run_step test quality-case quality bash -c 'exit 3'; then qrc=0; else qrc=$?; fi
+if run_step test infra-case infra bash -c 'exit 7'; then irc=0; else irc=$?; fi
+printf 'qrc=%s irc=%s\\n' \"$qrc\" \"$irc\"
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+            self.assertIn("qrc=0 irc=7", completed.stdout)
+            events = (t / "events.tsv").read_text(encoding="utf-8")
+            self.assertIn("quality-case\tquality\tquality-fail", events)
+            self.assertIn("infra-case\tinfra\tinfra-fail", events)
+
+    def test_revalidation_explicit_partial_coverage_does_not_mean_mixed_quality(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+EVENTS="{t / 'events.tsv'}"
+printf '2026-09-06T12:00:00+02:00\troles\ttask\tquality\tpass\tok\n' > "$EVENTS"
+printf '2026-09-06T12:00:01+02:00\towui\topenwebui-rag\tcoverage\tskipped\texplicit skip\n' >> "$EVENTS"
+quality_state
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertEqual(completed.stdout.strip(), "pass")
+
+    def test_common_result_quality_uses_qualification_records_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            rows = [
+                common.result_record(
+                    category="embeddings", model="m", case_id="q1",
+                    result_type="measurement", outcome="pass",
+                ),
+                common.result_record(
+                    category="embeddings", model="m", case_id="qualification",
+                    result_type="qualification", outcome="quality-fail",
+                    failure_kinds=["retrieval"],
+                ),
+            ]
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            summary_json, _ = common.write_result_summary(path, category="embeddings")
+            summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            self.assertEqual(summary["quality"], "fail")
+            self.assertEqual(summary["result_types"], {"measurement": 1, "qualification": 1})
+            self.assertEqual(summary["qualification_counts"]["quality-fail"], 1)
+            self.assertEqual(summary["failure_kinds"], {"retrieval": 1})
+
+    def test_all_common_result_calls_declare_measurement_or_qualification(self) -> None:
+        for path in BENCH.glob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+                    continue
+                if node.func.id != "result_record":
+                    continue
+                keywords = {kw.arg for kw in node.keywords if kw.arg}
+                self.assertIn("result_type", keywords, f"{path.name}:{node.lineno}")
+
+    def test_revalidation_package_roles_are_immutable_and_exact(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        for model in (
+            "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+            "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+            "prod-lfm25-8b-a1b-liquidai-q6-k",
+            "prod-qwen35-9b-unsloth-q6-k",
+            "prod-gpt-oss20b-ggml-org-mxfp4",
+        ):
+            self.assertIn(model, source)
+        self.assertIn("readonly -a PACKAGE_PROD_MODELS", source)
+        self.assertNotIn("installed_prod_models()", source)
+        self.assertNotIn("${GPT_OSS_MODEL:-", source)
+        edge = source[source.index("phase_edge() {"):source.index("phase_agent() {")]
+        self.assertIn('"${PACKAGE_PROD_MODELS[@]}"', edge)
+
+    def test_revalidation_token_is_validated_before_run_state_without_curl_bearer_argv(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        validate = source[source.index("validate_owui_token_file() {"):source.index("api_ready() {")]
+        self.assertIn('python3 - "$path"', validate)
+        self.assertNotIn("curl", validate)
+        start = source[source.index("start_run() {"):source.index("capture_cmd() {")]
+        self.assertLess(start.index('validate_owui_token_file "$token_file"'), start.index('rm -rf "$WORK"'))
+        self.assertIn("--skip-owui", start)
+        self.assertNotIn("OWUI_API_KEY", start)
+
+    def test_edge_sanity_policy_rejects_gross_decode_regression(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            rows = []
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": (100.0, 32768),
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": (60.0, 32768),
+                "prod-lfm25-8b-a1b-liquidai-q6-k": (120.0, 32768),
+                "prod-qwen35-9b-unsloth-q6-k": (40.0, 32768),
+                "prod-gpt-oss20b-ggml-org-mxfp4": (70.0, 16384),
+            }
+            for model, (tps, context) in specs.items():
+                rows.append({
+                    "category": "generation", "model": model, "case_id": "short-1",
+                    "result_type": "measurement", "outcome": "pass", "diagnostics": [],
+                    "metrics": {
+                        "tokens_per_second": tps, "allocated_context": context,
+                        "resident_size_bytes": 1000, "resident_vram_bytes": 1000,
+                        "mem_available_min_mib": 1024, "temp_max_c": 70,
+                        "prompt_eval_count": 5000,
+                    },
+                })
+            good = t / "good.jsonl"
+            bad = t / "bad.jsonl"
+            good.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            rows[0]["metrics"]["tokens_per_second"] = 1.0
+            bad.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            script = (
+                f'source "{source}" help >/dev/null\n'
+                f'write_edge_policy "{t / "policy.json"}"\n'
+                f'check_edge_generation_sanity "{good}" "{t / "policy.json"}" "{t / "good-out.json"}"\n'
+                f'if check_edge_generation_sanity "{bad}" "{t / "policy.json"}" "{t / "bad-out.json"}" 2>/dev/null; then exit 9; fi\n'
+            )
+            subprocess.run(["bash", "-c", script], check=True)
+            self.assertTrue(json.loads((t / "good-out.json").read_text())["passed"])
+            self.assertFalse(json.loads((t / "bad-out.json").read_text())["passed"])
+
+    def test_revalidation_quality_cause_report_reads_canonical_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            result_dir = t / "task" / "results"
+            result_dir.mkdir(parents=True)
+            (result_dir / "summary.json").write_text(json.dumps({
+                "category": "task",
+                "qualification_counts": {"pass": 3, "quality-fail": 3, "skipped": 0},
+                "failure_kinds": {"language": 2, "relevance": 1},
+            }), encoding="utf-8")
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f'source "{source}" help >/dev/null\nRAW="{t}"\nquality_cause_report\n'
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("task", completed.stdout)
+            self.assertIn("3/6", completed.stdout)
+            self.assertIn("language=2", completed.stdout)
+            self.assertIn("relevance=1", completed.stdout)
+
+    def test_rag_cycle_residency_loss_is_infrastructure_failure(self) -> None:
+        self.assertEqual(category.rag_cycle_outcome(True, False), ("infra-fail", ["coexistence"], 1))
+        self.assertEqual(category.rag_cycle_outcome(False, True), ("quality-fail", ["answer"], 3))
+        self.assertEqual(category.rag_cycle_outcome(True, True), ("pass", [], 0))
+
+    def test_openwebui_restore_requires_readback_and_cleanup_failures_propagate(self) -> None:
+        class FakeClient:
+            def __init__(self, restored: dict[str, object]):
+                self.restored = restored
+            def post(self, _path: str, _payload: object) -> dict[str, object]:
+                return {}
+            def get(self, _path: str) -> dict[str, object]:
+                return self.restored
+            def delete(self, _path: str) -> dict[str, object]:
+                raise openwebui_workflow.Failure("delete failed")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            paths = SimpleNamespace(results_jsonl=t / "results.jsonl")
+            expected = {"CHUNK_MIN_SIZE_TARGET": 0}
+            good = FakeClient({"CHUNK_MIN_SIZE_TARGET": 0})
+            bad = FakeClient({"CHUNK_MIN_SIZE_TARGET": 99})
+            self.assertTrue(openwebui_workflow.restore_config(
+                good, paths, "owui-chunk-min", "m", "/update", expected,
+                "/read", openwebui_workflow.rag_config,
+            ))
+            self.assertFalse(openwebui_workflow.restore_config(
+                bad, paths, "owui-chunk-min", "m", "/update", expected,
+                "/read", openwebui_workflow.rag_config,
+            ))
+            with self.assertRaisesRegex(openwebui_workflow.Failure, "cleanup failed"):
+                openwebui_workflow.cleanup_kb(good, "kb", None, "name")
+
+
+    def test_revalidation_token_survives_restore_through_finalization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            token = t / "owui-token"
+            script = f"""
+source "{source}" help >/dev/null
+OWUI_TOKEN="{token}"
+printf secret > "$OWUI_TOKEN"
+command_exists() {{ return 1; }}
+disable_worker_for_future_boots() {{ :; }}
+restore_all
+[[ -f "$OWUI_TOKEN" ]] || exit 20
+finish_worker_session
+[[ ! -e "$OWUI_TOKEN" ]] || exit 21
+printf 'ok\n'
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertEqual(completed.stdout.strip(), "ok")
+
+    def test_revalidation_failed_launch_removes_transient_token(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            token = t / "owui-token"
+            script = f"""
+source "{source}" help >/dev/null
+OWUI_TOKEN="{token}"
+printf secret > "$OWUI_TOKEN"
+install_unit() {{ return 0; }}
+systemctl() {{ [[ "$1" != start ]]; }}
+if launch_worker; then exit 30; fi
+[[ ! -e "$OWUI_TOKEN" ]] || exit 31
+printf 'ok\n'
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertEqual(completed.stdout.strip(), "ok")
+
+    def test_revalidation_sanitizes_hostile_benchmark_environment_and_pins_role_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            probe = t / "probe"
+            probe.write_text(
+                "#!/bin/bash\nprintf '%s|%s|%s|%s\n' \"${TRANSLATION_MODEL-unset}\" \"${TRANSLATION_EXPLICIT_DIRECTION-unset}\" \"${BC250_BENCH_FIXTURES-unset}\" \"${AGENT_TEMPERATURE-unset}\"\n",
+                encoding="utf-8",
+            )
+            probe.chmod(0o755)
+            script = f"""
+source "{source}" help >/dev/null
+export TRANSLATION_MODEL=evil TRANSLATION_EXPLICIT_DIRECTION=1 BC250_BENCH_FIXTURES=/evil AGENT_TEMPERATURE=9
+qualification_benchmark "{probe}"
+RAW="{t / 'raw'}"
+mkdir -p "$RAW/roles"
+set_phase() {{ :; }}
+warm_embedding() {{ :; }}
+snapshot() {{ :; }}
+write_phase_report() {{ :; }}
+run_step() {{ printf '%s\n' "$*"; }}
+phase_roles
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            lines = completed.stdout.splitlines()
+            self.assertEqual(lines[0], "unset|unset|unset|unset")
+            output = "\n".join(lines[1:])
+            self.assertIn("translation quality qualification_benchmark bc250-benchmark translation prod-lfm25-8b-a1b-liquidai-q6-k --ollama-url http://127.0.0.1:11434", output)
+            self.assertIn("--ollama-url http://127.0.0.1:11437", output)
+            self.assertIn("--embedding-ollama-url http://127.0.0.1:11437", output)
+            self.assertIn("--ollama-url http://127.0.0.1:11435", output)
+
+    def test_edge_sanity_gates_fail_independently(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-qwen35-9b-unsloth-q6-k": 32768,
+                "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
+            }
+            base = []
+            for model, context in specs.items():
+                base.append({
+                    "category": "generation", "model": model, "case_id": "short-1",
+                    "result_type": "measurement", "outcome": "pass", "diagnostics": [],
+                    "metrics": {
+                        "tokens_per_second": 100.0, "allocated_context": context,
+                        "resident_size_bytes": 1000, "resident_vram_bytes": 1000,
+                        "mem_available_min_mib": 1024, "temp_max_c": 70,
+                        "prompt_eval_count": 5000,
+                    },
+                })
+            cases = {
+                "residency": lambda row: row["metrics"].update(resident_vram_bytes=100),
+                "memory": lambda row: row["metrics"].update(mem_available_min_mib=1),
+                "context": lambda row: row["metrics"].update(allocated_context=1024),
+                "truncation": lambda row: (row["diagnostics"].append("context-truncation"), row["metrics"].update(prompt_eval_count=1000)),
+            }
+            for name, mutate in cases.items():
+                rows = json.loads(json.dumps(base))
+                mutate(rows[0])
+                path = t / f"{name}.jsonl"
+                path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            script_lines = [
+                f'source "{source}" help >/dev/null',
+                f'write_edge_policy "{t / "policy.json"}"',
+            ]
+            for name in cases:
+                script_lines.append(
+                    f'if check_edge_generation_sanity "{t / (name + ".jsonl")}" "{t / "policy.json"}" "{t / (name + ".out.json")}" 2>/dev/null; then exit 40; fi'
+                )
+            subprocess.run(["bash", "-c", "\n".join(script_lines)], check=True)
+            for name in cases:
+                result = json.loads((t / f"{name}.out.json").read_text(encoding="utf-8"))
+                self.assertFalse(result["passed"], name)
+
+    def test_system_context_restoration_includes_absent_state(self) -> None:
+        self.assertTrue(openwebui_workflow.sysctx_restoration_matches("", ""))
+        self.assertFalse(openwebui_workflow.sysctx_restoration_matches("", "false"))
+        self.assertTrue(openwebui_workflow.sysctx_restoration_matches("false", "FALSE"))
+
+    def test_owui_rag_cleanup_failure_is_classified_as_restoration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            paths = SimpleNamespace(results_jsonl=t / "results.jsonl")
+            args = SimpleNamespace(output_dir=None, model="m", url="http://127.0.0.1:3000")
+            with (
+                patch.object(openwebui_workflow, "prepare_result_dir", return_value=paths),
+                patch.object(openwebui_workflow, "owui_client", return_value=object()),
+                patch.object(openwebui_workflow, "simple_meta"),
+                patch.object(openwebui_workflow, "finish"),
+                patch.object(openwebui_workflow, "run_owui_rag_case", side_effect=openwebui_workflow.RestorationFailure("cleanup failed")),
+            ):
+                self.assertEqual(openwebui_workflow.cmd_owui_rag(args), 1)
+            row = json.loads(paths.results_jsonl.read_text(encoding="utf-8"))
+            self.assertEqual(row["failure_kinds"], ["restoration"])
+
+    def test_quality_cause_report_surfaces_corrupt_or_missing_canonical_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            result_dir = t / "task" / "results"
+            result_dir.mkdir(parents=True)
+            (result_dir / "summary.json").write_text("not-json\n", encoding="utf-8")
+            events = t / "events.tsv"
+            events.write_text(
+                "2026-09-06T12:00:00+02:00\troles\ttask\tquality\tquality-fail\tscope=roles rc=3\n",
+                encoding="utf-8",
+            )
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f'source "{source}" help >/dev/null\nRAW="{t}"\nEVENTS="{events}"\nquality_cause_report\n'
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("canonical summary unavailable", completed.stdout)
+            self.assertIn("task", completed.stdout)
+
+    def test_revalidation_tracks_liveness_and_progress_without_fake_heartbeat(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("events.tsv", source)
+        self.assertIn("STAGE_STARTED_FILE", source)
+        self.assertIn("LAST_EVENT_FILE", source)
+        self.assertIn("Last event", source)
+        self.assertNotIn("HEARTBEAT_FILE", source)
+        self.assertNotIn("Heartbeat    ", source)
+
+    def test_revalidation_final_state_separates_run_quality_and_restoration(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        for name in ("RUN_STATE_FILE", "INFRA_STATE_FILE", "QUALITY_STATE_FILE", "RESTORATION_STATE_FILE"):
+            self.assertIn(name, source)
+        summary = source[source.index("create_summary() {"):source.index("create_final_bundle() {")]
+        self.assertIn("Run state", summary)
+        self.assertIn("Infrastructure", summary)
+        self.assertIn("Quality", summary)
+        self.assertIn("Restoration", summary)
+        self.assertNotIn("PASSED", summary)
+
+    def test_round2b_removes_private_revalidation_tuning_helper(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        self.assertNotIn("owui-test-helper.py", source)
+        self.assertNotIn("write_helper()", source)
+        self.assertIn("bc250-benchmark concurrency", source)
+        self.assertIn("bc250-benchmark owui-rag", source)
+
+    def test_round2b_workflows_use_common_results_and_explicit_restoration(self) -> None:
+        runtime_source = (ROOT / "cmd/benchmark/runtime-benchmark.py").read_text(encoding="utf-8")
+        owui_source = (ROOT / "cmd/benchmark/openwebui-benchmark.py").read_text(encoding="utf-8")
+        for command in ("num-batch", "concurrency"):
+            self.assertIn(f'"{command}"', runtime_source)
+        for command in ("owui-rag", "owui-embedding-batch", "owui-chunk-min", "owui-system-context"):
+            self.assertIn(f'"{command}"', owui_source)
+        for source in (runtime_source, owui_source):
+            self.assertIn("prepare_result_dir", source)
+            self.assertIn("result_record", source)
+            self.assertIn("write_result_summary", source)
+        self.assertIn("def restore_config(", owui_source)
+        self.assertIn('category="owui-system-context"', owui_source)
+        self.assertFalse((ROOT / "cmd/benchmark/workflow-benchmark.py").exists())
+
+
+    def test_common_metadata_has_package_kernel_fixtures_and_finished_time(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            fixture = t / "fixture.json"
+            fixture.write_text("{}\n", encoding="utf-8")
+            meta_path = t / "meta.json"
+            meta = common.benchmark_metadata(
+                "task",
+                benchmark_version="8.0",
+                models=[{"model": "task-test", "digest": "abc"}],
+                fixtures=common.fixture_metadata(fixture),
+                options={"lane": 11435},
+                runtimes=[{"kind": "ollama", "url": "http://127.0.0.1:11435", "version": "0.33.3"}],
+            )
+            common.write_benchmark_metadata(meta_path, meta)
+            common.finalize_benchmark_metadata(meta_path)
+            data = json.loads(meta_path.read_text(encoding="utf-8"))
+            self.assertEqual(data["category"], "task")
+            self.assertEqual(data["benchmark_version"], "8.0")
+            self.assertTrue(data["package"]["version"])
+            self.assertTrue(data["kernel"])
+            self.assertEqual(data["fixtures"][0]["name"], "fixture.json")
+            self.assertTrue(data["finished_at"])
+
+    def test_category_metadata_records_effective_options_and_runtime(self) -> None:
+        class FakeClient:
+            base_url = "http://127.0.0.1:11437"
+            timeout = 321.0
+            def version(self) -> str:
+                return "0.33.3"
+            def show(self, _model: str) -> dict[str, object]:
+                return {"details": {"family": "test"}}
+            def digest(self, _model: str) -> str:
+                return "abc"
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fixture = root / "fixture.json"
+            fixture.write_text("{}\n", encoding="utf-8")
+            meta_path = root / "meta.json"
+            category.write_meta(
+                meta_path,
+                FakeClient(),
+                "embeddings",
+                ["embed-test"],
+                fixture,
+                options={"repeats": 2, "query_prefix_override": "Q: "},
+            )
+            meta = json.loads(meta_path.read_text())
+            self.assertEqual(meta["options"]["request_timeout_s"], 321.0)
+            self.assertEqual(meta["options"]["repeats"], 2)
+            self.assertEqual(meta["models"][0]["runtime_url"], "http://127.0.0.1:11437")
+
+    def test_generation_metadata_lists_resolved_environment_controls(self) -> None:
+        source = (BENCH / "generation-benchmark.py").read_text(encoding="utf-8")
+        for option in (
+            "num_predict_short", "num_predict_prefill", "num_predict_context",
+            "num_predict_long", "repeats", "latency_repeats",
+            "prefill_sentences", "ctx_points", "keep_alive",
+            "early_eos_fraction", "request_timeout_s",
+        ):
+            self.assertIn(f'"{option}"', source)
+
+    def test_generation_summary_contains_category_aggregates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            for run, tps in enumerate((40.0, 42.0, 41.0), start=1):
+                common.append_result(path, common.result_record(
+                    category="generation", model="m", case_id=f"short-{run}",
+                    result_type="measurement", outcome="pass",
+                    diagnostics=["context-truncation"] if run == 3 else [],
+                    metrics={
+                        "tokens_per_second": tps, "resident_size_bytes": 1024,
+                        "mem_available_min_mib": 2000, "swap_used_start_mib": 10,
+                        "swap_used_max_mib": 20, "swap_used_end_mib": 15,
+                        "swap_peak_delta_mib": 10, "temp_max_c": 70, "temp_p95_c": 68,
+                    }, test="short", run=run,
+                ))
+            common.append_result(path, common.result_record(
+                category="generation", model="m", case_id="prefill-1",
+                result_type="measurement", outcome="pass",
+                metrics={"prompt_tokens_per_second": 500.0}, test="prefill", run=1,
+            ))
+            summary_json, _summary_txt = common.write_result_summary(path, category="generation")
+            summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            model = summary["aggregates"]["models"]["m"]
+            self.assertAlmostEqual(model["decode_mean_tps"], 41.0)
+            self.assertAlmostEqual(model["prefill_tps"], 500.0)
+            self.assertEqual(model["diagnostics"], {"context-truncation": 1})
+
+    def test_chronological_resource_aggregate_uses_run_boundaries(self) -> None:
+        rows = [
+            {
+                "swap_used_start_mib": 100,
+                "swap_used_max_mib": 150,
+                "swap_used_end_mib": 140,
+                "temp_p95_c": 68,
+            },
+            {
+                "swap_used_start_mib": 140,
+                "swap_used_max_mib": 180,
+                "swap_used_end_mib": 120,
+                "temp_p95_c": 70,
+            },
+        ]
+        aggregate = common.chronological_resource_aggregate(rows)
+        self.assertEqual(aggregate["swap_used_start_mib"], 100)
+        self.assertEqual(aggregate["swap_used_max_mib"], 180)
+        self.assertEqual(aggregate["swap_used_end_mib"], 120)
+        self.assertEqual(aggregate["swap_peak_delta_mib"], 80)
+        self.assertEqual(aggregate["temp_p95_max_case_c"], 70)
+
+        nested = common.chronological_resource_aggregate(
+            [{"metrics": row} for row in rows], nested_metrics=True
+        )
+        self.assertEqual(nested["swap_peak_delta_mib"], 80)
+
+    def test_embedding_aggregate_record_drives_canonical_summary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            metrics = {
+                "recall_at_1": 0.8462,
+                "recall_at_3": 1.0,
+                "mrr": 0.9231,
+                "cross_recall_at_1": 0.8889,
+                "cross_mrr": 0.9444,
+                "hard_recall_at_1": 0.5,
+                "warm_input_tps": 321.0,
+                "cold_load_s": 1.5,
+            }
+            common.append_result(
+                path,
+                common.result_record(
+                    category="embeddings",
+                    model="embed-jina",
+                    case_id="aggregate",
+                    result_type="measurement",
+                    outcome="pass",
+                    metrics=metrics,
+                ),
+            )
+            summary_json, _ = common.write_result_summary(path, category="embeddings")
+            model = json.loads(summary_json.read_text())["aggregates"]["models"]["embed-jina"]
+            self.assertEqual(model["cross_recall_at_1"], 0.8889)
+            self.assertEqual(model["cross_mrr"], 0.9444)
+            self.assertEqual(model["warm_input_tps"], 321.0)
+
+    def test_quality_summary_preserves_per_model_failure_causes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            for model, cause in (("model-a", "language"), ("model-b", "relevance")):
+                common.append_result(
+                    path,
+                    common.result_record(
+                        category="task",
+                        model=model,
+                        case_id="case",
+                        result_type="qualification",
+                        outcome="quality-fail",
+                        failure_kinds=[cause],
+                    ),
+                )
+            summary_json, _ = common.write_result_summary(path, category="task")
+            models = json.loads(summary_json.read_text())["aggregates"]["models"]
+            self.assertEqual(models["model-a"]["failure_kinds"], {"language": 1})
+            self.assertEqual(models["model-b"]["failure_kinds"], {"relevance": 1})
+
+    def test_openwebui_metadata_resolves_model_on_supplied_runtime(self) -> None:
+        seen: list[str] = []
+
+        class FakeOllama:
+            def __init__(self, url: str, _timeout: float = 900.0) -> None:
+                self.base_url = url
+                seen.append(url)
+            def version(self) -> str:
+                return "0.33.3"
+            def digest(self, _model: str) -> str:
+                return "digest"
+
+        with tempfile.TemporaryDirectory() as temporary, patch.object(
+            openwebui_workflow, "OllamaClient", FakeOllama
+        ):
+            meta_path = Path(temporary) / "meta.json"
+            paths = SimpleNamespace(meta_json=meta_path)
+            openwebui_workflow.simple_meta(
+                paths,
+                "owui-embedding-batch",
+                url="http://127.0.0.1:3000",
+                model="embed-jina",
+                model_runtime_url="http://127.0.0.1:11437",
+            )
+            meta = json.loads(meta_path.read_text())
+            self.assertEqual(seen, ["http://127.0.0.1:11437"])
+            self.assertEqual(meta["models"][0]["runtime_url"], "http://127.0.0.1:11437")
+
+    def test_revalidation_quality_step_names_match_canonical_categories(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            events = root / "events.tsv"
+            for category_name in ("usecase", "agent", "owui-rag"):
+                result_dir = root / category_name / "results"
+                result_dir.mkdir(parents=True)
+                (result_dir / "summary.json").write_text(
+                    json.dumps({
+                        "category": category_name,
+                        "qualification_counts": {"pass": 0, "quality-fail": 1, "skipped": 0},
+                        "failure_kinds": {"requirements": 1},
+                    }),
+                    encoding="utf-8",
+                )
+            events.write_text(
+                "\n".join(
+                    f"2026-09-07T00:00:00+00:00\troles\t{name}\tquality\tquality-fail\trc=3"
+                    for name in ("usecase", "agent", "owui-rag")
+                ) + "\n",
+                encoding="utf-8",
+            )
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = (
+                f'source "{source}" help >/dev/null\n'
+                f'RAW="{root}"\nEVENTS="{events}"\nquality_cause_report\n'
+            )
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertNotIn("canonical summary unavailable", completed.stdout)
+            for name in ("usecase", "agent", "owui-rag"):
+                self.assertIn(name, completed.stdout)
+
+    def test_failed_launch_cleanup_removes_state_token_and_unit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            work = root / "work"
+            run_dir = root / "run"
+            unit = root / "worker.service"
+            token = root / "token"
+            work.mkdir()
+            run_dir.mkdir()
+            unit.write_text("unit")
+            token.write_text("secret")
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f'''source "{source}" help >/dev/null
+WORK="{work}"
+RUN_DIR="{run_dir}"
+UNIT_PATH="{unit}"
+OWUI_TOKEN="{token}"
+UNIT="test-worker.service"
+systemctl() {{ return 0; }}
+cleanup_failed_launch
+[[ ! -e "$WORK" && ! -e "$RUN_DIR" && ! -e "$UNIT_PATH" && ! -e "$OWUI_TOKEN" ]]
+'''
+            subprocess.run(["bash", "-c", script], check=True)
+
+    def test_agent_static_contract_has_no_legacy_correctness_alias(self) -> None:
+        self.assertFalse(hasattr(category, "validate_agent_output"))
+        source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
+        self.assertNotIn("correctness_ok", source)
+
+    def test_generation_budget_diagnostics_distinguish_output_from_thinking(self) -> None:
+        metrics = {"answer_started": False, "done_reason": "length"}
+        self.assertEqual(generation.budget_diagnostics(metrics, 128, ""), ["output-budget"])
+        self.assertEqual(
+            generation.budget_diagnostics(metrics, 128, "reasoning"),
+            ["output-budget", "thinking-budget"],
+        )
+
+    def test_round2c2_removes_stale_revalidation_and_splits_workflow_responsibility(self) -> None:
+        revalidate = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        for stale in ("PARAM_NAMES=", "run_bench()", "unload_model()", "disable_worker_for_future_boots", "Compatibility name"):
+            self.assertNotIn(stale, revalidate)
+        self.assertIn("Recent results", revalidate)
+        self.assertIn("Revalidation run completed.", revalidate)
+        self.assertTrue((BENCH / "runtime-benchmark.py").exists())
+        self.assertTrue((BENCH / "openwebui-benchmark.py").exists())
+        self.assertFalse((BENCH / "workflow-benchmark.py").exists())
+
+    def test_revalidation_uses_complete_live_cu_routing_health(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        block = source[source.index("check_live_cu_routing() {"):source.index("phase_preflight() {")]
+        self.assertIn("bc250-cu-status --summary", block)
+        self.assertIn("routed entries present; no off/problem cells", block)
+        self.assertNotIn("40/40", block)
 
 
 if __name__ == "__main__":

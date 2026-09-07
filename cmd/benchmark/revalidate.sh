@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v3.9
+# BC-250 package revalidation harness v4.0
 #
 # Intended target: bc250-llm-server 0.11.0 on Fedora 44; release suffix is not hard-coded.
-# `start` launches a systemd worker that spans reboots. The kernel lane dynamically
-# optionally compares the running/default kernel's TTM-only baseline with the historical
-# full profile, then restores its exact arguments after two normal reboots. Per-phase reports are
-# retained; temporary OWUI/RAG and exclusive-agent state is restored on every exit.
-# The supplied OWUI credential remains under /run and is never included in reports.
+# `start` launches one systemd-owned qualification worker. Routine revalidation
+# exercises packaged defaults only; tuning and hardware A/B decisions are explicit
+# benchmark/diagnostic work. Per-phase reports are retained and exclusive-agent state
+# is restored on every exit. Supplied OWUI credentials remain under /run and are never bundled.
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=3.9
+HARNESS_VERSION=4.0
 TARGET_VERSION=0.11.0
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
@@ -23,106 +22,80 @@ UNIT=bc250-revalidation.service
 UNIT_PATH=/etc/systemd/system/$UNIT
 LOCK=/run/lock/bc250-llm-server-revalidation.lock
 HARNESS_COPY=$WORK/harness.sh
-HELPER=$WORK/owui-test-helper.py
 
 PHASE_FILE=$WORK/phase
 STAGE_FILE=$WORK/stage
-HEARTBEAT_FILE=$WORK/heartbeat
+LAST_EVENT_FILE=$WORK/last-event
+STAGE_STARTED_FILE=$WORK/stage-started
+RUN_STATE_FILE=$WORK/run-state
+INFRA_STATE_FILE=$WORK/infrastructure-state
+QUALITY_STATE_FILE=$WORK/quality-state
+RESTORATION_STATE_FILE=$WORK/restoration-state
 RUN_ID_FILE=$WORK/run-id
 RUN_HARNESS_VERSION_FILE=$WORK/harness-version
-EVENTS=$WORK/events.log
+EVENTS=$WORK/events.tsv
 RAW=$WORK/results
 PHASE_REPORT_DIR=$WORK/phase-reports
 SETTINGS_FILE=$WORK/settings.env
-OWUI_CONFIG_SAVE=$WORK/owui-original-config.json
-SYSCTX_STATE=$WORK/sysctx-state
-SYSCTX_BACKUP=$WORK/sysctx-dropin.original
-SYSCTX_DROPIN=/etc/containers/systemd/open-webui.container.d/99-bc250-revalidation.conf
 OWUI_TOKEN=$RUN_DIR/owui-token
-OWUI_TOKEN_SOURCE_FILE=$WORK/owui-token-source-path
-TARGET_KERNEL_FILE=$WORK/target-kernel
-ORIGINAL_ARGS_FILE=$WORK/original-kernel-args.txt
+COVERAGE_STATE_FILE=$WORK/coverage-state
 FAILURE_RC_FILE=$WORK/failure-rc
 FAILURE_GUARD=$WORK/failure-handler-active
 ERROR_CONTEXT=$WORK/error-context.txt
 SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
-PARAM_NAMES='amdgpu.gttsize ttm.pages_limit ttm.page_pool_size amdgpu.ppfeaturemask'
-PACKAGE_BASELINE_PROFILE='ttm.pages_limit=4194304 ttm.page_pool_size=4194304'
-LEGACY_FULL_PROFILE='amdgpu.gttsize=14750 ttm.pages_limit=4194304 ttm.page_pool_size=4194304 amdgpu.ppfeaturemask=0xffffffff'
 
-# Optional/repeated checks. Routine runs default to no reboot and no repeated governor/
-# keepalive/warm-prefix qualification. Enable those lanes only when the relevant kernel,
-# governor, or residency policy changed. Values present at `start` are persisted for the
-# detached worker. With sudo, prefer `sudo env RUN_FOO=1 bash ... start`.
-RUN_KERNEL_REVALIDATION=${RUN_KERNEL_REVALIDATION:-0}
-RUN_GOVERNOR_REVALIDATION=${RUN_GOVERNOR_REVALIDATION:-0}
-RUN_KEEPALIVE_EXPIRY=${RUN_KEEPALIVE_EXPIRY:-0}
-RUN_PRODUCTION_GENERATION=${RUN_PRODUCTION_GENERATION:-1}
-RUN_WARM_PREFIX=${RUN_WARM_PREFIX:-0}
-RUN_NUM_BATCH=${RUN_NUM_BATCH:-1}
-RUN_AGENT=${RUN_AGENT:-1}
-RUN_OWUI_TUNING=${RUN_OWUI_TUNING:-1}
-RUN_EMBED_BATCH_SWEEP=${RUN_EMBED_BATCH_SWEEP:-1}
-RUN_CHUNK_MIN_SWEEP=${RUN_CHUNK_MIN_SWEEP:-1}
-RUN_RAG_SYSTEM_CONTEXT=${RUN_RAG_SYSTEM_CONTEXT:-1}
-RUN_CONCURRENCY=${RUN_CONCURRENCY:-1}
-RUN_OCR=${RUN_OCR:-0}
+# Revalidation v4.0 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# under explicit bc250-benchmark commands and is never selected by this worker.
 
-# Dedicated edge-case model. The harness skips it cleanly when not installed.
-GPT_OSS_MODEL=${GPT_OSS_MODEL:-prod-gpt-oss20b-ggml-org-mxfp4}
-E2B_MODEL=${E2B_MODEL:-prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl}
-E4B_MODEL=${E4B_MODEL:-prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl}
-EMBED_MODEL=${EMBED_MODEL:-embed-jina-v5-small-retrieval-q4-k-m}
-TASK_MODEL=${TASK_MODEL:-task-gemma3-1b-unsloth-ud-q4-k-xl}
-AGENT_MODEL=${AGENT_MODEL:-agentic-qwen25-coder7b-unsloth-q5-k-m}
-OWUI_RAG_MODEL=${OWUI_RAG_MODEL:-bc250-office-documents}
+# Immutable package-owned role definitions. Revalidation never accepts model-role
+# overrides; candidate selection belongs exclusively to bc250-benchmark.
+readonly E2B_MODEL=prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
+readonly E4B_MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+readonly LFM_MODEL=prod-lfm25-8b-a1b-liquidai-q6-k
+readonly QWEN_MODEL=prod-qwen35-9b-unsloth-q6-k
+readonly GPT_OSS_MODEL=prod-gpt-oss20b-ggml-org-mxfp4
+readonly EMBED_MODEL=embed-jina-v5-small-retrieval-q4-k-m
+readonly TASK_MODEL=task-gemma3-1b-unsloth-ud-q4-k-xl
+readonly AGENT_MODEL=agentic-qwen25-coder7b-unsloth-q5-k-m
+readonly OWUI_RAG_MODEL=bc250-office-documents
+readonly -a PACKAGE_PROD_MODELS=(
+  "$E2B_MODEL" "$E4B_MODEL" "$LFM_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
+)
+
+# Gross-regression gates only. These floors are intentionally conservative and
+# package-owned; ordinary run-to-run performance variation must not fail qualification.
+readonly EDGE_MIN_RESIDENCY_RATIO=0.90
+readonly EDGE_MIN_MEM_AVAILABLE_MIB=128
+readonly EDGE_MAX_TEMP_C=85
+readonly EDGE_SEVERE_CONTEXT_TOKENS=4096
 
 usage() {
   cat <<'USAGE'
 Usage:
-  sudo bc250-revalidate start [--owui-token-file FILE] [--detach] [--kernel-ab] [--governor-ab] [--keepalive-expiry]
+  sudo bc250-revalidate start --owui-token-file FILE [--detach]
+  sudo bc250-revalidate start --skip-owui [--detach]
   sudo bc250-revalidate status [--raw]
   sudo bc250-revalidate abort
   sudo bc250-revalidate cleanup
 
 Recommended authenticated start:
-  sudo install -m 600 /dev/null /root/owui-test.key
-  sudoedit /root/owui-test.key  # paste a temporary Open WebUI admin API key
   sudo bc250-revalidate start --owui-token-file /root/owui-test.key
 
-By default `start` follows the detached systemd worker with a live phase/stage
-indicator. Ctrl-C detaches from the display without stopping the worker. Use
-`--detach` for the previous immediate-return behavior. Kernel A/B runs always
-detach because the terminal cannot remain attached across host reboots.
+`start` launches one systemd-owned qualification worker and follows a compact
+six-phase dashboard by default. Ctrl-C detaches from the display; it never kills
+the worker. Use --detach for immediate return.
 
-With RUN_KERNEL_REVALIDATION=1, the worker performs a focused two-reboot A/B:
-current TTM-only baseline -> historical full profile -> exact original profile. The exact running kernel is selected
-at start; there is no release-specific kernel string in the harness.
+Revalidation answers one question only: does the configuration currently shipped
+by this package qualify on this BC-250? It does not choose configuration and does
+not run num_batch, embedding-batch, chunk-min, RAG_SYSTEM_CONTEXT, thinking-policy,
+kernel/governor, keepalive, or experimental-model A/B sweeps. Run those explicitly
+through bc250-benchmark or the appropriate hardware diagnostic workflow.
 
-Routine default: no kernel-profile reboots, no repeated governor A/B, no 10-minute
-keepalive-expiry wait, and no generic warm-prefix lane. Enable those only when needed.
-A completed run keeps its work/unit state for status/debugging; use `cleanup` after
-collecting the bundle, or simply start the next run to replace completed state.
-
-Without an Open WebUI key the core Ollama/service/model tests still run, while
-API-driven OWUI drift, embedding-batch, chunk-min and RAG_SYSTEM_CONTEXT tests
-are reported as skipped.
-
-Optional qualification lanes can be enabled explicitly:
-  sudo bc250-revalidate start --kernel-ab
-  sudo bc250-revalidate start --governor-ab
-  sudo bc250-revalidate start --keepalive-expiry
-
-Environment overrides remain available, for example:
-  sudo env RUN_PRODUCTION_GENERATION=0 RUN_CHUNK_MIN_SWEEP=0 \
-    bc250-revalidate start --owui-token-file /root/owui-test.key
-
-The worker never stores the supplied key itself under /var or inside the final bundle.
-When --owui-token-file is used, only the source FILE PATH is retained under the root-only
-work directory so the key can be re-copied into /run (tmpfs), including after each kernel
-reboot. Keep the source API key file until the run is complete, then delete it.
+Full package qualification requires a protected Open WebUI admin API-key file.
+Use --skip-owui only for an explicitly incomplete qualification run. The key is
+copied only to /run and is never bundled or persisted as package state.
 USAGE
 }
 
@@ -134,18 +107,37 @@ now() { date --iso-8601=seconds; }
 
 run_id() { cat "$RUN_ID_FILE" 2>/dev/null || true; }
 
-set_phase() {
-  printf '%s\n' "$1" > "$PHASE_FILE"
-  progress "$2"
+sanitize_event_field() {
+  local value="${1//$'\t'/ }"
+  value="${value//$'\n'/ }"
+  printf '%s' "$value"
 }
 
-progress() {
+record_event() {
+  local step="$1" kind="$2" outcome="$3" detail="${4:-}" ts phase
+  ts="$(now)"
+  phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "$ts" "$(sanitize_event_field "$phase")" "$(sanitize_event_field "$step")" \
+    "$(sanitize_event_field "$kind")" "$(sanitize_event_field "$outcome")" \
+    "$(sanitize_event_field "$detail")" >> "$EVENTS"
+  printf '%s\n' "$ts" > "$LAST_EVENT_FILE"
+}
+
+set_stage() {
   local msg="$1" ts
   ts="$(now)"
   printf '%s\n' "$msg" > "$STAGE_FILE"
-  printf '%s\n' "$ts" > "$HEARTBEAT_FILE"
-  printf '%s  phase=%s  %s\n' "$ts" "$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)" "$msg" | tee -a "$EVENTS"
+  printf '%s\n' "$ts" > "$STAGE_STARTED_FILE"
+  record_event "$msg" progress progress
 }
+
+set_phase() {
+  printf '%s\n' "$1" > "$PHASE_FILE"
+  set_stage "$2"
+}
+
+record_progress() { set_stage "$1"; }
 
 abort_requested() {
   [[ -e $WORK/ABORT ]]
@@ -153,61 +145,96 @@ abort_requested() {
 
 check_abort() {
   abort_requested || return 0
-  progress "operator abort requested"
+  record_progress "operator abort requested"
   return 130
 }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
 
+# Revalidation sanitizes every benchmark invocation so systemd manager/default
+# environment cannot replace package-owned fixtures, lane endpoints, models, or
+# sampling/tuning policy. Standalone bc250-benchmark intentionally remains flexible.
+qualification_benchmark() {
+  env \
+    -u OLLAMA_URL -u OLLAMA_HOST -u EMBEDDING_OLLAMA_URL \
+    -u BC250_BENCH_FIXTURES -u AGENT_TEMPERATURE \
+    -u TRANSLATION_MODEL -u TRANSLATION_EXPLICIT_DIRECTION \
+    -u RAG_EMBED_MODEL -u RAG_ANSWER_MODEL -u RAG_QUALITY_TOP_K \
+    -u RAG_QUALITY_NUM_PREDICT -u EMBED_REPEATS -u EMBED_QUERY_PREFIX \
+    -u EMBED_CONTENT_PREFIX -u KEEP_ALIVE -u REQUEST_TIMEOUT \
+    -u TELEMETRY_INTERVAL -u BENCH_INCLUDE_EXPERIMENTS -u BOARD_NOTE \
+    -u EARLY_EOS_FRACTION -u LATENCY_REPEATS -u NUM_PREDICT_CONTEXT \
+    -u NUM_PREDICT_LATENCY -u NUM_PREDICT_LATENCY_THINKING \
+    -u NUM_PREDICT_LONG -u NUM_PREDICT_PREFILL -u NUM_PREDICT_SHORT \
+    -u NUM_PREDICT_WARM_PREFIX -u PREFILL_SENTENCES -u REPEATS \
+    -u RUN_CONTEXT -u RUN_LATENCY -u RUN_THERMAL -u RUN_WARM_PREFIX \
+    -u CTX_POINTS -u THROTTLE_WINDOWS -u WARM_PREFIX_SENTENCES \
+    "$@"
+}
+
 save_settings() {
-  local name
-  : > "$SETTINGS_FILE"
-  for name in \
-    RUN_KERNEL_REVALIDATION RUN_GOVERNOR_REVALIDATION \
-    RUN_KEEPALIVE_EXPIRY RUN_PRODUCTION_GENERATION RUN_WARM_PREFIX RUN_NUM_BATCH \
-    RUN_AGENT RUN_OWUI_TUNING RUN_EMBED_BATCH_SWEEP RUN_CHUNK_MIN_SWEEP \
-    RUN_RAG_SYSTEM_CONTEXT RUN_CONCURRENCY RUN_OCR \
-    GPT_OSS_MODEL E2B_MODEL E4B_MODEL EMBED_MODEL TASK_MODEL AGENT_MODEL OWUI_RAG_MODEL; do
-    printf '%s=%q\n' "$name" "${!name}" >> "$SETTINGS_FILE"
-  done
+  printf 'SKIP_OWUI=%q\n' "${SKIP_OWUI:-0}" > "$SETTINGS_FILE"
   chmod 0600 "$SETTINGS_FILE"
 }
 
 load_settings() {
+  SKIP_OWUI=0
   [[ -f $SETTINGS_FILE ]] && source "$SETTINGS_FILE"
 }
 
-
-refresh_owui_token() {
-  install -d -m 0700 "$RUN_DIR"
-  if [[ -r $OWUI_TOKEN_SOURCE_FILE ]]; then
-    local source
-    source="$(cat "$OWUI_TOKEN_SOURCE_FILE")"
-    rm -f "$OWUI_TOKEN"
-    if [[ -n $source && -r $source ]]; then
-      install -m 0600 "$source" "$OWUI_TOKEN"
-      return 0
-    fi
-    progress "WARNING: saved OWUI token source is no longer readable; authenticated OWUI tests will be skipped"
+validate_protected_token_file() {
+  local path="$1" mode
+  [[ -f $path && -r $path && -s $path ]] || {
+    echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $path" >&2
+    return 2
+  }
+  mode="$(stat -c '%a' "$path" 2>/dev/null || true)"
+  [[ $mode =~ ^[0-7]{3,4}$ ]] || {
+    echo "ERROR: cannot determine permissions for Open WebUI API key file: $path" >&2
+    return 2
+  }
+  if (( (8#$mode) & 077 )); then
+    echo "ERROR: Open WebUI API key file must not be group/world accessible: $path (mode $mode)" >&2
+    return 2
   fi
-  # An OWUI_API_KEY supplied via the environment exists only for the initial boot;
-  # leave its already-created /run copy intact until a reboot naturally removes it.
-  return 0
+}
+
+validate_owui_token_file() {
+  local path="$1"
+  validate_protected_token_file "$path" || return $?
+  python3 - "$path" <<'PYTOKEN'
+import pathlib
+import sys
+import urllib.error
+import urllib.request
+
+path = pathlib.Path(sys.argv[1])
+token = path.read_text(encoding="utf-8").strip()
+if not token:
+    print("ERROR: supplied Open WebUI credential is empty.", file=sys.stderr)
+    raise SystemExit(2)
+req = urllib.request.Request(
+    "http://127.0.0.1:3000/ollama/config",
+    headers={"Authorization": f"Bearer {token}", "Accept": "application/json"},
+)
+try:
+    with urllib.request.urlopen(req, timeout=10) as response:
+        response.read(1)
+except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError) as exc:
+    print(
+        "ERROR: supplied Open WebUI credential was rejected or the admin API is unavailable: "
+        f"{exc}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+PYTOKEN
 }
 
 validate_owui_token() {
-  [[ -s $OWUI_TOKEN ]] || return 0
-  local token
-  token="$(<"$OWUI_TOKEN")"
-  [[ -n $token ]] || { echo "ERROR: supplied Open WebUI credential is empty." >&2; return 1; }
-  # The tuning lanes require administrator access to /ollama/config. Validate it
-  # before detaching/rebooting so a bad key cannot waste an entire kernel A/B run.
-  if ! curl -fsS --connect-timeout 2 --max-time 10       -H "Authorization: Bearer $token"       http://127.0.0.1:3000/ollama/config >/dev/null 2>&1; then
-    echo "ERROR: supplied Open WebUI credential was rejected by the admin configuration API." >&2
-    echo "       Use a current admin Bearer credential/API key, or omit it to skip authenticated OWUI tuning." >&2
-    return 1
-  fi
+  [[ -s $OWUI_TOKEN ]] || { echo "ERROR: Open WebUI token copy is missing." >&2; return 1; }
+  validate_owui_token_file "$OWUI_TOKEN"
 }
+
 
 api_ready() {
   local port="$1"
@@ -229,572 +256,15 @@ model_registered() {
     jq -e --arg m "$model" 'any(.models[]?; (.name | sub(":latest$"; "")) == $m)' >/dev/null 2>&1
 }
 
-first_registered() {
-  local port="$1" prefix="$2"
-  curl -fsS "http://127.0.0.1:${port}/api/tags" 2>/dev/null | \
-    jq -r --arg p "$prefix" '[.models[]?.name | sub(":latest$"; "") | select(startswith($p))][0] // empty'
-}
-
-installed_prod_models() {
-  curl -fsS http://127.0.0.1:11434/api/tags 2>/dev/null | \
-    jq -r '.models[]?.name | sub(":latest$"; "") | select(startswith("prod-"))' | sort -u
-}
-
-write_helper() {
-  cat > "$HELPER" <<'PY'
-#!/usr/bin/env python3
-"""Local-only helpers for the BC-250 0.11.0 revalidation harness."""
-from __future__ import annotations
-
-import argparse
-import concurrent.futures
-import hashlib
-import json
-import mimetypes
-import os
-import subprocess
-import sys
-import time
-import urllib.error
-import urllib.parse
-import urllib.request
-import uuid
-from pathlib import Path
-from typing import Any
-
-
-class Failure(RuntimeError):
-    pass
-
-
-class JsonClient:
-    def __init__(self, base: str, token: str | None = None, timeout: float = 900):
-        self.base = base.rstrip("/")
-        self.token = token
-        self.timeout = timeout
-
-    def request(self, method: str, path: str, payload: Any | None = None, headers: dict[str, str] | None = None) -> Any:
-        data = None
-        merged = {"Accept": "application/json"}
-        if payload is not None:
-            data = json.dumps(payload, ensure_ascii=False).encode()
-            merged["Content-Type"] = "application/json"
-        if self.token:
-            merged["Authorization"] = f"Bearer {self.token}"
-        if headers:
-            merged.update(headers)
-        req = urllib.request.Request(self.base + path, data=data, headers=merged, method=method)
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                raw = r.read()
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")
-            raise Failure(f"{method} {path}: HTTP {exc.code}: {detail}") from exc
-        except OSError as exc:
-            raise Failure(f"{method} {path}: {exc}") from exc
-        if not raw:
-            return {}
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise Failure(f"{method} {path}: non-JSON response") from exc
-
-    def get(self, path: str) -> Any:
-        return self.request("GET", path)
-
-    def post(self, path: str, payload: Any) -> Any:
-        return self.request("POST", path, payload)
-
-    def delete(self, path: str) -> Any:
-        return self.request("DELETE", path)
-
-
-def ns(v: Any) -> float | None:
-    try:
-        return float(v) / 1e9
-    except (TypeError, ValueError):
-        return None
-
-
-def ollama_unload(client: JsonClient, model: str) -> None:
-    try:
-        client.post("/api/generate", {"model": model, "stream": False, "keep_alive": 0})
-    except Failure:
-        pass
-
-
-def wait_ready(client: JsonClient, timeout: float = 90) -> None:
-    try:
-        client.get("/api/tags")
-        return
-    except Failure:
-        subprocess.run(
-            ["systemctl", "restart", "ollama.service"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-        )
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        try:
-            client.get("/api/tags")
-            return
-        except Failure:
-            time.sleep(2)
-    raise Failure("main Ollama did not recover before the next diagnostic candidate")
-
-
-def synthetic_prompt(sentences: int) -> str:
-    return "\n".join(
-        f"Office record sentence {i} contains contract BC250-{i:04d}, a dated policy item, department, CHF amount, payment deadline and procedural qualification."
-        for i in range(1, sentences + 1)
-    ) + "\nSummarize the operational pattern in two short sentences."
-
-
-def cmd_embed_warm(args: argparse.Namespace) -> int:
-    c = JsonClient(args.url)
-    result = c.post("/api/embed", {"model": args.model, "input": ["Query: BC-250 embedding residency check"], "keep_alive": args.keep_alive})
-    if not result.get("embeddings"):
-        raise Failure("embedding API returned no vectors")
-    print(json.dumps({"status": "ok", "model": args.model, "keep_alive": args.keep_alive, "vectors": len(result["embeddings"])}, sort_keys=True))
-    return 0
-
-
-def cmd_num_batch(args: argparse.Namespace) -> int:
-    c = JsonClient(args.url, timeout=args.timeout)
-    prompt = synthetic_prompt(args.sentences)
-    rows: list[dict[str, Any]] = []
-    batches: list[int | None] = [None, 512, 256, 128]
-    for model in args.models:
-        for batch in batches:
-            options: dict[str, Any] = {"temperature": 0, "num_predict": args.num_predict, "num_ctx": args.num_ctx}
-            if batch is not None:
-                options["num_batch"] = batch
-            payload = {"model": model, "prompt": prompt, "stream": False, "keep_alive": "2m", "options": options}
-            started = time.monotonic()
-            row: dict[str, Any] = {"model": model, "num_batch": "auto" if batch is None else batch}
-            try:
-                wait_ready(c)
-                ollama_unload(c, model)
-                time.sleep(1)
-                result = c.post("/api/generate", payload)
-                row.update({
-                    "status": "ok",
-                    "wall_s": time.monotonic() - started,
-                    "load_s": ns(result.get("load_duration")),
-                    "prompt_eval_count": result.get("prompt_eval_count"),
-                    "prompt_eval_s": ns(result.get("prompt_eval_duration")),
-                    "eval_count": result.get("eval_count"),
-                    "eval_s": ns(result.get("eval_duration")),
-                    "total_s": ns(result.get("total_duration")),
-                    "done_reason": result.get("done_reason"),
-                })
-            except Exception as exc:  # diagnostic sweep should retain later rows
-                row.update({"status": "error", "wall_s": time.monotonic() - started, "error": str(exc)})
-            rows.append(row)
-            print(json.dumps(row, ensure_ascii=False, sort_keys=True), flush=True)
-    Path(args.output).write_text("\n".join(json.dumps(r, ensure_ascii=False, sort_keys=True) for r in rows) + "\n")
-    return 0 if all(r["status"] == "ok" for r in rows) else 1
-
-
-def cmd_concurrency(args: argparse.Namespace) -> int:
-    main = JsonClient(args.main_url, timeout=args.timeout)
-    emb = JsonClient(args.embed_url, timeout=args.timeout)
-    prompt = synthetic_prompt(args.sentences)
-    ollama_unload(main, args.model)
-
-    def generation() -> dict[str, Any]:
-        start = time.monotonic()
-        r = main.post("/api/generate", {
-            "model": args.model,
-            "prompt": prompt,
-            "stream": False,
-            "keep_alive": "5m",
-            "options": {"temperature": 0, "num_predict": 32, "num_ctx": 32768},
-        })
-        return {"wall_s": time.monotonic() - start, "prompt_eval_count": r.get("prompt_eval_count"), "prompt_eval_s": ns(r.get("prompt_eval_duration")), "eval_s": ns(r.get("eval_duration"))}
-
-    def embeddings() -> list[dict[str, Any]]:
-        rows = []
-        for i in range(args.embed_requests):
-            start = time.monotonic()
-            r = emb.post("/api/embed", {"model": args.embed_model, "input": [f"Query: concurrent embedding request {i}"], "keep_alive": "10m"})
-            rows.append({"i": i, "wall_s": time.monotonic() - start, "ok": bool(r.get("embeddings"))})
-            time.sleep(0.25)
-        return rows
-
-    start = time.monotonic()
-    out: dict[str, Any] = {"model": args.model, "embed_model": args.embed_model}
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-            gf = pool.submit(generation)
-            ef = pool.submit(embeddings)
-            out["generation"] = gf.result()
-            out["embeddings"] = ef.result()
-        out["status"] = "ok" if all(x["ok"] for x in out["embeddings"]) else "error"
-    except Exception as exc:
-        out.update({"status": "error", "error": str(exc)})
-    out["wall_s"] = time.monotonic() - start
-    Path(args.output).write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
-    print(json.dumps(out, ensure_ascii=False, sort_keys=True))
-    return 0 if out.get("status") == "ok" else 1
-
-
-def token_from(path: str) -> str:
-    token = Path(path).read_text().strip()
-    if not token:
-        raise Failure("Open WebUI API key file is empty")
-    return token
-
-
-def emb_selected(data: dict[str, Any]) -> dict[str, Any]:
-    keys = [
-        "RAG_EMBEDDING_ENGINE", "RAG_EMBEDDING_MODEL", "RAG_EMBEDDING_BATCH_SIZE",
-        "ENABLE_ASYNC_EMBEDDING", "RAG_EMBEDDING_CONCURRENT_REQUESTS", "ollama_config",
-    ]
-    return {k: data.get(k) for k in keys}
-
-
-def rag_selected(data: dict[str, Any]) -> dict[str, Any]:
-    keys = ["CHUNK_MIN_SIZE_TARGET"]
-    return {k: data.get(k) for k in keys}
-
-
-def owui_client(args: argparse.Namespace) -> JsonClient:
-    return JsonClient(args.url, token_from(args.token_file), timeout=args.timeout)
-
-
-def cmd_save_config(args: argparse.Namespace) -> int:
-    c = owui_client(args)
-    out = {"embedding": emb_selected(c.get("/api/v1/retrieval/embedding")), "rag": rag_selected(c.get("/api/v1/retrieval/config"))}
-    Path(args.output).write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
-    return 0
-
-
-def cmd_restore_config(args: argparse.Namespace) -> int:
-    c = owui_client(args)
-    data = json.loads(Path(args.input).read_text())
-    c.post("/api/v1/retrieval/embedding/update", data["embedding"])
-    c.post("/api/v1/retrieval/config/update", data["rag"])
-    return 0
-
-
-def multipart_upload(c: JsonClient, path: Path, knowledge_id: str) -> dict[str, Any]:
-    content = path.read_bytes()
-    metadata = json.dumps({"knowledge_id": knowledge_id, "file_hash": hashlib.sha256(content).hexdigest()})
-    boundary = "----bc250-reval-" + uuid.uuid4().hex
-    mime = mimetypes.guess_type(path.name)[0] or "text/markdown"
-    body = b"".join([
-        f'--{boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{metadata}\r\n'.encode(),
-        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{path.name}"\r\nContent-Type: {mime}\r\n\r\n'.encode(),
-        content,
-        f"\r\n--{boundary}--\r\n".encode(),
-    ])
-    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}", "Accept": "application/json"}
-    if c.token:
-        headers["Authorization"] = f"Bearer {c.token}"
-    req = urllib.request.Request(c.base + "/api/v1/files/?process=true&process_in_background=false", data=body, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=c.timeout) as r:
-            result = json.loads(r.read() or b"{}")
-    except urllib.error.HTTPError as exc:
-        raise Failure(f"upload: HTTP {exc.code}: {exc.read().decode(errors='replace')}") from exc
-    fid = result.get("id")
-    if not fid:
-        raise Failure("upload returned no file id")
-    status = c.get(f"/api/v1/files/{fid}/process/status")
-    if status.get("status") != "completed":
-        raise Failure(f"file processing status={status!r}")
-    return result
-
-
-def create_kb(c: JsonClient, name: str) -> dict[str, Any]:
-    kb = c.post("/api/v1/knowledge/create", {"name": name, "description": "Temporary BC-250 revalidation knowledge base; safe to delete."})
-    if not kb.get("id"):
-        raise Failure("knowledge create returned no id")
-    return kb
-
-
-def cleanup_kb(c: JsonClient, kb_id: str | None, file_id: str | None) -> None:
-    if kb_id:
-        try:
-            c.delete(f"/api/v1/knowledge/{kb_id}/delete")
-        except Exception:
-            pass
-    if file_id:
-        try:
-            c.delete(f"/api/v1/files/{file_id}")
-        except Exception:
-            pass
-
-
-def chat(c: JsonClient, model: str, kb_id: str, messages: list[dict[str, str]]) -> dict[str, Any]:
-    return c.post("/api/chat/completions", {
-        "model": model,
-        "messages": messages,
-        "files": [{"type": "collection", "id": kb_id, "status": "processed"}],
-        "stream": False,
-        "background_tasks": {"title_generation": False, "tags_generation": False, "follow_up_generation": False},
-    })
-
-
-def response_text(result: dict[str, Any]) -> str:
-    try:
-        return str(result["choices"][0]["message"]["content"])
-    except Exception:
-        return ""
-
-
-def usage_row(result: dict[str, Any]) -> dict[str, Any]:
-    u = result.get("usage") if isinstance(result, dict) else {}
-    if not isinstance(u, dict):
-        u = {}
-    return {k: u.get(k) for k in ["prompt_tokens", "completion_tokens", "total_tokens", "prompt_token/s", "response_token/s", "total_duration", "load_duration", "prompt_eval_count", "prompt_eval_duration", "eval_count", "eval_duration"]}
-
-
-def source_meta(result: dict[str, Any]) -> dict[str, Any]:
-    """Retain retrieval/citation metadata when the tagged OWUI response exposes it."""
-    if not isinstance(result, dict):
-        return {}
-    keys = ("sources", "citations", "context_chunks_with_source", "context")
-    return {key: result[key] for key in keys if key in result}
-
-
-def make_batch_doc(path: Path) -> None:
-    parts = ["# BC-250 embedding batch fixture\n"]
-    for i in range(1, 181):
-        parts.append(f"## Record {i}\nContract BAT-{i:04d} belongs to Department {i % 11}, has a payment deadline of {10 + i % 20} days, amount CHF {1000 + i * 7}.00, and procedure code PROC-{i % 17:02d}. This paragraph exists to create realistic local embedding work without external downloads.\n")
-    path.write_text("\n".join(parts))
-
-
-def make_chunk_doc(path: Path) -> None:
-    path.write_text("""# Office handbook\n\n## Zurich lease\nThe current Zurich lease reference is ZH-CURRENT-7721. The notice period is six months.\n\n## Archive note\nThe archived Zurich lease reference ZH-OLD-6610 is superseded and must not be used for current notices.\n\n## Invoice 2026-0441\nInvoice reference INV-2026-0441 is CHF 18,740.00 and is due within 30 days.\n\n## Invoice 2026-0447\nInvoice reference INV-2026-0447 is CHF 18,470.00 and is due within 14 days.\n\n## Procurement\nPurchase order PO-88217 requires two approvals above CHF 25,000.\n\n## Privacy\nConfidential personnel documents may not be copied to public collections.\n""")
-
-
-def cmd_embedding_batch(args: argparse.Namespace) -> int:
-    c = owui_client(args)
-    original = emb_selected(c.get("/api/v1/retrieval/embedding"))
-    work = Path(args.work); work.mkdir(parents=True, exist_ok=True)
-    doc = work / "embedding-batch.md"; make_batch_doc(doc)
-    rows = []
-    try:
-        for batch in (1, 4, 8, 16):
-            cfg = dict(original); cfg["RAG_EMBEDDING_BATCH_SIZE"] = batch
-            c.post("/api/v1/retrieval/embedding/update", cfg)
-            kb_id = file_id = None
-            row = {"batch": batch}
-            try:
-                kb = create_kb(c, f"BC250 revalidation embed batch {batch} {uuid.uuid4().hex[:8]}")
-                kb_id = str(kb["id"])
-                start = time.monotonic(); up = multipart_upload(c, doc, kb_id); elapsed = time.monotonic() - start
-                file_id = str(up["id"])
-                row.update({"status": "ok", "process_wall_s": elapsed, "file_id": file_id})
-            except Exception as exc:
-                row.update({"status": "error", "error": str(exc)})
-            finally:
-                cleanup_kb(c, kb_id, file_id)
-            rows.append(row); print(json.dumps(row, sort_keys=True), flush=True)
-    finally:
-        c.post("/api/v1/retrieval/embedding/update", original)
-    Path(args.output).write_text("\n".join(json.dumps(r, sort_keys=True) for r in rows) + "\n")
-    return 0 if all(r.get("status") == "ok" for r in rows) else 1
-
-
-def cmd_chunk_min(args: argparse.Namespace) -> int:
-    c = owui_client(args)
-    original = rag_selected(c.get("/api/v1/retrieval/config"))
-    work = Path(args.work); work.mkdir(parents=True, exist_ok=True)
-    doc = work / "chunk-min.md"; make_chunk_doc(doc)
-    tests = [
-        ("What is the current Zurich lease reference and notice period?", ["ZH-CURRENT-7721", "six"]),
-        ("What amount and deadline belong to invoice INV-2026-0447?", ["18,470", "14"]),
-        ("Which invoice is CHF 18,740.00 and what is its deadline?", ["INV-2026-0441", "30"]),
-        ("What approval rule applies above CHF 25,000?", ["two", "25,000"]),
-    ]
-    rows = []
-    try:
-        for target in (0, 500, 750, 1000):
-            c.post("/api/v1/retrieval/config/update", {"CHUNK_MIN_SIZE_TARGET": target})
-            kb_id = file_id = None
-            row: dict[str, Any] = {"chunk_min_size_target": target, "cases": []}
-            try:
-                kb = create_kb(c, f"BC250 revalidation chunk {target} {uuid.uuid4().hex[:8]}"); kb_id = str(kb["id"])
-                start = time.monotonic(); up = multipart_upload(c, doc, kb_id); row["process_wall_s"] = time.monotonic() - start; file_id = str(up["id"])
-                passes = 0
-                for question, needles in tests:
-                    start = time.monotonic(); result = chat(c, args.model, kb_id, [{"role": "user", "content": question + " Answer briefly and cite the supplied source."}]); wall = time.monotonic() - start
-                    text = response_text(result); ok = all(n.casefold() in text.casefold() for n in needles)
-                    passes += int(ok)
-                    row["cases"].append({"question": question, "required": needles, "pass": ok, "wall_s": wall, "usage": usage_row(result), "source_meta": source_meta(result), "answer": text})
-                row.update({"status": "ok", "passes": passes, "total_cases": len(tests)})
-            except Exception as exc:
-                row.update({"status": "error", "error": str(exc)})
-            finally:
-                cleanup_kb(c, kb_id, file_id)
-            rows.append(row); print(json.dumps({k:v for k,v in row.items() if k != "cases"}, sort_keys=True), flush=True)
-    finally:
-        c.post("/api/v1/retrieval/config/update", original)
-    Path(args.output).write_text("\n".join(json.dumps(r, ensure_ascii=False, sort_keys=True) for r in rows) + "\n")
-    return 0 if all(r.get("status") == "ok" for r in rows) else 1
-
-
-def make_sysctx_doc(path: Path) -> None:
-    filler = " ".join(["The operational appendix contains stable office wording for cache measurement."] * 350)
-    path.write_text(f"""# Contract cache fixture\n\nThe active contract reference is CACHE-ZH-9917. The notice period is six months. The payment deadline is 30 days. The responsible unit is Facility Operations. The archived reference CACHE-ZH-1204 must not be used.\n\n## Stable appendix\n{filler}\n""")
-
-
-def cmd_rag_sysctx(args: argparse.Namespace) -> int:
-    c = owui_client(args)
-    work = Path(args.work); work.mkdir(parents=True, exist_ok=True)
-    doc = work / f"rag-sysctx-{args.label}.md"; make_sysctx_doc(doc)
-    kb_id = file_id = None
-    out: dict[str, Any] = {"label": args.label, "turns": []}
-    try:
-        kb = create_kb(c, f"BC250 revalidation sysctx {args.label} {uuid.uuid4().hex[:8]}"); kb_id = str(kb["id"])
-        start = time.monotonic(); up = multipart_upload(c, doc, kb_id); out["process_wall_s"] = time.monotonic() - start; file_id = str(up["id"])
-        messages: list[dict[str, str]] = []
-        questions = [
-            ("According to the document, what are the active contract reference and notice period? Answer briefly with a citation.", ["CACHE-ZH-9917", "six"]),
-            ("And what is the payment deadline and responsible unit? Answer briefly with a citation.", ["30", "Facility Operations"]),
-            ("Repeat only the active reference and payment deadline, with a citation.", ["CACHE-ZH-9917", "30"]),
-        ]
-        passes = 0
-        for idx, (q, required) in enumerate(questions, 1):
-            messages.append({"role": "user", "content": q})
-            start = time.monotonic(); result = chat(c, args.model, kb_id, messages); wall = time.monotonic() - start
-            text = response_text(result)
-            fact_ok = all(x.casefold() in text.casefold() for x in required)
-            archive_leak = "CACHE-ZH-1204" in text
-            ok = fact_ok and not archive_leak
-            passes += int(ok)
-            out["turns"].append({"turn": idx, "required": required, "pass": ok, "archive_leak": archive_leak, "wall_s": wall, "usage": usage_row(result), "source_meta": source_meta(result), "answer": text})
-            messages.append({"role": "assistant", "content": text})
-        out["passes"] = passes
-        out["total_turns"] = len(questions)
-        out["status"] = "ok" if passes == len(questions) else "quality-fail"
-    except Exception as exc:
-        out.update({"status": "error", "error": str(exc)})
-    finally:
-        cleanup_kb(c, kb_id, file_id)
-    Path(args.output).write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
-    print(json.dumps({k:v for k,v in out.items() if k != "turns"}, sort_keys=True))
-    if out.get("status") == "ok":
-        return 0
-    if out.get("status") == "quality-fail":
-        return 3
-    return 1
-
-
-def main() -> int:
-    p = argparse.ArgumentParser()
-    sub = p.add_subparsers(dest="cmd", required=True)
-
-    x = sub.add_parser("embed-warm"); x.add_argument("--url", default="http://127.0.0.1:11437"); x.add_argument("--model", required=True); x.add_argument("--keep-alive", default="10m"); x.set_defaults(fn=cmd_embed_warm)
-    x = sub.add_parser("num-batch"); x.add_argument("--url", default="http://127.0.0.1:11434"); x.add_argument("--models", nargs="+", required=True); x.add_argument("--sentences", type=int, default=704); x.add_argument("--num-predict", type=int, default=16); x.add_argument("--num-ctx", type=int, default=32768); x.add_argument("--timeout", type=float, default=900); x.add_argument("--output", required=True); x.set_defaults(fn=cmd_num_batch)
-    x = sub.add_parser("concurrency"); x.add_argument("--main-url", default="http://127.0.0.1:11434"); x.add_argument("--embed-url", default="http://127.0.0.1:11437"); x.add_argument("--model", required=True); x.add_argument("--embed-model", required=True); x.add_argument("--sentences", type=int, default=352); x.add_argument("--embed-requests", type=int, default=8); x.add_argument("--timeout", type=float, default=900); x.add_argument("--output", required=True); x.set_defaults(fn=cmd_concurrency)
-
-    def owui_common(x: argparse.ArgumentParser) -> None:
-        x.add_argument("--url", default="http://127.0.0.1:3000"); x.add_argument("--token-file", required=True); x.add_argument("--timeout", type=float, default=900)
-    x = sub.add_parser("save-config"); owui_common(x); x.add_argument("--output", required=True); x.set_defaults(fn=cmd_save_config)
-    x = sub.add_parser("restore-config"); owui_common(x); x.add_argument("--input", required=True); x.set_defaults(fn=cmd_restore_config)
-    x = sub.add_parser("embedding-batch"); owui_common(x); x.add_argument("--work", required=True); x.add_argument("--output", required=True); x.set_defaults(fn=cmd_embedding_batch)
-    x = sub.add_parser("chunk-min"); owui_common(x); x.add_argument("--work", required=True); x.add_argument("--output", required=True); x.add_argument("--model", required=True); x.set_defaults(fn=cmd_chunk_min)
-    x = sub.add_parser("rag-sysctx"); owui_common(x); x.add_argument("--work", required=True); x.add_argument("--output", required=True); x.add_argument("--model", required=True); x.add_argument("--label", required=True); x.set_defaults(fn=cmd_rag_sysctx)
-
-    args = p.parse_args()
-    return int(args.fn(args))
-
-
-if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except (Failure, KeyboardInterrupt) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1) from None
-PY
-  chmod 0700 "$HELPER"
-}
-
-
-canonical_profile_string() {
-  local input="$1"
-  tr ' ' '\n' <<<"$input" | grep -E "$PARAM_REGEX" | sed '/^$/d' | sort -u || true
-}
 
 current_relevant_args() {
-  tr ' ' '\n' < /proc/cmdline | grep -E "$PARAM_REGEX" | sort -u || true
-}
-
-saved_original_args() {
-  cat "$ORIGINAL_ARGS_FILE" 2>/dev/null || true
-}
-
-saved_original_args_string() {
-  paste -sd' ' "$ORIGINAL_ARGS_FILE" 2>/dev/null || true
-}
-
-target_kernel() {
-  cat "$TARGET_KERNEL_FILE" 2>/dev/null || true
-}
-
-check_running_kernel() {
-  local target expected
-  target="$(target_kernel)"
-  [[ -n $target ]] || { echo "ERROR: target kernel was not saved." >&2; return 1; }
-  expected="${target##*/vmlinuz-}"
-  [[ $(uname -r) == "$expected" ]] || {
-    echo "ERROR: running kernel $(uname -r) != saved test kernel $expected" >&2
-    return 1
-  }
-}
-
-verify_running_profile() {
-  local expected="$1" current expected_canon
-  current="$(current_relevant_args)"
-  expected_canon="$(canonical_profile_string "$expected")"
-  if [[ $current != "$expected_canon" ]]; then
-    {
-      echo 'EXPECTED:'
-      printf '%s\n' "$expected_canon"
-      echo 'CURRENT:'
-      printf '%s\n' "$current"
-    } >&2
-    return 1
-  fi
-}
-
-apply_profile_next_boot() {
-  local profile="$1" target
-  target="$(target_kernel)"
-  [[ -n $target ]] || { echo "ERROR: target kernel missing" >&2; return 1; }
-  progress "configuring next boot profile on ${target##*/}: ${profile:-<none>}"
-  grubby --update-kernel="$target" --remove-args="$PARAM_NAMES"
-  if [[ -n $profile ]]; then
-    grubby --update-kernel="$target" --args="$profile"
-  fi
-  grubby --info="$target" > "$RAW/grubby-next-$(cat "$PHASE_FILE")-$(date +%s).txt" 2>&1 || true
-}
-
-restore_original_next_boot() {
-  apply_profile_next_boot "$(saved_original_args_string)"
-}
-
-kernel_profile_modified() {
-  [[ -r $ORIGINAL_ARGS_FILE ]] || return 1
-  [[ $(current_relevant_args) != "$(saved_original_args)" ]]
-}
-
-request_reboot() {
-  local next_phase="$1"
-  printf '%s\n' "$next_phase" > "$PHASE_FILE"
-  progress "requesting reboot; next phase=$next_phase"
-  sync
-  systemctl reboot --no-block
-  exit 0
+  sed -E 's/[[:space:]]+/\n/g' /proc/cmdline | grep -E "$PARAM_REGEX" | sort | paste -sd' ' - || true
 }
 
 install_unit() {
   cat > "$UNIT_PATH" <<EOFUNIT
 [Unit]
-Description=BC-250 0.11.0 kernel/pipeline/settings revalidation v${HARNESS_VERSION}
+Description=BC-250 0.11.0 package qualification v${HARNESS_VERSION}
 After=network-online.target cyan-skillfish-governor-smu.service ollama.service open-webui.service
 Wants=network-online.target
 
@@ -805,35 +275,18 @@ TimeoutStartSec=infinity
 TimeoutStopSec=120
 KillMode=mixed
 
-[Install]
-WantedBy=multi-user.target
 EOFUNIT
   systemctl daemon-reload
-  systemctl enable "$UNIT" >/dev/null 2>&1
 }
 
 preflight() {
   local cmd missing=0 pkg
-  for cmd in curl jq python3 rpm systemctl journalctl podman sensors vulkaninfo timeout flock tar lspci bc250-status bc250-verify bc250-benchmark bc250-agent-mode bc250-openwebui-setup; do
+  for cmd in curl jq python3 rpm systemctl journalctl podman sensors vulkaninfo timeout flock tar lspci bc250-status bc250-verify bc250-benchmark bc250-agent-mode bc250-openwebui-setup bc250-cu-status; do
     if ! command_exists "$cmd"; then
       echo "ERROR: missing required command: $cmd" >&2
       missing=1
     fi
   done
-  if ((RUN_KERNEL_REVALIDATION)); then
-    for cmd in grubby bc250-memory-profile bc250-cu-status; do
-      if ! command_exists "$cmd"; then
-        echo "ERROR: kernel revalidation requires: $cmd" >&2
-        missing=1
-      fi
-    done
-  fi
-  if ((RUN_GOVERNOR_REVALIDATION)); then
-    command_exists cyan-skillfish-performance-mode || {
-      echo "ERROR: governor revalidation requires cyan-skillfish-performance-mode" >&2
-      missing=1
-    }
-  fi
   ((missing == 0)) || return 1
   lspci -Dnn 2>/dev/null | grep -iF "[$HARDWARE_PCI_ID]" >/dev/null || {
     echo "ERROR: BC-250 PCI device [$HARDWARE_PCI_ID] was not detected." >&2
@@ -862,8 +315,8 @@ owui_container_http() {
     "$url" >/dev/null 2>&1
 }
 
-phase_application_preflight() {
-  set_phase preflight "checking Open WebUI private-network connectivity"
+application_network_preflight() {
+  record_progress "checking Open WebUI private-network connectivity"
   local dir="$RAW/preflight" attempt failed=0 url label
   install -d -m 0700 "$dir"
   : > "$dir/connectivity.txt"
@@ -925,54 +378,33 @@ EOF_PREFLIGHT_URLS
     echo "Repair the application/container network before rerunning; no benchmark lanes were started." >&2
     return 1
   fi
-  progress "Open WebUI private-network preflight passed"
+  record_event "private-network" infra pass "Open WebUI private network healthy"
 }
 
 phase_label() {
   case "$1" in
-    pipeline-start|initializing) echo "Starting application revalidation" ;;
-    governor-current) echo "Governor qualification" ;;
-    baseline) echo "Baseline restoration and snapshot" ;;
-    preflight) echo "Application network preflight" ;;
-    pipeline) echo "Core model pipeline" ;;
-    num-batch) echo "GPT-OSS num_batch sweep" ;;
-    agent) echo "Exclusive agent mode" ;;
-    owui) echo "Open WebUI tuning" ;;
-    final) echo "Final restoration and snapshot" ;;
-    kernel-baseline) echo "Kernel A/B: current TTM-only baseline" ;;
-    kernel-full) echo "Kernel A/B: historical full profile" ;;
-    kernel-restored) echo "Kernel A/B: restored package profile" ;;
-    recovery) echo "Recovery" ;;
+    initializing) echo "Initializing" ;;
+    preflight) echo "Preflight" ;;
+    roles) echo "Production roles" ;;
+    edge) echo "Resource edge" ;;
+    agent) echo "Agent mode" ;;
+    owui) echo "Open WebUI" ;;
+    restore) echo "Restore / report" ;;
     done) echo "Complete" ;;
-    failed|failed-recovered|failed-manual-kernel-recovery) echo "Failed" ;;
+    failed) echo "Failed" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
 
 phase_position() {
-  local phase="$1" total=7 offset=0 position=""
-  if ((RUN_GOVERNOR_REVALIDATION)); then
-    total=8
-    if [[ "$phase" == governor-current ]]; then
-      echo "1/$total"
-      return 0
-    fi
-    offset=1
-  fi
-  case "$phase" in
-    baseline) position=$((1 + offset)) ;;
-    preflight) position=$((2 + offset)) ;;
-    pipeline) position=$((3 + offset)) ;;
-    num-batch) position=$((4 + offset)) ;;
-    agent) position=$((5 + offset)) ;;
-    owui) position=$((6 + offset)) ;;
-    final|done) position=$((7 + offset)) ;;
-    kernel-baseline) echo "kernel 1/3"; return 0 ;;
-    kernel-full) echo "kernel 2/3"; return 0 ;;
-    kernel-restored) echo "kernel 3/3"; return 0 ;;
-    *) return 0 ;;
+  case "$1" in
+    preflight) echo "1/6" ;;
+    roles) echo "2/6" ;;
+    edge) echo "3/6" ;;
+    agent) echo "4/6" ;;
+    owui) echo "5/6" ;;
+    restore|done) echo "6/6" ;;
   esac
-  echo "$position/$total"
 }
 
 format_elapsed() {
@@ -981,84 +413,80 @@ format_elapsed() {
   printf '%02d:%02d:%02d' $((seconds/3600)) $(((seconds%3600)/60)) $((seconds%60))
 }
 
-heartbeat_age() {
-  local value="$1" now_s heartbeat_s age
+event_age() {
+  local value="$1" now_s value_s age
   [[ -n "$value" && "$value" != none ]] || { echo "unknown"; return 0; }
-  heartbeat_s="$(date -d "$value" +%s 2>/dev/null || true)"
-  [[ "$heartbeat_s" =~ ^[0-9]+$ ]] || { echo "unknown"; return 0; }
+  value_s="$(date -d "$value" +%s 2>/dev/null || true)"
+  [[ "$value_s" =~ ^[0-9]+$ ]] || { echo "unknown"; return 0; }
   now_s="$(date +%s)"
-  age=$((now_s - heartbeat_s))
-  ((age < 0)) && age=0
-  if ((age < 60)); then
-    echo "${age}s ago"
-  elif ((age < 3600)); then
-    echo "$((age/60))m $((age%60))s ago"
-  else
-    echo "$((age/3600))h $(((age%3600)/60))m ago"
+  age=$((now_s - value_s)); ((age < 0)) && age=0
+  if ((age < 60)); then echo "${age}s ago"
+  elif ((age < 3600)); then echo "$((age/60))m $((age%60))s ago"
+  else echo "$((age/3600))h $(((age%3600)/60))m ago"
   fi
 }
 
-recent_benchmark_results() {
-  local entry label outcome symbol count=0
-  [[ -r "$EVENTS" ]] || { echo "  (none yet)"; return 0; }
-  while IFS= read -r entry; do
-    [[ -n "$entry" ]] || continue
-    label="${entry%%|*}"
-    outcome="${entry#*|}"
-    label="${label#pipeline/}"
+quality_counts() {
+  [[ -r "$EVENTS" ]] || { echo "0 0 0"; return; }
+  awk -F '\t' '$4=="quality" {if($5=="pass")p++; else if($5=="quality-fail")q++; else if($5=="skipped")s++} END{print p+0,q+0,s+0}' "$EVENTS"
+}
+
+quality_state() {
+  local p q skipped
+  read -r p q skipped <<<"$(quality_counts)"
+  if ((p == 0 && q == 0)); then echo "not-run"
+  elif ((q > 0 && p == 0)); then echo "fail"
+  elif ((q > 0)); then echo "mixed"
+  else echo "pass"
+  fi
+}
+
+recent_step_results() {
+  local count=0 step outcome symbol
+  [[ -r "$EVENTS" ]] || { echo "  (none yet)"; return; }
+  while IFS=$'\t' read -r step outcome; do
     case "$outcome" in
       pass) symbol='✓' ;;
       quality-fail) symbol='!' ;;
-      timeout-or-killed|signal-sigpipe|nonzero-*) symbol='×' ;;
+      infra-fail) symbol='×' ;;
+      skipped) symbol='·' ;;
       *) symbol='·' ;;
     esac
-    printf '  %-2s %-34s %s\n' "$symbol" "$label" "$outcome"
+    printf '  %-2s %-34s %s\n' "$symbol" "$step" "$outcome"
     count=$((count + 1))
-  done < <(
-    awk '
-      /benchmark finished:/ {
-        line=$0
-        sub(/^.*benchmark finished: /, "", line)
-        label=line
-        sub(/ rc=.*/, "", label)
-        outcome=line
-        sub(/^.* outcome=/, "", outcome)
-        rows[++n]=label "|" outcome
-      }
-      END {
-        start=n-5
-        if (start < 1) start=1
-        for (i=start; i<=n; i++) print rows[i]
-      }
-    ' "$EVENTS" 2>/dev/null
-  )
+  done < <(awk -F '\t' '$4=="quality" || $4=="infra" {rows[++n]=$3 "\t" $5} END {start=n-5; if(start<1)start=1; for(i=start;i<=n;i++) print rows[i]}' "$EVENTS")
   ((count > 0)) || echo "  (none yet)"
 }
 
 dashboard_text() {
-  local phase stage heartbeat started now_s elapsed position label
+  local phase stage last_event stage_started started now_s elapsed stage_elapsed position label service p q skipped
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
   stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
-  heartbeat="$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo none)"
-  stage="${stage//$'\n'/ }"
-  ((${#stage} <= 96)) || stage="${stage:0:93}..."
-  started="$(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s)"
-  now_s="$(date +%s)"
+  last_event="$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"
+  stage_started="$(cat "$STAGE_STARTED_FILE" 2>/dev/null || echo none)"
+  stage="${stage//$'\n'/ }"; ((${#stage} <= 96)) || stage="${stage:0:93}..."
+  started="$(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s)"; now_s="$(date +%s)"
   elapsed="$(format_elapsed $((now_s - started)))"
-  position="$(phase_position "$phase")"
-  label="$(phase_label "$phase")"
+  if [[ "$stage_started" != none ]]; then
+    local stage_s; stage_s="$(date -d "$stage_started" +%s 2>/dev/null || echo "$now_s")"
+    stage_elapsed="$(format_elapsed $((now_s - stage_s)))"
+  else stage_elapsed=unknown; fi
+  position="$(phase_position "$phase")"; label="$(phase_label "$phase")"
+  service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+  read -r p q skipped <<<"$(quality_counts)"
 
-  printf 'BC-250 revalidation  [running %s]\n' "$elapsed"
-  printf 'Run          %s\n' "$(run_id)"
-  if [[ -n "$position" ]]; then
-    printf 'Phase        %-10s %s\n' "$position" "$label"
-  else
-    printf 'Phase        %s\n' "$label"
-  fi
-  printf 'Stage        %s\n' "$stage"
-  printf 'Heartbeat    %s\n' "$(heartbeat_age "$heartbeat")"
-  printf '\nCompleted benchmarks (latest 6)\n'
-  recent_benchmark_results
+  printf 'BC-250 revalidation  [RUNNING %s]\n\n' "$elapsed"
+  printf 'Phase         %-4s  %s\n' "${position:-?}" "$label"
+  printf 'Stage         %s\n' "$stage"
+  printf 'Stage time    %s\n' "$stage_elapsed"
+  printf 'Worker        %s\n' "${service:-unknown}"
+  printf 'Last event    %s\n' "$(event_age "$last_event")"
+  local infra_state
+  infra_state="$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo pass)"
+  printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
+  printf 'Quality         %s pass / %s quality-fail / %s skipped\n' "$p" "$q" "$skipped"
+  printf '\nRecent results\n'
+  recent_step_results
   printf '\nCtrl-C detaches; the worker continues under systemd.\n'
 }
 
@@ -1070,21 +498,17 @@ follow_run() {
     phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
     stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
     if [[ -t 1 ]]; then
-      dashboard="$(dashboard_text)"
-      new_lines="$(printf '%s\n' "$dashboard" | awk 'END{print NR}')"
-      if ((drawn_lines > 0)); then
-        printf '\033[%dA' "$drawn_lines"
-      fi
-      while IFS= read -r line; do
-        printf '\033[2K\r%s\n' "$line"
-      done <<< "$dashboard"
+      dashboard="$(dashboard_text)"; new_lines="$(printf '%s\n' "$dashboard" | awk 'END{print NR}')"
+      ((drawn_lines == 0)) || printf '\033[%dA' "$drawn_lines"
+      while IFS= read -r line; do printf '\033[2K\r%s\n' "$line"; done <<< "$dashboard"
       drawn_lines="$new_lines"
     elif [[ "$phase|$stage" != "$last" ]]; then
       printf '[%s] phase=%s  %s\n' "$(format_elapsed $(( $(date +%s) - $(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s) )))" "$phase" "$stage"
       last="$phase|$stage"
     fi
     case "$phase" in
-      done|failed|failed-recovered|failed-manual-kernel-recovery) break ;;
+      done) [[ -n $(latest_bundle_path) ]] && break ;;
+      failed) break ;;
     esac
     sleep 2 || true
   done
@@ -1096,43 +520,73 @@ follow_run() {
   fi
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
   if [[ "$phase" == done ]]; then
-    echo "Revalidation completed successfully."
+    echo "Revalidation run completed."
+    printf 'Infrastructure: %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
+    printf 'Quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+    printf 'Restoration:    %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
     echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)"
     return 0
   fi
-  [[ -r "$FAILURE_RC_FILE" ]] && rc="$(cat "$FAILURE_RC_FILE")"
-  [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
-  echo "Revalidation stopped at phase=$phase (rc=$rc)." >&2
+  [[ -r "$FAILURE_RC_FILE" ]] && rc="$(cat "$FAILURE_RC_FILE")"; [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
+  echo "Revalidation failed at phase=$phase (rc=$rc)." >&2
   [[ ! -e $ERROR_CONTEXT ]] || echo "Error context: $ERROR_CONTEXT" >&2
-  echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)" >&2
   return "$rc"
+}
+
+cleanup_transient_token() {
+  rm -f "$OWUI_TOKEN"
+}
+
+cleanup_failed_launch() {
+  cleanup_transient_token
+  rm -f "$UNIT_PATH"
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
+  rm -rf "$WORK" "$RUN_DIR"
+}
+
+launch_worker() {
+  if ! install_unit; then
+    cleanup_failed_launch
+    return 1
+  fi
+  systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
+  if ! systemctl start --no-block "$UNIT"; then
+    cleanup_failed_launch
+    return 1
+  fi
 }
 
 start_run() {
   need_root
-  local token_file="" detach=0
+  local token_file="" detach=0 skip_owui=0
   shift || true
   while (($#)); do
     case "$1" in
       --owui-token-file)
         [[ $# -ge 2 ]] || { echo "ERROR: --owui-token-file requires a path" >&2; exit 2; }
         token_file="$2"; shift 2 ;;
-      --kernel-ab)
-        RUN_KERNEL_REVALIDATION=1; shift ;;
-      --governor-ab)
-        RUN_GOVERNOR_REVALIDATION=1; shift ;;
-      --keepalive-expiry)
-        RUN_KEEPALIVE_EXPIRY=1; shift ;;
-      --detach)
-        detach=1; shift ;;
+      --skip-owui) skip_owui=1; shift ;;
+      --detach) detach=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) echo "ERROR: unknown start option: $1" >&2; usage >&2; exit 2 ;;
     esac
   done
+  ((skip_owui == 0 || ${#token_file} == 0)) || {
+    echo "ERROR: --skip-owui and --owui-token-file are mutually exclusive." >&2
+    exit 2
+  }
+  if ((skip_owui == 0)) && [[ -z $token_file ]]; then
+    echo "ERROR: full package qualification requires --owui-token-file FILE." >&2
+    echo "       Use --skip-owui only for an explicitly incomplete run." >&2
+    exit 2
+  fi
+
   preflight
-  if [[ -n $token_file && ! -r $token_file ]]; then
-    echo "ERROR: cannot read Open WebUI API key file: $token_file" >&2
-    exit 1
+  if [[ -n $token_file ]]; then
+    # Validate protection before any run state exists. Authentication is also
+    # validated before state creation, after normal topology is available.
+    validate_protected_token_file "$token_file" || exit $?
   fi
   if systemctl is-active --quiet "$UNIT" 2>/dev/null; then
     echo "ERROR: $UNIT is already running." >&2
@@ -1140,82 +594,41 @@ start_run() {
   fi
   if [[ -d $WORK && -f $PHASE_FILE ]]; then
     case "$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)" in
-      done|failed|failed-recovered|failed-manual-kernel-recovery) ;;
-      *)
-        echo "ERROR: existing unfinished session under $WORK. Use status/abort/cleanup first." >&2
-        exit 1
-        ;;
+      done|failed) ;;
+      *) echo "ERROR: unfinished session under $WORK; use status/abort/cleanup first." >&2; exit 1 ;;
     esac
   fi
+  ensure_normal_mode
+  [[ -z $token_file ]] || validate_owui_token_file "$token_file" || exit $?
 
   rm -rf "$WORK" "$RUN_DIR"
-  install -d -m 0700 "$WORK" "$RAW" "$PHASE_REPORT_DIR" "$RUN_DIR"
-  install -d -m 0700 "$STATE_ROOT" "$REPORT_DIR"
+  install -d -m 0700 "$WORK" "$RAW" "$PHASE_REPORT_DIR" "$RUN_DIR" "$STATE_ROOT" "$REPORT_DIR"
   install -m 0700 "$0" "$HARNESS_COPY"
+  SKIP_OWUI="$skip_owui"
   save_settings
   : > "$EVENTS"
-  printf 'initializing\n' > "$PHASE_FILE"
-  printf 'start requested\n' > "$STAGE_FILE"
-  printf '%s\n' "$(now)" > "$HEARTBEAT_FILE"
+  printf 'initializing\n' > "$PHASE_FILE"; printf 'start requested\n' > "$STAGE_FILE"
+  printf '%s\n' "$(now)" > "$STAGE_STARTED_FILE"; cp "$STAGE_STARTED_FILE" "$LAST_EVENT_FILE"
   printf '%s-%s\n' "$(date +%Y%m%dT%H%M%S%z)" "$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')" > "$RUN_ID_FILE"
   printf '%s\n' "$HARNESS_VERSION" > "$RUN_HARNESS_VERSION_FILE"
-  if [[ -n $token_file ]]; then
-    printf '%s\n' "$(readlink -f -- "$token_file")" > "$OWUI_TOKEN_SOURCE_FILE"
-    chmod 0600 "$OWUI_TOKEN_SOURCE_FILE"
-    install -m 0600 "$token_file" "$OWUI_TOKEN"
-  elif [[ -n ${OWUI_API_KEY:-} ]]; then
-    printf '%s\n' "$OWUI_API_KEY" > "$OWUI_TOKEN"
-    chmod 0600 "$OWUI_TOKEN"
-    if ((RUN_KERNEL_REVALIDATION)); then
-      echo "WARN: OWUI_API_KEY from the environment cannot survive reboot; use --owui-token-file with a protected API key file for authenticated OWUI tests." >&2
-    fi
-  fi
-  validate_owui_token
-  write_helper
-
-  # Capture the kernel target before detaching. This intentionally follows the
-  # actual running/default kernel and contains no release-specific kernel name.
-  if ((RUN_KERNEL_REVALIDATION)); then
-    local target default current expected
-    target="/boot/vmlinuz-$(uname -r)"
-    default="$(grubby --default-kernel)"
-    [[ -e $target ]] || { echo "ERROR: running kernel image not found: $target" >&2; exit 1; }
-    [[ ${default##*/} == "${target##*/}" ]] || {
-      echo "ERROR: running kernel is not the grubby default; boot the default kernel first." >&2
-      exit 1
-    }
-    current="$(current_relevant_args)"
-    expected="$(canonical_profile_string "$PACKAGE_BASELINE_PROFILE")"
-    if [[ $current != "$expected" ]]; then
-      {
-        echo 'ERROR: current relevant kernel arguments do not match the 0.11.0 TTM-only package baseline.'
-        echo 'EXPECTED:'; printf '%s\n' "$expected"
-        echo 'CURRENT:'; printf '%s\n' "$current"
-      } >&2
-      exit 1
-    fi
-    printf '%s\n' "$target" > "$TARGET_KERNEL_FILE"
-    printf '%s\n' "$current" > "$ORIGINAL_ARGS_FILE"
-    chmod 0600 "$TARGET_KERNEL_FILE" "$ORIGINAL_ARGS_FILE"
-    printf 'kernel-baseline\n' > "$PHASE_FILE"
-    progress "kernel target=${target##*/}; exact original relevant args saved; other kernel entries will not be modified"
+  printf 'running\n' > "$RUN_STATE_FILE"; printf 'pass\n' > "$INFRA_STATE_FILE"; printf 'not-run\n' > "$QUALITY_STATE_FILE"; printf 'not-needed\n' > "$RESTORATION_STATE_FILE"
+  if ((skip_owui)); then
+    printf 'partial\n' > "$COVERAGE_STATE_FILE"
   else
-    printf 'pipeline-start\n' > "$PHASE_FILE"
-    progress "kernel revalidation disabled; starting application pipeline on $(uname -r)"
+    printf 'full\n' > "$COVERAGE_STATE_FILE"
+    install -m 0600 "$token_file" "$OWUI_TOKEN"
   fi
+  printf 'preflight\n' > "$PHASE_FILE"
+  record_event start infra pass "qualification worker requested"
 
-  install_unit
-  systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true
-  systemctl start --no-block "$UNIT"
+  launch_worker
   echo
   echo "Started BC-250 revalidation run $(run_id) with harness v$HARNESS_VERSION."
-  echo "The worker is owned by systemd; this terminal only follows its progress."
-  if ((RUN_KERNEL_REVALIDATION)); then
-    echo "The worker will reboot twice while comparing the current TTM-only profile with the historical full profile, then continue with application tests."
-    detach=1
+  if ((skip_owui)); then
+    echo "Coverage is partial: authenticated Open WebUI qualification was explicitly skipped."
   fi
+  echo "The systemd worker qualifies packaged defaults only; this terminal only follows progress."
   echo "Status: sudo bc250-revalidate status"
-  echo "Journal: sudo journalctl -fu $UNIT"
   echo "Final bundles: $REPORT_DIR"
   ((detach)) || follow_run
 }
@@ -1227,7 +640,7 @@ capture_cmd() {
 
 snapshot() {
   local label="$1" dir="$RAW/$1"
-  progress "capturing snapshot: $label"
+  record_progress "capturing snapshot: $label"
   install -d -m 0700 "$dir"
   {
     echo "timestamp=$(now)"
@@ -1235,7 +648,6 @@ snapshot() {
     echo "package=$(rpm -q bc250-llm-server 2>/dev/null || true)"
     echo "cmdline=$(cat /proc/cmdline)"
     echo "current_relevant_args=$(current_relevant_args | paste -sd' ' -)"
-    [[ ! -r $TARGET_KERNEL_FILE ]] || echo "target_kernel=$(target_kernel)"
     for f in \
       /sys/module/amdgpu/parameters/gttsize \
       /sys/module/amdgpu/parameters/ppfeaturemask \
@@ -1261,8 +673,8 @@ snapshot() {
   command_exists cyan-skillfish-performance-mode && capture_cmd "$dir/performance-mode.txt" cyan-skillfish-performance-mode --status || true
   capture_cmd "$dir/bc250-status.txt" bc250-status
   if [[ -s $OWUI_TOKEN ]]; then
-    OWUI_API_KEY="$(<"$OWUI_TOKEN")" bc250-verify > "$dir/bc250-verify.txt" 2>&1 || echo "command_rc=$?" >> "$dir/bc250-verify.txt"
-    OWUI_API_KEY="$(<"$OWUI_TOKEN")" bc250-openwebui-setup status > "$dir/openwebui-status-auth.txt" 2>&1 || echo "command_rc=$?" >> "$dir/openwebui-status-auth.txt"
+    bc250-verify --owui-token-file "$OWUI_TOKEN" > "$dir/bc250-verify.txt" 2>&1 || echo "command_rc=$?" >> "$dir/bc250-verify.txt"
+    bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/openwebui-status-auth.txt" 2>&1 || echo "command_rc=$?" >> "$dir/openwebui-status-auth.txt"
   else
     capture_cmd "$dir/bc250-verify.txt" bc250-verify
     capture_cmd "$dir/openwebui-status.txt" bc250-openwebui-setup status
@@ -1297,10 +709,6 @@ write_phase_report() {
     echo "kernel=$(uname -r)"
     echo "package=$(rpm -q bc250-llm-server 2>/dev/null || true)"
     echo "current_relevant_args=$(current_relevant_args | paste -sd' ' -)"
-    if [[ -r $TARGET_KERNEL_FILE ]]; then
-      echo "target_kernel=$(target_kernel)"
-      echo "saved_original_args=$(saved_original_args | paste -sd' ' -)"
-    fi
     echo
     echo "## Events"
     cat "$EVENTS"
@@ -1319,7 +727,7 @@ write_phase_report() {
     fi
   } > "$file"
   chmod 0644 "$file"
-  progress "immutable phase report written: $file"
+  record_progress "immutable phase report written: $file"
 }
 
 sample_loop() {
@@ -1376,246 +784,57 @@ write_rc_outcome() {
   case "$rc" in
     0) printf 'pass\n' > "$out" ;;
     3) printf 'quality-fail\n' > "$out" ;;
-    124|137) printf 'timeout-or-killed\n' > "$out" ;;
-    130) printf 'interrupted\n' > "$out" ;;
-    141) printf 'signal-sigpipe\n' > "$out" ;;
-    *) printf 'nonzero-%s\n' "$rc" > "$out" ;;
+    *) printf 'infra-fail\n' > "$out" ;;
   esac
 }
 
 start_sampler() {
   local out="$1"
   stop_sampler "${SAMPLER_PID:-}"
-  # The sampler is a best-effort child. It must never inherit the worker's ERR/
-  # signal handlers or gain authority to restore/remove global run state.
-  (
-    trap - ERR TERM INT
-    set +eE
-    sample_loop "$out"
-  ) >/dev/null 2>&1 &
+  ( trap - ERR TERM INT; set +eE; sample_loop "$out" ) >/dev/null 2>&1 &
   SAMPLER_PID=$!
 }
 
 stop_sampler() {
   local pid="${1:-${SAMPLER_PID:-}}"
   [[ -n $pid ]] || return 0
-  kill "$pid" >/dev/null 2>&1 || true
-  wait "$pid" 2>/dev/null || true
-  if [[ ${SAMPLER_PID:-} == "$pid" ]]; then
-    SAMPLER_PID=""
-  fi
+  kill "$pid" >/dev/null 2>&1 || true; wait "$pid" 2>/dev/null || true
+  [[ ${SAMPLER_PID:-} != "$pid" ]] || SAMPLER_PID=""
 }
 
-worker_exit_cleanup() {
-  stop_sampler "${SAMPLER_PID:-}"
-  performance_off
-}
+worker_exit_cleanup() { stop_sampler "${SAMPLER_PID:-}"; }
 
-run_bench_at() {
-  local scope="$1" label="$2"; shift 2
-  local dir="$RAW/$scope/$label" rc sampler_pid
+run_step() {
+  local scope="$1" label="$2" kind="$3"; shift 3
+  local dir="$RAW/$scope/$label" rc sampler_pid outcome
+  [[ "$kind" == quality || "$kind" == infra ]] || { echo "ERROR: invalid step kind: $kind" >&2; return 2; }
   install -d -m 0700 "$dir"
-  progress "benchmark starting: $scope/$label"
-  start_sampler "$dir/sampler.tsv"
-  sampler_pid="$SAMPLER_PID"
-  # bc250-benchmark uses nonzero statuses for quality/acceptance failures. Child
-  # shells explicitly drop the worker ERR/signal traps: only the parent worker
-  # owns restoration/finalization. This prevents a benchmark signal from deleting
-  # $WORK before the parent has recorded the benchmark status.
-  if (
-    trap - ERR TERM INT
-    set +eE
-    cd "$dir" || exit $?
-    exec timeout --signal=INT --kill-after=30s 45m "$@"
-  ) > "$dir/benchmark-console.txt" 2>&1; then
-    rc=0
-  else
-    rc=$?
-  fi
+  set_stage "$label"
+  start_sampler "$dir/sampler.tsv"; sampler_pid="$SAMPLER_PID"
+  if ( trap - ERR TERM INT; set +eE; cd "$dir" || exit $?; exec timeout --signal=INT --kill-after=30s 45m "$@" ) > "$dir/console.txt" 2>&1; then rc=0; else rc=$?; fi
   stop_sampler "$sampler_pid"
-  printf '%s\n' "$rc" > "$dir/benchmark-exit-status.txt"
-  write_rc_outcome "$rc" "$dir/benchmark-outcome.txt"
-  progress "benchmark finished: $scope/$label rc=$rc outcome=$(cat "$dir/benchmark-outcome.txt")"
-  case "$rc" in
-    0|3) return 0 ;;
-    *) return "$rc" ;;
-  esac
-}
-
-run_bench() {
-  run_bench_at pipeline "$@"
-}
-
-
-pick_kernel_models() {
-  local available model count=0
-  available="$(installed_prod_models || true)"
-  for model in \
-    prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl \
-    prod-lfm25-8b-a1b-liquidai-q6-k \
-    prod-gpt-oss20b-ggml-org-mxfp4; do
-    if grep -Fxq "$model" <<<"$available"; then
-      printf '%s\n' "$model"
-      count=$((count + 1))
-    fi
-  done
-  if ((count == 0)) && [[ -n $available ]]; then
-    head -n 3 <<<"$available"
-  fi
-}
-
-pick_governor_models() {
-  local available model count=0
-  available="$(installed_prod_models || true)"
-  for model in \
-    prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl \
-    prod-lfm25-8b-a1b-liquidai-q6-k \
-    prod-qwen35-9b-unsloth-q6-k; do
-    if grep -Fxq "$model" <<<"$available"; then
-      printf '%s\n' "$model"
-      count=$((count + 1))
-      ((count >= 2)) && return 0
-    fi
-  done
-  if ((count == 0)) && [[ -n $available ]]; then
-    head -n 2 <<<"$available"
-  fi
-}
-
-run_kernel_profile_benchmark() {
-  local scope="$1" label="$2"
-  local -a models=()
-  mapfile -t models < <(pick_kernel_models)
-  if ((${#models[@]} == 0)); then
-    install -d -m 0700 "$RAW/$scope/benchmark"
-    echo 'SKIP: no production models registered on main Ollama' > "$RAW/$scope/benchmark/benchmark-skipped.txt"
+  printf '%s\n' "$rc" > "$dir/exit-status.txt"; write_rc_outcome "$rc" "$dir/outcome.txt"; outcome="$(cat "$dir/outcome.txt")"
+  if [[ "$kind" == quality && $rc -eq 3 ]]; then
+    record_event "$label" quality quality-fail "scope=$scope rc=3"
     return 0
   fi
-  run_bench_at "$scope" benchmark env \
-    BOARD_NOTE="bc250-revalidation-v${HARNESS_VERSION} kernel=$label running=$(uname -r)" \
-    BENCH_MODE=neutral BENCH_PROFILE=conservative \
-    RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 REPEATS=1 \
-    PREFILL_SENTENCES=220 CTX_POINTS='352 704' \
-    NUM_PREDICT_SHORT=96 NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=48 \
-    REQUEST_TIMEOUT=1200 \
-    bc250-benchmark generation "${models[@]}"
-}
-
-performance_off() {
-  command_exists cyan-skillfish-performance-mode || return 0
-  cyan-skillfish-performance-mode --off >/dev/null 2>&1 || true
-}
-
-run_governor_benchmark() {
-  local label="$1" action="$2" frequency="${3:-}" scope="kernel-restored/governor-$1"
-  local -a models=()
-  install -d -m 0700 "$RAW/$scope"
-  mapfile -t models < <(pick_governor_models)
-  if ((${#models[@]} == 0)); then
-    echo 'SKIP: no production models registered on main Ollama' > "$RAW/$scope/skipped.txt"
+  if ((rc == 0)); then
+    record_event "$label" "$kind" pass "scope=$scope rc=0"
     return 0
   fi
-
-  performance_off
-  case "$action" in
-    busy) : ;;
-    performance)
-      if ! cyan-skillfish-performance-mode --on > "$RAW/$scope/mode-set.txt" 2>&1; then
-        echo 'SKIP: performance mode could not be enabled' >> "$RAW/$scope/mode-set.txt"
-        return 0
-      fi
-      ;;
-    fixed)
-      if ! cyan-skillfish-performance-mode --fixed-frequency "$frequency" > "$RAW/$scope/mode-set.txt" 2>&1; then
-        echo "SKIP: fixed frequency $frequency MHz could not be enabled" >> "$RAW/$scope/mode-set.txt"
-        performance_off
-        return 0
-      fi
-      ;;
-    *) echo "ERROR: unknown governor action $action" >&2; return 1 ;;
-  esac
-  sleep 2
-  cyan-skillfish-performance-mode --status > "$RAW/$scope/mode-status.txt" 2>&1 || true
-  run_bench_at "$scope" benchmark env \
-    BOARD_NOTE="bc250-revalidation-v${HARNESS_VERSION} governor=$label running=$(uname -r)" \
-    BENCH_MODE=neutral BENCH_PROFILE=conservative \
-    RUN_LATENCY=0 RUN_CONTEXT=0 RUN_THERMAL=0 REPEATS=1 \
-    PREFILL_SENTENCES=352 NUM_PREDICT_SHORT=96 NUM_PREDICT_PREFILL=24 \
-    REQUEST_TIMEOUT=1200 \
-    bc250-benchmark generation "${models[@]}"
-  performance_off
-}
-
-phase_kernel_baseline() {
-  set_phase kernel-baseline "testing current TTM-only kernel baseline on $(uname -r)"
-  check_running_kernel
-  verify_running_profile "$(saved_original_args_string)"
-  ensure_normal_mode
-  snapshot kernel-baseline/snapshot
-  run_kernel_profile_benchmark kernel-baseline current-ttm-only
-  write_phase_report kernel-baseline-ttm-only kernel-baseline
-  apply_profile_next_boot "$LEGACY_FULL_PROFILE"
-  request_reboot kernel-full
-}
-
-phase_kernel_full() {
-  set_phase kernel-full "testing historical full memory profile on $(uname -r)"
-  check_running_kernel
-  verify_running_profile "$LEGACY_FULL_PROFILE"
-  ensure_normal_mode
-  snapshot kernel-full/snapshot
-  run_kernel_profile_benchmark kernel-full legacy-full
-  write_phase_report kernel-legacy-full-profile kernel-full
-  restore_original_next_boot
-  request_reboot kernel-restored
-}
-
-phase_kernel_restored() {
-  set_phase kernel-restored "verifying exact original TTM-only profile and governor behavior"
-  check_running_kernel
-  verify_running_profile "$(saved_original_args_string)"
-  ensure_normal_mode
-  snapshot kernel-restored/before-governor
-  if ((RUN_GOVERNOR_REVALIDATION)); then
-    run_governor_benchmark busy-flag-current busy
-    run_governor_benchmark performance-max performance
-    run_governor_benchmark fixed-1750 fixed 1750
-    run_governor_benchmark fixed-1850 fixed 1850
-    performance_off
-  else
-    install -d -m 0700 "$RAW/kernel-restored"
-    echo 'SKIP: RUN_GOVERNOR_REVALIDATION=0' > "$RAW/kernel-restored/governor-skipped.txt"
-  fi
-  snapshot kernel-restored/final
-  write_phase_report kernel-restored-governor-results kernel-restored
+  record_event "$label" infra infra-fail "scope=$scope rc=$rc kind=$kind"
+  return "$rc"
 }
 
 
-phase_governor_current_only() {
-  set_phase governor-current "testing governor behavior on current kernel $(uname -r) without kernel-profile A/B"
-  ensure_normal_mode
-  snapshot kernel-restored/before-governor
-  run_governor_benchmark busy-flag-current busy
-  run_governor_benchmark performance-max performance
-  run_governor_benchmark fixed-1750 fixed 1750
-  run_governor_benchmark fixed-1850 fixed 1850
-  performance_off
-  snapshot kernel-restored/final
-  write_phase_report current-kernel-governor-results kernel-restored
-}
-
-unload_model() {
-  local port="$1" model="$2" payload
-  payload="$(jq -nc --arg model "$model" '{model:$model,prompt:"",stream:false,keep_alive:0}')"
-  curl -fsS --connect-timeout 2 --max-time 30 \
-    -H 'Content-Type: application/json' -d "$payload" \
-    "http://127.0.0.1:${port}/api/generate" >/dev/null 2>&1 || true
-}
 
 warm_embedding() {
-  [[ -x $HELPER ]] || return 1
+  local payload
   model_registered 11437 "$EMBED_MODEL" || return 1
-  "$HELPER" embed-warm --model "$EMBED_MODEL" --keep-alive 10m
+  payload="$(jq -nc --arg model "$EMBED_MODEL" '{model:$model,input:["Query: BC-250 embedding residency check"],keep_alive:"10m"}')"
+  curl -fsS --connect-timeout 2 --max-time 90 \
+    -H 'Content-Type: application/json' -d "$payload" \
+    http://127.0.0.1:11437/api/embed | jq -e '.embeddings | length > 0' >/dev/null
 }
 
 ensure_normal_mode() {
@@ -1646,7 +865,7 @@ container_env_value() {
 }
 
 check_openwebui_bootstrap_env() {
-  local out="$RAW/baseline/openwebui-bootstrap-contract.txt" key expected actual failures=0
+  local out="$RAW/preflight/openwebui-bootstrap-contract.txt" key expected actual failures=0
   : > "$out"
   while IFS='|' read -r key expected; do
     actual="$(container_env_value "$key")"
@@ -1667,447 +886,381 @@ EOFENV
   ((failures == 0))
 }
 
-phase_baseline() {
-  set_phase baseline "restoring and validating normal mode"
+required_role_models() {
+  printf '%s\n' "${PACKAGE_PROD_MODELS[@]}"
+}
+
+check_required_models() {
+  local model failed=0 out="$RAW/preflight/required-models.txt"
+  : > "$out"
+  while IFS= read -r model; do
+    if model_registered 11434 "$model"; then echo "PASS main $model" >> "$out"; else echo "FAIL main $model" >> "$out"; failed=1; fi
+  done < <(required_role_models)
+  if model_registered 11435 "$TASK_MODEL"; then echo "PASS task $TASK_MODEL" >> "$out"; else echo "FAIL task $TASK_MODEL" >> "$out"; failed=1; fi
+  if model_registered 11437 "$EMBED_MODEL"; then echo "PASS embedding $EMBED_MODEL" >> "$out"; else echo "FAIL embedding $EMBED_MODEL" >> "$out"; failed=1; fi
+  ((failed == 0))
+}
+
+health_gate() {
+  local label="$1" out="$2" rc
+  install -d -m 0700 "$(dirname "$out")"
+  if [[ ${SKIP_OWUI:-0} -eq 1 ]]; then
+    if bc250-verify > "$out" 2>&1; then rc=0; else rc=$?; fi
+  else
+    if bc250-verify --owui-token-file "$OWUI_TOKEN" > "$out" 2>&1; then rc=0; else rc=$?; fi
+  fi
+  if ((rc == 0)); then
+    record_event "$label" infra pass "bc250-verify health gate passed"
+    return 0
+  fi
+  record_event "$label" infra infra-fail "bc250-verify health gate rc=$rc"
+  echo "ERROR: appliance health gate failed ($label, rc=$rc); inspect $out" >&2
+  return "$rc"
+}
+
+model_loaded() {
+  local port="$1" model="$2"
+  curl -fsS "http://127.0.0.1:${port}/api/ps" 2>/dev/null | \
+    jq -e --arg m "$model" 'any(.models[]?; (.name | sub(":latest$"; "")) == $m)' >/dev/null 2>&1
+}
+
+write_edge_policy() {
+  local out="$1"
+  cat > "$out" <<EOF_POLICY
+{
+  "min_residency_ratio": $EDGE_MIN_RESIDENCY_RATIO,
+  "min_mem_available_mib": $EDGE_MIN_MEM_AVAILABLE_MIB,
+  "max_temp_c": $EDGE_MAX_TEMP_C,
+  "severe_context_tokens": $EDGE_SEVERE_CONTEXT_TOKENS,
+  "models": {
+    "$E2B_MODEL": {"min_decode_tps": 50.0, "min_context": 32768},
+    "$E4B_MODEL": {"min_decode_tps": 30.0, "min_context": 32768},
+    "$LFM_MODEL": {"min_decode_tps": 65.0, "min_context": 32768},
+    "$QWEN_MODEL": {"min_decode_tps": 20.0, "min_context": 32768},
+    "$GPT_OSS_MODEL": {"min_decode_tps": 35.0, "min_context": 16384}
+  }
+}
+EOF_POLICY
+}
+
+check_edge_generation_sanity() {
+  local jsonl="$1" policy="$2" out="$3"
+  python3 - "$jsonl" "$policy" "$out" <<'PY_EDGE'
+import json
+import statistics
+import sys
+from pathlib import Path
+
+jsonl, policy_path, output = map(Path, sys.argv[1:4])
+policy = json.loads(policy_path.read_text(encoding="utf-8"))
+records = []
+for line_no, line in enumerate(jsonl.read_text(encoding="utf-8").splitlines(), 1):
+    if not line.strip():
+        continue
+    row = json.loads(line)
+    if row.get("category") == "generation":
+        records.append(row)
+
+failures = []
+checks = {}
+for model, limits in policy["models"].items():
+    rows = [r for r in records if str(r.get("model", "")).removesuffix(":latest") == model]
+    passed = [r for r in rows if r.get("outcome") == "pass"]
+    model_checks = {}
+    if not passed:
+        failures.append(f"{model}: no successful generation measurements")
+        checks[model] = {"measurements_present": False}
+        continue
+
+    short = [float(r.get("metrics", {}).get("tokens_per_second") or 0) for r in passed if str(r.get("case_id", "")).startswith("short-")]
+    decode = statistics.fmean(short) if short else 0.0
+    model_checks["decode_tps"] = decode
+    model_checks["decode_floor"] = float(limits["min_decode_tps"])
+    if decode < float(limits["min_decode_tps"]):
+        failures.append(f"{model}: gross decode regression {decode:.2f} < {limits['min_decode_tps']} tok/s")
+
+    contexts = [int(r.get("metrics", {}).get("allocated_context") or 0) for r in passed]
+    allocated = max(contexts, default=0)
+    model_checks["allocated_context"] = allocated
+    model_checks["required_context"] = int(limits["min_context"])
+    if allocated < int(limits["min_context"]):
+        failures.append(f"{model}: allocated context {allocated} < package requirement {limits['min_context']}")
+
+    ratios = []
+    for r in passed:
+        m = r.get("metrics", {})
+        size = float(m.get("resident_size_bytes") or 0)
+        size_vram = float(m.get("resident_vram_bytes") or 0)
+        if size > 0:
+            ratios.append(size_vram / size)
+    residency = min(ratios, default=0.0)
+    model_checks["min_residency_ratio"] = residency
+    if residency < float(policy["min_residency_ratio"]):
+        failures.append(f"{model}: GPU residency ratio {residency:.3f} < {policy['min_residency_ratio']}")
+
+    mem_values = [float(r.get("metrics", {}).get("mem_available_min_mib")) for r in passed if r.get("metrics", {}).get("mem_available_min_mib") is not None]
+    mem_min = min(mem_values) if mem_values else 0.0
+    model_checks["mem_available_min_mib"] = mem_min
+    if mem_min < float(policy["min_mem_available_mib"]):
+        failures.append(f"{model}: MemAvailable floor {mem_min:.0f} MiB < {policy['min_mem_available_mib']} MiB")
+
+    temps = [float(r.get("metrics", {}).get("temp_max_c")) for r in passed if r.get("metrics", {}).get("temp_max_c") is not None]
+    temp_max = max(temps) if temps else 0.0
+    model_checks["temp_max_c"] = temp_max
+    if temp_max >= float(policy["max_temp_c"]):
+        failures.append(f"{model}: temperature {temp_max:.1f} C reached gross qualification ceiling {policy['max_temp_c']} C")
+
+    severe = [
+        r for r in passed
+        if "context-truncation" in r.get("diagnostics", [])
+        and int(r.get("metrics", {}).get("prompt_eval_count") or 0) < int(policy["severe_context_tokens"])
+    ]
+    model_checks["severe_early_context_truncation"] = bool(severe)
+    if severe:
+        failures.append(f"{model}: severe early context truncation below {policy['severe_context_tokens']} evaluated tokens")
+    checks[model] = model_checks
+
+result = {"passed": not failures, "policy": policy, "checks": checks, "failures": failures}
+output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+if failures:
+    for failure in failures:
+        print(f"ERROR: {failure}", file=sys.stderr)
+    raise SystemExit(1)
+PY_EDGE
+}
+
+check_recent_device_errors() {
+  local out="$1" since
+  since="$(awk 'NR==1{print $1; exit}' "$EVENTS" 2>/dev/null || true)"
+  [[ -n $since ]] || since="$(now)"
+  journalctl -k -b --since "$since" --no-pager > "$out" 2>&1 || return 1
+  if grep -Eiq 'amdgpu.*(ring[^[:space:]]*.*timeout|gpu reset|device lost|vm fault|page fault)' "$out"; then
+    echo "ERROR: AMDGPU/device fault detected during qualification; inspect $out" >&2
+    return 1
+  fi
+}
+
+check_live_cu_routing() {
+  local out="$RAW/preflight/cu-routing.txt"
+  bc250-cu-status --summary > "$out" 2>&1 || true
+  if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' "$out"; then
+    record_event "live-cu-routing" infra pass "complete live routing table healthy"
+    return 0
+  fi
+  echo "ERROR: complete live SPI/WGP routing table is not healthy; inspect $out" >&2
+  return 1
+}
+
+phase_preflight() {
+  set_phase preflight "restoring normal topology and checking packaged prerequisites"
+  install -d -m 0700 "$RAW/preflight"
   ensure_normal_mode
   [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]
-  install -d -m 0700 "$RAW/baseline"
   check_openwebui_bootstrap_env
-  snapshot baseline
-  write_phase_report normal-pipeline-baseline baseline
+  check_live_cu_routing
+  application_network_preflight
+  check_required_models
+  if [[ ${SKIP_OWUI:-0} -eq 0 ]]; then
+    local rc
+    validate_owui_token > "$RAW/preflight/token-validation.txt" 2>&1
+    if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$RAW/preflight/package-drift.txt" 2>&1; then rc=0; else rc=$?; fi
+    ((rc == 0)) || { echo "ERROR: packaged Open WebUI state cannot be qualified without first resolving drift/API error (rc=$rc)." >&2; return "$rc"; }
+    record_event "openwebui-drift" infra pass "package-owned settings current"
+  else
+    echo "SKIP: authenticated Open WebUI checks explicitly disabled by --skip-owui" > "$RAW/preflight/openwebui-skipped.txt"
+    record_event "openwebui-drift" coverage skipped "explicit --skip-owui"
+  fi
+  health_gate "preflight-health" "$RAW/preflight/bc250-verify-gate.txt"
+  snapshot preflight/final
+  write_phase_report preflight-results preflight
 }
 
-phase_pipeline() {
-  set_phase pipeline "testing normal main/task/embedding pipeline"
-  local all_roles=1 kdir m sampler_pid unloaded_at=""
-  local -a prod=()
-  install -d -m 0700 "$RAW/pipeline"
-
-  if model_registered 11437 "$EMBED_MODEL"; then
-    warm_embedding > "$RAW/pipeline/embed-warm.txt" 2>&1
-    # Routine appliance revalidation checks the promoted embedding model only.
-    # Alternate embedding comparisons belong in an explicit model-evaluation run.
-    run_bench embeddings bc250-benchmark embeddings "$EMBED_MODEL"
-  else
-    echo "ERROR: required baseline embedding model $EMBED_MODEL is not registered on 11437" >&2
-    return 1
-  fi
-
-  if api_ready 11435 && model_registered 11435 "$TASK_MODEL"; then
-    # The LFM task candidate is already exhausted; routine qualification should
-    # test the actual promoted Open WebUI task model instead of repeating it.
-    run_bench task bc250-benchmark task "$TASK_MODEL"
-  else
-    echo "ERROR: required baseline task model $TASK_MODEL is not available on 11435" >&2
-    return 1
-  fi
-
-  if model_registered 11434 prod-lfm25-8b-a1b-liquidai-q6-k; then
-    run_bench translation-implicit bc250-benchmark translation
-    run_bench translation-explicit env TRANSLATION_EXPLICIT_DIRECTION=1 bc250-benchmark translation
-  else
-    echo "SKIP: production LFM translation model not installed" > "$RAW/pipeline/translation-skipped.txt"
-  fi
-
-  if model_registered 11437 "$EMBED_MODEL" && model_registered 11434 "$E4B_MODEL"; then
-    warm_embedding >/dev/null 2>&1 || true
-    run_bench rag-quality bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL"
-    # The last real run retrieved the correct source in every case but often spent
-    # the full answer budget in model thinking. Compare the same deterministic
-    # fixture with thinking explicitly disabled; this is diagnostic only and does
-    # not change the package's Documents/RAG preset.
-    run_bench rag-quality-nonthinking env RAG_QUALITY_THINK=false bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL"
-  else
-    echo "SKIP: Jina/E4B pair not fully installed" > "$RAW/pipeline/rag-quality-skipped.txt"
-  fi
-
-  mapfile -t prod < <(installed_prod_models)
-  if ((RUN_PRODUCTION_GENERATION)) && ((${#prod[@]})); then
-    warm_embedding >/dev/null 2>&1 || true
-    run_bench production-generation env BENCH_MODE=production BENCH_PROFILE=conservative RUN_THERMAL=0 REPEATS=1 bc250-benchmark generation "${prod[@]}"
-    api_ready 11434 || ensure_normal_mode
-  fi
-
-  # Role acceptance is useful only when the complete production set is present.
-  for m in "$E2B_MODEL" "$E4B_MODEL" prod-lfm25-8b-a1b-liquidai-q6-k prod-qwen35-9b-unsloth-q6-k "$GPT_OSS_MODEL"; do
-    model_registered 11434 "$m" || all_roles=0
-  done
-  ((all_roles)) && run_bench production-usecase bc250-benchmark usecase || echo "SKIP: complete production role set not installed" > "$RAW/pipeline/usecase-skipped.txt"
-
-  if ((RUN_WARM_PREFIX)) && model_registered 11434 "$E4B_MODEL"; then
-    warm_embedding >/dev/null 2>&1 || true
-    run_bench warm-prefix env BENCH_MODE=production BENCH_PROFILE=conservative RUN_LATENCY=0 RUN_CONTEXT=0 RUN_THERMAL=0 RUN_WARM_PREFIX=1 REPEATS=1 bc250-benchmark generation "$E4B_MODEL"
-  fi
-
-  if model_registered 11434 "$GPT_OSS_MODEL"; then
-    warm_embedding >/dev/null 2>&1 || true
-    run_bench gpt-oss-embedding-headroom env BENCH_MODE=production BENCH_PROFILE=conservative RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 REPEATS=1 PREFILL_SENTENCES=352 CTX_POINTS='352 704' NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250-benchmark generation "$GPT_OSS_MODEL"
-    api_ready 11434 || ensure_normal_mode
-  else
-    echo "SKIP: $GPT_OSS_MODEL not installed; this remains the main post-deployment memory edge case" > "$RAW/pipeline/gpt-oss-skipped.txt"
-  fi
-
-  if ((RUN_CONCURRENCY)) && model_registered 11434 "$E2B_MODEL" && model_registered 11437 "$EMBED_MODEL"; then
-    progress "testing simultaneous E2B generation + dedicated embedding requests"
-    start_sampler "$RAW/pipeline/concurrency-sampler.tsv"
-    sampler_pid="$SAMPLER_PID"
-    local concurrency_rc
-    if "$HELPER" concurrency --model "$E2B_MODEL" --embed-model "$EMBED_MODEL" --output "$RAW/pipeline/concurrency.json" > "$RAW/pipeline/concurrency-console.txt" 2>&1; then
-      concurrency_rc=0
-    else
-      concurrency_rc=$?
-    fi
-    stop_sampler "$sampler_pid"
-    echo "$concurrency_rc" > "$RAW/pipeline/concurrency-exit-status.txt"
-    write_rc_outcome "$concurrency_rc" "$RAW/pipeline/concurrency-outcome.txt"
-  fi
-
-  if ((RUN_OCR)) && [[ -n $(first_registered 11434 exp-glm-ocr-) ]]; then
-    run_bench ocr bc250-benchmark ocr
-  fi
-
-  if ((RUN_KEEPALIVE_EXPIRY)) && model_registered 11437 "$EMBED_MODEL"; then
-    progress "testing dedicated embedding 10-minute keepalive"
-    kdir="$RAW/pipeline/embedding-keepalive"
-    install -d -m 0700 "$kdir"
-    warm_embedding > "$kdir/warm.txt" 2>&1
-    curl -fsS http://127.0.0.1:11437/api/ps > "$kdir/ps-t0.json"
-    sleep 60
-    curl -fsS http://127.0.0.1:11437/api/ps > "$kdir/ps-t60.json"
-    if jq -e --arg m "$EMBED_MODEL" 'any(.models[]?; (.name | sub(":latest$"; "")) == $m)' "$kdir/ps-t60.json" >/dev/null; then
-      echo "resident_t60=yes" >> "$kdir/embedding-keepalive-result.txt"
-    else
-      echo "resident_t60=no" >> "$kdir/embedding-keepalive-result.txt"
-    fi
-    progress "embedding still expected resident at t+60s; waiting to observe expiry after the 10-minute keepalive"
-    sleep 540
-    for elapsed in 600 610 620 630 640 650 660 670 680 690 700 710 720; do
-      curl -fsS http://127.0.0.1:11437/api/ps > "$kdir/ps-t${elapsed}.json"
-      if ! jq -e --arg m "$EMBED_MODEL" 'any(.models[]?; (.name | sub(":latest$"; "")) == $m)' "$kdir/ps-t${elapsed}.json" >/dev/null; then
-        unloaded_at="$elapsed"
-        break
-      fi
-      sleep 10
-    done
-    if [[ -n $unloaded_at ]]; then
-      echo "unloaded_by_s=$unloaded_at" >> "$kdir/embedding-keepalive-result.txt"
-    else
-      echo "resident_t720=yes" >> "$kdir/embedding-keepalive-result.txt"
-    fi
-  fi
-
-  snapshot pipeline/final
-  write_phase_report normal-pipeline-results pipeline
+phase_roles() {
+  set_phase roles "qualifying promoted production roles"
+  install -d -m 0700 "$RAW/roles"
+  warm_embedding > "$RAW/roles/embed-warm.txt" 2>&1
+  run_step roles embeddings quality qualification_benchmark bc250-benchmark embeddings "$EMBED_MODEL" --ollama-url http://127.0.0.1:11437 --output-dir "$RAW/roles/embeddings/results"
+  run_step roles task quality qualification_benchmark bc250-benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
+  # Qualify the package's shipped translation behavior only. Direction A/B remains
+  # an explicit standalone benchmark and cannot leak in through manager environment.
+  run_step roles translation quality qualification_benchmark bc250-benchmark translation "$LFM_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
+  warm_embedding >/dev/null 2>&1 || true
+  run_step roles rag-quality quality qualification_benchmark bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
+  run_step roles usecase quality qualification_benchmark bc250-benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
+  snapshot roles/final
+  write_phase_report production-role-results roles
 }
 
-phase_num_batch() {
-  set_phase num-batch "testing Ollama long-prefill num_batch candidates"
-  local dir="$RAW/num-batch"
-  install -d -m 0700 "$dir"
-  if ((!RUN_NUM_BATCH)); then
-    echo "SKIP: RUN_NUM_BATCH=0" > "$dir/skipped.txt"
-  else
-    local models=()
-    # This diagnostic exists for the large-model/long-prefill edge case.
-    # E2B is not a useful proxy; skip the sweep unless GPT-OSS is installed.
-    model_registered 11434 "$GPT_OSS_MODEL" && models+=("$GPT_OSS_MODEL")
-    if ((${#models[@]})); then
-      progress "num_batch sweep: ${models[*]}"
-      local sampler_pid rc
-      start_sampler "$dir/sampler.tsv"
-      sampler_pid="$SAMPLER_PID"
-      if timeout 60m "$HELPER" num-batch --models "${models[@]}" --output "$dir/num-batch-results.jsonl" > "$dir/num-batch-console.txt" 2>&1; then
-        rc=0
-      else
-        rc=$?
-      fi
-      stop_sampler "$sampler_pid"
-      echo "$rc" > "$dir/num-batch-exit-status.txt"
-      write_rc_outcome "$rc" "$dir/num-batch-outcome.txt"
-    else
-      echo "SKIP: GPT-OSS is not registered; num_batch sweep is not useful on E2B alone" > "$dir/skipped.txt"
-    fi
-  fi
+phase_edge() {
+  set_phase edge "checking bounded production performance and coexistence"
+  local policy="$RAW/edge/edge-policy.json" gpt_policy="$RAW/edge/gpt-oss-policy.json"
+  install -d -m 0700 "$RAW/edge"
+  write_edge_policy "$policy"
+
+  warm_embedding >/dev/null 2>&1
+  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${PACKAGE_PROD_MODELS[@]}"
+  run_step edge production-sanity infra check_edge_generation_sanity     "$RAW/edge/production-generation/results/results.jsonl" "$policy" "$RAW/edge/production-generation/sanity.json"
+
   api_ready 11434 || ensure_normal_mode
-  snapshot num-batch/final
-  write_phase_report num-batch-results num-batch
+  warm_embedding >/dev/null 2>&1
+  jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key == $m))' "$policy" > "$gpt_policy"
+  run_step edge gpt-oss-jina infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 PREFILL_SENTENCES=352 CTX_POINTS="352 704" NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/gpt-oss-jina/results" "$GPT_OSS_MODEL"
+  run_step edge gpt-oss-sanity infra check_edge_generation_sanity     "$RAW/edge/gpt-oss-jina/results/results.jsonl" "$gpt_policy" "$RAW/edge/gpt-oss-jina/sanity.json"
+  run_step edge jina-still-resident infra model_loaded 11437 "$EMBED_MODEL"
+
+  api_ready 11434 || ensure_normal_mode
+  run_step edge main-embedding-concurrency infra qualification_benchmark bc250-benchmark concurrency "$E2B_MODEL" "$EMBED_MODEL" --main-url http://127.0.0.1:11434 --embed-url http://127.0.0.1:11437 --output-dir "$RAW/edge/main-embedding-concurrency/results"
+  run_step edge device-errors infra check_recent_device_errors "$RAW/edge/kernel-device-errors.txt"
+  snapshot edge/final
+  write_phase_report resource-edge-results edge
 }
 
 phase_agent() {
-  set_phase agent "testing exclusive coding/agent mode"
-  local agent_model dir="$RAW/agent" port
+  set_phase agent "qualifying exclusive package-default agent"
+  local dir="$RAW/agent" port
   install -d -m 0700 "$dir"
-  if ((!RUN_AGENT)); then
-    echo "SKIP: RUN_AGENT=0" > "$dir/skipped.txt"
-  else
-    systemctl cat ollama-agent.service >/dev/null 2>&1 || {
-      echo "ERROR: required package unit is missing: ollama-agent.service" >&2
-      return 1
-    }
-    bc250-agent-mode enter > "$dir/agent-mode-enter.txt" 2>&1
-    wait_api 11436 45
-    for port in 11434 11435 11437; do
-      if api_ready "$port"; then
-        echo "ERROR: normal Ollama port $port remained available in agent mode." >&2
-        return 1
-      fi
-    done
-    bc250-agent-mode status > "$dir/agent-mode-active-status.txt" 2>&1
-    snapshot agent/active
-    if model_registered 11436 "$AGENT_MODEL"; then
-      agent_model="$AGENT_MODEL"
-      run_bench_at agent benchmark env OLLAMA_URL=http://127.0.0.1:11436 bc250-benchmark agent "$agent_model"
-    else
-      echo "SKIP: package-default agent model $AGENT_MODEL is not registered on 11436" > "$dir/agent-model-skipped.txt"
-    fi
-    bc250-agent-mode leave > "$dir/agent-mode-leave.txt" 2>&1
-    wait_api 11434 45
-    wait_api 11435 45
-    wait_api 11437 45
-    [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]
-  fi
+  systemctl cat ollama-agent.service >/dev/null 2>&1
+  bc250-agent-mode enter > "$dir/agent-mode-enter.txt" 2>&1
+  wait_api 11436 45
+  for port in 11434 11435 11437; do api_ready "$port" && { echo "ERROR: normal Ollama port $port remained available in agent mode." >&2; return 1; }; done
+  model_registered 11436 "$AGENT_MODEL" || { echo "ERROR: package-default agent model $AGENT_MODEL is not registered on 11436" >&2; return 1; }
+  snapshot agent/active
+  run_step agent agent quality qualification_benchmark bc250-benchmark agent "$AGENT_MODEL" --ollama-url http://127.0.0.1:11436 --output-dir "$RAW/agent/benchmark/results"
+  bc250-agent-mode leave > "$dir/agent-mode-leave.txt" 2>&1
+  wait_api 11434 45; wait_api 11435 45; wait_api 11437 45
+  [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]
+  record_event "normal-topology-restored" infra pass "agent mode left successfully"
   snapshot agent/restored
   write_phase_report agent-mode-results agent
 }
 
-save_sysctx_state() {
-  install -d -m 0755 "$(dirname "$SYSCTX_DROPIN")"
-  if [[ -e $SYSCTX_DROPIN ]]; then
-    echo present > "$SYSCTX_STATE"
-    cp -a "$SYSCTX_DROPIN" "$SYSCTX_BACKUP"
-  else
-    echo absent > "$SYSCTX_STATE"
-    rm -f "$SYSCTX_BACKUP"
-  fi
-  podman inspect open-webui --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | awk -F= '$1=="RAG_SYSTEM_CONTEXT"{print $2; exit}' > "$WORK/sysctx-original-value" || true
-}
-
-set_sysctx() {
-  local value="$1"
-  cat > "$SYSCTX_DROPIN" <<EOFCTX
-[Container]
-Environment=RAG_SYSTEM_CONTEXT=$value
-EOFCTX
-  chmod 0644 "$SYSCTX_DROPIN"
-  systemctl daemon-reload
-  systemctl restart open-webui.service
-  local i actual=""
-  for i in {1..60}; do
-    curl -fsS --connect-timeout 2 --max-time 4 http://127.0.0.1:3000/ >/dev/null 2>&1 && break
-    sleep 1
-  done
-  actual="$(podman inspect open-webui --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null | awk -F= '$1=="RAG_SYSTEM_CONTEXT"{v=$2} END{print v}')"
-  [[ ${actual,,} == "${value,,}" ]] || { echo "ERROR: Open WebUI RAG_SYSTEM_CONTEXT expected=$value actual=${actual:-missing}" >&2; return 1; }
-}
-
-restore_sysctx() {
-  [[ -f $SYSCTX_STATE ]] || return 0
-  if [[ $(cat "$SYSCTX_STATE") == present && -f $SYSCTX_BACKUP ]]; then
-    cp -a "$SYSCTX_BACKUP" "$SYSCTX_DROPIN"
-  else
-    rm -f "$SYSCTX_DROPIN"
-  fi
-  systemctl daemon-reload
-  systemctl restart open-webui.service >/dev/null 2>&1 || true
-  for _ in {1..60}; do
-    curl -fsS --connect-timeout 2 --max-time 4 http://127.0.0.1:3000/ >/dev/null 2>&1 && break
-    sleep 1
-  done
-}
-
-restore_owui_api_config() {
-  [[ -s $OWUI_TOKEN && -s $OWUI_CONFIG_SAVE && -x $HELPER ]] || return 0
-  "$HELPER" restore-config --token-file "$OWUI_TOKEN" --input "$OWUI_CONFIG_SAVE" >/dev/null 2>&1 || true
-}
-
-report_helper_failure() {
-  local label="$1" rc="$2" console="$3"
-  echo "ERROR: $label failed (rc=$rc). Last helper output:" >&2
-  if [[ -s "$console" ]]; then
-    tail -n 30 "$console" | sed 's/^/  /' >&2
-  else
-    echo "  <no helper console output>" >&2
-  fi
-}
-
 phase_owui() {
-  set_phase owui "testing Open WebUI API baseline and RAG tuning candidates"
-  local dir="$RAW/owui" key rc sampler_pid drift_rc
+  set_phase owui "qualifying packaged Open WebUI RAG configuration"
+  local dir="$RAW/owui" rc
   install -d -m 0700 "$dir"
-  if ((!RUN_OWUI_TUNING)) || [[ ! -s $OWUI_TOKEN ]]; then
-    echo "SKIP: authenticated OWUI tuning tests require --owui-token-file with a protected API key file and RUN_OWUI_TUNING=1" > "$dir/skipped.txt"
+  if [[ ${SKIP_OWUI:-0} -eq 1 ]]; then
+    echo "SKIP: authenticated Open WebUI qualification explicitly disabled by --skip-owui" > "$dir/skipped.txt"
+    record_event "openwebui-rag" coverage skipped "explicit --skip-owui"
     snapshot owui/skipped
-    write_phase_report openwebui-rag-tuning-results owui
+    write_phase_report openwebui-results owui
     return 0
   fi
+  validate_owui_token > "$dir/token-recheck.txt" 2>&1
+  if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-before.txt" 2>&1; then rc=0; else rc=$?; fi
+  ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state drift/API failure rc=$rc" >&2; return "$rc"; }
+  run_step owui owui-rag quality qualification_benchmark bc250-benchmark owui-rag "$OWUI_RAG_MODEL" --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-rag/results"
+  if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
+  ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state changed during qualification rc=$rc" >&2; return "$rc"; }
+  record_event "openwebui-state-unchanged" infra pass "package-owned settings unchanged"
+  snapshot owui/final
+  write_phase_report openwebui-results owui
+}
 
-  if ! validate_owui_token > "$dir/token-recheck.txt" 2>&1; then
-    echo "SKIP: Open WebUI credential is no longer valid; authenticated tuning was not run" > "$dir/skipped.txt"
-    snapshot owui/skipped-invalid-token
-    write_phase_report openwebui-rag-tuning-results owui
-    return 0
-  fi
-  key="$(<"$OWUI_TOKEN")"
-  printf '%s\n' "$OWUI_RAG_MODEL" > "$dir/owui-rag-model.txt"
+quality_cause_report() {
+  python3 - "$RAW" "$EVENTS" <<'PY_CAUSES'
+import json
+import sys
+from collections import defaultdict
+from pathlib import Path
 
-  # Tuning results are comparable only against the package-owned OWUI baseline.
-  # Do not silently mutate drifted operator state inside the revalidation harness.
-  if OWUI_API_KEY="$key" bc250-openwebui-setup status > "$dir/package-drift-before.txt" 2>&1; then
-    drift_rc=0
-  else
-    drift_rc=$?
-  fi
-  echo "$drift_rc" > "$dir/package-drift-before-exit-status.txt"
-  if ((drift_rc == 2)); then
-    echo "SKIP: package-owned Open WebUI settings are drifted; run bc250-openwebui-setup apply explicitly before tuning" > "$dir/skipped.txt"
-    snapshot owui/skipped-drift
-    write_phase_report openwebui-rag-tuning-results owui
-    return 0
-  elif ((drift_rc != 0)); then
-    echo "ERROR: could not validate the Open WebUI package baseline before tuning (rc=$drift_rc)" >&2
-    return "$drift_rc"
-  fi
+root = Path(sys.argv[1])
+events = Path(sys.argv[2])
+aggregate = {}
+invalid = []
+covered_labels = set()
+for path in sorted(root.rglob("summary.json")):
+    try:
+        summary = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        invalid.append(f"{path}: {exc}")
+        continue
+    if not isinstance(summary, dict):
+        invalid.append(f"{path}: summary root is not an object")
+        continue
+    category = str(summary.get("category") or path.parent.name)
+    counts = summary.get("qualification_counts") or {}
+    try:
+        passed = int(counts.get("pass") or 0)
+        failed = int(counts.get("quality-fail") or 0)
+    except (AttributeError, TypeError, ValueError) as exc:
+        invalid.append(f"{path}: invalid qualification_counts: {exc}")
+        continue
+    if failed <= 0:
+        continue
+    covered_labels.add(category)
+    entry = aggregate.setdefault(category, {"pass": 0, "fail": 0, "causes": defaultdict(int)})
+    entry["pass"] += passed
+    entry["fail"] += failed
+    failures = summary.get("failure_kinds") or {}
+    if not isinstance(failures, dict):
+        invalid.append(f"{path}: failure_kinds is not an object")
+        continue
+    for name, count in failures.items():
+        entry["causes"][str(name)] += int(count)
 
-  "$HELPER" save-config --token-file "$OWUI_TOKEN" --output "$OWUI_CONFIG_SAVE"
+failed_steps = []
+if events.exists():
+    for line in events.read_text(encoding="utf-8", errors="replace").splitlines():
+        fields = line.split("\t")
+        if len(fields) >= 5 and fields[3] == "quality" and fields[4] == "quality-fail":
+            failed_steps.append(fields[2])
 
-  if ((RUN_EMBED_BATCH_SWEEP)); then
-    progress "Open WebUI embedding batch sweep 1/4/8/16"
-    start_sampler "$dir/embedding-batch-sampler.tsv"
-    sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 60m "$HELPER" embedding-batch --token-file "$OWUI_TOKEN" --work "$dir/embed-batch-work" --output "$dir/embedding-batch.jsonl" > "$dir/embedding-batch-console.txt" 2>&1; then
-      rc=0
-    else
-      rc=$?
-    fi
-    stop_sampler "$sampler_pid"
-    echo "$rc" > "$dir/embedding-batch-exit-status.txt"
-    write_rc_outcome "$rc" "$dir/embedding-batch-outcome.txt"
-    if ((rc != 0)); then
-      report_helper_failure "Open WebUI embedding batch sweep" "$rc" "$dir/embedding-batch-console.txt"
-      return "$rc"
-    fi
-  fi
-
-  if ((RUN_CHUNK_MIN_SWEEP)) && model_registered 11434 "$E4B_MODEL"; then
-    progress "Open WebUI CHUNK_MIN_SIZE_TARGET sweep 0/500/750/1000"
-    start_sampler "$dir/chunk-min-sampler.tsv"
-    sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 60m "$HELPER" chunk-min --token-file "$OWUI_TOKEN" --work "$dir/chunk-min-work" --model "$OWUI_RAG_MODEL" --output "$dir/chunk-min.jsonl" > "$dir/chunk-min-console.txt" 2>&1; then
-      rc=0
-    else
-      rc=$?
-    fi
-    stop_sampler "$sampler_pid"
-    echo "$rc" > "$dir/chunk-min-exit-status.txt"
-    write_rc_outcome "$rc" "$dir/chunk-min-outcome.txt"
-    ((rc == 0)) || return "$rc"
-  fi
-
-  # Helper sweeps restore their own field, then restore the exact original selected
-  # API config once more before the environment-level system-context A/B.
-  restore_owui_api_config
-
-  if ((RUN_RAG_SYSTEM_CONTEXT)) && model_registered 11434 "$E4B_MODEL"; then
-    save_sysctx_state
-    progress "RAG_SYSTEM_CONTEXT=false API conversation"
-    set_sysctx false
-    if ! validate_owui_token > "$dir/rag-system-context-false-token-recheck.txt" 2>&1; then
-      echo "ERROR: Open WebUI credential became invalid after the false-context restart" >&2
-      return 1
-    fi
-    unload_model 11434 "$E4B_MODEL"
-    snapshot owui/sysctx-false-before
-    start_sampler "$dir/rag-system-context-false-sampler.tsv"
-    sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 45m "$HELPER" rag-sysctx --token-file "$OWUI_TOKEN" --work "$dir/sysctx-work" --model "$OWUI_RAG_MODEL" --label false --output "$dir/rag-system-context-false.json" > "$dir/rag-system-context-false-console.txt" 2>&1; then
-      rc=0
-    else
-      rc=$?
-    fi
-    stop_sampler "$sampler_pid"
-    echo "$rc" > "$dir/rag-system-context-false-exit-status.txt"
-    write_rc_outcome "$rc" "$dir/rag-system-context-false-outcome.txt"
-    case "$rc" in 0|3) ;; *) return "$rc" ;; esac
-
-    progress "RAG_SYSTEM_CONTEXT=true API conversation"
-    set_sysctx true
-    if ! validate_owui_token > "$dir/rag-system-context-true-token-recheck.txt" 2>&1; then
-      echo "ERROR: Open WebUI credential became invalid after the true-context restart" >&2
-      return 1
-    fi
-    unload_model 11434 "$E4B_MODEL"
-    snapshot owui/sysctx-true-before
-    start_sampler "$dir/rag-system-context-true-sampler.tsv"
-    sampler_pid="$SAMPLER_PID"
-    if timeout --signal=INT --kill-after=30s 45m "$HELPER" rag-sysctx --token-file "$OWUI_TOKEN" --work "$dir/sysctx-work" --model "$OWUI_RAG_MODEL" --label true --output "$dir/rag-system-context-true.json" > "$dir/rag-system-context-true-console.txt" 2>&1; then
-      rc=0
-    else
-      rc=$?
-    fi
-    stop_sampler "$sampler_pid"
-    echo "$rc" > "$dir/rag-system-context-true-exit-status.txt"
-    write_rc_outcome "$rc" "$dir/rag-system-context-true-outcome.txt"
-    case "$rc" in 0|3) ;; *) return "$rc" ;; esac
-
-    restore_sysctx
-    rm -f "$SYSCTX_STATE"
-    progress "RAG_SYSTEM_CONTEXT original Quadlet state restored"
-  fi
-
-  restore_owui_api_config
-  if OWUI_API_KEY="$key" bc250-openwebui-setup status > "$dir/package-drift-after.txt" 2>&1; then
-    rc=0
-  else
-    rc=$?
-  fi
-  echo "$rc" > "$dir/package-drift-after-exit-status.txt"
-  snapshot owui/restored
-  write_phase_report openwebui-rag-tuning-results owui
-  ((rc == 0)) || return "$rc"
+if not aggregate and not invalid and not failed_steps:
+    print("  (none)")
+else:
+    for category, entry in sorted(aggregate.items()):
+        total = entry["pass"] + entry["fail"]
+        print(f"  {category:<28} {entry['pass']}/{total}")
+        for name, count in sorted(entry["causes"].items()):
+            print(f"    {name}={count}")
+    for detail in invalid:
+        print(f"  canonical summary unavailable — {detail}")
+    for label in sorted(set(failed_steps)):
+        # Step labels and benchmark categories usually match. If canonical evidence
+        # did not yield any failure details, surface that fact rather than hiding it.
+        if label not in covered_labels and not any(label in key for key in aggregate):
+            print(f"  {label:<28} quality-fail — canonical summary unavailable")
+PY_CAUSES
 }
 
 create_summary() {
-  local out="$WORK/revalidation-summary.txt"
+  local out="$WORK/revalidation-summary.txt" p q skipped quality coverage
+  read -r p q skipped <<<"$(quality_counts)"; quality="$(quality_state)"
+  coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
+  printf '%s\n' "$quality" > "$QUALITY_STATE_FILE"
   {
-    echo "BC-250 0.11.0 revalidation v$HARNESS_VERSION"
-    echo "run_id=$(run_id)"
-    echo "finished=$(now)"
-    echo "package=$(rpm -q bc250-llm-server 2>/dev/null || true)"
-    echo "kernel=$(uname -r)"
+    echo "BC-250 revalidation complete"
     echo
-    if [[ -r $TARGET_KERNEL_FILE ]]; then
-      echo "kernel_target=$(target_kernel)"
-      echo "kernel_original_relevant_args=$(saved_original_args | paste -sd' ' -)"
-      echo
-    fi
-    echo "Key result locations:"
-    find "$RAW" -type f \( -name 'results*.csv' -o -name '*-results.jsonl' -o -name 'concurrency.json' -o -name 'embedding-batch.jsonl' -o -name 'chunk-min.jsonl' -o -name 'rag-system-context-*.json' -o -name 'embedding-keepalive-result.txt' \) -printf '  %p\n' | sort
+    printf 'Run             %s\n' "$(run_id)"
+    printf 'Package         %s\n' "$(rpm -q bc250-llm-server 2>/dev/null || true)"
+    printf 'Harness         %s\n' "$HARNESS_VERSION"
+    printf 'Kernel          %s\n' "$(uname -r)"
     echo
-    echo "Interpretation notes:"
-    echo "- Optional kernel A/B reuses the original compact benchmark shape for cross-kernel comparison; the package default remains TTM-only."
-    echo "- legacy-full is a diagnostic comparison profile only, not a recommendation. The redundant no-gtt/full-ppfeaturemask lane was retired after repeated equivalence."
-    echo "- Compare production/GPT-OSS results with embedding 11437 warm; do not add Linux+GTT+Ollama memory as separate pools."
-    echo "- Translation acceptance is quality data: a benchmark exit 3 must not abort the harness. Inspect direction/language and preservation failures separately."
-    echo "- Embedding reports include allocated_context/resident_size; flag unexpectedly large context residency because the dedicated lane is intended to stay small."
-    echo "- num_batch is diagnostic: prefer the largest stable/default setting unless 128/256 materially improves long-prefill reliability with acceptable speed."
-    echo "- embedding batch 1/4/8/16: compare process_wall_s, errors, memory pressure and service logs; do not promote on speed alone."
-    echo "- CHUNK_MIN_SIZE_TARGET: prefer 0 unless a nonzero target improves the deterministic cases without losing facts/citations."
-    echo "- RAG quality records retrieval_ok, answer/thinking sizes and done_reason separately; length exhaustion with correct retrieval is not a retrieval failure."
-    echo "- RAG_SYSTEM_CONTEXT: focus on turns 2/3 prompt_eval_duration and wall_s plus answer/citation correctness; turn 1 includes cold/load noise."
-    echo "- Open WebUI RAG tuning uses workspace preset $OWUI_RAG_MODEL; package-owned drift causes the authenticated A/B lanes to skip rather than self-apply."
-    echo "- Routine revalidation qualifies promoted defaults/production roles only; installed exp-* models are inventory unless an explicit comparison run names them."
-    echo "- Agent mode must show only 11436 during its active snapshot and must restore normal lanes afterward."
+    printf 'Run state       %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RUN_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
+    printf 'Infrastructure  %s\n' "$(tr '[:lower:]' '[:upper:]' < "$INFRA_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
+    printf 'Quality         %s       %s pass / %s quality-fail / %s skipped\n' "${quality^^}" "$p" "$q" "$skipped"
+    printf 'Restoration     %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
+    printf 'Coverage        %s\n' "${coverage^^}"
+    echo
+    echo "Quality failures"
+    quality_cause_report
+    echo
+    echo "Result root"
+    echo "  $RAW"
+    echo
+    echo "Policy"
+    echo "  Revalidation qualifies packaged defaults only; tuning/model/hardware A/B comparisons belong to explicit benchmark/diagnostic workflows."
+    echo "  The complete live SPI/WGP routing table is the CU authority; numeric kernel/RADV counters are diagnostic only."
+    echo "  BC-250 resource headroom is interpreted through residency, MemAvailable and swap context; VRAM/GTT are not additive pools."
   } > "$out"
 }
-
-FINAL_BUNDLE=""
 
 create_final_bundle() {
   local bundle tmp journal_since
   bundle="$REPORT_DIR/$(run_id)-bc250-revalidation-results.tar.gz"
   tmp="${bundle}.tmp.$$"
   create_summary
-  progress "creating final bundle"
+  record_progress "creating final bundle"
   # The service journal is decisive for shell/control-flow failures and contains no
   # supplied OWUI token material. Limit it to this run when the first event timestamp
   # is available so repeated same-boot revalidations do not contaminate each bundle.
@@ -2117,10 +1270,7 @@ create_final_bundle() {
   else
     journalctl -b -u "$UNIT" --no-pager > "$SERVICE_JOURNAL" 2>&1 || true
   fi
-  # Do not bundle OWUI_CONFIG_SAVE: a customized provider config could contain a secret.
-  local -a items=(events.log phase stage heartbeat run-id settings.env revalidation-summary.txt results phase-reports)
-  [[ ! -e $TARGET_KERNEL_FILE ]] || items+=(target-kernel)
-  [[ ! -e $ORIGINAL_ARGS_FILE ]] || items+=(original-kernel-args.txt)
+  local -a items=(events.tsv phase stage stage-started last-event run-id run-state infrastructure-state quality-state restoration-state coverage-state settings.env revalidation-summary.txt results phase-reports)
   [[ ! -e $FAILURE_RC_FILE ]] || items+=(failure-rc)
   [[ ! -e $ERROR_CONTEXT ]] || items+=(error-context.txt)
   [[ ! -e $SERVICE_JOURNAL ]] || items+=(revalidation-service-journal.txt)
@@ -2129,24 +1279,15 @@ create_final_bundle() {
   chmod 0644 "$tmp"
   mv -f "$tmp" "$bundle"
   FINAL_BUNDLE="$bundle"
-  progress "final bundle written: $bundle"
+  record_progress "final bundle written: $bundle"
 }
 
 restore_all() {
-  local had_errexit=0
-  [[ $- == *e* ]] && had_errexit=1
-  set +e
-  if command_exists bc250-agent-mode; then bc250-agent-mode leave >/dev/null 2>&1; fi
-  restore_sysctx
-  restore_owui_api_config
-  rm -f "$OWUI_TOKEN"
-  if ((had_errexit)); then set -e; else set +e; fi
-}
-
-disable_worker_for_future_boots() {
-  # Removing the boot wants-link is enough here; avoid a manager reload from the
-  # still-running oneshot. Explicit cleanup performs the later daemon-reload.
-  systemctl disable --no-reload "$UNIT" >/dev/null 2>&1 || true
+  local rc=0
+  # Restore appliance state only. The transient credential must remain available
+  # through the final authenticated health gate/snapshot and failure evidence.
+  if command_exists bc250-agent-mode; then bc250-agent-mode leave >/dev/null 2>&1 || rc=1; fi
+  return "$rc"
 }
 
 finish_worker_session() {
@@ -2154,57 +1295,21 @@ finish_worker_session() {
   # Never remove/reload the unit or delete $WORK from inside the executing oneshot.
   # Doing so can make systemd terminate an otherwise successful worker. Leave the
   # finished state for `status`; `cleanup` or the next `start` removes it safely.
-  disable_worker_for_future_boots
-  rm -f "$OWUI_TOKEN"
+  cleanup_transient_token
   [[ -z $bundle ]] || echo "Final bundle: $bundle"
 }
 
 finish_failed_run() {
-  local rc="$1" label="$2" snapshot_needed="${3:-1}"
+  local rc="$1" label="$2"
   printf '%s\n' "$rc" > "$FAILURE_RC_FILE"
-  performance_off
-  restore_all
-  ensure_normal_mode >/dev/null 2>&1 || true
-  if ((snapshot_needed)); then
-    snapshot "$label"
-    write_phase_report "$label-results" "$label"
-  fi
+  printf 'failed\n' > "$RUN_STATE_FILE"; printf 'fail\n' > "$INFRA_STATE_FILE"
+  if restore_all && ensure_normal_mode >/dev/null 2>&1; then printf 'pass\n' > "$RESTORATION_STATE_FILE"; else printf 'fail\n' > "$RESTORATION_STATE_FILE"; fi
+  snapshot "$label" || true
+  write_phase_report "$label-results" "$label" || true
   printf 'failed\n' > "$PHASE_FILE"
   create_final_bundle
   finish_worker_session
   exit "$rc"
-}
-
-recover_kernel_or_finish_failure() {
-  local rc="$1" label="$2" snapshot_taken=0
-  printf '%s\n' "$rc" > "$FAILURE_RC_FILE"
-  performance_off
-  restore_all
-
-  # The target entry may already contain the next candidate profile even while the
-  # currently running /proc/cmdline still shows the original profile. Always put
-  # the exact saved arguments back on that target before deciding whether a
-  # recovery reboot is required.
-  if [[ -r $ORIGINAL_ARGS_FILE && -r $TARGET_KERNEL_FILE ]]; then
-    snapshot "$label"
-    write_phase_report "$label-results" "$label"
-    snapshot_taken=1
-    if ! restore_original_next_boot; then
-      progress "CRITICAL: could not restore saved kernel arguments; manual recovery required"
-      printf 'failed-manual-kernel-recovery\n' > "$PHASE_FILE"
-      create_final_bundle
-      finish_worker_session
-      exit "$rc"
-    fi
-    if kernel_profile_modified; then
-      printf 'recovery\n' > "$PHASE_FILE"
-      progress "exact original kernel arguments configured after $label; rebooting for recovery verification"
-      sync
-      systemctl reboot --no-block
-      exit 0
-    fi
-  fi
-  finish_failed_run "$rc" "$label" "$((1 - snapshot_taken))"
 }
 
 capture_error_context() {
@@ -2224,116 +1329,70 @@ capture_error_context() {
 }
 
 worker_fail() {
-  local rc="${1:-1}" command="${2:-unknown}" line="${3:-unknown}"
-  local bash_lines="${4:-}" functions="${5:-}"
-  # errtrace can propagate ERR into subshells/functions. Only the top-level worker
-  # owns recovery/finalization; a child may return its status but may never delete
-  # or restore global run state.
-  if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then
-    trap - ERR
-    return "$rc"
-  fi
-  trap - ERR TERM INT
-  set +e
+  local rc="${1:-1}" command="${2:-unknown}" line="${3:-unknown}" bash_lines="${4:-}" functions="${5:-}"
+  if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then trap - ERR; return "$rc"; fi
+  trap - ERR TERM INT; set +e
   capture_error_context "$rc" "$command" "$line" "$bash_lines" "$functions" || true
-  if ! mkdir "$FAILURE_GUARD" 2>/dev/null; then
-    exit "$rc"
-  fi
-  progress "worker failure rc=$rc; restoring temporary state"
-  recover_kernel_or_finish_failure "$rc" failure
+  mkdir "$FAILURE_GUARD" 2>/dev/null || exit "$rc"
+  record_event "worker-failure" infra infra-fail "rc=$rc"
+  finish_failed_run "$rc" failure
 }
 
 worker_abort() {
-  if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then
-    trap - TERM INT
-    return 130
-  fi
-  trap - ERR TERM INT
-  set +e
-  printf 'abort\n' > "$WORK/ABORT"
-  progress "worker interrupted/aborted; restoring temporary state"
-  recover_kernel_or_finish_failure 130 aborted
+  if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then trap - TERM INT; return 130; fi
+  trap - ERR TERM INT; set +e; printf 'abort\n' > "$WORK/ABORT"
+  record_event "operator-abort" infra infra-fail "signal=TERM/INT"
+  finish_failed_run 130 aborted
 }
 
-phase_recovery() {
-  local rc=1
-  [[ -r $FAILURE_RC_FILE ]] && rc="$(cat "$FAILURE_RC_FILE")"
-  set_phase recovery "verifying exact original kernel profile after recovery reboot"
-  check_running_kernel
-  verify_running_profile "$(saved_original_args_string)"
-  performance_off
-  restore_all
-  ensure_normal_mode
-  snapshot recovery
-  write_phase_report kernel-recovery-results recovery
-  printf 'failed-recovered\n' > "$PHASE_FILE"
-  progress "recovery complete; original kernel profile and normal mode restored"
-  create_final_bundle
-  finish_worker_session
-  trap - ERR TERM INT
-  exit "$rc"
-}
-
-run_pipeline_sequence() {
-  phase_baseline
-  check_abort
-  phase_application_preflight
-  check_abort
-  phase_pipeline
-  check_abort
-  phase_num_batch
-  check_abort
-  phase_agent
-  check_abort
-  phase_owui
-  set_phase final "restoring original temporary state and capturing final snapshot"
-  restore_all
-  ensure_normal_mode
-  performance_off
-  if [[ -r $ORIGINAL_ARGS_FILE ]]; then
-    verify_running_profile "$(saved_original_args_string)"
+phase_restore_report() {
+  set_phase restore "restoring normal topology and producing final report"
+  if restore_all && ensure_normal_mode; then
+    printf 'pass\n' > "$RESTORATION_STATE_FILE"
+    record_event "restoration" infra pass "normal topology restored"
+  else
+    printf 'fail\n' > "$RESTORATION_STATE_FILE"
+    record_event "restoration" infra infra-fail "normal topology restoration failed"
+    return 1
   fi
+  health_gate "final-health" "$RAW/restore/bc250-verify-gate.txt"
   snapshot final
-  write_phase_report final-restored-state final
+  write_phase_report final-restored-state restore
+  if [[ $(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo full) == partial ]]; then
+    printf 'incomplete\n' > "$RUN_STATE_FILE"
+  else
+    printf 'completed\n' > "$RUN_STATE_FILE"
+  fi
+  printf 'pass\n' > "$INFRA_STATE_FILE"; printf '%s\n' "$(quality_state)" > "$QUALITY_STATE_FILE"
   printf 'done\n' > "$PHASE_FILE"
-  progress "all tests complete; normal mode active; exact kernel/temporary OWUI state restored"
+  record_event "qualification-complete" infra pass "qualification sequence completed; report pending"
   create_final_bundle
   finish_worker_session
-  trap - ERR TERM INT
+}
+
+run_qualification_sequence() {
+  phase_preflight; check_abort
+  phase_roles; check_abort
+  phase_edge; check_abort
+  phase_agent; check_abort
+  phase_owui; check_abort
+  phase_restore_report
 }
 
 worker() {
   need_root
-  exec 9>"$LOCK"
-  flock -n 9 || { echo "ERROR: another worker holds $LOCK" >&2; exit 1; }
-  rm -rf "$FAILURE_GUARD"
-  WORKER_BASHPID=$BASHPID
+  exec 9>"$LOCK"; flock -n 9 || { echo "ERROR: another worker holds $LOCK" >&2; exit 1; }
+  rm -rf "$FAILURE_GUARD"; WORKER_BASHPID=$BASHPID
   trap 'worker_fail "$?" "$BASH_COMMAND" "$LINENO" "${BASH_LINENO[*]}" "${FUNCNAME[*]}"' ERR
-  trap worker_abort TERM INT
-  trap worker_exit_cleanup EXIT
+  trap worker_abort TERM INT; trap worker_exit_cleanup EXIT
   load_settings
-  write_helper
-  refresh_owui_token
-  progress "worker started pid=$$ boot_id=$(cat /proc/sys/kernel/random/boot_id) kernel=$(uname -r)"
-
+  record_event "worker-start" infra pass "pid=$$ kernel=$(uname -r)"
   case "$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)" in
-    kernel-baseline) phase_kernel_baseline ;;
-    kernel-full) phase_kernel_full ;;
-    kernel-restored)
-      phase_kernel_restored
-      run_pipeline_sequence
-      ;;
-    pipeline-start)
-      ((RUN_GOVERNOR_REVALIDATION)) && phase_governor_current_only
-      run_pipeline_sequence
-      ;;
-    recovery) phase_recovery ;;
-    done|failed|failed-recovered|failed-manual-kernel-recovery)
-      disable_worker_for_future_boots
-      echo "Run already stopped at phase=$(cat "$PHASE_FILE")."
-      ;;
+    preflight|initializing) run_qualification_sequence ;;
+    done|failed) echo "Run already stopped at phase=$(cat "$PHASE_FILE")." ;;
     *) echo "ERROR: unknown phase: $(cat "$PHASE_FILE" 2>/dev/null || echo missing)" >&2; return 1 ;;
   esac
+  trap - ERR TERM INT
 }
 
 latest_phase_report_path() {
@@ -2358,6 +1417,17 @@ saved_run_harness_version() {
   printf '%s\n' "${value:-unknown}"
 }
 
+effective_run_state() {
+  local state service
+  state="$(cat "$RUN_STATE_FILE" 2>/dev/null || echo none)"
+  service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+  if [[ "$state" == running && "$service" != active && "$service" != activating && "$service" != reloading ]]; then
+    echo incomplete
+  else
+    echo "$state"
+  fi
+}
+
 status_raw() {
   echo "harness_version=$HARNESS_VERSION"
   echo "run_harness_version=$(saved_run_harness_version)"
@@ -2365,122 +1435,50 @@ status_raw() {
   echo "run_id=$(run_id)"
   echo "phase=$(cat "$PHASE_FILE" 2>/dev/null || echo none)"
   echo "stage=$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
-  echo "heartbeat=$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo none)"
+  echo "stage_started=$(cat "$STAGE_STARTED_FILE" 2>/dev/null || echo none)"
+  echo "last_event=$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"
+  echo "run_state=$(effective_run_state)"
+  echo "infrastructure=$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo none)"
+  echo "quality=$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  echo "restoration=$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo none)"
   echo "kernel=$(uname -r)"
-  [[ -r "$TARGET_KERNEL_FILE" ]] && echo "target_kernel=$(target_kernel)"
-  echo "current_relevant_args=$(current_relevant_args | paste -sd' ' -)"
-  [[ -r "$ORIGINAL_ARGS_FILE" ]] && echo "saved_original_args=$(saved_original_args | paste -sd' ' -)"
   echo "service=$(systemctl is-active "$UNIT" 2>/dev/null || true)"
   echo "phase_reports=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" 2>/dev/null | wc -l)"
   echo "latest_phase_report=$(latest_phase_report_path)"
   echo "latest_bundle=$(latest_bundle_path)"
   [[ ! -e $ERROR_CONTEXT ]] || echo "error_context=$ERROR_CONTEXT"
-  if [[ -f $RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt ]]; then
-    cat "$RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt"
-  fi
 }
 
 status_run() {
   need_root
-  load_settings
-  local raw=0 phase stage heartbeat service rid run_version result worker phase_reports report bundle
-  local failure_phase="" failure_stage="" position="" label=""
+  local raw=0 phase stage service rid run_version worker position label stage_started last_event
   shift || true
-  while (($#)); do
-    case "$1" in
-      --raw) raw=1; shift ;;
-      -h|--help)
-        echo "Usage: sudo bc250-revalidate status [--raw]"
-        return 0
-        ;;
-      *) echo "ERROR: unknown status option: $1" >&2; return 2 ;;
-    esac
-  done
+  while (($#)); do case "$1" in --raw) raw=1; shift ;; -h|--help) echo "Usage: sudo bc250-revalidate status [--raw]"; return 0 ;; *) echo "ERROR: unknown status option: $1" >&2; return 2 ;; esac; done
   ((raw == 0)) || { status_raw; return; }
-
-  rid="$(run_id)"
-  phase="$(cat "$PHASE_FILE" 2>/dev/null || echo none)"
-  stage="$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
-  heartbeat="$(cat "$HEARTBEAT_FILE" 2>/dev/null || echo none)"
-  service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
-  run_version="$(saved_run_harness_version)"
-  phase_reports="$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "${rid}-*.txt" 2>/dev/null | wc -l)"
-  report="$(latest_phase_report_path)"
-  bundle="$(latest_bundle_path)"
-  label="$(phase_label "$phase")"
-  position="$(phase_position "$phase")"
-
-  case "$service" in
-    active|activating|reloading) worker="running ($service)" ;;
-    *) worker="not running${service:+ (systemd: $service)}" ;;
-  esac
-  case "$phase" in
-    done) result="PASSED" ;;
-    failed|failed-recovered|failed-manual-kernel-recovery) result="FAILED" ;;
-    none) result="none" ;;
-    *)
-      if [[ "$service" == active || "$service" == activating || "$service" == reloading ]]; then
-        result="RUNNING"
-      else
-        result="INCOMPLETE"
-      fi
-      ;;
-  esac
-
-  if [[ -r "$ERROR_CONTEXT" ]]; then
-    failure_phase="$(awk -F= '$1=="phase"{sub(/^[^=]*=/,""); print; exit}' "$ERROR_CONTEXT")"
-    failure_stage="$(awk -F= '$1=="stage"{sub(/^[^=]*=/,""); print; exit}' "$ERROR_CONTEXT")"
-  fi
+  rid="$(run_id)"; phase="$(cat "$PHASE_FILE" 2>/dev/null || echo none)"; stage="$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
+  stage_started="$(cat "$STAGE_STARTED_FILE" 2>/dev/null || echo none)"; last_event="$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"
+  service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"; run_version="$(saved_run_harness_version)"; label="$(phase_label "$phase")"; position="$(phase_position "$phase")"
+  case "$service" in active|activating|reloading) worker="running ($service)" ;; *) worker="not running${service:+ (systemd: $service)}" ;; esac
 
   echo "BC-250 revalidation"
-  printf 'Current harness : %s\n' "$HARNESS_VERSION"
-  printf 'Target version  : %s\n' "$TARGET_VERSION"
-  printf 'Worker          : %s\n' "$worker"
-  echo
-  if [[ -z "$rid" ]]; then
-    echo "Last run        : none"
+  printf 'Current harness : %s\n' "$HARNESS_VERSION"; printf 'Target version  : %s\n' "$TARGET_VERSION"; printf 'Worker          : %s\n' "$worker"; echo
+  if [[ -z "$rid" ]]; then echo "Last run        : none"; return; fi
+  echo "Run"
+  printf '  ID             : %s\n' "$rid"; printf '  Harness        : %s\n' "$run_version"
+  printf '  State          : %s\n' "$(effective_run_state)"
+  printf '  Infrastructure : %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
+  printf '  Quality        : %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  printf '  Restoration    : %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
+  if [[ "$phase" != done && "$phase" != failed ]]; then
+    printf '  Phase          : %s %s\n' "${position:-?}" "$label"; printf '  Stage          : %s\n' "$stage"
+    printf '  Stage started  : %s\n' "$stage_started"; printf '  Last event     : %s (%s)\n' "$last_event" "$(event_age "$last_event")"
   else
-    echo "Run"
-    printf '  ID            : %s\n' "$rid"
-    printf '  Harness       : %s\n' "$run_version"
-    printf '  Result        : %s\n' "$result"
-    if [[ "$result" == RUNNING ]]; then
-      if [[ -n "$position" ]]; then
-        printf '  Phase         : %s  %s\n' "$position" "$label"
-      else
-        printf '  Phase         : %s\n' "$label"
-      fi
-      printf '  Stage         : %s\n' "$stage"
-      printf '  Heartbeat     : %s (%s)\n' "$heartbeat" "$(heartbeat_age "$heartbeat")"
-    else
-      printf '  Last phase    : %s\n' "$label"
-      printf '  Finished      : %s\n' "$heartbeat"
-    fi
-    if [[ -n "$failure_phase" ]]; then
-      printf '  Failure phase : %s\n' "$(phase_label "$failure_phase")"
-      [[ -z "$failure_stage" ]] || printf '  Failure stage : %s\n' "$failure_stage"
-    fi
-    printf '  Phase reports : %s\n' "$phase_reports"
-    [[ -z "$report" ]] || printf '  Latest report : %s\n' "$report"
-    [[ -z "$bundle" ]] || printf '  Bundle        : %s\n' "$bundle"
-    [[ ! -e $ERROR_CONTEXT ]] || printf '  Error context : %s\n' "$ERROR_CONTEXT"
+    printf '  Last phase     : %s\n' "$label"
   fi
-  echo
-  echo "System"
-  printf '  Kernel        : %s\n' "$(uname -r)"
-  printf '  Memory profile: %s\n' "$(current_relevant_args | paste -sd' ' -)"
-  if [[ -r "$TARGET_KERNEL_FILE" ]]; then
-    printf '  Target kernel : %s\n' "$(target_kernel)"
-  fi
-  if [[ -f $RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt ]]; then
-    echo
-    echo "Keepalive observation"
-    sed 's/^/  /' "$RAW/pipeline/embedding-keepalive/embedding-keepalive-result.txt"
-  fi
-  [[ "$run_version" == unknown || "$run_version" == "$HARNESS_VERSION" || -z "$rid" ]] || {
-    echo
-    echo "Note: the recorded run used harness v$run_version; the installed command is v$HARNESS_VERSION."
-  }
+  printf '  Bundle         : %s\n' "$(latest_bundle_path)"
+  [[ ! -e $ERROR_CONTEXT ]] || printf '  Error context  : %s\n' "$ERROR_CONTEXT"
+  echo; echo "System"; printf '  Kernel         : %s\n' "$(uname -r)"; printf '  Memory profile : %s\n' "$(current_relevant_args)"
+  [[ "$run_version" == unknown || "$run_version" == "$HARNESS_VERSION" ]] || echo "Note: recorded run used harness v$run_version; installed command is v$HARNESS_VERSION."
 }
 
 abort_run() {
@@ -2491,9 +1489,9 @@ abort_run() {
     systemctl kill --kill-who=main --signal=TERM "$UNIT" || true
   else
     set +e
-    recover_kernel_or_finish_failure 130 aborted
+    finish_failed_run 130 aborted
   fi
-  echo "Abort requested; the worker will restore the exact saved kernel/temporary state before stopping."
+  echo "Abort requested; the worker will restore normal appliance mode before stopping."
 }
 
 cleanup_run() {
@@ -2503,7 +1501,6 @@ cleanup_run() {
     exit 1
   fi
   restore_all || true
-  disable_worker_for_future_boots
   rm -f "$UNIT_PATH"
   systemctl daemon-reload
   systemctl reset-failed "$UNIT" >/dev/null 2>&1 || true

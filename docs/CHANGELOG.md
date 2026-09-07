@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.11.0-1.6 - 2026-09-06
+
+- Complete Round 2C-2 evidence output: canonical summaries now contain category aggregates, and generation reports warm answer latency, prefill, swap start/peak/end/delta, temperature p95/max and context/output diagnostics.
+- Standardize benchmark metadata around package identity, kernel, benchmark version, runtime endpoints/versions, model names/digests, fixture hashes and effective options.
+- Split the mixed workflow implementation into `runtime-benchmark.py` for Ollama/coexistence and `openwebui-benchmark.py` for Open WebUI RAG/tuning/restoration.
+- Remove stale revalidation compatibility/reboot-era helpers and polish active-run/final wording without changing harness-v4 restoration ownership.
+- Treat `bc250-benchmark rag-quality --think true|false` as the canonical thinking-policy comparison; routine revalidation continues to test only the packaged policy.
+
+## 0.11.0-1.5 - 2026-09-06
+
+- Revalidation now qualifies immutable package-owned model roles; operator/stale `prod-*` registrations cannot widen the run.
+- Canonical benchmark records distinguish `measurement` from `qualification`; quality summaries derive only from qualification cases.
+- Phase 3 now enforces conservative gross-regression gates for decode, residency, context, memory, temperature, device errors, and GPT-OSS/Jina coexistence.
+- Full revalidation requires a protected Open WebUI token file validated before run-state creation; `--skip-owui` is an explicit incomplete-coverage mode.
+- Final reports aggregate canonical benchmark failure causes, and preflight/final `bc250-verify` checks are hard health gates.
+- Open WebUI mutation benchmarks verify configuration readback and temporary knowledge/file cleanup; cleanup/restoration failure is infrastructure failure.
+- RAG answer-model residency loss is classified as an infrastructure/coexistence failure rather than a quality failure.
+
+## 0.11.0-1.4 - 2026-09-06
+
+- Complete the Round-2 benchmark-result migration for generation, OCR, RAG, coexistence and Open WebUI tuning workflows using one canonical per-run result directory.
+- Remove legacy `bc250-benchmark` aliases and the implicit commandless generation mode; explicit canonical subcommands are now required.
+- Remove the private revalidation tuning helper. `num-batch`, concurrency and Open WebUI tuning are explicit benchmark workflows, while harness v4 continues to qualify only packaged defaults.
+- Make `results.jsonl`, `summary.json`, `summary.txt`, `meta.json` and copied fixtures the canonical evidence set; CSV remains a category export where useful.
+- Improve BC-250 UMA generation summaries with resident size, minimum `MemAvailable`, swap start/peak/end/delta and diagnostic thermal/context warnings.
+
+## 0.11.0-1.3 - 2026-09-06
+
+- Advance `bc250-revalidate` to harness v4.0 and make routine revalidation qualification-only: six phases cover preflight, production roles, resource edge, exclusive agent mode, packaged Open WebUI RAG, and final restoration/reporting.
+- Remove routine configuration-decision sweeps and hardware A/B controls from revalidation. `num_batch`, embedding-batch, chunk-min, `RAG_SYSTEM_CONTEXT`, thinking-policy, keepalive, kernel/governor, and experimental-model comparisons belong to explicit benchmark/diagnostic workflows.
+- Route benchmark/helper execution through one explicit quality-vs-infrastructure status path: quality `rc=3` remains nonfatal, while other helper/benchmark failures propagate to the worker and restoration.
+- Replace the stage-transition heartbeat with a TSV event stream, stage-start timestamp, worker state and last real event age; final status separately reports run state, infrastructure, quality and restoration.
+- Qualify the complete live SPI/WGP routing-table health in preflight without requiring a hard-coded numeric CU total.
+
 ## 0.11.0-1.2 - 2026-09-06
 
 - Finish the Round-1 agent static-contract correction without executing generated code: nested function/class bodies no longer satisfy Python requirements, `parse_ports` requires recognizable deduplication, and range-bound evidence must be associated with branches that raise `ValueError`.
