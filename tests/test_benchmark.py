@@ -806,8 +806,7 @@ printf 'qrc=%s irc=%s\\n' \"$qrc\" \"$irc\"
             completed = subprocess.run(
                 ["bash", "-c", script],
                 text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 check=True,
             )
             self.assertIn("qrc=0 irc=7", completed.stdout)

@@ -15,8 +15,9 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib.parse import quote
 
 from benchmark_common import (
@@ -473,13 +474,17 @@ def make_sysctx_doc(path: Path) -> None:
 def rag_turns() -> list[tuple[str, list[str]]]:
     return [
         (
-            "According to the document, what are the active contract reference and notice "
-            "period? Answer briefly with a citation.",
+            (
+                "According to the document, what are the active contract reference and notice "
+                "period? Answer briefly with a citation."
+            ),
             ["CACHE-ZH-9917", "six"],
         ),
         (
-            "And what is the payment deadline and responsible unit? Answer briefly with a "
-            "citation.",
+            (
+                "And what is the payment deadline and responsible unit? Answer briefly with a "
+                "citation."
+            ),
             ["30", "Facility Operations"],
         ),
         (
