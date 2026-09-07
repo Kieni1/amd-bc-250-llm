@@ -1032,6 +1032,10 @@ def main() -> int:
 def entrypoint() -> int:
     try:
         return main()
+    except KeyboardInterrupt as exc:
+        finalize_active_infrastructure_failure(exc, failure_kind="interrupted")
+        print("ERROR: benchmark interrupted.", file=sys.stderr)
+        return 130
     except (BenchmarkError, Failure, OSError, ValueError) as exc:
         finalize_active_infrastructure_failure(exc)
         print(f"ERROR: {exc}", file=sys.stderr)

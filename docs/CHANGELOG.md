@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0-1.8 - 2026-09-07
+
+- Finalize canonical benchmark evidence on SIGINT/harness-timeout interruption across category, generation, runtime and Open WebUI benchmark entry points.
+- Require complete resource evidence on every successful Phase-3 measurement; missing context, residency, `MemAvailable`, temperature, or short-decode throughput now makes qualification evidence incomplete.
+- Restore `openwebui-benchmark.py` source mode to `0755`, clean the current RAG memory-edge wording, and add focused deterministic regressions for interruption and telemetry completeness.
+
 ## 0.11.0-1.7 - 2026-09-07
 
 - Preserve canonical benchmark evidence on initialized-run infrastructure failures across category, generation, runtime and Open WebUI benchmark entry points.

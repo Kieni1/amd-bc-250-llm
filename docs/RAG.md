@@ -425,8 +425,8 @@ bc250-benchmark rag-cycle embed-jina-v5-small-retrieval-q4-k-m \
 ```
 
 The RAG cycle now records whether a warm Gemma E4B answer model remains resident
-while Jina runs on the dedicated embedding service. GPT-OSS 20B is the likely
-memory-edge production case and was not re-qualified with this new layout and remains the dedicated memory-edge qualification; rerun it after a candidate
+while Jina runs on the dedicated embedding service. GPT-OSS 20B remains the
+dedicated production memory-edge qualification. Rerun it after a candidate
 promotion or material runtime change.
 
 ## 10. Second phase: hybrid search

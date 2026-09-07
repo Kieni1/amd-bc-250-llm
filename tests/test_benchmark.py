@@ -4,9 +4,11 @@ import ast
 import importlib.util
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -1770,6 +1772,203 @@ cleanup_failed_launch
         self.assertIn("bc250-cu-status --summary", block)
         self.assertIn("routed entries present; no off/problem cells", block)
         self.assertNotIn("40/40", block)
+
+    def test_benchmark_entrypoints_handle_keyboard_interrupt(self) -> None:
+        for module in (
+            category,
+            generation,
+            runtime_workflow,
+            openwebui_workflow,
+        ):
+            with (
+                self.subTest(module=module.__name__),
+                patch.object(module, "main", side_effect=KeyboardInterrupt()),
+                patch.object(
+                    module, "finalize_active_infrastructure_failure"
+                ) as finalize,
+            ):
+                self.assertEqual(module.entrypoint(), 130)
+                finalize.assert_called_once()
+                self.assertEqual(finalize.call_args.kwargs["failure_kind"], "interrupted")
+
+    def test_subprocess_sigint_finalizes_canonical_benchmark_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            result_dir = t / "results"
+            ready = t / "ready"
+            code = f'''\
+import importlib.util
+import sys
+import time
+from pathlib import Path
+
+bench = Path({str(BENCH)!r})
+sys.path.insert(0, str(bench))
+spec = importlib.util.spec_from_file_location("sigint_category", bench / "category-benchmark.py")
+assert spec and spec.loader
+module = importlib.util.module_from_spec(spec)
+sys.modules["sigint_category"] = module
+spec.loader.exec_module(module)
+out = Path(sys.argv[1])
+ready = Path(sys.argv[2])
+
+def fake_main():
+    module.prepare_result_dir("task", out)
+    ready.write_text("ready\\n", encoding="utf-8")
+    time.sleep(30)
+    return 0
+
+module.main = fake_main
+raise SystemExit(module.entrypoint())
+'''
+            process = subprocess.Popen(
+                [sys.executable, "-c", code, str(result_dir), str(ready)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and not ready.exists():
+                if process.poll() is not None:
+                    break
+                time.sleep(0.02)
+            self.assertTrue(
+                ready.exists(), "SIGINT probe did not initialize result directory"
+            )
+            process.send_signal(signal.SIGINT)
+            stdout, stderr = process.communicate(timeout=5)
+            self.assertEqual(process.returncode, 130, (stdout, stderr))
+
+            meta = json.loads((result_dir / "meta.json").read_text(encoding="utf-8"))
+            self.assertIsNotNone(meta["finished_at"])
+            rows = [
+                json.loads(line)
+                for line in (result_dir / "results.jsonl")
+                .read_text(encoding="utf-8")
+                .splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(rows[-1]["outcome"], "infra-fail")
+            self.assertEqual(rows[-1]["failure_kinds"], ["interrupted"])
+            self.assertEqual(rows[-1]["error_type"], "KeyboardInterrupt")
+            self.assertEqual(rows[-1]["error"], "benchmark interrupted by SIGINT")
+            summary = json.loads(
+                (result_dir / "summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(summary["infrastructure"], "fail")
+            self.assertTrue((result_dir / "summary.txt").is_file())
+
+    def test_edge_requires_complete_resource_evidence_per_measurement(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-qwen35-9b-unsloth-q6-k": 32768,
+                "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
+            }
+            base = []
+            for model, context in specs.items():
+                base.append(
+                    {
+                        "category": "generation",
+                        "model": model,
+                        "case_id": "short-1",
+                        "result_type": "measurement",
+                        "outcome": "pass",
+                        "diagnostics": [],
+                        "metrics": {
+                            "tokens_per_second": 100.0,
+                            "allocated_context": context,
+                            "resident_size_bytes": 1000,
+                            "resident_vram_bytes": 1000,
+                            "mem_available_min_mib": 1024,
+                            "temp_max_c": 70,
+                            "prompt_eval_count": 5000,
+                        },
+                    }
+                )
+
+            missing_cases = (
+                "allocated_context",
+                "resident_size_bytes",
+                "resident_vram_bytes",
+                "mem_available_min_mib",
+                "temp_max_c",
+                "tokens_per_second",
+            )
+            script_lines = [
+                f'source "{source}" help >/dev/null',
+                f'write_edge_policy "{t / "policy.json"}"',
+            ]
+            target_model = "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl"
+            for field in missing_cases:
+                rows = json.loads(json.dumps(base))
+                extra = json.loads(json.dumps(rows[0]))
+                extra["case_id"] = (
+                    "short-2" if field == "tokens_per_second" else "ctx_220"
+                )
+                extra["metrics"].pop(field)
+                rows.append(extra)
+                path = t / f"missing-{field}.jsonl"
+                path.write_text(
+                    "".join(json.dumps(row) + "\n" for row in rows),
+                    encoding="utf-8",
+                )
+                out = t / f"missing-{field}.json"
+                script_lines.append(
+                    f'if check_edge_generation_sanity "{path}" '
+                    f'"{t / "policy.json"}" "{out}" 2>/dev/null; '
+                    "then exit 43; fi"
+                )
+            subprocess.run(["bash", "-c", "\n".join(script_lines)], check=True)
+
+            for field in missing_cases:
+                result = json.loads(
+                    (t / f"missing-{field}.json").read_text(encoding="utf-8")
+                )
+                self.assertFalse(result["passed"], field)
+                check = result["checks"][target_model]
+                self.assertFalse(check["resource_evidence_complete"], field)
+                self.assertTrue(
+                    any(
+                        item.endswith(f":{field}")
+                        for item in check["missing_required_evidence"]
+                    ),
+                    (field, check),
+                )
+
+    def test_manifest_executable_source_modes_match_literal_0755_entries(self) -> None:
+        manifest = ROOT / "packaging/install-manifest.tsv"
+        checked = []
+        for raw in manifest.read_text(encoding="utf-8").splitlines():
+            if not raw or raw.startswith("#"):
+                continue
+            parts = raw.split("\t")
+            if len(parts) < 4 or parts[0] != "file" or parts[1] != "0755":
+                continue
+            source = parts[2]
+            if any(char in source for char in "*?["):
+                continue
+            path = ROOT / source
+            if not path.exists():
+                continue
+            checked.append(source)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o755, source)
+        self.assertIn("cmd/benchmark/openwebui-benchmark.py", checked)
+
+    def test_rag_memory_edge_wording_is_current_and_unambiguous(self) -> None:
+        source = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "GPT-OSS 20B remains the\ndedicated production memory-edge qualification.",
+            source,
+        )
+        self.assertNotIn(
+            "was not re-qualified with this new layout and remains", source
+        )
+
 
 
 if __name__ == "__main__":

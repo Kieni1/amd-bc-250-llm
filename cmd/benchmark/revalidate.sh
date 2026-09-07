@@ -980,14 +980,55 @@ for model, limits in policy["models"].items():
         checks[model] = {"measurements_present": False}
         continue
 
-    short = [float(r.get("metrics", {}).get("tokens_per_second") or 0) for r in passed if str(r.get("case_id", "")).startswith("short-")]
+    missing_evidence = []
+    for r in passed:
+        case_id = str(r.get("case_id", "unknown"))
+        metrics = r.get("metrics", {})
+        required = (
+            "allocated_context",
+            "resident_size_bytes",
+            "resident_vram_bytes",
+            "mem_available_min_mib",
+            "temp_max_c",
+        )
+        for field in required:
+            value = metrics.get(field)
+            invalid = value is None
+            if field in {"allocated_context", "resident_size_bytes"} and value is not None:
+                try:
+                    invalid = float(value) <= 0
+                except (TypeError, ValueError):
+                    invalid = True
+            if invalid:
+                missing_evidence.append(f"{case_id}:{field}")
+        if case_id.startswith("short-") and metrics.get("tokens_per_second") is None:
+            missing_evidence.append(f"{case_id}:tokens_per_second")
+
+    model_checks["resource_evidence_complete"] = not missing_evidence
+    model_checks["missing_required_evidence"] = missing_evidence
+    if missing_evidence:
+        failures.append(
+            f"{model}: required Phase-3 evidence unavailable for "
+            + ", ".join(missing_evidence)
+        )
+
+    short = [
+        float(r.get("metrics", {}).get("tokens_per_second"))
+        for r in passed
+        if str(r.get("case_id", "")).startswith("short-")
+        and r.get("metrics", {}).get("tokens_per_second") is not None
+    ]
     decode = statistics.fmean(short) if short else 0.0
     model_checks["decode_tps"] = decode
     model_checks["decode_floor"] = float(limits["min_decode_tps"])
     if decode < float(limits["min_decode_tps"]):
         failures.append(f"{model}: gross decode regression {decode:.2f} < {limits['min_decode_tps']} tok/s")
 
-    contexts = [int(r.get("metrics", {}).get("allocated_context") or 0) for r in passed]
+    contexts = [
+        int(r.get("metrics", {}).get("allocated_context"))
+        for r in passed
+        if r.get("metrics", {}).get("allocated_context") is not None
+    ]
     allocated = min(contexts, default=0)
     model_checks["min_allocated_context"] = allocated
     model_checks["required_context"] = int(limits["min_context"])
@@ -997,32 +1038,42 @@ for model, limits in policy["models"].items():
     ratios = []
     for r in passed:
         m = r.get("metrics", {})
-        size = float(m.get("resident_size_bytes") or 0)
-        size_vram = float(m.get("resident_vram_bytes") or 0)
+        size_raw = m.get("resident_size_bytes")
+        vram_raw = m.get("resident_vram_bytes")
+        if size_raw is None or vram_raw is None:
+            continue
+        size = float(size_raw)
         if size > 0:
-            ratios.append(size_vram / size)
+            ratios.append(float(vram_raw) / size)
     residency = min(ratios, default=0.0)
     model_checks["min_residency_ratio"] = residency
     if residency < float(policy["min_residency_ratio"]):
         failures.append(f"{model}: GPU residency ratio {residency:.3f} < {policy['min_residency_ratio']}")
 
-    mem_values = [float(r.get("metrics", {}).get("mem_available_min_mib")) for r in passed if r.get("metrics", {}).get("mem_available_min_mib") is not None]
+    mem_values = [
+        float(r.get("metrics", {}).get("mem_available_min_mib"))
+        for r in passed
+        if r.get("metrics", {}).get("mem_available_min_mib") is not None
+    ]
     mem_min = min(mem_values) if mem_values else 0.0
     model_checks["mem_available_min_mib"] = mem_min
     if mem_min < float(policy["min_mem_available_mib"]):
         failures.append(f"{model}: MemAvailable floor {mem_min:.0f} MiB < {policy['min_mem_available_mib']} MiB")
 
-    temps = [float(r.get("metrics", {}).get("temp_max_c")) for r in passed if r.get("metrics", {}).get("temp_max_c") is not None]
+    temps = [
+        float(r.get("metrics", {}).get("temp_max_c"))
+        for r in passed
+        if r.get("metrics", {}).get("temp_max_c") is not None
+    ]
+    model_checks["temperature_telemetry_present"] = bool(temps)
+    model_checks["temperature_telemetry_complete"] = len(temps) == len(passed)
     if temps:
         temp_max = max(temps)
         model_checks["temp_max_c"] = temp_max
-        model_checks["temperature_telemetry_present"] = True
         if temp_max >= float(policy["max_temp_c"]):
             failures.append(f"{model}: temperature {temp_max:.1f} C reached gross qualification ceiling {policy['max_temp_c']} C")
     else:
         model_checks["temp_max_c"] = None
-        model_checks["temperature_telemetry_present"] = False
-        failures.append(f"{model}: required temperature telemetry unavailable")
 
     severe = [
         r for r in passed

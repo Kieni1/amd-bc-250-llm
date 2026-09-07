@@ -697,6 +697,13 @@ def finalize_active_infrastructure_failure(
             ),
         )
 
+    error_text = str(exc).strip()
+    if not error_text:
+        error_text = (
+            "benchmark interrupted by SIGINT"
+            if isinstance(exc, KeyboardInterrupt)
+            else type(exc).__name__
+        )
     append_result(
         paths.results_jsonl,
         result_record(
@@ -706,7 +713,7 @@ def finalize_active_infrastructure_failure(
             result_type="measurement",
             outcome="infra-fail",
             failure_kinds=[failure_kind],
-            error=str(exc),
+            error=error_text,
             error_type=type(exc).__name__,
         ),
     )
