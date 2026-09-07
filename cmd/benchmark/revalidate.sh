@@ -41,6 +41,10 @@ OWUI_TOKEN=$RUN_DIR/owui-token
 COVERAGE_STATE_FILE=$WORK/coverage-state
 FAILURE_RC_FILE=$WORK/failure-rc
 FAILURE_GUARD=$WORK/failure-handler-active
+FAILURE_PHASE_FILE=$WORK/failure-phase
+FAILURE_STAGE_FILE=$WORK/failure-stage
+FAILURE_STAGE_STARTED_FILE=$WORK/failure-stage-started
+FAILURE_CONSOLE_FILE=$WORK/failure-console
 ERROR_CONTEXT=$WORK/error-context.txt
 SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
@@ -176,6 +180,30 @@ qualification_benchmark() {
     -u RUN_CONTEXT -u RUN_LATENCY -u RUN_THERMAL -u RUN_WARM_PREFIX \
     -u CTX_POINTS -u THROTTLE_WINDOWS -u WARM_PREFIX_SENTENCES \
     "$@"
+}
+
+# GNU timeout can execute external commands, not shell functions. Package
+# qualification wraps benchmark commands in the sanitizer above, so keep timeout
+# inside that function rather than asking timeout to exec qualification_benchmark.
+run_step_command() {
+  if [[ ${1:-} == qualification_benchmark ]]; then
+    shift
+    qualification_benchmark timeout --signal=INT --kill-after=30s 45m "$@"
+  else
+    exec timeout --signal=INT --kill-after=30s 45m "$@"
+  fi
+}
+
+remember_failure_location() {
+  local phase="${1:-}" stage="${2:-}" console="${3:-}"
+  [[ -n $phase ]] || phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
+  [[ -n $stage ]] || stage="$(cat "$STAGE_FILE" 2>/dev/null || echo unknown)"
+  [[ -e $FAILURE_PHASE_FILE ]] || printf '%s\n' "$phase" > "$FAILURE_PHASE_FILE"
+  [[ -e $FAILURE_STAGE_FILE ]] || printf '%s\n' "$stage" > "$FAILURE_STAGE_FILE"
+  if [[ ! -e $FAILURE_STAGE_STARTED_FILE ]]; then
+    cat "$STAGE_STARTED_FILE" > "$FAILURE_STAGE_STARTED_FILE" 2>/dev/null || printf 'none\n' > "$FAILURE_STAGE_STARTED_FILE"
+  fi
+  [[ -z $console || -e $FAILURE_CONSOLE_FILE ]] || printf '%s\n' "$console" > "$FAILURE_CONSOLE_FILE"
 }
 
 save_settings() {
@@ -465,11 +493,17 @@ recent_step_results() {
 }
 
 dashboard_text() {
-  local phase stage last_event stage_started started now_s elapsed stage_elapsed position label service p q skipped
+  local phase display_phase stage last_event stage_started started now_s elapsed stage_elapsed position label service p q skipped banner
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
+  display_phase="$phase"
   stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
   last_event="$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"
   stage_started="$(cat "$STAGE_STARTED_FILE" 2>/dev/null || echo none)"
+  if [[ $phase == failed ]]; then
+    display_phase="$(cat "$FAILURE_PHASE_FILE" 2>/dev/null || echo failed)"
+    stage="$(cat "$FAILURE_STAGE_FILE" 2>/dev/null || printf '%s\n' "$stage")"
+    stage_started="$(cat "$FAILURE_STAGE_STARTED_FILE" 2>/dev/null || printf '%s\n' "$stage_started")"
+  fi
   stage="${stage//$'\n'/ }"; ((${#stage} <= 96)) || stage="${stage:0:93}..."
   started="$(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s)"; now_s="$(date +%s)"
   elapsed="$(format_elapsed $((now_s - started)))"
@@ -477,11 +511,15 @@ dashboard_text() {
     local stage_s; stage_s="$(date -d "$stage_started" +%s 2>/dev/null || echo "$now_s")"
     stage_elapsed="$(format_elapsed $((now_s - stage_s)))"
   else stage_elapsed=unknown; fi
-  position="$(phase_position "$phase")"; label="$(phase_label "$phase")"
+  position="$(phase_position "$display_phase")"; label="$(phase_label "$display_phase")"
+  [[ $phase != failed ]] || label="$label — FAILED"
   service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
   read -r p q skipped <<<"$(quality_counts)"
 
-  printf 'BC-250 revalidation  [RUNNING %s]\n\n' "$elapsed"
+  banner=RUNNING
+  [[ $phase != failed ]] || banner=FAILED
+  [[ $phase != done ]] || banner=COMPLETED
+  printf 'BC-250 revalidation  [%s %s]\n\n' "$banner" "$elapsed"
   printf 'Phase         %-4s  %s\n' "${position:-?}" "$label"
   printf 'Stage         %s\n' "$stage"
   printf 'Stage time    %s\n' "$stage_elapsed"
@@ -509,7 +547,14 @@ follow_run() {
       while IFS= read -r line; do printf '\033[2K\r%s\n' "$line"; done <<< "$dashboard"
       drawn_lines="$new_lines"
     elif [[ "$phase|$stage" != "$last" ]]; then
-      printf '[%s] phase=%s  %s\n' "$(format_elapsed $(( $(date +%s) - $(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s) )))" "$phase" "$stage"
+      if [[ $phase == failed ]]; then
+        printf '[%s] phase=%s FAILED  %s\n' \
+          "$(format_elapsed $(( $(date +%s) - $(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s) )))" \
+          "$(cat "$FAILURE_PHASE_FILE" 2>/dev/null || echo unknown)" \
+          "$(cat "$FAILURE_STAGE_FILE" 2>/dev/null || printf '%s\n' "$stage")"
+      else
+        printf '[%s] phase=%s  %s\n' "$(format_elapsed $(( $(date +%s) - $(stat -c %Y "$RUN_ID_FILE" 2>/dev/null || date +%s) )))" "$phase" "$stage"
+      fi
       last="$phase|$stage"
     fi
     case "$phase" in
@@ -536,8 +581,18 @@ follow_run() {
     return 0
   fi
   [[ -r "$FAILURE_RC_FILE" ]] && rc="$(cat "$FAILURE_RC_FILE")"; [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
-  echo "Revalidation failed at phase=$phase (rc=$rc)." >&2
-  [[ ! -e $ERROR_CONTEXT ]] || echo "Error context: $ERROR_CONTEXT" >&2
+  local failed_phase failed_stage failed_console failed_position failed_label
+  failed_phase="$(cat "$FAILURE_PHASE_FILE" 2>/dev/null || echo unknown)"
+  failed_stage="$(cat "$FAILURE_STAGE_FILE" 2>/dev/null || echo unknown)"
+  failed_console="$(cat "$FAILURE_CONSOLE_FILE" 2>/dev/null || true)"
+  failed_position="$(phase_position "$failed_phase")"; failed_label="$(phase_label "$failed_phase")"
+  echo "Revalidation failed in ${failed_position:-?} $failed_label, stage=$failed_stage (rc=$rc)." >&2
+  [[ ! -e $ERROR_CONTEXT ]] || echo "Error context: sudo cat $ERROR_CONTEXT" >&2
+  if [[ -n $failed_console && -r $failed_console && -s $failed_console ]]; then
+    echo "Failing step log: $failed_console" >&2
+    echo "Failing step output (last 12 lines):" >&2
+    tail -n 12 "$failed_console" | sed 's/^/  /' >&2
+  fi
   return "$rc"
 }
 
@@ -819,7 +874,7 @@ run_step() {
   install -d -m 0700 "$dir"
   set_stage "$label"
   start_sampler "$dir/sampler.tsv"; sampler_pid="$SAMPLER_PID"
-  if ( trap - ERR TERM INT; set +eE; cd "$dir" || exit $?; exec timeout --signal=INT --kill-after=30s 45m "$@" ) > "$dir/console.txt" 2>&1; then rc=0; else rc=$?; fi
+  if ( trap - ERR TERM INT; set +eE; cd "$dir" || exit $?; run_step_command "$@" ) > "$dir/console.txt" 2>&1; then rc=0; else rc=$?; fi
   stop_sampler "$sampler_pid"
   printf '%s\n' "$rc" > "$dir/exit-status.txt"; write_rc_outcome "$rc" "$dir/outcome.txt"; outcome="$(cat "$dir/outcome.txt")"
   if [[ "$kind" == quality && $rc -eq 3 ]]; then
@@ -830,6 +885,7 @@ run_step() {
     record_event "$label" "$kind" pass "scope=$scope rc=0"
     return 0
   fi
+  remember_failure_location "$scope" "$label" "$dir/console.txt"
   record_event "$label" infra infra-fail "scope=$scope rc=$rc kind=$kind"
   return "$rc"
 }
@@ -1337,6 +1393,10 @@ create_final_bundle() {
   fi
   local -a items=(events.tsv phase stage stage-started last-event run-id run-state infrastructure-state quality-state restoration-state coverage-state settings.env revalidation-summary.txt results phase-reports)
   [[ ! -e $FAILURE_RC_FILE ]] || items+=(failure-rc)
+  [[ ! -e $FAILURE_PHASE_FILE ]] || items+=(failure-phase)
+  [[ ! -e $FAILURE_STAGE_FILE ]] || items+=(failure-stage)
+  [[ ! -e $FAILURE_STAGE_STARTED_FILE ]] || items+=(failure-stage-started)
+  [[ ! -e $FAILURE_CONSOLE_FILE ]] || items+=(failure-console)
   [[ ! -e $ERROR_CONTEXT ]] || items+=(error-context.txt)
   [[ ! -e $SERVICE_JOURNAL ]] || items+=(revalidation-service-journal.txt)
   rm -f "$tmp"
@@ -1366,6 +1426,7 @@ finish_worker_session() {
 
 finish_failed_run() {
   local rc="$1" label="$2"
+  remember_failure_location
   printf '%s\n' "$rc" > "$FAILURE_RC_FILE"
   printf 'failed\n' > "$RUN_STATE_FILE"; printf 'fail\n' > "$INFRA_STATE_FILE"
   if restore_all && ensure_normal_mode >/dev/null 2>&1; then printf 'pass\n' > "$RESTORATION_STATE_FILE"; else printf 'fail\n' > "$RESTORATION_STATE_FILE"; fi
@@ -1390,6 +1451,16 @@ capture_error_context() {
     echo "line=$line"
     echo "bash_lineno=$bash_lines"
     echo "funcname=$functions"
+    echo "failure_phase=$(cat "$FAILURE_PHASE_FILE" 2>/dev/null || echo unknown)"
+    echo "failure_stage=$(cat "$FAILURE_STAGE_FILE" 2>/dev/null || echo unknown)"
+    local failure_console
+    failure_console="$(cat "$FAILURE_CONSOLE_FILE" 2>/dev/null || true)"
+    echo "failure_console=${failure_console:-none}"
+    if [[ -n $failure_console && -r $failure_console && -s $failure_console ]]; then
+      echo "failure_console_tail_begin"
+      tail -n 12 "$failure_console"
+      echo "failure_console_tail_end"
+    fi
   } > "$ERROR_CONTEXT"
 }
 
@@ -1397,6 +1468,7 @@ worker_fail() {
   local rc="${1:-1}" command="${2:-unknown}" line="${3:-unknown}" bash_lines="${4:-}" functions="${5:-}"
   if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then trap - ERR; return "$rc"; fi
   trap - ERR TERM INT; set +e
+  remember_failure_location || true
   capture_error_context "$rc" "$command" "$line" "$bash_lines" "$functions" || true
   mkdir "$FAILURE_GUARD" 2>/dev/null || exit "$rc"
   record_event "worker-failure" infra infra-fail "rc=$rc"
@@ -1406,6 +1478,7 @@ worker_fail() {
 worker_abort() {
   if [[ -n ${WORKER_BASHPID:-} && $BASHPID != "$WORKER_BASHPID" ]]; then trap - TERM INT; return 130; fi
   trap - ERR TERM INT; set +e; printf 'abort\n' > "$WORK/ABORT"
+  remember_failure_location || true
   record_event "operator-abort" infra infra-fail "signal=TERM/INT"
   finish_failed_run 130 aborted
 }
@@ -1512,6 +1585,9 @@ status_raw() {
   echo "phase_reports=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" 2>/dev/null | wc -l)"
   echo "latest_phase_report=$(latest_phase_report_path)"
   echo "latest_bundle=$(latest_bundle_path)"
+  [[ ! -e $FAILURE_PHASE_FILE ]] || echo "failure_phase=$(cat "$FAILURE_PHASE_FILE")"
+  [[ ! -e $FAILURE_STAGE_FILE ]] || echo "failure_stage=$(cat "$FAILURE_STAGE_FILE")"
+  [[ ! -e $FAILURE_CONSOLE_FILE ]] || echo "failure_console=$(cat "$FAILURE_CONSOLE_FILE")"
   [[ ! -e $ERROR_CONTEXT ]] || echo "error_context=$ERROR_CONTEXT"
 }
 
@@ -1539,11 +1615,19 @@ status_run() {
   if [[ "$phase" != done && "$phase" != failed ]]; then
     printf '  Phase          : %s %s\n' "${position:-?}" "$label"; printf '  Stage          : %s\n' "$stage"
     printf '  Stage started  : %s\n' "$stage_started"; printf '  Last event     : %s (%s)\n' "$last_event" "$(event_age "$last_event")"
+  elif [[ "$phase" == failed ]]; then
+    local failed_phase failed_stage failed_position failed_label
+    failed_phase="$(cat "$FAILURE_PHASE_FILE" 2>/dev/null || echo unknown)"
+    failed_stage="$(cat "$FAILURE_STAGE_FILE" 2>/dev/null || echo unknown)"
+    failed_position="$(phase_position "$failed_phase")"; failed_label="$(phase_label "$failed_phase")"
+    printf '  Failed phase   : %s %s\n' "${failed_position:-?}" "$failed_label"
+    printf '  Failed stage   : %s\n' "$failed_stage"
   else
     printf '  Last phase     : %s\n' "$label"
   fi
   printf '  Bundle         : %s\n' "$(latest_bundle_path)"
-  [[ ! -e $ERROR_CONTEXT ]] || printf '  Error context  : %s\n' "$ERROR_CONTEXT"
+  [[ ! -e $FAILURE_CONSOLE_FILE ]] || printf '  Failing log    : %s\n' "$(cat "$FAILURE_CONSOLE_FILE")"
+  [[ ! -e $ERROR_CONTEXT ]] || printf '  Error context  : sudo cat %s\n' "$ERROR_CONTEXT"
   echo; echo "System"; printf '  Kernel         : %s\n' "$(uname -r)"; printf '  Memory profile : %s\n' "$(current_relevant_args)"
   [[ "$run_version" == unknown || "$run_version" == "$HARNESS_VERSION" ]] || echo "Note: recorded run used harness v$run_version; installed command is v$HARNESS_VERSION."
 }

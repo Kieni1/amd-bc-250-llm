@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.8%{?dist}
+Release:        1.9%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Sep 07 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.9
+- Fix harness-v4 benchmark execution so the sanitized qualification shell wrapper runs GNU timeout internally instead of being passed to timeout as a nonexistent executable.
+- Preserve the original failed phase/stage and failing-step log in dashboard, status, error context and bundles, with sudo-safe operator guidance and console-tail diagnostics.
+- Make source executable-mode validation Git-safe while retaining exact installed 0755 manifest policy, and add deterministic regressions for the real rc=127 revalidation failure path.
+
 * Mon Sep 07 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.8
 - Preserve canonical benchmark evidence when harness SIGINT/timeout interrupts an initialized category, generation, runtime, or Open WebUI benchmark.
 - Require complete per-measurement Phase-3 resource evidence instead of silently dropping missing context, residency, memory, temperature, or short-decode telemetry.

@@ -816,6 +816,173 @@ printf 'qrc=%s irc=%s\\n' \"$qrc\" \"$irc\"
             self.assertIn("quality-case\tquality\tquality-fail", events)
             self.assertIn("infra-case\tinfra\tinfra-fail", events)
 
+    def test_revalidation_run_step_executes_sanitized_qualification_under_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+RAW="{t / 'results'}"
+EVENTS="{t / 'events.tsv'}"
+PHASE_FILE="{t / 'phase'}"
+STAGE_FILE="{t / 'stage'}"
+STAGE_STARTED_FILE="{t / 'stage-started'}"
+LAST_EVENT_FILE="{t / 'last-event'}"
+FAILURE_PHASE_FILE="{t / 'failure-phase'}"
+FAILURE_STAGE_FILE="{t / 'failure-stage'}"
+FAILURE_STAGE_STARTED_FILE="{t / 'failure-stage-started'}"
+FAILURE_CONSOLE_FILE="{t / 'failure-console'}"
+mkdir -p "$RAW"
+printf 'roles\n' > "$PHASE_FILE"
+: > "$EVENTS"
+export OLLAMA_URL=hostile
+run_step roles embeddings infra qualification_benchmark bash -c '[[ -z ${{OLLAMA_URL+x}} ]]'
+printf 'rc=%s\n' "$?"
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("rc=0", completed.stdout)
+            self.assertNotIn("qualification_benchmark", completed.stderr)
+
+    def test_revalidation_failed_dashboard_preserves_original_phase_and_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+WORK="{t}"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+LAST_EVENT_FILE="$WORK/last-event"
+STAGE_STARTED_FILE="$WORK/stage-started"
+RUN_ID_FILE="$WORK/run-id"
+INFRA_STATE_FILE="$WORK/infrastructure-state"
+EVENTS="$WORK/events.tsv"
+FAILURE_PHASE_FILE="$WORK/failure-phase"
+FAILURE_STAGE_FILE="$WORK/failure-stage"
+FAILURE_STAGE_STARTED_FILE="$WORK/failure-stage-started"
+printf 'failed\n' > "$PHASE_FILE"
+printf 'final bundle written: /tmp/result.tar.gz\n' > "$STAGE_FILE"
+printf '2026-09-07T20:38:39+02:00\n' > "$LAST_EVENT_FILE"
+printf '2026-09-07T20:38:37+02:00\n' > "$STAGE_STARTED_FILE"
+printf 'run\n' > "$RUN_ID_FILE"
+printf 'fail\n' > "$INFRA_STATE_FILE"
+printf 'roles\n' > "$FAILURE_PHASE_FILE"
+printf 'embeddings\n' > "$FAILURE_STAGE_FILE"
+printf '2026-09-07T20:38:10+02:00\n' > "$FAILURE_STAGE_STARTED_FILE"
+printf '2026-09-07T20:38:39+02:00\troles\tembeddings\tinfra\tinfra-fail\trc=127\n' > "$EVENTS"
+systemctl() {{ echo failed; }}
+dashboard_text
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("[FAILED ", completed.stdout)
+            self.assertIn("2/6", completed.stdout)
+            self.assertIn("Production roles — FAILED", completed.stdout)
+            self.assertIn("Stage         embeddings", completed.stdout)
+            self.assertNotIn("Stage         final bundle written", completed.stdout)
+
+    def test_revalidation_failure_summary_shows_sudo_context_and_console_tail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            console = t / "console.txt"
+            console.write_text("first\nimportant failure detail\n", encoding="utf-8")
+            script = f"""
+source "{source}" help >/dev/null
+WORK="{t}"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+STAGE_STARTED_FILE="$WORK/stage-started"
+LAST_EVENT_FILE="$WORK/last-event"
+RUN_ID_FILE="$WORK/run-id"
+FAILURE_RC_FILE="$WORK/failure-rc"
+FAILURE_PHASE_FILE="$WORK/failure-phase"
+FAILURE_STAGE_FILE="$WORK/failure-stage"
+FAILURE_CONSOLE_FILE="$WORK/failure-console"
+ERROR_CONTEXT="$WORK/error-context.txt"
+REPORT_DIR="$WORK/reports"
+printf 'failed\n' > "$PHASE_FILE"
+printf 'final bundle written\n' > "$STAGE_FILE"
+printf '2026-09-07T20:38:39+02:00\n' > "$STAGE_STARTED_FILE"
+printf '2026-09-07T20:38:39+02:00\n' > "$LAST_EVENT_FILE"
+printf 'run\n' > "$RUN_ID_FILE"
+printf '127\n' > "$FAILURE_RC_FILE"
+printf 'roles\n' > "$FAILURE_PHASE_FILE"
+printf 'embeddings\n' > "$FAILURE_STAGE_FILE"
+printf '%s\n' "{console}" > "$FAILURE_CONSOLE_FILE"
+printf 'context\n' > "$ERROR_CONTEXT"
+mkdir -p "$REPORT_DIR"
+if follow_run; then rc=0; else rc=$?; fi
+printf 'follow_rc=%s\n' "$rc"
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            combined = completed.stdout + completed.stderr
+            self.assertIn("phase=roles FAILED  embeddings", combined)
+            self.assertIn("2/6 Production roles, stage=embeddings (rc=127)", combined)
+            self.assertIn(f"Error context: sudo cat {t / 'error-context.txt'}", combined)
+            self.assertIn("important failure detail", combined)
+            self.assertIn("follow_rc=127", combined)
+
+    def test_revalidation_failed_status_reports_original_failure_location(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+need_root() {{ :; }}
+systemctl() {{ echo failed; }}
+current_relevant_args() {{ echo none; }}
+WORK="{t}"
+RUN_ID_FILE="$WORK/run-id"
+RUN_STATE_FILE="$WORK/run-state"
+RUN_HARNESS_VERSION_FILE="$WORK/harness-version"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+STAGE_STARTED_FILE="$WORK/stage-started"
+LAST_EVENT_FILE="$WORK/last-event"
+INFRA_STATE_FILE="$WORK/infrastructure-state"
+QUALITY_STATE_FILE="$WORK/quality-state"
+RESTORATION_STATE_FILE="$WORK/restoration-state"
+COVERAGE_STATE_FILE="$WORK/coverage-state"
+FAILURE_PHASE_FILE="$WORK/failure-phase"
+FAILURE_STAGE_FILE="$WORK/failure-stage"
+FAILURE_CONSOLE_FILE="$WORK/failure-console"
+ERROR_CONTEXT="$WORK/error-context.txt"
+REPORT_DIR="$WORK/reports"
+PHASE_REPORT_DIR="$WORK/phase-reports"
+EVENTS="$WORK/events.tsv"
+mkdir -p "$REPORT_DIR" "$PHASE_REPORT_DIR"
+printf 'run-1\n' > "$RUN_ID_FILE"
+printf 'failed\n' > "$RUN_STATE_FILE"
+printf '4.0\n' > "$RUN_HARNESS_VERSION_FILE"
+printf 'failed\n' > "$PHASE_FILE"
+printf 'final bundle written\n' > "$STAGE_FILE"
+printf '2026-09-07T20:38:39+02:00\n' > "$STAGE_STARTED_FILE"
+printf '2026-09-07T20:38:39+02:00\n' > "$LAST_EVENT_FILE"
+printf 'fail\n' > "$INFRA_STATE_FILE"
+printf 'not-run\n' > "$QUALITY_STATE_FILE"
+printf 'pass\n' > "$RESTORATION_STATE_FILE"
+printf 'full\n' > "$COVERAGE_STATE_FILE"
+printf 'roles\n' > "$FAILURE_PHASE_FILE"
+printf 'embeddings\n' > "$FAILURE_STAGE_FILE"
+printf '/tmp/embeddings-console.txt\n' > "$FAILURE_CONSOLE_FILE"
+printf 'context\n' > "$ERROR_CONTEXT"
+: > "$EVENTS"
+status_run status
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("Failed phase   : 2/6 Production roles", completed.stdout)
+            self.assertIn("Failed stage   : embeddings", completed.stdout)
+            self.assertIn("Failing log    : /tmp/embeddings-console.txt", completed.stdout)
+            self.assertIn(f"Error context  : sudo cat {t / 'error-context.txt'}", completed.stdout)
+
     def test_revalidation_explicit_partial_coverage_does_not_mean_mixed_quality(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)
@@ -1940,7 +2107,7 @@ raise SystemExit(module.entrypoint())
                     (field, check),
                 )
 
-    def test_manifest_executable_source_modes_match_literal_0755_entries(self) -> None:
+    def test_manifest_executable_sources_have_git_executable_bit(self) -> None:
         manifest = ROOT / "packaging/install-manifest.tsv"
         checked = []
         for raw in manifest.read_text(encoding="utf-8").splitlines():

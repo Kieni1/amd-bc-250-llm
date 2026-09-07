@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0-1.9 - 2026-09-07
+
+- Fix harness-v4 `run_step` so package-qualification commands are sanitized first and GNU `timeout` executes the real benchmark command rather than trying to execute the `qualification_benchmark` Bash function.
+- Preserve the original failed phase/stage and failing-step console path across failure finalization; dashboard/status now report the useful failure location, error-context guidance is sudo-safe, and foreground failure output includes the console tail.
+- Make executable-source validation Git-safe by requiring the executable bit rather than an exact source `0755` mode; the install manifest continues to enforce installed `0755`.
+
 ## 0.11.0-1.8 - 2026-09-07
 
 - Finalize canonical benchmark evidence on SIGINT/harness-timeout interruption across category, generation, runtime and Open WebUI benchmark entry points.
