@@ -30,6 +30,7 @@ from benchmark_common import (
     benchmark_metadata,
     copy_fixtures,
     cosine,
+    finalize_active_infrastructure_failure,
     finalize_benchmark_metadata,
     fixture_metadata,
     mean,
@@ -2328,7 +2329,7 @@ def main() -> int:
     )
     add_common(task, "http://127.0.0.1:11435")
     agent = sub.add_parser(
-        "agent", help="coding/agent output correctness + runtime"
+        "agent", help="coding/agent static contract acceptance + runtime"
     )
     add_common(agent, "http://127.0.0.1:11436")
     ocr = sub.add_parser(
@@ -2365,28 +2366,33 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    try:
-        if args.category == "embeddings":
-            return benchmark_embeddings(args)
-        if args.category == "task":
-            return benchmark_task(args)
-        if args.category == "agent":
-            return benchmark_agent(args)
-        if args.category == "ocr":
-            return benchmark_ocr(args)
-        if args.category == "usecase":
-            return benchmark_usecase(args)
-        if args.category == "translation":
-            return benchmark_translation(args)
-        if args.category == "rag-cycle":
-            return benchmark_rag_cycle(args)
-        if args.category == "rag-quality":
-            return benchmark_rag_quality(args)
-    except (BenchmarkError, OSError, json.JSONDecodeError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 1
+    if args.category == "embeddings":
+        return benchmark_embeddings(args)
+    if args.category == "task":
+        return benchmark_task(args)
+    if args.category == "agent":
+        return benchmark_agent(args)
+    if args.category == "ocr":
+        return benchmark_ocr(args)
+    if args.category == "usecase":
+        return benchmark_usecase(args)
+    if args.category == "translation":
+        return benchmark_translation(args)
+    if args.category == "rag-cycle":
+        return benchmark_rag_cycle(args)
+    if args.category == "rag-quality":
+        return benchmark_rag_quality(args)
     return 2
 
 
+def entrypoint() -> int:
+    try:
+        return main()
+    except (BenchmarkError, OSError, json.JSONDecodeError) as exc:
+        finalize_active_infrastructure_failure(exc)
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(entrypoint())

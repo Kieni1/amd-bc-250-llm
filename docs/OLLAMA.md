@@ -46,8 +46,8 @@ The package owns a fixed four-lane service topology. A completed normal applianc
 `ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250-agent-mode enter` before coding work and
 `sudo bc250-agent-mode leave` afterwards. All lanes share the same BC-250 UMA
 pool; the separation controls lifecycle and eviction, not physical memory.
-GPT-OSS 20B is the expected memory-edge production case with a warm embedding
-model and should be re-benchmarked after 0.10.0 deployment.
+GPT-OSS 20B with warm Jina remains the production memory-edge qualification;
+re-run it when a package/runtime change could affect residency or UMA headroom.
 
 ## 0.33.3 runtime notes
 

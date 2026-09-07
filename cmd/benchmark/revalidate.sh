@@ -66,6 +66,12 @@ readonly -a PACKAGE_PROD_MODELS=(
 
 # Gross-regression gates only. These floors are intentionally conservative and
 # package-owned; ordinary run-to-run performance variation must not fail qualification.
+# Gross-regression qualification policy, not performance targets. Same-board decode
+# baselines in MODELS.md map conservatively to these floors: E2B ~112 -> 50,
+# E4B ~72 -> 30, LFM ~147 -> 65, Qwen9B ~46 -> 20, GPT-OSS ~80 -> 35 tok/s.
+# Residency 0.90 catches major CPU spill; 128 MiB MemAvailable is a deliberately
+# unsafe floor rather than desired headroom; 85 C matches the benchmark's highest
+# thermal warning/qualification ceiling.
 readonly EDGE_MIN_RESIDENCY_RATIO=0.90
 readonly EDGE_MIN_MEM_AVAILABLE_MIB=128
 readonly EDGE_MAX_TEMP_C=85
@@ -521,9 +527,11 @@ follow_run() {
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
   if [[ "$phase" == done ]]; then
     echo "Revalidation run completed."
+    printf 'Run state:      %s\n' "$(effective_run_state)"
     printf 'Infrastructure: %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
     printf 'Quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
     printf 'Restoration:    %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
+    printf 'Coverage:       %s\n' "$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
     echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)"
     return 0
   fi
@@ -980,11 +988,11 @@ for model, limits in policy["models"].items():
         failures.append(f"{model}: gross decode regression {decode:.2f} < {limits['min_decode_tps']} tok/s")
 
     contexts = [int(r.get("metrics", {}).get("allocated_context") or 0) for r in passed]
-    allocated = max(contexts, default=0)
-    model_checks["allocated_context"] = allocated
+    allocated = min(contexts, default=0)
+    model_checks["min_allocated_context"] = allocated
     model_checks["required_context"] = int(limits["min_context"])
     if allocated < int(limits["min_context"]):
-        failures.append(f"{model}: allocated context {allocated} < package requirement {limits['min_context']}")
+        failures.append(f"{model}: minimum allocated context {allocated} < package requirement {limits['min_context']}")
 
     ratios = []
     for r in passed:
@@ -1005,10 +1013,16 @@ for model, limits in policy["models"].items():
         failures.append(f"{model}: MemAvailable floor {mem_min:.0f} MiB < {policy['min_mem_available_mib']} MiB")
 
     temps = [float(r.get("metrics", {}).get("temp_max_c")) for r in passed if r.get("metrics", {}).get("temp_max_c") is not None]
-    temp_max = max(temps) if temps else 0.0
-    model_checks["temp_max_c"] = temp_max
-    if temp_max >= float(policy["max_temp_c"]):
-        failures.append(f"{model}: temperature {temp_max:.1f} C reached gross qualification ceiling {policy['max_temp_c']} C")
+    if temps:
+        temp_max = max(temps)
+        model_checks["temp_max_c"] = temp_max
+        model_checks["temperature_telemetry_present"] = True
+        if temp_max >= float(policy["max_temp_c"]):
+            failures.append(f"{model}: temperature {temp_max:.1f} C reached gross qualification ceiling {policy['max_temp_c']} C")
+    else:
+        model_checks["temp_max_c"] = None
+        model_checks["temperature_telemetry_present"] = False
+        failures.append(f"{model}: required temperature telemetry unavailable")
 
     severe = [
         r for r in passed
@@ -1441,6 +1455,7 @@ status_raw() {
   echo "infrastructure=$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo none)"
   echo "quality=$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
   echo "restoration=$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo none)"
+  echo "coverage=$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo none)"
   echo "kernel=$(uname -r)"
   echo "service=$(systemctl is-active "$UNIT" 2>/dev/null || true)"
   echo "phase_reports=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" 2>/dev/null | wc -l)"
@@ -1469,6 +1484,7 @@ status_run() {
   printf '  Infrastructure : %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
   printf '  Quality        : %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
   printf '  Restoration    : %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
+  printf '  Coverage       : %s\n' "$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
   if [[ "$phase" != done && "$phase" != failed ]]; then
     printf '  Phase          : %s %s\n' "${position:-?}" "$label"; printf '  Stage          : %s\n' "$stage"
     printf '  Stage started  : %s\n' "$stage_started"; printf '  Last event     : %s (%s)\n' "$last_event" "$(event_age "$last_event")"

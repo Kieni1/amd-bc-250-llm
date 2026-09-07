@@ -33,6 +33,7 @@ from benchmark_common import (
     append_result,
     benchmark_metadata,
     chronological_resource_aggregate,
+    finalize_active_infrastructure_failure,
     finalize_benchmark_metadata,
     fixture_metadata,
     prepare_result_dir,
@@ -1174,9 +1175,14 @@ def main() -> int:
     return 1 if infra_failed else 0
 
 
-if __name__ == "__main__":
+def entrypoint() -> int:
     try:
-        raise SystemExit(main())
+        return main()
     except (BenchmarkError, OSError, ValueError) as exc:
+        finalize_active_infrastructure_failure(exc)
         print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(entrypoint())

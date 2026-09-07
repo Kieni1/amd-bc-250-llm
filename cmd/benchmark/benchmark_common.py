@@ -182,8 +182,15 @@ class BenchmarkPaths:
     fixtures_dir: Path
 
 
+_ACTIVE_BENCHMARK_PATHS: BenchmarkPaths | None = None
+_ACTIVE_BENCHMARK_CATEGORY = ""
+
+
 def prepare_result_dir(category: str, output_dir: str | Path | None = None) -> BenchmarkPaths:
     """Create one isolated result directory for a benchmark invocation."""
+    global _ACTIVE_BENCHMARK_PATHS, _ACTIVE_BENCHMARK_CATEGORY
+    _ACTIVE_BENCHMARK_PATHS = None
+    _ACTIVE_BENCHMARK_CATEGORY = ""
     if output_dir is None:
         stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
         root = Path("bc250-results") / f"{stamp}-{category}"
@@ -194,7 +201,7 @@ def prepare_result_dir(category: str, output_dir: str | Path | None = None) -> B
     root.mkdir(parents=True, exist_ok=True)
     fixtures = root / "fixtures"
     fixtures.mkdir(exist_ok=True)
-    return BenchmarkPaths(
+    paths = BenchmarkPaths(
         root=root,
         results_jsonl=root / "results.jsonl",
         summary_json=root / "summary.json",
@@ -203,6 +210,9 @@ def prepare_result_dir(category: str, output_dir: str | Path | None = None) -> B
         csv_export=root / "results.csv",
         fixtures_dir=fixtures,
     )
+    _ACTIVE_BENCHMARK_PATHS = paths
+    _ACTIVE_BENCHMARK_CATEGORY = category
+    return paths
 
 
 def copy_fixtures(paths: BenchmarkPaths, *sources: Path) -> None:
@@ -656,6 +666,53 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
 
 class BenchmarkError(RuntimeError):
     pass
+
+
+def finalize_active_infrastructure_failure(
+    exc: BaseException,
+    *,
+    benchmark_version: str = "8.0",
+    failure_kind: str = "runtime-api",
+) -> bool:
+    """Finalize an initialized benchmark directory after an unhandled infra error.
+
+    Benchmark commands are single-invocation processes. ``prepare_result_dir``
+    records the current invocation so the outer command handler can preserve
+    canonical evidence even when a runtime/API error interrupts category-local
+    control flow before its normal summary path. Returns False when no result
+    directory had been initialized yet.
+    """
+    paths = _ACTIVE_BENCHMARK_PATHS
+    category = _ACTIVE_BENCHMARK_CATEGORY
+    if paths is None or not category:
+        return False
+
+    if not paths.meta_json.exists():
+        write_benchmark_metadata(
+            paths.meta_json,
+            benchmark_metadata(
+                category,
+                benchmark_version=benchmark_version,
+                options={"failure_finalized_by": "outer-command-handler"},
+            ),
+        )
+
+    append_result(
+        paths.results_jsonl,
+        result_record(
+            category=category,
+            model="benchmark",
+            case_id="benchmark-infrastructure-failure",
+            result_type="measurement",
+            outcome="infra-fail",
+            failure_kinds=[failure_kind],
+            error=str(exc),
+            error_type=type(exc).__name__,
+        ),
+    )
+    finalize_benchmark_metadata(paths.meta_json)
+    write_result_summary(paths.results_jsonl, category=category)
+    return True
 
 
 class OllamaClient:

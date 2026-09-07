@@ -601,7 +601,12 @@ main() {
   fi
   echo "  Reconfigure Open WebUI: sudo bc250-openwebui-setup init"
   echo "  40-CU status:           sudo bc250-40cu status"
-  echo "  Revalidation:           sudo bc250-revalidate start"
+  if [[ -n "$completion_owui_token" && -f "$completion_owui_token" && -r "$completion_owui_token" ]]; then
+    echo "  Revalidation:           sudo bc250-revalidate start --owui-token-file $completion_owui_token"
+  else
+    echo "  Revalidation (full):    sudo bc250-revalidate start --owui-token-file FILE"
+    echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"
+  fi
   echo "  Agent mode:             sudo bc250-agent-mode enter"
 }
 

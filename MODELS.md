@@ -107,13 +107,13 @@ with the package Vulkan profile; they are not cross-machine leaderboard claims.
 | GLM-OCR / OvisOCR2 | GLM ~0.996 mean word F1 vs Ovis ~0.735, both full field recall on the three-page baseline | GLM leads fidelity; Ovis remains speed/structure comparison |
 | Gemma 3 1B task | 6/6 structurally usable OWUI JSON, but requested language matched only 2/6 | Keep task default; multilingual adherence is the next quality target |
 
-### 0.10.0 residency follow-up
+### Production residency follow-up
 
 The 2026-08-31 production run predates the dedicated 11437 embedding service.
-Jina is small and normal main+task+embedding concurrency is the intended 0.10.0
-layout, but GPT-OSS 20B is the likely memory-edge case. After deploying 0.10.0,
-rerun the production/use-case and long-context measurements with the embedding
-model warm. A 2026-09-05 script-validation run reached GPT-OSS + 4K Jina coexistence
+Jina is small and normal main+task+embedding concurrency is the packaged layout,
+but GPT-OSS 20B is the memory-edge production case. Re-run production/use-case
+and long-context measurements with the embedding model warm after changes that can
+affect runtime residency. A 2026-09-05 script-validation run reached GPT-OSS + 4K Jina coexistence
 without the previous global OOM, but that run also exposed harness issues and is
 therefore provisional rather than a final device-policy measurement. Do not change
 the keepalive from that single run. Agentic/coding results are separate because

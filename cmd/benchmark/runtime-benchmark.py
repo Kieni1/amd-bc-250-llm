@@ -21,6 +21,7 @@ from benchmark_common import (
     TelemetrySampler,
     append_result,
     benchmark_metadata,
+    finalize_active_infrastructure_failure,
     finalize_benchmark_metadata,
     fixture_metadata,
     prepare_result_dir,
@@ -452,9 +453,14 @@ def main() -> int:
     return int(args.func(args))
 
 
-if __name__ == "__main__":
+def entrypoint() -> int:
     try:
-        raise SystemExit(main())
+        return main()
     except (BenchmarkError, Failure, OSError, ValueError) as exc:
+        finalize_active_infrastructure_failure(exc)
         print(f"ERROR: {exc}", file=sys.stderr)
-        raise SystemExit(1) from None
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(entrypoint())

@@ -1105,6 +1105,307 @@ phase_roles
                 result = json.loads((t / f"{name}.out.json").read_text(encoding="utf-8"))
                 self.assertFalse(result["passed"], name)
 
+    def test_initialized_benchmark_failures_finalize_canonical_evidence(self) -> None:
+        def assert_failed_run(root: Path, category_name: str) -> None:
+            self.assertTrue((root / "results.jsonl").is_file())
+            self.assertTrue((root / "summary.json").is_file())
+            self.assertTrue((root / "summary.txt").is_file())
+            meta = json.loads((root / "meta.json").read_text(encoding="utf-8"))
+            self.assertIsNotNone(meta["finished_at"])
+            rows = [
+                json.loads(line)
+                for line in (root / "results.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(rows[-1]["category"], category_name)
+            self.assertEqual(rows[-1]["outcome"], "infra-fail")
+            self.assertEqual(rows[-1]["case_id"], "benchmark-infrastructure-failure")
+            summary = json.loads((root / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["infrastructure"], "fail")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+
+            task_dir = base / "task"
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "bc250-benchmark",
+                        "task",
+                        "test-model",
+                        "--output-dir",
+                        str(task_dir),
+                    ],
+                ),
+                patch.object(
+                    category.OllamaClient,
+                    "version",
+                    side_effect=category.BenchmarkError("forced task metadata failure"),
+                ),
+            ):
+                self.assertEqual(category.entrypoint(), 1)
+            assert_failed_run(task_dir, "task")
+
+            generation_dir = base / "generation"
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "bc250-benchmark generation",
+                        "test-model",
+                        "--profile",
+                        "edge",
+                        "--output-dir",
+                        str(generation_dir),
+                    ],
+                ),
+                patch.object(generation.OllamaClient, "version", return_value="0.33.3"),
+                patch.object(generation.OllamaClient, "show", return_value={}),
+                patch.object(
+                    generation.OllamaClient,
+                    "digest",
+                    side_effect=generation.BenchmarkError(
+                        "forced generation metadata failure"
+                    ),
+                ),
+            ):
+                self.assertEqual(generation.entrypoint(), 1)
+            assert_failed_run(generation_dir, "generation")
+
+            runtime_dir = base / "runtime"
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "bc250-benchmark",
+                        "num-batch",
+                        "test-model",
+                        "--output-dir",
+                        str(runtime_dir),
+                    ],
+                ),
+                patch.object(
+                    runtime_workflow.OllamaClient,
+                    "digest",
+                    side_effect=runtime_workflow.BenchmarkError(
+                        "forced runtime metadata failure"
+                    ),
+                ),
+            ):
+                self.assertEqual(runtime_workflow.entrypoint(), 1)
+            assert_failed_run(runtime_dir, "num-batch")
+
+            owui_dir = base / "owui"
+            token = base / "token"
+            token.write_text("secret\n", encoding="utf-8")
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "bc250-benchmark",
+                        "owui-embedding-batch",
+                        "--token-file",
+                        str(token),
+                        "--output-dir",
+                        str(owui_dir),
+                    ],
+                ),
+                patch.object(
+                    openwebui_workflow.JsonClient,
+                    "get",
+                    side_effect=openwebui_workflow.Failure("forced OWUI failure"),
+                ),
+            ):
+                self.assertEqual(openwebui_workflow.entrypoint(), 1)
+            assert_failed_run(owui_dir, "owui-embedding-batch")
+
+    def test_edge_context_floor_rejects_low_context_reload(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-qwen35-9b-unsloth-q6-k": 32768,
+                "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
+            }
+            rows = []
+            for model, context in specs.items():
+                rows.append(
+                    {
+                        "category": "generation",
+                        "model": model,
+                        "case_id": "short-1",
+                        "result_type": "measurement",
+                        "outcome": "pass",
+                        "diagnostics": [],
+                        "metrics": {
+                            "tokens_per_second": 100.0,
+                            "allocated_context": context,
+                            "resident_size_bytes": 1000,
+                            "resident_vram_bytes": 1000,
+                            "mem_available_min_mib": 1024,
+                            "temp_max_c": 70,
+                            "prompt_eval_count": 5000,
+                        },
+                    }
+                )
+            rows.append(json.loads(json.dumps(rows[0])))
+            rows[-1]["case_id"] = "ctx_220"
+            rows[-1]["metrics"]["allocated_context"] = 1024
+            path = t / "context-reload.jsonl"
+            path.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            script = (
+                f'source "{source}" help >/dev/null\n'
+                f'write_edge_policy "{t / "policy.json"}"\n'
+                f'if check_edge_generation_sanity "{path}" '
+                f'"{t / "policy.json"}" "{t / "out.json"}" 2>/dev/null; '
+                "then exit 41; fi\n"
+            )
+            subprocess.run(["bash", "-c", script], check=True)
+            result = json.loads((t / "out.json").read_text(encoding="utf-8"))
+            self.assertFalse(result["passed"])
+            check = result["checks"]["prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl"]
+            self.assertEqual(check["min_allocated_context"], 1024)
+
+    def test_edge_missing_temperature_telemetry_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-qwen35-9b-unsloth-q6-k": 32768,
+                "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
+            }
+            rows = []
+            for model, context in specs.items():
+                rows.append(
+                    {
+                        "category": "generation",
+                        "model": model,
+                        "case_id": "short-1",
+                        "result_type": "measurement",
+                        "outcome": "pass",
+                        "diagnostics": [],
+                        "metrics": {
+                            "tokens_per_second": 100.0,
+                            "allocated_context": context,
+                            "resident_size_bytes": 1000,
+                            "resident_vram_bytes": 1000,
+                            "mem_available_min_mib": 1024,
+                            "prompt_eval_count": 5000,
+                        },
+                    }
+                )
+            path = t / "missing-temperature.jsonl"
+            path.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            script = (
+                f'source "{source}" help >/dev/null\n'
+                f'write_edge_policy "{t / "policy.json"}"\n'
+                f'if check_edge_generation_sanity "{path}" '
+                f'"{t / "policy.json"}" "{t / "out.json"}" 2>/dev/null; '
+                "then exit 42; fi\n"
+            )
+            subprocess.run(["bash", "-c", script], check=True)
+            result = json.loads((t / "out.json").read_text(encoding="utf-8"))
+            self.assertFalse(result["passed"])
+            for check in result["checks"].values():
+                self.assertFalse(check["temperature_telemetry_present"])
+                self.assertIsNone(check["temp_max_c"])
+
+    def test_partial_revalidation_completion_and_status_surface_coverage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            work = t / "work"
+            reports = t / "results"
+            phases = work / "phase-reports"
+            work.mkdir()
+            reports.mkdir()
+            phases.mkdir()
+            bundle = reports / "run-1-bc250-revalidation-results.tar.gz"
+            bundle.write_text("bundle\n", encoding="utf-8")
+            script = f'''\
+source "{source}" help >/dev/null
+WORK="{work}"
+REPORT_DIR="{reports}"
+PHASE_REPORT_DIR="{phases}"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+LAST_EVENT_FILE="$WORK/last-event"
+STAGE_STARTED_FILE="$WORK/stage-started"
+RUN_STATE_FILE="$WORK/run-state"
+INFRA_STATE_FILE="$WORK/infrastructure-state"
+QUALITY_STATE_FILE="$WORK/quality-state"
+RESTORATION_STATE_FILE="$WORK/restoration-state"
+RUN_ID_FILE="$WORK/run-id"
+RUN_HARNESS_VERSION_FILE="$WORK/harness-version"
+COVERAGE_STATE_FILE="$WORK/coverage-state"
+ERROR_CONTEXT="$WORK/error-context.txt"
+FAILURE_RC_FILE="$WORK/failure-rc"
+EVENTS="$WORK/events.tsv"
+printf 'done\n' > "$PHASE_FILE"
+printf 'complete\n' > "$STAGE_FILE"
+printf '2026-09-07T00:00:00+02:00\n' > "$LAST_EVENT_FILE"
+printf '2026-09-07T00:00:00+02:00\n' > "$STAGE_STARTED_FILE"
+printf 'incomplete\n' > "$RUN_STATE_FILE"
+printf 'pass\n' > "$INFRA_STATE_FILE"
+printf 'pass\n' > "$QUALITY_STATE_FILE"
+printf 'pass\n' > "$RESTORATION_STATE_FILE"
+printf 'partial\n' > "$COVERAGE_STATE_FILE"
+printf 'run-1\n' > "$RUN_ID_FILE"
+printf '4.0\n' > "$RUN_HARNESS_VERSION_FILE"
+: > "$EVENTS"
+systemctl() {{ echo inactive; }}
+follow_run
+printf '%s\n' '---STATUS---'
+status_run status
+printf '%s\n' '---RAW---'
+status_raw
+'''
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            output = completed.stdout.lower()
+            self.assertIn("run state:      incomplete", output)
+            self.assertIn("coverage:       partial", output)
+            self.assertIn("coverage       : partial", output)
+            self.assertIn("coverage=partial", output)
+
+    def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
+        source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
+        self.assertNotIn(
+            'echo "  Revalidation:           sudo bc250-revalidate start"', source
+        )
+        self.assertIn(
+            "sudo bc250-revalidate start --owui-token-file $completion_owui_token",
+            source,
+        )
+        self.assertIn("sudo bc250-revalidate start --owui-token-file FILE", source)
+        self.assertIn("sudo bc250-revalidate start --skip-owui", source)
+
+    def test_edge_policy_documents_conservative_threshold_rationale(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("Same-board decode", source)
+        self.assertIn("MODELS.md map conservatively", source)
+        self.assertIn("major CPU spill", source)
+        self.assertIn("unsafe floor rather than desired headroom", source)
+        self.assertIn("thermal warning/qualification ceiling", source)
+
     def test_system_context_restoration_includes_absent_state(self) -> None:
         self.assertTrue(openwebui_workflow.sysctx_restoration_matches("", ""))
         self.assertFalse(openwebui_workflow.sysctx_restoration_matches("", "false"))

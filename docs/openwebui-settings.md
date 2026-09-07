@@ -132,8 +132,8 @@ splitting, Top K 8, hybrid search off and Tika extraction. Open WebUI is explici
 set to `TIKA_SERVER_VERSION=4` so it uses the Tika 4 API; smoke-test representative
 office/PDF extraction after this major Tika refresh.
 
-`RAG_SYSTEM_CONTEXT=false` remains deliberate for 0.10.0. Test it later with a
-real repeated-turn RAG acceptance run before changing the default. Likewise keep
+`RAG_SYSTEM_CONTEXT=false` remains the packaged default pending promotion evidence
+from repeated-turn RAG acceptance on the real appliance. Likewise keep
 `CHUNK_MIN_SIZE_TARGET=0` and embedding batch size 1 until measured on the real
 corpus.
 
@@ -179,7 +179,7 @@ authenticated `bc250-openwebui-setup status` before changing the pin.
 
 ## Deferred candidates
 
-Keep these as later measurements, not 0.10.0 defaults:
+Keep these as explicit benchmark candidates, not packaged defaults:
 
 - `RAG_SYSTEM_CONTEXT=true` repeated-turn quality/cache A/B;
 - larger embedding batches;

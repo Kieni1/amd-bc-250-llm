@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0-1.7 - 2026-09-07
+
+- Preserve canonical benchmark evidence on initialized-run infrastructure failures across category, generation, runtime and Open WebUI benchmark entry points.
+- Correct Phase-3 context qualification to enforce the minimum observed allocated context across successful measurements, and treat missing required thermal telemetry as qualification failure.
+- Show run state and coverage in revalidation completion/status output, and make installer revalidation guidance match the authenticated harness-v4 interface.
+- Document the conservative gross-edge policy rationale, use static-contract terminology for agent evaluation, and remove stale current-facing 0.10.0 wording.
+
 ## 0.11.0-1.6 - 2026-09-06
 
 - Complete Round 2C-2 evidence output: canonical summaries now contain category aggregates, and generation reports warm answer latency, prefill, swap start/peak/end/delta, temperature p95/max and context/output diagnostics.

@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.6%{?dist}
+Release:        1.7%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Sep 07 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.7
+- Finalize canonical infra-failure evidence for initialized benchmark runs across category, generation, runtime, and Open WebUI entry points.
+- Tighten Phase-3 qualification so every successful load must retain the required context floor and missing thermal telemetry fails qualification instead of becoming 0 C.
+- Surface incomplete/partial revalidation state to operators, correct installer revalidation guidance, document gross-edge threshold provenance, and clean stale current-facing wording.
+- Add deterministic adversarial coverage for failure finalization, context reload masking, thermal evidence, partial coverage UX, and installer guidance.
+
 * Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.6
 - Finish Round 2C-2 canonical evidence: category aggregates, complete generation summaries, shared package/kernel/runtime/model/fixture metadata, and precise output-vs-thinking budget diagnostics.
 - Split runtime/coexistence workflows from Open WebUI lifecycle/tuning workflows and remove stale revalidation compatibility/reboot-era helpers.
