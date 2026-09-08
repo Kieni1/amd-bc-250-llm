@@ -510,7 +510,7 @@ def print_models(
             details = [provider, origin, download[source]]
         if provider.startswith("ollama"):
             details.append(
-                {True: "set up", False: "not set up", None: "setup unknown"}[setup]
+                {True: "set up", False: "not set up", None: "registration unavailable"}[setup]
             )
         index = model.get("index", offset)
         print(

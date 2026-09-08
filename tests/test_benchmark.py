@@ -4,6 +4,7 @@ import ast
 import importlib.util
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -437,6 +438,27 @@ done | sort
 """
         self.assertTrue(category.evaluate_agent_output(good, case)["accepted"])
 
+        observed_real_device = """\
+#!/bin/bash
+if [ -z "$1" ]; then
+    exit 2
+fi
+directory="$1"
+if [ ! -d "$directory" ]; then
+    exit 2
+fi
+find "$directory" -maxdepth 1 -name "*.Modelfile" | sed 's#.*/##' | sort
+"""
+        observed_result = category.evaluate_agent_output(observed_real_device, case)
+        self.assertTrue(observed_result["syntax_ok"])
+        self.assertTrue(observed_result["requirements_ok"])
+        self.assertNotIn("missing basename extraction", observed_result["problems"])
+
+        fake_sed = observed_real_device.replace("sed 's#.*/##'", "sed 's#foo##'")
+        fake_result = category.evaluate_agent_output(fake_sed, case)
+        self.assertFalse(fake_result["requirements_ok"])
+        self.assertIn("missing basename extraction", fake_result["problems"])
+
         find_good = """\
 #!/usr/bin/env bash
 if [ "$#" -ne 1 ]; then
@@ -486,6 +508,47 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertTrue(retrieval_ok)
         self.assertFalse(answer_ok)
         self.assertTrue(source_cited)
+        self.assertTrue(problems)
+
+        observed = (
+            "Confidential personnel data may not be stored in public cloud services; "
+            "it must only be stored in authorized internal systems [de-datenschutz]."
+        )
+        retrieval_ok, answer_ok, source_cited, problems = category.rag_case_checks(
+            observed, case, target_rank=1, top_k=fixture["top_k"]
+        )
+        self.assertTrue(retrieval_ok)
+        self.assertTrue(answer_ok)
+        self.assertTrue(source_cited)
+        self.assertEqual(problems, [])
+
+    def test_rag_invoice_accepts_answered_facts_without_repeating_question_id(self) -> None:
+        fixture = json.loads(
+            (ROOT / "examples/benchmark/rag-quality-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        case = next(item for item in fixture["cases"] if item["id"] == "invoice-4821")
+        observed = (
+            "Der Gesamtbetrag beträgt CHF 319.50 und das Fälligkeitsdatum ist der "
+            "31. August 2026 [fr-facture-4821]."
+        )
+        retrieval_ok, answer_ok, source_cited, problems = category.rag_case_checks(
+            observed, case, target_rank=1, top_k=fixture["top_k"]
+        )
+        self.assertTrue(retrieval_ok)
+        self.assertTrue(answer_ok)
+        self.assertTrue(source_cited)
+        self.assertEqual(problems, [])
+
+        wrong_amount = (
+            "Der Gesamtbetrag beträgt CHF 391.50 und das Fälligkeitsdatum ist der "
+            "31. August 2026 [fr-facture-4821]."
+        )
+        _retrieval_ok, answer_ok, _source_cited, problems = category.rag_case_checks(
+            wrong_amount, case, target_rank=1, top_k=fixture["top_k"]
+        )
+        self.assertFalse(answer_ok)
         self.assertTrue(problems)
 
     def test_ocr_score_tracks_required_field_order(self) -> None:
@@ -739,6 +802,51 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         )
         self.assertFalse(required_ok)
         self.assertFalse(preserved_ok)
+
+    def test_translation_real_device_de_fr_invoice_accepts_locale_currency_order(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        case = next(item for item in cases if item["id"] == "de-fr-invoice")
+        observed = (
+            "Facture INV‑4821 : Montant total de 319,50 CHF, Référence client "
+            "ZH‑204. Le paiement est dû jusqu’au 31 août 2026."
+        )
+        self.assertEqual(
+            category.translation_content_checks(observed, case),
+            (True, True, True, True),
+        )
+        wrong_amount = observed.replace("319,50", "391,50")
+        required_ok, _forbidden_ok, _preserved_ok, _meaningful_ok = (
+            category.translation_content_checks(wrong_amount, case)
+        )
+        self.assertFalse(required_ok)
+
+    def test_translation_real_device_de_fr_negation_accepts_formal_prohibition(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        case = next(item for item in cases if item["id"] == "de-fr-negation")
+        observed = (
+            "Les données personnelles confidentielles ne peuvent être stockées "
+            "dans des services cloud publics."
+        )
+        self.assertEqual(
+            category.translation_content_checks(observed, case),
+            (True, True, True, True),
+        )
+        permissive = (
+            "Les données personnelles confidentielles peuvent être stockées "
+            "dans des services cloud publics."
+        )
+        required_ok, _forbidden_ok, _preserved_ok, _meaningful_ok = (
+            category.translation_content_checks(permissive, case)
+        )
+        self.assertFalse(required_ok)
 
     def test_translation_source_leakage_is_not_mislabeled_as_language(self) -> None:
         failures = category.translation_failure_kinds(
@@ -1035,6 +1143,7 @@ dashboard_text
             )
             self.assertIn("[RUNNING ", completed.stdout)
             self.assertIn("Infrastructure  PASS so far", completed.stdout)
+            self.assertIn("Quality steps", completed.stdout)
             self.assertIn(
                 "Ctrl-C detaches; the worker continues under systemd.",
                 completed.stdout,
@@ -1072,6 +1181,7 @@ dashboard_text
             self.assertIn("Infrastructure  PASS", completed.stdout)
             self.assertNotIn("Infrastructure  PASS so far", completed.stdout)
             self.assertNotIn("worker continues under systemd", completed.stdout)
+            self.assertIn("Quality steps", completed.stdout)
 
     def test_revalidation_failed_dashboard_preserves_original_phase_and_stage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1111,6 +1221,85 @@ dashboard_text
             self.assertIn("Production roles — FAILED", completed.stdout)
             self.assertIn("Stage         embeddings", completed.stdout)
             self.assertNotIn("Stage         final bundle written", completed.stdout)
+            self.assertNotIn("worker continues under systemd", completed.stdout)
+
+    def test_revalidation_dashboard_redraw_clears_surplus_running_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+WORK="{t}"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+LAST_EVENT_FILE="$WORK/last-event"
+STAGE_STARTED_FILE="$WORK/stage-started"
+RUN_ID_FILE="$WORK/run-id"
+INFRA_STATE_FILE="$WORK/infrastructure-state"
+EVENTS="$WORK/events.tsv"
+printf 'edge\n' > "$PHASE_FILE"
+printf 'production-sanity\n' > "$STAGE_FILE"
+printf '2026-09-08T17:20:00+02:00\n' > "$LAST_EVENT_FILE"
+printf '2026-09-08T17:20:00+02:00\n' > "$STAGE_STARTED_FILE"
+printf 'run\n' > "$RUN_ID_FILE"
+printf 'pass\n' > "$INFRA_STATE_FILE"
+: > "$EVENTS"
+systemctl() {{ echo active; }}
+running="$(dashboard_text)"
+render_dashboard_frame "$running" 0
+drawn="$RENDERED_DASHBOARD_LINES"
+printf 'done\n' > "$PHASE_FILE"
+printf 'final bundle written: /tmp/result.tar.gz\n' > "$STAGE_FILE"
+systemctl() {{ echo inactive; }}
+completed="$(dashboard_text)"
+render_dashboard_frame "$completed" "$drawn"
+printf 'Run state: completed\n'
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], capture_output=True, check=True
+            )
+            stream = completed.stdout.decode("utf-8")
+
+            lines = [""]
+            row = col = i = 0
+            while i < len(stream):
+                if stream.startswith("\x1b[", i):
+                    match = re.match(r"\x1b\[(\d+)([AK])", stream[i:])
+                    self.assertIsNotNone(match)
+                    amount = int(match.group(1))
+                    if match.group(2) == "A":
+                        row = max(0, row - amount)
+                    else:
+                        while row >= len(lines):
+                            lines.append("")
+                        lines[row] = ""
+                    i += match.end()
+                    continue
+                char = stream[i]
+                if char == "\r":
+                    col = 0
+                elif char == "\n":
+                    row += 1
+                    col = 0
+                    while row >= len(lines):
+                        lines.append("")
+                else:
+                    while row >= len(lines):
+                        lines.append("")
+                    line = lines[row]
+                    if col > len(line):
+                        line += " " * (col - len(line))
+                    if col == len(line):
+                        line += char
+                    else:
+                        line = line[:col] + char + line[col + 1 :]
+                    lines[row] = line
+                    col += 1
+                i += 1
+
+            rendered = "\n".join(lines)
+            self.assertIn("Run state: completed", rendered)
+            self.assertNotIn("worker continues under systemd", rendered)
 
     def test_revalidation_failure_summary_shows_sudo_context_and_console_tail(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

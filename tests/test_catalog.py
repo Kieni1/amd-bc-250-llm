@@ -453,6 +453,30 @@ class StatusTests(unittest.TestCase):
         self.assertIn("source Ollama-managed (main+projector), not set up", text)
         self.assertNotIn("download unknown", text)
 
+    def test_unavailable_registration_status_is_explicit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output_path = Path(temporary) / "model.gguf"
+            output_path.write_bytes(b"weights")
+            model = {
+                "id": "m",
+                "name": "agentic-test",
+                "provider": "ollama",
+                "from": str(output_path),
+                "gguf": output_path.name,
+                "enabled": True,
+            }
+            output = StringIO()
+            with (
+                patch.object(modelctl, "model_path", return_value=output_path),
+                redirect_stdout(output),
+            ):
+                modelctl.print_models(
+                    {"destination": temporary}, [model], registered=None
+                )
+            text = output.getvalue()
+            self.assertIn("downloaded, registration unavailable", text)
+            self.assertNotIn("setup unknown", text)
+
     def test_retained_gguf_reports_downloaded_after_registration_cleanup(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output_path = Path(temporary) / "model.gguf"

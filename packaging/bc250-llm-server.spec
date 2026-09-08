@@ -211,10 +211,11 @@ fi
 
 %changelog
 * Tue Sep 08 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.11
-- Accept semantically equivalent public-cloud prohibition wording in the direct-RAG fixture while preserving retrieval and citation gates.
-- Correct the DE-to-FR formal-office translation fixture to preserve invariant names/references rather than an untranslated German honorific.
+- Accept semantically equivalent public-cloud prohibition wording and avoid redundant question-ID requirements in direct RAG while preserving retrieval and citation gates.
+- Correct DE-to-FR translation fixtures for invariant names/references, locale-safe currency ordering, and formal prohibition wording without weakening semantic checks.
 - Require language compliance for the German tag task fixture and add multilingual task-language regressions.
-- Use final-state dashboard wording after completed revalidation runs without changing failed-run diagnostics or harness semantics.
+- Use final-state dashboard wording and clear stale TTY rows after completed revalidation runs without changing failed-run diagnostics or harness semantics.
+- Report unavailable model registration probes explicitly instead of the ambiguous setup-unknown catalog label.
 
 * Mon Sep 07 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.10
 - Fix harness-v4 run_step execution for declared internal Bash functions by exporting the harness function set into a bounded child Bash while retaining the special sanitized benchmark path.

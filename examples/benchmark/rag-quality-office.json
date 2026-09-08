@@ -13,7 +13,7 @@
       "id": "invoice-4821",
       "question": "Welcher Gesamtbetrag und welches Fälligkeitsdatum gehören zur Rechnung INV-4821?",
       "target": "fr-facture-4821",
-      "required": ["INV-4821", "CHF 319.50", "31. August 2026"],
+      "required": ["CHF 319.50", "31. August 2026"],
       "required_any": ["fr-facture-4821", "[fr-facture-4821]"],
       "forbidden": ["CHF 391.50", "30. September 2026"]
     },
@@ -21,7 +21,7 @@
       "id": "privacy-public-cloud",
       "question": "May confidential HR data be stored in public cloud services? Answer in English.",
       "target": "de-datenschutz",
-      "required_any": ["not allowed", "not permitted", "must not", "not permissible"],
+      "required_any": ["not allowed", "not permitted", "must not", "not permissible", "may not be stored"],
       "forbidden": ["yes,", "may be stored"]
     },
     {

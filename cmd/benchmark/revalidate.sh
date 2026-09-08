@@ -542,26 +542,38 @@ dashboard_text() {
   else
     printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
   fi
-  printf 'Quality         %s pass / %s quality-fail / %s skipped\n' "$p" "$q" "$skipped"
+  printf 'Quality steps   %s pass / %s quality-fail / %s skipped\n' "$p" "$q" "$skipped"
   printf '\nRecent results\n'
   recent_step_results
-  if [[ $phase != done ]]; then
+  if [[ $phase != done && $phase != failed ]]; then
     printf '\nCtrl-C detaches; the worker continues under systemd.\n'
   fi
 }
 
+render_dashboard_frame() {
+  local dashboard="$1" previous_lines="${2:-0}" new_lines extra line i
+  new_lines="$(printf '%s\n' "$dashboard" | awk 'END{print NR}')"
+  ((previous_lines == 0)) || printf '\033[%dA' "$previous_lines"
+  while IFS= read -r line; do printf '\033[2K\r%s\n' "$line"; done <<< "$dashboard"
+  if ((previous_lines > new_lines)); then
+    extra=$((previous_lines - new_lines))
+    for ((i=0; i<extra; i++)); do printf '\033[2K\r\n'; done
+    printf '\033[%dA' "$extra"
+  fi
+  RENDERED_DASHBOARD_LINES="$new_lines"
+}
+
 follow_run() {
-  local interrupted=0 phase stage last="" rc=1 dashboard="" drawn_lines=0 new_lines=0
+  local interrupted=0 phase stage last="" rc=1 dashboard="" drawn_lines=0
   trap 'interrupted=1' INT
   echo
   while ((interrupted == 0)); do
     phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
     stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
     if [[ -t 1 ]]; then
-      dashboard="$(dashboard_text)"; new_lines="$(printf '%s\n' "$dashboard" | awk 'END{print NR}')"
-      ((drawn_lines == 0)) || printf '\033[%dA' "$drawn_lines"
-      while IFS= read -r line; do printf '\033[2K\r%s\n' "$line"; done <<< "$dashboard"
-      drawn_lines="$new_lines"
+      dashboard="$(dashboard_text)"
+      render_dashboard_frame "$dashboard" "$drawn_lines"
+      drawn_lines="$RENDERED_DASHBOARD_LINES"
     elif [[ "$phase|$stage" != "$last" ]]; then
       if [[ $phase == failed ]]; then
         printf '[%s] phase=%s FAILED  %s\n' \

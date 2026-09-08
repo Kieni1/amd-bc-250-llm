@@ -24,20 +24,22 @@
     "input": "Rechnung INV-4821: Gesamtbetrag CHF 319.50, Kundenreferenz ZH-204. Die Zahlung ist bis 31. August 2026 fällig.",
     "required": [
       "INV-4821",
-      "CHF 319.50",
       "ZH-204",
       "31 août 2026"
     ],
     "preserve": [
       "INV-4821",
-      "CHF 319.50",
       "ZH-204"
     ],
     "forbidden": [
       "Gesamtbetrag",
       "Zahlung ist bis"
     ],
-    "min_words": 6
+    "min_words": 6,
+    "required_any": [
+      "CHF 319.50",
+      "319.50 CHF"
+    ]
   },
   {
     "id": "de-fr-negation",
@@ -48,7 +50,8 @@
       "ne doivent pas",
       "ne peuvent pas",
       "n'est pas autorisé",
-      "ne sont pas autorisés"
+      "ne sont pas autorisés",
+      "ne peuvent être stockées dans des services cloud publics"
     ],
     "required": [
       "Cloud"

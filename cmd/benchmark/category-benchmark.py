@@ -905,10 +905,18 @@ def _bash_contract(body: str, case: dict[str, Any]) -> list[str]:
     elif quoted_glob and not _bash_glob_no_match_safe(body):
         problems.append("glob is not safe when no Modelfile matches")
 
+    # Accept only explicit basename-producing forms. The sed form is narrow:
+    # it must remove everything through the final slash and replace it with
+    # an empty string, as in sed 's#.*/##'.
+    sed_basename = re.search(
+        r"\bsed(?:\s+-[A-Za-z]+)*\s+['\"]s(?P<delim>[^A-Za-z0-9\s\\])\.\*/(?P=delim)(?P=delim)['\"]",
+        body,
+    )
     if not (
         re.search(r"\bbasename\b", body)
         or re.search(r"%f", body)
         or re.search(r"\$\{[^}]+##\*/\}", body)
+        or sed_basename
     ):
         problems.append("missing basename extraction")
     if not re.search(r"\bsort\b", body):
