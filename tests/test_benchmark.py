@@ -845,6 +845,42 @@ printf 'rc=%s\n' "$?"
             self.assertIn("rc=0", completed.stdout)
             self.assertNotIn("qualification_benchmark", completed.stderr)
 
+    def test_revalidation_run_step_executes_internal_shell_function_under_timeout(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+RAW="{t / 'results'}"
+EVENTS="{t / 'events.tsv'}"
+PHASE_FILE="{t / 'phase'}"
+STAGE_FILE="{t / 'stage'}"
+STAGE_STARTED_FILE="{t / 'stage-started'}"
+LAST_EVENT_FILE="{t / 'last-event'}"
+FAILURE_PHASE_FILE="{t / 'failure-phase'}"
+FAILURE_STAGE_FILE="{t / 'failure-stage'}"
+FAILURE_STAGE_STARTED_FILE="{t / 'failure-stage-started'}"
+FAILURE_CONSOLE_FILE="{t / 'failure-console'}"
+mkdir -p "$RAW"
+printf 'edge\n' > "$PHASE_FILE"
+: > "$EVENTS"
+internal_step_probe() {{
+    [[ $1 == expected ]] || return 9
+    printf 'internal-function-ran\n'
+}}
+if run_step edge internal-function infra internal_step_probe expected; then ok_rc=0; else ok_rc=$?; fi
+if run_step edge internal-function-fail infra internal_step_probe wrong; then bad_rc=0; else bad_rc=$?; fi
+printf 'ok_rc=%s bad_rc=%s\n' "$ok_rc" "$bad_rc"
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("ok_rc=0 bad_rc=9", completed.stdout)
+            console = t / "results/edge/internal-function/console.txt"
+            self.assertIn("internal-function-ran", console.read_text(encoding="utf-8"))
+            events = (t / "events.tsv").read_text(encoding="utf-8")
+            self.assertIn("internal-function-fail\tinfra\tinfra-fail", events)
+
     def test_revalidation_failed_dashboard_preserves_original_phase_and_stage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)

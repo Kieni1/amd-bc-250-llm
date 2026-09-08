@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0-1.10 - 2026-09-07
+
+- Fix harness-v4 `run_step` execution for declared internal Bash functions so GNU `timeout` runs them inside an exported child Bash rather than treating function names as nonexistent executables.
+- Close the real Phase-3 `rc=127` path affecting production sanity, GPT-OSS sanity, Jina residency, and recent device-error checks while preserving the sanitized benchmark wrapper.
+- Add deterministic regression coverage for both successful and nonzero internal-function return-code propagation through `run_step`.
+
 ## 0.11.0-1.9 - 2026-09-07
 
 - Fix harness-v4 `run_step` so package-qualification commands are sanitized first and GNU `timeout` executes the real benchmark command rather than trying to execute the `qualification_benchmark` Bash function.

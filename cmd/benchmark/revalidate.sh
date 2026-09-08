@@ -183,12 +183,22 @@ qualification_benchmark() {
 }
 
 # GNU timeout can execute external commands, not shell functions. Package
-# qualification wraps benchmark commands in the sanitizer above, so keep timeout
-# inside that function rather than asking timeout to exec qualification_benchmark.
+# qualification keeps its sanitizer outside timeout. Other declared harness
+# functions are exported into a child Bash so they receive the same bounded
+# execution semantics as external commands.
 run_step_command() {
-  if [[ ${1:-} == qualification_benchmark ]]; then
+  local command_name="${1:-}" function_name
+  if [[ $command_name == qualification_benchmark ]]; then
     shift
     qualification_benchmark timeout --signal=INT --kill-after=30s 45m "$@"
+  elif declare -F -- "$command_name" >/dev/null; then
+    shift
+    while IFS= read -r function_name; do
+      export -f "$function_name"
+    done < <(compgen -A function)
+    export EVENTS
+    exec timeout --signal=INT --kill-after=30s 45m \
+      bash -c '"$@"' run-step-function "$command_name" "$@"
   else
     exec timeout --signal=INT --kill-after=30s 45m "$@"
   fi
