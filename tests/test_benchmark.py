@@ -455,6 +455,39 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertTrue(category._acceptance_ok("Documents vendredi AB-42", case)[0])
         self.assertFalse(category._acceptance_ok("AB-42 Unterlagen bis Freitag", case)[0])
 
+    def test_rag_public_cloud_accepts_equivalent_prohibition_not_permission(self) -> None:
+        fixture = json.loads(
+            (ROOT / "examples/benchmark/rag-quality-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        case = next(
+            item for item in fixture["cases"] if item["id"] == "privacy-public-cloud"
+        )
+        correct = (
+            "Confidential HR data is not permissible in public cloud services "
+            "[de-datenschutz]."
+        )
+        retrieval_ok, answer_ok, source_cited, problems = category.rag_case_checks(
+            correct, case, target_rank=1, top_k=fixture["top_k"]
+        )
+        self.assertTrue(retrieval_ok)
+        self.assertTrue(answer_ok)
+        self.assertTrue(source_cited)
+        self.assertEqual(problems, [])
+
+        allowing = (
+            "Yes, confidential HR data may be stored in public cloud services "
+            "[de-datenschutz]."
+        )
+        retrieval_ok, answer_ok, source_cited, problems = category.rag_case_checks(
+            allowing, case, target_rank=1, top_k=fixture["top_k"]
+        )
+        self.assertTrue(retrieval_ok)
+        self.assertFalse(answer_ok)
+        self.assertTrue(source_cited)
+        self.assertTrue(problems)
+
     def test_ocr_score_tracks_required_field_order(self) -> None:
         case = {"expected_text": "A B C", "required_fields": ["A", "B", "C"]}
         self.assertEqual(category.ocr_scores("A B C", case)[5], 1.0)
@@ -583,6 +616,60 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertEqual(category.task_language_hint("Datenschutz und Dokument Analyse", "de"), "match")
         self.assertEqual(category.task_language_hint("privacy and document analysis", "de"), "other")
 
+    def test_task_tag_language_requirement_handles_de_fr_and_technical_terms(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/task-cases.json").read_text(encoding="utf-8")
+        )
+        tags_de = next(item for item in cases if item["id"] == "tags-de")
+        self.assertTrue(tags_de["language_required"])
+
+        hint, passed = category.task_language_decision(
+            "Vertrag Kündigung Open WebUI REF-81",
+            "de",
+            required=True,
+            semantic_ok=True,
+        )
+        self.assertEqual(hint, "match")
+        self.assertTrue(passed)
+
+        hint, passed = category.task_language_decision(
+            "Document Review Contract Management",
+            "de",
+            required=True,
+            semantic_ok=True,
+        )
+        self.assertEqual(hint, "other")
+        self.assertFalse(passed)
+
+        hint, passed = category.task_language_decision(
+            "Documents Résiliation Open WebUI REF-81",
+            "fr",
+            required=True,
+            semantic_ok=True,
+        )
+        self.assertEqual(hint, "match")
+        self.assertTrue(passed)
+
+        hint, passed = category.task_language_decision(
+            "Document Review Contract Management",
+            "fr",
+            required=True,
+            semantic_ok=True,
+        )
+        self.assertEqual(hint, "other")
+        self.assertFalse(passed)
+
+        # Language-neutral product names, identifiers, and technical abbreviations
+        # are not rejected merely because they provide no language evidence.
+        hint, passed = category.task_language_decision(
+            "Open WebUI OCR PDF RAG REF-81",
+            "fr",
+            required=True,
+            semantic_ok=True,
+        )
+        self.assertEqual(hint, "unknown")
+        self.assertTrue(passed)
+
     def test_agent_empty_final_is_not_syntax_success_and_budgets_allow_reasoning(self) -> None:
         case = {"id": "b", "validator": "bash", "required": ["echo"]}
         result = category.evaluate_agent_output("", case)
@@ -614,6 +701,44 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("CHF 319.50"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("ZH-204"), category.acceptance_text(actual))
+
+    def test_translation_formal_office_preserves_invariants_not_german_honorific(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        case = next(item for item in cases if item["id"] == "de-fr-formal-office")
+        self.assertNotIn("Frau Keller", case.get("required", []))
+        self.assertNotIn("Frau Keller", case.get("preserve", []))
+
+        valid = (
+            "Madame Keller, veuillez confirmer la réception du contrat REF-81 "
+            "avant le 12 octobre 2026."
+        )
+        checks = category.translation_content_checks(valid, case)
+        self.assertEqual(checks, (True, True, True, True))
+        self.assertEqual(category.task_language_hint(valid, "fr"), "match")
+
+        missing_keller = (
+            "Madame, veuillez confirmer la réception du contrat REF-81 "
+            "avant le 12 octobre 2026."
+        )
+        required_ok, _forbidden_ok, preserved_ok, _meaningful_ok = (
+            category.translation_content_checks(missing_keller, case)
+        )
+        self.assertFalse(required_ok)
+        self.assertFalse(preserved_ok)
+
+        missing_ref = (
+            "Madame Keller, veuillez confirmer la réception du contrat "
+            "avant le 12 octobre 2026."
+        )
+        required_ok, _forbidden_ok, preserved_ok, _meaningful_ok = (
+            category.translation_content_checks(missing_ref, case)
+        )
+        self.assertFalse(required_ok)
+        self.assertFalse(preserved_ok)
 
     def test_translation_source_leakage_is_not_mislabeled_as_language(self) -> None:
         failures = category.translation_failure_kinds(
@@ -880,6 +1005,73 @@ printf 'ok_rc=%s bad_rc=%s\n' "$ok_rc" "$bad_rc"
             self.assertIn("internal-function-ran", console.read_text(encoding="utf-8"))
             events = (t / "events.tsv").read_text(encoding="utf-8")
             self.assertIn("internal-function-fail\tinfra\tinfra-fail", events)
+
+    def test_revalidation_dashboard_running_uses_active_worker_wording(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+WORK="{t}"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+LAST_EVENT_FILE="$WORK/last-event"
+STAGE_STARTED_FILE="$WORK/stage-started"
+RUN_ID_FILE="$WORK/run-id"
+INFRA_STATE_FILE="$WORK/infrastructure-state"
+EVENTS="$WORK/events.tsv"
+printf 'edge\n' > "$PHASE_FILE"
+printf 'production-sanity\n' > "$STAGE_FILE"
+printf '2026-09-08T06:00:00+02:00\n' > "$LAST_EVENT_FILE"
+printf '2026-09-08T06:00:00+02:00\n' > "$STAGE_STARTED_FILE"
+printf 'run\n' > "$RUN_ID_FILE"
+printf 'pass\n' > "$INFRA_STATE_FILE"
+: > "$EVENTS"
+systemctl() {{ echo active; }}
+dashboard_text
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("[RUNNING ", completed.stdout)
+            self.assertIn("Infrastructure  PASS so far", completed.stdout)
+            self.assertIn(
+                "Ctrl-C detaches; the worker continues under systemd.",
+                completed.stdout,
+            )
+
+    def test_revalidation_dashboard_completed_uses_final_wording(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source "{source}" help >/dev/null
+WORK="{t}"
+PHASE_FILE="$WORK/phase"
+STAGE_FILE="$WORK/stage"
+LAST_EVENT_FILE="$WORK/last-event"
+STAGE_STARTED_FILE="$WORK/stage-started"
+RUN_ID_FILE="$WORK/run-id"
+INFRA_STATE_FILE="$WORK/infrastructure-state"
+EVENTS="$WORK/events.tsv"
+printf 'done\n' > "$PHASE_FILE"
+printf 'final bundle written: /tmp/result.tar.gz\n' > "$STAGE_FILE"
+printf '2026-09-08T06:05:00+02:00\n' > "$LAST_EVENT_FILE"
+printf '2026-09-08T06:05:00+02:00\n' > "$STAGE_STARTED_FILE"
+printf 'run\n' > "$RUN_ID_FILE"
+printf 'pass\n' > "$INFRA_STATE_FILE"
+: > "$EVENTS"
+systemctl() {{ echo inactive; }}
+dashboard_text
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("[COMPLETED ", completed.stdout)
+            self.assertIn("Worker        inactive", completed.stdout)
+            self.assertIn("Infrastructure  PASS", completed.stdout)
+            self.assertNotIn("Infrastructure  PASS so far", completed.stdout)
+            self.assertNotIn("worker continues under systemd", completed.stdout)
 
     def test_revalidation_failed_dashboard_preserves_original_phase_and_stage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

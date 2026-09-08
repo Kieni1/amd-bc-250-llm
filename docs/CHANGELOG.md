@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0-1.11 - 2026-09-08
+
+- Correct post-qualification evaluator false negatives for public-cloud RAG prohibition wording and the DE-to-FR formal-office honorific/invariant-content fixture.
+- Enforce language compliance for the German tag task case while retaining separate language and relevance failure reporting.
+- Make completed revalidation dashboards use final-state infrastructure/worker wording while preserving running and failed-run UX.
+- Keep the successful 0.11.0-1.10 real-device qualification bundle historical and unchanged; these corrections apply only to new runs.
+
 ## 0.11.0-1.10 - 2026-09-07
 
 - Fix harness-v4 `run_step` execution for declared internal Bash functions so GNU `timeout` runs them inside an exported child Bash rather than treating function names as nonexistent executables.

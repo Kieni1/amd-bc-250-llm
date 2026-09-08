@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.10%{?dist}
+Release:        1.11%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Tue Sep 08 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.11
+- Accept semantically equivalent public-cloud prohibition wording in the direct-RAG fixture while preserving retrieval and citation gates.
+- Correct the DE-to-FR formal-office translation fixture to preserve invariant names/references rather than an untranslated German honorific.
+- Require language compliance for the German tag task fixture and add multilingual task-language regressions.
+- Use final-state dashboard wording after completed revalidation runs without changing failed-run diagnostics or harness semantics.
+
 * Mon Sep 07 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.10
 - Fix harness-v4 run_step execution for declared internal Bash functions by exporting the harness function set into a bounded child Bash while retaining the special sanitized benchmark path.
 - Close the real Phase-3 rc=127 failure for production-sanity, GPT-OSS sanity, Jina residency and recent-device-error helpers without changing qualification policy.

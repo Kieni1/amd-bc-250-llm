@@ -537,11 +537,17 @@ dashboard_text() {
   printf 'Last event    %s\n' "$(event_age "$last_event")"
   local infra_state
   infra_state="$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo pass)"
-  printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
+  if [[ $phase == done ]]; then
+    printf '\nInfrastructure  %s\n' "${infra_state^^}"
+  else
+    printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
+  fi
   printf 'Quality         %s pass / %s quality-fail / %s skipped\n' "$p" "$q" "$skipped"
   printf '\nRecent results\n'
   recent_step_results
-  printf '\nCtrl-C detaches; the worker continues under systemd.\n'
+  if [[ $phase != done ]]; then
+    printf '\nCtrl-C detaches; the worker continues under systemd.\n'
+  fi
 }
 
 follow_run() {

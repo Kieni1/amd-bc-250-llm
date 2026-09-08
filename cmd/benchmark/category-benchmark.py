@@ -460,6 +460,19 @@ def task_language_hint(text: str, expected: str) -> str:
     return "unknown"
 
 
+def task_language_decision(
+    text: str, expected: str, *, required: bool, semantic_ok: bool
+) -> tuple[str, bool]:
+    """Return language evidence without penalizing language-neutral technical tags."""
+    hint = task_language_hint(text, expected)
+    passed = (
+        (not required)
+        or hint == "match"
+        or (hint == "unknown" and semantic_ok)
+    )
+    return hint, passed
+
+
 def keyword_score(text: str, keywords: list[str]) -> float:
     words = set(normalize_words(text))
     hits = 0
@@ -575,14 +588,17 @@ def benchmark_task(args: argparse.Namespace) -> int:
                 semantic_groups, _ = semantic_groups_score(value_text, groups)
                 semantic_required = int(case.get("min_semantic_groups", 0))
                 semantic_ok = semantic_groups >= semantic_required
-                language_hint = task_language_hint(value_text, case["language"])
-                language_required = bool(case.get("language_required", case["type"] in {"title", "query"}))
-                # Short titles can be language-indeterminate. Target-language semantic
-                # groups provide a deterministic fallback without accepting clear other-language output.
-                language_pass = (
-                    (not language_required)
-                    or language_hint == "match"
-                    or (language_hint == "unknown" and semantic_ok)
+                language_required = bool(
+                    case.get("language_required", case["type"] in {"title", "query"})
+                )
+                # Language-neutral product names, identifiers, and unavoidable technical
+                # terms may be indeterminate; relevant indeterminate output is accepted,
+                # but clear other-language output is not.
+                language_hint, language_pass = task_language_decision(
+                    value_text,
+                    case["language"],
+                    required=language_required,
+                    semantic_ok=semantic_ok,
                 )
                 score = keyword_score(value_text, case.get("keywords", []))
                 ok = structure_ok and language_pass and semantic_ok
@@ -1449,6 +1465,17 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
     problems.extend(f"forbidden {term}" for term in present_forbidden)
     return not problems, problems
 
+
+def rag_case_checks(
+    content: str, case: dict[str, Any], *, target_rank: int, top_k: int
+) -> tuple[bool, bool, bool, list[str]]:
+    answer_ok, problems = _acceptance_ok(content, case)
+    retrieval_ok = target_rank <= top_k
+    source_cited = f"[{case['target']}]".casefold() in content.casefold()
+    if not source_cited:
+        problems.append(f"missing source [{case['target']}]")
+    return retrieval_ok, answer_ok, source_cited, problems
+
 def acceptance_text(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).translate(
         str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
@@ -1486,6 +1513,28 @@ def translation_failure_kinds(
     if not preserved_ok:
         failures.append("preservation")
     return failures
+
+
+def translation_content_checks(
+    content: str, case: dict[str, Any]
+) -> tuple[bool, bool, bool, bool]:
+    folded = acceptance_text(content)
+    required_ok = all(
+        acceptance_text(term) in folded for term in case.get("required", [])
+    )
+    choices = case.get("required_any", [])
+    if choices:
+        required_ok = required_ok and any(
+            acceptance_text(term) in folded for term in choices
+        )
+    forbidden_ok = not any(
+        acceptance_text(term) in folded for term in case.get("forbidden", [])
+    )
+    preserved_ok = all(
+        acceptance_text(term) in folded for term in case.get("preserve", [])
+    )
+    meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
+    return required_ok, forbidden_ok, preserved_ok, meaningful_ok
 
 
 def benchmark_translation(args: argparse.Namespace) -> int:
@@ -1577,27 +1626,12 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     )
                     content = str(message.get("content") or "")
                     thinking = str(message.get("thinking") or "")
-                    folded = acceptance_text(content)
-                    required_ok = all(
-                        acceptance_text(term) in folded
-                        for term in case.get("required", [])
-                    )
-                    choices = case.get("required_any", [])
-                    if choices:
-                        required_ok = required_ok and any(
-                            acceptance_text(term) in folded for term in choices
-                        )
-                    forbidden_ok = not any(
-                        acceptance_text(term) in folded
-                        for term in case.get("forbidden", [])
-                    )
-                    preserved_ok = all(
-                        acceptance_text(term) in folded
-                        for term in case.get("preserve", [])
-                    )
-                    meaningful_ok = len(normalize_words(content)) >= int(
-                        case.get("min_words", 6)
-                    )
+                    (
+                        required_ok,
+                        forbidden_ok,
+                        preserved_ok,
+                        meaningful_ok,
+                    ) = translation_content_checks(content, case)
                     language_hint = task_language_hint(
                         content, case["target_language"]
                     )
@@ -2177,11 +2211,9 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
             )
             content = str(message.get("content") or "")
             thinking = str(message.get("thinking") or "")
-            answer_ok, problems = _acceptance_ok(content, case)
-            retrieval_ok = target_rank <= top_k
-            source_cited = f"[{case['target']}]".casefold() in content.casefold()
-            if not source_cited:
-                problems.append(f"missing source [{case['target']}]")
+            retrieval_ok, answer_ok, source_cited, problems = rag_case_checks(
+                content, case, target_rank=target_rank, top_k=top_k
+            )
             ok = retrieval_ok and answer_ok and source_cited
             done_reason = str(response.get("done_reason") or "")
             thinking_exhausted = (

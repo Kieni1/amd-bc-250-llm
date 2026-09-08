@@ -21,7 +21,7 @@
       "id": "privacy-public-cloud",
       "question": "May confidential HR data be stored in public cloud services? Answer in English.",
       "target": "de-datenschutz",
-      "required_any": ["not allowed", "not permitted", "must not"],
+      "required_any": ["not allowed", "not permitted", "must not", "not permissible"],
       "forbidden": ["yes,", "may be stored"]
     },
     {

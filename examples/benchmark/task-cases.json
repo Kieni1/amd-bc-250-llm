@@ -172,7 +172,8 @@
         "dokumentanalyse"
       ]
     ],
-    "min_semantic_groups": 2
+    "min_semantic_groups": 2,
+    "language_required": true
   },
   {
     "id": "query-fr",

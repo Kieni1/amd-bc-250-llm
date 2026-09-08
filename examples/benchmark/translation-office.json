@@ -66,12 +66,21 @@
     "target_language": "fr",
     "input": "Sehr geehrte Frau Keller, bitte bestätigen Sie den Erhalt von Vertrag REF-81 bis zum 12. Oktober 2026.",
     "required": [
-      "Frau Keller",
+      "Keller",
       "REF-81",
-      "12 octobre 2026"
+      "12 octobre 2026",
+      "contrat"
+    ],
+    "required_any": [
+      "confirmer la réception",
+      "confirmer la reception",
+      "confirmez la réception",
+      "confirmez la reception",
+      "accuser réception",
+      "accuser reception"
     ],
     "preserve": [
-      "Frau Keller",
+      "Keller",
       "REF-81"
     ],
     "forbidden": [
