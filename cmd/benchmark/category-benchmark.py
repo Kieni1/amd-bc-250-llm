@@ -905,18 +905,31 @@ def _bash_contract(body: str, case: dict[str, Any]) -> list[str]:
     elif quoted_glob and not _bash_glob_no_match_safe(body):
         problems.append("glob is not safe when no Modelfile matches")
 
-    # Accept only explicit basename-producing forms. The sed form is narrow:
-    # it must remove everything through the final slash and replace it with
-    # an empty string, as in sed 's#.*/##'.
+    # Accept only explicit basename-producing forms. A bare ``basename`` token
+    # is insufficient: it must occur in command position so constructs such as
+    # ``echo basename "$f"`` cannot satisfy the contract. The sed/awk forms are
+    # deliberately narrow and must actually strip/select the final path field.
+    basename_command = re.search(
+        r"(?:^|[;{}\n]|&&|\|\||\||\(|\))\s*"
+        r"(?:(?:then|do|else|elif|if|while|until)\s+)?"
+        r"(?:command\s+)?basename(?=\s|$)",
+        body,
+        re.MULTILINE,
+    )
     sed_basename = re.search(
         r"\bsed(?:\s+-[A-Za-z]+)*\s+['\"]s(?P<delim>[^A-Za-z0-9\s\\])\.\*/(?P=delim)(?P=delim)['\"]",
         body,
     )
+    awk_basename = re.search(
+        r"\bawk\s+-F\s*['\"]?/['\"]?\s+['\"]\{[^{}\n]*\bprint\s+\$NF\b[^{}\n]*\}['\"]",
+        body,
+    )
     if not (
-        re.search(r"\bbasename\b", body)
+        basename_command
         or re.search(r"%f", body)
         or re.search(r"\$\{[^}]+##\*/\}", body)
         or sed_basename
+        or awk_basename
     ):
         problems.append("missing basename extraction")
     if not re.search(r"\bsort\b", body):

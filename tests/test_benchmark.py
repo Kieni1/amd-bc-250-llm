@@ -459,6 +459,47 @@ find "$directory" -maxdepth 1 -name "*.Modelfile" | sed 's#.*/##' | sort
         self.assertFalse(fake_result["requirements_ok"])
         self.assertIn("missing basename extraction", fake_result["problems"])
 
+        # Real-device Gemma output from 2026-09-09: ``basename`` is merely an
+        # argument to echo here, so it must not satisfy basename extraction.
+        printed_basename = """\
+#!/bin/bash
+if [ $# -ne 1 ]; then
+    exit 2
+fi
+shopt -s nullglob
+for f in "$1"/*.Modelfile; do
+    [ -f "$f" ] && echo basename "$f"
+done | sort
+"""
+        printed_result = category.evaluate_agent_output(printed_basename, case)
+        self.assertTrue(printed_result["syntax_ok"])
+        self.assertFalse(printed_result["requirements_ok"])
+        self.assertIn("missing basename extraction", printed_result["problems"])
+
+        keyword_as_argument = printed_basename.replace(
+            'echo basename "$f"', 'echo if basename "$f"'
+        )
+        keyword_result = category.evaluate_agent_output(keyword_as_argument, case)
+        self.assertFalse(keyword_result["requirements_ok"])
+        self.assertIn("missing basename extraction", keyword_result["problems"])
+
+        awk_good = """\
+#!/usr/bin/env bash
+if [ "$#" -ne 1 ]; then
+    exit 2
+fi
+find "$1" -maxdepth 1 -type f -name '*.Modelfile' | awk -F'/' '{print $NF}' | sort
+"""
+        awk_result = category.evaluate_agent_output(awk_good, case)
+        self.assertTrue(awk_result["syntax_ok"])
+        self.assertTrue(awk_result["requirements_ok"])
+        self.assertNotIn("missing basename extraction", awk_result["problems"])
+
+        fake_awk = awk_good.replace("{print $NF}", "{print $1}")
+        fake_awk_result = category.evaluate_agent_output(fake_awk, case)
+        self.assertFalse(fake_awk_result["requirements_ok"])
+        self.assertIn("missing basename extraction", fake_awk_result["problems"])
+
         find_good = """\
 #!/usr/bin/env bash
 if [ "$#" -ne 1 ]; then
