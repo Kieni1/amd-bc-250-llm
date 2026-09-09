@@ -380,6 +380,47 @@ def parse_ports(value: str) -> list[int]:
 """
         self.assertTrue(category.evaluate_agent_output(good, case)["accepted"])
 
+        # Real-device Qwable output from 2026-09-09: range checking and
+        # deduplication are correct, but int(part.strip()) raises on blank
+        # comma-separated items instead of ignoring them as requested.
+        missing_blank_skip = """\
+def parse_ports(value: str) -> list[int]:
+    seen = set()
+    for part in value.split(','):
+        port = int(part.strip())
+        if not (1 <= port <= 65535):
+            raise ValueError(f"port {port} out of range")
+        seen.add(port)
+    return sorted(seen)
+"""
+        blank_result = category.evaluate_agent_output(missing_blank_skip, case)
+        self.assertTrue(blank_result["syntax_ok"])
+        self.assertFalse(blank_result["requirements_ok"])
+        self.assertEqual(blank_result["problems"], ["missing blank-item skip"])
+
+        direct_strip_guard = """\
+def parse_ports(value: str) -> list[int]:
+    ports = set()
+    for item in value.split(','):
+        if not item.strip():
+            continue
+        port = int(item)
+        if not 1 <= port <= 65535:
+            raise ValueError
+        ports.add(port)
+    return sorted(ports)
+"""
+        self.assertTrue(
+            category.evaluate_agent_output(direct_strip_guard, case)["accepted"]
+        )
+
+        whitespace_unsafe = direct_strip_guard.replace(
+            "if not item.strip():", "if not item:"
+        )
+        unsafe_result = category.evaluate_agent_output(whitespace_unsafe, case)
+        self.assertFalse(unsafe_result["requirements_ok"])
+        self.assertIn("missing blank-item skip", unsafe_result["problems"])
+
     def test_agent_bash_contract_rejects_token_only_false_positive(self) -> None:
         case = next(
             item
@@ -886,6 +927,30 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         )
         required_ok, _forbidden_ok, _preserved_ok, _meaningful_ok = (
             category.translation_content_checks(permissive, case)
+        )
+        self.assertFalse(required_ok)
+
+    def test_translation_real_device_fr_de_lease_accepts_equivalent_quarter_end(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        case = next(item for item in cases if item["id"] == "fr-de-lease")
+        observed = (
+            "Die Kündigungsfrist des Genfer Büros beträgt sechs Monate "
+            "für das Ende eines Quartals."
+        )
+        self.assertEqual(
+            category.translation_content_checks(observed, case),
+            (True, True, True, True),
+        )
+
+        wrong_boundary = observed.replace(
+            "Ende eines Quartals", "Anfang eines Quartals"
+        )
+        required_ok, _forbidden_ok, _preserved_ok, _meaningful_ok = (
+            category.translation_content_checks(wrong_boundary, case)
         )
         self.assertFalse(required_ok)
 

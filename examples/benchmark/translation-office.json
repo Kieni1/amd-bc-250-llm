@@ -117,8 +117,11 @@
     "input": "Le délai de résiliation du bureau de Genève est de six mois pour la fin d'un trimestre.",
     "required": [
       "Genf",
-      "sechs Monate",
-      "Quartalsende"
+      "sechs Monate"
+    ],
+    "required_any": [
+      "Quartalsende",
+      "Ende eines Quartals"
     ],
     "preserve": [],
     "forbidden": [

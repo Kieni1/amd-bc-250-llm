@@ -38,6 +38,7 @@
       65535
     ],
     "python_require_dedup": true,
+    "python_require_blank_skip": true,
     "python_range_guard": {
       "bounds": [
         1,

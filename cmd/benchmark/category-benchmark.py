@@ -779,6 +779,89 @@ def _python_has_dedup(nodes: list[ast.AST]) -> bool:
     return False
 
 
+def _stripped_name(node: ast.AST) -> str | None:
+    """Return the source name for ``name`` or ``name.strip()`` expressions."""
+    if isinstance(node, ast.Name):
+        return node.id
+    if (
+        isinstance(node, ast.Call)
+        and not node.args
+        and not node.keywords
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "strip"
+        and isinstance(node.func.value, ast.Name)
+    ):
+        return node.func.value.id
+    return None
+
+
+def _blank_test_names(test: ast.AST) -> set[str]:
+    """Return names explicitly tested as blank by a simple condition."""
+    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+        name = _stripped_name(test.operand)
+        return {name} if name else set()
+    if isinstance(test, ast.Compare) and len(test.ops) == len(test.comparators) == 1:
+        if not isinstance(test.ops[0], ast.Eq):
+            return set()
+        left, right = test.left, test.comparators[0]
+        if isinstance(right, ast.Constant) and right.value == "":
+            name = _stripped_name(left)
+            return {name} if name else set()
+        if isinstance(left, ast.Constant) and left.value == "":
+            name = _stripped_name(right)
+            return {name} if name else set()
+    return set()
+
+
+def _python_has_blank_skip(function: ast.AST) -> bool:
+    """Recognize split-loop guards that skip empty or whitespace-only items."""
+    for loop in ast.walk(function):
+        if not isinstance(loop, (ast.For, ast.AsyncFor)) or not isinstance(loop.target, ast.Name):
+            continue
+        if not (
+            isinstance(loop.iter, ast.Call)
+            and isinstance(loop.iter.func, ast.Attribute)
+            and loop.iter.func.attr == "split"
+        ):
+            continue
+        source_names = {loop.target.id}
+        stripped_aliases: set[str] = set()
+        for statement in loop.body:
+            if (
+                isinstance(statement, (ast.Assign, ast.AnnAssign))
+                and isinstance(statement.value, ast.Call)
+                and isinstance(statement.value.func, ast.Attribute)
+                and statement.value.func.attr == "strip"
+                and isinstance(statement.value.func.value, ast.Name)
+                and statement.value.func.value.id in source_names
+            ):
+                targets = (
+                    statement.targets
+                    if isinstance(statement, ast.Assign)
+                    else [statement.target]
+                )
+                stripped_aliases.update(
+                    target.id for target in targets if isinstance(target, ast.Name)
+                )
+            if not isinstance(statement, ast.If):
+                continue
+            blank_names = _blank_test_names(statement.test)
+            accepted_names = source_names | stripped_aliases
+            if blank_names & accepted_names and any(
+                isinstance(node, ast.Continue) for node in statement.body
+            ):
+                # A bare source-name check (``if not item``) does not ignore
+                # whitespace-only fields. Require strip() either in the test or
+                # through an alias assigned from the split item.
+                test_uses_strip = any(
+                    isinstance(node, ast.Attribute) and node.attr == "strip"
+                    for node in ast.walk(statement.test)
+                )
+                if test_uses_strip or bool(blank_names & stripped_aliases):
+                    return True
+    return False
+
+
 def _python_contract(body: str, case: dict[str, Any]) -> list[str]:
     problems: list[str] = []
     try:
@@ -843,6 +926,8 @@ def _python_contract(body: str, case: dict[str, Any]) -> list[str]:
             )
     if case.get("python_require_dedup") and not _python_has_dedup(nodes):
         problems.append("missing duplicate removal")
+    if case.get("python_require_blank_skip") and not _python_has_blank_skip(scope):
+        problems.append("missing blank-item skip")
     return problems
 
 
