@@ -6,22 +6,21 @@
 sudo bc250-model install agentic
 
 # Current measured coding-helper starting point
-sudo bc250-model install agentic agentic-qwen25-coder7b-unsloth-q5-k-m
+sudo bc250-model install agentic agentic-ornith15-9b-ornith-q5-k-m
 ```
 
 The package ships static `ollama-agent.service` on port `11436` with its own model
 store. It has no boot enablement and is intentionally exclusive with the
 main/task/embedding lanes. Current choices are:
 
-- `agentic-qwen25-coder7b-unsloth-q5-k-m` — current coding-helper starting
-  point because it consistently reaches a final answer without reasoning-token
-  starvation. The 2026-08-31 run exposed that the old static benchmark was too
-  permissive: its Bash answer used whitespace-splitting `xargs` despite the
-  space-safe requirement and its Python answer silently ignored out-of-range
-  ports. The tightened fixture now checks those requirements explicitly;
-- `agentic-ornith15-9b-ornith-q5-k-m` — native-reasoning agent/coding candidate;
+- `agentic-ornith15-9b-ornith-q5-k-m` — current default. Temperature 0 with a
+  3072-token Bash/Python budget passed all 3 agent fixtures in three consecutive
+  real BC-250 runs with identical final answers;
+- `agentic-qwen25-coder7b-unsloth-q5-k-m` — retained as an alternative coding
+  model, but no longer the package default;
 - `agentic-qwable9b-empero-q6-k` — native-reasoning comparison candidate;
-- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — Gemma 4 12B coding/tool-use experiment at Q4_K_M and 16K context; keep it in the exclusive lane and compare its actual agent fixture results before promotion.
+- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — Gemma 4 12B coding/tool-use
+  experiment at Q4_K_M and 16K context.
 
 With no selection, `bc250-model install agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to
@@ -34,7 +33,7 @@ exclusively rather than alongside a large main-model workload.
 bc250-code review src/app.py review.md
 bc250-code refactor src/app.py src/app.refactored.py \
   "Keep the public API stable"
-CODING_AGENT_MODEL=agentic-qwen25-coder7b-unsloth-q5-k-m \
+CODING_AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m \
   bc250-code document src/app.py docs.md
 ```
 

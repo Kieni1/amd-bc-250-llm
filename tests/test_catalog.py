@@ -147,24 +147,25 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("PARAMETER temperature 0.6", q38)
         self.assertIn("PARAMETER top_p 0.95", q38)
         self.assertIn("PARAMETER top_k 20", q38)
-        coder = (MODELFILES / "agentic-qwen25-coder7b-unsloth-q5-k-m.Modelfile").read_text()
+        coder = (MODELFILES / "agentic-ornith15-9b-ornith-q5-k-m.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 32768", coder)
-        self.assertIn("PARAMETER temperature 0.7", coder)
-        self.assertIn("PARAMETER top_p 0.8", coder)
+        self.assertIn("PARAMETER num_predict 3072", coder)
+        self.assertIn("PARAMETER temperature 0", coder)
+        self.assertIn("PARAMETER top_p 0.95", coder)
 
-    def test_coding_helper_defaults_to_measured_qwen25_coder(self) -> None:
+    def test_coding_helper_defaults_to_measured_ornith(self) -> None:
         helper = (ROOT / "models/coding-agent/coding-agent.sh").read_text(
             encoding="utf-8"
         )
         self.assertIn(
-            "CODING_AGENT_MODEL:-agentic-qwen25-coder7b-unsloth-q5-k-m", helper
+            "CODING_AGENT_MODEL:-agentic-ornith15-9b-ornith-q5-k-m", helper
         )
 
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {
             "embedding": "embed-jina-v5-small-retrieval-q4-k-m",
             "task": "task-gemma3-1b-unsloth-ud-q4-k-xl",
-            "agentic": "agentic-qwen25-coder7b-unsloth-q5-k-m",
+            "agentic": "agentic-ornith15-9b-ornith-q5-k-m",
         }
         for category, name in expected.items():
             with self.subTest(category=category):

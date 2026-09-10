@@ -38,7 +38,7 @@ RECOMMENDED_MODELS = {
     "prod-qwen35-9b-unsloth-q6-k",
     "prod-gpt-oss20b-ggml-org-mxfp4",
     "task-gemma3-1b-unsloth-ud-q4-k-xl",
-    "agentic-qwen25-coder7b-unsloth-q5-k-m",
+    "agentic-ornith15-9b-ornith-q5-k-m",
     "embed-jina-v5-small-retrieval-q4-k-m",
 }
 LOW_FREE_BYTES = 20 * 1024**3
