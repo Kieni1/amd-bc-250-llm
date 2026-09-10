@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.12%{?dist}
+Release:        1.13%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Sep 10 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.13
+- Add checksum-pinned experimental compact task candidates for LFM2.5 1.2B, MiniCPM5 2B, Qwen3 1.7B, and Qwen3.8 2B without changing the packaged Gemma 3 1B task default.
+- Add experimental Hunyuan-MT 7B Q4_K_M and Translate-Gemma 4 Sub E4B Q4_K_XL translation candidates; retain LFM2.5 8B-A1B as the production translation model pending real-device comparison.
+- Package the recent task/translation quality evidence scripts plus separate reusable task, direct-translation, Open WebUI integration, and installed-asset checks outside harness-4.0.
+- Keep package-build validation minimal: syntax/discovery/install-manifest coverage only; candidate quality and hardware behavior remain opt-in real-BC-250 checks.
+
 * Wed Sep 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.12
 - Keep the proven 20-minute main-model residency and 15-minute optional warm-up so interactive chat remains warm instead of paying a large-model cold-load penalty on every turn.
 - Retain the compact Gemma 3 1B Open WebUI task default after hardware/UX review; Qwen3.8 4B Distill remains opt-in because concurrent residency with GPT-OSS caused a real task-service OOM and safe serialization would make subsequent chat cold-start again.

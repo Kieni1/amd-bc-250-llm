@@ -109,6 +109,50 @@ with the package Vulkan profile; they are not cross-machine leaderboard claims.
 | Gemma 3 1B task | compact dedicated task lane; earlier multilingual fixture exposed weak language adherence | Keep as the low-memory Open WebUI task default pending a replacement that can coexist safely with memory-edge main models |
 | Qwen3.8 4B Distill task experiment | 6/6 with clarified individual-message counting and a 256-token non-title budget | Quality winner in focused testing, but not promoted because GPT-OSS overlap OOM-killed the task service and serialization would regress chat latency |
 
+## 2026-09-10 quality follow-up
+
+The pre-v1.0 quality pass now separates model-candidate work from the six-phase
+whole-appliance revalidation harness. The standalone checks under
+`quality-checks/` collect candidate evidence without changing production
+defaults or claiming release qualification.
+
+Task-model evidence on the real BC-250:
+
+- packaged Gemma 3 1B: **6/18** across three runs (roughly 2/6 each run);
+  failures were mainly genuine language/relevance misses;
+- Granite 4.2 3B Q6_K: **2/18** under the packaged contract, with 16
+  output-budget diagnostics and frequent reasoning-budget exhaustion before a
+  usable final answer;
+- Qwen3.8 4B Distill Q6_K: **9/18** under the unchanged 128-token non-title
+  contract; eight of nine failures hit the output budget. Earlier clarified
+  prompting plus a 256-token non-title budget reached 6/6, but deliberate
+  simultaneous residency with warm GPT-OSS OOM-killed the task service.
+
+The 1B Gemma therefore remains the production task model. Four additional
+compact task candidates are packaged only as `exp-*` comparisons: LFM2.5 1.2B,
+MiniCPM5 2B, Qwen3 1.7B, and Qwen3.8 2B Distill. A candidate must first improve
+quality and then prove safe coexistence with warm GPT-OSS before any promotion.
+
+Translation evidence on the actual authenticated Open WebUI path:
+
+- original LFM preset: **45/80**;
+- stronger auto-direction prompt: **67/80**, with a regression on the formal
+  German-to-French case;
+- minimal auto-direction prompt: **69/80**, the best LFM prompt tested so far;
+- two explicit direction roles: **69/80**, no net improvement;
+- minimal prompt plus temperature 0: **60/80**, making two bad modes
+  deterministic.
+
+Prompt/sampling tuning for LFM is therefore paused. The production LFM model is
+unchanged in 1.13 while model-level challengers are screened. The priority
+translation experiments are Hunyuan-MT 7B Q4_K_M and Translate-Gemma 4 Sub E4B
+Q4_K_XL; the existing Ministral 8B experiment remains only a short comparison
+control because prior testing was not strong.
+
+Do not infer promotion from a short candidate screen. A translation challenger
+must beat the LFM quality pattern, then pass the real Open WebUI integration
+path, and only then receive latency/memory and broader-corpus confirmation.
+
 ### Production residency follow-up
 
 The 2026-08-31 production run predates the dedicated 11437 embedding service.
@@ -142,10 +186,13 @@ contain Modelfiles only; it is intentionally outside every model discovery root.
 | `exp-granite42-8b-ibm-q5-k-m` | ~8.3 GiB resident for ~50 tok/s and weak long-prompt throughput; no demonstrated office/RAG quality win over the production set |
 | `exp-ling30-tiny-bloomer-q5-k-m` | very high raw decode (~144 tok/s) but the shared reasoning cap was repeatedly consumed before a usable final answer |
 | `exp-qwen35-9b-davidau-defiant-fable-q6-k` | older comparable run had much worse answer-start latency with no throughput/UX case against production Qwen3.5 or GPT-OSS |
+| `task-lfm25-2.6b-liquidai-q6-k` | retired task-lane experiment; no remaining promotion case against the smaller packaged task baseline and newer compact candidates |
 
-Still-open comparisons include Qwen3.8 4B Distill (compact reasoner), Granite
-4.2 3B (compact architecture baseline), both embedding models, OCR candidates,
-and the agentic models. The latest evidence is not sufficient to call those exhausted.
+Still-open comparisons include Qwen3.8 4B Distill and the new compact task
+candidates, the Hunyuan/Translate-Gemma translation challengers, both embedding
+models, OCR candidates, and the agentic models. Granite 4.2 3B remains a measured
+control despite its poor task-contract result. The latest evidence is not sufficient
+to call the other open candidates exhausted.
 
 Use the role-specific lanes before changing defaults:
 
@@ -174,6 +221,12 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
+| `exp-lfm25-1.2b-instruct-liquidai-q6-k` | checksum-pinned 1.2B compact task candidate; compare quality and coexistence against packaged task Gemma |
+| `exp-minicpm5-2b-openbmb-q4-k-m` | checksum-pinned 2B edge-model task candidate; multilingual task quality must be proven on the BC-250 |
+| `exp-qwen3-1.7b-ggml-q4-k-m` | checksum-pinned compact Qwen task candidate under the deployable task contract |
+| `exp-qwen38-2b-distill-empero-q6-k` | checksum-pinned 2B Distill follow-up to test whether the 4B Qwen3.8 quality signal survives at safer residency |
+| `exp-hunyuan-mt-7b-mungert-q4-k-m` | checksum-pinned dedicated translation challenger; screen explicit DE/FR direction first, then OWUI integration |
+| `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | checksum-pinned translation-specialist Gemma E4B challenger for DE/FR office text |
 | `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
 | `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
 | `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; temperature 0 + 3072-token Bash/Python budget passed 3/3 in three consecutive BC-250 runs |

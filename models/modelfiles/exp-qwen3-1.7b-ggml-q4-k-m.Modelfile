@@ -1,0 +1,26 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen3-1.7b-ggml-q4-k-m
+# Source: ggml-org/Qwen3-1.7B-GGUF @ main
+# GGUF: Qwen3-1.7B-Q4_K_M.gguf
+# SHA256: d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5
+# License: Apache-2.0
+# Role: compact Qwen task-lane fallback candidate.
+#
+# Intended role:
+# - DE/FR/EN structured task generation experiment
+# - Low-memory comparison against Gemma 3 1B, LFM2.5 1.2B and Qwen3.8 2B
+# - Candidate for safe coexistence with warm GPT-OSS if quality is sufficient
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/Qwen3-1.7B-Q4_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 4096
+PARAMETER num_predict 128
+# Qwen3 recommended thinking-mode sampling. The task benchmark should reveal
+# whether its reasoning overhead is acceptable under the deployable contract.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental compact task assistant. Follow requested output formats exactly. Use the requested language or the primary language of the supplied chat. Preserve names, identifiers, dates and numbers. When the user requests only a title, tags, query, or JSON object, return only that requested result."""

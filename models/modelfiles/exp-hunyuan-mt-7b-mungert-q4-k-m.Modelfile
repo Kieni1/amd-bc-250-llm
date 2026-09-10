@@ -1,0 +1,23 @@
+# BC250 category: experimental
+# Ollama model: exp-hunyuan-mt-7b-mungert-q4-k-m
+# Source: Mungert/Hunyuan-MT-7B-GGUF @ main
+# GGUF: Hunyuan-MT-7B-q4_k_m.gguf
+# SHA256: c6cb1068db17f851a4dd9e1d2e3217a293a50000e617486e7fd0bfaa05674d88
+# Role: translation-specialist challenger for German/French office text.
+#
+# Hunyuan-MT is intentionally kept experimental. Upstream recommends a direct
+# target-language user prompt and no default system prompt; the standalone
+# translation checks exercise that contract before any Open WebUI promotion.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/Hunyuan-MT-7B-q4_k_m.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+# Keep the first BC-250 comparison conservative; office fixtures are short.
+PARAMETER num_ctx 8192
+PARAMETER num_predict 1024
+# Tencent Hunyuan-MT recommended inference settings.
+PARAMETER temperature 0.7
+PARAMETER top_k 20
+PARAMETER top_p 0.6
+PARAMETER repeat_penalty 1.05

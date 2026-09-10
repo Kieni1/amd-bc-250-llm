@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.0-1.13 - 2026-09-10
+
+- Add checksum-pinned experimental compact task candidates: LFM2.5 1.2B, MiniCPM5 2B, Qwen3 1.7B and Qwen3.8 2B Distill. The production task default remains Gemma 3 1B until a candidate proves both quality and safe coexistence with warm GPT-OSS.
+- Add Hunyuan-MT 7B Q4_K_M and Translate-Gemma 4 Sub E4B Q4_K_XL as translation experiments. LFM2.5 8B-A1B remains production while model comparison continues.
+- Install the Batch 1-3D evidence scripts and new standalone task/translation candidate screens under `/usr/share/bc250-llm-server/quality-checks/`. These are deliberately separate from harness-4.0 qualification.
+- Add only minimal package coverage for the new quality assets; real model downloads, GPU/runtime quality and Open WebUI mutation checks remain operator-run on the BC-250.
+
+## 0.11.0-1.12 - 2026-09-09
+
+- Preserve the proven 20-minute main-model residency and keep Gemma 3 1B as the lightweight Open WebUI task default after Qwen3.8 4B overlap with GPT-OSS caused a real task-service OOM.
+- Promote Ornith 1.5 9B for exclusive agent mode at temperature 0 with 3072-token Bash/Python budgets.
+- Keep Jina v5 small as the warm embedding default and retain explicit German/French translation direction in the production LFM model.
+- Preserve harness-4.0 architecture and quality return-code semantics while carrying forward the corrected RAG, translation, task, agent and dashboard evaluators.
+
 ## 0.11.0-1.11 - 2026-09-08
 
 - Correct post-qualification evaluator false negatives for public-cloud RAG prohibition wording, redundant question identifiers, locale/order-safe currency invariants, formal French prohibition wording, and the DE-to-FR formal-office honorific/invariant-content fixture.

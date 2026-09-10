@@ -188,6 +188,7 @@ Repository groups:
 - `cmd/`: host commands, services and timers;
 - `config/`: shipped governor, nginx and container configuration;
 - `models/`: Modelfiles and specialized model workflows;
+- `quality-checks/`: standalone real-device candidate screens and evidence helpers;
 - `packaging/` and `scripts/`: RPM policy and build tooling;
 - `docs/`: operator references.
 
@@ -196,6 +197,7 @@ Repository groups:
 - [`TLDR.md`](TLDR.md): short installation and operations sheet.
 - [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
 - [`MODELS.md`](MODELS.md): operator model roles, swapping, overrides and cleanup.
+- [`docs/QUALITY-CHECKS.md`](docs/QUALITY-CHECKS.md): standalone candidate-quality screens, evidence bundles and separation from release qualification.
 - [`models/README.md`](models/README.md): detailed Modelfile discovery/storage contract.
 - [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
 - [`docs/RAG.md`](docs/RAG.md): German/French/English office-document and knowledge-base pilot.

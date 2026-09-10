@@ -1,0 +1,24 @@
+# BC250 category: experimental
+# Ollama model: exp-minicpm5-2b-openbmb-q4-k-m
+# Source: openbmb/MiniCPM5-2B-GGUF @ main
+# GGUF: MiniCPM5-2B-Q4_K_M.gguf
+# SHA256: ec2d5801640099e97d8d7e8003ad4d81f336e757811f03a26173dddf386602fd
+# License: Apache-2.0
+# Role: compact task-quality candidate with on-device/edge focus.
+#
+# Intended role:
+# - Structured title/tag/query generation experiment
+# - Test DE/FR behavior despite upstream emphasis on English/Chinese
+# - Candidate for task-lane use only if multilingual quality and coexistence pass
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/MiniCPM5-2B-Q4_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 4096
+PARAMETER num_predict 128
+# OpenBMB recommended sampling.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+
+SYSTEM """You are an experimental compact task assistant. Follow the requested output format exactly and do not add explanations when a raw title, tag list, query, or JSON object is requested. Use the requested language or the primary language of the supplied chat and preserve names, identifiers, dates, and numbers."""

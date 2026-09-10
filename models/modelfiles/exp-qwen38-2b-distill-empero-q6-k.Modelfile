@@ -1,0 +1,29 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen38-2b-distill-empero-q6-k
+# Source: empero-ai/Qwen3.8-2B-Distill-GGUF @ main
+# GGUF: Qwen3.8-2B-Q6_K.gguf
+# SHA256: 0c9fc69b74d8be52ee28c388518f31787b65be35d3db882a66a0d548eba8d4df
+# License: Apache-2.0
+# Role: compact native-reasoning task candidate derived from the successful Qwen3.8 Distill line.
+#
+# Intended role:
+# - Determine how much of the Qwen3.8 4B task quality survives at 2B
+# - DE/FR/EN structured title/tag/query generation
+# - Candidate for task-lane coexistence testing with warm GPT-OSS
+#
+# Requires current Qwen3.5/Gated-DeltaNet runtime support.
+# Upstream describes this as a native reasoning model; do not force generic greedy decoding.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/Qwen3.8-2B-Q6_K.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+# Deliberately task-sized to limit unified-memory pressure on the BC-250.
+PARAMETER num_ctx 4096
+PARAMETER num_predict 128
+# Upstream recommended reasoning sampling.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+
+SYSTEM """You are an experimental compact reasoning assistant for structured Open WebUI tasks. Follow the user's requested format exactly, answer in the requested language or the language of the supplied chat, preserve names, identifiers, dates and numbers, and return only the requested result when a raw title, tag list, query, or JSON object is requested."""

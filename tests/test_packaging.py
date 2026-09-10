@@ -23,6 +23,19 @@ class PackagingTests(unittest.TestCase):
             rf"(?m)^%changelog\n\* .* - {re.escape(version)}-{re.escape(release.group(1))}$",
         )
 
+    def test_standalone_quality_checks_are_packaged_but_not_wired_into_revalidation(self) -> None:
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        revalidate = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        for entry in (
+            "quality-checks/README.md\t{share}/quality-checks/README.md",
+            "quality-checks/package/*.sh\t{share}/quality-checks/package/",
+            "quality-checks/task/*.sh\t{share}/quality-checks/task/",
+            "quality-checks/translation/*.sh\t{share}/quality-checks/translation/",
+            "quality-checks/translation/prompts/*.txt\t{share}/quality-checks/translation/prompts/",
+        ):
+            self.assertIn(entry, manifest)
+        self.assertNotIn("quality-checks", revalidate)
+
     def test_install_manifest_rejects_sources_outside_source_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

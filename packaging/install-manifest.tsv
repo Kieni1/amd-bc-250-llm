@@ -16,6 +16,13 @@ dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
 dir	0755	-	{share}/ollama-profiles
 dir	0755	-	{share}/openwebui
+dir	0755	-	{share}/quality-checks
+dir	0755	-	{share}/quality-checks/history
+dir	0755	-	{share}/quality-checks/package
+dir	0755	-	{share}/quality-checks/task
+dir	0755	-	{share}/quality-checks/translation
+dir	0755	-	{share}/quality-checks/translation/prompts
+dir	0755	-	{share}/quality-checks/utils
 dir	0755	-	{config}
 dir	0755	-	{config}/models.d
 dir	0755	-	{sysconfdir}/cyan-skillfish-governor-smu
@@ -118,6 +125,13 @@ file	0644	examples/raspi-wol/bc250-night-shutdown.timer	{unitdir}/bc250-night-sh
 file	0644	models/mtp/models.toml	{share}/model-management/mtp-models.toml
 file	0644	models/modelfiles/*.Modelfile	{share}/model-management/modelfiles/
 file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-management/MODEL-TEMPLATE.Modelfile.example
+file	0644	quality-checks/README.md	{share}/quality-checks/README.md
+file	0755	quality-checks/history/*.sh	{share}/quality-checks/history/
+file	0755	quality-checks/package/*.sh	{share}/quality-checks/package/
+file	0755	quality-checks/task/*.sh	{share}/quality-checks/task/
+file	0755	quality-checks/translation/*.sh	{share}/quality-checks/translation/
+file	0644	quality-checks/translation/prompts/*.txt	{share}/quality-checks/translation/prompts/
+file	0755	quality-checks/utils/*.sh	{share}/quality-checks/utils/
 
 file	0644	models/task-model/README.md	{share}/examples/task-model/README.md
 file	0755	models/task-model/setup-ollama.sh	{share}/examples/task-model/setup-ollama.sh

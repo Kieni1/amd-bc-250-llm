@@ -19,6 +19,7 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/bin/llm-run-diagnose` | Model-run diagnostic |
 | `/usr/libexec/bc250-llm-server/` | Command implementations |
 | `/usr/share/bc250-llm-server/model-management/` | Packaged Modelfiles and operator template |
+| `/usr/share/bc250-llm-server/quality-checks/` | Standalone real-device candidate screens, historical quality recipes and evidence helpers; not release qualification |
 | `/usr/share/bc250-llm-server/40cu/` | Pinned unlock patch and source metadata |
 | `/usr/share/doc/bc250-llm-server/` | Installed documentation, including `MODELS.md` and `BENCHMARK.md` |
 | `/usr/lib/systemd/system/` | Packaged services and timers |

@@ -1,0 +1,22 @@
+# BC250 category: experimental
+# Ollama model: exp-translate-gemma4-sub-e4b-17s-q4-k-xl
+# Source: 17slever17/translate-gemma-4-sub-e4b-GGUF @ main
+# GGUF: translate_gemma4_sub-E4B-Q4_K_XL.gguf
+# SHA256: 0b3d302f371fefa42945371635cbb2355a74c1c8a5ecf80670b21ccf421027d9
+# License: Apache-2.0
+# Role: Gemma 4 E4B translation-specialist challenger for German/French office text.
+#
+# The source model was fine-tuned for source-to-target translation and uses
+# deterministic generation in its published examples. Keep this experimental
+# until BC-250 quality, memory and latency are measured.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/translate_gemma4_sub-E4B-Q4_K_XL.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 8192
+PARAMETER num_predict 1024
+# Published Translate-Gemma examples use do_sample=false.
+PARAMETER temperature 0
+
+SYSTEM """You are a professional translation model. Follow the user's explicit source-language and target-language instruction exactly. Preserve meaning, names, numbers, terminology, register and document structure. Translate ordinary-language source words completely and return only the requested final translation without commentary."""

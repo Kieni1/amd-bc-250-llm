@@ -1,0 +1,26 @@
+# BC250 category: experimental
+# Ollama model: exp-lfm25-1.2b-instruct-liquidai-q6-k
+# Source: LiquidAI/LFM2.5-1.2B-Instruct-GGUF @ main
+# GGUF: LFM2.5-1.2B-Instruct-Q6_K.gguf
+# SHA256: c5e895c191a066f6b26a8f09f10e94cdb799e579216f87df61a7e27beacd9a2b
+# License: LFM1.0
+# Role: compact task-lane candidate for Open WebUI title/tag/query generation.
+#
+# Intended role:
+# - DE/FR/EN structured task generation
+# - Small-model comparison against task Gemma 3 1B
+# - Candidate for safe coexistence with warm GPT-OSS if quality is sufficient
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/LFM2.5-1.2B-Instruct-Q6_K.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+# Match the deployed task lane's practical context rather than the model maximum.
+PARAMETER num_ctx 4096
+PARAMETER num_predict 128
+# LiquidAI recommended generation settings for LFM2.5-1.2B-Instruct.
+PARAMETER temperature 0.1
+PARAMETER top_k 50
+PARAMETER repeat_penalty 1.05
+
+SYSTEM """You are an experimental compact task assistant. Follow the user's requested output format exactly. Respond in the requested language or the language of the supplied chat. Preserve names, identifiers, dates, numbers, and technical terms. Return only the requested title, tags, search query, or structured result without commentary."""
