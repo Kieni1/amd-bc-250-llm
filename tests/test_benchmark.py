@@ -964,15 +964,12 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         )
         self.assertEqual(failures, ["source-leakage"])
 
-    def test_translation_direction_can_be_made_explicit_for_ab_comparison(self) -> None:
+    def test_translation_direction_is_explicit_package_policy(self) -> None:
         case = {"source_language": "fr", "target_language": "de", "input": "Bonjour."}
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("TRANSLATION_EXPLICIT_DIRECTION", None)
-            self.assertEqual(category.translation_prompt(case), "Bonjour.")
-        with patch.dict(os.environ, {"TRANSLATION_EXPLICIT_DIRECTION": "1"}, clear=False):
-            prompt = category.translation_prompt(case)
-            self.assertIn("French to German", prompt)
-            self.assertTrue(prompt.endswith("Bonjour."))
+        prompt = category.translation_prompt(case)
+        self.assertIn("French to German", prompt)
+        self.assertIn("Translate every ordinary-language source word", prompt)
+        self.assertTrue(prompt.endswith("Bonjour."))
 
     def test_task_and_agent_benchmarks_return_quality_status(self) -> None:
         source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
@@ -1721,13 +1718,13 @@ printf 'ok\n'
             source = ROOT / "cmd/benchmark/revalidate.sh"
             probe = t / "probe"
             probe.write_text(
-                "#!/bin/bash\nprintf '%s|%s|%s|%s\n' \"${TRANSLATION_MODEL-unset}\" \"${TRANSLATION_EXPLICIT_DIRECTION-unset}\" \"${BC250_BENCH_FIXTURES-unset}\" \"${AGENT_TEMPERATURE-unset}\"\n",
+                "#!/bin/bash\nprintf '%s|%s|%s\\n' \"${TRANSLATION_MODEL-unset}\" \"${BC250_BENCH_FIXTURES-unset}\" \"${AGENT_TEMPERATURE-unset}\"\n",
                 encoding="utf-8",
             )
             probe.chmod(0o755)
             script = f"""
 source "{source}" help >/dev/null
-export TRANSLATION_MODEL=evil TRANSLATION_EXPLICIT_DIRECTION=1 BC250_BENCH_FIXTURES=/evil AGENT_TEMPERATURE=9
+export TRANSLATION_MODEL=evil BC250_BENCH_FIXTURES=/evil AGENT_TEMPERATURE=9
 qualification_benchmark "{probe}"
 RAW="{t / 'raw'}"
 mkdir -p "$RAW/roles"
@@ -1742,7 +1739,7 @@ phase_roles
                 ["bash", "-c", script], text=True, capture_output=True, check=True
             )
             lines = completed.stdout.splitlines()
-            self.assertEqual(lines[0], "unset|unset|unset|unset")
+            self.assertEqual(lines[0], "unset|unset|unset")
             output = "\n".join(lines[1:])
             self.assertIn("translation quality qualification_benchmark bc250-benchmark translation prod-lfm25-8b-a1b-liquidai-q6-k --ollama-url http://127.0.0.1:11434", output)
             self.assertIn("--ollama-url http://127.0.0.1:11437", output)

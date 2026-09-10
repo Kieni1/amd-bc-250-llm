@@ -2,7 +2,7 @@
   {
     "id": "bash-model-list",
     "validator": "bash",
-    "num_predict": 1024,
+    "num_predict": 3072,
     "required": [
       "*.Modelfile",
       "sort",
@@ -21,7 +21,7 @@
   {
     "id": "python-port-parser",
     "validator": "python",
-    "num_predict": 1024,
+    "num_predict": 3072,
     "required": [],
     "prompt": "Write Python 3 code defining parse_ports(value: str) -> list[int]. It must parse comma-separated TCP ports, ignore blank items, reject values outside 1..65535 with ValueError, remove duplicates, and return ascending ports. Use only the standard library. Return only code, with no Markdown fences or explanation.",
     "raw_only": true,

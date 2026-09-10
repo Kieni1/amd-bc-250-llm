@@ -1591,12 +1591,14 @@ def acceptance_text(text: str) -> str:
 
 
 def translation_prompt(case: dict[str, Any]) -> str:
-    if os.environ.get("TRANSLATION_EXPLICIT_DIRECTION", "").casefold() not in {"1", "true", "yes"}:
-        return case["input"]
     names = {"de": "German", "fr": "French", "en": "English"}
     source = names.get(case["source_language"], case["source_language"])
     target = names.get(case["target_language"], case["target_language"])
-    return f"Translate from {source} to {target}. Return only the translation.\n\n{case['input']}"
+    return (
+        f"Translate from {source} to {target}. Translate every ordinary-language "
+        "source word. Preserve only names, identifiers, reference numbers, amounts, "
+        f"and dates unchanged. Return only the translation.\n\n{case['input']}"
+    )
 
 
 def translation_failure_kinds(
@@ -1667,11 +1669,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
     copy_fixtures(paths, fixture)
     write_meta(
         meta_path, client, "translation", models, fixture,
-        options={
-            "explicit_direction": os.environ.get(
-                "TRANSLATION_EXPLICIT_DIRECTION", ""
-            ).casefold() in {"1", "true", "yes"}
-        },
+        options={"explicit_direction": True},
     )
     fields = [
         "timestamp",
