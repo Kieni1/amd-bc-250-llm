@@ -62,7 +62,7 @@ readonly QWEN_MODEL=prod-qwen35-9b-unsloth-q6-k
 readonly GPT_OSS_MODEL=prod-gpt-oss20b-ggml-org-mxfp4
 readonly EMBED_MODEL=embed-jina-v5-small-retrieval-q4-k-m
 readonly TASK_MODEL=task-gemma3-1b-unsloth-ud-q4-k-xl
-readonly AGENT_MODEL=agentic-qwen25-coder7b-unsloth-q5-k-m
+readonly AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m
 readonly OWUI_RAG_MODEL=bc250-office-documents
 readonly -a PACKAGE_PROD_MODELS=(
   "$E2B_MODEL" "$E4B_MODEL" "$LFM_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
@@ -168,7 +168,7 @@ qualification_benchmark() {
   env \
     -u OLLAMA_URL -u OLLAMA_HOST -u EMBEDDING_OLLAMA_URL \
     -u BC250_BENCH_FIXTURES -u AGENT_TEMPERATURE \
-    -u TRANSLATION_MODEL -u TRANSLATION_EXPLICIT_DIRECTION \
+    -u TRANSLATION_MODEL \
     -u RAG_EMBED_MODEL -u RAG_ANSWER_MODEL -u RAG_QUALITY_TOP_K \
     -u RAG_QUALITY_NUM_PREDICT -u EMBED_REPEATS -u EMBED_QUERY_PREFIX \
     -u EMBED_CONTENT_PREFIX -u KEEP_ALIVE -u REQUEST_TIMEOUT \

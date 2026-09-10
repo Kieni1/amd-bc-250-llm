@@ -35,3 +35,14 @@ and tag generation enabled. Keep retrieval-query generation off for the baseline
 and enable it only when deliberately testing query rewriting. Leave autocomplete,
 follow-ups and web-search query generation off until needed because repeated task
 loads can overlap a larger warm chat model.
+
+## Hardware/UX decision for Qwen3.8 4B
+
+`exp-qwen38-4b-distill-empero-q6-k` remains an opt-in experiment rather than the
+Open WebUI task default. It scored materially better in focused task experiments,
+but real BC-250 overlap with the 10.8 GiB GPT-OSS main model drove available
+memory to the edge and the kernel OOM-killed the task service. Serializing the
+4B task model would also evict a warm large chat model and impose a large cold-load
+penalty on the next user message. The packaged 1B task lane therefore remains the
+safer low-latency companion while the 4B candidate stays available for deliberate
+manual experiments.

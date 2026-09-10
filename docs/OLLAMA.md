@@ -38,7 +38,7 @@ The package owns a fixed four-lane service topology. A completed normal applianc
 
 | Lane | Port | Keepalive | Normal boot | Purpose |
 |---|---:|---|---|---|
-| main | 11434 | production profile | yes | production chat/RAG answers |
+| main | 11434 | `20m` | yes | production chat/RAG answers; keep warm for interactive latency |
 | task | 11435 | `0` | yes | Open WebUI title/tag tasks |
 | embedding | 11437 | `10m` | yes | retrieval embeddings only |
 | agent | 11436 | `5m` | **no** | exclusive coding/agent work |
@@ -46,8 +46,13 @@ The package owns a fixed four-lane service topology. A completed normal applianc
 `ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250-agent-mode enter` before coding work and
 `sudo bc250-agent-mode leave` afterwards. All lanes share the same BC-250 UMA
 pool; the separation controls lifecycle and eviction, not physical memory.
-GPT-OSS 20B with warm Jina remains the production memory-edge qualification;
-re-run it when a package/runtime change could affect residency or UMA headroom.
+The compact task model remains ephemeral while the main chat model stays warm. This is
+intentional: real-device testing showed that the Qwen3.8 4B task candidate can OOM the
+task service when it overlaps GPT-OSS, while making the main lane ephemeral adds a
+large cold-start penalty to normal chat. Qwen3.8 therefore remains an opt-in experiment
+rather than the packaged task default. GPT-OSS 20B with warm Jina remains the
+production memory-edge qualification; re-run it when a package/runtime change could
+affect residency or UMA headroom.
 
 ## 0.33.3 runtime notes
 
