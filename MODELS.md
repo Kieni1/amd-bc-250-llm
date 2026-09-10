@@ -18,11 +18,12 @@ way to override packaged model definitions.
 | `agentic` | `agentic-` | `11436` | coding/repository work |
 | `mtp` | n/a | llama.cpp helper | download-only MTP experiments |
 
-Main, task and embedding stores are deliberately separate. The task model unloads
-after requests; the embedding lane keeps the small retrieval model for 10 minutes
-to avoid unnecessary chat-model eviction during document work. Agent/coding is
-**exclusive**: `bc250-agent-mode enter` stops main/task/embedding and starts only
-11436; `leave` restores normal mode.
+Main, task and embedding stores are deliberately separate. The main lane keeps its
+selected chat model warm for 20 minutes, the compact task lane unloads after each
+request, and the embedding lane keeps the small retrieval model warm for 10 minutes.
+This preserves interactive chat latency while keeping background task residency small.
+Agent/coding is **exclusive**: `bc250-agent-mode enter` stops main/task/embedding and
+starts only 11436; `leave` restores normal mode.
 
 The package owns all four Ollama service definitions statically. Normal mode requires main, task and embedding; model registration automatically switches into temporary agent mode when an agentic selection is included and restores normal mode afterwards.
 
@@ -105,19 +106,22 @@ with the package Vulkan profile; they are not cross-machine leaderboard claims.
 | GPT-OSS 20B | ~10.8 GiB, ~80 tok/s and usable medium-reasoning latency in the reviewed run | Keep deep-reasoning role; re-test memory headroom with the new resident embedding lane |
 | Jina v5 / Qwen3 Embedding | both 11/13 Recall@1, 13/13 Recall@3 on the harder multilingual near-duplicate fixture | Jina stays baseline; Qwen remains a real licensing/behavior alternative |
 | GLM-OCR / OvisOCR2 | GLM ~0.996 mean word F1 vs Ovis ~0.735, both full field recall on the three-page baseline | GLM leads fidelity; Ovis remains speed/structure comparison |
-| Gemma 3 1B task | 6/6 structurally usable OWUI JSON, but requested language matched only 2/6 | Keep task default; multilingual adherence is the next quality target |
+| Gemma 3 1B task | compact dedicated task lane; earlier multilingual fixture exposed weak language adherence | Keep as the low-memory Open WebUI task default pending a replacement that can coexist safely with memory-edge main models |
+| Qwen3.8 4B Distill task experiment | 6/6 with clarified individual-message counting and a 256-token non-title budget | Quality winner in focused testing, but not promoted because GPT-OSS overlap OOM-killed the task service and serialization would regress chat latency |
 
 ### Production residency follow-up
 
 The 2026-08-31 production run predates the dedicated 11437 embedding service.
-Jina is small and normal main+task+embedding concurrency is the packaged layout,
-but GPT-OSS 20B is the memory-edge production case. Re-run production/use-case
-and long-context measurements with the embedding model warm after changes that can
-affect runtime residency. A 2026-09-05 script-validation run reached GPT-OSS + 4K Jina coexistence
-without the previous global OOM, but that run also exposed harness issues and is
-therefore provisional rather than a final device-policy measurement. Do not change
-the keepalive from that single run. Agentic/coding results are separate because
-agent mode is exclusive by design.
+Jina is small and all three normal services remain active. GPT-OSS 20B is the
+memory-edge production case, so re-run production/use-case and long-context
+measurements with the embedding model warm after changes that can affect runtime
+residency. Later real-device testing showed that GPT-OSS remained healthy after an
+ephemeral Qwen3.8 task request, but deliberate simultaneous GPT-OSS + Qwen3.8
+residency OOM-killed the task service. Making every main request ephemeral avoided
+that overlap but imposed roughly large-model cold-load latency on subsequent chat,
+so the package keeps the proven warm main lane and retains the much smaller Gemma
+1B task default. Qwen3.8 Distill remains an explicit experiment. Agentic/coding
+results are separate because agent mode is exclusive by design.
 
 ### Exhausted comparison candidates
 
@@ -164,7 +168,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-qwen38-4b-distill-empero-q6-k` | compact native-reasoning Qwen comparison |
+| `exp-qwen38-4b-distill-empero-q6-k` | focused task-quality candidate; 6/6 in the temporary clarified-prompt/256-token experiment, but too memory-heavy to become the always-available task default beside GPT-OSS |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
@@ -172,7 +176,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
 | `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
 | `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
-| `agentic-qwen25-coder7b-unsloth-q5-k-m` | Qwen2.5-Coder coding starting point; rerun the tightened static-semantic agent fixture before promotion |
+| `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; temperature 0 + 3072-token Bash/Python budget passed 3/3 in three consecutive BC-250 runs |
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use experiment for the exclusive 11436 lane; compare against Qwen2.5-Coder and Ornith before any role change |
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit

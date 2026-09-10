@@ -87,18 +87,23 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
-| Coding and agentic work | `agentic-qwen25-coder7b-unsloth-q5-k-m` |
+| Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
 The packaged comparison catalog retains the operator's measured experiment
-set, including `agentic-ornith15-9b-ornith-q5-k-m`, `exp-qwen38-4b-distill-empero-q6-k`,
-`exp-granite42-3b-ibm-q6-k`, `exp-granite42-8b-ibm-q5-k-m`, and
+set, including `exp-granite42-3b-ibm-q6-k`, `exp-granite42-8b-ibm-q5-k-m`, and
 `exp-ling30-tiny-bloomer-q5-k-m`; they are benchmark challengers, not silent
 replacements for the defaults above.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
-quality and quantization comparisons. The Jina embedding model uses a
-non-commercial license; review every model's current license before use.
+quality and quantization comparisons. The main lane keeps models warm for 20 minutes
+for responsive chat, the compact task lane unloads after each request, and the Jina
+embedding lane keeps its small retrieval model warm for 10 minutes. Qwen3.8 4B
+Distill remains an opt-in experiment: it scored much better in focused task tests,
+but simultaneous residency with GPT-OSS caused a real task-service OOM and forcing
+safe serialization would make the next large-model chat cold-start again. The Jina
+embedding model uses a non-commercial license; review every model's current license
+before use.
 
 ## Daily commands
 

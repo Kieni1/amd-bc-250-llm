@@ -123,7 +123,7 @@ class DocumentationTests(unittest.TestCase):
             "prod-gpt-oss20b-ggml-org-mxfp4",
             "embed-jina-v5-small-retrieval-q4-k-m",
             "task-gemma3-1b-unsloth-ud-q4-k-xl",
-            "agentic-qwen25-coder7b-unsloth-q5-k-m",
+            "agentic-ornith15-9b-ornith-q5-k-m",
         )
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         for name in recommended:
