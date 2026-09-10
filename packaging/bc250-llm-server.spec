@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.11%{?dist}
+Release:        1.12%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Wed Sep 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.12
+- Keep the proven 20-minute main-model residency and 15-minute optional warm-up so interactive chat remains warm instead of paying a large-model cold-load penalty on every turn.
+- Retain the compact Gemma 3 1B Open WebUI task default after hardware/UX review; Qwen3.8 4B Distill remains opt-in because concurrent residency with GPT-OSS caused a real task-service OOM and safe serialization would make subsequent chat cold-start again.
+- Promote Ornith 1.5 9B to the exclusive coding/agent role with temperature 0 and 3072-token Bash/Python agent budgets.
+- Make German/French translation direction explicit by default and strengthen complete-source-word translation while preserving document invariants.
+- Preserve the harness/evaluator architecture and previously corrected translation, task-language, RAG, agent and dashboard evaluators without adding package-build test cases.
+
 * Tue Sep 08 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.11
 - Accept semantically equivalent public-cloud prohibition wording and avoid redundant question-ID requirements in direct RAG while preserving retrieval and citation gates.
 - Correct DE-to-FR translation fixtures for invariant names/references, locale-safe currency ordering, and formal prohibition wording without weakening semantic checks.
