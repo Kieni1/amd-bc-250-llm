@@ -39,6 +39,9 @@
     "required_any": [
       "CHF 319.50",
       "319.50 CHF"
+    ],
+    "numeric_values": [
+      "319.50"
     ]
   },
   {
@@ -51,7 +54,8 @@
       "ne peuvent pas",
       "n'est pas autorisé",
       "ne sont pas autorisés",
-      "ne peuvent être stockées dans des services cloud publics"
+      "ne peuvent être stockées dans des services cloud publics",
+      "ne sont pas autorisées"
     ],
     "required": [
       "Cloud"
@@ -149,7 +153,10 @@
       "Facture",
       "approbation est requise"
     ],
-    "min_words": 6
+    "min_words": 6,
+    "numeric_values": [
+      "10450.00"
+    ]
   },
   {
     "id": "fr-de-negation",

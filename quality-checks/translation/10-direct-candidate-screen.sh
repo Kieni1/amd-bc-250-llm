@@ -6,11 +6,19 @@ umask 077
 
 CANDIDATE="${1:-}"
 ROUNDS="${2:-${BC250_SCREEN_ROUNDS:-3}}"
+ALLOW_PRODUCTION_REFERENCE="${BC250_ALLOW_PRODUCTION_REFERENCE:-0}"
 MAIN_URL='http://127.0.0.1:11434'
 MAIN_HOST='127.0.0.1:11434'
 
 [[ -n "$CANDIDATE" ]] || { echo "usage: $0 EXPERIMENT-MODEL [ROUNDS]" >&2; exit 2; }
-[[ "$CANDIDATE" == exp-* ]] || { echo 'ERROR: candidate must be a packaged exp-* model.' >&2; exit 2; }
+if [[ "$CANDIDATE" == exp-* ]]; then
+    INSTALL_EXPERIMENT=1
+elif [[ "$ALLOW_PRODUCTION_REFERENCE" == 1 && "$CANDIDATE" == prod-lfm25-8b-a1b-liquidai-q6-k ]]; then
+    INSTALL_EXPERIMENT=0
+else
+    echo 'ERROR: model must be a packaged exp-* candidate (or the explicit production LFM reference wrapper).' >&2
+    exit 2
+fi
 [[ "$ROUNDS" =~ ^[1-9][0-9]*$ ]] || { echo 'ERROR: rounds must be a positive integer.' >&2; exit 2; }
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -18,6 +26,7 @@ ROOT="${BC250_QUALITY_ROOT:-$HOME/bc250-quality}"
 SAFE_NAME="${CANDIDATE//[^a-zA-Z0-9._-]/_}"
 OUT="$ROOT/translation-direct-${SAFE_NAME}-${STAMP}"
 START_ISO="$(date --iso-8601=seconds)"
+QUALITY_FAIL=0
 mkdir -p "$OUT"/{setup,runs,post}
 printf '%s\n' "$START_ISO" > "$OUT/setup/start-time.txt"
 cp "$0" "$OUT/translation-direct-candidate-screen.sh" 2>/dev/null || true
@@ -75,25 +84,59 @@ run_round() {
         printf 'ERROR: translation benchmark infrastructure failure rc=%s\n' "$rc" >&2
         return "$rc"
     }
+    [[ "$rc" == 0 ]] || QUALITY_FAIL=1
     unload_main
 }
 
 write_aggregate() {
     python3 - "$OUT" <<'PY' > "$OUT/aggregate.txt"
-import json, pathlib, sys
+import json, math, pathlib, statistics, sys
 from collections import Counter, defaultdict
 root=pathlib.Path(sys.argv[1]); rows=[]
 for p in sorted((root/'runs').glob('*/results.jsonl')):
+    round_name=p.parent.name
     for line in p.read_text(encoding='utf-8').splitlines():
         if not line.strip(): continue
         r=json.loads(line)
-        if r.get('result_type')=='qualification': rows.append(r)
-passed=sum(r.get('outcome')=='pass' for r in rows)
-failures=Counter(x for r in rows for x in r.get('failure_kinds',[]))
-budget=sum('output-budget' in r.get('diagnostics',[]) for r in rows)
-print(f"OVERALL: {passed}/{len(rows)}")
-print('FAILURES:', dict(failures) or '-')
-print('OUTPUT-BUDGET DIAGNOSTICS:', budget)
+        if r.get('result_type')!='qualification': continue
+        r=dict(r); r['_round']=round_name; rows.append(r)
+
+def nums(xs, path):
+    out=[]
+    for r in xs:
+        cur=r
+        for key in path:
+            cur=cur.get(key,{}) if isinstance(cur,dict) else None
+        if cur is not None:
+            try: out.append(float(cur))
+            except (TypeError, ValueError): pass
+    return out
+
+def pct(xs, q):
+    if not xs: return None
+    ys=sorted(xs); idx=max(0, min(len(ys)-1, math.ceil(q*len(ys))-1)); return ys[idx]
+
+def summary(label, xs):
+    passed=sum(r.get('outcome')=='pass' for r in xs)
+    failures=Counter(x for r in xs for x in r.get('failure_kinds',[]))
+    diagnostics=Counter(x for r in xs for x in r.get('diagnostics',[]))
+    mem=nums(xs,('telemetry','mem_available_min_mib'))
+    swap=nums(xs,('telemetry','swap_used_max_mib'))
+    temp=nums(xs,('telemetry','temp_max_c'))
+    wall=nums(xs,('metrics','wall_s'))
+    print(f"{label}: {passed}/{len(xs)}")
+    print(f"  failures={dict(failures) or '-'} diagnostics={dict(diagnostics) or '-'}")
+    print(f"  min_mem_available_mib={min(mem) if mem else 'NA'} max_swap_used_mib={max(swap) if swap else 'NA'} max_temp_c={max(temp) if temp else 'NA'}")
+    print(f"  wall_mean_s={statistics.mean(wall):.3f}" if wall else "  wall_mean_s=NA", end='')
+    print(f" wall_p95_s={pct(wall,0.95):.3f}" if wall else " wall_p95_s=NA")
+
+summary('OVERALL', rows)
+print('\nPER ROUND')
+for rd in sorted({r['_round'] for r in rows}, key=lambda x:int(x) if x.isdigit() else 999999):
+    summary(f'round {rd}', [r for r in rows if r['_round']==rd])
+print('\nBY DIRECTION')
+for src,tgt in (('de','fr'),('fr','de')):
+    summary(f'{src.upper()}->{tgt.upper()}', [r for r in rows if r.get('source_language')==src and r.get('target_language')==tgt])
 print('\nPER CASE')
 by=defaultdict(list)
 for r in rows: by[r['case_id']].append(r)
@@ -105,7 +148,7 @@ for case,xs in sorted(by.items()):
 print('\nFAILED RESPONSES')
 for r in rows:
     if r.get('outcome')=='pass': continue
-    print(f"\n[{r['case_id']}] fail={','.join(r.get('failure_kinds',[])) or '-'} diag={','.join(r.get('diagnostics',[])) or '-'}")
+    print(f"\n[round={r['_round']} {r['case_id']}] fail={','.join(r.get('failure_kinds',[])) or '-'} diag={','.join(r.get('diagnostics',[])) or '-'}")
     print(r.get('response',''))
 PY
 }
@@ -140,7 +183,12 @@ capture_state "$OUT/setup/state-before"
 sha256sum /usr/libexec/bc250-llm-server/category-benchmark.py \
     /usr/share/bc250-llm-server/benchmark/translation-office.json > "$OUT/setup/benchmark-contract.sha256"
 cp /usr/share/bc250-llm-server/benchmark/translation-office.json "$OUT/setup/translation-office.json"
-sudo bc250-model install experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-install.txt"
-model_present || { echo 'ERROR: candidate is not registered on main Ollama.' >&2; exit 1; }
+if [[ "$INSTALL_EXPERIMENT" == 1 ]]; then
+    sudo bc250-model install experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-install.txt"
+else
+    printf 'production reference: using existing registered model %s\n' "$CANDIDATE" | tee "$OUT/setup/candidate-install.txt"
+fi
+model_present || { echo 'ERROR: candidate/reference model is not registered on main Ollama.' >&2; exit 1; }
 for n in $(seq 1 "$ROUNDS"); do run_round "$n"; done
 write_aggregate
+[[ "$QUALITY_FAIL" == 0 ]] || exit 3

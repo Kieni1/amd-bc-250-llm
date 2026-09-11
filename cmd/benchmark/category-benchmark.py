@@ -17,6 +17,7 @@ import time
 import unicodedata
 from collections import Counter
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
@@ -377,6 +378,16 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
 
 # Mirrors the behavior/shape of Open WebUI v0.11.3's default title/tag/query
 # task templates without vendoring the full upstream prose into this package.
+TASK_NUM_PREDICT = {
+    # Open WebUI v0.11.3 falls back to max_tokens=1000 for title generation
+    # when TASK_MODEL_PARAMS is empty. The other packaged task paths inherit
+    # the model's 128-token generation limit.
+    "title": 1000,
+    "tags": 128,
+    "query": 128,
+}
+
+
 def task_prompt(case: dict[str, Any]) -> str:
     messages = case.get("messages") or [
         {"role": "user", "content": case.get("input", "")}
@@ -508,6 +519,11 @@ def semantic_groups_score(text: str, groups: list[list[str]]) -> tuple[int, int]
     return matched, len(groups)
 
 
+def task_request_options(case: dict[str, Any]) -> dict[str, Any]:
+    """Return the explicit Open WebUI-compatible task request budget."""
+    return {"num_predict": TASK_NUM_PREDICT.get(str(case.get("type")), 128)}
+
+
 def benchmark_task(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "task-cases.json")
@@ -518,7 +534,19 @@ def benchmark_task(args: argparse.Namespace) -> int:
     paths = prepare_result_dir("task", args.output_dir)
     csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
     copy_fixtures(paths, fixture)
-    write_meta(meta_path, client, "task", models, fixture)
+    write_meta(
+        meta_path,
+        client,
+        "task",
+        models,
+        fixture,
+        options={
+            # Task requests explicitly unload after every response. Record the
+            # actual request contract instead of the benchmark-wide 30m default.
+            "keep_alive": 0,
+            "num_predict_by_task": TASK_NUM_PREDICT,
+        },
+    )
 
     fields = [
         "timestamp", "model", "case_id", "task", "language", "passed",
@@ -537,9 +565,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
             scores: list[float] = []
             for case in cases:
                 prompt = task_prompt(case)
-                options: dict[str, Any] = {
-                    "num_predict": 1000 if case["type"] == "title" else 128
-                }
+                options = task_request_options(case)
                 payload = {
                     "model": model,
                     "messages": [{"role": "user", "content": prompt}],
@@ -641,10 +667,11 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     result_type="qualification", outcome="pass" if ok else "quality-fail", failure_kinds=failures,
                     diagnostics=diagnostics,
                     checks={"structure": structure_ok, "language": language_pass, "relevance": semantic_ok},
-                    metrics={"keyword_score": score, "semantic_groups": semantic_groups, "wall_s": wall, "eval_count": response.get("eval_count", 0)},
+                    metrics={"keyword_score": score, "semantic_groups": semantic_groups, "wall_s": wall, "load_s": ns_to_s(response.get("load_duration")), "eval_count": response.get("eval_count", 0)},
                     timestamp=iso_now(), case=case, response=content, thinking=thinking,
                     valid_json=valid_json, strict_json=strict_json, language_hint=language_hint,
-                    telemetry=telemetry,
+                    telemetry=telemetry, request_options=options, keep_alive=0,
+                    done_reason=done_reason,
                 ))
                 print(
                     f"  {case['id']}: structure={structure_ok} "
@@ -1590,15 +1617,74 @@ def acceptance_text(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
+def numeric_values(text: str) -> set[Decimal]:
+    values: set[Decimal] = set()
+    for raw in re.findall(r"(?<![\w-])\d(?:[\d\s.,'’]*\d)?(?![\w-])", text):
+        token = raw.strip().replace(" ", "").replace("'", "").replace("’", "")
+        if not token:
+            continue
+        last_dot = token.rfind(".")
+        last_comma = token.rfind(",")
+        decimal_pos = max(last_dot, last_comma)
+        if decimal_pos >= 0 and len(token) - decimal_pos - 1 == 2:
+            whole = re.sub(r"[.,]", "", token[:decimal_pos]) or "0"
+            token = whole + "." + token[decimal_pos + 1 :]
+        else:
+            token = re.sub(r"[.,]", "", token)
+        try:
+            values.add(Decimal(token))
+        except InvalidOperation:
+            continue
+    return values
+
+
+def translation_prompt_profile(model: str) -> str:
+    lower = model.casefold()
+    if "hunyuan-mt" in lower:
+        return "hunyuan-mt-upstream"
+    if "translate-gemma" in lower:
+        return "translate-gemma-current-source"
+    return "generic-explicit"
+
+
 def translation_prompt(case: dict[str, Any]) -> str:
     names = {"de": "German", "fr": "French", "en": "English"}
     source = names.get(case["source_language"], case["source_language"])
     target = names.get(case["target_language"], case["target_language"])
     return (
         f"Translate from {source} to {target}. Translate every ordinary-language "
-        "source word. Preserve only names, identifiers, reference numbers, amounts, "
-        f"and dates unchanged. Return only the translation.\n\n{case['input']}"
+        "source word. Preserve names, identifiers, reference numbers, and numeric "
+        "amounts. Preserve the calendar value of dates while rendering ordinary date "
+        f"wording naturally in {target}. Return only the translation.\n\n{case['input']}"
     )
+
+
+def translation_messages(case: dict[str, Any], model: str) -> list[dict[str, str]]:
+    names = {"de": "German", "fr": "French", "en": "English"}
+    source = names.get(case["source_language"], case["source_language"])
+    target = names.get(case["target_language"], case["target_language"])
+    profile = translation_prompt_profile(model)
+    if profile == "hunyuan-mt-upstream":
+        return [{
+            "role": "user",
+            "content": (
+                f"Translate the following segment into {target}, without additional "
+                f"explanation.\n\n{case['input']}"
+            ),
+        }]
+    if profile == "translate-gemma-current-source":
+        system = (
+            f"TASK: Translate {source} office and business text into {target}.\n"
+            "STYLE: Preserve the source register and formality.\n"
+            "Translate only CURRENT_SOURCE. Preserve meaning, names, numbers, "
+            "terminology, negations, qualifications and document structure. Return "
+            "only the final translation without labels or commentary."
+        )
+        return [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"[CURRENT_SOURCE]\n{case['input']}"},
+        ]
+    return [{"role": "user", "content": translation_prompt(case)}]
 
 
 def translation_failure_kinds(
@@ -1641,6 +1727,9 @@ def translation_content_checks(
     preserved_ok = all(
         acceptance_text(term) in folded for term in case.get("preserve", [])
     )
+    expected_numbers = {Decimal(str(value)) for value in case.get("numeric_values", [])}
+    if expected_numbers:
+        preserved_ok = preserved_ok and expected_numbers.issubset(numeric_values(content))
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     return required_ok, forbidden_ok, preserved_ok, meaningful_ok
 
@@ -1667,9 +1756,16 @@ def benchmark_translation(args: argparse.Namespace) -> int:
     paths = prepare_result_dir("translation", args.output_dir)
     csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
     copy_fixtures(paths, fixture)
+    translation_num_predict = int(os.environ.get("TRANSLATION_NUM_PREDICT", "1024"))
+    if translation_num_predict <= 0:
+        raise BenchmarkError("TRANSLATION_NUM_PREDICT must be a positive integer")
     write_meta(
         meta_path, client, "translation", models, fixture,
-        options={"explicit_direction": True},
+        options={
+            "explicit_direction": True,
+            "num_predict_default": translation_num_predict,
+            "prompt_profiles": {model: translation_prompt_profile(model) for model in models},
+        },
     )
     fields = [
         "timestamp",
@@ -1706,13 +1802,11 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     total += 1
                     payload = {
                         "model": model,
-                        "messages": [
-                            {"role": "user", "content": translation_prompt(case)}
-                        ],
+                        "messages": translation_messages(case, model),
                         "stream": False,
                         "keep_alive": KEEP_ALIVE,
                         "options": {
-                            "num_predict": int(case.get("num_predict", 512))
+                            "num_predict": int(case.get("num_predict", translation_num_predict))
                         },
                     }
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()

@@ -751,6 +751,43 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertIn("Today's date is", query)
         self.assertIn("err on the side", query)
 
+    def test_task_request_budgets_are_explicit_and_match_packaged_contract(self) -> None:
+        self.assertEqual(
+            category.TASK_NUM_PREDICT,
+            {"title": 1000, "tags": 128, "query": 128},
+        )
+        self.assertEqual(
+            category.task_request_options({"type": "title"}), {"num_predict": 1000}
+        )
+        self.assertEqual(
+            category.task_request_options({"type": "tags"}), {"num_predict": 128}
+        )
+        self.assertEqual(
+            category.task_request_options({"type": "query"}), {"num_predict": 128}
+        )
+
+        source = (BENCH / "category-benchmark.py").read_text(encoding="utf-8")
+        task = source.split("def benchmark_task", 1)[1].split("def clean_code_output", 1)[0]
+        self.assertIn('"keep_alive": 0', task)
+        self.assertIn('"num_predict_by_task": TASK_NUM_PREDICT', task)
+        self.assertIn("request_options=options", task)
+        self.assertIn("done_reason=done_reason", task)
+
+    def test_task_candidate_screen_uses_task_lane_and_preserves_quality_status(self) -> None:
+        source = (ROOT / "quality-checks/task/10-candidate-screen.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("register_candidate_on_task", source)
+        self.assertIn(
+            'run_one "$n" candidate "$CANDIDATE" "$TASK_URL" "$TASK_HOST"', source
+        )
+        self.assertNotIn(
+            'run_one "$n" candidate "$CANDIDATE" "$MAIN_URL" "$MAIN_HOST"', source
+        )
+        self.assertIn("QUALITY_FAILED=1", source)
+        self.assertIn('[[ "$QUALITY_FAILED" == 0 ]] || exit 3', source)
+        self.assertIn("remove_temporary_task_candidate", source)
+
     def test_task_json_parser_matches_open_webui_fenced_json_tolerance(self) -> None:
         fenced = '```json\n{"title":"Open WebUI PDF extraction"}\n```'
         self.assertEqual(category.parse_json_object(fenced), {"title": "Open WebUI PDF extraction"})
@@ -846,6 +883,62 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("CHF 319.50"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("ZH-204"), category.acceptance_text(actual))
+
+    def test_translation_preservation_rejects_wrong_numeric_magnitude(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        de_fr = next(item for item in cases if item["id"] == "de-fr-invoice")
+        valid = (
+            "Facture INV-4821 : montant total CHF 319,50, référence client ZH-204. "
+            "Le paiement est dû au 31 août 2026."
+        )
+        wrong = valid.replace("CHF 319,50", "CHF 31950")
+        self.assertTrue(category.translation_content_checks(valid, de_fr)[2])
+        self.assertFalse(category.translation_content_checks(wrong, de_fr)[2])
+
+        fr_de = next(item for item in cases if item["id"] == "fr-de-invoice")
+        valid_de = (
+            "Rechnung INV-9007, Betrag CHF 10 450.00, Kostenstelle IT-22. "
+            "Eine zweite Genehmigung ist erforderlich."
+        )
+        wrong_de = valid_de.replace("CHF 10 450.00", "CHF 1045000")
+        locale_de = valid_de.replace("CHF 10 450.00", "CHF 10.450,00")
+        self.assertTrue(category.translation_content_checks(valid_de, fr_de)[2])
+        self.assertTrue(category.translation_content_checks(locale_de, fr_de)[2])
+        self.assertFalse(category.translation_content_checks(wrong_de, fr_de)[2])
+
+    def test_translation_prompt_profiles_match_specialist_contracts(self) -> None:
+        case = {
+            "source_language": "de",
+            "target_language": "fr",
+            "input": "Guten Tag.",
+        }
+        hunyuan = category.translation_messages(
+            case, "exp-hunyuan-mt-7b-mungert-q4-k-m"
+        )
+        self.assertEqual(len(hunyuan), 1)
+        self.assertIn("Translate the following segment into French", hunyuan[0]["content"])
+        self.assertNotIn('"role": "system"', json.dumps(hunyuan))
+
+        gemma = category.translation_messages(
+            case, "exp-translate-gemma4-sub-e4b-17s-q4-k-xl"
+        )
+        self.assertEqual([message["role"] for message in gemma], ["system", "user"])
+        self.assertIn("TASK: Translate German", gemma[0]["content"])
+        self.assertTrue(gemma[1]["content"].startswith("[CURRENT_SOURCE]"))
+
+    def test_translation_generic_prompt_does_not_contradict_localized_dates(self) -> None:
+        case = {
+            "source_language": "de",
+            "target_language": "fr",
+            "input": "Freitag, 4. September 2026",
+        }
+        prompt = category.translation_prompt(case)
+        self.assertNotIn("dates unchanged", prompt)
+        self.assertIn("rendering ordinary date wording naturally in French", prompt)
 
     def test_translation_formal_office_preserves_invariants_not_german_honorific(self) -> None:
         cases = json.loads(
