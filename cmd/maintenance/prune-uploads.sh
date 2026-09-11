@@ -133,7 +133,7 @@ age_label="${MAX_AGE_DAYS}d"; ceiling_label="${MAX_TOTAL_GB}GiB"
 ((MAX_TOTAL_GB > 0)) || ceiling_label=disabled
 log "Files=${#rows[@]} known_total=$((total/1024/1024))MiB ceiling=${ceiling_label} age=${age_label} dry_run=${DRY_RUN}"
 if ((unknown_age > 0 || unknown_size > 0)); then
-  log "WARNING: preserving uncertain metadata for size pruning (unknown_age=${unknown_age} unknown_size=${unknown_size})."
+  log "WARNING: preserving uncertain metadata from automatic pruning (unknown_age=${unknown_age} unknown_size=${unknown_size})."
 fi
 
 deleted=0; freed=0; failures=0
@@ -159,7 +159,7 @@ delete_one(){
 remaining=()
 for row in "${rows[@]}"; do
   IFS=$'\t' read -r ts size id <<< "$row"
-  if (( MAX_AGE_DAYS > 0 && ts > 0 && ts < cutoff )); then
+  if (( MAX_AGE_DAYS > 0 && ts > 0 && size >= 0 && ts < cutoff )); then
     delete_one "$ts" "$size" "$id" "age>${MAX_AGE_DAYS}d" || remaining+=("$row")
   else
     remaining+=("$row")

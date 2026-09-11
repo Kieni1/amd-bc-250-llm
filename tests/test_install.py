@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -175,26 +176,71 @@ input_is_interactive && exit 9 || exit 0
         with tempfile.TemporaryDirectory() as tmp:
             tmpdir = Path(tmp)
             log = tmpdir / "systemctl.log"
+            state = tmpdir / "state"
+            state.mkdir()
+            for unit in ("ollama.service", "ollama-task.service", "ollama-embedding.service"):
+                (state / unit).touch()
             systemctl = tmpdir / "systemctl"
             systemctl.write_text(
-                "#!/usr/bin/env bash\n"
-                "printf 'systemctl:%s\\n' \"$*\" >> \"$BC250_TEST_LOG\"\n"
-                "case \"${1:-}\" in\n"
-                "  cat|start|stop|status) exit 0 ;;\n"
-                "  is-active) exit 1 ;;\n"
-                "esac\n"
-                "exit 0\n"
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    printf 'systemctl:%s\n' "$*" >> "$BC250_TEST_LOG"
+                    cmd=${1:-}; shift || true
+                    case "$cmd" in
+                      cat|status) exit 0 ;;
+                      start)
+                        if [[ " $* " == *' ollama-agent.service '* ]]; then
+                          rm -f "$BC250_TEST_STATE/ollama.service" \
+                            "$BC250_TEST_STATE/ollama-task.service" \
+                            "$BC250_TEST_STATE/ollama-embedding.service"
+                          touch "$BC250_TEST_STATE/ollama-agent.service"
+                        else
+                          rm -f "$BC250_TEST_STATE/ollama-agent.service"
+                          for unit in "$@"; do touch "$BC250_TEST_STATE/$unit"; done
+                        fi
+                        exit 0 ;;
+                      is-active)
+                        [[ ${1:-} == --quiet ]] && shift
+                        [[ -f "$BC250_TEST_STATE/${1:-}" ]] && exit 0
+                        exit 3 ;;
+                    esac
+                    exit 0
+                    """
+                ),
+                encoding="utf-8",
             )
             curl = tmpdir / "curl"
-            curl.write_text("#!/usr/bin/env bash\nexit 0\n")
+            curl.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    url=${@: -1}
+                    case "$url" in
+                      *:11434/*) unit=ollama.service ;;
+                      *:11435/*) unit=ollama-task.service ;;
+                      *:11436/*) unit=ollama-agent.service ;;
+                      *:11437/*) unit=ollama-embedding.service ;;
+                      *) exit 1 ;;
+                    esac
+                    [[ -f "$BC250_TEST_STATE/$unit" ]]
+                    """
+                ),
+                encoding="utf-8",
+            )
             systemctl.chmod(0o755)
             curl.chmod(0o755)
             env = {
                 "PATH": f"{tmpdir}:/usr/bin:/bin",
                 "BC250_TEST_LOG": str(log),
+                "BC250_TEST_STATE": str(state),
             }
             result = subprocess.run(
-                ["bash", "-c", 'script="$1"; set --; source "$script"; enter_agent; leave_agent', "agent-mode-test", str(script)],
+                [
+                    "bash", "-c",
+                    'script="$1"; set --; source "$script"; enter_agent; leave_agent',
+                    "agent-mode-test", str(script),
+                ],
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -204,11 +250,50 @@ input_is_interactive && exit 9 || exit 0
             self.assertEqual(result.returncode, 0, result.stdout)
             calls = log.read_text()
             self.assertIn("systemctl:start ollama-agent.service", calls)
-            self.assertNotIn("systemctl:stop ollama-agent.service", calls)
             self.assertIn(
                 "systemctl:start ollama.service ollama-task.service ollama-embedding.service",
                 calls,
             )
+            self.assertFalse((state / "ollama-agent.service").exists())
+            for unit in ("ollama.service", "ollama-task.service", "ollama-embedding.service"):
+                self.assertTrue((state / unit).exists())
+
+    def test_agent_mode_rejects_nonexclusive_service_state(self) -> None:
+        script = ROOT / "cmd/system/agent-mode.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            systemctl = tmpdir / "systemctl"
+            systemctl.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    case "${1:-}" in
+                      cat|start|status) exit 0 ;;
+                      is-active) exit 0 ;;
+                    esac
+                    exit 0
+                    """
+                ),
+                encoding="utf-8",
+            )
+            curl = tmpdir / "curl"
+            curl.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            systemctl.chmod(0o755)
+            curl.chmod(0o755)
+            result = subprocess.run(
+                [
+                    "bash", "-c", 'script="$1"; set --; source "$script"; enter_agent',
+                    "agent-mode-test", str(script),
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env={"PATH": f"{tmpdir}:/usr/bin:/bin"},
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("restoring normal mode", result.stdout)
+            self.assertIn("not exclusive", result.stdout)
 
 
     def test_fresh_install_lifecycle_defers_open_webui_until_models(self) -> None:

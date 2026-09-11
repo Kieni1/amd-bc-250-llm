@@ -33,17 +33,39 @@ wait_api() {
   return 1
 }
 
+agent_units_exclusive() {
+  local unit
+  systemctl is-active --quiet "$AGENT_UNIT" 2>/dev/null || return 1
+  for unit in "${NORMAL_UNITS[@]}"; do
+    systemctl is-active --quiet "$unit" 2>/dev/null && return 1
+  done
+  return 0
+}
+
+normal_units_exclusive() {
+  local unit
+  systemctl is-active --quiet "$AGENT_UNIT" 2>/dev/null && return 1
+  for unit in "${NORMAL_UNITS[@]}"; do
+    systemctl is-active --quiet "$unit" 2>/dev/null || return 1
+  done
+  return 0
+}
+
 start_normal() {
   systemctl start "${NORMAL_UNITS[@]}"
   wait_api 11434 && wait_api 11435 && wait_api 11437 || {
     echo "ERROR: normal Ollama topology did not become ready on 11434/11435/11437." >&2
     return 1
   }
+  normal_units_exclusive || {
+    echo "ERROR: normal Ollama services are not exclusive; expected main/task/embedding active and agent inactive." >&2
+    return 1
+  }
 }
 
 enter_agent() {
   require_units
-  if systemctl start "$AGENT_UNIT" && wait_api 11436; then
+  if systemctl start "$AGENT_UNIT" && wait_api 11436 && agent_units_exclusive; then
     echo "Agent mode active: 11436 only."
     return 0
   fi

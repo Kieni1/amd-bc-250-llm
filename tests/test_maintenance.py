@@ -82,6 +82,7 @@ class MaintenanceTests(unittest.TestCase):
                     #!/usr/bin/env bash
                     printf '%s\\n' '[
                       {"id":"known-old","created_at":"2026-01-01T00:00:00Z","meta":{"size":2147483648}},
+                      {"id":"unknown-size-old","created_at":"2026-01-01T00:00:00Z","meta":{}},
                       {"id":"uncertain","created_at":null,"meta":{"size":2147483648}}
                     ]'
                     """
@@ -107,8 +108,32 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertIn("WOULD delete [size-ceiling] id=known-old", result.stdout)
             self.assertNotIn("WOULD delete [size-ceiling] id=uncertain", result.stdout)
+            self.assertNotIn("id=unknown-size-old", "\n".join(
+                line for line in result.stdout.splitlines() if "WOULD delete" in line
+            ))
             self.assertIn("preserving uncertain metadata", result.stdout)
 
+            # Exercise the age-pruning path independently: an old file with a
+            # known timestamp but unknown size must still be preserved.
+            env["MAX_AGE_DAYS"] = "1"
+            env["MAX_TOTAL_GB"] = "0"
+            aged = subprocess.run(
+                [str(script)],
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(aged.returncode, 0, aged.stdout)
+            self.assertIn("WOULD delete [age>1d] id=known-old", aged.stdout)
+            age_deletes = "\n".join(
+                line for line in aged.stdout.splitlines() if "WOULD delete" in line
+            )
+            self.assertNotIn("id=unknown-size-old", age_deletes)
+            self.assertNotIn("id=uncertain", age_deletes)
+
+            env["MAX_AGE_DAYS"] = "0"
             env["MAX_TOTAL_GB"] = "0"
             disabled = subprocess.run(
                 [str(script)],
