@@ -16,37 +16,37 @@ exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
-exp-granite42-8b-ibm-q5-k-m
-exp-ling30-tiny-bloomer-q5-k-m
+exp-hunyuan-mt-7b-mungert-q4-k-m
+exp-lfm25-1.2b-instruct-liquidai-q6-k
+exp-minicpm5-2b-openbmb-q4-k-m
 exp-ministral3-8b-unsloth-ud-q5-k-xl
 exp-ovisocr2-abiray-q8-0
+exp-qwen3-1.7b-ggml-q4-k-m
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
-exp-qwen35-9b-davidau-defiant-fable-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
+exp-qwen38-2b-distill-empero-q6-k
 exp-qwen38-4b-distill-empero-q6-k
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
+exp-translate-gemma4-sub-e4b-17s-q4-k-xl
 ```
 
 The 0.11.0 catalog keeps only active comparison candidates in normal discovery.
-Measured candidates that no longer have a plausible promotion path are excluded
-from normal model discovery. Granite 4.2 3B/8B, Ling 3.0 Tiny, Qwen3.8 9B, the
-TIR Qwen3.5 9B non-thinking fine-tune, a second Qwen3.8 4B Q6_K artifact and the
-Unsloth GPT-OSS 20B UD-Q4_K_XL control quant remain opt-in comparisons;
-routine package/revalidation runs do not expand merely because experiments are
-installed.
+Measured candidates that no longer have a plausible promotion path are moved to
+`../modelfiles-graveyard/`, which is source-only and excluded from packaging and
+model discovery. Granite 4.2 3B, Qwen3.8 9B, the TIR Qwen3.5 9B non-thinking
+fine-tune, the second Qwen3.8 4B Q6_K artifact and the Unsloth GPT-OSS 20B
+UD-Q4_K_XL control quant remain opt-in comparisons; routine package/revalidation
+runs do not expand merely because experiments are installed.
 
 The 2026-08-31 BC-250 generation rerun makes several candidates easier to
 place. Qwen3.8 4B Distill (~74.5 tok/s, ~4.0 GiB) and Granite 4.2 3B (~91.5
 tok/s, ~4.1 GiB) remain useful compact comparisons. Granite 4.2 8B (~50.3
-tok/s, ~8.3 GiB) is exhausted as a production-promotion candidate unless a
-future role-quality test shows a large advantage. Ling 3.0 Tiny decoded at about
-144 tok/s but repeatedly spent the shared cap in reasoning before a usable final
-answer, so it is likewise exhausted as an ordinary assistant promotion path.
-The definitions stay packaged for reproducible comparisons; see `MODELS.md` for
-the complete benchmark-status table.
+tok/s, ~8.3 GiB) and Ling 3.0 Tiny (~144 tok/s but repeated reasoning-cap
+exhaustion) no longer have a plausible promotion path and are retained only in
+the source graveyard. See `MODELS.md` for the complete benchmark-status table.
 
 Local-GGUF source revisions may be commits, tags, branches or `latest`. Moving
 revisions favor flexibility over reproducibility; use `--refresh` to download
