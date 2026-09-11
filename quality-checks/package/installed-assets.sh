@@ -27,13 +27,27 @@ done
 
 for path in \
   "$QUALITY_DIR/task/10-candidate-screen.sh" \
+  "$QUALITY_DIR/task/11-lfm12b.sh" \
+  "$QUALITY_DIR/task/12-minicpm5-2b.sh" \
+  "$QUALITY_DIR/task/13-qwen3-1p7b.sh" \
+  "$QUALITY_DIR/task/14-qwen38-2b.sh" \
   "$QUALITY_DIR/translation/10-direct-candidate-screen.sh" \
+  "$QUALITY_DIR/translation/11-ministral-direct.sh" \
+  "$QUALITY_DIR/translation/12-hunyuan-direct.sh" \
+  "$QUALITY_DIR/translation/13-translate-gemma-direct.sh" \
+  "$QUALITY_DIR/translation/14-lfm-direct-reference.sh" \
   "$QUALITY_DIR/translation/20-owui-candidate-screen.sh" \
+  "$QUALITY_DIR/translation/21-hunyuan-owui.sh" \
+  "$QUALITY_DIR/translation/22-translate-gemma-owui.sh" \
+  "$QUALITY_DIR/translation/23-lfm-owui-reference.sh" \
   "$QUALITY_DIR/utils/inspect-latest-evidence.sh"
 do
     need_file "$path"
     [[ -x "$path" ]] || { printf 'NOT EXECUTABLE: %s\n' "$path" >&2; exit 1; }
 done
+
+need_file "$QUALITY_DIR/translation/prompts/auto-direction-minimal.txt"
+need_file "$QUALITY_DIR/translation/prompts/auto-direction-translate-gemma.txt"
 
 # Discovery is source-only here: no GGUF download and no registration mutation.
 sudo bc250-model list experiments > /tmp/bc250-quality-model-list.$$ 2>&1
