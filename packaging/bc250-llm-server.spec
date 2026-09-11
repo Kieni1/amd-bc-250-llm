@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.0
-Release:        1.13%{?dist}
+Release:        1.14%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.14
+- Harden standalone translation screening: use the 1024-token specialist contract, candidate-specific prompt profiles, numeric-value preservation, quality rc=3 propagation, Open WebUI telemetry, selected-field preset-delta verification, and exact restoration/credential checks.
+- Make task candidate screening deployment-faithful by benchmarking baseline and challenger on task Ollama 11435, recording the effective request contract, preserving rc=3, refusing unknown pre-existing task registrations, and cleaning temporary registrations on exit.
+- Harden support operations by preserving uploads with uncertain metadata from automatic pruning, verifying exclusive agent/normal service topology, and making model cleanup honor explicit host/destination overrides.
+- Retire exhausted Granite 8B, Ling 3.0 Tiny, and Defiant-Fable Qwen3.5 comparisons to the source-only graveyard, synchronize active-catalog documentation, and keep all production model/runtime defaults unchanged.
+
 * Thu Sep 10 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.13
 - Add checksum-pinned experimental compact task candidates for LFM2.5 1.2B, MiniCPM5 2B, Qwen3 1.7B, and Qwen3.8 2B without changing the packaged Gemma 3 1B task default.
 - Add experimental Hunyuan-MT 7B Q4_K_M and Translate-Gemma 4 Sub E4B Q4_K_XL translation candidates; retain LFM2.5 8B-A1B as the production translation model pending real-device comparison.
