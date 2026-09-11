@@ -1144,7 +1144,7 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             print("Cleanup cancelled.")
             return 0
     _uid, _gid = ollama_identity()
-    host = ollama_host(defaults)
+    host = ollama_host(defaults, getattr(args, "host", None))
     ollama_bin = shutil.which("ollama")
     failures: list[str] = []
     removed = 0
@@ -1176,7 +1176,7 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         output = None
         retained: list[Path] = []
         if model["provider"] != "ollama-hf":
-            output = model_path(defaults, model)
+            output = model_path(defaults, model, getattr(args, "destination", None))
             if args.keep_gguf:
                 retained.extend((output, state_path(output)))
             else:
@@ -1268,6 +1268,14 @@ def build_parser() -> argparse.ArgumentParser:
     cleaning.add_argument("selection", nargs="?")
     cleaning.add_argument("--list", action="store_true")
     cleaning.add_argument("--yes", action="store_true")
+    cleaning.add_argument(
+        "--host",
+        help="override the target Ollama API; use the same override as installation",
+    )
+    cleaning.add_argument(
+        "--destination",
+        help="override the GGUF root; use the same override as installation",
+    )
     cleaning.add_argument(
         "--keep-gguf",
         action="store_true",

@@ -96,7 +96,7 @@ a no-op update with current model sources does not ask for one.
 sudo bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 sudo bc250-model install CATEGORY [SELECTION] [OPTIONS]
-sudo bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--list] [--yes]
+sudo bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--host HOST[:PORT]] [--destination PATH] [--list] [--yes]
 ```
 
 Categories are `production`, `experiments`, `task`, `agentic`, `embedding`,
@@ -116,6 +116,8 @@ MTP entries.
 For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
 registration/runtime Modelfile while retaining the local GGUF and its state
 sidecar for fast reuse. Without it, cleanup also deletes the local GGUF/state.
+If a model was installed with `--host` or `--destination`, pass the same override
+to `cleanup` so removal targets that registration and manager-owned source tree.
 Ollama remains responsible for pruning registration manifests and unreferenced
 blob data, so shared blobs are not deleted manually.
 

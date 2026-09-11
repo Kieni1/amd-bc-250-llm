@@ -221,6 +221,58 @@ class StateTests(unittest.TestCase):
             self.assertTrue(sidecar.exists())
             self.assertFalse(runtime_file.exists())
 
+
+    def test_cleanup_accepts_install_host_and_destination_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            default_root = base / "default"
+            custom_root = base / "custom"
+            default_root.mkdir()
+            custom_root.mkdir()
+            default_output = default_root / "model.gguf"
+            custom_output = custom_root / "model.gguf"
+            default_output.write_bytes(b"default-marker")
+            custom_output.write_bytes(b"weights")
+            custom_sidecar = modelctl.state_path(custom_output)
+            custom_sidecar.write_text("{}", encoding="utf-8")
+            model = {
+                "id": "m",
+                "name": "prod-test",
+                "provider": "ollama",
+                "from": str(default_output),
+                "gguf": "model.gguf",
+            }
+            args = SimpleNamespace(
+                yes=True, keep_gguf=False, host="127.0.0.1:19999",
+                destination=str(custom_root),
+            )
+            with (
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(modelctl, "ollama_identity", return_value=(1, 1)),
+                patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+                patch.object(
+                    modelctl, "run_as_ollama", return_value=SimpleNamespace(returncode=0)
+                ) as run_rm,
+            ):
+                self.assertEqual(
+                    modelctl.cleanup_models(
+                        {
+                            "destination": str(default_root),
+                            "ollama_host": "127.0.0.1:11434",
+                        },
+                        [model],
+                        args,
+                    ),
+                    0,
+                )
+            run_rm.assert_called_once_with(
+                ["/usr/bin/ollama", "rm", "prod-test"],
+                {"HOME": "/var/lib/ollama", "OLLAMA_HOST": "127.0.0.1:19999"},
+            )
+            self.assertFalse(custom_output.exists())
+            self.assertFalse(custom_sidecar.exists())
+            self.assertTrue(default_output.exists())
+
     def test_remote_ocr_keep_gguf_explains_ollama_managed_source(self) -> None:
         model = {
             "id": "m",
