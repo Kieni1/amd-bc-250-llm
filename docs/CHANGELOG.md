@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0-1.14 - 2026-09-11
+
+- Harden translation candidate evidence before more real-device comparison: direct screening now uses a 1024-token default, model-appropriate Hunyuan/Translate-Gemma prompt contracts, numeric-value preservation, and correct `rc=3` propagation; authenticated Open WebUI screening adds request/resource telemetry, selected stable-field preset-delta checks, restoration verification, and credential scanning.
+- Make compact task candidate screens compare baseline and challenger on the same dedicated task Ollama runtime, record the effective title/tag/query budgets and `keep_alive=0` contract, preserve `rc=3`, reject unknown pre-existing temporary task registrations, and clean the task-lane candidate on exit.
+- Harden support operations: automatic upload pruning preserves files with unknown timestamps or sizes, agent-mode transitions verify the promised exclusive service topology, and `bc250-model cleanup` accepts the same explicit `--host`/`--destination` overrides as installation.
+- Move three clearly exhausted comparison definitions (Granite 4.2 8B, Ling 3.0 Tiny, and Defiant-Fable Qwen3.5 9B) into the source-only graveyard and synchronize the active experiment/catalog documentation. Production models, residency policy, harness-4.0 semantics, and quality thresholds are unchanged.
+
 ## 0.11.0-1.13 - 2026-09-10
 
 - Add checksum-pinned experimental compact task candidates: LFM2.5 1.2B, MiniCPM5 2B, Qwen3 1.7B and Qwen3.8 2B Distill. The production task default remains Gemma 3 1B until a candidate proves both quality and safe coexistence with warm GPT-OSS.

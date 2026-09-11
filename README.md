@@ -89,9 +89,10 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 | Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
-The packaged comparison catalog retains the operator's measured experiment
-set, including `exp-granite42-3b-ibm-q6-k`, `exp-granite42-8b-ibm-q5-k-m`, and
-`exp-ling30-tiny-bloomer-q5-k-m`; they are benchmark challengers, not silent
+The packaged comparison catalog retains active measured challengers, including
+`exp-granite42-3b-ibm-q6-k` plus the compact task and translation candidates under
+`quality-checks/`. Exhausted comparisons are kept only in the source graveyard and
+are not exposed through normal model discovery. Experimental models are never silent
 replacements for the defaults above.
 
 These are starting points, not a fixed production set. Packaged and

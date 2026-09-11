@@ -143,8 +143,8 @@ Translation evidence on the actual authenticated Open WebUI path:
 - minimal prompt plus temperature 0: **60/80**, making two bad modes
   deterministic.
 
-Prompt/sampling tuning for LFM is therefore paused. The production LFM model is
-unchanged in 1.13 while model-level challengers are screened. The priority
+Prompt/sampling tuning for LFM is therefore paused. The production LFM model remains
+unchanged while model-level challengers are screened. The priority
 translation experiments are Hunyuan-MT 7B Q4_K_M and Translate-Gemma 4 Sub E4B
 Q4_K_XL; the existing Ministral 8B experiment remains only a short comparison
 control because prior testing was not strong.
@@ -177,15 +177,18 @@ The source-only graveyard is reserved for models explicitly retired from routine
 operator-facing discovery because continued comparison no longer justifies their
 catalog presence. Graveyard definitions are not packaged, discovered or listed.
 
-The 0.11.0 pruning pass retired four such definitions to
+The source graveyard currently contains seven retired definitions in
 `models/modelfiles-graveyard/`. That directory is a source depot only and must
 contain Modelfiles only; it is intentionally outside every model discovery root.
 
-| Model | Why the current promotion path is exhausted |
+| Model | Why it is retired from routine discovery |
 |---|---|
+| `exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
 | `exp-granite42-8b-ibm-q5-k-m` | ~8.3 GiB resident for ~50 tok/s and weak long-prompt throughput; no demonstrated office/RAG quality win over the production set |
 | `exp-ling30-tiny-bloomer-q5-k-m` | very high raw decode (~144 tok/s) but the shared reasoning cap was repeatedly consumed before a usable final answer |
 | `exp-qwen35-9b-davidau-defiant-fable-q6-k` | older comparable run had much worse answer-start latency with no throughput/UX case against production Qwen3.5 or GPT-OSS |
+| `exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
+| `exp-qwythos9b-empero-q6-k` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
 | `task-lfm25-2.6b-liquidai-q6-k` | retired task-lane experiment; no remaining promotion case against the smaller packaged task baseline and newer compact candidates |
 
 Still-open comparisons include Qwen3.8 4B Distill and the new compact task
@@ -227,8 +230,6 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-qwen38-2b-distill-empero-q6-k` | checksum-pinned 2B Distill follow-up to test whether the 4B Qwen3.8 quality signal survives at safer residency |
 | `exp-hunyuan-mt-7b-mungert-q4-k-m` | checksum-pinned dedicated translation challenger; screen explicit DE/FR direction first, then OWUI integration |
 | `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | checksum-pinned translation-specialist Gemma E4B challenger for DE/FR office text |
-| `exp-granite42-8b-ibm-q5-k-m` | larger Granite office/RAG challenger |
-| `exp-ling30-tiny-bloomer-q5-k-m` | low-active-parameter architecture experiment |
 | `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; temperature 0 + 3072-token Bash/Python budget passed 3/3 in three consecutive BC-250 runs |
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use experiment for the exclusive 11436 lane; compare against Qwen2.5-Coder and Ornith before any role change |
 
