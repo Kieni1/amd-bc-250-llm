@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.1-0.2 - 2026-09-12
+
+- Move the runtime baseline from Ollama 0.33.3 to 0.34.0 using the commit-pinned official installer (`d8ab4b4f0ca24b51d3a46b3bf4f462e58ce66b1f`) and the existing verified installer SHA-256. Ollama 0.34.0 keeps the same llama.cpp revision as 0.33.3, so this is a greenfield runtime refresh rather than evidence that existing AMD/Vulkan UMA risks are fixed; real BC-250 model-load and coexistence validation remains required.
+- Add four packaged main-model experiments: Qwen3.6 35B-A3B UD-IQ3_S, Qwen3.8 27B ISTA GSQ-RCO IQ3_S, Qwen3.8 27B Unsloth UD-IQ3_S, and Gemma 4 26B-A4B i1-IQ3_S. Each Modelfile records the next lower quant to try if the larger candidate cannot load safely.
+- Package `quality-checks/main/10-main-model-candidate-matrix.sh` for sequential GPT-OSS-versus-candidate comparison with normal-lane residency cleanup, resource/journal evidence, compare/edge profiles, and source-GGUF retention by default.
+- Fix the model-state regression exposed by upgrade/drift evaluation: schema-3 state is now treated as current, harmless sidecar rewrites preserve the `dedupe` map, and re-registration output explains whether source, Modelfile, refresh, or registration state caused reconciliation. Add `--quiet` for scripted install/cleanup and describe inactive agent registrations as deferred rather than broken.
+- Keep the field-tested 16 MiB XFS dedupe range but issue all ranges for one source/blob pair through one `xfs_io` process instead of one process per chunk. Storage status/dedupe now separate live manifest-referenced source/blob pairs from transient unreferenced source-hash blobs; the latter are left to Ollama startup pruning rather than being deduped. Source GGUF retention remains the default so re-registration can avoid redownloads.
+- Carry forward the prior support-ops retirement/storage patch set (retired catalog cleanup, schema-3 identity, protected-root accounting, canonical dedupe labels, fast source checksum validation) and the two Ruff-oriented translation/catalog fixes.
+- Keep the upstream Ollama installer ownership model unchanged: the helper still removes the upstream-generated unit and verifies the RPM-owned unit afterward. Upstream ROCm payload behavior is not changed in this release because it has not yet been qualified as safely suppressible.
+
 ## 0.11.1-0.1 - 2026-09-12
 
 - Promote LFM2.5 1.2B Q6_K to the dedicated Open WebUI task lane after 15/18 direct quality, 15/18 live Open WebUI quality with package-owned task prompts, and 9/9 clean true-overlap trials beside warm GPT-OSS; retain Gemma 3 1B as an optional fallback/control.

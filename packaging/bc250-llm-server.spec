@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.1
-Release:        0.1%{?dist}
+Release:        0.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.2
+- Update the package runtime baseline to Ollama 0.34.0 and keep the existing BC-250 Vulkan/UMA topology, cloud-off policy, and real-device requalification requirement.
+- Add four large main-lane challengers plus a packaged sequential GPT-OSS comparison matrix; retain source GGUFs by default and document lower-quant fallbacks for BC-250 memory pressure.
+- Fix schema-3 model-state reconciliation so ordinary drift checks preserve dedupe bookkeeping, explain registration drift, improve inactive-agent/quiet model-manager UX, and retain the prior support-ops retirement/storage safeguards.
+- Batch all conservative 16 MiB XFS dedupe ranges for each source/blob pair into one xfs_io process, exclude unreferenced Ollama import blobs from dedupe targets, report those transient blobs separately, and retain source GGUFs for no-redownload recovery.
+- Include the translation/catalog lint corrections and package the standalone main-model quality-check directory.
+
 * Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.1
 - Promote LFM2.5 1.2B Q6_K to the default dedicated Open WebUI task role after direct, live-OWUI, and true-concurrency BC-250 qualification; retain Gemma 3 1B as an optional fallback.
 - Own the title/tag/retrieval-query prompt templates in desired state and reuse that exact policy in the direct task benchmark so production and benchmark prompt contracts cannot silently diverge.
