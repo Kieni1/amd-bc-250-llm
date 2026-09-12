@@ -61,7 +61,6 @@ with open(dst, "w", encoding="utf-8") as out:
                 f"({','.join(literal(v) for v in row)});\n"
             )
     out.write("COMMIT;\n")
-print(" ".join(tables))
 PY_USERS
 
 gzip -9 "$sql"

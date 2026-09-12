@@ -43,6 +43,76 @@ class MaintenanceTests(unittest.TestCase):
         self.assertNotIn('model-baseline', maintenance)
         self.assertNotIn('owui-model-baseline.py', manifest)
 
+    def test_backup_log_is_scoped_to_current_systemd_invocation(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            systemctl = tmp / "systemctl"
+            journalctl = tmp / "journalctl"
+            args_log = tmp / "journal.args"
+            systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "if [[ $1 == show ]]; then echo invocation-test; fi\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            journalctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$*\" > \"$JOURNAL_ARGS\"\n"
+                "echo CURRENT-RUN\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(0o755)
+            journalctl.chmod(0o755)
+            command = (
+                "source <(sed '$d' " + str(script) + " ); "
+                "systemd_available() { return 0; }; run_task backup-config"
+            )
+            result = subprocess.run(
+                ["bash", "-c", command],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "JOURNAL_ARGS": str(args_log),
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("CURRENT-RUN", result.stdout)
+            args = args_log.read_text(encoding="utf-8")
+            self.assertIn("_SYSTEMD_INVOCATION_ID=invocation-test", args)
+            self.assertNotIn("-n 20", args)
+
+    def test_prune_preflight_rejects_missing_key_without_exposing_credentials(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "maintenance.env"
+            config.write_text(
+                "OWUI_API_KEY=REPLACE_WITH_ADMIN_API_KEY\n"
+                "MAX_AGE_DAYS=90\nMAX_TOTAL_GB=20\nDRY_RUN=1\n",
+                encoding="utf-8",
+            )
+            command = (
+                "source <(sed '$d' " + str(script) + " ); CONFIG="
+                + str(config) + "; preflight_prune"
+            )
+            result = subprocess.run(
+                ["bash", "-c", command],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("API key is not configured", result.stdout)
+            self.assertIn("dry_run=1", result.stdout)
+            self.assertNotIn("REPLACE_WITH_ADMIN_API_KEY", result.stdout)
+
+        source = script.read_text(encoding="utf-8")
+        self.assertIn("prune) preflight_prune && run_task prune-uploads", source)
+
     def test_backups_are_persistent_and_serialized(self) -> None:
         config_timer = (ROOT / "cmd/maintenance/owui-backup-config.timer").read_text()
         users_timer = (ROOT / "cmd/maintenance/owui-backup-users.timer").read_text()

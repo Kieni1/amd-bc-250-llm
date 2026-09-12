@@ -322,14 +322,33 @@ show_status() {
 }
 
 run_task() {
-  local instance="$1"
+  local instance="$1" unit="owui-maintenance@${1}.service" invocation since rc=0
   systemd_available || { echo "ERROR: systemd is not available." >&2; exit 1; }
   echo "Running $instance..."
-  if ! systemctl start "owui-maintenance@${instance}.service"; then
-    journalctl -u "owui-maintenance@${instance}.service" -n 20 --no-pager || true
-    return 1
+  since="@$(date +%s.%N)"
+  systemctl start "$unit" || rc=$?
+  invocation="$(systemctl show "$unit" -p InvocationID --value 2>/dev/null || true)"
+  if [[ -n "$invocation" ]]; then
+    journalctl _SYSTEMD_INVOCATION_ID="$invocation" --no-pager -o cat || true
+  else
+    journalctl -u "$unit" --since "$since" --no-pager -o cat || true
   fi
-  journalctl -u "owui-maintenance@${instance}.service" -n 20 --no-pager
+  return "$rc"
+}
+
+preflight_prune() {
+  local key
+  key="$(get_setting OWUI_API_KEY '')"
+  [[ -n "$key" && "$key" != REPLACE_WITH_ADMIN_API_KEY ]] && return 0
+  printf '%s\n' \
+    'Upload pruning cannot run.' \
+    '' \
+    'Reason: Open WebUI API key is not configured.' \
+    '' \
+    "Current policy: age=$(get_setting MAX_AGE_DAYS 90)d ceiling=$(get_setting MAX_TOTAL_GB 20)GiB dry_run=$(get_setting DRY_RUN 1)" \
+    'Configure the protected Open WebUI credential and retry.' \
+    'No uploads were changed.' >&2
+  return 1
 }
 
 run_selected() {
@@ -340,11 +359,11 @@ run_selected() {
       run_task backup-config
       run_task backup-users
       ;;
-    prune) run_task prune-uploads ;;
+    prune) preflight_prune && run_task prune-uploads ;;
     all)
       run_task backup-config
       run_task backup-users
-      run_task prune-uploads
+      preflight_prune && run_task prune-uploads
       ;;
     *) echo "ERROR: run requires backup, prune or all." >&2; usage >&2; exit 2 ;;
   esac

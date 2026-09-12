@@ -96,8 +96,10 @@ after matching an Ollama blob, and requires explicit confirmation. `prune-40cu`
 removes build caches only for kernels no longer installed.
 
 Upload pruning calls Open WebUI's authenticated delete API so database, file
-and vector state stay aligned. It starts with `DRY_RUN=1`; review the journal
-before setting `DRY_RUN=0` in root-readable
+and vector state stay aligned. A manual `run prune`/`run all` preflights the protected
+API key before starting the prune unit and reports the current age/ceiling/dry-run
+policy without exposing the credential. It starts with `DRY_RUN=1`; review the current
+run output before setting `DRY_RUN=0` in root-readable
 `/etc/bc250-llm-server/maintenance.env`.
 
 - `MAX_AGE_DAYS=0` disables the age rule.
@@ -143,5 +145,6 @@ sudo bc250-maintenance status
 | Idle power action | Weekdays from 18:30 | Disabled |
 
 Backup timers are persistent and run after the next boot if missed. Prune,
-warm-up and power timers are non-persistent. All storage jobs share one lock and
-use idle I/O scheduling.
+warm-up and power timers are non-persistent. Manual `run` output is scoped to the
+just-completed systemd invocation, so older journal history does not bury the result.
+All storage jobs share one lock and use idle I/O scheduling.
