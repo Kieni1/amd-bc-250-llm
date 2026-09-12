@@ -29,6 +29,7 @@ class PackagingTests(unittest.TestCase):
         for entry in (
             "quality-checks/README.md\t{share}/quality-checks/README.md",
             "quality-checks/package/*.sh\t{share}/quality-checks/package/",
+            "quality-checks/main/*.sh\t{share}/quality-checks/main/",
             "quality-checks/task/*.sh\t{share}/quality-checks/task/",
             "quality-checks/translation/*.sh\t{share}/quality-checks/translation/",
             "quality-checks/translation/owui-provider-config.py\t{share}/quality-checks/translation/owui-provider-config.py",
