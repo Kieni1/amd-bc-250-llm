@@ -27,6 +27,7 @@ SAFE_NAME="${CANDIDATE//[^a-zA-Z0-9._-]/_}"
 OUT="$ROOT/translation-direct-${SAFE_NAME}-${STAMP}"
 START_ISO="$(date --iso-8601=seconds)"
 QUALITY_FAIL=0
+SERIOUS_WARNING_COUNT=0
 mkdir -p "$OUT"/{setup,runs,post}
 printf '%s\n' "$START_ISO" > "$OUT/setup/start-time.txt"
 cp "$0" "$OUT/translation-direct-candidate-screen.sh" 2>/dev/null || true
@@ -86,6 +87,38 @@ run_round() {
     }
     [[ "$rc" == 0 ]] || QUALITY_FAIL=1
     unload_main
+}
+
+capture_provenance() {
+    ollama --version > "$OUT/setup/ollama-version.txt" 2>&1 || true
+    curl -sS --connect-timeout 5 --max-time 30 -H 'Content-Type: application/json' \
+        -d "$(jq -cn --arg model "$CANDIDATE" '{model:$model}')" "$MAIN_URL/api/show" \
+        > "$OUT/setup/candidate-ollama-show.json" 2>&1 || true
+    local category resolved sidecar
+    category=experiments; [[ "$INSTALL_EXPERIMENT" == 0 ]] && category=production
+    resolved="$(bc250-model resolve "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
+    if [[ -n "$resolved" ]]; then
+        printf '%s\n' "$resolved" > "$OUT/setup/candidate-source-path.txt"
+        sidecar="${resolved}.bc250.json"
+        if [[ -r "$sidecar" ]]; then
+            python3 - "$sidecar" <<'PY' > "$OUT/setup/candidate-source-identity.json"
+import json,sys
+v=json.load(open(sys.argv[1],encoding='utf-8'))
+print(json.dumps({k:v.get(k) for k in ('schema','model_name','model_id','category','sha256','size')},indent=2,sort_keys=True))
+PY
+        fi
+    fi
+}
+
+write_run_manifest() {
+    local final_rc="$1" quality infra
+    [[ "$QUALITY_FAIL" == 0 ]] && quality=pass || quality=quality-fail
+    if [[ "$final_rc" == 0 || "$final_rc" == 3 ]]; then infra=pass; else infra=fail; fi
+    jq -n --arg candidate "$CANDIDATE" --arg path direct --argjson rounds "$ROUNDS" \
+        --arg quality "$quality" --arg infrastructure "$infra" --argjson final_rc "$final_rc" \
+        --argjson serious_warning_count "$SERIOUS_WARNING_COUNT" \
+        '{candidate:$candidate,path:$path,rounds:$rounds,quality_result:$quality,infrastructure_result:$infrastructure,final_rc:$final_rc,serious_warning_count:$serious_warning_count}' \
+        > "$OUT/run-manifest.json"
 }
 
 write_aggregate() {
@@ -163,7 +196,9 @@ finalize() {
     journalctl -k -b --since "$START_ISO" --no-pager > "$OUT/post/kernel-journal.txt" 2>&1 || true
     grep -Ein 'out of memory|oom-kill|oom_reaper|killed process|device lost|gpu reset|amdgpu.*(reset|timeout|fault)|ring.*(timeout|reset|fault|error)' \
         "$OUT/post/service-journal.txt" "$OUT/post/kernel-journal.txt" > "$OUT/post/serious-warnings.txt" 2>/dev/null || true
+    SERIOUS_WARNING_COUNT="$(wc -l < "$OUT/post/serious-warnings.txt" | tr -d ' ')"
     write_aggregate || true
+    write_run_manifest "$rc"
     printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
     date --iso-8601=seconds > "$OUT/post/end-time.txt"
     local parent name tarball
@@ -189,6 +224,7 @@ else
     printf 'production reference: using existing registered model %s\n' "$CANDIDATE" | tee "$OUT/setup/candidate-install.txt"
 fi
 model_present || { echo 'ERROR: candidate/reference model is not registered on main Ollama.' >&2; exit 1; }
+capture_provenance
 for n in $(seq 1 "$ROUNDS"); do run_round "$n"; done
 write_aggregate
 [[ "$QUALITY_FAIL" == 0 ]] || exit 3
