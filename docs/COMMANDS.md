@@ -96,6 +96,7 @@ a no-op update with current model sources does not ask for one.
 sudo bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 sudo bc250-model install CATEGORY [SELECTION] [OPTIONS]
+# add --quiet for scripted reconciliation without repeated catalog/mode chatter
 sudo bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--host HOST[:PORT]] [--destination PATH] [--list] [--yes]
 sudo bc250-model cleanup-retired [--yes]
 ```
@@ -258,8 +259,10 @@ sudo bc250-storage prune-40cu [--yes]
 Detailed `status` accounting requires elevated access to the protected model
 stores; an unprivileged invocation reports that accounting as unavailable rather
 than returning false zeroes. Privileged status distinguishes verified pairs whose
-dedupe state is recorded from legacy/unrecorded pairs without claiming the latter
-are physically undeduplicated. `dedupe` requires XFS with `reflink=1`; it verifies
+dedupe state is recorded from legacy/unrecorded live pairs without claiming the latter
+are physically undeduplicated. Unreferenced source-hash Ollama blobs are reported
+separately and excluded from dedupe targets; normal Ollama startup pruning is expected
+to remove those transient imports. `dedupe` requires XFS with `reflink=1`; it verifies
 manager state/source hashes and uses kernel-verified 16 MiB `FIDEDUPERANGE` sharing
 while retaining both paths. Successful pairs are recorded in schema-3 sidecars and
 unchanged recorded pairs are skipped on later runs. Normal interactive use requires

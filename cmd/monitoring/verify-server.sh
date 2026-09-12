@@ -580,7 +580,7 @@ if command -v bc250-openwebui-setup >/dev/null 2>&1; then
       printf '%s\n' "$owui_drift" | sed 's/^/    /'
     fi
   else
-    info "authenticated Open WebUI desired-state drift check skipped; set OWUI_API_KEY temporarily to enable"
+    info "authenticated Open WebUI desired-state drift check skipped; rerun with --owui-token-file FILE or set OWUI_API_KEY temporarily"
   fi
 else
   warn "bc250-openwebui-setup is not installed; live Open WebUI drift was not checked"
