@@ -9,6 +9,7 @@ work; these scripts do not build packages.
 
 - `history/` — the actual Batch 1–3D evidence scripts plus the short Ministral
   comparison recipe. They are retained for reproducibility.
+- `main/` — sequential large main-model candidate matrices against the production GPT-OSS baseline.
 - `task/` — one-candidate-at-a-time compact task screens. Each run compares the
   candidate against the package-owned LFM2.5 1.2B baseline without changing defaults.
 - `translation/` — direct candidate screens first, then an optional authenticated
@@ -20,6 +21,21 @@ normally create a `.tar.gz` in `$HOME`; the OWUI mutation screen withholds its
 tarball if credential/root-temp safety checks fail. `rc=3` remains a quality
 failure rather than an infrastructure failure. The machine-facing scripts deliberately require
 BC-250 services/tools and should not be run in generic build CI.
+
+## Main-model candidate sequence
+
+Run the four-current-candidate matrix only on the real BC-250:
+
+```bash
+sudo /usr/share/bc250-llm-server/quality-checks/main/10-main-model-candidate-matrix.sh
+```
+
+It compares production GPT-OSS at the start and end, installs any missing candidate
+through `bc250-model`, unloads resident main/task/embedding models between runs, and
+runs the package generation `compare` profile plus the memory-oriented `edge` profile.
+Candidate GGUFs are retained by default (`BC250_KEEP_GGUF=1`) so failed registrations
+or later lower-quant experiments do not force a redownload. Registrations created by
+the matrix are removed on cleanup. Set `BC250_RUN_EDGE=0` for the shorter first screen.
 
 ## Task candidate sequence
 

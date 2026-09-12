@@ -12,6 +12,7 @@ from the production selection. The current packaged comparison set is:
 ```text
 exp-gemma4-12b-google-qat-q4-0
 exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
+exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
 exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
@@ -22,11 +23,22 @@ exp-ovisocr2-abiray-q8-0
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
+exp-qwen36-35b-a3b-unsloth-ud-iq3-s
+exp-qwen38-27b-ista-gsq-rco-iq3-s
+exp-qwen38-27b-unsloth-ud-iq3-s
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
 exp-translate-gemma4-sub-e4b-17s-q4-k-xl
 ```
+
+The four large September 2026 main-lane additions are deliberately experimental: Qwen3.6
+35B-A3B UD-IQ3_S, Qwen3.8 27B GSQ-RCO IQ3_S, Qwen3.8 27B UD-IQ3_S and Gemma 4
+26B-A4B i1-IQ3_S. Their Modelfiles start at 16K context, omit optional vision/MTP
+components for the first comparison, and name a smaller fallback quant if BC-250
+unified-memory headroom is unsafe. Use `quality-checks/main/10-main-model-candidate-matrix.sh`
+to compare them sequentially against production GPT-OSS; installation success alone
+is not promotion evidence.
 
 The 0.11.1 catalog keeps only active comparison candidates in normal discovery.
 Measured candidates that no longer have a plausible promotion path are moved to

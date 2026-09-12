@@ -235,6 +235,10 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
+| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | large MoE main-lane challenger; start at 16K context and fall back to UD-Q2_K_XL if BC-250 headroom is unsafe |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | dense 27B GSQ/RCO challenger; IQ3_S first, IQ3_XXS fallback if load/headroom fails |
+| `exp-qwen38-27b-unsloth-ud-iq3-s` | dense 27B Unsloth dynamic-quant control; UD-IQ3_S first, UD-IQ3_XXS fallback |
+| `exp-gemma4-26b-a4b-mradermacher-i1-iq3-s` | Gemma 4 MoE main-lane challenger; i1-IQ3_S first, i1-IQ3_XS fallback; projector omitted for initial text comparison |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |

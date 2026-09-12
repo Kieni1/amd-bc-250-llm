@@ -19,6 +19,7 @@ sudo bc250-model list mtp --all
 
 sudo bc250-model install production MODEL-NAME
 sudo bc250-model install production MODEL-NAME --refresh
+sudo bc250-model install experiments MODEL1,MODEL2 --quiet
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
 sudo bc250-model cleanup-retired
@@ -96,7 +97,9 @@ size/mtime/ctime use a fast reuse path. Legacy state or changed stat metadata
 forces a full SHA-256 check before the existing GGUF can be reused, so modified
 or corrupted bytes are not accepted merely because the sidecar still exists.
 Repository, revision and GGUF filename must also match. Modelfile-only changes
-therefore regenerate the Ollama registration without downloading again. Use
+therefore regenerate the Ollama registration without downloading again. Reconciliation
+prints the reason (source, Modelfile, refresh, or missing registration); `--quiet` suppresses
+the repeated catalog/mode chatter for scripted install or cleanup. Use
 `--refresh` to deliberately fetch new source bytes, including a moving revision
 such as `latest`.
 
@@ -128,8 +131,19 @@ Ollama imports model layers into one of these separate stores:
 ```
 
 A local model can therefore consume space as both source GGUF and Ollama blob.
-Shared layers may reduce incremental Ollama use, while `ollama list` reports
-logical model size rather than total appliance use.
+Some newly imported GGUF architectures also cause Ollama to create a temporary
+source-hash blob plus a converted live model layer. The temporary source-hash blob is
+unreferenced by the final manifest and normal Ollama startup pruning removes it;
+`bc250-storage status` reports such blobs separately and `bc250-storage dedupe` does not
+spend time deduplicating them. The retained source GGUF is intentionally kept so a later
+registration repair does not require a redownload.
+
+For live source/blob pairs whose bytes are identical, `bc250-storage dedupe` keeps the
+conservative 16 MiB XFS dedupe range but batches all ranges for one pair into a single
+`xfs_io` process. This preserves the measured range size while avoiding thousands of
+process launches. Dedupe state is stored in the schema-3 sidecar and survives ordinary
+model reconciliation. Shared layers may reduce incremental Ollama use, while `ollama list`
+reports logical model size rather than total appliance use.
 
 Package-retired definitions remain source-only under `models/modelfiles-graveyard/`,
 while installed `retired-models.json` carries only the canonical name/category/host
