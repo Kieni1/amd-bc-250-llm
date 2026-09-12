@@ -1,0 +1,25 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen38-27b-unsloth-ud-iq3-s
+# Source: unsloth/Qwen3.8-27B-GGUF @ latest
+# GGUF: Qwen3.8-27B-UD-IQ3_S.gguf
+# SHA256: d847e2c1e4aa276e4b7b8e9ad7628050e61e165d49ab995407bc36677a6f3864
+# License: Apache-2.0
+# Role: Unsloth dynamic-quant dense 27B main-model challenger to GPT-OSS 20B on BC-250.
+# Approx source GGUF size: 12.0 GB.
+# BC-250 fallback if this quant cannot load or leaves unsafe memory headroom:
+#   Qwen3.8-27B-UD-IQ3_XXS.gguf (~10.9 GB, SHA256 c0b7c3038681ed2e3040456c1dd45f9858b6c2290bed172c70388a94874f3eee)
+# Deliberately omit the vision projector and MTP for the first appliance comparison.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-27b-unsloth-ud-iq3-s/Qwen3.8-27B-UD-IQ3_S.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 16384
+
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """You are an experimental general-purpose reasoning assistant for office, technical, coding, and analytical tasks. Follow the user's requested format, distinguish facts from inference, and answer in the requested language or the language of the latest request."""

@@ -1,0 +1,28 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen38-27b-ista-gsq-rco-iq3-s
+# Source: ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF @ latest
+# GGUF: Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf
+# SHA256: 64b53b64c7aa39f20a7e54bd80582fe595b1d745624ee8a72e92508c0326d810
+# License: Apache-2.0
+# Role: GSQ/RCO dense 27B main-model challenger to GPT-OSS 20B on BC-250.
+# Approx source GGUF size: 11.8 GB.
+# BC-250 fallback if this quant cannot load or leaves unsafe memory headroom:
+#   Qwen3.8-27B-GSQ-RCO-IQ3_XXS.gguf (~10.1 GB, SHA256 fdfcb6a29b11188956dfbfd904223588a6c1b77eb250c3e8a36e1bd269df91f7)
+# Deliberately use the non-MTP GGUF and omit the vision projector for the first comparison.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-27b-ista-gsq-rco-iq3-s/Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+
+# 16K is the first fair/safe comparison point against the production GPT-OSS profile.
+# The model may support more, but context expansion is a separate memory test.
+PARAMETER num_ctx 16384
+
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """You are an experimental general-purpose reasoning assistant for office, technical, coding, and analytical tasks. Follow the user's requested format, distinguish facts from inference, and answer in the requested language or the language of the latest request."""

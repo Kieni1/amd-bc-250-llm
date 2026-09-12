@@ -1,0 +1,31 @@
+# BC250 category: experimental
+# Ollama model: exp-qwen36-35b-a3b-unsloth-ud-iq3-s
+# Source: unsloth/Qwen3.6-35B-A3B-GGUF @ latest
+# GGUF: Qwen3.6-35B-A3B-UD-IQ3_S.gguf
+# SHA256: 66a3ca888ce13482b40c333db2432c0ebde3a7b13754fc29f0c6f5e89703ec66
+# License: Apache-2.0
+# Role: large MoE main-model challenger to GPT-OSS 20B on BC-250.
+# Approx source GGUF size: 13.7 GB.
+# BC-250 fallback if this quant cannot load or leaves unsafe memory headroom:
+#   Qwen3.6-35B-A3B-UD-Q2_K_XL.gguf (~12.3 GB, SHA256 96b9c0af5c77a4ecaabe3983175112b5ece763261c1ece12b2494b692a70dad7)
+# Keep vision/projector disabled for the first appliance comparison.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen36-35b-a3b-unsloth-ud-iq3-s/Qwen3.6-35B-A3B-UD-IQ3_S.gguf
+
+# BC-250: force full GPU offload.
+PARAMETER num_gpu 99
+
+# Preserve the initial/system context during eviction.
+PARAMETER num_keep 256
+
+# Match the current GPT-OSS comparison envelope first; raise only after memory evidence.
+PARAMETER num_ctx 16384
+
+# Conservative Qwen-family reasoning sampling for comparison use.
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """You are an experimental general-purpose reasoning assistant for office, technical, coding, and analytical tasks. Follow the user's requested format, distinguish facts from inference, and answer in the requested language or the language of the latest request."""

@@ -1,0 +1,25 @@
+# BC250 category: experimental
+# Ollama model: exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
+# Source: mradermacher/gemma-4-26B-A4B-i1-GGUF @ latest
+# GGUF: gemma-4-26B-A4B.i1-IQ3_S.gguf
+# SHA256: a87cbaac5637985a7c614da17d3ae66ab3bd3dcc718bb11db65fac248f701e79
+# License: Apache-2.0
+# Role: Gemma 4 26B-A4B MoE main-model challenger to GPT-OSS 20B on BC-250.
+# Approx source GGUF size: 12.2 GB.
+# BC-250 fallback if this quant cannot load or leaves unsafe memory headroom:
+#   gemma-4-26B-A4B.i1-IQ3_XS.gguf (~11.6 GB, SHA256 17bc8e915efd07538c817c4366a113a26c9de921699280eaf90311cdb2fbebf7)
+# Omit the multimodal projector for the first appliance comparison.
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-26b-a4b-mradermacher-i1-iq3-s/gemma-4-26B-A4B.i1-IQ3_S.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 16384
+
+# Gemma-family sampling; neutral generation benchmark overrides temperature for fair comparison.
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER top_k 64
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """You are an experimental general-purpose reasoning assistant for office, technical, coding, and analytical tasks. Follow the user's requested format, distinguish facts from inference, and answer in the requested language or the language of the latest request."""
