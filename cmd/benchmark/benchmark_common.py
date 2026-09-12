@@ -2,7 +2,7 @@
 """Shared helpers for BC-250 benchmarks.
 
 Stdlib-only by design: these helpers are installed with the RPM and must work on
-an otherwise minimal Fedora host. API shapes target Ollama 0.33.3.
+an otherwise minimal Fedora host. API shapes target Ollama 0.34.0.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 from urllib import error, request
 
-STANDARD_OLLAMA_VERSION = "0.33.3"
+STANDARD_OLLAMA_VERSION = "0.34.0"
 DEFAULT_TIMEOUT = 900.0
 DEFAULT_TELEMETRY_INTERVAL = 0.5
 TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
@@ -825,7 +825,7 @@ class OllamaClient:
         return list(self.json_request("/api/ps").get("models", []))
 
     def stop(self, model: str) -> bool:
-        """Request model unload, falling back to the Ollama 0.33.3 HTTP path."""
+        """Request model unload, falling back to the Ollama 0.34.0 HTTP path."""
         env = os.environ.copy()
         env["OLLAMA_HOST"] = self.base_url
         try:
@@ -842,7 +842,7 @@ class OllamaClient:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         # Ollama documents an empty /api/generate request with keep_alive=0 as
-        # the HTTP unload path. This remains valid in 0.33.3.
+        # the HTTP unload path. This remains valid in 0.34.0.
         try:
             self.json_request(
                 "/api/generate", {"model": model, "keep_alive": 0, "stream": False}

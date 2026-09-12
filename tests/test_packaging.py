@@ -188,15 +188,15 @@ class PackagingTests(unittest.TestCase):
         for forbidden in ("firewall-cmd", "setsebool", "dnf ", "bc250-model", "systemctl enable --now"):
             self.assertNotIn(forbidden, post)
 
-    def test_package_standard_ollama_is_0333(self) -> None:
+    def test_package_standard_ollama_is_0340(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
         self.assertIn('source "$runtime_env"', installer)
-        self.assertNotIn('BC250_OLLAMA_VERSION="0.33.3"', installer)
+        self.assertNotIn('BC250_OLLAMA_VERSION="0.34.0"', installer)
         self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
-        self.assertIn("BC250_OLLAMA_VERSION=0.33.3", (ROOT / "config/runtime.env").read_text())
+        self.assertIn("BC250_OLLAMA_VERSION=0.34.0", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
@@ -453,10 +453,10 @@ class PackagingTests(unittest.TestCase):
                 values[key] = value
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.33.3")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.34.0")
         self.assertEqual(
             values["BC250_OLLAMA_INSTALLER_COMMIT"],
-            "b79067b0db7417f20108363bc22adb97f35c966a",
+            "d8ab4b4f0ca24b51d3a46b3bf4f462e58ce66b1f",
         )
         self.assertEqual(
             values["BC250_OLLAMA_INSTALLER_SHA256"],

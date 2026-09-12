@@ -418,7 +418,7 @@ Generation and coexistence reporting emphasizes resident size, minimum
 `MemAvailable`, swap start/peak/end/delta, temperature and request outcomes. VRAM/GTT
 remain diagnostic Vulkan counters and must not be interpreted as independent additive
 memory pools on the BC-250. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
-for result schema, category contracts and Ollama 0.33.3 request policy. The installed copy is
+for result schema, category contracts and Ollama 0.34.0 request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
 
 ## Open WebUI setup

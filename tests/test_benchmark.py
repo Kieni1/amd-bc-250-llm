@@ -1970,7 +1970,7 @@ phase_roles
                         str(generation_dir),
                     ],
                 ),
-                patch.object(generation.OllamaClient, "version", return_value="0.33.3"),
+                patch.object(generation.OllamaClient, "version", return_value="0.34.0"),
                 patch.object(generation.OllamaClient, "show", return_value={}),
                 patch.object(
                     generation.OllamaClient,
@@ -2309,7 +2309,7 @@ status_raw
                 models=[{"model": "task-test", "digest": "abc"}],
                 fixtures=common.fixture_metadata(fixture),
                 options={"lane": 11435},
-                runtimes=[{"kind": "ollama", "url": "http://127.0.0.1:11435", "version": "0.33.3"}],
+                runtimes=[{"kind": "ollama", "url": "http://127.0.0.1:11435", "version": "0.34.0"}],
             )
             common.write_benchmark_metadata(meta_path, meta)
             common.finalize_benchmark_metadata(meta_path)
@@ -2326,7 +2326,7 @@ status_raw
             base_url = "http://127.0.0.1:11437"
             timeout = 321.0
             def version(self) -> str:
-                return "0.33.3"
+                return "0.34.0"
             def show(self, _model: str) -> dict[str, object]:
                 return {"details": {"family": "test"}}
             def digest(self, _model: str) -> str:
@@ -2472,7 +2472,7 @@ status_raw
                 self.base_url = url
                 seen.append(url)
             def version(self) -> str:
-                return "0.33.3"
+                return "0.34.0"
             def digest(self, _model: str) -> str:
                 return "digest"
 

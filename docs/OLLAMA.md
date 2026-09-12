@@ -2,7 +2,7 @@
 
 The Ollama binary is installed from the pinned upstream release by the guided helper, while the RPM owns all four systemd lane definitions. Use the commands below for an explicit binary reinstall or runtime change.
 
-Package standard: **Ollama v0.33.3**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden.
+Package standard: **Ollama v0.34.0**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden.
 
 ## Install and verify
 
@@ -54,13 +54,13 @@ rather than the packaged task default. GPT-OSS 20B with warm Jina remains the
 production memory-edge qualification; re-run it when a package/runtime change could
 affect residency or UMA headroom.
 
-## 0.33.3 runtime notes
+## 0.34.0 runtime notes
 
-The 0.33.x line remains a runtime/cache refresh for this headless Linux appliance.
-Ollama 0.33.0 fixes cancelled/resumed prefill cache restore behavior. Version
-0.33.3 refreshes llama.cpp, reports cached prompt tokens and honors GGUF-defined
-default parameters; its Gemma4 image/audio work is on the MLX path and does not
-change the BC-250 Vulkan policy. No cloud or desktop integration is enabled.
+Ollama 0.34.0 keeps the same llama.cpp revision as 0.33.3. The earlier 0.33.x
+line supplied the cache/prefill and llama.cpp refresh already used by this
+appliance; 0.34.0 primarily adds desktop/OpenAI-compatible integration work and
+Apple-Silicon structured-output improvements. Those changes do not replace
+BC-250 Vulkan/UMA qualification. No cloud or desktop integration is enabled.
 
 The package continues to use the experimental Vulkan backend on BC-250. Current
 Ollama Linux guidance still supports `OLLAMA_VULKAN=1` and
@@ -99,10 +99,10 @@ a possible quality cost. Service profiles do not modify individual Modelfiles.
 
 ## Benchmark API baseline
 
-`bc250-benchmark` targets the Ollama **0.33.3** request schema. Neutral generation
+`bc250-benchmark` targets the Ollama **0.34.0** request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
-`low`/`medium`/`high`/`max` as supported by 0.33.3. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
+`low`/`medium`/`high`/`max` as supported by 0.34.0. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
 lane; RAG-quality uses 11437 for vectors and 11434 for the answer model. Model
 allocation comes from `/api/ps`. The `bc250-benchmark agent` lane uses `/api/chat`
 on exclusive port 11436 and does not globally force reasoning off.
@@ -123,7 +123,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.33.3** as the package-standard runtime. Before moving beyond it, review
+Treat **0.34.0** as the package-standard runtime. Before moving beyond it, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;

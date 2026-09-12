@@ -8,7 +8,7 @@ The benchmark has two deliberate modes:
 * production: no SYSTEM/sampling override, so the registered Modelfile is
   exercised as deployed.
 
-Request shapes target Ollama 0.33.3.  The implementation is stdlib-only.
+Request shapes target Ollama 0.34.0.  The implementation is stdlib-only.
 """
 
 from __future__ import annotations
@@ -162,7 +162,7 @@ def make_filler(sentences: int) -> str:
 
 
 def resolve_think_policy(model: str, requested: str) -> str:
-    """Return omit|true|false|low|medium|high|max for Ollama 0.33.3."""
+    """Return omit|true|false|low|medium|high|max for Ollama 0.34.0."""
     if requested != "auto":
         return requested
     lower = model.casefold()
@@ -213,7 +213,7 @@ def generate_payload(
         "options": options_for(mode, num_predict),
     }
     if mode == "neutral":
-        # Ollama 0.33.3 GenerateRequest.System explicitly overrides the
+        # Ollama 0.34.0 GenerateRequest.System explicitly overrides the
         # registered Modelfile SYSTEM. Do not use raw=true: model renderers and
         # templates remain part of the runtime being benchmarked.
         payload["system"] = NEUTRAL_SYSTEM
@@ -520,7 +520,7 @@ def fmt(value: Any, digits: int = 2) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="bc250-benchmark generation",
-        description="BC-250 generation benchmark for Ollama 0.33.3.",
+        description="BC-250 generation benchmark for Ollama 0.34.0.",
     )
     parser.add_argument(
         "models",
