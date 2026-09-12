@@ -346,7 +346,7 @@ step_7_models() {
   echo "Ensuring baseline Open WebUI infrastructure models."
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
     bc250-model install all \
-    "task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m"
+    "task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m"
 
   echo
   echo "Optional production, experiment, agent and additional model selection:"

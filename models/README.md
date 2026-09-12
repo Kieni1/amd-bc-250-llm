@@ -21,6 +21,7 @@ sudo bc250-model install production MODEL-NAME
 sudo bc250-model install production MODEL-NAME --refresh
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
+sudo bc250-model cleanup-retired
 ```
 
 The category-free list shows all Ollama-backed models with one global index,
@@ -33,9 +34,10 @@ Enter cancels. Prefer full names in scripts.
 Model listing requires `sudo` because the local GGUF/state trees are intentionally
 protected. This avoids misleading `download unknown` results after
 `cleanup --keep-gguf`; a retained local source is visible as `downloaded` while
-its registration is shown as `not set up`. A registration without a current
-Modelfile is shown as unmanaged; a known model on the wrong Ollama instance is
-shown as misplaced.
+its registration is shown as `not set up`. A registration without a current active Modelfile is shown as unmanaged unless
+it is named in the package retirement catalog. Retired package-managed
+registrations are shown separately and are eligible for `cleanup-retired`; a
+known active model on the wrong Ollama instance is shown as misplaced.
 
 | Category | Prefix | Ollama API | Source GGUF directory |
 |---|---|---|---|
@@ -87,8 +89,9 @@ same-name operator file overrides the packaged template and survives upgrades.
 
 ## Download state and authentication
 
-After a successful manager-downloaded GGUF, an adjacent `*.bc250.json` file
-records source identity, calculated SHA-256 and file stat metadata. Unchanged
+After a successful manager-downloaded GGUF, an adjacent schema-3
+`*.bc250.json` file records source/model/category identity, calculated SHA-256
+and file stat metadata. Schema 1/2 sidecars remain readable. Unchanged
 size/mtime/ctime use a fast reuse path. Legacy state or changed stat metadata
 forces a full SHA-256 check before the existing GGUF can be reused, so modified
 or corrupted bytes are not accepted merely because the sidecar still exists.
@@ -127,6 +130,13 @@ Ollama imports model layers into one of these separate stores:
 A local model can therefore consume space as both source GGUF and Ollama blob.
 Shared layers may reduce incremental Ollama use, while `ollama list` reports
 logical model size rather than total appliance use.
+
+Package-retired definitions remain source-only under `models/modelfiles-graveyard/`,
+while installed `retired-models.json` carries only the canonical name/category/host
+and manager-owned source/runtime paths needed for safe cleanup.
+`sudo bc250-model cleanup-retired` previews only those explicit package-retired
+models, refuses uncertain or misplaced registration state, and never targets
+arbitrary unmanaged operator models.
 
 Prefer `bc250-model cleanup` over deleting one side manually. For ordinary
 local-GGUF definitions it removes the selected Ollama registration, source GGUF,

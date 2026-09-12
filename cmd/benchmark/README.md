@@ -99,9 +99,13 @@ separately. OCR remains a benchmark role until a production OCR model is promote
 bc250-benchmark task [MODEL ...]
 ```
 
-Exercises Open WebUI-compatible title, tag and query shapes. Acceptance evaluates the
-parsed content: structure, requested language and semantic groups. Empty output and
-budget behavior are recorded separately.
+Exercises title, tag and retrieval-query shapes using the exact package-owned prompt
+templates from `openwebui/desired-state.json`. Acceptance evaluates the parsed
+content: structure, requested language and semantic groups. Empty output and budget
+behavior are recorded separately. This direct Ollama path is a fast qualification
+gate, not a substitute for a real authenticated Open WebUI endpoint check when
+promoting or requalifying a task model; the 2026-09-12 LFM work demonstrated that
+upstream/default Open WebUI prompts could turn a 15/18 direct result into 6/18 live.
 
 ## Agent
 

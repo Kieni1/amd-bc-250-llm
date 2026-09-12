@@ -1,0 +1,29 @@
+# BC250 category: task
+# Ollama model: task-lfm25-1.2b-instruct-liquidai-q6-k
+# Source: LiquidAI/LFM2.5-1.2B-Instruct-GGUF @ main
+# GGUF: LFM2.5-1.2B-Instruct-Q6_K.gguf
+# SHA256: c5e895c191a066f6b26a8f09f10e94cdb799e579216f87df61a7e27beacd9a2b
+# License: LFM1.0
+# Role: default compact Open WebUI title/tag/retrieval-query task model.
+#
+# Real-device evidence, 2026-09-12:
+# - 15/18 direct task qualification (5/6 in each of three rounds).
+# - 15/18 through the real Open WebUI task endpoints when package-owned task
+#   prompt templates were applied.
+# - 9/9 successful true-overlap trials while GPT-OSS remained warm/resident;
+#   no additional swap growth and no OOM/GPU/device-reset warnings.
+# - Known residual: the French-title fixture remains a relevance miss.
+#
+# Deliberately no fixed SYSTEM prompt. Open WebUI supplies a different package-
+# owned prompt for title, tags, and retrieval-query generation. A generic SYSTEM
+# prompt was tested and reduced reliability by priming multiple task shapes.
+
+FROM /var/lib/bc250-llm-server/gguf/task/LFM2.5-1.2B-Instruct-Q6_K.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 4096
+PARAMETER num_predict 128
+PARAMETER temperature 0.1
+PARAMETER top_k 50
+PARAMETER repeat_penalty 1.05

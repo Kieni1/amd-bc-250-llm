@@ -3,46 +3,57 @@
 ## Setup and verify
 
 ```bash
-sudo bc250-model install task task-gemma3-1b-unsloth-ud-q4-k-xl
+sudo bc250-model install task task-lfm25-1.2b-instruct-liquidai-q6-k
 
 curl -fsS http://127.0.0.1:11435/api/chat \
   -H 'Content-Type: application/json' \
-  -d '{"model":"task-gemma3-1b-unsloth-ud-q4-k-xl:latest","messages":[{"role":"user","content":"Return only a short title for: Installing Fedora on a BC-250"}],"stream":false,"keep_alive":0}'
+  -d '{"model":"task-lfm25-1.2b-instruct-liquidai-q6-k:latest","messages":[{"role":"user","content":"Return only a short title for: Installing Fedora on a BC-250"}],"stream":false,"keep_alive":0}'
 sleep 2
 OLLAMA_HOST=127.0.0.1:11435 ollama ps
 ```
 
-The package ships `ollama-task.service` statically on port `11435` with a separate model
-store. It is part of required normal mode. With no selection `bc250-model install task` lists task Modelfiles and prompts. The service uses
+The package ships `ollama-task.service` statically on port `11435` with a separate
+model store. It is part of required normal mode. With no selection,
+`bc250-model install task` lists task Modelfiles and prompts. The service uses
 `OLLAMA_KEEP_ALIVE=0`; the final command should show no resident task model.
 
-Current packaged task model:
+Current packaged task models:
 
-- `task-gemma3-1b-unsloth-ud-q4-k-xl` — current default: the 2026-08-31
-  Open WebUI 0.11.3 fixture produced usable structure/JSON in all 6 cases,
-  although language adherence remained weak (2/6 matched the requested language);
+- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **default**. Real BC-250 evidence on 2026-09-12: 15/18 direct
+  qualification (5/6 each round), 15/18 again through the actual Open WebUI
+  title/tag/query endpoints with the package-owned prompts, and 9/9 successful
+  true-overlap trials while warm GPT-OSS remained resident. The known residual
+  miss is the French-title relevance fixture.
+- `task-gemma3-1b-unsloth-ud-q4-k-xl` — retained as the previous low-memory fallback/control, but no
+  longer selected by default.
 
-The task Modelfile deliberately omits a fixed `SYSTEM` prompt: Open WebUI supplies a
-different task prompt for title, tags and query rewriting. Run
-`bc250-benchmark task MODEL...` before changing the Open WebUI local task model.
-The benchmark accepts the same fenced/surrounded JSON shape that Open WebUI
-0.11.3 extracts, while also reporting whether the response was strict raw JSON
-and an informational language-adherence hint.
+The default LFM Modelfile deliberately omits a fixed `SYSTEM` prompt. A generic
+SYSTEM was tested and caused task-shape contamination (for example title responses
+that also emitted tags/search-query fields). Open WebUI therefore owns the exact
+title/tag/retrieval-query prompt templates in `openwebui/desired-state.json`. The
+direct `bc250-benchmark task` path reads those same templates so direct and live
+qualification cannot silently drift to different prompt contracts again.
 
-Keep port `11435` blocked from untrusted networks. Add
-`http://host.containers.internal:11435` as the task connection. Start with title
-and tag generation enabled. Keep retrieval-query generation off for the baseline
-and enable it only when deliberately testing query rewriting. Leave autocomplete,
-follow-ups and web-search query generation off until needed because repeated task
-loads can overlap a larger warm chat model.
+Keep port `11435` blocked from untrusted networks. The package adds
+`http://host.containers.internal:11435` as the task connection. Title and tag
+generation are enabled. Retrieval-query generation remains off by default and
+should be enabled deliberately when required. Autocomplete, follow-ups and
+web-search query generation remain off because repeated task loads can overlap a
+larger warm chat model.
 
-## Hardware/UX decision for Qwen3.8 4B
+## Promotion lessons
 
-`exp-qwen38-4b-distill-empero-q6-k` remains an opt-in experiment rather than the
-Open WebUI task default. It scored materially better in focused task experiments,
-but real BC-250 overlap with the 10.8 GiB GPT-OSS main model drove available
-memory to the edge and the kernel OOM-killed the task service. Serializing the
-4B task model would also evict a warm large chat model and impose a large cold-load
-penalty on the next user message. The packaged 1B task lane therefore remains the
-safer low-latency companion while the 4B candidate stays available for deliberate
-manual experiments.
+Do not promote a task model from the direct score alone. This evaluation found a
+15/18 direct result that collapsed to 6/18 through real Open WebUI while Open
+WebUI's upstream default task prompts were still in use. Applying the package-owned
+prompt contract restored 15/18 live. Future task candidates therefore need:
+
+1. direct task qualification against the package-owned prompt templates;
+2. a real authenticated Open WebUI task-path check using those same templates;
+3. sequential warm-main coexistence/resource evidence; and
+4. true simultaneous main/task generation before promotion.
+
+The earlier Qwen3.8 4B Distill task candidate is retired from routine discovery:
+although quality was promising, simultaneous residency with warm GPT-OSS
+OOM-killed the task service. The smaller promoted LFM survived nine true-overlap
+trials with no additional swap growth or serious GPU/OOM warning.

@@ -1,4 +1,9 @@
 # BC250 category: experimental
+# RETIRED 2026-09-12: failed the packaged task contract on the BC-250.
+# Result: 4/18 (1/6, 2/6, 1/6) with 12 output-budget diagnostics; all tag
+# and query cases were empty after reasoning consumed the 128-token budget.
+# Isolated runtime/resource health was clean, but quality was not competitive.
+#
 # Ollama model: exp-minicpm5-2b-openbmb-q4-k-m
 # Source: openbmb/MiniCPM5-2B-GGUF @ main
 # GGUF: MiniCPM5-2B-Q4_K_M.gguf

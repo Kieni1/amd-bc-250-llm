@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "models": [
+    {
+      "name": "exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p/Gemma-4-E4B-Uncensored-HauhauCS-Aggressive-Q6_K_P.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p.Modelfile"
+    },
+    {
+      "name": "exp-granite42-8b-ibm-q5-k-m",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-granite42-8b-ibm-q5-k-m/granite-4.2-8b-Q5_K_M.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-granite42-8b-ibm-q5-k-m.Modelfile"
+    },
+    {
+      "name": "exp-lfm25-1.2b-instruct-liquidai-q6-k",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/LFM2.5-1.2B-Instruct-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
+    },
+    {
+      "name": "exp-ling30-tiny-bloomer-q5-k-m",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-ling30-tiny-bloomer-q5-k-m/Ling-3.0-tiny-Q5_K_M.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-ling30-tiny-bloomer-q5-k-m.Modelfile"
+    },
+    {
+      "name": "exp-minicpm5-2b-openbmb-q4-k-m",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/MiniCPM5-2B-Q4_K_M.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-minicpm5-2b-openbmb-q4-k-m.Modelfile"
+    },
+    {
+      "name": "exp-qwen3-1.7b-ggml-q4-k-m",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/Qwen3-1.7B-Q4_K_M.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen3-1.7b-ggml-q4-k-m.Modelfile"
+    },
+    {
+      "name": "exp-qwen35-9b-davidau-defiant-fable-q6-k",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-9b-davidau-defiant-fable-q6-k/Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-NEO-MAX-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen35-9b-davidau-defiant-fable-q6-k.Modelfile"
+    },
+    {
+      "name": "exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/qwen36-14b-a3b-fablevibes-Q4_K_M/Qwen3.6-14B-A3B-FableVibes-Q4_K_M.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m.Modelfile"
+    },
+    {
+      "name": "exp-qwen38-2b-distill-empero-q6-k",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/Qwen3.8-2B-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen38-2b-distill-empero-q6-k.Modelfile"
+    },
+    {
+      "name": "exp-qwen38-4b-distill-empero-q6-k",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-4b-distill-empero-q6-k/Qwen3.8-4B-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen38-4b-distill-empero-q6-k.Modelfile"
+    },
+    {
+      "name": "exp-qwythos9b-empero-q6-k",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwythos9b-empero-q6-k/Qwythos-9B-Claude-Mythos-5-1M-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwythos9b-empero-q6-k.Modelfile"
+    },
+    {
+      "name": "task-lfm25-2.6b-liquidai-q6-k",
+      "category": "task",
+      "ollama_host": "127.0.0.1:11435",
+      "source": "/var/lib/bc250-llm-server/gguf/task/LFM2.5-2.6B-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/task/task-lfm25-2.6b-liquidai-q6-k.Modelfile"
+    }
+  ]
+}

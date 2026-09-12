@@ -17,23 +17,18 @@ exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
 exp-hunyuan-mt-7b-mungert-q4-k-m
-exp-lfm25-1.2b-instruct-liquidai-q6-k
-exp-minicpm5-2b-openbmb-q4-k-m
 exp-ministral3-8b-unsloth-ud-q5-k-xl
 exp-ovisocr2-abiray-q8-0
-exp-qwen3-1.7b-ggml-q4-k-m
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
-exp-qwen38-2b-distill-empero-q6-k
-exp-qwen38-4b-distill-empero-q6-k
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
 exp-translate-gemma4-sub-e4b-17s-q4-k-xl
 ```
 
-The 0.11.0 catalog keeps only active comparison candidates in normal discovery.
+The 0.11.1 catalog keeps only active comparison candidates in normal discovery.
 Measured candidates that no longer have a plausible promotion path are moved to
 `../modelfiles-graveyard/`, which is source-only and excluded from packaging and
 model discovery. Granite 4.2 3B, Qwen3.8 9B, the TIR Qwen3.5 9B non-thinking

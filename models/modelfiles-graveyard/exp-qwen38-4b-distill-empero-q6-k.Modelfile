@@ -1,4 +1,10 @@
 # BC250 category: experimental
+# RETIRED 2026-09-12 for the normal Open WebUI task role. Quality was promising
+# (including a temporary 6/6 clarified-prompt/256-token experiment), but real
+# simultaneous residency with warm GPT-OSS OOM-killed the task service. Keeping
+# it as the always-available task companion would violate the warm-main UX/safety
+# policy on the 16 GiB unified-memory BC-250.
+#
 # Ollama model: exp-qwen38-4b-distill-empero-q6-k
 # Source: empero-ai/Qwen3.8-4B-Distill-GGUF @ latest
 # GGUF: Qwen3.8-4B-Q6_K.gguf

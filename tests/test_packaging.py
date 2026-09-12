@@ -31,7 +31,9 @@ class PackagingTests(unittest.TestCase):
             "quality-checks/package/*.sh\t{share}/quality-checks/package/",
             "quality-checks/task/*.sh\t{share}/quality-checks/task/",
             "quality-checks/translation/*.sh\t{share}/quality-checks/translation/",
+            "quality-checks/translation/owui-provider-config.py\t{share}/quality-checks/translation/owui-provider-config.py",
             "quality-checks/translation/prompts/*.txt\t{share}/quality-checks/translation/prompts/",
+            "models/retired-models.json\t{share}/model-management/retired-models.json",
         ):
             self.assertIn(entry, manifest)
         self.assertNotIn("quality-checks", revalidate)
@@ -309,6 +311,17 @@ class PackagingTests(unittest.TestCase):
             (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
         )
         self.assertEqual(desired["task"]["TASK_MODEL_PARAMS"], {})
+        self.assertEqual(
+            desired["task"]["TASK_MODEL"],
+            "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
+        )
+        for key in (
+            "TITLE_GENERATION_PROMPT_TEMPLATE",
+            "TAGS_GENERATION_PROMPT_TEMPLATE",
+            "QUERY_GENERATION_PROMPT_TEMPLATE",
+        ):
+            self.assertIsInstance(desired["task"][key], str)
+            self.assertTrue(desired["task"][key].strip())
         self.assertIn("Environment=ENABLE_DIRECT_CONNECTIONS=false", quadlet)
         self.assertIn("Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false", quadlet)
         self.assertIn("Environment=RAG_FILE_MAX_SIZE=128", quadlet)
@@ -329,6 +342,29 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("CHUNK_MIN_SIZE_TARGET=", quadlet)
         self.assertNotIn("RAG_EMBEDDING_BATCH_SIZE=", quadlet)
         self.assertNotIn("Environment=ENABLE_ORJSON=true", quadlet)
+
+    def test_task_default_is_consistent_across_package_entry_points(self) -> None:
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
+        )
+        task = desired["task"]["TASK_MODEL"].removesuffix(":latest")
+        self.assertEqual(task, "task-lfm25-1.2b-instruct-liquidai-q6-k")
+        self.assertIn(
+            f'"{task},embed-jina-v5-small-retrieval-q4-k-m"',
+            (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            f"readonly TASK_MODEL={task}",
+            (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            f'--arg model "{task}"',
+            (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8"),
+        )
+        self.assertIn(
+            f'"{task}"',
+            (ROOT / "models/modelctl.py").read_text(encoding="utf-8"),
+        )
 
     def test_compare_mtp_does_not_force_global_think_false(self) -> None:
         source = (ROOT / "models/experiments/compare-mtp.sh").read_text(

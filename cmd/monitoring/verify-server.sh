@@ -454,7 +454,7 @@ else
 fi
 if ((agent_active == 0)); then
   task_tags="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null || true)"
-  if [[ -n "$task_tags" ]] && jq -e --arg model "task-gemma3-1b-unsloth-ud-q4-k-xl" \
+  if [[ -n "$task_tags" ]] && jq -e --arg model "task-lfm25-1.2b-instruct-liquidai-q6-k" \
       'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
       <<< "$task_tags" >/dev/null 2>&1; then
     ok "default Open WebUI task model is registered on dedicated task Ollama"

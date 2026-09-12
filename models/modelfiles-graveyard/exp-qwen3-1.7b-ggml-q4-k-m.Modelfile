@@ -1,4 +1,9 @@
 # BC250 category: experimental
+# RETIRED 2026-09-12: failed the packaged task contract on the BC-250.
+# Result: 3/18 (1/6 each round) with 13 output-budget diagnostics; all 12 tag
+# and query runs failed, dominated by reasoning-budget starvation/empty output.
+# The model did not justify a coexistence test.
+#
 # Ollama model: exp-qwen3-1.7b-ggml-q4-k-m
 # Source: ggml-org/Qwen3-1.7B-GGUF @ main
 # GGUF: Qwen3-1.7B-Q4_K_M.gguf

@@ -54,6 +54,12 @@ FIXTURE_ROOT = (
 )
 TELEMETRY_INTERVAL = float(os.environ.get("TELEMETRY_INTERVAL", "0.5"))
 KEEP_ALIVE = os.environ.get("KEEP_ALIVE", "30m")
+INSTALLED_OWUI_DESIRED_STATE = (
+    Path(os.environ.get("BC250_SHARE", "/usr/share/bc250-llm-server"))
+    / "openwebui"
+    / "desired-state.json"
+)
+SOURCE_OWUI_DESIRED_STATE = SCRIPT_DIR.parent.parent / "config" / "openwebui" / "desired-state.json"
 
 
 def iso_now() -> str:
@@ -376,8 +382,10 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
     return 3 if quality_failed else 0
 
 
-# Mirrors the behavior/shape of Open WebUI v0.11.3's default title/tag/query
-# task templates without vendoring the full upstream prose into this package.
+# Task generation is package policy, not an upstream-default approximation.
+# The exact prompt templates live in the package-owned Open WebUI desired state and
+# are consumed by both Open WebUI and this direct benchmark. This prevents a model
+# from qualifying against one prompt contract and then regressing on the live route.
 TASK_NUM_PREDICT = {
     # Open WebUI v0.11.3 falls back to max_tokens=1000 for title generation
     # when TASK_MODEL_PARAMS is empty. The other packaged task paths inherit
@@ -387,45 +395,64 @@ TASK_NUM_PREDICT = {
     "query": 128,
 }
 
+TASK_PROMPT_KEYS = {
+    "title": ("TITLE_GENERATION_PROMPT_TEMPLATE", 2),
+    "tags": ("TAGS_GENERATION_PROMPT_TEMPLATE", 6),
+    "query": ("QUERY_GENERATION_PROMPT_TEMPLATE", 6),
+}
 
-def task_prompt(case: dict[str, Any]) -> str:
+
+def task_prompt_state_path() -> Path:
+    return (
+        INSTALLED_OWUI_DESIRED_STATE
+        if INSTALLED_OWUI_DESIRED_STATE.is_file()
+        else SOURCE_OWUI_DESIRED_STATE
+    )
+
+
+def task_prompt_templates() -> dict[str, str]:
+    path = task_prompt_state_path()
+    try:
+        desired = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise BenchmarkError(f"cannot read task prompt policy {path}: {exc}") from exc
+    task = desired.get("task") if isinstance(desired, dict) else None
+    if not isinstance(task, dict):
+        raise BenchmarkError(f"invalid task prompt policy in {path}")
+    templates: dict[str, str] = {}
+    for task_type, (key, _limit) in TASK_PROMPT_KEYS.items():
+        value = task.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise BenchmarkError(f"task prompt policy {path} is missing {key}")
+        templates[task_type] = value
+    return templates
+
+
+def task_prompt(
+    case: dict[str, Any], templates: dict[str, str] | None = None
+) -> str:
     messages = case.get("messages") or [
         {"role": "user", "content": case.get("input", "")}
     ]
-
-    def history(limit: int) -> str:
-        return "\n".join(
-            f"{str(message.get('role', 'user')).upper()}: {message.get('content', '')!s}"
-            for message in messages[-limit:]
+    task_type = str(case.get("type") or "")
+    if task_type not in TASK_PROMPT_KEYS:
+        raise BenchmarkError(f"unsupported task type: {task_type!r}")
+    _key, limit = TASK_PROMPT_KEYS[task_type]
+    history = "\n".join(
+        f"{str(message.get('role', 'user')).upper()}: {message.get('content', '')!s}"
+        for message in messages[-limit:]
+    )
+    prompt_templates = templates if templates is not None else task_prompt_templates()
+    template = prompt_templates[task_type]
+    rendered = template.replace(f"{{{{MESSAGES:END:{limit}}}}}", history)
+    rendered = rendered.replace(
+        "{{CURRENT_DATE}}", datetime.now().astimezone().date().isoformat()
+    )
+    if "{{MESSAGES:" in rendered or "{{CURRENT_DATE}}" in rendered:
+        raise BenchmarkError(
+            f"unexpanded placeholder in package task prompt for {task_type}"
         )
-
-    if case["type"] == "title":
-        return f"""### Task:
-Generate a concise title summarizing the chat history.
-Keep it to 2-4 words when possible, use the chat's primary language, and do not use emojis or decorative formatting.
-Return only one raw JSON object: {{\"title\": \"short title\"}}
-### Chat History (Open WebUI 0.11.3: latest 2 messages):
-<chat_history>
-{history(2)}
-</chat_history>"""
-    if case["type"] == "tags":
-        return f"""### Task:
-Generate 1-3 broad theme tags plus 1-3 specific subtopic tags in the chat's primary language.
-If the chat has fewer than 3 messages or is too diverse, return only {{\"tags\": [\"General\"]}}.
-Otherwise return only one raw JSON object: {{\"tags\": [\"tag1\", \"tag2\"]}}
-### Chat History (Open WebUI 0.11.3: latest 6 messages):
-<chat_history>
-{history(6)}
-</chat_history>"""
-    current_date = datetime.now().astimezone().date().isoformat()
-    return f"""### Task:
-Generate 1-3 broad, relevant retrieval queries in the language of the chat when useful; err on the side of generating useful queries.
-If no useful retrieval is possible, return an empty list. Today's date is {current_date}.
-Return only one raw JSON object: {{\"queries\": [\"query1\", \"query2\"]}}
-### Chat History (Open WebUI 0.11.3: latest 6 messages):
-<chat_history>
-{history(6)}
-</chat_history>"""
+    return rendered
 
 
 def parse_json_object(text: str) -> dict[str, Any] | None:
@@ -533,7 +560,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
         raise BenchmarkError("no task models found")
     paths = prepare_result_dir("task", args.output_dir)
     csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
-    copy_fixtures(paths, fixture)
+    prompt_policy = task_prompt_state_path()
+    prompt_templates = task_prompt_templates()
+    copy_fixtures(paths, fixture, prompt_policy)
     write_meta(
         meta_path,
         client,
@@ -545,6 +574,14 @@ def benchmark_task(args: argparse.Namespace) -> int:
             # actual request contract instead of the benchmark-wide 30m default.
             "keep_alive": 0,
             "num_predict_by_task": TASK_NUM_PREDICT,
+            "prompt_policy": str(prompt_policy),
+            "prompt_templates_sha256": hashlib.sha256(
+                json.dumps(
+                    prompt_templates,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                ).encode("utf-8")
+            ).hexdigest(),
         },
     )
 
@@ -564,7 +601,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
             print(f"\n=== task: {model} ===")
             scores: list[float] = []
             for case in cases:
-                prompt = task_prompt(case)
+                prompt = task_prompt(case, prompt_templates)
                 options = task_request_options(case)
                 payload = {
                     "model": model,

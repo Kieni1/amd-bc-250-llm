@@ -1,4 +1,9 @@
 # BC250 category: experimental
+# RETIRED 2026-09-12: task quality remained below the promoted LFM candidate.
+# Result: 8/18 (3/6, 3/6, 2/6) with 9 output-budget diagnostics. Titles were
+# strong, but tag/query generation remained unreliable under the deployed 128-
+# token non-title contract, so it did not advance to coexistence testing.
+#
 # Ollama model: exp-qwen38-2b-distill-empero-q6-k
 # Source: empero-ai/Qwen3.8-2B-Distill-GGUF @ main
 # GGUF: Qwen3.8-2B-Q6_K.gguf

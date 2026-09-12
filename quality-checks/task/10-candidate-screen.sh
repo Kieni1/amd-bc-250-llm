@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
-# Compare one packaged experimental task candidate against the current Gemma 3
-# 1B task baseline. This is candidate evidence only; it never changes defaults.
+# Compare one packaged experimental task candidate against the package-owned
+# Open WebUI task default. This is candidate evidence only; it never changes defaults.
 set -Eeuo pipefail
 umask 077
 
 CANDIDATE="${1:-}"
 ROUNDS="${2:-${BC250_SCREEN_ROUNDS:-3}}"
-BASELINE='task-gemma3-1b-unsloth-ud-q4-k-xl'
 SHARE='/usr/share/bc250-llm-server'
+DESIRED_STATE="$SHARE/openwebui/desired-state.json"
+BASELINE="$(jq -er '.task.TASK_MODEL | sub(":latest$"; "")' "$DESIRED_STATE")"
+[[ "$BASELINE" == task-* ]] || { printf 'ERROR: invalid package task baseline: %s\n' "$BASELINE" >&2; exit 2; }
 MAIN_URL='http://127.0.0.1:11434'
 TASK_URL='http://127.0.0.1:11435'
 MAIN_HOST='127.0.0.1:11434'

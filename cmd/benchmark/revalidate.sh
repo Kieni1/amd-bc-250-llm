@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BC-250 package revalidation harness v4.0
 #
-# Intended target: bc250-llm-server 0.11.0 on Fedora 44; release suffix is not hard-coded.
+# Intended target: bc250-llm-server 0.11.1 on Fedora 44; release suffix is not hard-coded.
 # `start` launches one systemd-owned qualification worker. Routine revalidation
 # exercises packaged defaults only; tuning and hardware A/B decisions are explicit
 # benchmark/diagnostic work. Per-phase reports are retained and exclusive-agent state
@@ -10,7 +10,7 @@ set -Eeuo pipefail
 umask 0077
 
 HARNESS_VERSION=4.0
-TARGET_VERSION=0.11.0
+TARGET_VERSION=0.11.1
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
 
@@ -61,7 +61,7 @@ readonly LFM_MODEL=prod-lfm25-8b-a1b-liquidai-q6-k
 readonly QWEN_MODEL=prod-qwen35-9b-unsloth-q6-k
 readonly GPT_OSS_MODEL=prod-gpt-oss20b-ggml-org-mxfp4
 readonly EMBED_MODEL=embed-jina-v5-small-retrieval-q4-k-m
-readonly TASK_MODEL=task-gemma3-1b-unsloth-ud-q4-k-xl
+readonly TASK_MODEL=task-lfm25-1.2b-instruct-liquidai-q6-k
 readonly AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m
 readonly OWUI_RAG_MODEL=bc250-office-documents
 readonly -a PACKAGE_PROD_MODELS=(
@@ -167,7 +167,7 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 qualification_benchmark() {
   env \
     -u OLLAMA_URL -u OLLAMA_HOST -u EMBEDDING_OLLAMA_URL \
-    -u BC250_BENCH_FIXTURES -u AGENT_TEMPERATURE \
+    -u BC250_SHARE -u BC250_BENCH_FIXTURES -u AGENT_TEMPERATURE \
     -u TRANSLATION_MODEL \
     -u RAG_EMBED_MODEL -u RAG_ANSWER_MODEL -u RAG_QUALITY_TOP_K \
     -u RAG_QUALITY_NUM_PREDICT -u EMBED_REPEATS -u EMBED_QUERY_PREFIX \
@@ -308,7 +308,7 @@ current_relevant_args() {
 install_unit() {
   cat > "$UNIT_PATH" <<EOFUNIT
 [Unit]
-Description=BC-250 0.11.0 package qualification v${HARNESS_VERSION}
+Description=BC-250 0.11.1 package qualification v${HARNESS_VERSION}
 After=network-online.target cyan-skillfish-governor-smu.service ollama.service open-webui.service
 Wants=network-online.target
 
@@ -792,7 +792,7 @@ write_phase_report() {
   stamp="$(date +%Y%m%dT%H%M%S)"
   file="$PHASE_REPORT_DIR/$(run_id)-${label}-${stamp}.txt"
   {
-    echo "# BC-250 0.11.0 revalidation v${HARNESS_VERSION} phase report"
+    echo "# BC-250 0.11.1 revalidation v${HARNESS_VERSION} phase report"
     echo "generated=$(now)"
     echo "run_id=$(run_id)"
     echo "phase=$(cat "$PHASE_FILE")"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import shutil
 import sys
@@ -44,6 +45,13 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertTrue(all("graveyard" not in str(path) for path in roots))
         active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
         self.assertTrue(retired.isdisjoint(active))
+
+    def test_retired_catalog_exactly_matches_source_graveyard(self) -> None:
+        graveyard = ROOT / "models/modelfiles-graveyard"
+        expected = {path.stem for path in graveyard.glob("*.Modelfile")}
+        catalog = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
+        actual = {item["name"] for item in catalog["models"]}
+        self.assertEqual(actual, expected)
 
     def test_every_packaged_modelfile_is_discovered_and_strictly_valid(self) -> None:
         models = modelctl.discover_models([MODELFILES])
@@ -142,11 +150,12 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         )
         self.assertIn("pooling metadata", text)
 
-    def test_new_compact_candidates_have_reviewed_sampling_and_roles(self) -> None:
-        q38 = (MODELFILES / "exp-qwen38-4b-distill-empero-q6-k.Modelfile").read_text()
-        self.assertIn("PARAMETER temperature 0.6", q38)
-        self.assertIn("PARAMETER top_p 0.95", q38)
-        self.assertIn("PARAMETER top_k 20", q38)
+    def test_promoted_task_model_has_reviewed_sampling_and_no_fixed_system(self) -> None:
+        task = (MODELFILES / "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile").read_text()
+        self.assertIn("PARAMETER temperature 0.1", task)
+        self.assertIn("PARAMETER top_k 50", task)
+        self.assertIn("PARAMETER repeat_penalty 1.05", task)
+        self.assertNotRegex(task, r"(?m)^SYSTEM\s")
         coder = (MODELFILES / "agentic-ornith15-9b-ornith-q5-k-m.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 32768", coder)
         self.assertIn("PARAMETER num_predict 3072", coder)
@@ -164,13 +173,17 @@ class ModelfileDiscoveryTests(unittest.TestCase):
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {
             "embedding": "embed-jina-v5-small-retrieval-q4-k-m",
-            "task": "task-gemma3-1b-unsloth-ud-q4-k-xl",
+            "task": "task-lfm25-1.2b-instruct-liquidai-q6-k",
             "agentic": "agentic-ornith15-9b-ornith-q5-k-m",
         }
         for category, name in expected.items():
             with self.subTest(category=category):
                 _defaults, models = load(category)
                 self.assertIn(name, {model["name"] for model in models})
+        self.assertIn(
+            "task-gemma3-1b-unsloth-ud-q4-k-xl",
+            {model["name"] for model in load("task")[1]},
+        )
 
     def test_example_is_ignored_and_operator_template_overrides_package(self) -> None:
         name = "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile"
@@ -192,7 +205,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 modelctl.load_modelfile(path)
 
     def test_duplicate_source_metadata_is_rejected(self) -> None:
-        source = MODELFILES / "task-gemma3-1b-unsloth-ud-q4-k-xl.Modelfile"
+        source = MODELFILES / "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / source.name
             text = source.read_text(encoding="utf-8")
@@ -218,7 +231,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertNotIn("Do not assume that a German or French input should be translated", lfm)
 
     def test_task_model_accepts_open_webui_integrated_task_prompts(self) -> None:
-        source = MODELFILES / "task-gemma3-1b-unsloth-ud-q4-k-xl.Modelfile"
+        source = MODELFILES / "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
         text = source.read_text(encoding="utf-8")
         self.assertIn("PARAMETER num_predict 128", text)
         self.assertNotRegex(
@@ -405,7 +418,7 @@ class StatusTests(unittest.TestCase):
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
                 "unmanaged-test-model",
             },
-            "127.0.0.1:11435": {"task-gemma3-1b-unsloth-ud-q4-k-xl"},
+            "127.0.0.1:11435": {"task-lfm25-1.2b-instruct-liquidai-q6-k"},
             "127.0.0.1:11436": {"prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl"},
             "127.0.0.1:11437": set(),
         }

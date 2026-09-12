@@ -23,6 +23,7 @@
       "1": {
         "enable": true,
         "model_ids": [
+          "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
           "task-gemma3-1b-unsloth-ud-q4-k-xl:latest"
         ],
         "tags": [
@@ -33,7 +34,7 @@
     }
   },
   "task": {
-    "TASK_MODEL": "task-gemma3-1b-unsloth-ud-q4-k-xl:latest",
+    "TASK_MODEL": "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
     "TASK_MODEL_EXTERNAL": null,
     "TASK_MODEL_PARAMS": {},
     "ENABLE_TITLE_GENERATION": true,
@@ -41,7 +42,10 @@
     "ENABLE_FOLLOW_UP_GENERATION": false,
     "ENABLE_AUTOCOMPLETE_GENERATION": false,
     "ENABLE_SEARCH_QUERY_GENERATION": false,
-    "ENABLE_RETRIEVAL_QUERY_GENERATION": false
+    "ENABLE_RETRIEVAL_QUERY_GENERATION": false,
+    "TITLE_GENERATION_PROMPT_TEMPLATE": "### Task:\nGenerate a concise title summarizing the chat history.\nKeep it to 2-4 words when possible, use the chat's primary language, and do not use emojis or decorative formatting.\nReturn only one raw JSON object: {\"title\": \"short title\"}\n### Chat History (Open WebUI 0.11.3: latest 2 messages):\n<chat_history>\n{{MESSAGES:END:2}}\n</chat_history>",
+    "TAGS_GENERATION_PROMPT_TEMPLATE": "### Task:\nGenerate 1-3 broad theme tags plus 1-3 specific subtopic tags in the chat's primary language.\nIf the chat has fewer than 3 messages or is too diverse, return only {\"tags\": [\"General\"]}.\nOtherwise return only one raw JSON object: {\"tags\": [\"tag1\", \"tag2\"]}\n### Chat History (Open WebUI 0.11.3: latest 6 messages):\n<chat_history>\n{{MESSAGES:END:6}}\n</chat_history>",
+    "QUERY_GENERATION_PROMPT_TEMPLATE": "### Task:\nGenerate 1-3 broad, relevant retrieval queries in the language of the chat when useful; err on the side of generating useful queries.\nIf no useful retrieval is possible, return an empty list. Today's date is {{CURRENT_DATE}}.\nReturn only one raw JSON object: {\"queries\": [\"query1\", \"query2\"]}\n### Chat History (Open WebUI 0.11.3: latest 6 messages):\n<chat_history>\n{{MESSAGES:END:6}}\n</chat_history>"
   },
   "embedding": {
     "RAG_EMBEDDING_ENGINE": "ollama",

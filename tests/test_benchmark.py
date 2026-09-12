@@ -750,6 +750,19 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertIn('["General"]', tags)
         self.assertIn("Today's date is", query)
         self.assertIn("err on the side", query)
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
+        )
+        templates = category.task_prompt_templates()
+        self.assertEqual(
+            templates["title"], desired["task"]["TITLE_GENERATION_PROMPT_TEMPLATE"]
+        )
+        self.assertEqual(
+            templates["tags"], desired["task"]["TAGS_GENERATION_PROMPT_TEMPLATE"]
+        )
+        self.assertEqual(
+            templates["query"], desired["task"]["QUERY_GENERATION_PROMPT_TEMPLATE"]
+        )
 
     def test_task_request_budgets_are_explicit_and_match_packaged_contract(self) -> None:
         self.assertEqual(
@@ -770,6 +783,8 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         task = source.split("def benchmark_task", 1)[1].split("def clean_code_output", 1)[0]
         self.assertIn('"keep_alive": 0', task)
         self.assertIn('"num_predict_by_task": TASK_NUM_PREDICT', task)
+        self.assertIn("copy_fixtures(paths, fixture, prompt_policy)", task)
+        self.assertIn("task_prompt(case, prompt_templates)", task)
         self.assertIn("request_options=options", task)
         self.assertIn("done_reason=done_reason", task)
 
@@ -778,6 +793,8 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
             encoding="utf-8"
         )
         self.assertIn("register_candidate_on_task", source)
+        self.assertIn(".task.TASK_MODEL", source)
+        self.assertNotIn("BASELINE='task-gemma3", source)
         self.assertIn(
             'run_one "$n" candidate "$CANDIDATE" "$TASK_URL" "$TASK_HOST"', source
         )
@@ -957,6 +974,16 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         checks = category.translation_content_checks(valid, case)
         self.assertEqual(checks, (True, True, True, True))
         self.assertEqual(category.task_language_hint(valid, "fr"), "match")
+
+        observed_hunyuan = (
+            "Chère Madame Keller, veuillez confirmer avoir reçu le contrat REF-81 "
+            "avant le 12 octobre 2026."
+        )
+        self.assertEqual(
+            category.translation_content_checks(observed_hunyuan, case),
+            (True, True, True, True),
+        )
+        self.assertEqual(category.task_language_hint(observed_hunyuan, "fr"), "match")
 
         missing_keller = (
             "Madame, veuillez confirmer la réception du contrat REF-81 "
@@ -1811,13 +1838,13 @@ printf 'ok\n'
             source = ROOT / "cmd/benchmark/revalidate.sh"
             probe = t / "probe"
             probe.write_text(
-                "#!/bin/bash\nprintf '%s|%s|%s\\n' \"${TRANSLATION_MODEL-unset}\" \"${BC250_BENCH_FIXTURES-unset}\" \"${AGENT_TEMPERATURE-unset}\"\n",
+                "#!/bin/bash\nprintf '%s|%s|%s|%s\\n' \"${TRANSLATION_MODEL-unset}\" \"${BC250_BENCH_FIXTURES-unset}\" \"${AGENT_TEMPERATURE-unset}\" \"${BC250_SHARE-unset}\"\n",
                 encoding="utf-8",
             )
             probe.chmod(0o755)
             script = f"""
 source "{source}" help >/dev/null
-export TRANSLATION_MODEL=evil BC250_BENCH_FIXTURES=/evil AGENT_TEMPERATURE=9
+export TRANSLATION_MODEL=evil BC250_BENCH_FIXTURES=/evil AGENT_TEMPERATURE=9 BC250_SHARE=/evil-share
 qualification_benchmark "{probe}"
 RAW="{t / 'raw'}"
 mkdir -p "$RAW/roles"
@@ -1832,7 +1859,7 @@ phase_roles
                 ["bash", "-c", script], text=True, capture_output=True, check=True
             )
             lines = completed.stdout.splitlines()
-            self.assertEqual(lines[0], "unset|unset|unset")
+            self.assertEqual(lines[0], "unset|unset|unset|unset")
             output = "\n".join(lines[1:])
             self.assertIn("translation quality qualification_benchmark bc250-benchmark translation prod-lfm25-8b-a1b-liquidai-q6-k --ollama-url http://127.0.0.1:11434", output)
             self.assertIn("--ollama-url http://127.0.0.1:11437", output)

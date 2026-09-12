@@ -63,7 +63,7 @@ class DocumentationTests(unittest.TestCase):
         maintenance = (ROOT / "docs/MAINTENANCE.md").read_text(encoding="utf-8")
         self.assertIn("128 MiB per file", settings)
         self.assertIn("256 MiB reverse-proxy ceiling", settings)
-        self.assertIn("0.11.0 catalog", experiments)
+        self.assertIn("0.11.1 catalog", experiments)
         self.assertNotIn("0.9.7-0.11 catalog", experiments)
         self.assertIn("bc250-openwebui-setup init", settings)
         self.assertIn("custom_params.think=false", maintenance)
@@ -122,7 +122,7 @@ class DocumentationTests(unittest.TestCase):
             "prod-lfm25-8b-a1b-liquidai-q6-k",
             "prod-gpt-oss20b-ggml-org-mxfp4",
             "embed-jina-v5-small-retrieval-q4-k-m",
-            "task-gemma3-1b-unsloth-ud-q4-k-xl",
+            "task-lfm25-1.2b-instruct-liquidai-q6-k",
             "agentic-ornith15-9b-ornith-q5-k-m",
         )
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

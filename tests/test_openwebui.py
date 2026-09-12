@@ -20,17 +20,7 @@ class FakeClient:
     def __init__(self, overrides: dict[str, Any] | None = None):
         self.responses = {
             "/ollama/config": OPENWEBUI.desired_ollama(),
-            "/api/v1/tasks/config": {
-                "TASK_MODEL": OPENWEBUI.TASK_MODEL,
-                "TASK_MODEL_EXTERNAL": None,
-                "TASK_MODEL_PARAMS": {},
-                "ENABLE_TITLE_GENERATION": True,
-                "ENABLE_TAGS_GENERATION": True,
-                "ENABLE_FOLLOW_UP_GENERATION": False,
-                "ENABLE_AUTOCOMPLETE_GENERATION": False,
-                "ENABLE_SEARCH_QUERY_GENERATION": False,
-                "ENABLE_RETRIEVAL_QUERY_GENERATION": False,
-            },
+            "/api/v1/tasks/config": OPENWEBUI.desired_task(),
             "/api/v1/retrieval/embedding": OPENWEBUI.desired_embedding(),
             "/api/v1/retrieval/config": OPENWEBUI.desired_rag(),
             "/api/v1/models/export": OPENWEBUI.load_models()["models"],

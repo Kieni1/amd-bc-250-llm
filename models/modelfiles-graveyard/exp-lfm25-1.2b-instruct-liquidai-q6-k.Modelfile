@@ -1,4 +1,11 @@
 # BC250 category: experimental
+# RETIRED 2026-09-12: this experimental alias completed the task-model evaluation.
+# The same Q6_K weights were promoted as task-lfm25-1.2b-instruct-liquidai-q6-k
+# after 15/18 direct quality, 15/18 through real Open WebUI with package-owned
+# task prompts, and 9/9 clean true-overlap trials beside warm GPT-OSS. The old
+# generic SYSTEM prompt was specifically rejected because it caused cross-task
+# output contamination; the promoted task model intentionally has no SYSTEM.
+#
 # Ollama model: exp-lfm25-1.2b-instruct-liquidai-q6-k
 # Source: LiquidAI/LFM2.5-1.2B-Instruct-GGUF @ main
 # GGUF: LFM2.5-1.2B-Instruct-Q6_K.gguf

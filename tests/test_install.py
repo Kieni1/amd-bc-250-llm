@@ -106,7 +106,7 @@ step_3_install_ollama
         source = INSTALLER.read_text()
         self.assertIn("bc250-model list all --all", source)
         self.assertIn('BC250_MODEL_SELECTION', source)
-        self.assertIn('task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m', source)
+        self.assertIn('task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m', source)
         self.assertIn('bc250-model install all "$selection" --include-disabled', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -121,7 +121,7 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:list all --all", result.stdout)
-        self.assertIn("task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
+        self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
         self.assertIn("no additional models selected", result.stdout)
         self.assertEqual(result.stdout.count("model:install"), 1)
 
@@ -136,7 +136,7 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:install all recommended,19-20 --include-disabled", result.stdout)
-        self.assertIn("task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
+        self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
         self.assertEqual(result.stdout.count("model:install"), 2)
 
     def test_original_noninteractive_input_survives_transcript_pty(self) -> None:
@@ -364,7 +364,7 @@ step_8_application_services
             self.assertEqual(resumed.returncode, 0, resumed.stdout)
             calls = log.read_text()
             baseline = calls.index(
-                "model:install all task-gemma3-1b-unsloth-ud-q4-k-xl,embed-jina-v5-small-retrieval-q4-k-m"
+                "model:install all task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m"
             )
             owui = calls.index("systemctl:start tika.service open-webui.service")
             self.assertLess(baseline, owui)
