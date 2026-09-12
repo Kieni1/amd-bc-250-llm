@@ -349,6 +349,40 @@ class StateTests(unittest.TestCase):
             self.assertEqual(state["model_id"], "exp-test")
             self.assertEqual(state["category"], "experiments")
 
+
+    def test_write_state_preserves_dedupe_records(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "model.gguf"
+            output.write_bytes(b"weights")
+            sidecar = modelctl.state_path(output)
+            record = {
+                "main/sha256-" + "a" * 64: {
+                    "source": {"size": 7},
+                    "blob": {"size": 7},
+                }
+            }
+            sidecar.write_text(
+                json.dumps({"schema": 3, "dedupe": record}),
+                encoding="utf-8",
+            )
+            model = {
+                "id": "exp-test",
+                "name": "exp-test",
+                "category": "experiments",
+                "repository": "example/model",
+                "revision": "main",
+                "gguf": "model.gguf",
+            }
+            with patch.object(modelctl.os, "chown"), patch.object(modelctl.os, "chmod"):
+                modelctl.write_state(sidecar, model, modelctl.sha256(output), 1)
+            state = json.loads(sidecar.read_text())
+            self.assertEqual(state["dedupe"], record)
+
+    def test_current_schema3_fast_path_does_not_force_state_rewrite(self) -> None:
+        source = (ROOT / "models/modelctl.py").read_text()
+        self.assertIn('state.get("schema") != 3', source)
+        self.assertNotIn('state.get("schema") != 2\n', source)
+
     def test_cleanup_retired_removes_only_catalogued_package_model(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)

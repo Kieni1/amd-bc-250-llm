@@ -106,6 +106,29 @@ class StorageTests(unittest.TestCase):
             result = json.loads(state_path.read_text())
             self.assertEqual(set(result["dedupe"]), {storage.dedupe_key(blob) for blob in blobs})
 
+
+    def test_dedupe_pair_batches_all_16m_ranges_into_one_xfs_io_process(self) -> None:
+        alias = Path("/tmp/source")
+        blob = Path("/tmp/blob")
+        size = storage.DEDUPE_CHUNK_BYTES * 2 + 7
+        with patch.object(storage.subprocess, "run") as run:
+            ranges = storage.dedupe_pair(alias, blob, size)
+        self.assertEqual(ranges, 3)
+        run.assert_called_once()
+        command = run.call_args.args[0]
+        self.assertEqual(command[0], "xfs_io")
+        self.assertEqual(command[-1], str(blob))
+        self.assertEqual(command.count("-c"), 3)
+        self.assertIn(
+            f"dedupe -q {alias} 0 0 {storage.DEDUPE_CHUNK_BYTES}",
+            command,
+        )
+
+    def test_dedupe_targets_only_manifest_referenced_pairs(self) -> None:
+        source = (ROOT / "cmd/system/storage.py").read_text()
+        self.assertIn("live_pairs = [pair for pair in all_pairs if blob_referenced(pair[1])]", source)
+        self.assertIn("unreferenced source-hash blobs", source)
+
     def test_stale_40cu_cache_means_removed_kernel_only(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             cache = Path(temporary) / "cache"; modules = Path(temporary) / "modules"

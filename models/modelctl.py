@@ -510,9 +510,12 @@ def print_models(
         else:
             details = [provider, origin, download[source]]
         if provider.startswith("ollama"):
-            details.append(
-                {True: "set up", False: "not set up", None: "registration unavailable"}[setup]
-            )
+            if setup is None and defaults.get("category") == "agentic":
+                details.append("registration deferred (agent lane inactive)")
+            else:
+                details.append(
+                    {True: "set up", False: "not set up", None: "registration unavailable"}[setup]
+                )
         index = model.get("index", offset)
         print(
             f"  {index:2d}) {model.get('name', model['id']):<56} [{', '.join(details)}]"
@@ -789,6 +792,7 @@ def ensure_file_permissions(path: Path, uid: int, gid: int, mode: int) -> bool:
 
 def write_state(path: Path, model: dict, checksum: str, gid: int) -> None:
     stat = path.with_name(path.name.removesuffix(".bc250.json")).stat()
+    existing = load_state(path)
     value = {
         "schema": 3,
         "model_name": model.get("name", model["id"]),
@@ -802,6 +806,11 @@ def write_state(path: Path, model: dict, checksum: str, gid: int) -> None:
         "mtime_ns": stat.st_mtime_ns,
         "ctime_ns": stat.st_ctime_ns,
     }
+    # Preserve dedupe bookkeeping across harmless state refreshes. The record
+    # contains source/blob stat signatures, so storage.py will still reject it
+    # automatically if a source inode/content transition made it stale.
+    if isinstance(existing.get("dedupe"), dict):
+        value["dedupe"] = existing["dedupe"]
     temporary = path.with_name(f".{path.name}.tmp")
     try:
         temporary.write_text(
@@ -1053,6 +1062,27 @@ def registration_current(
         and name in registrations
     )
 
+def registration_drift_reason(
+    name: str,
+    registrations: set[str] | None,
+    *,
+    refresh: bool,
+    source_changed: bool,
+    template_changed: bool,
+) -> str:
+    reasons: list[str] = []
+    if refresh:
+        reasons.append("refresh requested")
+    if source_changed:
+        reasons.append("GGUF/source changed")
+    if template_changed:
+        reasons.append("Modelfile changed")
+    if registrations is None:
+        reasons.append("registration state unavailable")
+    elif name not in registrations:
+        reasons.append("registration missing")
+    return ", ".join(reasons) or "registration reconciliation required"
+
 def render_modelfile(
     source: Path, model: dict, output: Path | None, destination: Path
 ) -> bool:
@@ -1155,6 +1185,11 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 ):
                     print("    already current; skipping")
                     continue
+                reason = registration_drift_reason(
+                    model["name"], registrations, refresh=args.refresh,
+                    source_changed=False, template_changed=template_changed,
+                )
+                print(f"    registration drift: {reason}; reconciling")
                 result = run_as_ollama(
                     [ollama_bin, "create", model["name"], "-f", str(runtime_template)],
                     {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
@@ -1179,7 +1214,7 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 permissions_changed = ensure_file_permissions(output, 0, gid, 0o640)
                 current = output.stat()
                 if (
-                    state.get("schema") != 2
+                    state.get("schema") != 3
                     or state.get("size") != current.st_size
                     or state.get("mtime_ns") != current.st_mtime_ns
                     or state.get("ctime_ns") != current.st_ctime_ns
@@ -1260,6 +1295,11 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
             ):
                 print("    already current; skipping")
                 continue
+            reason = registration_drift_reason(
+                model["name"], registrations, refresh=args.refresh,
+                source_changed=source_changed, template_changed=template_changed,
+            )
+            print(f"    registration drift: {reason}; reconciling")
             result = run_as_ollama(
                 [ollama_bin, "create", model["name"], "-f", str(runtime_template)],
                 {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
@@ -1393,6 +1433,10 @@ def build_parser() -> argparse.ArgumentParser:
     catalog_arguments(installing)
     installing.add_argument("selection", nargs="?")
     installing.add_argument("--list", action="store_true")
+    installing.add_argument(
+        "--quiet", action="store_true",
+        help="suppress the repeated model catalog and mode-transition chatter",
+    )
     installing.add_argument("--host")
     installing.add_argument("--revision")
     installing.add_argument("--sha256")
@@ -1411,6 +1455,10 @@ def build_parser() -> argparse.ArgumentParser:
     catalog_arguments(cleaning)
     cleaning.add_argument("selection", nargs="?")
     cleaning.add_argument("--list", action="store_true")
+    cleaning.add_argument(
+        "--quiet", action="store_true",
+        help="suppress the repeated model catalog and mode-transition chatter",
+    )
     cleaning.add_argument("--yes", action="store_true")
     cleaning.add_argument(
         "--host",
@@ -1504,7 +1552,10 @@ def run_all_catalog_operation(
             status = max(status, operate_models(*group, group_args))
 
     if agent_selected:
-        quiet_mode = os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1"
+        quiet_mode = (
+            getattr(args, "quiet", False)
+            or os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1"
+        )
         if quiet_mode:
             print("Switching temporarily to exclusive agent mode for agent model setup.")
         set_appliance_mode("agent")
@@ -1553,6 +1604,9 @@ def main(argv: list[str] | None = None) -> int:
         if reconfigure:
             reconfigure(line_buffering=True)
     args = build_parser().parse_args(argv)
+    if getattr(args, "quiet", False):
+        os.environ["BC250_MODELCTL_SUPPRESS_MODE_OUTPUT"] = "1"
+        os.environ["BC250_MODELCTL_SUPPRESS_CATALOG"] = "1"
     # One transient authentication decision is shared by all selected categories
     # in this process, including a temporary switch into the agent lane.
     args.hf_session = {"resolved": False, "token": ""}
@@ -1600,7 +1654,7 @@ def main(argv: list[str] | None = None) -> int:
             command=args.command,
             include_disabled=getattr(args, "include_disabled", False),
         )
-        if os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") != "1":
+        if not getattr(args, "quiet", False) and os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") != "1":
             print("Available all models:")
             print_catalogs(
                 catalogs,
@@ -1657,18 +1711,20 @@ def main(argv: list[str] | None = None) -> int:
     available = models
     if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
         available = [model for model in models if model["enabled"]]
-    print(f"Available {category} models:")
+    if not getattr(args, "quiet", False):
+        print(f"Available {category} models:")
     host = (
         ollama_host(defaults, getattr(args, "host", None))
         if defaults.get("ollama_host")
         else None
     )
-    print_models(
-        defaults,
-        available,
-        registered_models(host) if host else None,
-        destination=getattr(args, "destination", None),
-    )
+    if not getattr(args, "quiet", False):
+        print_models(
+            defaults,
+            available,
+            registered_models(host) if host else None,
+            destination=getattr(args, "destination", None),
+        )
     if args.list:
         return 0
     if not available:

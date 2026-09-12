@@ -21,6 +21,7 @@ OPERATOR_MODEL_DIR = Path("/etc/bc250-llm-server/models.d")
 RETIRED_CATALOG = Path("/usr/share/bc250-llm-server/model-management/retired-models.json")
 SERVICES = ("ollama.service", "ollama-task.service", "ollama-embedding.service", "ollama-agent.service", "open-webui.service")
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
+DEDUPE_CHUNK_BYTES = 16 * 1024**2
 
 
 def human(value: int) -> str:
@@ -217,18 +218,28 @@ def status() -> int:
         print("Run: sudo bc250-storage status")
         return 1
     pairs = state_pairs()
-    pending = [pair for pair in pairs if not dedupe_record_matches(pair[0], pair[1], pair[4])]
+    live_pairs = [pair for pair in pairs if blob_referenced(pair[1])]
+    transient_pairs = [pair for pair in pairs if not blob_referenced(pair[1])]
+    pending = [
+        pair
+        for pair in live_pairs
+        if not dedupe_record_matches(pair[0], pair[1], pair[4])
+    ]
     print(f"  GGUF logical bytes:    {human(gguf_bytes or 0)}")
     print(f"  Ollama logical bytes:  {human(ollama_bytes or 0)}")
-    print(f"  verified source/blob pairs:{len(pairs):7d}")
-    print(f"  dedupe state recorded:{len(pairs) - len(pending):9d}")
+    print(f"  verified live source/blob pairs:{len(live_pairs):7d}")
+    print(f"  dedupe state recorded:{len(live_pairs) - len(pending):9d}")
     print(f"  dedupe state unrecorded:{len(pending):7d}")
     print(f"  unrecorded logical data:{human(sum(src.stat().st_size for src, *_ in pending))}")
+    print(f"  unreferenced source-hash blobs:{len(transient_pairs):5d}")
+    print(f"  unreferenced logical data:{human(sum(src.stat().st_size for src, *_ in transient_pairs))}")
     stale = stale_cu_caches()
     print(f"  stale 40-CU caches:    {len(stale):9d}")
     for path in stale:
         print(f"    {path.name}")
     print("Note: logical byte totals include reflink-shared extents; df reports physical free capacity.")
+    if transient_pairs:
+        print("Unreferenced source-hash blobs are not dedupe targets; normal Ollama startup pruning can remove them.")
     return 0
 
 
@@ -280,13 +291,38 @@ def quiesce_services() -> list[str]:
         raise RuntimeError(f"could not quiesce model services: {exc}{detail}") from exc
 
 
+def dedupe_pair(alias: Path, blob: Path, size: int) -> int:
+    """Deduplicate one source/blob pair with one xfs_io process.
+
+    Keep the field-tested 16 MiB FIDEDUPERANGE size, but batch every range for
+    the pair into one xfs_io invocation. This avoids thousands of process
+    launches while preserving the conservative range size used on BC-250.
+    """
+    command = ["xfs_io"]
+    ranges = 0
+    for offset in range(0, size, DEDUPE_CHUNK_BYTES):
+        length = min(DEDUPE_CHUNK_BYTES, size - offset)
+        command.extend(
+            ["-c", f"dedupe -q {alias} {offset} {offset} {length}"]
+        )
+        ranges += 1
+    command.append(str(blob))
+    subprocess.run(command, check=True)
+    return ranges
+
+
 def dedupe(yes: bool) -> int:
     require_root(); xfs_ready()
     all_pairs = state_pairs()
-    pairs = [pair for pair in all_pairs if not dedupe_record_matches(pair[0], pair[1], pair[4])]
+    live_pairs = [pair for pair in all_pairs if blob_referenced(pair[1])]
+    pairs = [
+        pair
+        for pair in live_pairs
+        if not dedupe_record_matches(pair[0], pair[1], pair[4])
+    ]
     if not pairs:
-        if all_pairs:
-            print(f"All {len(all_pairs)} verified source/blob pair(s) are already recorded as deduplicated.")
+        if live_pairs:
+            print(f"All {len(live_pairs)} verified live source/blob pair(s) are already recorded as deduplicated.")
         else:
             print("No package-managed GGUF/Ollama duplicate pairs found.")
         return 0
@@ -306,11 +342,16 @@ def dedupe(yes: bool) -> int:
                     raise RuntimeError(f"source/blob state changed for {source_label(source, state, names)}")
                 alias.unlink(missing_ok=True); alias.symlink_to(source)
                 size = source.stat().st_size
-                for offset in range(0, size, 16 * 1024**2):
-                    length = min(16 * 1024**2, size - offset)
-                    subprocess.run(["xfs_io", "-c", f"dedupe -q {alias} {offset} {offset} {length}", str(blob)], check=True)
+                ranges = (size + DEDUPE_CHUNK_BYTES - 1) // DEDUPE_CHUNK_BYTES
+                label = source_label(source, state, names)
+                print(
+                    f"  [{index}/{len(pairs)}] {label} [{blob.parents[1].name}] "
+                    f"{human(size)} in {ranges} batched 16 MiB range(s)...",
+                    flush=True,
+                )
+                dedupe_pair(alias, blob, size)
                 write_dedupe_record(state_path, source, blob, state)
-                print(f"  [{index}/{len(pairs)}] {source_label(source, state, names)} [{blob.parents[1].name}]")
+                print(f"      recorded dedupe state for {label}")
         os.sync()
     finally:
         failed = restore_services(active)
