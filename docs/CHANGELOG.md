@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1-0.3 - 2026-09-12
+
+- Polish model cleanup without changing deletion semantics: explicitly named targets no longer dump the full category, interactive cleanup shows registration/runtime/source/state actions before confirmation, and `--keep-gguf` previews retained source/state data while `--list` remains discovery-only. Remove the duplicate all-model catalog print.
+- Scope manual maintenance output to the current systemd invocation instead of a historical journal tail and remove an internal backup-users table-name line from normal output.
+- Preflight the protected Open WebUI API key before manual upload pruning, report the active age/ceiling/dry-run policy without exposing credentials, and avoid expected systemd failure noise when the key is missing or still the placeholder.
+- Refresh operator documentation and command examples for the current cleanup/maintenance behavior, including `sudo` where examples use root-owned token files or privileged appliance operations. No lifecycle semantics, retention policy, quality thresholds, service topology, or storage-dedupe behavior changes in this release.
+
 ## 0.11.1-0.2 - 2026-09-12
 
 - Move the runtime baseline from Ollama 0.33.3 to 0.34.0 using the commit-pinned official installer (`d8ab4b4f0ca24b51d3a46b3bf4f462e58ce66b1f`) and the existing verified installer SHA-256. Ollama 0.34.0 keeps the same llama.cpp revision as 0.33.3, so this is a greenfield runtime refresh rather than evidence that existing AMD/Vulkan UMA risks are fixed; real BC-250 model-load and coexistence validation remains required.

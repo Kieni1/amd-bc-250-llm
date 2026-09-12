@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.1
-Release:        0.2%{?dist}
+Release:        0.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.3
+- Make targeted model cleanup concise and show exact interactive cleanup effects, including keep-GGUF retention, without changing cleanup semantics.
+- Limit manual maintenance output to the current systemd invocation and preflight upload-prune credentials before launching the unit, without exposing the key.
+- Refresh README/operator command documentation, including privileged examples and root-owned token-file invocations, and remove small duplicate/noisy output paths.
+
 * Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.2
 - Update the package runtime baseline to Ollama 0.34.0 and keep the existing BC-250 Vulkan/UMA topology, cloud-off policy, and real-device requalification requirement.
 - Add four large main-lane challengers plus a packaged sequential GPT-OSS comparison matrix; retain source GGUFs by default and document lower-quant fallbacks for BC-250 memory pressure.
