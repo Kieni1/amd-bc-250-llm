@@ -71,6 +71,7 @@ template; invalid definitions are rejected before download.
 ```bash
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL
+sudo bc250-model cleanup production MODEL --keep-gguf
 ```
 
 Use the package tools rather than deleting source GGUFs or Ollama blobs by hand.

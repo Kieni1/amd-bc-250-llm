@@ -22,6 +22,7 @@ sudo bc250-model install production MODEL-NAME --refresh
 sudo bc250-model install experiments MODEL1,MODEL2 --quiet
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
+sudo bc250-model cleanup production MODEL-NAME --keep-gguf
 sudo bc250-model cleanup-retired
 ```
 
@@ -152,7 +153,10 @@ and manager-owned source/runtime paths needed for safe cleanup.
 models, refuses uncertain or misplaced registration state, and never targets
 arbitrary unmanaged operator models.
 
-Prefer `bc250-model cleanup` over deleting one side manually. For ordinary
+Named cleanup is concise by default; interactive cleanup prints the exact registration,
+runtime Modelfile, source GGUF and state-sidecar actions before confirmation. `--keep-gguf`
+shows and retains the source/state pair. `cleanup CATEGORY --list` remains the catalog
+discovery view. Prefer `bc250-model cleanup` over deleting one side manually. For ordinary
 local-GGUF definitions it removes the selected Ollama registration, source GGUF,
 state and rendered Modelfile while retaining the source template. For remote OCR definitions it removes the registration/rendered Modelfile;
 there is no separate manager-owned GGUF/state pair to retain or delete. With

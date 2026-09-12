@@ -278,6 +278,18 @@ class CategoryInterfaceTests(unittest.TestCase):
         ):
             modelctl.main(["list"])
 
+    def test_targeted_cleanup_suppresses_category_catalog_by_default(self) -> None:
+        defaults = {"category": "experiments", "ollama_host": "127.0.0.1:11434"}
+        models = [{"category": "experiments", "id": "m", "name": "exp-m", "enabled": True}]
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "load_models", return_value=(defaults, models)),
+            patch.object(modelctl, "print_models") as printed,
+            patch.object(modelctl, "run_category_operation", return_value=0),
+        ):
+            self.assertEqual(modelctl.main(["cleanup", "experiments", "m", "--yes"]), 0)
+        printed.assert_not_called()
+
     def test_cleanup_all_without_selection_selects_every_catalog_entry(self) -> None:
         catalogs = [
             (
@@ -335,6 +347,26 @@ class CategoryInterfaceTests(unittest.TestCase):
 
         self.assertEqual(modes, ["normal", "agent", "normal"])
         self.assertEqual(operations, ["production", "task", "embedding", "agentic", "mtp"])
+
+    def test_cleanup_confirmation_happens_before_mode_switch(self) -> None:
+        defaults = {
+            "category": "agentic",
+            "ollama_host": "127.0.0.1:11436",
+            "destination": "/tmp",
+        }
+        model = {
+            "category": "agentic", "id": "a", "name": "agent-a",
+            "provider": "ollama", "from": "/tmp/a.gguf", "gguf": "a.gguf",
+        }
+        args = modelctl.argparse.Namespace(
+            command="cleanup", yes=False, keep_gguf=False, host=None, destination=None
+        )
+        with (
+            patch.object(modelctl, "prompt_line", return_value="n"),
+            patch.object(modelctl, "set_appliance_mode") as mode,
+        ):
+            self.assertEqual(modelctl.run_category_operation(defaults, [model], args), 0)
+        mode.assert_not_called()
 
     def test_all_cleanup_dispatches_each_selected_category(self) -> None:
         catalogs = [

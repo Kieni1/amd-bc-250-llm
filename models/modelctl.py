@@ -1319,10 +1319,39 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     return 0
 
 
+def show_cleanup_plan(
+    groups: list[tuple[dict, list[dict]]], args: argparse.Namespace
+) -> None:
+    print("Cleanup plan:")
+    keep = getattr(args, "keep_gguf", False)
+    for defaults, models in groups:
+        host = ollama_host(defaults, getattr(args, "host", None))
+        runtime_root = defaults.get("modelfile_destination")
+        for model in models:
+            label = model.get("name", model["id"])
+            print(f"\n{label}")
+            if model["provider"].startswith("ollama"):
+                print(f"  Registration: remove from {host}")
+            else:
+                print("  Registration: none (download-only)")
+            if runtime_root and model.get("modelfile"):
+                print(f"  Runtime Modelfile: remove {Path(runtime_root) / model['modelfile']}")
+            if model["provider"] == "ollama-hf":
+                print("  Manager-owned source: none (Ollama-managed model/projector blobs)")
+            else:
+                output = model_path(defaults, model, getattr(args, "destination", None))
+                size = f" ({output.stat().st_size / 1024**3:.1f} GiB)" if output.is_file() else ""
+                action = "retain" if keep else "remove"
+                print(f"  Manager-owned source: {action} {output}{size}")
+                print(f"  State sidecar: {action} {state_path(output)}")
+            print("  Packaged/source Modelfile definition: retain")
+
+
 def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
     if not args.yes:
+        show_cleanup_plan([(defaults, models)], args)
         names = ", ".join(model.get("name", model["id"]) for model in models)
         if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
             print("Cleanup cancelled.")
@@ -1520,12 +1549,6 @@ def run_all_catalog_operation(
         for model in selected:
             print(f"  {model.get('name', model['id'])}")
         print(f"\nProcessing {len(selected)} selected model(s)...")
-    if args.command == "cleanup" and not args.yes:
-        names = ", ".join(model.get("name", model["id"]) for model in selected)
-        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
-            print("Cleanup cancelled.")
-            return 0
-
     groups: dict[str, tuple[dict, list[dict]]] = {}
     for defaults, models in catalogs:
         chosen = [
@@ -1535,6 +1558,13 @@ def run_all_catalog_operation(
         ]
         if chosen:
             groups[defaults["category"]] = (defaults, chosen)
+
+    if args.command == "cleanup" and not args.yes:
+        show_cleanup_plan(list(groups.values()), args)
+        names = ", ".join(model.get("name", model["id"]) for model in selected)
+        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
+            print("Cleanup cancelled.")
+            return 0
 
     status = 0
     normal_selected = any(category in groups for category in NORMAL_CATEGORIES)
@@ -1583,6 +1613,13 @@ def run_all_catalog_operation(
 def run_category_operation(
     defaults: dict, selected: list[dict], args: argparse.Namespace
 ) -> int:
+    if args.command == "cleanup" and not args.yes:
+        show_cleanup_plan([(defaults, selected)], args)
+        names = ", ".join(model.get("name", model["id"]) for model in selected)
+        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
+            print("Cleanup cancelled.")
+            return 0
+        args = argparse.Namespace(**vars(args)); args.yes = True
     category = defaults["category"]
     if category == "mtp" or getattr(args, "host", None):
         return operate_models(defaults, selected, args)
@@ -1654,7 +1691,10 @@ def main(argv: list[str] | None = None) -> int:
             command=args.command,
             include_disabled=getattr(args, "include_disabled", False),
         )
-        if not getattr(args, "quiet", False) and os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") != "1":
+        targeted_cleanup = (
+            args.command == "cleanup" and args.selection is not None and not args.list
+        )
+        if not targeted_cleanup and not getattr(args, "quiet", False) and os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") != "1":
             print("Available all models:")
             print_catalogs(
                 catalogs,
@@ -1711,14 +1751,17 @@ def main(argv: list[str] | None = None) -> int:
     available = models
     if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
         available = [model for model in models if model["enabled"]]
-    if not getattr(args, "quiet", False):
+    targeted_cleanup = (
+        args.command == "cleanup" and args.selection is not None and not args.list
+    )
+    if not targeted_cleanup and not getattr(args, "quiet", False):
         print(f"Available {category} models:")
     host = (
         ollama_host(defaults, getattr(args, "host", None))
         if defaults.get("ollama_host")
         else None
     )
-    if not getattr(args, "quiet", False):
+    if not targeted_cleanup and not getattr(args, "quiet", False):
         print_models(
             defaults,
             available,

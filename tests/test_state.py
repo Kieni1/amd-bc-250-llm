@@ -154,6 +154,30 @@ class StateTests(unittest.TestCase):
             )  # preserve recorded mtime
             self.assertFalse(modelctl.state_matches(state, MODEL, output))
 
+    def test_cleanup_preview_distinguishes_remove_and_keep_gguf(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "model.gguf"
+            source.write_bytes(b"weights")
+            model = {
+                "id": "m", "name": "prod-test", "provider": "ollama",
+                "from": str(source), "gguf": source.name, "modelfile": "prod-test.Modelfile",
+            }
+            defaults = {
+                "destination": str(root),
+                "ollama_host": "127.0.0.1:11434",
+                "modelfile_destination": str(root / "runtime"),
+            }
+            for keep, expected in ((False, "remove"), (True, "retain")):
+                capture = StringIO()
+                args = SimpleNamespace(keep_gguf=keep, host=None, destination=None)
+                with redirect_stdout(capture):
+                    modelctl.show_cleanup_plan([(defaults, [model])], args)
+                text = capture.getvalue()
+                self.assertIn(f"Manager-owned source: {expected} {source}", text)
+                self.assertIn(f"State sidecar: {expected} {modelctl.state_path(source)}", text)
+                self.assertIn("Packaged/source Modelfile definition: retain", text)
+
     def test_cleanup_retains_local_source_when_ollama_registration_removal_fails(
         self,
     ) -> None:
