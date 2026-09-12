@@ -39,7 +39,7 @@ def main_provider_index(config: dict, port: int = 11434) -> int:
     if config["ENABLE_OLLAMA_API"] is not True:
         raise ValueError("Open WebUI Ollama API is disabled")
     if not isinstance(urls, list) or not isinstance(configs, dict):
-        raise ValueError("unexpected Open WebUI Ollama config shape")
+        raise TypeError("unexpected Open WebUI Ollama config shape")
     matches: list[int] = []
     for idx, url in enumerate(urls):
         if not isinstance(url, str):
@@ -56,7 +56,7 @@ def main_provider_index(config: dict, port: int = 11434) -> int:
     idx = matches[0]
     provider = configs.get(str(idx))
     if not isinstance(provider, dict):
-        raise ValueError(f"missing Ollama API config for main provider index {idx}")
+        raise TypeError(f"missing Ollama API config for main provider index {idx}")
     if provider.get("enable", True) is not True:
         raise ValueError("main Ollama provider is disabled")
     return idx
