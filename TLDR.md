@@ -69,7 +69,7 @@ sudo bc250-model install task
 sudo bc250-openwebui-setup init
 sudo bc250-model install agentic
 
-# Review before removing source GGUF and Ollama registration
+# --list discovers candidates; named interactive cleanup previews exact effects
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
 ```
@@ -112,6 +112,7 @@ sudo bc250-revalidate status
 
 sudo bc250-maintenance setup --defaults
 sudo bc250-maintenance run backup
+sudo bc250-maintenance run prune      # fails before systemd launch if API key is not configured
 sudo bc250-maintenance clean-cache
 ```
 

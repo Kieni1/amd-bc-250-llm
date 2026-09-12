@@ -172,8 +172,8 @@ bc250-benchmark rag-quality --think true
 bc250-benchmark rag-quality --think false
 bc250-benchmark generation --profile compare \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-bc250-benchmark owui-embedding-batch --token-file /root/owui-test.key
-bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /root/owui-test.key
+sudo bc250-benchmark owui-embedding-batch --token-file /root/owui-test.key
+sudo bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /root/owui-test.key
 sudo bc250-benchmark owui-system-context OWUI_RAG_MODEL \
   --token-file /root/owui-test.key
 ```

@@ -119,6 +119,7 @@ sudo bc250-model install experiments
 sudo bc250-model install embedding
 sudo bc250-model install task
 sudo bc250-model install agentic   # temporarily switches to agent mode, then restores normal
+sudo bc250-model cleanup experiments MODEL  # concise target + interactive effects preview
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
 sudo bc250-openwebui-setup init
@@ -134,6 +135,8 @@ sudo bc250-40cu status
 # Optional maintenance / storage
 sudo bc250-status
 sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance run backup
+sudo bc250-maintenance run prune      # preflights the protected Open WebUI API key
 # Check/apply package-owned Open WebUI state when needed:
 bc250-openwebui-setup status
 sudo bc250-maintenance clean-cache

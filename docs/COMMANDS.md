@@ -122,9 +122,13 @@ is supplied. It fails closed if expected registration state is unavailable or a
 retired model is detected on an unexpected package-owned Ollama lane; arbitrary
 unmanaged models are never selected.
 
-For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
-registration/runtime Modelfile while retaining the local GGUF and its state
-sidecar for fast reuse. Without it, cleanup also deletes the local GGUF/state.
+For an explicitly named cleanup target, the manager skips the full category listing.
+Without `--yes`, it prints the exact registration/runtime/source/state actions first
+and asks for confirmation; `--keep-gguf` changes the source/state actions to retain.
+`cleanup CATEGORY --list` remains the discovery view rather than a destructive-effects
+preview. For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
+registration/runtime Modelfile while retaining the local GGUF and its state sidecar
+for fast reuse. Without it, cleanup also deletes the local GGUF/state.
 If a model was installed with `--host` or `--destination`, pass the same override
 to `cleanup` so removal targets that registration and manager-owned source tree.
 Ollama remains responsible for pruning registration manifests and unreferenced
@@ -465,12 +469,14 @@ sudo bc250-maintenance clean-cache
 sudo bc250-maintenance disable
 ```
 
-`setup --defaults` enables verified local backups only. `clean-cache` requires
-confirmation and removes only rebuildable Hugging Face cache, dangling Podman
-images and old **system-wide** journal archives; model and Open WebUI data are
-retained.
-Interactive setup can also configure dry-run upload pruning, model warm-up and
-an after-hours power action. Configuration is stored in root-readable
+`setup --defaults` enables verified local backups only. Manual maintenance runs show
+only the current systemd invocation instead of a historical journal tail. Upload
+pruning preflights the protected Open WebUI credential before starting its unit; a
+missing/placeholder key fails with the active age/ceiling/dry-run policy and never
+prints the credential. `clean-cache` requires confirmation and removes only rebuildable
+Hugging Face cache, dangling Podman images and old **system-wide** journal archives;
+model and Open WebUI data are retained. Interactive setup can also configure dry-run
+upload pruning, model warm-up and an after-hours power action. Configuration is stored in root-readable
 `/etc/bc250-llm-server/maintenance.env`. See
 [`MAINTENANCE.md`](MAINTENANCE.md) before enabling deletion or power actions.
 

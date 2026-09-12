@@ -78,6 +78,41 @@ class DocumentationTests(unittest.TestCase):
             for legacy in ("`tasker`", "`coding`", "`embedded`", "`embed`"):
                 self.assertNotIn(legacy, text)
 
+    def test_privileged_command_examples_use_sudo(self) -> None:
+        privileged = (
+            r"bc250-install(?:-ollama)?(?:\s|$)",
+            r"bc250-maintenance(?:\s|$)",
+            r"bc250-model\s+(?:list|install|cleanup|cleanup-retired)(?:\s|$)",
+            r"bc250-storage(?:\s|$)",
+            r"bc250-revalidate(?:\s|$)",
+            r"bc250-rag-import(?:\s|$)",
+            r"bc250-ocr\s+install(?:\s|$)",
+            r"bc250-fetch-mtp(?:\s|$)",
+            r"bc250-agent-mode\s+(?:enter|leave)(?:\s|$)",
+            r"bc250-40cu(?:\s|$)",
+            r"bc250-cu-live-manager(?:\s|$)",
+            r"bc250-memory-profile\s+(?:ensure|apply-full|remove)(?:\s|$)",
+            r"bc250-swap-profile\s+(?:ensure|apply|remove)(?:\s|$)",
+            r"bc250-ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
+            r"bc250-openwebui-setup\s+(?:init|apply)(?:\s|$)",
+            r"bc250-benchmark\s+owui-system-context(?:\s|$)",
+            r"bc250-reset(?:\s|$)",
+            r"bc250-uninstall(?:\s|$)",
+        )
+        for path in ROOT.rglob("*.md"):
+            relative = path.relative_to(ROOT)
+            if any(part in EXCLUDED_DOC_TREES for part in relative.parts):
+                continue
+            text = path.read_text(encoding="utf-8")
+            for block in re.findall(r"```(?:bash|text)?\n(.*?)```", text, re.DOTALL):
+                for line in block.splitlines():
+                    command = line.strip()
+                    if not command or command.startswith("#"):
+                        continue
+                    for pattern in privileged:
+                        if re.search(pattern, command):
+                            self.assertRegex(command, r"(?:^|\s)sudo(?:\s|$)", f"{relative}: {command}")
+
     def test_internal_markdown_links_resolve(self) -> None:
         for path in ROOT.rglob("*.md"):
             relative = path.relative_to(ROOT)
