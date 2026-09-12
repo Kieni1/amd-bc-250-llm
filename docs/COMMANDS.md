@@ -97,6 +97,7 @@ sudo bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 sudo bc250-model install CATEGORY [SELECTION] [OPTIONS]
 sudo bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--host HOST[:PORT]] [--destination PATH] [--list] [--yes]
+sudo bc250-model cleanup-retired [--yes]
 ```
 
 Categories are `production`, `experiments`, `task`, `agentic`, `embedding`,
@@ -112,6 +113,13 @@ With no category, `list` shows every Ollama-backed category as one catalog with
 global indexes. A category filters the same catalog without renumbering it.
 `list all` also includes the enabled MTP catalog; add `--all` to include disabled
 MTP entries.
+
+`cleanup-retired` is separate from ordinary catalog cleanup. It operates only on
+models named in the package-installed retirement catalog, previews canonical
+name/category/registration/source size, and requires confirmation unless `--yes`
+is supplied. It fails closed if expected registration state is unavailable or a
+retired model is detected on an unexpected package-owned Ollama lane; arbitrary
+unmanaged models are never selected.
 
 For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
 registration/runtime Modelfile while retaining the local GGUF and its state
@@ -157,7 +165,8 @@ Remote experimental `hf.co/...` definitions do not accept `--revision`,
 
 Authentication is requested only when a download is required. A validated GGUF
 is reused only while its recorded repository, revision and filename match and
-its schema-2 size/mtime/ctime metadata is unchanged. If those stat values or a
+its schema-2/3 size/mtime/ctime metadata is unchanged. New sidecars use schema 3
+and additionally record canonical model/category identity. If those stat values or a
 legacy sidecar differ, the manager recalculates SHA-256 before reuse.
 If source state, rendered Modelfile and the registration on the correct Ollama
 instance all match, installation prints `already current; skipping`. Modelfile-only
@@ -240,16 +249,20 @@ See [`../MODELS.md`](../MODELS.md) for model roles/swapping and
 ## Storage
 
 ```text
-bc250-storage status
+sudo bc250-storage status
 sudo bc250-storage dedupe [--yes]
 sudo bc250-storage prune-sources [--yes]
 sudo bc250-storage prune-40cu [--yes]
 ```
 
-`status` reports root headroom, logical GGUF/Ollama usage, verified dedupe
-candidates and 40-CU caches belonging to removed kernels. `dedupe` requires XFS
-with `reflink=1`; it verifies manager state/source hashes and uses kernel-verified
-`FIDEDUPERANGE` sharing while retaining both paths. Normal interactive use requires
+Detailed `status` accounting requires elevated access to the protected model
+stores; an unprivileged invocation reports that accounting as unavailable rather
+than returning false zeroes. Privileged status distinguishes verified pairs whose
+dedupe state is recorded from legacy/unrecorded pairs without claiming the latter
+are physically undeduplicated. `dedupe` requires XFS with `reflink=1`; it verifies
+manager state/source hashes and uses kernel-verified 16 MiB `FIDEDUPERANGE` sharing
+while retaining both paths. Successful pairs are recorded in schema-3 sidecars and
+unchanged recorded pairs are skipped on later runs. Normal interactive use requires
 typing `DEDUPLICATE`; `--yes` is for deliberate automation. Compare `df` before
 and after because `du` may still account a shared extent to both logical files.
 

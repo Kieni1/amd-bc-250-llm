@@ -6,7 +6,9 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
+import stat as statmod
 import subprocess
 import tempfile
 from pathlib import Path
@@ -14,7 +16,11 @@ from pathlib import Path
 GGUF = Path(os.environ.get("BC250_GGUF_ROOT", "/var/lib/bc250-llm-server/gguf"))
 OLLAMA = Path(os.environ.get("BC250_OLLAMA_ROOT", "/var/lib/bc250-llm-server/ollama"))
 CU_CACHE = Path(os.environ.get("BC250_40CU_CACHE", "/var/cache/bc250-llm-server/40cu"))
+INSTALLED_MODEL_DIR = Path("/usr/share/bc250-llm-server/model-management/modelfiles")
+OPERATOR_MODEL_DIR = Path("/etc/bc250-llm-server/models.d")
+RETIRED_CATALOG = Path("/usr/share/bc250-llm-server/model-management/retired-models.json")
 SERVICES = ("ollama.service", "ollama-task.service", "ollama-embedding.service", "ollama-agent.service", "open-webui.service")
+SHA256_RE = re.compile(r"[0-9a-f]{64}")
 
 
 def human(value: int) -> str:
@@ -29,30 +35,56 @@ def digest(path: Path) -> str:
     return value.hexdigest()
 
 
-def state_pairs() -> list[tuple[Path, Path, str]]:
-    pairs: list[tuple[Path, Path, str]] = []
+def load_json(path: Path) -> dict | list:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def state_pairs() -> list[tuple[Path, Path, str, Path, dict]]:
+    pairs: list[tuple[Path, Path, str, Path, dict]] = []
     if not GGUF.is_dir() or not OLLAMA.is_dir():
         return pairs
-    # One checksum may exist in more than one Ollama lane, so retain every blob.
     by_hash: dict[str, list[Path]] = {}
     for path in OLLAMA.glob("*/blobs/sha256-*"):
         if path.is_file():
             by_hash.setdefault(path.name.removeprefix("sha256-"), []).append(path)
     for state_path in GGUF.rglob("*.gguf.bc250.json"):
         source = state_path.with_name(state_path.name.removesuffix(".bc250.json"))
-        try:
-            state = json.loads(state_path.read_text())
-            checksum = state["sha256"]
-        except (OSError, KeyError, json.JSONDecodeError, TypeError):
+        state = load_json(state_path)
+        if not isinstance(state, dict):
             continue
-        if source.is_file() and len(checksum) == 64:
-            for blob in by_hash.get(checksum, ()): 
-                pairs.append((source, blob, checksum))
+        checksum = str(state.get("sha256", ""))
+        if source.is_file() and SHA256_RE.fullmatch(checksum):
+            for blob in by_hash.get(checksum, ()):
+                pairs.append((source, blob, checksum, state_path, state))
     return pairs
 
 
-def tree_bytes(root: Path) -> int:
-    return sum(path.stat().st_size for path in root.rglob("*") if path.is_file()) if root.is_dir() else 0
+def tree_bytes(root: Path) -> int | None:
+    try:
+        root_stat = root.stat()
+    except FileNotFoundError:
+        return 0
+    except PermissionError:
+        return None
+    if not statmod.S_ISDIR(root_stat.st_mode):
+        return 0
+    if not os.access(root, os.R_OK | os.X_OK):
+        return None
+    total = 0
+
+    def raise_walk_error(error: OSError) -> None:
+        raise error
+
+    try:
+        for directory, _dirs, files in os.walk(root, onerror=raise_walk_error):
+            for filename in files:
+                total += (Path(directory) / filename).stat().st_size
+    except PermissionError:
+        return None
+    return total
 
 
 def blob_referenced(blob: Path) -> bool:
@@ -77,20 +109,126 @@ def stale_cu_caches() -> list[Path]:
     return [p for p in CU_CACHE.iterdir() if p.is_dir() and not Path("/usr/lib/modules", p.name).is_dir()]
 
 
+def parse_modelfile_identity(path: Path) -> tuple[str, Path] | None:
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    name_match = re.search(r"^# Ollama model:\s*(\S+)\s*$", text, re.MULTILINE)
+    from_match = re.search(r"^FROM\s+(/\S+\.gguf)\s*$", text, re.MULTILINE)
+    if not name_match or not from_match:
+        return None
+    return name_match.group(1), Path(from_match.group(1))
+
+
+def source_names() -> dict[Path, str]:
+    result: dict[Path, str] = {}
+    roots = [INSTALLED_MODEL_DIR, OPERATOR_MODEL_DIR]
+    local = Path(__file__).resolve().parents[2] / "models" / "modelfiles"
+    if local.is_dir():
+        roots.insert(0, local)
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for path in root.glob("*.Modelfile"):
+            parsed = parse_modelfile_identity(path)
+            if parsed:
+                name, source = parsed
+                result[source] = name
+    local_retired = Path(__file__).resolve().parents[2] / "models" / "retired-models.json"
+    retired = load_json(local_retired if local_retired.is_file() else RETIRED_CATALOG)
+    if isinstance(retired, dict):
+        for item in retired.get("models", []):
+            if isinstance(item, dict) and item.get("source") and item.get("name"):
+                result[Path(item["source"])] = str(item["name"])
+    return result
+
+
+def source_label(source: Path, state: dict, names: dict[Path, str]) -> str:
+    return str(state.get("model_name") or names.get(source) or source.name)
+
+
+def stat_signature(path: Path) -> dict[str, int]:
+    value = path.stat()
+    return {
+        "size": value.st_size,
+        "mtime_ns": value.st_mtime_ns,
+        "ctime_ns": value.st_ctime_ns,
+        "inode": value.st_ino,
+    }
+
+
+def source_checksum_valid(source: Path, checksum: str, state: dict) -> bool:
+    current = stat_signature(source)
+    if (
+        state.get("schema") in {2, 3}
+        and state.get("size") == current["size"]
+        and state.get("mtime_ns") == current["mtime_ns"]
+        and state.get("ctime_ns") == current["ctime_ns"]
+        and SHA256_RE.fullmatch(checksum)
+    ):
+        return True
+    return digest(source) == checksum
+
+
+def dedupe_key(blob: Path) -> str:
+    return f"{blob.parents[1].name}/{blob.name}"
+
+
+def dedupe_record_matches(source: Path, blob: Path, state: dict) -> bool:
+    records = state.get("dedupe")
+    if not isinstance(records, dict):
+        return False
+    record = records.get(dedupe_key(blob))
+    return isinstance(record, dict) and record.get("source") == stat_signature(source) and record.get("blob") == stat_signature(blob)
+
+
+def write_dedupe_record(state_path: Path, source: Path, blob: Path, state: dict) -> None:
+    latest = load_json(state_path)
+    updated = dict(latest if isinstance(latest, dict) else state)
+    records = dict(updated.get("dedupe") or {})
+    records[dedupe_key(blob)] = {
+        "source": stat_signature(source),
+        "blob": stat_signature(blob),
+    }
+    updated["dedupe"] = records
+    original = state_path.stat()
+    temporary = state_path.with_name(f".{state_path.name}.tmp")
+    temporary.write_text(json.dumps(updated, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.chown(temporary, original.st_uid, original.st_gid)
+    os.chmod(temporary, original.st_mode & 0o777)
+    os.replace(temporary, state_path)
+
+
 def status() -> int:
     free = shutil.disk_usage(GGUF if GGUF.exists() else "/").free
-    pairs = state_pairs()
+    gguf_bytes = tree_bytes(GGUF)
+    ollama_bytes = tree_bytes(OLLAMA)
+    inaccessible = gguf_bytes is None or ollama_bytes is None
     print("BC-250 storage")
     print(f"  filesystem free:       {human(free)}")
-    print(f"  GGUF logical bytes:    {human(tree_bytes(GGUF))}")
-    print(f"  Ollama logical bytes:  {human(tree_bytes(OLLAMA))}")
-    print(f"  dedupe candidate pairs:{len(pairs):9d}")
-    print(f"  duplicate logical data:{human(sum(src.stat().st_size for src, _blob, _sha in pairs))}")
+    if inaccessible:
+        print("  GGUF logical bytes:    unavailable (permission denied)")
+        print("  Ollama logical bytes:  unavailable (permission denied)")
+        print("  verified source/blob pairs: unavailable")
+        print("  pending dedupe:        unavailable")
+        print("  potential reclaimable: unavailable")
+        print("Detailed storage accounting requires elevated privileges.")
+        print("Run: sudo bc250-storage status")
+        return 1
+    pairs = state_pairs()
+    pending = [pair for pair in pairs if not dedupe_record_matches(pair[0], pair[1], pair[4])]
+    print(f"  GGUF logical bytes:    {human(gguf_bytes or 0)}")
+    print(f"  Ollama logical bytes:  {human(ollama_bytes or 0)}")
+    print(f"  verified source/blob pairs:{len(pairs):7d}")
+    print(f"  dedupe state recorded:{len(pairs) - len(pending):9d}")
+    print(f"  dedupe state unrecorded:{len(pending):7d}")
+    print(f"  unrecorded logical data:{human(sum(src.stat().st_size for src, *_ in pending))}")
     stale = stale_cu_caches()
     print(f"  stale 40-CU caches:    {len(stale):9d}")
     for path in stale:
         print(f"    {path.name}")
-    print("Note: after XFS dedupe, du may count shared extents twice; df shows reclaimed capacity.")
+    print("Note: logical byte totals include reflink-shared extents; df reports physical free capacity.")
     return 0
 
 
@@ -112,10 +250,7 @@ def xfs_ready() -> None:
 
 
 def active_services() -> list[str]:
-    return [
-        unit for unit in SERVICES
-        if subprocess.run(["systemctl", "is-active", "--quiet", unit], check=False).returncode == 0
-    ]
+    return [unit for unit in SERVICES if subprocess.run(["systemctl", "is-active", "--quiet", unit], check=False).returncode == 0]
 
 
 def restore_services(active: list[str]) -> list[str]:
@@ -131,12 +266,10 @@ def restore_services(active: list[str]) -> list[str]:
 
 def quiesce_services() -> list[str]:
     active = active_services()
-    stopped: list[str] = []
     try:
         for unit in ("open-webui.service", *SERVICES[:-1]):
             if unit in active:
                 subprocess.run(["systemctl", "stop", unit], check=True)
-                stopped.append(unit)
         remaining = active_services()
         if remaining:
             raise RuntimeError(f"services still active after stop: {', '.join(remaining)}")
@@ -149,11 +282,18 @@ def quiesce_services() -> list[str]:
 
 def dedupe(yes: bool) -> int:
     require_root(); xfs_ready()
-    pairs = state_pairs()
+    all_pairs = state_pairs()
+    pairs = [pair for pair in all_pairs if not dedupe_record_matches(pair[0], pair[1], pair[4])]
     if not pairs:
-        print("No package-managed GGUF/Ollama duplicate pairs found.")
+        if all_pairs:
+            print(f"All {len(all_pairs)} verified source/blob pair(s) are already recorded as deduplicated.")
+        else:
+            print("No package-managed GGUF/Ollama duplicate pairs found.")
         return 0
-    print(f"Verified candidates: {len(pairs)} pair(s), {human(sum(p[0].stat().st_size for p in pairs))} logical duplicate data.")
+    names = source_names()
+    print(f"Unrecorded dedupe pairs: {len(pairs)} pair(s), {human(sum(p[0].stat().st_size for p in pairs))} logical data.")
+    for index, (source, blob, _checksum, _state_path, state) in enumerate(pairs, 1):
+        print(f"  {index:2d}) {source_label(source, state, names)} [{blob.parents[1].name}]")
     if not yes and input("Type DEDUPLICATE to share identical XFS extents: ") != "DEDUPLICATE":
         print("Cancelled."); return 0
     before = shutil.disk_usage(GGUF).free
@@ -161,15 +301,16 @@ def dedupe(yes: bool) -> int:
     try:
         with tempfile.TemporaryDirectory(prefix="bc250-dedupe-", dir="/var/tmp") as temp:
             alias = Path(temp, "source")
-            for index, (source, blob, checksum) in enumerate(pairs, 1):
-                if source.stat().st_size != blob.stat().st_size or digest(source) != checksum:
-                    raise RuntimeError(f"source/blob state changed for {source}")
+            for index, (source, blob, checksum, state_path, state) in enumerate(pairs, 1):
+                if source.stat().st_size != blob.stat().st_size or not source_checksum_valid(source, checksum, state):
+                    raise RuntimeError(f"source/blob state changed for {source_label(source, state, names)}")
                 alias.unlink(missing_ok=True); alias.symlink_to(source)
                 size = source.stat().st_size
                 for offset in range(0, size, 16 * 1024**2):
                     length = min(16 * 1024**2, size - offset)
                     subprocess.run(["xfs_io", "-c", f"dedupe -q {alias} {offset} {offset} {length}", str(blob)], check=True)
-                print(f"  [{index}/{len(pairs)}] {source.name}")
+                write_dedupe_record(state_path, source, blob, state)
+                print(f"  [{index}/{len(pairs)}] {source_label(source, state, names)} [{blob.parents[1].name}]")
         os.sync()
     finally:
         failed = restore_services(active)
@@ -182,23 +323,28 @@ def dedupe(yes: bool) -> int:
 
 def prune_sources(yes: bool) -> int:
     require_root()
-    candidates: dict[Path, tuple[Path, str]] = {}
-    for source, blob, checksum in state_pairs():
+    candidates: dict[Path, tuple[Path, str, dict]] = {}
+    for source, blob, checksum, _state_path, state in state_pairs():
         if Path("mtp") in source.relative_to(GGUF).parents or not blob_referenced(blob):
             continue
-        candidates.setdefault(source, (blob, checksum))
+        candidates.setdefault(source, (blob, checksum, state))
+    names = source_names()
     print(f"Validated registered source candidates: {len(candidates)}")
+    total = sum(source.stat().st_size for source in candidates)
+    for index, (source, (blob, _checksum, state)) in enumerate(candidates.items(), 1):
+        print(f"  {index:2d}) {source_label(source, state, names)} [{blob.parents[1].name}] {human(source.stat().st_size)}")
+    print(f"Offline GGUF source data selected: {human(total)}")
     if not yes and input("Type PRUNE-SOURCES to remove these offline GGUF source copies: ") != "PRUNE-SOURCES":
         print("Cancelled."); return 0
     removed = 0
-    for source, (blob, checksum) in candidates.items():
-        if digest(source) != checksum or digest(blob) != checksum:
-            print(f"  skip changed/unverified: {source}")
+    for source, (blob, checksum, state) in candidates.items():
+        if not source_checksum_valid(source, checksum, state) or digest(blob) != checksum:
+            print(f"  skip changed/unverified: {source_label(source, state, names)}")
             continue
         removed += source.stat().st_size
         source.unlink()
         source.with_name(source.name + ".bc250.json").unlink(missing_ok=True)
-        print(f"  removed {source}")
+        print(f"  removed {source_label(source, state, names)}: {source}")
     print(f"Removed offline source data: {human(removed)}")
     return 0
 

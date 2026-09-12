@@ -30,6 +30,82 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(len(pairs), 2)
             self.assertEqual({pair[1].parents[1].name for pair in pairs}, {"main", "embedding"})
 
+    def test_source_checksum_fast_path_uses_sidecar_stat_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "model.gguf"
+            source.write_bytes(b"same")
+            checksum = storage.digest(source)
+            stat = source.stat()
+            state = {
+                "schema": 2,
+                "sha256": checksum,
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                "ctime_ns": stat.st_ctime_ns,
+            }
+            with patch.object(storage, "digest", side_effect=AssertionError("rehash should not run")):
+                self.assertTrue(storage.source_checksum_valid(source, checksum, state))
+
+    def test_canonical_source_label_prefers_model_identity(self) -> None:
+        source = Path("/var/lib/bc250-llm-server/gguf/experiments/Qwen3.8-4B-Q6_K.gguf")
+        self.assertEqual(
+            storage.source_label(source, {"model_name": "exp-qwen38-4b-distill-empero-q6-k"}, {}),
+            "exp-qwen38-4b-distill-empero-q6-k",
+        )
+
+    def test_recorded_dedupe_pair_is_not_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source = base / "source.gguf"; blob = base / "main" / "blobs" / ("sha256-" + "a" * 64)
+            source.write_bytes(b"same"); blob.parent.mkdir(parents=True); blob.write_bytes(b"same")
+            state = {"dedupe": {storage.dedupe_key(blob): {"source": storage.stat_signature(source), "blob": storage.stat_signature(blob)}}}
+            self.assertTrue(storage.dedupe_record_matches(source, blob, state))
+
+
+    def test_tree_bytes_reports_unavailable_when_root_is_not_traversable(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "protected"
+            root.mkdir()
+            with patch.object(storage.os, "access", return_value=False):
+                self.assertIsNone(storage.tree_bytes(root))
+
+    def test_schema1_sidecar_does_not_use_stat_only_checksum_fast_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "model.gguf"
+            source.write_bytes(b"same")
+            checksum = storage.digest(source)
+            stat = source.stat()
+            state = {
+                "schema": 1,
+                "sha256": checksum,
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+                "ctime_ns": stat.st_ctime_ns,
+            }
+            with patch.object(storage, "digest", return_value=checksum) as rehash:
+                self.assertTrue(storage.source_checksum_valid(source, checksum, state))
+                rehash.assert_called_once_with(source)
+
+    def test_dedupe_record_writes_merge_latest_sidecar_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source = base / "source.gguf"
+            source.write_bytes(b"same")
+            state_path = base / "source.gguf.bc250.json"
+            state_path.write_text(json.dumps({"schema": 3, "sha256": "a" * 64}), encoding="utf-8")
+            blobs = []
+            for lane in ("main", "task"):
+                blob = base / lane / "blobs" / ("sha256-" + "a" * 64)
+                blob.parent.mkdir(parents=True)
+                blob.write_bytes(b"same")
+                blobs.append(blob)
+            stale = json.loads(state_path.read_text())
+            with patch.object(storage.os, "chown"):
+                storage.write_dedupe_record(state_path, source, blobs[0], stale)
+                storage.write_dedupe_record(state_path, source, blobs[1], stale)
+            result = json.loads(state_path.read_text())
+            self.assertEqual(set(result["dedupe"]), {storage.dedupe_key(blob) for blob in blobs})
+
     def test_stale_40cu_cache_means_removed_kernel_only(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             cache = Path(temporary) / "cache"; modules = Path(temporary) / "modules"
@@ -49,7 +125,7 @@ class StorageTests(unittest.TestCase):
     def test_dedupe_requires_explicit_confirmation_by_default(self) -> None:
         source = (ROOT / "cmd/system/storage.py").read_text()
         self.assertIn("Type DEDUPLICATE", source)
-        self.assertIn("digest(source) != checksum", source)
+        self.assertIn("source_checksum_valid(source, checksum, state)", source)
         self.assertIn("reflink=1", source)
         self.assertIn("16 * 1024**2", source)
 
@@ -67,7 +143,7 @@ class StorageTests(unittest.TestCase):
 
     def test_source_prune_is_hash_verified_registered_and_excludes_mtp(self) -> None:
         source = (ROOT / "cmd/system/storage.py").read_text()
-        self.assertIn("digest(source) != checksum or digest(blob) != checksum", source)
+        self.assertIn("not source_checksum_valid(source, checksum, state) or digest(blob) != checksum", source)
         self.assertIn("not blob_referenced(blob)", source)
         self.assertIn('Path("mtp") in source.relative_to(GGUF).parents', source)
         self.assertIn("PRUNE-SOURCES", source)

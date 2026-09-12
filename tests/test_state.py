@@ -328,6 +328,102 @@ class StateTests(unittest.TestCase):
             path.write_text(json.dumps({"schema": 99}), encoding="utf-8")
             self.assertEqual(modelctl.load_state(path), {})
 
+    def test_schema3_state_records_model_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "model.gguf"
+            output.write_bytes(b"weights")
+            model = {
+                "id": "exp-test",
+                "name": "exp-test-long-name",
+                "category": "experiments",
+                "repository": "example/model",
+                "revision": "main",
+                "gguf": "model.gguf",
+            }
+            sidecar = modelctl.state_path(output)
+            with patch.object(modelctl.os, "chown"), patch.object(modelctl.os, "chmod"):
+                modelctl.write_state(sidecar, model, modelctl.sha256(output), 1)
+            state = json.loads(sidecar.read_text())
+            self.assertEqual(state["schema"], 3)
+            self.assertEqual(state["model_name"], "exp-test-long-name")
+            self.assertEqual(state["model_id"], "exp-test")
+            self.assertEqual(state["category"], "experiments")
+
+    def test_cleanup_retired_removes_only_catalogued_package_model(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source_root = base / "gguf" / "experiments"
+            runtime_root = base / "modelfiles" / "experiments"
+            source = source_root / "retired.gguf"
+            runtime = runtime_root / "retired.Modelfile"
+            source.parent.mkdir(parents=True); runtime.parent.mkdir(parents=True)
+            source.write_bytes(b"weights"); modelctl.state_path(source).write_text("{}")
+            runtime.write_text("FROM retired.gguf\n")
+            catalog = base / "retired-models.json"
+            catalog.write_text(json.dumps({"schema": 1, "models": [{
+                "name": "exp-retired",
+                "category": "experiments",
+                "ollama_host": "127.0.0.1:11434",
+                "source": str(source),
+                "runtime_modelfile": str(runtime),
+            }]}))
+            defaults = dict(modelctl.CATEGORY_DEFAULTS["experiments"])
+            defaults["destination"] = str(source_root)
+            defaults["modelfile_destination"] = str(runtime_root)
+            with (
+                patch.object(modelctl, "local_source_root", return_value=None),
+                patch.object(modelctl, "RETIRED_CATALOG", catalog),
+                patch.dict(modelctl.CATEGORY_DEFAULTS, {"experiments": defaults}),
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(
+                    modelctl,
+                    "registered_models",
+                    side_effect=lambda host: {"exp-retired"} if host == "127.0.0.1:11434" else set(),
+                ),
+                patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+                patch.object(modelctl, "run_as_ollama", return_value=SimpleNamespace(returncode=0)),
+            ):
+                self.assertEqual(modelctl.cleanup_retired(yes=True), 0)
+            self.assertFalse(source.exists())
+            self.assertFalse(modelctl.state_path(source).exists())
+            self.assertFalse(runtime.exists())
+
+
+    def test_cleanup_retired_refuses_misplaced_registration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            source_root = base / "gguf" / "experiments"
+            runtime_root = base / "modelfiles" / "experiments"
+            source = source_root / "retired.gguf"
+            runtime = runtime_root / "retired.Modelfile"
+            source.parent.mkdir(parents=True); runtime.parent.mkdir(parents=True)
+            source.write_bytes(b"weights"); modelctl.state_path(source).write_text("{}")
+            runtime.write_text("FROM retired.gguf\n")
+            catalog = base / "retired-models.json"
+            catalog.write_text(json.dumps({"schema": 1, "models": [{
+                "name": "exp-retired", "category": "experiments",
+                "ollama_host": "127.0.0.1:11434", "source": str(source),
+                "runtime_modelfile": str(runtime),
+            }]}))
+            defaults = dict(modelctl.CATEGORY_DEFAULTS["experiments"])
+            defaults["destination"] = str(source_root)
+            defaults["modelfile_destination"] = str(runtime_root)
+            with (
+                patch.object(modelctl, "local_source_root", return_value=None),
+                patch.object(modelctl, "RETIRED_CATALOG", catalog),
+                patch.dict(modelctl.CATEGORY_DEFAULTS, {"experiments": defaults}),
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(
+                    modelctl, "registered_models",
+                    side_effect=lambda host: {"exp-retired"} if host == "127.0.0.1:11435" else set(),
+                ),
+                patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+            ):
+                self.assertEqual(modelctl.cleanup_retired(yes=True), 2)
+            self.assertTrue(source.exists())
+            self.assertTrue(runtime.exists())
+
+
 
 if __name__ == "__main__":
     unittest.main()

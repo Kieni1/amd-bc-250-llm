@@ -27,6 +27,7 @@ INSTALLED_SHARE = Path(f"/usr/share/{PROJECT}/model-management")
 INSTALLED_CONFIG = Path(f"/etc/{PROJECT}")
 PACKAGED_MODEL_DIR = INSTALLED_SHARE / "modelfiles"
 OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
+RETIRED_CATALOG = INSTALLED_SHARE / "retired-models.json"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
@@ -37,7 +38,7 @@ RECOMMENDED_MODELS = {
     "prod-lfm25-8b-a1b-liquidai-q6-k",
     "prod-qwen35-9b-unsloth-q6-k",
     "prod-gpt-oss20b-ggml-org-mxfp4",
-    "task-gemma3-1b-unsloth-ud-q4-k-xl",
+    "task-lfm25-1.2b-instruct-liquidai-q6-k",
     "agentic-ornith15-9b-ornith-q5-k-m",
     "embed-jina-v5-small-retrieval-q4-k-m",
 }
@@ -518,6 +519,135 @@ def print_models(
         )
 
 
+
+def retired_catalog_path() -> Path:
+    source_root = local_source_root()
+    local = source_root / "retired-models.json" if source_root else None
+    if local and local.is_file():
+        return local
+    return RETIRED_CATALOG
+
+
+def load_retired_models() -> list[dict]:
+    path = retired_catalog_path()
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ModelError(f"could not read retired-model catalog {path}: {error}") from error
+    models = value.get("models") if isinstance(value, dict) else None
+    if not isinstance(models, list):
+        raise ModelError(f"invalid retired-model catalog: {path}")
+    result = []
+    for item in models:
+        if not isinstance(item, dict):
+            raise ModelError(f"invalid retired-model entry in {path}")
+        required = ("name", "category", "ollama_host", "source", "runtime_modelfile")
+        if not all(isinstance(item.get(key), str) and item[key] for key in required):
+            raise ModelError(f"incomplete retired-model entry in {path}")
+        category = modelfile_category(item["category"])
+        source = Path(item["source"]); runtime = Path(item["runtime_modelfile"])
+        source_root = Path(CATEGORY_DEFAULTS[category]["destination"])
+        runtime_root = Path(CATEGORY_DEFAULTS[category]["modelfile_destination"])
+        if not source.is_absolute() or not source.is_relative_to(source_root):
+            raise ModelError(f"retired model source is outside manager-owned storage: {source}")
+        if not runtime.is_absolute() or not runtime.is_relative_to(runtime_root):
+            raise ModelError(f"retired runtime Modelfile is outside manager-owned storage: {runtime}")
+        if item["ollama_host"] != CATEGORY_DEFAULTS[category]["ollama_host"]:
+            raise ModelError(f"retired model host/category mismatch: {item['name']}")
+        normalized = dict(item); normalized["category"] = category
+        result.append(normalized)
+    return result
+
+
+def retired_present(item: dict, registrations: dict[str, set[str] | None]) -> bool:
+    source = Path(item["source"]); runtime = Path(item["runtime_modelfile"])
+    registered = any(
+        names is not None and item["name"] in names
+        for names in registrations.values()
+    )
+    return source.exists() or state_path(source).exists() or runtime.exists() or registered
+
+
+def cleanup_retired(*, yes: bool) -> int:
+    if os.geteuid() != 0:
+        raise ModelError("run with sudo")
+    retired = load_retired_models()
+    hosts = sorted({CATEGORY_DEFAULTS[category]["ollama_host"] for category in OLLAMA_CATEGORIES})
+    registrations = {host: registered_models(host) for host in hosts}
+    present = [item for item in retired if retired_present(item, registrations)]
+    if not present:
+        print("No retired package-managed models are present.")
+        return 0
+    print("Retired package-managed models:")
+    total = 0
+    for index, item in enumerate(present, 1):
+        source = Path(item["source"]); size = source.stat().st_size if source.is_file() else 0
+        total += size
+        names = registrations.get(item["ollama_host"])
+        other_hosts = [
+            host for host, other_names in registrations.items()
+            if host != item["ollama_host"] and other_names is not None and item["name"] in other_names
+        ]
+        if names is None:
+            registration = "unknown (expected API unavailable)"
+        elif item["name"] in names:
+            registration = "present"
+        elif other_hosts:
+            registration = "misplaced on " + ",".join(other_hosts)
+        else:
+            registration = "absent"
+        print(f"  {index:2d}) {item['name']} [{item['category']}, registration {registration}, source {size / 1024**3:.1f} GiB]")
+    print(f"Manager-owned source data selected: {total / 1024**3:.1f} GiB")
+    if not yes and prompt_line("Purge these retired package-managed models and local data? [y/N] ").lower() not in {"y", "yes"}:
+        print("Cleanup cancelled.")
+        return 0
+    ollama_bin = shutil.which("ollama")
+    failures: list[str] = []
+    removed = 0
+    for item in present:
+        name = item["name"]; host = item["ollama_host"]
+        source = Path(item["source"]); runtime = Path(item["runtime_modelfile"])
+        print(f"\n>>> purging retired {name}")
+        names = registrations.get(host)
+        misplaced_hosts = [
+            other_host
+            for other_host, other_names in registrations.items()
+            if other_host != host and other_names is not None and name in other_names
+        ]
+        if misplaced_hosts:
+            print(
+                "    ERROR: retired model is registered on unexpected Ollama host(s): "
+                + ", ".join(misplaced_hosts)
+                + "; local data retained",
+                file=sys.stderr,
+            )
+            failures.append(name); continue
+        if names is None:
+            print("    ERROR: expected Ollama registration state unavailable; local data retained", file=sys.stderr)
+            failures.append(name); continue
+        if name in names:
+            if not ollama_bin:
+                print("    ERROR: ollama executable unavailable; local data retained", file=sys.stderr)
+                failures.append(name); continue
+            result = run_as_ollama([ollama_bin, "rm", name], {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host})
+            if result.returncode != 0:
+                print("    ERROR: registration removal failed; local data retained", file=sys.stderr)
+                failures.append(name); continue
+            print(f"    removed Ollama registration from {host}")
+        for path in (runtime, source, state_path(source)):
+            if path.exists():
+                path.unlink(); print(f"    removed {path}")
+        try:
+            source.parent.rmdir()
+        except OSError:
+            pass
+        removed += 1
+    print(f"\nPurged {removed} retired package-managed model(s).")
+    if failures:
+        print(f"Failed: {' '.join(failures)}", file=sys.stderr)
+        return 2
+    return 0
+
 def print_all_models(directories: list[Path]) -> None:
     models = discover_models(directories)
     hosts = {
@@ -537,11 +667,22 @@ def print_all_models(directories: list[Path]) -> None:
         for model in models
         if model["provider"] == "ollama-hf"
     }
+    retired = {item["name"]: item for item in load_retired_models()}
+    retired_registered = sorted(
+        (host, name)
+        for host, names in registrations.items()
+        for name in names or ()
+        if name in retired
+    )
+    if retired_registered:
+        print("Retired package-managed Ollama models:")
+        for host, name in retired_registered:
+            print(f"    - {name:<56} [{host}, set up, cleanup-retired eligible]")
     unmanaged = sorted(
         (host, name)
         for host, names in registrations.items()
         for name in names or ()
-        if name not in known and not (hf_backings.get((host, name)) in (names or set()))
+        if name not in known and name not in retired and not (hf_backings.get((host, name)) in (names or set()))
     )
     if unmanaged:
         print("Unmanaged Ollama models (registered without a Modelfile):")
@@ -591,7 +732,7 @@ def load_state(path: Path) -> dict:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    if not isinstance(value, dict) or value.get("schema") not in {1, 2}:
+    if not isinstance(value, dict) or value.get("schema") not in {1, 2, 3}:
         return {}
     return value
 
@@ -613,7 +754,7 @@ def state_matches(state: dict, model: dict, output: Path) -> bool:
     ):
         return False
     if (
-        state.get("schema") == 2
+        state.get("schema") in {2, 3}
         and state.get("size") == stat.st_size
         and state.get("mtime_ns") == stat.st_mtime_ns
         and state.get("ctime_ns") == stat.st_ctime_ns
@@ -649,7 +790,10 @@ def ensure_file_permissions(path: Path, uid: int, gid: int, mode: int) -> bool:
 def write_state(path: Path, model: dict, checksum: str, gid: int) -> None:
     stat = path.with_name(path.name.removesuffix(".bc250.json")).stat()
     value = {
-        "schema": 2,
+        "schema": 3,
+        "model_name": model.get("name", model["id"]),
+        "model_id": model["id"],
+        "category": model.get("category", ""),
         "repository": model["repository"],
         "revision": model["revision"],
         "gguf": model["gguf"],
@@ -1281,13 +1425,23 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="remove Ollama registration/runtime Modelfile but retain local GGUF and state sidecar",
     )
+    retired = commands.add_parser(
+        "cleanup-retired", help="purge models explicitly retired by the package"
+    )
+    retired.add_argument("--yes", action="store_true")
     return parser
 
 
 def require_admin_status(command: str) -> None:
-    if command == "list" and os.geteuid() != 0:
+    if os.geteuid() == 0:
+        return
+    if command == "list":
         raise ModelError(
             "run 'sudo bc250-model list ...'; local GGUF/state directories are intentionally protected"
+        )
+    if command == "cleanup-retired":
+        raise ModelError(
+            "run 'sudo bc250-model cleanup-retired'; retired package-managed data is protected"
         )
 
 
@@ -1403,6 +1557,8 @@ def main(argv: list[str] | None = None) -> int:
     # in this process, including a temporary switch into the agent lane.
     args.hf_session = {"resolved": False, "token": ""}
     require_admin_status(args.command)
+    if args.command == "cleanup-retired":
+        return cleanup_retired(yes=args.yes)
 
     source = args.source or (
         Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None

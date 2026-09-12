@@ -125,11 +125,13 @@ file	0644	examples/raspi-wol/bc250-night-shutdown.timer	{unitdir}/bc250-night-sh
 file	0644	models/mtp/models.toml	{share}/model-management/mtp-models.toml
 file	0644	models/modelfiles/*.Modelfile	{share}/model-management/modelfiles/
 file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-management/MODEL-TEMPLATE.Modelfile.example
+file	0644	models/retired-models.json	{share}/model-management/retired-models.json
 file	0644	quality-checks/README.md	{share}/quality-checks/README.md
 file	0755	quality-checks/history/*.sh	{share}/quality-checks/history/
 file	0755	quality-checks/package/*.sh	{share}/quality-checks/package/
 file	0755	quality-checks/task/*.sh	{share}/quality-checks/task/
 file	0755	quality-checks/translation/*.sh	{share}/quality-checks/translation/
+file	0755	quality-checks/translation/owui-provider-config.py	{share}/quality-checks/translation/owui-provider-config.py
 file	0644	quality-checks/translation/prompts/*.txt	{share}/quality-checks/translation/prompts/
 file	0755	quality-checks/utils/*.sh	{share}/quality-checks/utils/
 
