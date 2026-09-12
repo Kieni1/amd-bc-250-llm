@@ -22,18 +22,9 @@ sudo /usr/share/bc250-llm-server/quality-checks/package/installed-assets.sh
 
 ## Compact task candidates
 
-Run one candidate at a time. Each wrapper defaults to three rounds and compares
-the candidate against the packaged Gemma 3 1B task baseline on the dedicated
-task Ollama runtime:
-
-```bash
-/usr/share/bc250-llm-server/quality-checks/task/11-lfm12b.sh
-/usr/share/bc250-llm-server/quality-checks/task/12-minicpm5-2b.sh
-/usr/share/bc250-llm-server/quality-checks/task/13-qwen3-1p7b.sh
-/usr/share/bc250-llm-server/quality-checks/task/14-qwen38-2b.sh
-```
-
-The generic form is:
+The previous one-off compact-candidate wrappers were removed when their Modelfiles
+moved to the source-only graveyard. For any future packaged `exp-*` challenger,
+compare it against the current package-owned task default with the generic form:
 
 ```bash
 /usr/share/bc250-llm-server/quality-checks/task/10-candidate-screen.sh \
@@ -99,14 +90,26 @@ The generic integration form is:
   [ROUNDS]
 ```
 
-The integration check saves the exact existing `bc250-office-translation`
-preset, temporarily points it at the candidate, verifies that selected stable live-preset fields differ
-only by the intended candidate delta, disables background title/tag/follow-up jobs,
-captures per-request wall time plus BC-250 temperature/memory/swap telemetry,
-restores the original preset, and scans the evidence directory for the bearer token
-before creating the tarball. Translate-Gemma uses its dedicated auto-direction
-prompt shaped around the fine-tune's `CURRENT_SOURCE` contract. Treat a restoration,
-telemetry, or credential-scan failure as infrastructure failure.
+The integration check serializes temporary Open WebUI mutations with an exclusive
+lock. It saves the exact `bc250-office-translation` preset and complete Ollama
+provider config, keeping the unredacted provider config only in root-owned mode-0600
+files under `/run`. For an experimental model it locates the enabled main provider
+by port 11434 and, only when that provider already has a restrictive `model_ids`
+list, appends the raw candidate exactly once; an absent/empty list remains
+unrestricted. `prefix_id` is honored for the effective model ID. Zero/multiple
+11434 providers or a disabled provider fail closed. Evidence receives only redacted
+provider snapshots.
+
+The check then proves effective candidate/base-preset visibility, disables
+background title/tag/follow-up jobs, preserves curl rc + HTTP status + response body
+for provider/model/chat operations, and captures per-request wall time plus BC-250
+temperature/memory/swap telemetry. On exit it restores the preset first and exact
+provider config second, refreshes effective models, verifies both persisted and
+effective restoration, scans evidence for the admin token and all provider secrets,
+and writes runtime provenance plus `run-manifest.json`. Translate-Gemma uses its
+dedicated auto-direction prompt shaped around the fine-tune's `CURRENT_SOURCE`
+contract. Treat any restoration, telemetry, HTTP-contract or credential-scan
+failure as infrastructure failure.
 
 ## Evidence semantics
 
@@ -117,8 +120,9 @@ The scripts retain the package's quality-result semantics:
 - other nonzero result: infrastructure failure.
 
 The standalone direct and Open WebUI wrappers propagate this return-code contract
-after writing their evidence tarball; do not infer success merely because a tarball
-was created. Their summaries include per-round, per-direction and per-case quality
+after evidence finalization; do not infer success merely because an evidence
+directory or tarball exists. The OWUI wrapper deliberately withholds the tarball
+if credential scanning or root-only temporary-file cleanup fails. Their summaries include per-round, per-direction and per-case quality
 plus latency/resource extrema.
 
 Output-budget diagnostics are evidence and must not automatically be relabeled as
@@ -127,3 +131,5 @@ model mistakes into passes.
 
 Historical Batch 1–3D scripts are installed under `quality-checks/history/` only
 for reproducibility. Prefer the generic current screens for new comparisons.
+
+Before production translation promotion, use a separate broader 24–40 case corpus covering both directions, office prose, invoices/tables, IDs/dates/amounts, negation, formatting, proper nouns and source-language leakage. The 8-case short screen remains a screening gate, not promotion proof.

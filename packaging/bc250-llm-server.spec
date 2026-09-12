@@ -10,8 +10,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.11.0
-Release:        1.14%{?dist}
+Version:        0.11.1
+Release:        0.1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,17 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.1
+- Promote LFM2.5 1.2B Q6_K to the default dedicated Open WebUI task role after direct, live-OWUI, and true-concurrency BC-250 qualification; retain Gemma 3 1B as an optional fallback.
+- Own the title/tag/retrieval-query prompt templates in desired state and reuse that exact policy in the direct task benchmark so production and benchmark prompt contracts cannot silently diverge.
+- Move completed/exhausted task candidates to the source-only graveyard with evidence notes, synchronize default wiring/quality assets/docs/tests, and preserve evaluator thresholds plus warm-main/task-unload policy.
+
+* Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.15
+- Repair authenticated translation candidate testing through Open WebUI provider allow-lists while keeping complete provider credentials out of evidence, preserving HTTP failures, and verifying exact/effective restoration.
+- Accept the demonstrated valid French formal-office wording "confirmer avoir reçu" without weakening language, identifier, date, amount, or source-leakage requirements; add deterministic provider-transaction/redaction coverage and translation run provenance/manifests.
+- Add explicit package-retired model metadata plus safe `bc250-model cleanup-retired`, canonical model identity in storage output, schema-3 state identity, and recorded-success dedupe skipping while retaining the measured 16 MiB XFS dedupe strategy.
+- Make protected storage accounting fail visibly instead of returning false zeroes, improve source-prune/dedupe previews, and keep production model defaults, residency policy, harness-4.0 semantics, and quality thresholds unchanged.
+
 * Fri Sep 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.14
 - Harden standalone translation screening: use the 1024-token specialist contract, candidate-specific prompt profiles, numeric-value preservation, quality rc=3 propagation, Open WebUI telemetry, selected-field preset-delta verification, and exact restoration/credential checks.
 - Make task candidate screening deployment-faithful by benchmarking baseline and challenger on task Ollama 11435, recording the effective request contract, preserving rc=3, refusing unknown pre-existing task registrations, and cleaning temporary registrations on exit.

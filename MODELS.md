@@ -106,8 +106,8 @@ with the package Vulkan profile; they are not cross-machine leaderboard claims.
 | GPT-OSS 20B | ~10.8 GiB, ~80 tok/s and usable medium-reasoning latency in the reviewed run | Keep deep-reasoning role; re-test memory headroom with the new resident embedding lane |
 | Jina v5 / Qwen3 Embedding | both 11/13 Recall@1, 13/13 Recall@3 on the harder multilingual near-duplicate fixture | Jina stays baseline; Qwen remains a real licensing/behavior alternative |
 | GLM-OCR / OvisOCR2 | GLM ~0.996 mean word F1 vs Ovis ~0.735, both full field recall on the three-page baseline | GLM leads fidelity; Ovis remains speed/structure comparison |
-| Gemma 3 1B task | compact dedicated task lane; earlier multilingual fixture exposed weak language adherence | Keep as the low-memory Open WebUI task default pending a replacement that can coexist safely with memory-edge main models |
-| Qwen3.8 4B Distill task experiment | 6/6 with clarified individual-message counting and a 256-token non-title budget | Quality winner in focused testing, but not promoted because GPT-OSS overlap OOM-killed the task service and serialization would regress chat latency |
+| LFM2.5 1.2B task | 15/18 direct and 15/18 through real Open WebUI with package-owned prompts; 9/9 true-overlap trials beside warm GPT-OSS | Promote as default task model; retain Gemma 3 1B as fallback/control |
+| Gemma 3 1B task | 6/18 baseline with systematic language/relevance misses | Retain as the previous low-memory fallback/control, not the default |
 
 ## 2026-09-10 quality follow-up
 
@@ -128,10 +128,17 @@ Task-model evidence on the real BC-250:
   prompting plus a 256-token non-title budget reached 6/6, but deliberate
   simultaneous residency with warm GPT-OSS OOM-killed the task service.
 
-The 1B Gemma therefore remains the production task model. Four additional
-compact task candidates are packaged only as `exp-*` comparisons: LFM2.5 1.2B,
-MiniCPM5 2B, Qwen3 1.7B, and Qwen3.8 2B Distill. A candidate must first improve
-quality and then prove safe coexistence with warm GPT-OSS before any promotion.
+The 2026-09-12 compact-task follow-up changed that decision. LFM2.5 1.2B first
+scored 11/18 with its generic experimental SYSTEM, then 15/18 after removing that
+SYSTEM. The no-SYSTEM candidate repeated 15/18 through the real Open WebUI route
+only after Open WebUI was given the same package-owned task prompts used by the
+direct benchmark; with upstream/default OWUI prompts the live result was only
+6/18. Finally, nine deliberate simultaneous GPT-OSS/LFM generations completed
+with both models observed resident, no additional swap growth, and no serious
+OOM/GPU warnings. `task-lfm25-1.2b-instruct-liquidai-q6-k` is therefore the
+package default. Gemma 3 1B
+remains an optional fallback/control. The exhausted compact task candidates and
+the unsafe Qwen3.8 4B task candidate are source-graveyard entries.
 
 Translation evidence on the actual authenticated Open WebUI path:
 
@@ -163,8 +170,9 @@ residency. Later real-device testing showed that GPT-OSS remained healthy after 
 ephemeral Qwen3.8 task request, but deliberate simultaneous GPT-OSS + Qwen3.8
 residency OOM-killed the task service. Making every main request ephemeral avoided
 that overlap but imposed roughly large-model cold-load latency on subsequent chat,
-so the package keeps the proven warm main lane and retains the much smaller Gemma
-1B task default. Qwen3.8 Distill remains an explicit experiment. Agentic/coding
+so the package keeps the proven warm main lane. The later LFM2.5 1.2B Q6_K task
+model passed true overlap without additional swap growth and replaced Gemma as the
+default; the unsafe Qwen3.8 4B task candidate moved to the source graveyard. Agentic/coding
 results are separate because agent mode is exclusive by design.
 
 ### Exhausted comparison candidates
@@ -175,25 +183,34 @@ mean the GGUF is corrupt or that the model must be deleted. The active compariso
 catalog may retain measured controls even when their promotion path is exhausted.
 The source-only graveyard is reserved for models explicitly retired from routine
 operator-facing discovery because continued comparison no longer justifies their
-catalog presence. Graveyard definitions are not packaged, discovered or listed.
+catalog presence. Graveyard Modelfiles are not packaged or discovered. Their canonical identities
+and manager-owned paths are mirrored in the installed `retired-models.json`
+catalog solely so `bc250-model list` can distinguish stale package-retired
+registrations from operator-created unmanaged models and `cleanup-retired` can
+remove them safely.
 
-The source graveyard currently contains seven retired definitions in
+The source graveyard currently contains twelve retired definitions in
 `models/modelfiles-graveyard/`. That directory is a source depot only and must
 contain Modelfiles only; it is intentionally outside every model discovery root.
 
 | Model | Why it is retired from routine discovery |
 |---|---|
 | `exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
+| `exp-lfm25-1.2b-instruct-liquidai-q6-k` | experimental alias retired after the same Q6_K weights were promoted as `task-lfm25-1.2b-instruct-liquidai-q6-k`; its generic SYSTEM caused cross-task output contamination |
+| `exp-minicpm5-2b-openbmb-q4-k-m` | 4/18 with 12 output-budget diagnostics; tag/query outputs were exhausted by reasoning under the deployed budget |
+| `exp-qwen3-1.7b-ggml-q4-k-m` | 3/18 with 13 output-budget diagnostics and all tag/query cases failing |
+| `exp-qwen38-2b-distill-empero-q6-k` | 8/18 with nine output-budget diagnostics; strong titles did not compensate for unreliable tag/query generation |
+| `exp-qwen38-4b-distill-empero-q6-k` | promising quality, but simultaneous residency with warm GPT-OSS OOM-killed the task service, making it unsafe for the normal task role |
 | `exp-granite42-8b-ibm-q5-k-m` | ~8.3 GiB resident for ~50 tok/s and weak long-prompt throughput; no demonstrated office/RAG quality win over the production set |
 | `exp-ling30-tiny-bloomer-q5-k-m` | very high raw decode (~144 tok/s) but the shared reasoning cap was repeatedly consumed before a usable final answer |
 | `exp-qwen35-9b-davidau-defiant-fable-q6-k` | older comparable run had much worse answer-start latency with no throughput/UX case against production Qwen3.5 or GPT-OSS |
 | `exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
 | `exp-qwythos9b-empero-q6-k` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
-| `task-lfm25-2.6b-liquidai-q6-k` | retired task-lane experiment; no remaining promotion case against the smaller packaged task baseline and newer compact candidates |
+| `task-lfm25-2.6b-liquidai-q6-k` | retired task-lane experiment; superseded by the smaller promoted LFM2.5 1.2B task model |
 
-Still-open comparisons include Qwen3.8 4B Distill and the new compact task
-candidates, the Hunyuan/Translate-Gemma translation challengers, both embedding
-models, OCR candidates, and the agentic models. Granite 4.2 3B remains a measured
+Still-open comparisons include the Hunyuan/Translate-Gemma translation
+challengers, both embedding models, OCR candidates, the remaining general-model
+experiments, and the agentic models. Granite 4.2 3B remains a measured
 control despite its poor task-contract result. The latest evidence is not sufficient
 to call the other open candidates exhausted.
 
@@ -218,16 +235,11 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-qwen38-4b-distill-empero-q6-k` | focused task-quality candidate; 6/6 in the temporary clarified-prompt/256-token experiment, but too memory-heavy to become the always-available task default beside GPT-OSS |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
-| `exp-lfm25-1.2b-instruct-liquidai-q6-k` | checksum-pinned 1.2B compact task candidate; compare quality and coexistence against packaged task Gemma |
-| `exp-minicpm5-2b-openbmb-q4-k-m` | checksum-pinned 2B edge-model task candidate; multilingual task quality must be proven on the BC-250 |
-| `exp-qwen3-1.7b-ggml-q4-k-m` | checksum-pinned compact Qwen task candidate under the deployable task contract |
-| `exp-qwen38-2b-distill-empero-q6-k` | checksum-pinned 2B Distill follow-up to test whether the 4B Qwen3.8 quality signal survives at safer residency |
 | `exp-hunyuan-mt-7b-mungert-q4-k-m` | checksum-pinned dedicated translation challenger; screen explicit DE/FR direction first, then OWUI integration |
 | `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | checksum-pinned translation-specialist Gemma E4B challenger for DE/FR office text |
 | `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; temperature 0 + 3072-token Bash/Python budget passed 3/3 in three consecutive BC-250 runs |

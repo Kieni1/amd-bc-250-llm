@@ -63,7 +63,8 @@ bc250-verify-lan SERVER_IP
 Storage visibility and explicit reclamation:
 
 ```bash
-sudo bc250-storage status
+sudo bc250-storage status          # protected accounting requires sudo
+sudo bc250-model cleanup-retired   # preview/purge package-retired model data
 sudo bc250-storage dedupe          # confirmed XFS extent sharing
 sudo bc250-storage prune-sources   # optional verified offline-source removal
 sudo bc250-storage prune-40cu      # removed-kernel build caches only
@@ -86,14 +87,16 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 | General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` |
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
-| Open WebUI task model | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
+| Open WebUI task model | `task-lfm25-1.2b-instruct-liquidai-q6-k` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
 The packaged comparison catalog retains active measured challengers, including
 `exp-granite42-3b-ibm-q6-k` plus the compact task and translation candidates under
-`quality-checks/`. Exhausted comparisons are kept only in the source graveyard and
-are not exposed through normal model discovery. Experimental models are never silent
-replacements for the defaults above.
+`quality-checks/`. Exhausted comparisons are kept only in the source graveyard and are not
+exposed through normal model discovery. The installed retirement catalog lets
+`bc250-model list` identify stale package-retired registrations and
+`sudo bc250-model cleanup-retired` remove only those explicitly catalogued models.
+Experimental models are never silent replacements for the defaults above.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,

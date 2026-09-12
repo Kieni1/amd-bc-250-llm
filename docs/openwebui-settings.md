@@ -114,14 +114,15 @@ board before treating that combination as qualified.
 The API helper selects:
 
 ```text
-task-gemma3-1b-unsloth-ud-q4-k-xl:latest
+task-lfm25-1.2b-instruct-liquidai-q6-k:latest
 ```
 
 and keeps title/tag generation on while follow-up, autocomplete, search-query and
 retrieval-query generation remain off. `TASK_MODEL_PARAMS` stays `{}` so Open
 WebUI v0.11.3 retains its upstream task-token behavior. The helper first reads the
-complete v0.11.3 task configuration and then updates only reviewed fields, which
-preserves upstream prompt templates.
+complete v0.11.3 task configuration and then updates only reviewed fields. Those
+reviewed fields now include package-owned title, tag and retrieval-query prompt
+templates so live Open WebUI and direct task qualification share one prompt policy.
 
 ## RAG baseline
 

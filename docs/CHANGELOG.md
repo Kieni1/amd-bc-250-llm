@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.11.1-0.1 - 2026-09-12
+
+- Promote LFM2.5 1.2B Q6_K to the dedicated Open WebUI task lane after 15/18 direct quality, 15/18 live Open WebUI quality with package-owned task prompts, and 9/9 clean true-overlap trials beside warm GPT-OSS; retain Gemma 3 1B as an optional fallback/control.
+- Make the package-owned title/tag/retrieval-query prompt templates explicit in Open WebUI desired state and make the direct task benchmark consume that same policy, closing the observed 15/18-direct versus 6/18-live prompt-contract gap.
+- Retire the completed/exhausted compact task candidates and unsafe Qwen3.8 4B task candidate to the source-only graveyard with evidence notes; remove obsolete candidate wrappers and keep the generic future-candidate screen aligned to the package task default.
+- Preserve task keep_alive=0, warm-main residency, evaluator thresholds and quality rc=3 semantics; no evaluator is weakened to hide the known French-title relevance miss.
+
+## 0.11.0-1.15 - 2026-09-12
+
+- Fix the Translate-Gemma Open WebUI screening showstopper by temporarily extending only an existing restricted main-provider allow-list, preserving unrestricted providers, honoring `prefix_id`, capturing HTTP failures, and restoring both preset and provider policy with effective-model verification. Full provider configuration remains root-only under `/run`; evidence contains redacted snapshots and is scanned for both the admin token and provider credentials.
+- Accept the observed valid French formal-office wording `confirmer avoir reçu` while retaining all language, source-leakage, reference, date and numeric-preservation gates. Translation direct/OWUI screens now record stronger runtime/model provenance and machine-readable run manifests; a broader corpus remains required before promotion.
+- Add a first-class package retirement catalog and `bc250-model cleanup-retired`, keeping source graveyard Modelfiles out of normal discovery while safely distinguishing retired package registrations from arbitrary unmanaged models.
+- Correct storage accounting for protected roots, add canonical model/lane names to dedupe/prune output, record model identity in schema-3 sidecars, and skip only previously recorded unchanged dedupe pairs. Legacy/unrecorded pairs are reported without claiming physical reclaimability.
+- Preserve current production defaults, warm-main/task/embedding residency policy, exclusive agent topology, 16 MiB XFS dedupe ranges, harness-4.0 semantics and quality thresholds.
+
 ## 0.11.0-1.14 - 2026-09-11
 
 - Harden translation candidate evidence before more real-device comparison: direct screening now uses a 1024-token default, model-appropriate Hunyuan/Translate-Gemma prompt contracts, numeric-value preservation, and correct `rc=3` propagation; authenticated Open WebUI screening adds request/resource telemetry, selected stable-field preset-delta checks, restoration verification, and credential scanning.
