@@ -47,12 +47,14 @@ The package owns a fixed four-lane service topology. A completed normal applianc
 `sudo bc250-agent-mode leave` afterwards. All lanes share the same BC-250 UMA
 pool; the separation controls lifecycle and eviction, not physical memory.
 The compact task model remains ephemeral while the main chat model stays warm. This is
-intentional: real-device testing showed that the Qwen3.8 4B task candidate can OOM the
-task service when it overlaps GPT-OSS, while making the main lane ephemeral adds a
-large cold-start penalty to normal chat. Qwen3.8 therefore remains an opt-in experiment
-rather than the packaged task default. GPT-OSS 20B with warm Jina remains the
-production memory-edge qualification; re-run it when a package/runtime change could
-affect residency or UMA headroom.
+intentional: real-device testing showed that the retired task candidate
+`exp-qwen38-4b-distill-empero-q6-k` can OOM the task service when it overlaps GPT-OSS,
+while making the main lane ephemeral adds a large cold-start penalty to normal chat.
+That exact Distill candidate is now source-graveyard only, not an opt-in packaged
+experiment. The similarly named active `exp-qwen38-4b-empero-q6-k` is a separate
+general comparison. GPT-OSS 20B with warm Jina remains the production memory-edge
+qualification; re-run it when a package/runtime change could affect residency or UMA
+headroom.
 
 ## 0.34.0 runtime notes
 
@@ -83,7 +85,7 @@ BC-250 comparison runs.
 ## Runtime profiles
 
 ```bash
-sudo bc250-ollama-profile status
+bc250-ollama-profile status
 sudo bc250-ollama-profile balanced
 sudo bc250-ollama-profile max-context
 sudo bc250-ollama-profile reset

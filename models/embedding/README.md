@@ -22,7 +22,7 @@ near-duplicate cases (current-vs-archived lease policy and invoice 4821-vs-4822)
 That is a useful tie rather than a reason to churn the RAG default; keep Jina as
 the reviewed baseline and use Qwen when its Apache-2.0 license is preferable.
 
-See `/usr/share/doc/bc250-llm-server/RAG.md` (source: `docs/RAG.md`) for the
+See `/usr/share/doc/bc250-llm-server/docs/RAG.md` for the
 German/French/English office-document pilot.
 
 Verify before selecting the exact name in Open WebUI:

@@ -170,9 +170,11 @@ networks.
 
 Open WebUI persists many settings in its database. The packaged JSON plus the
 supported API setup/drift workflow are therefore authoritative for package-owned
-application state; the Quadlet is limited to process bootstrap/runtime controls. This pre-1.0 release does
-not add automatic database-backup/migration machinery; treat application data as
-test-appliance state and keep any operator-required backup policy separate.
+application state; the Quadlet is limited to process bootstrap/runtime controls.
+The package now provides scheduled, verified config and identity/user backups through
+`bc250-maintenance`; those are deliberately scoped recovery artifacts, not a complete
+`/var/lib/open-webui` snapshot or an automatic database-migration framework. Keep any
+broader operator retention/migration policy explicit and separate.
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
 upload/extraction, embedding/retrieval, the five package presets and an

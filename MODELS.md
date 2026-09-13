@@ -227,6 +227,37 @@ bc250-benchmark task
 bc250-benchmark agent
 ```
 
+## Active experiment catalog
+
+This is the canonical operator-facing list of packaged `exp-*` registrations. It is
+validated against `models/modelfiles/`; retired/source-graveyard models are listed
+separately below.
+
+<!-- ACTIVE_EXPERIMENTS:BEGIN -->
+```text
+exp-gemma4-12b-google-qat-q4-0
+exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
+exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
+exp-glm-ocr-ggml-q8-0
+exp-gpt-oss20b-davidau-neo-mxfp4-moe4
+exp-gpt-oss20b-unsloth-ud-q4-k-xl
+exp-granite42-3b-ibm-q6-k
+exp-hunyuan-mt-7b-mungert-q4-k-m
+exp-ministral3-8b-unsloth-ud-q5-k-xl
+exp-ovisocr2-abiray-q8-0
+exp-qwen3-4b-lmstudio-q6-k
+exp-qwen35-4b-unsloth-q6-k
+exp-qwen35-9b-hauhaucs-uncensored-q6-k
+exp-qwen36-35b-a3b-unsloth-ud-iq3-s
+exp-qwen38-27b-ista-gsq-rco-iq3-s
+exp-qwen38-27b-unsloth-ud-iq3-s
+exp-qwen38-4b-empero-q6-k
+exp-qwen38-9b-empero-q6-k
+exp-tir-qwen35-9b-nonthinking-v2-q6-k
+exp-translate-gemma4-sub-e4b-17s-q4-k-xl
+```
+<!-- ACTIVE_EXPERIMENTS:END -->
+
 ## Current comparison policy
 
 Production roles stay stable until a measured replacement wins its real use case.
