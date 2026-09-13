@@ -20,6 +20,22 @@ discovery can see them. It does not download weights or exercise the GPU:
 sudo /usr/share/bc250-llm-server/quality-checks/package/installed-assets.sh
 ```
 
+## Main-model candidates
+
+Run the packaged large-main candidate matrix only on the real BC-250:
+
+```bash
+sudo /usr/share/bc250-llm-server/quality-checks/main/10-main-model-candidate-matrix.sh
+```
+
+It compares production GPT-OSS at the start and end, installs missing candidates
+through `bc250-model`, unloads resident main/task/embedding models between runs, and
+runs the generation `compare` profile plus the memory-oriented `edge` profile.
+Candidate GGUFs are retained by default (`BC250_KEEP_GGUF=1`) so a failed registration
+or later lower-quant experiment does not force a redownload. Registrations created by
+the matrix are removed during cleanup. Set `BC250_RUN_EDGE=0` only for the shorter
+first quality screen; any candidate that survives still needs the resource edge run.
+
 ## Compact task candidates
 
 The previous one-off compact-candidate wrappers were removed when their Modelfiles
