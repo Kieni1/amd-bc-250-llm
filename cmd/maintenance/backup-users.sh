@@ -9,7 +9,12 @@ KEEP="${KEEP_USERS:-${KEEP:-14}}"
 [[ "$KEEP" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: KEEP_USERS must be positive." >&2; exit 1; }
 [[ -f "$DB" ]] || { echo "ERROR: DB not found: $DB" >&2; exit 1; }
 command -v sqlite3 >/dev/null || { echo "ERROR: install sqlite." >&2; exit 1; }
-install -d -m 0700 "$OUT_DIR"
+if getent group bc250-backup-export >/dev/null 2>&1; then
+  install -d -m 0750 -o root -g bc250-backup-export "$OUT_DIR"
+else
+  # Source-tree/direct execution fallback before package sysusers has created the reserved group.
+  install -d -m 0700 "$OUT_DIR"
+fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -69,6 +74,10 @@ stamp="$(date +%F_%H%M%S)"
 out="$OUT_DIR/owui-users-$stamp.sql.gz"
 mv "$sql.gz" "$out"
 ( cd "$OUT_DIR" && sha256sum "$(basename "$out")" > "$(basename "$out").sha256" )
+if id bc250-backup-export >/dev/null 2>&1; then
+  chgrp bc250-backup-export -- "$out" "$out.sha256"
+  chmod 0640 -- "$out" "$out.sha256"
+fi
 mapfile -t old < <(ls -1t "$OUT_DIR"/owui-users-*.sql.gz 2>/dev/null | tail -n "+$((KEEP+1))")
 for f in "${old[@]}"; do rm -f -- "$f" "$f.sha256"; done
 printf 'Wrote and verified %s (%s)\n' "$out" "$(du -h "$out" | cut -f1)"

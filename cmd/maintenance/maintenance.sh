@@ -7,6 +7,8 @@ CONFIG="${BC250_MAINTENANCE_CONFIG:-/etc/bc250-llm-server/maintenance.env}"
 EXAMPLE="${BC250_MAINTENANCE_EXAMPLE:-/usr/share/bc250-llm-server/examples/maintenance.env.example}"
 POWER_DROPIN_DIR="${BC250_POWER_DROPIN_DIR:-/etc/systemd/system/bc250-night-shutdown.timer.d}"
 POWER_DROPIN="$POWER_DROPIN_DIR/schedule.conf"
+CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/MAINTENANCE-CONTRACT.md}"
+ACCESS_HELPER="${BC250_MAINTENANCE_ACCESS_HELPER:-/usr/libexec/bc250-llm-server/maintenance-companion.sh}"
 
 BACKUP_TIMERS=(owui-backup-config.timer owui-backup-users.timer)
 OPTIONAL_TIMERS=(owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer)
@@ -16,6 +18,10 @@ usage() {
   cat <<'USAGE'
 Usage: sudo bc250-maintenance setup [--defaults]
        sudo bc250-maintenance status
+       sudo bc250-maintenance contract
+       sudo bc250-maintenance companion status|enable
+       sudo bc250-maintenance backup-export status|enable
+       sudo bc250-maintenance request-shutdown
        sudo bc250-maintenance run backup|prune|all
        sudo bc250-maintenance clean-cache
        sudo bc250-maintenance disable
@@ -27,6 +33,11 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
   setup --defaults  Fast safe baseline: enable only verified local backups.
   status            Read-only schedule and backup overview. The API key is
                     never printed; bc250-status shows appliance storage.
+  contract          Print the BC-250/Pi maintenance interface contract.
+  companion         Inspect or prepare restricted Pi maintenance access over
+                    SSH for safe shutdown requests. HTTP remains the office UI.
+  backup-export     Inspect or prepare optional read-only rrsync backup export.
+  request-shutdown  Ask the package safe-power policy to power off only if idle.
   run backup        Run configuration and identity backups now, in sequence.
   run prune         Run the configured upload-prune policy now.
   run all           Run backups and then pruning.
@@ -35,8 +46,8 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
   disable           Disable all optional maintenance and power timers. Data and
                     configuration are retained.
 
-Local backups protect against application mistakes, not disk loss. Copy them
-to encrypted storage controlled by the office for disaster recovery.
+Local backups protect against application mistakes, not disk loss. Optional
+Pi export can copy them off-device later; it is not required for normal office use.
 USAGE
 }
 
@@ -211,7 +222,7 @@ setup_power() {
   write_power_schedule "$time"
   set_setting NIGHT_POWER_ACTION "$action"
 
-  if ask_yes_no "Configure Wake-on-LAN for this host" no; then
+  if ask_yes_no "Configure Wake-on-LAN for this host" yes; then
     nic="$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')"
     nic="$(ask_value "Network interface" "${nic:-enp4s0}")"
     [[ "$nic" =~ ^[A-Za-z0-9_.:-]+$ && -d "/sys/class/net/$nic" ]] || {
@@ -321,10 +332,10 @@ show_status() {
   echo "  Local backups contain private office data and do not protect against failure of this disk."
 }
 
-run_task() {
-  local instance="$1" unit="owui-maintenance@${1}.service" invocation since rc=0
+run_unit() {
+  local label="$1" unit="$2" invocation since rc=0
   systemd_available || { echo "ERROR: systemd is not available." >&2; exit 1; }
-  echo "Running $instance..."
+  echo "Running $label..."
   since="@$(date +%s.%N)"
   systemctl start "$unit" || rc=$?
   invocation="$(systemctl show "$unit" -p InvocationID --value 2>/dev/null || true)"
@@ -335,6 +346,8 @@ run_task() {
   fi
   return "$rc"
 }
+
+run_task() { run_unit "$1" "owui-maintenance@$1.service"; }
 
 preflight_prune() {
   local key
@@ -369,6 +382,24 @@ run_selected() {
   esac
 }
 
+show_contract() {
+  [[ -r "$CONTRACT_DOC" ]] || {
+    echo "ERROR: maintenance contract is missing: $CONTRACT_DOC" >&2
+    return 1
+  }
+  cat "$CONTRACT_DOC"
+}
+
+run_access() {
+  [[ -x "$ACCESS_HELPER" ]] || { echo "ERROR: maintenance companion helper is missing: $ACCESS_HELPER" >&2; return 1; }
+  "$ACCESS_HELPER" "$@"
+}
+
+request_shutdown() {
+  require_root
+  run_unit "safe shutdown request" bc250-night-shutdown.service
+}
+
 clean_cache() {
   local cache
   require_root
@@ -399,6 +430,16 @@ main() {
       esac
       ;;
     status) (($# <= 1)) || { usage >&2; exit 2; }; show_status ;;
+    contract) (($# == 1)) || { usage >&2; exit 2; }; show_contract ;;
+    companion)
+      (($# == 2)) || { usage >&2; exit 2; }
+      case "$2" in status) run_access companion-status ;; enable) run_access companion-enable ;; *) usage >&2; exit 2 ;; esac
+      ;;
+    backup-export)
+      (($# == 2)) || { usage >&2; exit 2; }
+      case "$2" in status) run_access backup-status ;; enable) run_access backup-enable ;; *) usage >&2; exit 2 ;; esac
+      ;;
+    request-shutdown) (($# == 1)) || { usage >&2; exit 2; }; request_shutdown ;;
     run) (($# == 2)) || { usage >&2; exit 2; }; run_selected "$2" ;;
     clean-cache) (($# == 1)) || { usage >&2; exit 2; }; clean_cache ;;
     disable) (($# == 1)) || { usage >&2; exit 2; }; disable_all ;;
