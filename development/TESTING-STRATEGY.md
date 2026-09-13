@@ -1,0 +1,252 @@
+# BC-250 testing strategy
+
+This is the development plan for continuing BC-250 qualification without repeatedly
+running one giant hardware campaign. The package already separates health,
+measurement, and qualification; the testing process should preserve that separation.
+
+## 1. Three different questions
+
+Use the right tool for the question:
+
+| Question | Primary tool |
+|---|---|
+| Is the appliance healthy right now? | `bc250-verify` |
+| Which model/setting behaves better? | `bc250-benchmark ...` |
+| Does the package configuration qualify as a whole? | `bc250-revalidate` |
+
+Do not use a benchmark win as proof of appliance health. Do not use a healthy verifier
+as proof of model quality. Do not run whole-appliance revalidation merely to compare
+one candidate.
+
+## 2. Test ownership
+
+- **Source/chat environment:** unit/static checks that are actually available.
+- **GitHub:** RPM/package build.
+- **Workstation:** Ruff and developer linting as configured by the user.
+- **BC-250:** real services, GPU/resource behavior, model quality, WOL/power, Open WebUI,
+  llama.cpp/MTP and integration qualification.
+
+Never substitute an unavailable local check with an imitation and report it as real.
+
+## 3. Common promotion funnel
+
+For a candidate change, stop as soon as it no longer has a promotion case.
+
+1. **Source/static gate** — package parses/tests; model definition is sane.
+2. **Cheap/direct screen** — deterministic fixture on the narrow role contract.
+3. **Real integration path** — Open WebUI or package workflow where the product uses it.
+4. **Resource/coexistence gate** — memory, swap, latency, topology and thermal evidence.
+5. **Repeatability** — repeat only finalists or production defaults, not every loser.
+6. **Decision record** — observed facts, interpretation, decision, retest conditions.
+
+A larger model does not advance merely because it is interesting. A quality winner does
+not promote if it makes the real appliance unsafe or unresponsive.
+
+## 4. Evidence envelope for every BC-250 batch
+
+Record:
+
+```text
+source release / source SHA when available
+installed RPM NEVRA
+runtime versions
+exact model IDs and relevant digests
+exact command(s)
+effective settings / benchmark profile
+result directory or evidence archive + SHA-256
+verifier/topology before and after when stateful
+observed facts
+interpretation
+decision / next gate
+restoration result
+```
+
+Do not include GGUF contents, API keys, HF tokens, passwords or private backup data.
+
+## 5. Cadence: one bounded hardware batch at a time
+
+The next batch should depend on the previous result. In particular, do not provide a
+five-stage destructive machine plan up front. Use read-only baseline evidence before
+state changes. Restore state before moving to another lane.
+
+## 6. Recommended work order from 0.11.1-0.6
+
+### Lane A — general operations / office availability / power
+
+This is currently the highest product priority because the Pi/maintenance contract was
+added after much of the older hardware evidence.
+
+First batch is read-only:
+
+```text
+installed NEVRA and runtime versions
+bc250-verify
+normal service topology
+HTTP :80 readiness
+maintenance contract/status
+companion status
+WOL NIC state
+firewall/listener state
+```
+
+If clean, next batch is a real powered-off/S5 WOL test. Only after S5 wake succeeds
+should safe shutdown be exercised: first a deliberately busy/defer case, then an idle
+allow case. Backup export is separate and lower priority.
+
+### Lane B — benchmark operations
+
+Before trusting a large new benchmark campaign, establish that the measurement layer
+still behaves correctly on the current installed package.
+
+Use a **small production control set**, not every model:
+
+- one normal generation run on a known production model;
+- one role-quality benchmark such as `usecase` or `task`;
+- one stateful benchmark only if its subsystem is about to be tested;
+- verify canonical `meta.json`, `results.jsonl`, `summary.json`, `summary.txt`;
+- verify result isolation and refusal to merge into a non-empty output directory;
+- for mutating OWUI benchmarks, verify exact restoration and no secret leakage.
+
+Once the benchmark substrate is trusted, specialist lanes can reuse it without
+revalidating every formatter on every run.
+
+### Lane C — translation
+
+Current production remains `prod-lfm25-8b-a1b-liquidai-q6-k`; the strongest recorded
+LFM prompt result is 69/80 and prompt/sampling micro-tuning is exhausted for now.
+
+Use this funnel:
+
+1. production LFM direct control on the current fixture;
+2. direct candidate screen for Hunyuan-MT 7B and Translate-Gemma E4B;
+3. stop candidates that do not materially beat the production failure pattern;
+4. authenticated Open WebUI candidate path for finalists;
+5. latency/residency/resource confirmation only after quality survives the real path;
+6. repeat broader office-language cases before promotion.
+
+Preserve numbers, identifiers, formality and direction. Do not weaken the evaluator to
+make a challenger pass.
+
+### Lane D — RAG / office documents
+
+RAG is a core office use case and should be tested in layers:
+
+1. **retrieval correctness** with the embedding lane;
+2. **direct answer quality** via `rag-quality`;
+3. **real Open WebUI path** via `owui-rag` using packaged settings;
+4. only then A/B one tuning axis at a time (`embedding-batch`, `chunk-min`,
+   `system-context`, thinking policy, hybrid search when explicitly tested);
+5. exact restoration after every mutation.
+
+Expand the fixture around the failure modes that matter for office use:
+
+- answer absent / required abstention;
+- multiple required sources;
+- conflicting documents;
+- invoices/tables and OCR-derived text;
+- German/French/multilingual documents;
+- preservation of names, numbers and dates;
+- citation/source correctness;
+- privacy-restricted or insufficient-evidence questions.
+
+Do not change retrieval and answer model/settings in the same experiment unless the
+question explicitly requires an interaction study.
+
+### Lane E — general assistant / main lane
+
+Start with the production role map, not experimental candidates:
+
+- `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` — standard office;
+- `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` — RAG answer;
+- `prod-qwen35-9b-unsloth-q6-k` — higher-quality office;
+- `prod-gpt-oss20b-ggml-org-mxfp4` — deep reasoning / warm main.
+
+First establish a current `usecase` baseline and representative generation/resource
+metrics with the normal task+embedding topology present. Then screen large main-lane
+candidates for **fit/performance** before spending time on broad semantic comparison.
+Only candidates that load with safe headroom and acceptable latency advance to the
+human/general-office corpus.
+
+Human review should remain explicit for subjective dimensions such as helpfulness,
+correction/follow-up quality and overall daily-use acceptability. Do not manufacture a
+single precise score for inherently subjective judgments.
+
+### Lane F — agentic / coding
+
+Agent mode is exclusive by design. Always capture normal topology before entry and
+verify full restoration after leaving.
+
+Keep two test layers separate:
+
+1. `bc250-benchmark agent` — safe static shape/syntax/contract evidence;
+2. actual `bc250-code` workflows on disposable inputs — review, refactor, tests,
+   documentation, structured config work and commit-message generation.
+
+Generated code must not be automatically executed as root. If behavior needs execution,
+run deliberately reviewed output in a disposable/safe context and then run the relevant
+real tests. The product claim remains a local coding helper, not an autonomous repository
+agent.
+
+Only compare alternative agent models after the production Ornith baseline is current.
+
+### Lane G — MTP / speculative decoding
+
+MTP is experimental and should stay behind the production-office lanes.
+
+Prerequisites:
+
+- explicitly enabled MTP catalog entry;
+- pinned/recorded GGUF identity;
+- an external `llama-server` whose CLI supports the required options;
+- reviewed baseline is llama.cpp `b10069` / commit
+  `178a6c44937154dc4c4eff0d166f4a044c4fceba`, but compatible newer releases may be
+  tested and must be recorded.
+
+Test one MTP model at a time. A useful MTP comparison must include:
+
+```text
+same or closely comparable task/prompt
+baseline throughput and answer quality
+MTP throughput
+accepted draft tokens / proposed draft tokens
+context and draft-n settings
+resident memory / MemAvailable / swap
+stability and error logs
+output-quality regressions
+```
+
+`models/experiments/compare-mtp.sh` is a quick speed probe, not a promotion evaluator.
+Do not claim an MTP win from tok/s alone. A speedup that changes answer quality,
+exhausts memory, or relies on a fragile external runtime is not a production win.
+
+## 7. Routine revalidation vs specialist campaigns
+
+Run full `bc250-revalidate` when:
+
+- preparing a meaningful release candidate;
+- runtime/service topology changed;
+- a promoted role model changed;
+- Open WebUI/package integration changed materially;
+- enough independent changes accumulated that cross-lane interaction is uncertain.
+
+Do **not** run full revalidation after a documentation-only/source-memory refresh.
+
+Specialist campaigns should return to main integration with a compact handoff and should
+not independently change production defaults, release metadata or cross-stream policy.
+
+## 8. Promotion rules
+
+Promotion requires all applicable gates:
+
+```text
+quality improvement or clear role benefit
+real product-path success
+resource safety on 16 GB shared GDDR6
+acceptable latency/UX
+repeatability
+restoration/integrity clean
+no regression of another production role
+```
+
+When a candidate is rejected, record **Retest only if** conditions so future work does
+not repeat a disproven experiment without a material reason.

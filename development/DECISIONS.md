@@ -66,3 +66,27 @@ qualification and power management.
 
 **Retest only if:** the maintenance setup can no longer affect power state before the
 installer exits, or installer verification is redesigned with equivalent protection.
+
+## DEC-005 — Use impact-based qualification and temporary specialist lanes
+
+**Status:** ACTIVE
+
+**Decision:** Do not run one giant hardware/quality campaign after every source change.
+Use a shared source gate, then qualify only the subsystems affected by the change. Run
+full `bc250-revalidate` for meaningful release/milestone qualification or material
+runtime/topology changes. Open temporary specialist chats for active quality lanes rather
+than maintaining many permanently synchronized specialist handovers.
+
+**Observed:** The project now has independent production roles, a canonical benchmark
+result contract, whole-appliance revalidation, Git-only decision memory and several
+quality lanes with different acceptance semantics. Older parallel handovers duplicated
+current model/package facts and drifted at different rates; documentation/test-only
+releases did not create a technical reason to re-run all expensive BC-250 campaigns.
+
+**Interpretation:** Confidence is improved by testing the changed contract deeply, not by
+repeating unrelated expensive tests. Shared evidence conventions plus a current
+validation matrix preserve cross-lane visibility without copying the whole project state
+into every specialist prompt.
+
+**Retest only if:** impact-based qualification misses a cross-lane regression in practice,
+or package architecture changes so strongly that most subsystems become coupled again.
