@@ -25,7 +25,8 @@ Usage: sudo bc250-install [--models-only] [--owui-token-file FILE]
 Before 1.0 this is a pre-1.0 greenfield appliance setup. Apply or resume the packaged BC-250 setup. The command checks current
 state, avoids completed work where practical, applies the TTM/swap baseline,
 prepares optional 40-CU support for the exact running kernel, offers one unified
-model selection, configures Open WebUI, and verifies the result.
+model selection, configures Open WebUI, verifies the core appliance result, then
+offers optional office-maintenance/Pi companion setup.
 
 A normal update has one primary reboot after Fedora/kernel + memory setup. A
 second reboot is requested only when persistent 40-CU mode is already configured
@@ -460,6 +461,8 @@ show_plan() {
   printf '  storage headroom      %s available\n' "$(df -h --output=avail /var/lib/bc250-llm-server 2>/dev/null | awk 'NR==2{print $1}' || echo unknown)"
   printf '  models                ensure baseline + optional model selection\n'
   printf '  Open WebUI            start after models, then apply/status\n'
+  printf '  core verification     run before optional power/remote-maintenance setup\n'
+  printf '  maintenance / Pi      optional guided WOL, safe-shutdown and export setup\n'
   printf '  primary reboot        %s\n' "$reboot"
 }
 
@@ -530,6 +533,54 @@ step_9_open_webui() {
   fi
 }
 
+step_11_maintenance() {
+  heading "11. OFFICE MAINTENANCE / PI COMPANION"
+  command -v bc250-maintenance >/dev/null 2>&1 || {
+    echo "Maintenance helper unavailable; skipping optional setup."
+    return 0
+  }
+  if ! input_is_interactive || [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
+    echo "Non-interactive install: optional maintenance/Pi setup was not changed."
+    echo "Run later with: sudo bc250-maintenance setup"
+    echo "                sudo bc250-maintenance companion enable"
+    echo "                sudo bc250-maintenance backup-export enable"
+    return 0
+  fi
+
+  if yes_no_default_yes "Configure office maintenance, Wake-on-LAN and after-hours power saving now?"; then
+    bc250-maintenance setup
+  else
+    echo "Skipped maintenance policy setup. Run later: sudo bc250-maintenance setup"
+  fi
+
+  if yes_no_default_yes "Prepare restricted Raspberry Pi maintenance access over SSH?"; then
+    if ! systemctl cat sshd.service >/dev/null 2>&1; then
+      if yes_no_default_yes "Install Fedora openssh-server for restricted Pi maintenance access?"; then
+        dnf install -y openssh-server
+      else
+        echo "Pi maintenance access skipped; SSH server is unavailable."
+      fi
+    fi
+    systemctl cat sshd.service >/dev/null 2>&1 && bc250-maintenance companion enable
+  else
+    echo "Skipped Pi maintenance access. HTTP :80 remains the office endpoint; no Pi-only application port is opened."
+  fi
+
+  if yes_no "Prepare optional read-only Raspberry Pi backup export too?"; then
+    if [[ ! -x /usr/bin/rrsync ]]; then
+      if yes_no_default_yes "Install Fedora rsync-rrsync for read-only backup export?"; then
+        dnf install -y rsync-rrsync
+      else
+        echo "Backup export skipped; /usr/bin/rrsync is unavailable."
+        return 0
+      fi
+    fi
+    bc250-maintenance backup-export enable
+  else
+    echo "Backup export remains disabled; local backups are unchanged."
+  fi
+}
+
 step_10_verify() {
   heading "10. VERIFY INSTALLATION"
   local verify_status=0
@@ -582,11 +633,12 @@ main() {
   step_8_application_services
   step_9_open_webui
   step_10_verify
+  step_11_maintenance
   echo
   echo "Installation and verification completed successfully."
   echo "Transcript: $LOG_FILE"
   if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-    echo "Persistent 40-CU boot activation is configured; maintenance timers were not changed."
+    echo "Persistent 40-CU boot activation is configured."
   else
     echo "Persistent 40-CU boot activation is not enabled; live CU routing remains separately managed."
   fi
@@ -607,6 +659,9 @@ main() {
     echo "  Revalidation (full):    sudo bc250-revalidate start --owui-token-file FILE"
     echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"
   fi
+  echo "  Maintenance status:     sudo bc250-maintenance status"
+  echo "  Pi companion status:    sudo bc250-maintenance companion status"
+  echo "  Maintenance contract:   sudo bc250-maintenance contract"
   echo "  Agent mode:             sudo bc250-agent-mode enter"
 }
 

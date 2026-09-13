@@ -162,8 +162,16 @@ input_is_interactive && exit 9 || exit 0
             "step_8_application_services",
             "step_9_open_webui",
             "step_10_verify",
+            "step_11_maintenance",
         )]
         self.assertEqual(order, sorted(order))
+        plan = source[source.index("show_plan() {"):source.index("wait_for_open_webui() {")]
+        self.assertLess(plan.index("core verification"), plan.index("maintenance / Pi"))
+        help_text = subprocess.run(
+            ["bash", str(INSTALLER), "--help"],
+            text=True, stdout=subprocess.PIPE, check=False,
+        ).stdout
+        self.assertIn("verifies the core appliance result, then", help_text)
         topology = source[source.index("step_6_runtime_topology() {"):source.index("step_7_models() {")]
         self.assertIn("ollama.service ollama-task.service ollama-embedding.service ollama-agent.service", topology)
         self.assertIn("systemctl enable ollama.service ollama-task.service ollama-embedding.service", topology)
@@ -410,6 +418,21 @@ step_8_application_services
         block = source[source.index("step_10_verify() {"):source.index("run_models_only() {")]
         self.assertIn("bc250-verify --summary", block)
         self.assertNotIn("llm-run-diagnose --no-load", block)
+
+    def test_full_installer_offers_bounded_pi_maintenance_setup(self) -> None:
+        source = INSTALLER.read_text()
+        block = source[
+            source.index("step_11_maintenance() {"):
+            source.index("run_models_only() {")
+        ]
+        self.assertIn("bc250-maintenance setup", block)
+        self.assertIn("bc250-maintenance companion enable", block)
+        self.assertIn("bc250-maintenance backup-export enable", block)
+        self.assertIn("dnf install -y rsync-rrsync", block)
+        self.assertIn("HTTP :80", block)
+        self.assertNotIn("11434", block)
+        self.assertNotIn("11435", block)
+        self.assertNotIn("11437", block)
 
     def test_models_only_resume_is_public(self) -> None:
         source = INSTALLER.read_text()
