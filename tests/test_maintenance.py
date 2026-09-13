@@ -70,75 +70,77 @@ class MaintenanceTests(unittest.TestCase):
                 (True, 0o700, 0o750),
                 (False, 0o750, 0o700),
             ):
-                with self.subTest(script=script.name, group_present=group_present):
-                    with tempfile.TemporaryDirectory() as temporary:
-                        tmp = Path(temporary)
-                        fake_bin = tmp / "bin"
-                        fake_bin.mkdir()
-                        data = tmp / "owui"
-                        data.mkdir()
-                        db = data / "webui.db"
-                        db.write_bytes(b"placeholder")
-                        out_dir = tmp / "backup"
-                        out_dir.mkdir(mode=initial_mode)
-                        out_dir.chmod(initial_mode)
-                        install_log = tmp / "install.args"
+                with (
+                    self.subTest(script=script.name, group_present=group_present),
+                    tempfile.TemporaryDirectory() as temporary,
+                ):
+                    tmp = Path(temporary)
+                    fake_bin = tmp / "bin"
+                    fake_bin.mkdir()
+                    data = tmp / "owui"
+                    data.mkdir()
+                    db = data / "webui.db"
+                    db.write_bytes(b"placeholder")
+                    out_dir = tmp / "backup"
+                    out_dir.mkdir(mode=initial_mode)
+                    out_dir.chmod(initial_mode)
+                    install_log = tmp / "install.args"
 
-                        (fake_bin / "sqlite3").write_text(
-                            "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
+                    (fake_bin / "sqlite3").write_text(
+                        "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
+                    )
+                    (fake_bin / "mktemp").write_text(
+                        "#!/usr/bin/env bash\nexit 97\n", encoding="utf-8"
+                    )
+                    (fake_bin / "getent").write_text(
+                        "#!/usr/bin/env bash\n"
+                        + (
+                            "[[ ${1-} == group && ${2-} == bc250-backup-export ]] && exit 0\n"
+                            if group_present
+                            else "[[ ${1-} == group && ${2-} == bc250-backup-export ]] && exit 2\n"
                         )
-                        (fake_bin / "mktemp").write_text(
-                            "#!/usr/bin/env bash\nexit 97\n", encoding="utf-8"
-                        )
-                        (fake_bin / "getent").write_text(
-                            "#!/usr/bin/env bash\n"
-                            + (
-                                "[[ ${1-} == group && ${2-} == bc250-backup-export ]] && exit 0\n"
-                                if group_present
-                                else "[[ ${1-} == group && ${2-} == bc250-backup-export ]] && exit 2\n"
-                            )
-                            + "exec /usr/bin/getent \"$@\"\n",
-                            encoding="utf-8",
-                        )
-                        (fake_bin / "install").write_text(
-                            "#!/usr/bin/env bash\n"
-                            "printf '%s\n' \"$*\" >> \"$INSTALL_LOG\"\n"
-                            "args=()\n"
-                            "while (($#)); do\n"
-                            "  case $1 in\n"
-                            "    -o) shift 2 ;;\n"
-                            "    -g) shift 2 ;;\n"
-                            "    *) args+=(\"$1\"); shift ;;\n"
-                            "  esac\n"
-                            "done\n"
-                            "exec /usr/bin/install \"${args[@]}\"\n",
-                            encoding="utf-8",
-                        )
-                        for fake in fake_bin.iterdir():
-                            fake.chmod(0o755)
+                        + "exec /usr/bin/getent \"$@\"\n",
+                        encoding="utf-8",
+                    )
+                    (fake_bin / "install").write_text(
+                        "#!/usr/bin/env bash\n"
+                        "printf '%s\n' \"$*\" >> \"$INSTALL_LOG\"\n"
+                        "args=()\n"
+                        "while (($#)); do\n"
+                        "  case $1 in\n"
+                        "    -o) shift 2 ;;\n"
+                        "    -g) shift 2 ;;\n"
+                        "    *) args+=(\"$1\"); shift ;;\n"
+                        "  esac\n"
+                        "done\n"
+                        "exec /usr/bin/install \"${args[@]}\"\n",
+                        encoding="utf-8",
+                    )
+                    for fake in fake_bin.iterdir():
+                        fake.chmod(0o755)
 
-                        env = os.environ | {
-                            "PATH": f"{fake_bin}:{os.environ['PATH']}",
-                            "OWUI_DATA": str(data),
-                            "OWUI_DB": str(db),
-                            output_variable: str(out_dir),
-                            "INSTALL_LOG": str(install_log),
-                        }
-                        result = subprocess.run(
-                            [str(script)],
-                            env=env,
-                            text=True,
-                            stdout=subprocess.PIPE,
-                            stderr=subprocess.STDOUT,
-                            check=False,
-                        )
-                        self.assertNotEqual(result.returncode, 0, result.stdout)
-                        self.assertEqual(out_dir.stat().st_mode & 0o777, expected_mode)
-                        install_args = install_log.read_text(encoding="utf-8")
-                        if group_present:
-                            self.assertIn("-g bc250-backup-export", install_args)
-                        else:
-                            self.assertNotIn("bc250-backup-export", install_args)
+                    env = os.environ | {
+                        "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                        "OWUI_DATA": str(data),
+                        "OWUI_DB": str(db),
+                        output_variable: str(out_dir),
+                        "INSTALL_LOG": str(install_log),
+                    }
+                    result = subprocess.run(
+                        [str(script)],
+                        env=env,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        check=False,
+                    )
+                    self.assertNotEqual(result.returncode, 0, result.stdout)
+                    self.assertEqual(out_dir.stat().st_mode & 0o777, expected_mode)
+                    install_args = install_log.read_text(encoding="utf-8")
+                    if group_present:
+                        self.assertIn("-g bc250-backup-export", install_args)
+                    else:
+                        self.assertNotIn("bc250-backup-export", install_args)
 
     def test_open_webui_model_import_preserves_qwen_non_thinking(self) -> None:
         helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
