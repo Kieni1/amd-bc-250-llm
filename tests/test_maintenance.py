@@ -70,8 +70,10 @@ class MaintenanceTests(unittest.TestCase):
                 (True, 0o700, 0o750),
                 (False, 0o750, 0o700),
             ):
-                with self.subTest(script=script.name, group_present=group_present):
-                    with tempfile.TemporaryDirectory() as temporary:
+                with (
+                    self.subTest(script=script.name, group_present=group_present),
+                    tempfile.TemporaryDirectory() as temporary,
+                        ):
                         tmp = Path(temporary)
                         fake_bin = tmp / "bin"
                         fake_bin.mkdir()
