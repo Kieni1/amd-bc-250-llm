@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1-0.7 - 2026-09-13
+
+- Fix `bc250-maintenance contract` after the installed-documentation hierarchy change by resolving the contract from `docs/MAINTENANCE-CONTRACT.md` under the package doc directory.
+- Improve the interactive maintenance/Pi installer flow: clearly separate local BC-250 maintenance from optional Raspberry Pi access/export, use an explicit numbered power-action choice, show the detected WOL interface and address before accepting it, and explain that the setup is safe to rerun.
+- Re-prompt locally for invalid yes/no answers, pruning limits, warm-up values, power time/action and network-interface input instead of terminating the entire maintenance setup after earlier sections have already been applied. An IP address entered where a Linux interface name is required now gets a targeted explanation.
+- Keep production topology, model defaults, maintenance policy defaults, retention, firewall exposure and quality thresholds unchanged.
+
 ## 0.11.1-0.6 - 2026-09-13
 
 - Strengthen the optional backup-export regression coverage by executing each backup producer through its directory-preparation path in a hermetic test and asserting the resulting `0750` installed-group mode plus the `0700` no-package-group fallback, instead of protecting the fix with exact source-code strings.

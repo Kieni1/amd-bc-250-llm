@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.1
-Release:        0.6%{?dist}
+Release:        0.7%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 13 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.7
+- Fix the installed maintenance-contract path after the documentation hierarchy change.
+- Improve interactive local-maintenance and Pi-companion wording, including an explicit power-action menu and detected WOL interface/address display.
+- Re-prompt invalid maintenance answers locally instead of aborting the entire setup; explain IP-address versus Linux-interface-name mistakes.
+
 * Sun Sep 13 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.6
 - Replace the backup-export directory permission source-string regression with hermetic behavior coverage for the installed reserved-group 0750 path and the source/direct-execution 0700 fallback.
 - Keep documentation validation focused on durable package contracts: public command names, runnable-command privilege examples, revalidation lifecycle, retired-Qwen distinction, source/installed links, and canonical active-model equality; drop brittle prose-content assertions.
