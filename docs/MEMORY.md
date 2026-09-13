@@ -12,9 +12,9 @@ ttm.page_pool_size=4194304
 Apply/review:
 
 ```bash
-sudo bc250-memory-profile status
+bc250-memory-profile status
 sudo bc250-memory-profile ensure      # idempotent; used by bc250-install
-sudo bc250-memory-profile recommend
+bc250-memory-profile recommend
 sudo bc250-memory-profile apply-full  # confirmed interactive equivalent
 sudo reboot
 ```

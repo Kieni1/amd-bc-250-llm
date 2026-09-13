@@ -30,5 +30,5 @@ a consistency check, not cryptographic provenance or Vulkan-conformance proof.
 
 Rebuild the external kernel module, initramfs and boot entry after every kernel
 update before selecting the custom Mesa again. The project can build its own
-40-CU variant; do not run it and `bc250-40cu prepare` as two independent module
+40-CU variant; do not run it and `sudo bc250-40cu prepare` as two independent module
 installers. Choose one workflow or maintain one deliberately merged patch set.
