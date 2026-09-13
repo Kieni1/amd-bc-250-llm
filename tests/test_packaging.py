@@ -405,6 +405,7 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertIn("g      ollama -", sysusers)
         self.assertIn('u      ollama -  "Runs Ollama"', sysusers)
+        self.assertIn("g      bc250-backup-export -", sysusers)
         self.assertIn(
             "packaging/bc250-llm-server.sysusers\t{sysusersdir}/bc250-llm-server.conf",
             manifest,
@@ -412,6 +413,16 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('--define "sysusersdir=%{_sysusersdir}"', spec)
         self.assertNotIn("Requires(pre):    shadow-utils", spec)
         self.assertNotRegex(spec, r"(?s)%pre\s+.*?useradd.*?%build")
+
+    def test_backup_export_directory_permissions_survive_tmpfiles_reconciliation(self) -> None:
+        tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("d /var/backups/bc250-llm-server 0710 root bc250-backup-export -", tmpfiles)
+        self.assertIn("d /var/backups/bc250-llm-server/config 0750 root bc250-backup-export -", tmpfiles)
+        self.assertIn("d /var/backups/bc250-llm-server/users 0750 root bc250-backup-export -", tmpfiles)
+        self.assertIn("%attr(0710,root,bc250-backup-export) /var/backups/bc250-llm-server", spec)
+        self.assertIn("%attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/config", spec)
+        self.assertIn("%attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/users", spec)
 
     def test_config_noreplace_and_explicit_install_behavior_remain(self) -> None:
         installer = (ROOT / "scripts/install-manifest.py").read_text(encoding="utf-8")
