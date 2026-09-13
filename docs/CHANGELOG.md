@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.11.1-0.6 - 2026-09-13
+
+- Strengthen the optional backup-export regression coverage by executing each backup producer through its directory-preparation path in a hermetic test and asserting the resulting `0750` installed-group mode plus the `0700` no-package-group fallback, instead of protecting the fix with exact source-code strings.
+- Reduce documentation regression checks to durable package-facing invariants rather than accumulating prose assertions: public command names, runnable privileged/read-only examples, revalidation lifecycle, the known retired-vs-active Qwen distinction, source/installed relative links, and exact active-experiment catalog equality remain protected.
+- Add concise Git-only review/release guidance so future implementation chats report what changed, what was deliberately deferred, what validation actually ran and any residual risk, and prefer behavior-level regression tests when practical.
+
+## 0.11.1-0.5 - 2026-09-13
+
+- Fix the optional backup-export permission regression: config/users backup producers now preserve the package-owned `0750 root:bc250-backup-export` directory contract when the reserved group exists, while retaining a private `0700` fallback for source-tree/direct execution without that package group. Published artifacts remain `0640` only after the export account is explicitly enabled; rollback backups remain private.
+- Reconcile current-facing documentation with the package: core verification is shown before optional maintenance/Pi setup, the retired `exp-qwen38-4b-distill-empero-q6-k` task candidate is no longer described as active, Open WebUI backup wording reflects scheduled verified config/users backups, and the full `bc250-revalidate` lifecycle is documented.
+- Preserve repository-relative documentation paths under `/usr/share/doc/bc250-llm-server/` so one link layout works in Git and on the appliance; add staged-installed-document link regression coverage and keep Git-only `development/` bookkeeping out of the binary RPM payload.
+- Consolidate `docs/RPM-LAYOUT.md` into `docs/FILESTRUCTURE.md` and `docs/REPACKAGING.md` into `packaging/README.md`; reduce source-subtree quality/experiment READMEs to maintainer guidance while retaining detailed operator/model rationale in their canonical documents.
+- Add a small development-memory convention with durable decision records and model-run templates, including explicit retest conditions, so rejected experiments are not repeated merely because current-facing docs are shortened.
+
+## 0.11.1-0.4 - 2026-09-12
+
+- Define maintenance contract version 1 for an external Raspberry Pi companion: office readiness is HTTP :80, Wake-on-LAN is the morning-start mechanism, and `sudo bc250-maintenance request-shutdown` is the stable remote-safe-power interface. The BC-250, not the Pi, remains responsible for deciding whether active SSH/UI/Ollama/maintenance work permits shutdown.
+- Add `bc250-maintenance companion status|enable` to prepare a dedicated forced-command power-control account and ensure only the existing office HTTP service plus restricted SSH :22 are available; internal Open WebUI/Ollama ports remain outside the companion contract.
+- Add optional `backup-export status|enable` using Fedora `/usr/bin/rrsync` (`rsync-rrsync`) with separate config/users key scopes. Reserve a dormant export group for stable directory permissions and publish new artifacts `0640` only after the export account is explicitly enabled; rollback backups and maintenance secrets remain private.
+- Add the maintenance/Pi step to full interactive `bc250-install`, including explicit prompts for WOL/power policy, restricted Pi access and optional `rsync-rrsync`. Non-interactive and `--models-only` installs do not silently enable remote maintenance or backup export.
+- Keep backup secondary to office availability/power savings: no Open WebUI API key is required by the Pi, no push-to-Pi credential is introduced, and no new application port is exposed.
+
 ## 0.11.1-0.3 - 2026-09-12
 
 - Polish model cleanup without changing deletion semantics: explicitly named targets no longer dump the full category, interactive cleanup shows registration/runtime/source/state actions before confirmation, and `--keep-gguf` previews retained source/state data while `--list` remains discovery-only. Remove the duplicate all-model catalog print.

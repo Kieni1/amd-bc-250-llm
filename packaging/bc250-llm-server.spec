@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.1
-Release:        0.3%{?dist}
+Release:        0.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -202,14 +202,31 @@ fi
 %ghost %dir %attr(0750,ollama,ollama) /var/cache/bc250-llm-server/huggingface
 %ghost %dir %attr(0750,ollama,ollama) /var/lib/ollama
 %ghost %dir %attr(0750,root,root) /var/lib/open-webui
-%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server
-%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/config
-%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/users
+%ghost %dir %attr(0710,root,bc250-backup-export) /var/backups/bc250-llm-server
+%ghost %dir %attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/config
+%ghost %dir %attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/users
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/config
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 13 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.6
+- Replace the backup-export directory permission source-string regression with hermetic behavior coverage for the installed reserved-group 0750 path and the source/direct-execution 0700 fallback.
+- Keep documentation validation focused on durable package contracts: public command names, runnable-command privilege examples, revalidation lifecycle, retired-Qwen distinction, source/installed links, and canonical active-model equality; drop brittle prose-content assertions.
+- Record review/release discipline in Git-only development memory: after implementing a review, report changes, deliberate deferrals, validation actually run, and residual risk; prefer observable behavior tests over implementation-string assertions.
+
+* Sun Sep 13 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.5
+- Fix backup producers so config/users export directories retain the package-owned 0750 root:bc250-backup-export contract instead of being reset to private 0700 on each backup run.
+- Reconcile current-facing installer, model, Open WebUI and command documentation; make revalidation lifecycle and privilege examples explicit without changing runtime/model defaults.
+- Preserve source-relative documentation layout in the installed RPM and validate installed Markdown links, while consolidating duplicate maintainer/layout documents and keeping development bookkeeping out of the binary payload.
+- Add Git-only development decision/model-run records so negative experiment results and retest conditions survive future documentation cleanup.
+
+* Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.4
+- Define a versioned BC-250/Pi maintenance contract with HTTP :80 office readiness, Wake-on-LAN, and a stable safe-shutdown request that preserves the appliance idle/session policy.
+- Add optional restricted Pi maintenance access over SSH :22 plus read-only rrsync backup export, keeping internal Open WebUI/Ollama ports closed and private keys off the BC-250.
+- Publish new config/users backups with export-group read rights only after the export account is explicitly enabled, while keeping rollback data private and reserving stable backup-directory group ownership across boots.
+- Offer maintenance/WOL, Pi companion access and optional backup export after core verification during full interactive installation; non-interactive and models-only runs leave maintenance policy unchanged.
+
 * Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.3
 - Make targeted model cleanup concise and show exact interactive cleanup effects, including keep-GGUF retention, without changing cleanup semantics.
 - Limit manual maintenance output to the current systemd invocation and preflight upload-prune credentials before launching the unit, without exposing the key.
