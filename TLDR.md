@@ -1,5 +1,8 @@
 # BC-250 LLM appliance: quick sheet
 
+This is the common-path operator sheet. Use [`docs/COMMANDS.md`](docs/COMMANDS.md)
+for the complete command reference and the topic docs for rationale/recovery details.
+
 ## Install
 
 Keep the binary RPM beside the repository bootstrap:
@@ -8,25 +11,24 @@ Keep the binary RPM beside the repository bootstrap:
 sudo ./install
 ```
 
-The bootstrap installs the RPM and invokes the packaged `bc250-install`,
-which owns Fedora update policy. Rerun after the requested primary reboot with:
+The bootstrap installs the RPM and invokes `bc250-install`, which owns Fedora update
+and appliance provisioning policy. After the requested primary reboot, resume with:
 
 ```bash
 sudo bc250-install
 ```
 
-Use `sudo bc250-install --models-only` to reconcile models/Open WebUI without the
-system-update stages. The promoted task and Jina embedding models are baseline
-infrastructure; one additional-model prompt accepts global indexes/ranges/names
-or `recommended`, `production`, `all`, and Enter skips extra models. Unattended selection uses
+Use `sudo bc250-install --models-only` to reconcile runtime topology, models and Open
+WebUI without system/kernel setup. The task and Jina embedding models are baseline
+infrastructure; the additional-model prompt accepts indexes/ranges/names or
+`recommended`, `production`, `all`, and Enter skips extras. Unattended selection uses
 `BC250_MODEL_SELECTION`.
 
-Legacy full-unit overrides for the task/embedding/agent Ollama lanes are not migrated; the installer stops rather than mixing old dynamic units with the package-owned topology.
-
-Before 1.0 this is intentionally a green-field appliance flow. Kernel update and
-the TTM-only profile are prepared before one primary reboot; 40-CU is then built
-for the exact running kernel. A second reboot is requested only when an already
-persistent 40-CU configuration needs the prepared module loaded.
+Full interactive installs verify the core appliance first, then offer optional
+maintenance/WOL and restricted Raspberry Pi companion setup. Models-only and
+noninteractive runs do not silently enable those remote-maintenance features. Legacy
+full-unit task/embedding/agent overrides are rejected rather than mixed with the
+package-owned four-lane topology.
 
 ## Verify and open the UI
 
@@ -34,22 +36,26 @@ persistent 40-CU configuration needs the prepared module loaded.
 sudo bc250-status
 sudo bc250-verify
 bc250-verify-lan SERVER_IP
-```
-
-```bash
 sudo bc250-storage status
 sudo bc250-storage dedupe
 ```
 
-`dedupe` preserves both logical files and shares verified identical XFS extents;
-`df` reflects reclaimed capacity even when `du` still counts shared extents twice.
+`dedupe` keeps both logical files but shares verified identical XFS extents; `df`
+reflects reclaimed capacity even when `du` counts both names. Open
+`http://SERVER_IP/` from the trusted LAN. If Open WebUI initialization was skipped:
 
-Open `http://SERVER_IP/` from the trusted LAN. The installer can initialize the
-Open WebUI administrator/API baseline interactively; if skipped, run
-`sudo bc250-openwebui-setup init`. HTTP is not encrypted.
+```bash
+sudo bc250-openwebui-setup init
+```
 
-For a document/RAG pilot, install the document answer model and embedding model,
-then follow [`docs/RAG.md`](docs/RAG.md). Operator documents live under `/srv/bc250-documents`; run `sudo bc250-rag-import plan` before any bulk sync.
+For RAG, keep operator documents under `/srv/bc250-documents` and plan before sync:
+
+```bash
+sudo bc250-rag-import plan /srv/bc250-documents
+```
+
+See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use
+[`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
 
 ## Models
 
@@ -59,66 +65,67 @@ sudo bc250-model list experiments
 sudo bc250-model list task
 sudo bc250-model list agentic
 sudo bc250-model list embedding
-bc250-ocr list
-sudo bc250-rag-import plan /srv/bc250-documents
 
 sudo bc250-model install production
 sudo bc250-model install experiments
-sudo bc250-model install embedding
 sudo bc250-model install task
-sudo bc250-openwebui-setup init
 sudo bc250-model install agentic
+sudo bc250-model install embedding
 
-# --list discovers candidates; named interactive cleanup previews exact effects
+bc250-ocr list
 sudo bc250-model cleanup production --list
 sudo bc250-model cleanup production MODEL-NAME
 ```
 
-Selections accept a full name, displayed index, range such as `0,2-4`, or
-`all`. With no selection, the command prompts; Enter cancels.
+Selections accept a full name, displayed index, ranges such as `0,2-4`, or `all`.
+Enter cancels an interactive selection. Preserve downloaded GGUFs where practical;
+use package lifecycle tools rather than deleting `/var/lib` content manually.
 
 ## Profiles and hardware
 
 ```bash
-sudo bc250-memory-profile status
+bc250-memory-profile status
 sudo bc250-memory-profile ensure
-sudo bc250-swap-profile status
+bc250-swap-profile status
 sudo bc250-swap-profile ensure
-sudo bc250-ollama-profile status
+bc250-ollama-profile status
 sudo bc250-cu-status
-sudo bc250-40cu status          # module/persistence + live routed-CU summary
+sudo bc250-40cu status
 ```
 
-The guided installer applies the memory/swap profiles and prepares the
-kernel-specific 40-CU module without silently enabling persistent boot mode.
-Live CU routing is reported separately. Start with
-`sudo bc250-40cu`, then test the feasible CU count for the individual board;
-see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md).
+The installer prepares the kernel-specific 40-CU module without silently enabling
+persistent boot mode. Live routing is separate. Start the guided workflow with
+`sudo bc250-40cu`; see [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md) before changing routing.
 
-## Operations
+## Operations and maintenance
 
 ```bash
-bc250-benchmark generation --profile compare      # neutral generation comparison
-bc250-benchmark generation --profile edge --mode production  # deployed-config edge check
+bc250-benchmark generation --profile compare
+bc250-benchmark generation --profile edge --mode production
 bc250-benchmark embeddings
 bc250-benchmark ocr
 bc250-benchmark task
+
 sudo bc250-agent-mode enter
-bc250-benchmark agent                 # exclusive agent correctness lane, port 11436
+bc250-benchmark agent
 sudo bc250-agent-mode leave
+
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
 sudo bc250-revalidate status
 
 sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance companion status
+sudo bc250-maintenance contract
 sudo bc250-maintenance run backup
-sudo bc250-maintenance run prune      # fails before systemd launch if API key is not configured
+sudo bc250-maintenance run prune
 sudo bc250-maintenance clean-cache
 ```
 
-`setup --defaults` enables verified local backups only. Guided maintenance can
-also configure dry-run upload pruning, optional warm-up and optional after-hours
-power saving.
+`setup --defaults` enables verified local backups only. Guided maintenance can also
+configure dry-run upload pruning, optional warm-up and optional after-hours safe power.
+Pi integration uses office HTTP :80 and restricted SSH :22 only; Wake-on-LAN is an
+Ethernet magic packet and opens no host firewall port.
 
 ## Services
 
@@ -131,11 +138,9 @@ curl -fsS http://127.0.0.1:11434/api/tags
 curl -fsS http://127.0.0.1:11437/api/tags
 ```
 
-Normal mode uses task `11435` and embedding `11437` alongside main `11434`.
-Agent `11436` is exclusive and disabled at boot. Open WebUI is also deliberately
-not boot-enabled by the base Quadlet; `bc250-install` enables it only after the
-baseline task/Jina models are registered. Keep ports `11434`–`11437` blocked
-from untrusted networks.
+Normal mode uses main `11434`, task `11435` and embedding `11437`. Agent `11436` is
+exclusive and disabled at boot. Open WebUI is enabled by `bc250-install` only after
+baseline model registration. Keep `11434`–`11437` blocked from untrusted networks.
 
 ## Remove
 
@@ -143,28 +148,21 @@ from untrusted networks.
 # Keep models and persistent application data
 sudo dnf remove bc250-llm-server.x86_64
 
-# Explicitly purge the complete appliance setup
+# Explicit greenfield appliance reset
 sudo bc250-reset
 ```
 
-Reset preserves `/srv/bc250-documents` and does not roll back Fedora upgrades or filesystem growth.
-`bc250-uninstall` remains a compatibility alias.
+Reset preserves `/srv/bc250-documents` and does not undo Fedora upgrades/filesystem
+growth. `bc250-uninstall` remains a compatibility alias. Read
+[`docs/UNINSTALL.md`](docs/UNINSTALL.md) before reset.
 
-See [`docs/COMMANDS.md`](docs/COMMANDS.md) for every installed command and
-[`docs/UNINSTALL.md`](docs/UNINSTALL.md) before a destructive reset.
-
-## Benchmark quick checks
+## Full qualification
 
 ```bash
-bc250-benchmark usecase
-bc250-benchmark translation
-bc250-benchmark rag-quality
-bc250-benchmark embeddings
-bc250-benchmark ocr
-bc250-benchmark task
+sudo bc250-revalidate start --owui-token-file /root/owui-test.key
 ```
 
-For a full live-appliance pass use `sudo bc250-revalidate start --owui-token-file /root/owui-test.key`; it is opt-in,
-root-only, and stores its final tarball under `/var/lib/bc250-llm-server/revalidation/results/`.
-See `cmd/benchmark/README.md` / installed `BENCHMARK.md` for canonical result directories, explicit tuning commands, RAG qualification and thermal profiles.
-
+It is opt-in/root-only and stores final bundles under
+`/var/lib/bc250-llm-server/revalidation/results/`. See `cmd/benchmark/README.md`
+(installed at the same relative path under `/usr/share/doc/bc250-llm-server/`) for
+result directories, tuning commands, RAG qualification and thermal profiles.

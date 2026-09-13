@@ -53,7 +53,7 @@ Use WGP IDs reported on the actual board, not IDs copied from another system.
 Test representative inference output, Vulkan initialization, temperature and
 kernel logs—not only reported CU count or speed. Use the live manager's save
 and service-install workflow only after the routing table is stable, then
-confirm it after reboot with `bc250-cu-live-manager status`.
+confirm it after reboot with `sudo bc250-cu-live-manager status`.
 
 The replacement module and live WGP routing solve different parts of the
 workflow. A numerically full routing table alone does not prove that the patched
@@ -87,8 +87,8 @@ Unstable harvested CUs can cause wrong output, GPU resets, hangs, boot failure
 or excess heat. Keep local console access and another bootable kernel while
 testing. The CU tools do not alter governor frequency or voltage policy.
 
-Use `bc250-40cu disable` to return to disabled CU mode while retaining the
-prepared module. Use `bc250-40cu restore` to restore a verified stock Fedora
+Use `sudo bc250-40cu disable` to return to disabled CU mode while retaining the
+prepared module. Use `sudo bc250-40cu restore` to restore a verified stock Fedora
 module backup. Do not combine two independent module installers.
 
 ## External projects

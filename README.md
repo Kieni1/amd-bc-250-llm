@@ -38,8 +38,10 @@ TTM activation into one primary reboot. After reboot it prepares 40-CU support
 for the exact running kernel, establishes the static main/task/embedding normal
 mode, installs the promoted task and Jina embedding infrastructure models, then
 presents one global prompt for additional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
-desired state and verifying the appliance. A
-second reboot is requested only if persistent 40-CU mode was already configured
+desired state, then offers optional office-maintenance/WOL and Raspberry Pi
+companion setup after core appliance verification. The companion setup keeps HTTP :80 as
+the office endpoint and uses only restricted SSH :22; it does not expose internal
+Open WebUI/Ollama ports. A second reboot is requested only if persistent 40-CU mode was already configured
 and its newly prepared replacement module is not yet loaded.
 
 The model prompt accepts global indexes, ranges, exact names, `recommended`,
@@ -102,12 +104,13 @@ These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
 quality and quantization comparisons. The main lane keeps models warm for 20 minutes
 for responsive chat, the compact task lane unloads after each request, and the Jina
-embedding lane keeps its small retrieval model warm for 10 minutes. Qwen3.8 4B
-Distill remains an opt-in experiment: it scored much better in focused task tests,
-but simultaneous residency with GPT-OSS caused a real task-service OOM and forcing
-safe serialization would make the next large-model chat cold-start again. The Jina
-embedding model uses a non-commercial license; review every model's current license
-before use.
+embedding lane keeps its small retrieval model warm for 10 minutes. The former task
+candidate `exp-qwen38-4b-distill-empero-q6-k` is retired from normal discovery: it
+scored much better in focused task tests, but simultaneous residency with GPT-OSS
+OOM-killed the task service and safe serialization would reintroduce large-model
+cold starts. Do not confuse it with the separate active general comparison
+`exp-qwen38-4b-empero-q6-k`. The Jina embedding model uses a non-commercial license;
+review every model's current license before use.
 
 ## Daily commands
 
@@ -127,16 +130,19 @@ sudo bc250-agent-mode enter         # use the registered coding model exclusivel
 sudo bc250-agent-mode leave
 
 # Profiles and hardware
-sudo bc250-memory-profile status
-sudo bc250-swap-profile status
-sudo bc250-ollama-profile status
+bc250-memory-profile status
+bc250-swap-profile status
+bc250-ollama-profile status
 sudo bc250-40cu status
 
 # Optional maintenance / storage
 sudo bc250-status
 sudo bc250-maintenance setup --defaults
+sudo bc250-maintenance companion status
+sudo bc250-maintenance contract
 sudo bc250-maintenance run backup
 sudo bc250-maintenance run prune      # preflights the protected Open WebUI API key
+# Optional Pi setup: companion enable = safe shutdown over SSH; backup export is separate.
 # Check/apply package-owned Open WebUI state when needed:
 bc250-openwebui-setup status
 sudo bc250-maintenance clean-cache
@@ -157,7 +163,8 @@ bc250-benchmark rag-quality
 ```
 
 The complete installed interface and its exact syntax are in
-[`docs/COMMANDS.md`](docs/COMMANDS.md).
+[`docs/COMMANDS.md`](docs/COMMANDS.md). Raspberry Pi/WOL/safe-power integration
+uses the stable interface in [`docs/MAINTENANCE-CONTRACT.md`](docs/MAINTENANCE-CONTRACT.md).
 
 ## Components
 

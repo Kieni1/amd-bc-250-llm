@@ -28,7 +28,7 @@ BC-250 safety checks:
 - the gaming-oriented `mitigations=off` suggestion is intentionally not applied
   by this office/RAG appliance.
 
-Always verify after reboot with `sudo bc250-memory-profile status`,
+Always verify after reboot with `bc250-memory-profile status`,
 `sudo bc250-verify`, and a representative model load.
 
 Community cross-check: [ElektricM BC-250 kernel guide](https://elektricm.github.io/amd-bc250-docs/linux/kernel/)

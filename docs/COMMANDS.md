@@ -23,7 +23,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-gitea-review` | Generate an optional Gitea pull-request review |
 | `bc250-install` | Apply/resume the packaged appliance setup |
 | `bc250-install-ollama` | Install or normalize official Ollama |
-| `bc250-maintenance` | Backups, retention and optional power schedules |
+| `bc250-maintenance` | Backups, safe power/WOL policy and optional Pi companion access |
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
 | `bc250-model` | Unified model discovery, installation and cleanup |
 | `bc250-ocr` | Experimental office OCR model list/install/test helper |
@@ -345,8 +345,12 @@ sudo llm-run-diagnose --no-load
 MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 bc250-check-temp --once
 bc250-benchmark generation
+sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+sudo bc250-revalidate start --skip-owui
 sudo bc250-revalidate status
 sudo bc250-revalidate status --raw
+sudo bc250-revalidate abort
+sudo bc250-revalidate cleanup
 ```
 
 `bc250-revalidate` harness v4.0 is the root-only systemd-backed package
@@ -374,7 +378,10 @@ inspectable until `cleanup` or a later `start`.
 
 `bc250-revalidate status` is human-readable by default and separates the installed
 harness/worker state from the recorded last-run result; `--raw` preserves the
-key/value form for scripts. `bc250-status` is a short overview including CPU
+key/value form for scripts. `abort` requests termination of the current systemd-owned
+run through the harness recovery/finalization path; `cleanup` removes completed work
+state after its result bundle is no longer needed. Neither command is a substitute
+for ordinary service stop/start management. `bc250-status` is a short overview including CPU
 topology/power-state exposure, RAM, memory pressure, zram, disk swap, swappiness
 and appliance storage. `bc250-verify` is the detailed pass/fail check and accepts
 `--owui-token-file FILE` for the authenticated package-owned Open WebUI drift check. `bc250-check-temp` refreshes every
@@ -426,7 +433,7 @@ Generation and coexistence reporting emphasizes resident size, minimum
 remain diagnostic Vulkan counters and must not be interpreted as independent additive
 memory pools on the BC-250. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
 for result schema, category contracts and Ollama 0.34.0 request policy. The installed copy is
-`/usr/share/doc/bc250-llm-server/BENCHMARK.md`.
+`/usr/share/doc/bc250-llm-server/cmd/benchmark/README.md`.
 
 ## Open WebUI setup
 
@@ -464,6 +471,10 @@ backend; leaving restores normal mode.
 ```text
 sudo bc250-maintenance setup [--defaults]
 sudo bc250-maintenance status
+sudo bc250-maintenance contract
+sudo bc250-maintenance companion {status|enable}
+sudo bc250-maintenance backup-export {status|enable}
+sudo bc250-maintenance request-shutdown
 sudo bc250-maintenance run {backup|prune|all}
 sudo bc250-maintenance clean-cache
 sudo bc250-maintenance disable
@@ -476,9 +487,13 @@ missing/placeholder key fails with the active age/ceiling/dry-run policy and nev
 prints the credential. `clean-cache` requires confirmation and removes only rebuildable
 Hugging Face cache, dangling Podman images and old **system-wide** journal archives;
 model and Open WebUI data are retained. Interactive setup can also configure dry-run
-upload pruning, model warm-up and an after-hours power action. Configuration is stored in root-readable
-`/etc/bc250-llm-server/maintenance.env`. See
-[`MAINTENANCE.md`](MAINTENANCE.md) before enabling deletion or power actions.
+upload pruning, model warm-up and an after-hours power action. `companion enable`
+prepares restricted SSH :22 access for the stable safe-shutdown request and keeps
+HTTP :80 as the office-readiness endpoint; it does not expose internal Ollama/UI
+ports. `backup-export enable` is optional and requires `/usr/bin/rrsync` from the
+Fedora `rsync-rrsync` package. Configuration is stored in root-readable
+`/etc/bc250-llm-server/maintenance.env`. See [`MAINTENANCE.md`](MAINTENANCE.md)
+and [`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
 
 ## Coding and experiments
 
