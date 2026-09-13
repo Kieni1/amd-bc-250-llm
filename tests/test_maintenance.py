@@ -142,6 +142,66 @@ class MaintenanceTests(unittest.TestCase):
                     else:
                         self.assertNotIn("bc250-backup-export", install_args)
 
+    def test_contract_default_path_matches_installed_document_hierarchy(self) -> None:
+        maintenance = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertIn(
+            "/usr/share/doc/bc250-llm-server/docs/MAINTENANCE-CONTRACT.md",
+            maintenance,
+        )
+        self.assertIn("docs/*.md\t{docdir}/docs/", manifest)
+
+    def test_interactive_maintenance_values_reprompt_instead_of_aborting(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        command = (
+            "source <(sed '$d' " + str(script) + "); "
+            "if ask_yes_no 'Continue' yes; then echo YES; else echo NO; fi; "
+            "action=$(ask_power_action poweroff); "
+            "when=$(ask_power_time 18:30); "
+            "count=$(ask_nonnegative_integer 'Count' 7); "
+            "printf 'ACTION=%s\nTIME=%s\nCOUNT=%s\n' \"$action\" \"$when\" \"$count\""
+        )
+        result = subprocess.run(
+            ["bash", "-c", command],
+            input="maybe\ny\ny\n2\n25:00\n19:15\nnope\n5\n",
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Please answer yes or no.", result.stdout)
+        self.assertIn("Please choose 1 for power off or 2 for suspend.", result.stdout)
+        self.assertIn("Please use 24-hour HH:MM", result.stdout)
+        self.assertIn("Please enter a non-negative whole number.", result.stdout)
+        self.assertIn("YES", result.stdout)
+        self.assertIn("ACTION=suspend", result.stdout)
+        self.assertIn("TIME=19:15", result.stdout)
+        self.assertIn("COUNT=5", result.stdout)
+
+    def test_wol_interface_prompt_explains_ip_address_and_reprompts(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        command = (
+            "source <(sed '$d' " + str(script) + "); "
+            "default_route_interface() { echo enp0s16f0u1; }; "
+            "interface_ipv4_address() { echo 192.168.1.191; }; "
+            "network_interface_exists() { [[ $1 == enp0s16f0u1 ]]; }; "
+            "nic=$(ask_wol_interface); printf 'NIC=%s\n' \"$nic\""
+        )
+        result = subprocess.run(
+            ["bash", "-c", command],
+            input="n\n192.168.1.191\nenp0s16f0u1\n",
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("detected: enp0s16f0u1", result.stdout)
+        self.assertIn("address:  192.168.1.191", result.stdout)
+        self.assertIn("That looks like an IP address.", result.stdout)
+        self.assertIn("NIC=enp0s16f0u1", result.stdout)
+
     def test_open_webui_model_import_preserves_qwen_non_thinking(self) -> None:
         helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
         models = (ROOT / "config/openwebui/models.json").read_text(encoding="utf-8")

@@ -547,13 +547,19 @@ step_11_maintenance() {
     return 0
   fi
 
-  if yes_no_default_yes "Configure office maintenance, Wake-on-LAN and after-hours power saving now?"; then
+  echo "First, configure maintenance performed locally by this BC-250."
+  echo "Raspberry Pi SSH access and optional off-device backup export are separate choices afterward."
+  if yes_no_default_yes "Configure local backups, optional pruning/warm-up, Wake-on-LAN and power saving now?"; then
     bc250-maintenance setup
   else
-    echo "Skipped maintenance policy setup. Run later: sudo bc250-maintenance setup"
+    echo "Skipped local maintenance policy setup. Run later: sudo bc250-maintenance setup"
   fi
 
-  if yes_no_default_yes "Prepare restricted Raspberry Pi maintenance access over SSH?"; then
+  echo
+  echo "Restricted Raspberry Pi maintenance access (optional)"
+  echo "  Prepares a forced-command power-control account and narrow sudo rule."
+  echo "  The Pi keeps its private key; Open WebUI/Ollama application ports are not exposed."
+  if yes_no_default_yes "Prepare the BC-250 side of restricted Raspberry Pi maintenance SSH?"; then
     if ! systemctl cat sshd.service >/dev/null 2>&1; then
       if yes_no_default_yes "Install Fedora openssh-server for restricted Pi maintenance access?"; then
         dnf install -y openssh-server
@@ -566,6 +572,10 @@ step_11_maintenance() {
     echo "Skipped Pi maintenance access. HTTP :80 remains the office endpoint; no Pi-only application port is opened."
   fi
 
+  echo
+  echo "Read-only Raspberry Pi backup export (optional)"
+  echo "  Lets separate restricted Pi keys pull verified config/users backups only."
+  echo "  Local backups continue to work when this remains disabled."
   if yes_no "Prepare optional read-only Raspberry Pi backup export too?"; then
     if [[ ! -x /usr/bin/rrsync ]]; then
       if yes_no_default_yes "Install Fedora rsync-rrsync for read-only backup export?"; then

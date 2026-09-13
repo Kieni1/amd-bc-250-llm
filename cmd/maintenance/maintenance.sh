@@ -7,7 +7,7 @@ CONFIG="${BC250_MAINTENANCE_CONFIG:-/etc/bc250-llm-server/maintenance.env}"
 EXAMPLE="${BC250_MAINTENANCE_EXAMPLE:-/usr/share/bc250-llm-server/examples/maintenance.env.example}"
 POWER_DROPIN_DIR="${BC250_POWER_DROPIN_DIR:-/etc/systemd/system/bc250-night-shutdown.timer.d}"
 POWER_DROPIN="$POWER_DROPIN_DIR/schedule.conf"
-CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/MAINTENANCE-CONTRACT.md}"
+CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/docs/MAINTENANCE-CONTRACT.md}"
 ACCESS_HELPER="${BC250_MAINTENANCE_ACCESS_HELPER:-/usr/libexec/bc250-llm-server/maintenance-companion.sh}"
 
 BACKUP_TIMERS=(owui-backup-config.timer owui-backup-users.timer)
@@ -106,16 +106,144 @@ set_setting() {
 ask_yes_no() {
   local prompt="$1" default="$2" answer suffix
   if [[ "$default" == yes ]]; then suffix='[Y/n]'; else suffix='[y/N]'; fi
-  read -r -p "$prompt $suffix: " answer
-  answer="${answer,,}"
-  [[ -z "$answer" ]] && answer="$default"
-  [[ "$answer" == y || "$answer" == yes ]]
+  while true; do
+    read -r -p "$prompt $suffix: " answer || {
+      echo >&2
+      echo "ERROR: interactive input ended before setup was complete." >&2
+      exit 1
+    }
+    answer="${answer,,}"
+    [[ -z "$answer" ]] && answer="$default"
+    case "$answer" in
+      y|yes) return 0 ;;
+      n|no) return 1 ;;
+      *) echo "Please answer yes or no." >&2 ;;
+    esac
+  done
 }
 
 ask_value() {
   local prompt="$1" default="$2" answer
-  read -r -p "$prompt [$default]: " answer
+  read -r -p "$prompt [$default]: " answer || {
+    echo >&2
+    echo "ERROR: interactive input ended before setup was complete." >&2
+    exit 1
+  }
   printf '%s' "${answer:-$default}"
+}
+
+ask_nonnegative_integer() {
+  local prompt="$1" default="$2" answer
+  while true; do
+    answer="$(ask_value "$prompt" "$default")"
+    if [[ "$answer" =~ ^[0-9]+$ ]]; then
+      printf '%s' "$answer"
+      return 0
+    fi
+    echo "Please enter a non-negative whole number." >&2
+  done
+}
+
+ask_model_name() {
+  local default="$1" answer
+  while true; do
+    answer="$(ask_value "Model name" "$default")"
+    if [[ "$answer" =~ ^[A-Za-z0-9._:/-]+$ ]]; then
+      printf '%s' "$answer"
+      return 0
+    fi
+    echo "Please enter a valid model name." >&2
+  done
+}
+
+ask_keep_alive() {
+  local default="$1" answer
+  while true; do
+    answer="$(ask_value "Keep model loaded after warm-up (for example 30s, 15m or 1h)" "$default")"
+    if [[ "$answer" =~ ^[0-9]+(s|m|h)$ ]]; then
+      printf '%s' "$answer"
+      return 0
+    fi
+    echo "Please use a duration such as 30s, 15m or 1h." >&2
+  done
+}
+
+ask_power_action() {
+  local default="$1" default_choice answer
+  [[ "$default" == suspend ]] && default_choice=2 || default_choice=1
+  while true; do
+    echo "Power-saving action:" >&2
+    echo "  1) Power off" >&2
+    echo "  2) Suspend" >&2
+    read -r -p "Choose [1/2] [$default_choice]: " answer || {
+      echo >&2
+      echo "ERROR: interactive input ended before setup was complete." >&2
+      exit 1
+    }
+    [[ -z "$answer" ]] && answer="$default_choice"
+    case "${answer,,}" in
+      1|poweroff|'power off') printf '%s' poweroff; return 0 ;;
+      2|suspend) printf '%s' suspend; return 0 ;;
+      *) echo "Please choose 1 for power off or 2 for suspend." >&2 ;;
+    esac
+  done
+}
+
+ask_power_time() {
+  local default="$1" answer
+  while true; do
+    answer="$(ask_value "First weekday power-saving attempt, HH:MM (four more attempts follow every 15 minutes)" "$default")"
+    if [[ "$answer" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]]; then
+      printf '%s' "$answer"
+      return 0
+    fi
+    echo "Please use 24-hour HH:MM, for example 18:30." >&2
+  done
+}
+
+default_route_interface() {
+  ip route show default 2>/dev/null | awk 'NR==1 {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}'
+}
+
+interface_ipv4_address() {
+  local nic="$1"
+  ip -4 -o addr show dev "$nic" 2>/dev/null | awk 'NR==1 {split($4, a, "/"); print a[1]}'
+}
+
+network_interface_exists() {
+  [[ "$1" =~ ^[A-Za-z0-9_.:-]+$ && -d "/sys/class/net/$1" ]]
+}
+
+ask_wol_interface() {
+  local detected address answer
+  detected="$(default_route_interface)"
+  if [[ -n "$detected" ]] && network_interface_exists "$detected"; then
+    address="$(interface_ipv4_address "$detected")"
+    echo "Wake-on-LAN network interface:" >&2
+    echo "  detected: $detected" >&2
+    echo "  address:  ${address:-not assigned}" >&2
+    if ask_yes_no "Use the detected interface" yes; then
+      printf '%s' "$detected"
+      return 0
+    fi
+  fi
+
+  while true; do
+    read -r -p "Linux interface name (for example enp0s16f0u1): " answer || {
+      echo >&2
+      echo "ERROR: interactive input ended before setup was complete." >&2
+      exit 1
+    }
+    if [[ "$answer" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      echo "That looks like an IP address. Wake-on-LAN needs the Linux interface name, for example enp0s16f0u1." >&2
+      continue
+    fi
+    if network_interface_exists "$answer"; then
+      printf '%s' "$answer"
+      return 0
+    fi
+    echo "Network interface not found: ${answer:-<empty>}. Enter a Linux interface name." >&2
+  done
 }
 
 enable_units() {
@@ -154,54 +282,58 @@ PY_SCHEDULE
 }
 
 setup_pruning() {
-  local token age ceiling
-  if ! ask_yes_no "Configure upload pruning (starts in dry-run mode)" no; then
+  local token age ceiling prompt
+  if ! ask_yes_no "Configure upload pruning policy? It starts in DRY-RUN and will not delete anything yet" no; then
     disable_units owui-prune.timer
     return
   fi
 
   token="$(get_setting OWUI_API_KEY '')"
   if [[ -z "$token" || "$token" == REPLACE_WITH_ADMIN_API_KEY ]]; then
-    read -r -s -p "Open WebUI administrator API key: " token
-    echo
-  elif ! ask_yes_no "Keep the existing stored Open WebUI API key" yes; then
-    read -r -s -p "New Open WebUI administrator API key: " token
-    echo
+    prompt="Open WebUI administrator API key"
+    token=''
+  elif ask_yes_no "Keep the existing stored Open WebUI API key" yes; then
+    prompt=''
+  else
+    prompt="New Open WebUI administrator API key"
+    token=''
   fi
-  [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || {
-    echo "ERROR: the API key is empty or contains unsupported characters." >&2
-    exit 1
-  }
+  while [[ -n "$prompt" ]]; do
+    read -r -s -p "$prompt: " token || {
+      echo >&2
+      echo "ERROR: interactive input ended before setup was complete." >&2
+      exit 1
+    }
+    echo
+    if [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
+      break
+    fi
+    echo "The API key is empty or contains unsupported characters; please enter it again." >&2
+  done
 
-  age="$(ask_value "Delete uploads older than this many days (0 disables age rule)" "$(get_setting MAX_AGE_DAYS 90)")"
-  ceiling="$(ask_value "Maximum known upload storage in GiB (0 disables size rule)" "$(get_setting MAX_TOTAL_GB 20)")"
-  [[ "$age" =~ ^[0-9]+$ && "$ceiling" =~ ^[0-9]+$ ]] || {
-    echo "ERROR: pruning limits must be non-negative integers." >&2
-    exit 1
-  }
-  ((age > 0 || ceiling > 0)) || {
-    echo "ERROR: at least one pruning rule must be enabled." >&2
-    exit 1
-  }
+  while true; do
+    age="$(ask_nonnegative_integer "Age threshold in days (0 disables age-based pruning)" "$(get_setting MAX_AGE_DAYS 90)")"
+    ceiling="$(ask_nonnegative_integer "Storage ceiling for known uploads in GiB (0 disables size-based pruning)" "$(get_setting MAX_TOTAL_GB 20)")"
+    ((age > 0 || ceiling > 0)) && break
+    echo "At least one pruning rule must be enabled; set an age threshold or storage ceiling above zero." >&2
+  done
 
   set_setting OWUI_API_KEY "$token"
   set_setting MAX_AGE_DAYS "$age"
   set_setting MAX_TOTAL_GB "$ceiling"
   set_setting DRY_RUN 1
   enable_units owui-prune.timer
-  echo "Upload pruning is enabled in DRY_RUN=1 mode. Review a manual run before setting DRY_RUN=0."
+  echo "Upload pruning is enabled in DRY_RUN=1 mode. No uploads will be deleted until you review a manual run and explicitly set DRY_RUN=0."
 }
 
 setup_warmup() {
   local model keep
-  if ! ask_yes_no "Warm a model before work (uses extra electricity)" no; then
+  if ! ask_yes_no "Enable model warm-up before work? This uses extra electricity" no; then
     disable_units owui-warmup.timer
     return
   fi
-  model="$(ask_value "Model name" "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)")"
-  keep="$(ask_value "Keep model loaded after warm-up" "$(get_setting WARMUP_KEEP_ALIVE 15m)")"
-  [[ "$model" =~ ^[A-Za-z0-9._:/-]+$ ]] || { echo "ERROR: invalid model name." >&2; exit 1; }
-  [[ "$keep" =~ ^[0-9]+(s|m|h)$ ]] || { echo "ERROR: keep-alive must look like 30s, 15m or 1h." >&2; exit 1; }
+  model="$(ask_model_name "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)")"
+  keep="$(ask_keep_alive "$(get_setting WARMUP_KEEP_ALIVE 15m)")"
   set_setting WARMUP_MODEL "$model"
   set_setting WARMUP_KEEP_ALIVE "$keep"
   enable_units owui-warmup.timer
@@ -209,26 +341,17 @@ setup_warmup() {
 
 setup_power() {
   local action time nic wol_tmp
-  if ! ask_yes_no "Enable automatic after-hours power saving" no; then
+  if ! ask_yes_no "Enable automatic weekday after-hours power saving" no; then
     disable_units bc250-night-shutdown.timer
     return
   fi
-  action="$(ask_value "Power action: poweroff or suspend" "$(get_setting NIGHT_POWER_ACTION poweroff)")"
-  [[ "$action" == poweroff || "$action" == suspend ]] || {
-    echo "ERROR: power action must be poweroff or suspend." >&2
-    exit 1
-  }
-  time="$(ask_value "First weekday attempt (four retries follow at 15-minute intervals)" "18:30")"
+  action="$(ask_power_action "$(get_setting NIGHT_POWER_ACTION poweroff)")"
+  time="$(ask_power_time "18:30")"
   write_power_schedule "$time"
   set_setting NIGHT_POWER_ACTION "$action"
 
-  if ask_yes_no "Configure Wake-on-LAN for this host" yes; then
-    nic="$(ip route show default 2>/dev/null | awk 'NR==1 {print $5}')"
-    nic="$(ask_value "Network interface" "${nic:-enp4s0}")"
-    [[ "$nic" =~ ^[A-Za-z0-9_.:-]+$ && -d "/sys/class/net/$nic" ]] || {
-      echo "ERROR: network interface not found: $nic" >&2
-      exit 1
-    }
+  if ask_yes_no "Configure Wake-on-LAN so an external companion can wake this host" yes; then
+    nic="$(ask_wol_interface)"
     wol_tmp="$(mktemp)"
     printf 'BC250_NIC=%s\n' "$nic" > "$wol_tmp"
     install -D -m0600 "$wol_tmp" /etc/default/bc250-wol
@@ -247,9 +370,20 @@ setup_power() {
 setup_interactive() {
   require_root
   ensure_config
-  echo "BC-250 office maintenance setup"
-  echo "The safe baseline keeps data local, does not auto-delete uploads and does not warm a model."
-  if ask_yes_no "Enable daily verified local backups" yes; then
+  cat <<'SETUP_INTRO'
+BC-250 local maintenance policy
+
+This configures maintenance performed by the BC-250 itself:
+  - verified local backups
+  - optional upload pruning
+  - optional model warm-up
+  - optional after-hours shutdown or suspend
+  - Wake-on-LAN for this host
+
+Raspberry Pi SSH access and remote backup export are configured separately after this step.
+Changes are applied as each section completes. This setup is safe to rerun.
+SETUP_INTRO
+  if ask_yes_no "Enable daily verified local Open WebUI backups on this BC-250" yes; then
     enable_units "${BACKUP_TIMERS[@]}"
   else
     disable_units "${BACKUP_TIMERS[@]}"
