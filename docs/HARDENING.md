@@ -27,6 +27,21 @@ sudo firewall-cmd --reload
 sudo firewall-cmd --zone="$ZONE" --list-all
 ```
 
+## Raspberry Pi maintenance access
+
+`sudo bc250-maintenance companion enable` deliberately keeps the office web path
+on HTTP :80 and ensures SSH :22 is available for a forced-command maintenance
+key. It does not open Open WebUI :3000 or Ollama :11434-:11437. Treat SSH :22
+as an administrative surface: keep password authentication policy appropriate for
+the site, pin the BC-250 host key on the Pi, and use the package-generated
+forced-command `authorized_keys` scope rather than a general Pi shell key. If the
+Pi address is stable, adding `from="PI_IP"` to that key is an additional useful
+restriction.
+
+The Pi should request `sudo bc250-maintenance request-shutdown`; do not grant it
+raw `systemctl poweroff`, because that bypasses the package's active-session and
+maintenance checks. See [`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
+
 ## Check Ollama exposure
 
 ```bash

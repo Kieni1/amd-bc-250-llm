@@ -55,8 +55,8 @@ ordinary host content.
 ## Preflight for large models
 
 ```bash
-sudo bc250-memory-profile status
-sudo bc250-swap-profile status
+bc250-memory-profile status
+bc250-swap-profile status
 df -h / /var/lib/bc250-llm-server
 ```
 

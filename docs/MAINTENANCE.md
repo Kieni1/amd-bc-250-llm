@@ -22,6 +22,11 @@ For those optional choices, use the guided setup:
 sudo bc250-maintenance setup
 ```
 
+A full interactive `sudo bc250-install` now offers this maintenance setup near
+the end of installation, followed by optional Raspberry Pi companion setup. The
+companion path deliberately uses only office HTTP :80 and restricted SSH :22;
+Wake-on-LAN itself does not require a host firewall port.
+
 Re-running setup updates the existing private configuration. Disable all
 maintenance and power timers without deleting data with:
 
@@ -37,9 +42,24 @@ bulky uploads, vector data and caches. It is therefore **not a complete RAG
 backup** and cannot restore an ingested document library by itself. `backup-users` is a selective identity
 export and contains password hashes, API keys and access-control data.
 
-Backups under `/var/backups/bc250-llm-server` are root-only but remain on the
-same disk. Treat them as confidential recovery points, not protection against
-theft or disk failure. Copy them to encrypted storage controlled by the office.
+Backups under `/var/backups/bc250-llm-server` remain local by default. Treat
+them as confidential recovery points, not protection against theft or disk
+failure. Optional Pi export can be prepared later without changing the backup
+format or using an Open WebUI API key:
+
+```bash
+sudo bc250-maintenance backup-export status
+sudo dnf install rsync-rrsync       # only if export is actually wanted
+sudo bc250-maintenance backup-export enable
+```
+
+The export uses read-only `/usr/bin/rrsync` over the same restricted SSH :22
+path. It exposes only the normal config/users backup directories, never rollback
+data or `/etc/bc250-llm-server/maintenance.env`. Private SSH keys stay on the Pi.
+The package reserves the export group for stable directory permissions, and the
+backup producers preserve those directory modes on every run. Until the export
+account is explicitly enabled, the reserved group has no members and newly published
+artifacts remain private `0600`; after enablement they are published `0640`.
 
 Before upgrading Open WebUI or moving the complete instance, take a stopped
 filesystem snapshot:
@@ -86,7 +106,7 @@ images and old system-wide journal archives; it does not delete GGUFs, Ollama
 models or Open WebUI data. The journal vacuum affects archived logs for the
 whole host, not only BC-250 services.
 
-Model weights are never deleted automatically. Use `bc250-model cleanup` for
+Model weights are never deleted automatically. Use `sudo bc250-model cleanup` for
 model lifecycle operations. `bc250-storage dedupe` requires the affected model/UI
 services to quiesce successfully and reports any restoration failure. It retains both a validated
 source GGUF and its Ollama blob while sharing identical XFS extents; `df` shows
@@ -112,6 +132,39 @@ run output before setting `DRY_RUN=0` in root-readable
 Use generous retention and agree the policy with office users before enabling
 deletion.
 
+## Raspberry Pi maintenance companion
+
+The Pi is primarily an availability/power companion, not a second appliance
+controller. The BC-250 owns the decision whether shutdown is safe. Prepare the
+server side with:
+
+```bash
+sudo bc250-maintenance companion enable
+sudo bc250-maintenance companion status
+sudo bc250-maintenance contract
+```
+
+`companion enable` enables the existing SSH server/firewall service, keeps HTTP
+`:80` available as the office-readiness endpoint, and prepares a dedicated
+`bc250-power-control` account whose authorized key must use the forced command
+printed by the helper. It does **not** open `3000` or Ollama ports
+`11434`-`11437`.
+
+The stable remote request is:
+
+```bash
+sudo bc250-maintenance request-shutdown
+```
+
+That request runs the same package safe-power policy as the night timer. Active
+maintenance, SSH, UI or Ollama traffic can therefore defer shutdown. A Pi should
+never replace this with an unconditional remote `systemctl poweroff`.
+
+The external machine owns its weekday morning WOL schedule and readiness retry
+policy. Verify a real poweroff-to-WOL boot before relying on unattended nightly
+poweroff. The complete shared interface is in
+[`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
+
 ## Electricity use
 
 Model warm-up is off by default because it runs inference and keeps a model
@@ -125,7 +178,10 @@ tested on the board. Requiring Wake-on-LAN makes the power action refuse to run
 when WOL setup is not verified.
 
 An automatic power action needs a deliberate morning restart path: tested WOL,
-firmware scheduling, a managed smart plug or someone on site.
+firmware scheduling, a managed smart plug or someone on site. When guided power
+saving is enabled, configuring WOL is now the default recommendation and sets
+`REQUIRE_WOL=1`; the power action then refuses to run if WOL setup cannot be
+verified.
 
 ## Timers
 

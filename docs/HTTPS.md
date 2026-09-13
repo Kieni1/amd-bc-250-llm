@@ -11,7 +11,7 @@ endpoint on a trusted LAN.
 3. Obtain a certificate from a trusted issuer. A direct-IP certificate must
    contain that exact IP address as an IP subject alternative name.
 4. Copy the packaged `https-example.conf` from
-   `/usr/share/doc/bc250-llm-server/` to `/etc/nginx/conf.d/` and replace every
+   `/usr/share/doc/bc250-llm-server/config/nginx/https-example.conf` to `/etc/nginx/conf.d/` and replace every
    placeholder.
 5. Remove or rename the default HTTP configuration when forced HTTPS is ready.
 6. Validate nginx, open HTTPS in the active firewall zone and test from another
