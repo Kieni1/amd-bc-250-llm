@@ -37,13 +37,13 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.1
-RPM Release   0.6%{?dist}
-NVR           0.11.1-0.6
+RPM Release   0.7%{?dist}
+NVR           0.11.1-0.7
 ```
 
-This particular handover/validation refresh intentionally does **not** bump VERSION or
-RPM Release and does not change installed payload. It lives in the Git/source-only
-`development/` tree.
+The prior source-only coordination refresh did not bump RPM metadata. The current
+`0.11.1-0.7` source does: it contains a focused installed maintenance-contract path fix
+and Step-11 interaction/validation UX changes. The `development/` tree remains Git-only.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -1110,8 +1110,8 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.1-0.6 regenerated source needs external GitHub RPM build if it is to be
-  installed as a freshly built package;
+- current 0.11.1-0.7 source needs an external GitHub RPM build before it can replace the
+  currently observed 0.11.1-0.6 appliance package;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - translation challengers still need direct → live OWUI → resource progression;
 - RAG quality corpus should expand around absent/multisource/conflict/table/multilingual
@@ -1133,8 +1133,8 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. **Operations Batch 1:** read-only current 0.11.1-0.6 installed-state / office-readiness
-   / WOL configuration baseline.
+1. **Operations Batch 1:** after installing 0.11.1-0.7, re-check the maintenance contract,
+   current maintenance state, office readiness and WOL configuration baseline.
 2. Analyze returned evidence.
 3. If clean, **Operations Batch 2:** one real S5 Wake-on-LAN cycle.
 4. If clean, **Operations Batch 3:** safe-shutdown busy/defer and later idle/allow.

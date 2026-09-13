@@ -13,13 +13,14 @@ Status vocabulary:
 - **PENDING** — no sufficient evidence yet.
 - **N/A** — that validation class does not apply.
 
-Current source baseline while this file was refreshed: `0.11.1-0.6`.
-The RPM/source release was deliberately **not bumped** for this Git-only handover and
-validation-planning refresh.
+Current source baseline while this file was refreshed: `0.11.1-0.7`.
+This release is a focused maintenance-contract path and interactive Step-11 UX correction.
+Existing real-device `0.11.1-0.6` evidence remains historical evidence and does not by itself
+qualify the new RPM.
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — 312 tests on base 0.6 | external | N/A | rerun after source edits; report exact checks |
+| repository/unit validation | SOURCE PASS — 315 tests on current 0.7 | external | N/A | rerun after source edits; report exact checks |
 | RPM build/install | preflight only | PENDING/EXTERNAL | PENDING for regenerated source | GitHub owns package build; do not emulate it locally |
 | normal service topology | SOURCE PASS | external | HISTORICAL REAL DEVICE | re-check with `bc250-verify` on the installed 0.6 RPM before new hardware campaigns |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE | include in first operations/power batch |

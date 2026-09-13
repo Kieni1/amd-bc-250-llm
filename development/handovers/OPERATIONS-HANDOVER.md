@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current 0.11.1-0.6 source
+# BC-250 support / operations handover — current 0.11.1-0.7 source
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,11 +10,11 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.1
-RPM Release:  0.6
-source base:  amd-bc-250-llm-0.11.1-0.6.zip
+RPM Release:  0.7
+source base:  amd-bc-250-llm-0.11.1-0.7.zip
 ```
 
-This handover does **not** assert that a 0.11.1-0.6 RPM has already been installed or
+This handover does **not** assert that a 0.11.1-0.7 RPM has already been installed or
 hardware-qualified. Capture installed NEVRA before interpreting machine evidence.
 
 ## Validation ownership
@@ -82,10 +82,14 @@ Do not revive graveyard models merely because an old handover names them.
 - Stock CPU operation exposes 6C/12T even though 8C/16T silicon exists; CPU unlock is
   separate and not required for the appliance.
 
-Latest retained real-device reference predating this source-only refresh included Fedora
-kernel 7.2.4-200.fc44, Mesa 26.1.8, governor 0.4.12, 40/40 live routing, 16 GiB disk swap
-+ 2 GiB zram and no known recent Vulkan device-loss/compute-ring failure. Treat it as
-historical context until the current installed release is captured.
+Latest retained real-device evidence is from installed `0.11.1-0.6` after a completed
+`bc250-install`: Fedora kernel 7.2.4-200.fc44, healthy 40/40 live routing, normal
+main/task/embedding service topology, office HTTP :80 ready, and `bc250-verify` at
+48 ok / 0 warn / 0 fail when authenticated Open WebUI verification was skipped. Local
+config/users backups were enabled, pruning remained DRY_RUN=1, warm-up and automatic
+night shutdown were disabled, and Pi companion/export were skipped. The same run exposed
+the stale installed path used by `bc250-maintenance contract`; `0.11.1-0.7` fixes that
+source defect. Treat the 0.6 machine evidence as historical until 0.7 is installed.
 
 ## Storage lessons to preserve
 
@@ -130,25 +134,20 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-**Batch 1 must be read-only** and capture:
+After GitHub builds and the appliance installs `0.11.1-0.7`, run one bounded re-check of:
 
 ```text
 installed RPM NEVRA
-runtime versions
-bc250-verify
-normal service topology/listeners
-HTTP :80 readiness
 bc250-maintenance contract
-companion status
-WOL interface/state
-firewall state
+bc250-maintenance status
+bc250-maintenance companion status
+bc250-verify
 ```
 
-Return the evidence before proposing Batch 2.
-
-If Batch 1 is clean, Batch 2 should be one real S5 Wake-on-LAN cycle. If that succeeds,
-Batch 3 can test safe shutdown defer while deliberately busy, followed by an idle/allow
-case. Keep optional backup export and dedupe performance separate.
+If that is clean, configure/confirm the intended WOL interface and power policy, then run
+one real S5 Wake-on-LAN cycle. Only after S5 WOL succeeds should the safe-shutdown
+busy/defer and later idle/allow cases be tested. Keep optional backup export and dedupe
+performance separate.
 
 ## Other operations work after power qualification
 
