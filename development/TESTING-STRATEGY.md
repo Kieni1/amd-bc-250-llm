@@ -69,7 +69,7 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## 6. Recommended work order from 0.11.1-0.7
+## 6. Recommended work order from 0.11.1-0.10
 
 ### Lane A — general operations / office availability / power
 
@@ -161,15 +161,36 @@ Start with the production role map, not experimental candidates:
 - `prod-qwen35-9b-unsloth-q6-k` — higher-quality office;
 - `prod-gpt-oss20b-ggml-org-mxfp4` — deep reasoning / warm main.
 
-First establish a current `usecase` baseline and representative generation/resource
-metrics with the normal task+embedding topology present. Then screen large main-lane
-candidates for **fit/performance** before spending time on broad semantic comparison.
-Only candidates that load with safe headroom and acceptable latency advance to the
-human/general-office corpus.
+Keep production GPT-OSS and Ollama `0.34.0` unchanged while the current qualification
+cycle is open. Candidate qualification follows this funnel:
 
-Human review should remain explicit for subjective dimensions such as helpfulness,
-correction/follow-up quality and overall daily-use acceptability. Do not manufacture a
-single precise score for inherently subjective judgments.
+```text
+load / resource / backend-aware completion integrity
+-> tiny semantic sanity (`bc250-benchmark usecase`)
+-> optional 4K/16K context performance where useful
+-> gfx1013/runtime stability
+-> optional sustained thermal/CU testing for finalists
+-> full semantic + product-path + coexistence qualification
+-> restoration/integrity verification
+-> decision
+```
+
+Evidence must record the exact runtime/build/meaningful flags, KV cache type, memory/swap
+and GPU-journal state. Use the highest-precision **feasible** KV configuration as the
+correctness reference; compare compressed KV types model-by-model rather than changing a
+global default. Do not force F16 or 32K when they make the candidate's intended envelope
+infeasible.
+
+For affected hybrid/SSM/direct-llama paths on gfx1013, compare runtime-default ubatch
+against `384` as a conservative control only when warranted by the path. Do not set 384
+globally from external GFX10 reports. Current CU/governor policy remains unchanged.
+
+First establish current production `usecase` and representative generation/resource
+metrics with normal task+embedding topology present. Only candidates that survive the
+cheap gates advance to the broader human/general-office corpus. Human review should remain
+explicit for subjective dimensions such as helpfulness, correction/follow-up quality and
+overall daily-use acceptability. Do not manufacture a single precise score for inherently
+subjective judgments.
 
 ### Lane F — agentic / coding
 
@@ -206,10 +227,11 @@ Test one MTP model at a time. A useful MTP comparison must include:
 
 ```text
 same or closely comparable task/prompt
+exact llama.cpp build/commit and effective launch flags
 baseline throughput and answer quality
 MTP throughput
-accepted draft tokens / proposed draft tokens
-context and draft-n settings
+accepted draft tokens / proposed draft tokens / acceptance rate
+context, KV types, draft-n and effective ubatch settings
 resident memory / MemAvailable / swap
 stability and error logs
 output-quality regressions

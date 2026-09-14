@@ -37,13 +37,16 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.1
-RPM Release   0.7%{?dist}
-NVR           0.11.1-0.7
+RPM Release   0.10%{?dist}
+NVR           0.11.1-0.10
 ```
 
-The prior source-only coordination refresh did not bump RPM metadata. The current
-`0.11.1-0.7` source does: it contains a focused installed maintenance-contract path fix
-and Step-11 interaction/validation UX changes. The `development/` tree remains Git-only.
+The current `0.11.1-0.10` source keeps the 0.8 maintenance fixes and the 0.9
+evidence-only main-model/MTP qualification improvements, then closes the quick MTP
+completion-integrity gap: backend integrity failures now return nonzero while missing
+draft-acceptance telemetry remains a qualification-evidence limitation rather than a
+corruption signal. Production model/runtime, KV, governor and CU defaults remain unchanged.
+The `development/` tree remains Git-only.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -526,6 +529,18 @@ exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
 The packaged matrix `quality-checks/main/10-main-model-candidate-matrix.sh` is a
 performance/resource-fit test against production GPT-OSS. It is **not semantic
 acceptance**.
+
+Current main-candidate qualification policy is deliberately evidence-first. Require
+backend-aware completion integrity, exact runtime/build/flags, KV-type reporting and a
+highest-precision feasible KV reference. After load/resource integrity, run the compact
+`usecase` semantic sanity gate before optional 4K/16K context work. Reserve sustained
+thermal/CU work for finalists and capture GPU-journal errors. On affected gfx1013
+hybrid/direct-llama paths, runtime-default vs `n_ubatch=384` is a qualification A/B, not
+a global workaround. MTP evidence must include draft acceptance rate.
+
+Do **not** globally change KV defaults, force F16/32K, set ubatch 384, change governor/CU
+policy, upgrade Ollama or promote a new main model from upstream observations alone.
+See `development/DECISIONS.md` DEC-006.
 
 The source graveyard contains retired definitions that should not return to routine
 discovery absent a justified retest condition. `MODELS.md` is canonical for the current
@@ -1110,7 +1125,7 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.1-0.7 source needs an external GitHub RPM build before it can replace the
+- current 0.11.1-0.10 source needs an external GitHub RPM build before it can replace the
   currently observed 0.11.1-0.6 appliance package;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - translation challengers still need direct → live OWUI → resource progression;
@@ -1133,7 +1148,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. **Operations Batch 1:** after installing 0.11.1-0.7, re-check the maintenance contract,
+1. **Operations Batch 1:** after installing 0.11.1-0.10, re-check package health and the affected benchmark evidence path,
    current maintenance state, office readiness and WOL configuration baseline.
 2. Analyze returned evidence.
 3. If clean, **Operations Batch 2:** one real S5 Wake-on-LAN cycle.

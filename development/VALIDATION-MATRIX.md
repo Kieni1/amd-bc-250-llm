@@ -13,16 +13,19 @@ Status vocabulary:
 - **PENDING** — no sufficient evidence yet.
 - **N/A** — that validation class does not apply.
 
-Current source baseline while this file was refreshed: `0.11.1-0.7`.
-This release is a focused maintenance-contract path and interactive Step-11 UX correction.
+Current source baseline while this file was refreshed: `0.11.1-0.10`.
+This release keeps the current production runtime/model policy and retains the 0.9
+main-model qualification gates while making the quick MTP probe fail closed on backend
+completion-integrity errors. Missing draft-acceptance counters remain distinct from
+corrupt inference and are reported as insufficient MTP qualification evidence.
 Existing real-device `0.11.1-0.6` evidence remains historical evidence and does not by itself
 qualify the new RPM.
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — 315 tests on current 0.7 | external | N/A | rerun after source edits; report exact checks |
+| repository/unit validation | SOURCE PASS — 324 tests on current 0.10 | external | N/A | rerun after source edits; report exact checks |
 | RPM build/install | preflight only | PENDING/EXTERNAL | PENDING for regenerated source | GitHub owns package build; do not emulate it locally |
-| normal service topology | SOURCE PASS | external | HISTORICAL REAL DEVICE | re-check with `bc250-verify` on the installed 0.6 RPM before new hardware campaigns |
+| normal service topology | SOURCE PASS | external | HISTORICAL REAL DEVICE | re-check with `bc250-verify` on the installed 0.10 RPM before new hardware campaigns |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE | include in first operations/power batch |
 | maintenance companion | SOURCE PASS | external | PENDING | status/readiness first, then restricted-control test |
 | WOL NIC configuration | SOURCE PASS | external | PENDING on current maintenance contract | inspect read-only first |
@@ -32,7 +35,7 @@ qualify the new RPM.
 | model lifecycle/reconciliation | SOURCE PASS | external | HISTORICAL REAL DEVICE | current role models previously reconciled without needless refetch |
 | storage transient-import behavior | N/A | N/A | HISTORICAL REAL DEVICE | Ollama startup pruned four unreferenced conversion/import blobs |
 | XFS dedupe correctness | SOURCE PASS | external | HISTORICAL/PARTIAL | preserve GGUFs; current batched implementation still deserves performance qualification |
-| benchmark result contract | SOURCE PASS | external | HISTORICAL/PARTIAL | re-establish one current production baseline before specialist campaigns |
+| benchmark result contract | SOURCE PASS | external | HISTORICAL/PARTIAL | re-establish one current production baseline; new main-candidate gates need real BC-250 evidence |
 | whole-appliance revalidation v4 | SOURCE PASS | external | HISTORICAL/PARTIAL | use for milestone/release qualification, not after every small patch |
 | task default: LFM2.5 1.2B | SOURCE PASS | external | HISTORICAL REAL DEVICE | 15/18 direct + 15/18 live + 9/9 overlap supports current default |
 | translation production LFM8B | SOURCE PASS | external | HISTORICAL REAL DEVICE | best recorded LFM prompt 69/80; model challengers remain open |
