@@ -533,6 +533,26 @@ step_9_open_webui() {
   fi
 }
 
+
+ensure_optional_ssh_server() {
+  local purpose="$1"
+  if systemctl cat sshd.service >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! yes_no_default_yes "Install Fedora openssh-server for $purpose?"; then
+    echo "$purpose skipped; SSH server is unavailable."
+    return 1
+  fi
+  if ! dnf install -y openssh-server; then
+    echo "ERROR: failed to install openssh-server for $purpose." >&2
+    return 1
+  fi
+  if ! systemctl cat sshd.service >/dev/null 2>&1; then
+    echo "ERROR: openssh-server was installed but sshd.service is unavailable; $purpose skipped." >&2
+    return 1
+  fi
+}
+
 step_11_maintenance() {
   heading "11. OFFICE MAINTENANCE / PI COMPANION"
   command -v bc250-maintenance >/dev/null 2>&1 || {
@@ -560,14 +580,9 @@ step_11_maintenance() {
   echo "  Prepares a forced-command power-control account and narrow sudo rule."
   echo "  The Pi keeps its private key; Open WebUI/Ollama application ports are not exposed."
   if yes_no_default_yes "Prepare the BC-250 side of restricted Raspberry Pi maintenance SSH?"; then
-    if ! systemctl cat sshd.service >/dev/null 2>&1; then
-      if yes_no_default_yes "Install Fedora openssh-server for restricted Pi maintenance access?"; then
-        dnf install -y openssh-server
-      else
-        echo "Pi maintenance access skipped; SSH server is unavailable."
-      fi
+    if ensure_optional_ssh_server "restricted Pi maintenance access"; then
+      bc250-maintenance companion enable
     fi
-    systemctl cat sshd.service >/dev/null 2>&1 && bc250-maintenance companion enable
   else
     echo "Skipped Pi maintenance access. HTTP :80 remains the office endpoint; no Pi-only application port is opened."
   fi
@@ -585,7 +600,11 @@ step_11_maintenance() {
         return 0
       fi
     fi
-    bc250-maintenance backup-export enable
+    if ensure_optional_ssh_server "read-only backup export"; then
+      bc250-maintenance backup-export enable
+    else
+      echo "Backup export skipped; restricted SSH is unavailable."
+    fi
   else
     echo "Backup export remains disabled; local backups are unchanged."
   fi

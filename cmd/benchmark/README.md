@@ -54,13 +54,34 @@ bc250-benchmark generation MODEL [MODEL ...]
 bc250-benchmark generation --profile compare MODEL...
 bc250-benchmark generation --profile edge --mode production MODEL...
 bc250-benchmark generation --profile thermal MODEL...
+bc250-benchmark generation --deep-context MODEL...
+bc250-benchmark generation --profile thermal --sustained-seconds 180 MODEL...
 ```
 
-Profiles:
+Profiles and optional qualification modes:
 
 - `compare`: normal cold/warm, repeated short decode, prefill and context comparison;
 - `edge`: bounded long-prefill/context work for memory-edge qualification;
-- `thermal`: repeated sustained generation with thermal/drift reporting.
+- `thermal`: repeated generation with thermal/drift reporting; add
+  `--sustained-seconds SECONDS` when a fixed minimum heat-soak interval is required;
+- `--deep-context`: adds explicit approximate 4K and 16K prompt targets. The recorded
+  `prompt_eval_count` is authoritative; this mode deliberately does not force 32K.
+
+Generation evidence records the effective local Ollama service command/environment when
+available, including the resolved `OLLAMA_KV_CACHE_TYPE`, and captures the current CU
+status. Completion integrity requires Ollama's terminal `done=true` record and rejects
+pathological runs of reserved/unused tokens. Kernel GPU-journal capture is best-effort by
+default and flags ring timeouts, GPU resets/device loss, VM faults and compute-ring errors;
+use `--no-gpu-journal` only when the journal is intentionally unavailable.
+
+For main-model qualification, use the highest-precision **feasible** KV configuration as
+the correctness reference. `q8_0` is a useful first compressed comparison and `q4_0` is a
+more aggressive comparison, but neither is globally promoted by this policy. Do not force
+F16 when it makes the target context infeasible.
+
+After load/resource/completion-integrity smoke, use the existing compact
+`bc250-benchmark usecase MODEL` as the tiny semantic sanity gate before expensive
+deep-context or sustained testing.
 
 The normal comparison summary emphasizes decode mean/CV, cold load, warm answer
 latency where available, prefill, resident size, minimum `MemAvailable`, swap

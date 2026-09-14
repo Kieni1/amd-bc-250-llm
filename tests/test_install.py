@@ -434,6 +434,37 @@ step_8_application_services
         self.assertNotIn("11435", block)
         self.assertNotIn("11437", block)
 
+    def test_backup_export_prepares_ssh_even_when_pi_access_was_skipped(self) -> None:
+        result = source_probe(r"""
+input_is_interactive() { return 0; }
+SSHD_READY=0
+yes_no_default_yes() {
+  case "$1" in
+    *openssh-server*|*rsync-rrsync*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+yes_no() { return 0; }
+systemctl() {
+  if [[ ${1:-} == cat && ${2:-} == sshd.service ]]; then
+    [[ $SSHD_READY == 1 ]]
+    return
+  fi
+  return 0
+}
+dnf() {
+  printf 'DNF:%s\n' "$*"
+  [[ " $* " == *' install -y openssh-server '* ]] && SSHD_READY=1
+  return 0
+}
+bc250-maintenance() { printf 'MAINT:%s\n' "$*"; }
+step_11_maintenance
+""")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("DNF:install -y openssh-server", result.stdout)
+        self.assertIn("MAINT:backup-export enable", result.stdout)
+        self.assertNotIn("MAINT:companion enable", result.stdout)
+
     def test_models_only_resume_is_public(self) -> None:
         source = INSTALLER.read_text()
         self.assertIn("sudo bc250-install [--models-only]", source)

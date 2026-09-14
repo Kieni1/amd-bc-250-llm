@@ -13,6 +13,7 @@ fi
 
 PORT="${PORT:-8090}"
 LLAMACPP="${LLAMACPP:-}"
+UBATCH="${UBATCH:-}"
 REVIEWED_LLAMACPP_RELEASE="b10069"
 [[ -x "$LLAMACPP" ]] || { echo "ERROR: set LLAMACPP to an executable llama-server." >&2; exit 1; }
 [[ -x "$MANAGER" ]] || { echo "ERROR: model manager is not executable: $MANAGER" >&2; exit 1; }
@@ -27,6 +28,13 @@ if ((${#missing_flags[@]})); then
   echo "ERROR: llama-server lacks required option(s): ${missing_flags[*]}" >&2
   echo "Reviewed llama.cpp release: $REVIEWED_LLAMACPP_RELEASE" >&2
   exit 1
+fi
+if [[ -n "$UBATCH" ]]; then
+  [[ "$UBATCH" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: UBATCH must be a positive integer." >&2; exit 2; }
+  grep -Fq -- '--ubatch-size' <<< "$help_output" || {
+    echo "ERROR: UBATCH was requested but llama-server lacks --ubatch-size." >&2
+    exit 1
+  }
 fi
 cache_flags=()
 grep -Fq -- '--cache-ram' <<< "$help_output" && cache_flags+=(--cache-ram 0)
@@ -49,11 +57,24 @@ CTX="${CTX:-$DEFAULT_CTX}"
 DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
 [[ -s "$GGUF" ]] || { echo "ERROR: missing $GGUF; run bc250-fetch-mtp first." >&2; exit 1; }
 
+args=(
+  -m "$GGUF"
+  --host 127.0.0.1 --port "$PORT"
+  --n-gpu-layers 99 --ctx-size "$CTX" --flash-attn on --parallel 1
+  "${cache_flags[@]}" --cache-type-k q8_0 --cache-type-v q8_0
+  --spec-type draft-mtp --spec-draft-n-max "$DRAFT_N_MAX"
+  --temp 0.7 --top-p 0.8 --top-k 20 --presence-penalty 1.5
+)
+[[ -z "$UBATCH" ]] || args+=(--ubatch-size "$UBATCH")
+
 echo "MTP server: http://127.0.0.1:$PORT"
 echo "Compatible llama-server detected; reviewed release: $REVIEWED_LLAMACPP_RELEASE"
-exec "$LLAMACPP" -m "$GGUF" \
-  --host 127.0.0.1 --port "$PORT" \
-  --n-gpu-layers 99 --ctx-size "$CTX" --flash-attn on --parallel 1 \
-  "${cache_flags[@]}" --cache-type-k q8_0 --cache-type-v q8_0 \
-  --spec-type draft-mtp --spec-draft-n-max "$DRAFT_N_MAX" \
-  --temp 0.7 --top-p 0.8 --top-k 20 --presence-penalty 1.5
+echo "llama-server executable: $LLAMACPP"
+echo "llama-server version/build:"
+"$LLAMACPP" --version 2>&1 | sed 's/^/  /' || true
+printf 'llama-server flags:'
+printf ' %q' "${args[@]}"
+printf '\n'
+echo "KV cache: k=q8_0 v=q8_0"
+echo "ubatch: ${UBATCH:-default}"
+exec "$LLAMACPP" "${args[@]}"

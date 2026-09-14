@@ -292,6 +292,10 @@ setup_pruning() {
   if [[ -z "$token" || "$token" == REPLACE_WITH_ADMIN_API_KEY ]]; then
     prompt="Open WebUI administrator API key"
     token=''
+  elif [[ ! "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
+    echo "The stored Open WebUI API key contains unsupported characters; enter a replacement." >&2
+    prompt="New Open WebUI administrator API key"
+    token=''
   elif ask_yes_no "Keep the existing stored Open WebUI API key" yes; then
     prompt=''
   else

@@ -179,6 +179,40 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("TIME=19:15", result.stdout)
         self.assertIn("COUNT=5", result.stdout)
 
+    def test_invalid_stored_pruning_api_key_requires_replacement(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "maintenance.env"
+            config.write_text(
+                "OWUI_API_KEY=bad token\n"
+                "MAX_AGE_DAYS=90\n"
+                "MAX_TOTAL_GB=20\n"
+                "DRY_RUN=1\n",
+                encoding="utf-8",
+            )
+            command = (
+                "source <(sed '$d' " + str(script) + "); "
+                "enable_units() { :; }; "
+                "setup_pruning; "
+                "printf 'TOKEN=%s\n' \"$(get_setting OWUI_API_KEY '')\""
+            )
+            result = subprocess.run(
+                ["bash", "-c", command],
+                input="y\nreplacement-key\n\n\n",
+                env=os.environ | {"BC250_MAINTENANCE_CONFIG": str(config)},
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn(
+                "The stored Open WebUI API key contains unsupported characters",
+                result.stdout,
+            )
+            self.assertIn("TOKEN=replacement-key", result.stdout)
+            self.assertNotIn("OWUI_API_KEY=bad token", config.read_text(encoding="utf-8"))
+
     def test_wol_interface_prompt_explains_ip_address_and_reprompts(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
         command = (

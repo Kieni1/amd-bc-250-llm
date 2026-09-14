@@ -18,7 +18,10 @@ import csv
 import hashlib
 import json
 import os
+import re
+import shlex
 import statistics
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -103,6 +106,9 @@ CSV_FIELDS = [
     "answer_chars",
     "thinking_chars",
     "done_reason",
+    "completion_terminal",
+    "completion_finish_reason",
+    "reserved_token_run",
     "server_overhead_s",
     "client_overhead_s",
     "resident_size_bytes",
@@ -141,6 +147,137 @@ def prompt_variant(prompt: str, variant: int = 0) -> str:
     without giving reasoning models a request id or other text to interpret.
     """
     return "\n" * (1 + variant % 7) + prompt
+
+
+_RESERVED_RUN_RE = re.compile(
+    r"(?:\s*<(?:unused|reserved)[_-]?\d+>){8,}", re.IGNORECASE
+)
+
+
+def validate_ollama_completion(response: dict[str, Any], text: str) -> dict[str, Any]:
+    """Require Ollama's terminal record and reject obvious reserved-token corruption."""
+    if response.get("done") is not True:
+        raise BenchmarkError("Ollama response ended without done=true")
+    reserved_run = bool(_RESERVED_RUN_RE.search(text))
+    if reserved_run:
+        raise BenchmarkError("Ollama response contains a pathological reserved/unused-token run")
+    return {
+        "completion_terminal": True,
+        "completion_finish_reason": str(response.get("done_reason") or "unknown"),
+        "reserved_token_run": reserved_run,
+    }
+
+
+def ollama_unit_for_url(base_url: str) -> str | None:
+    for port, unit in (
+        ("11434", "ollama.service"),
+        ("11435", "ollama-task.service"),
+        ("11436", "ollama-agent.service"),
+        ("11437", "ollama-embedding.service"),
+    ):
+        if re.search(rf":{port}(?:/|$)", base_url):
+            return unit
+    return None
+
+
+def ollama_runtime_evidence(base_url: str) -> dict[str, Any]:
+    """Best-effort exact service command/environment evidence for local Ollama lanes."""
+    unit = ollama_unit_for_url(base_url)
+    if not unit:
+        return {"service": None, "evidence": "non-standard endpoint"}
+    try:
+        completed = subprocess.run(
+            [
+                "systemctl",
+                "show",
+                unit,
+                "--no-pager",
+                "--property=ExecStart",
+                "--property=Environment",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"service": unit, "evidence_error": str(exc)}
+    if completed.returncode != 0:
+        return {
+            "service": unit,
+            "evidence_error": completed.stderr.strip() or f"systemctl rc={completed.returncode}",
+        }
+    values: dict[str, str] = {}
+    for line in completed.stdout.splitlines():
+        key, sep, value = line.partition("=")
+        if sep:
+            values[key] = value
+    allowed_environment = {
+        "GGML_VK_VISIBLE_DEVICES",
+        "OLLAMA_CONTEXT_LENGTH",
+        "OLLAMA_FLASH_ATTENTION",
+        "OLLAMA_HOST",
+        "OLLAMA_IGPU_ENABLE",
+        "OLLAMA_KEEP_ALIVE",
+        "OLLAMA_KV_CACHE_TYPE",
+        "OLLAMA_MAX_LOADED_MODELS",
+        "OLLAMA_MODELS",
+        "OLLAMA_NO_CLOUD",
+        "OLLAMA_NUM_PARALLEL",
+        "OLLAMA_VULKAN",
+    }
+    environment: dict[str, str] = {}
+    for item in shlex.split(values.get("Environment", "")):
+        key, sep, value = item.partition("=")
+        if sep and key in allowed_environment:
+            environment[key] = value
+    return {
+        "service": unit,
+        "exec_start": values.get("ExecStart", ""),
+        "environment": environment,
+        "kv_cache_type": environment.get("OLLAMA_KV_CACHE_TYPE", "unset"),
+    }
+
+
+def command_evidence(argv: list[str]) -> dict[str, Any]:
+    try:
+        completed = subprocess.run(
+            argv, check=False, capture_output=True, text=True, timeout=15
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return {"argv": argv, "error": str(exc)}
+    return {
+        "argv": argv,
+        "returncode": completed.returncode,
+        "stdout": completed.stdout.strip(),
+        "stderr": completed.stderr.strip(),
+    }
+
+
+def deep_context_prompt(target_tokens: int) -> str:
+    """Build a deterministic approximate token target; prompt_eval_count is authoritative."""
+    reserve = 96
+    repeated = max(1, target_tokens - reserve)
+    return (" policy" * repeated) + "\nSummarize the policy context in two concise sentences."
+
+
+def capture_gpu_journal(since: str) -> tuple[str, list[str], str | None]:
+    """Return kernel journal text and BC-250-relevant GPU error lines, best effort."""
+    try:
+        completed = subprocess.run(
+            ["journalctl", "-k", "-b", "--since", since, "--no-pager", "-o", "short-iso"],
+            check=False, capture_output=True, text=True, timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return "", [], str(exc)
+    if completed.returncode != 0:
+        return "", [], completed.stderr.strip() or f"journalctl rc={completed.returncode}"
+    pattern = re.compile(
+        r"ring.*timeout|gpu reset|device lost|vm fault|compute ring|amdgpu.*fault",
+        re.IGNORECASE,
+    )
+    errors = [line for line in completed.stdout.splitlines() if pattern.search(line)]
+    return completed.stdout, errors, None
 
 
 def latency_budget(base: int, thinking: int, think_policy: str, model: str = "") -> int:
@@ -292,13 +429,16 @@ def run_generate(
     finally:
         wall = time.monotonic() - start
         telemetry = sampler.stop()
+    answer = str(response.get("response") or "")
+    thinking = str(response.get("thinking") or "")
     metrics = response_metrics(response, wall)
+    metrics.update(validate_ollama_completion(response, answer + thinking))
     metrics.update(client.runtime_state(model))
     metrics.update(telemetry)
     detail = {
         "request": payload,
-        "response": response.get("response", ""),
-        "thinking": response.get("thinking", ""),
+        "response": answer,
+        "thinking": thinking,
     }
     return metrics, telemetry, detail
 
@@ -355,6 +495,7 @@ def run_chat_stream(
     )
     answer = "".join(content_parts)
     thinking = "".join(thinking_parts)
+    metrics.update(validate_ollama_completion(final, answer + thinking))
     metrics["answer_started"] = bool(answer)
     metrics["answer_chars"] = len(answer)
     metrics["thinking_chars"] = len(thinking)
@@ -549,7 +690,25 @@ def main() -> int:
         choices=("auto", "omit", "true", "false", "low", "medium", "high", "max"),
         default="auto",
     )
+    parser.add_argument(
+        "--deep-context",
+        action="store_true",
+        help="add optional approximate 4K and 16K prompt targets; actual prompt_eval_count is authoritative",
+    )
+    parser.add_argument(
+        "--sustained-seconds",
+        type=float,
+        default=float(os.environ.get("SUSTAINED_SECONDS", "0")),
+        help="keep the optional thermal lane running for at least this many seconds",
+    )
+    parser.add_argument(
+        "--no-gpu-journal",
+        action="store_true",
+        help="skip best-effort kernel GPU-error capture",
+    )
     args = parser.parse_args()
+    if args.sustained_seconds < 0:
+        parser.error("--sustained-seconds must be non-negative")
 
     profile = args.profile
     defaults = {
@@ -633,9 +792,12 @@ def main() -> int:
         "RUN_THERMAL",
         profile == "thermal",
         interactive_prompt="Run sustained-load thermal test too?",
-    )
+    ) or args.sustained_seconds > 0
     run_warm_prefix = bool_setting("RUN_WARM_PREFIX", False)
     thermal_windows = int(os.environ.get("THROTTLE_WINDOWS", "3"))
+    thermal_max_windows = int(os.environ.get("THERMAL_MAX_WINDOWS", "60"))
+    if thermal_windows < 1 or thermal_max_windows < thermal_windows:
+        raise ValueError("thermal window counts are invalid")
 
     client = OllamaClient(
         args.ollama_url, float(os.environ.get("REQUEST_TIMEOUT", "900"))
@@ -674,6 +836,8 @@ def main() -> int:
         + "\n",
         encoding="utf-8",
     )
+    runtime_evidence = ollama_runtime_evidence(client.base_url)
+    cu_evidence = command_evidence(["bc250-cu-status"])
     model_metadata: list[dict[str, Any]] = []
     for model in models:
         try:
@@ -690,6 +854,7 @@ def main() -> int:
                 "quantization_level": details.get("quantization_level", ""),
                 "runtime_url": client.base_url,
                 "think_policy": resolve_think_policy(model, think_requested),
+                "kv_cache_type": runtime_evidence.get("kv_cache_type", "unknown"),
                 "latency_num_predict": latency_budget(
                     num_latency,
                     num_latency_thinking,
@@ -700,7 +865,7 @@ def main() -> int:
         )
     meta = benchmark_metadata(
         "generation",
-        benchmark_version="8.0",
+        benchmark_version="8.1",
         models=model_metadata,
         fixtures=fixture_metadata(prompt_fixture),
         options={
@@ -712,6 +877,10 @@ def main() -> int:
             "run_context": run_context,
             "run_thermal": run_thermal,
             "run_warm_prefix": run_warm_prefix,
+            "deep_context": args.deep_context,
+            "deep_context_targets": [4096, 16384] if args.deep_context else [],
+            "sustained_seconds": args.sustained_seconds,
+            "gpu_journal_capture": not args.no_gpu_journal,
             "num_predict_short": num_short,
             "num_predict_prefill": num_prefill,
             "num_predict_context": num_context,
@@ -724,6 +893,7 @@ def main() -> int:
             "early_eos_fraction": early_fraction,
             "request_timeout_s": client.timeout,
             "thermal_windows": thermal_windows,
+            "thermal_max_windows": thermal_max_windows,
             "warm_prefix_sentences": warm_prefix_sentences,
             "warm_prefix_num_predict": num_warm_prefix,
             "latency_num_predict_non_thinking": num_latency,
@@ -737,14 +907,17 @@ def main() -> int:
                 "url": client.base_url,
                 "version": version,
                 "package_standard_version": STANDARD_OLLAMA_VERSION,
+                "service_evidence": runtime_evidence,
             }
         ],
+        hardware_evidence={"cu_status": cu_evidence},
         neutral_system_sha256=(
             hashlib.sha256(NEUTRAL_SYSTEM.encode()).hexdigest()
             if mode == "neutral" else None
         ),
     )
     write_benchmark_metadata(meta_path, meta)
+    journal_since = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
 
     rows: list[dict[str, Any]] = []
     long_prompt = (
@@ -822,6 +995,7 @@ def main() -> int:
                 request=request_meta,
                 response=detail.get("response", ""),
                 thinking=detail.get("thinking", ""),
+                context_target_tokens=detail.get("context_target_tokens"),
                 notes=warnings,
             ),
         )
@@ -987,6 +1161,26 @@ def main() -> int:
                         )
                         previous_prompt_count = prompt_count
 
+                if args.deep_context:
+                    for target, label in ((4096, "4k"), (16384, "16k")):
+                        client.ensure_unloaded(model)
+                        prompt = deep_context_prompt(target)
+                        metrics, _telemetry, detail = run_generate(
+                            client, model, prompt, num_context, mode, think_policy,
+                            keep_alive, telemetry_interval,
+                        )
+                        actual = int(metrics.get("prompt_eval_count") or 0)
+                        allocated = metrics.get("allocated_context")
+                        warning = None
+                        if isinstance(allocated, int) and actual + num_context >= allocated:
+                            warning = f"deep-context target approaches allocated context {allocated}"
+                        detail["context_target_tokens"] = target
+                        detail["actual_prompt_tokens"] = actual
+                        record(
+                            model, f"ctx_{label}", 1, metrics, detail,
+                            num_context, think_policy, warning,
+                        )
+
                 if run_warm_prefix:
                     # This lane deliberately keeps the runner loaded and changes
                     # only the suffix after a byte-identical office-document prefix.
@@ -1023,7 +1217,10 @@ def main() -> int:
                     window_tokens = max(1, num_long // max(1, thermal_windows))
                     first_tps: float | None = None
                     last_tps: float | None = None
-                    for window in range(1, thermal_windows + 1):
+                    thermal_started = time.monotonic()
+                    window = 0
+                    while True:
+                        window += 1
                         metrics, _telemetry, detail = run_generate(
                             client,
                             model,
@@ -1047,10 +1244,23 @@ def main() -> int:
                         if first_tps is None:
                             first_tps = tps
                         last_tps = tps
+                        elapsed = time.monotonic() - thermal_started
+                        enough_windows = window >= thermal_windows
+                        enough_time = elapsed >= args.sustained_seconds
+                        if enough_windows and enough_time:
+                            break
+                        if window >= thermal_max_windows:
+                            print(
+                                f"    WARNING: thermal run hit {thermal_max_windows} windows "
+                                f"before sustained target {args.sustained_seconds:.0f}s",
+                                file=sys.stderr,
+                            )
+                            break
                     if first_tps and last_tps is not None:
                         drop = (first_tps - last_tps) / first_tps * 100.0
                         print(
-                            f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s ({drop:+.1f}%)"
+                            f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s "
+                            f"({drop:+.1f}%, elapsed={time.monotonic() - thermal_started:.1f}s)"
                         )
 
             except BenchmarkError as exc:
@@ -1086,6 +1296,40 @@ def main() -> int:
                     client.ensure_unloaded(model)
                 except BenchmarkError as exc:
                     print(f"WARNING: {exc}", file=sys.stderr)
+
+    if not args.no_gpu_journal:
+        journal_text, gpu_errors, journal_error = capture_gpu_journal(journal_since)
+        journal_path = paths.root / "gpu-journal.txt"
+        if journal_text:
+            journal_path.write_text(journal_text, encoding="utf-8")
+        diagnostics: list[str] = []
+        outcome = "pass"
+        failure_kinds: list[str] = []
+        if journal_error:
+            diagnostics.append("gpu-journal-unavailable")
+        if gpu_errors:
+            outcome = "infra-fail"
+            failure_kinds.append("gpu-journal-error")
+            infra_failed = True
+        append_result(
+            jsonl_path,
+            result_record(
+                category="generation",
+                model="runtime",
+                case_id="gpu-journal",
+                result_type="measurement",
+                outcome=outcome,
+                failure_kinds=failure_kinds,
+                diagnostics=diagnostics,
+                checks={
+                    "journal_available": journal_error is None,
+                    "gpu_error_count": len(gpu_errors),
+                },
+                gpu_errors=gpu_errors,
+                journal_error=journal_error,
+                journal_file=(journal_path.name if journal_text else None),
+            ),
+        )
 
     finalize_benchmark_metadata(meta_path)
 

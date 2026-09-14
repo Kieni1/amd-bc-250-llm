@@ -399,6 +399,45 @@ class PackagingTests(unittest.TestCase):
                     encoding="utf-8",
                 )
                 curl.chmod(0o755)
+                jq = fake_bin / "jq"
+                jq.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "set -eu\n"
+                    "if [[ \" $* \" == *\" -nc \"* ]]; then printf '{}\\n'; exit 0; fi\n"
+                    "query=\"${!#}\"\n"
+                    "case \"$query\" in\n"
+                    "  '.done // false') printf '%s\\n' \"${FAKE_OLLAMA_DONE:-false}\" ;;&\n"
+                    "  '.response // \"\"') printf '%s\\n' \"${FAKE_OLLAMA_TEXT:-}\" ;;&\n"
+                    "  'if .error or ((.eval_duration // 0) <= 0)'*) printf '%s\\n' \"${FAKE_OLLAMA_TPS:-}\" ;;&\n"
+                    "  '.choices[0].finish_reason // empty') printf '%s\\n' \"${FAKE_MTP_FINISH:-}\" ;;&\n"
+                    "  '[.choices[0].message.content'*) printf '%s\\n' \"${FAKE_MTP_TEXT:-}\" ;;&\n"
+                    "  '.timings.predicted_per_second // empty') printf '%s\\n' \"${FAKE_MTP_TPS:-}\" ;;&\n"
+                    "  '.timings.draft_n_accepted // empty') printf '%s\\n' \"${FAKE_MTP_ACCEPTED:-}\" ;;&\n"
+                    "  '.timings.draft_n // empty') printf '%s\\n' \"${FAKE_MTP_PROPOSED:-}\" ;;&\n"
+                    "  *) exit 3 ;;&\n"
+                    "esac\n",
+                    encoding="utf-8",
+                )
+                jq.chmod(0o755)
+                ollama = json.loads(ollama_json)
+                mtp = json.loads(mtp_json)
+                choices = mtp.get("choices") or []
+                choice = choices[0] if choices else {}
+                message = choice.get("message") or {}
+                timings = mtp.get("timings") or {}
+                duration = ollama.get("eval_duration") or 0
+                ollama_tps = ""
+                if not ollama.get("error") and duration > 0:
+                    ollama_tps = str((ollama.get("eval_count") or 0) / (duration / 1e9))
+                mtp_text = "\n".join(
+                    value
+                    for value in (
+                        message.get("content"),
+                        message.get("reasoning_content"),
+                        message.get("reasoning"),
+                    )
+                    if isinstance(value, str) and value
+                )
                 return subprocess.run(
                     [str(script)],
                     text=True,
@@ -408,7 +447,16 @@ class PackagingTests(unittest.TestCase):
                         "PATH": f"{fake_bin}:/usr/bin:/bin",
                         "FAKE_OLLAMA_JSON": ollama_json,
                         "FAKE_MTP_JSON": mtp_json,
+                        "FAKE_OLLAMA_DONE": "true" if ollama.get("done") else "false",
+                        "FAKE_OLLAMA_TEXT": str(ollama.get("response") or ""),
+                        "FAKE_OLLAMA_TPS": ollama_tps,
+                        "FAKE_MTP_FINISH": str(choice.get("finish_reason") or ""),
+                        "FAKE_MTP_TEXT": mtp_text,
+                        "FAKE_MTP_TPS": str(timings.get("predicted_per_second") or ""),
+                        "FAKE_MTP_ACCEPTED": str(timings.get("draft_n_accepted") if timings.get("draft_n_accepted") is not None else ""),
+                        "FAKE_MTP_PROPOSED": str(timings.get("draft_n") if timings.get("draft_n") is not None else ""),
                     },
+                    timeout=5,
                 )
 
         valid_ollama = json.dumps(

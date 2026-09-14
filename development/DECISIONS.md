@@ -90,3 +90,26 @@ into every specialist prompt.
 
 **Retest only if:** impact-based qualification misses a cross-lane regression in practice,
 or package architecture changes so strongly that most subsystems become coupled again.
+
+
+## DEC-006 — Strengthen main-model qualification without changing production policy
+
+**Status:** ACTIVE
+
+**Decision:** Keep `prod-gpt-oss20b-ggml-org-mxfp4`, Ollama `0.34.0`, the current
+governor/CU policy and current KV defaults while the main-model qualification cycle is
+open. Strengthen candidate evidence before considering promotion.
+
+**Required candidate evidence:** backend-aware completion integrity; exact runtime/build
+and meaningful flags; KV type; highest-precision feasible KV reference methodology; a
+tiny semantic sanity stage; optional 4K/16K context evidence; optional sustained
+thermal/CU evidence for finalists; GPU-journal/error capture; gfx1013 runtime-default vs
+`n_ubatch=384` comparison when the affected path warrants it; and MTP draft acceptance
+evidence when speculative decoding is tested.
+
+**Do not infer yet:** no global KV-default change, no forced F16, no forced 32K tests, no
+global `n_ubatch=384`, no governor/CU policy change, no Ollama upgrade and no new main
+model promotion without real BC-250 evidence.
+
+**Retest only if:** upstream/runtime changes invalidate one of these gates, or real BC-250
+evidence shows that a gate is either insufficient or unnecessarily expensive.

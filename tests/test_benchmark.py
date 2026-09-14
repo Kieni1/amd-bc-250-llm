@@ -139,6 +139,58 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertIn('bool_setting("RUN_WARM_PREFIX", False)', source)
         self.assertIn('"prefix_warm"', source)
 
+    def test_generation_completion_integrity_requires_terminal_record(self) -> None:
+        good = generation.validate_ollama_completion(
+            {"done": True, "done_reason": "stop"}, "Normal answer"
+        )
+        self.assertTrue(good["completion_terminal"])
+        self.assertEqual(good["completion_finish_reason"], "stop")
+        with self.assertRaisesRegex(generation.BenchmarkError, "done=true"):
+            generation.validate_ollama_completion({"done": False}, "partial")
+
+    def test_generation_completion_integrity_rejects_reserved_token_run(self) -> None:
+        corrupted = " ".join(f"<unused{i}>" for i in range(8))
+        with self.assertRaisesRegex(generation.BenchmarkError, "reserved/unused-token"):
+            generation.validate_ollama_completion(
+                {"done": True, "done_reason": "stop"}, corrupted
+            )
+
+    def test_generation_runtime_evidence_reports_kv_type_and_flags(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["systemctl"],
+            returncode=0,
+            stdout=(
+                "ExecStart={ path=/usr/local/bin/ollama ; argv[]=/usr/local/bin/ollama serve ; }\n"
+                "Environment=OLLAMA_VULKAN=1 OLLAMA_KV_CACHE_TYPE=q8_0 "
+                "GGML_VK_VISIBLE_DEVICES=0\n"
+            ),
+            stderr="",
+        )
+        with patch.object(generation.subprocess, "run", return_value=completed):
+            evidence = generation.ollama_runtime_evidence("http://127.0.0.1:11434")
+        self.assertEqual(evidence["service"], "ollama.service")
+        self.assertEqual(evidence["kv_cache_type"], "q8_0")
+        self.assertEqual(evidence["environment"]["OLLAMA_VULKAN"], "1")
+        self.assertIn("ollama serve", evidence["exec_start"])
+
+    def test_deep_context_prompt_keeps_requested_target_explicit(self) -> None:
+        prompt = generation.deep_context_prompt(4096)
+        self.assertGreater(prompt.count(" policy"), 3900)
+        self.assertIn("Summarize the policy context", prompt)
+
+    def test_gpu_journal_capture_finds_relevant_errors(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["journalctl"],
+            returncode=0,
+            stdout="ok line\namdgpu: ring gfx timeout\nGPU reset requested\n",
+            stderr="",
+        )
+        with patch.object(generation.subprocess, "run", return_value=completed):
+            text, errors, error = generation.capture_gpu_journal("2026-09-14 12:00:00")
+        self.assertIsNone(error)
+        self.assertIn("ok line", text)
+        self.assertEqual(len(errors), 2)
+
 
 class CategoryPolicyTests(unittest.TestCase):
     def test_embedding_prefixes_match_packaged_rag_policy(self) -> None:
