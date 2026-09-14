@@ -402,6 +402,8 @@ default and no legacy alias layer:
 bc250-benchmark generation --profile compare MODEL...
 bc250-benchmark generation --profile edge --mode production MODEL...
 bc250-benchmark generation --profile thermal MODEL...
+bc250-benchmark generation --deep-context MODEL...
+bc250-benchmark generation --profile thermal --sustained-seconds 180 MODEL...
 bc250-benchmark embeddings [MODEL ...]
 bc250-benchmark ocr [MODEL ...]
 bc250-benchmark task [MODEL ...]
@@ -429,7 +431,11 @@ knowledge/file state, and restore the original value. Restoration failure is an
 infrastructure failure. Routine revalidation does not run these A/B sweeps.
 
 Generation and coexistence reporting emphasizes resident size, minimum
-`MemAvailable`, swap start/peak/end/delta, temperature and request outcomes. VRAM/GTT
+`MemAvailable`, swap start/peak/end/delta, temperature and request outcomes. Generation
+also records completion-integrity state, effective local Ollama runtime/KV evidence when
+available, current CU status and best-effort kernel GPU-error evidence. `--deep-context`
+adds approximate 4K/16K targets with actual `prompt_eval_count` as the authority;
+`--sustained-seconds` makes the thermal lane continue to a minimum elapsed time. VRAM/GTT
 remain diagnostic Vulkan counters and must not be interpreted as independent additive
 memory pools on the BC-250. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
 for result schema, category contracts and Ollama 0.34.0 request policy. The installed copy is
@@ -511,8 +517,12 @@ bc250-run-mtp {27b|4b|ID}
 push, approve or merge without the command's explicit local action.
 
 The quick MTP comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
-`NUM_PREDICT` and `PROMPT`. It is a speed-oriented Ollama-vs-llama.cpp helper;
-use `bc250-benchmark` for category quality/correctness comparisons. MTP requires
+`NUM_PREDICT` and `PROMPT`. It is a speed-oriented Ollama-vs-llama.cpp helper and
+returns nonzero when either backend fails terminal completion integrity, emits a
+pathological repeated reserved/unused-token run, or returns no usable completion.
+Missing MTP draft-acceptance telemetry is reported as insufficient qualification
+evidence rather than inference corruption. Use `bc250-benchmark` for category
+quality/correctness comparisons. MTP requires
 a compatible external llama.cpp
 server binary through `LLAMACPP`; `PORT`, `CTX` and `DRAFT_N_MAX` override its
 runtime values. When supported, the runner passes `--cache-ram 0` and
