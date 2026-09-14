@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.1
-Release:        0.7%{?dist}
+Release:        0.10%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,21 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Sep 14 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.10
+- Make the quick MTP comparison fail closed on backend completion-integrity failures, require a non-empty usable content/reasoning completion, and align reserved-token corruption detection with the repeated-run semantics used by the main generation benchmark.
+- Keep missing draft-acceptance counters distinct from corrupt inference: report them as insufficient MTP qualification evidence without failing otherwise valid completion.
+- Replace MTP source-string assertions with a focused fake-backend behavior regression covering valid completion, missing terminal state, repeated reserved-token corruption, empty completion, reasoning-only output and acceptance-rate reporting.
+
+* Mon Sep 14 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.9
+- Strengthen main-model generation evidence with backend-aware completion integrity, effective Ollama runtime/KV metadata, optional 4K/16K context targets, optional minimum-duration thermal runs, CU-state capture and best-effort GPU-kernel journal checks.
+- Improve the external llama.cpp/MTP evidence path by printing exact runtime/build/flags, keeping gfx1013 UBATCH=384 strictly opt-in, and reporting draft accepted/proposed counts plus acceptance rate instead of treating throughput alone as success.
+- Record the evidence-first main-model qualification funnel without changing production GPT-OSS, Ollama 0.34.0, KV defaults, governor/CU policy or any promoted model.
+
+* Sun Sep 13 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.8
+- Revalidate retained Open WebUI pruning API keys before they can be kept during interactive maintenance setup; invalid stored values now require a replacement instead of surviving setup.
+- Let optional read-only backup export independently install/verify openssh-server through the same bounded installer helper used by Pi maintenance, so selecting export cannot fail merely because the earlier Pi SSH branch was skipped.
+- Refresh current-source validation/development guidance for 0.8 without changing model, firewall, retention or power-policy defaults.
+
 * Sun Sep 13 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.7
 - Fix the installed maintenance-contract path after the documentation hierarchy change.
 - Improve interactive local-maintenance and Pi-companion wording, including an explicit power-action menu and detected WOL interface/address display.

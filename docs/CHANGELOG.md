@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.11.1-0.10 - 2026-09-14
+
+- Make `bc250-compare-mtp` return nonzero when either backend fails completion integrity, including a missing terminal state, a pathological repeated reserved/unused-token run, or no usable completion content/reasoning.
+- Align MTP reserved-token corruption detection with the generation benchmark so isolated reserved tokens do not count as a pathological run. Missing draft-acceptance counters remain valid inference but are explicitly insufficient for MTP qualification.
+- Replace the MTP comparison source-string regression with a focused fake-backend behavior test covering valid completion, reasoning-only completion, absent acceptance telemetry, missing terminal markers, repeated reserved-token corruption and empty output.
+
+## 0.11.1-0.9 - 2026-09-14
+
+- Strengthen main-model generation evidence with backend-aware completion integrity: Ollama responses must reach their terminal state and obvious repeated reserved/unused-token corruption is treated as a runtime failure. Generation metadata now records the effective local Ollama service command/environment and KV cache type where available, plus current CU status and best-effort GPU-kernel journal evidence.
+- Add optional `--deep-context` 4K/16K target runs and `--sustained-seconds` thermal/clock stability runs without forcing 32K or changing CU/governor policy. The existing compact `usecase` benchmark remains the tiny semantic sanity gate before expensive candidate qualification.
+- Make direct llama.cpp/MTP evidence reproducible: the runner prints exact runtime version/build and launch flags, `UBATCH=384` remains an explicit opt-in gfx1013 stability control, and the comparison reports draft acceptance counts/rate with backend-specific completion integrity.
+- Record the main-model qualification policy in Git-only development memory. Production remains GPT-OSS on Ollama 0.34.0 with existing KV, governor and CU defaults; no new main model is promoted.
+
+## 0.11.1-0.8 - 2026-09-13
+
+- Revalidate an existing stored Open WebUI pruning API key before allowing interactive maintenance setup to retain it; invalid stored values now prompt for a replacement rather than bypassing the same character policy applied to newly entered keys.
+- Make optional read-only Raspberry Pi backup export independently ensure that Fedora `openssh-server`/`sshd.service` is available, sharing the same small installer helper with restricted Pi maintenance access so skipping the earlier SSH branch cannot abort export setup.
+- Correct current-source validation/development references for the 0.8 RPM. Production topology, model defaults, firewall exposure, retention and power-policy defaults remain unchanged.
+
 ## 0.11.1-0.7 - 2026-09-13
 
 - Fix `bc250-maintenance contract` after the installed-documentation hierarchy change by resolving the contract from `docs/MAINTENANCE-CONTRACT.md` under the package doc directory.
