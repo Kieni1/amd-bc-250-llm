@@ -373,6 +373,144 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertNotIn("think:false", source)
 
+    def test_mtp_evidence_records_acceptance_and_opt_in_ubatch(self) -> None:
+        runner = (ROOT / "models/mtp/run-mtp-llamacpp.sh").read_text(encoding="utf-8")
+        self.assertIn('UBATCH="${UBATCH:-}"', runner)
+        self.assertIn('--ubatch-size "$UBATCH"', runner)
+        self.assertIn("llama-server version/build", runner)
+        self.assertIn("llama-server flags", runner)
+        self.assertNotIn('UBATCH="384"', runner)
+
+    def test_compare_mtp_enforces_completion_integrity_behaviorally(self) -> None:
+        script = ROOT / "models/experiments/compare-mtp.sh"
+
+        def run_probe(ollama_json: str, mtp_json: str) -> subprocess.CompletedProcess[str]:
+            with tempfile.TemporaryDirectory() as tmp:
+                fake_bin = Path(tmp) / "bin"
+                fake_bin.mkdir()
+                curl = fake_bin / "curl"
+                curl.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "case \"$*\" in\n"
+                    "  *'/api/generate'*) printf '%s\\n' \"$FAKE_OLLAMA_JSON\" ;;\n"
+                    "  *'/v1/chat/completions'*) printf '%s\\n' \"$FAKE_MTP_JSON\" ;;\n"
+                    "  *) exit 1 ;;\n"
+                    "esac\n",
+                    encoding="utf-8",
+                )
+                curl.chmod(0o755)
+                return subprocess.run(
+                    [str(script)],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    env={
+                        "PATH": f"{fake_bin}:/usr/bin:/bin",
+                        "FAKE_OLLAMA_JSON": ollama_json,
+                        "FAKE_MTP_JSON": mtp_json,
+                    },
+                )
+
+        valid_ollama = json.dumps(
+            {
+                "done": True,
+                "response": "Useful baseline completion.",
+                "eval_count": 100,
+                "eval_duration": 1_000_000_000,
+            }
+        )
+        valid_mtp = json.dumps(
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {"content": "Useful MTP completion."},
+                    }
+                ],
+                "timings": {
+                    "predicted_per_second": 50.0,
+                    "draft_n_accepted": 8,
+                    "draft_n": 10,
+                },
+            }
+        )
+
+        result = run_probe(valid_ollama, valid_mtp)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MTP draft acceptance: 8/10 (80.0%)", result.stdout)
+
+        no_acceptance = json.dumps(
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {"reasoning_content": "Usable reasoning-only result."},
+                    }
+                ],
+                "timings": {"predicted_per_second": 40.0},
+            }
+        )
+        result = run_probe(valid_ollama, no_acceptance)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("qualification evidence is insufficient", result.stdout)
+
+        isolated_reserved = " ".join(
+            f"word{i} <unused{i}>" for i in range(8)
+        ) + " useful tail"
+        isolated_reserved_mtp = json.dumps(
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {"content": isolated_reserved},
+                    }
+                ],
+                "timings": {"predicted_per_second": 45.0},
+            }
+        )
+        result = run_probe(valid_ollama, isolated_reserved_mtp)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        ollama_without_done = json.dumps(
+            {
+                "done": False,
+                "response": "Incomplete baseline.",
+                "eval_count": 100,
+                "eval_duration": 1_000_000_000,
+            }
+        )
+        self.assertNotEqual(run_probe(ollama_without_done, valid_mtp).returncode, 0)
+
+        mtp_without_finish = json.dumps(
+            {
+                "choices": [{"message": {"content": "No terminal state."}}],
+                "timings": {"predicted_per_second": 50.0},
+            }
+        )
+        self.assertNotEqual(run_probe(valid_ollama, mtp_without_finish).returncode, 0)
+
+        reserved_run = "".join(f"<unused{i}>" for i in range(8))
+        mtp_reserved = json.dumps(
+            {
+                "choices": [
+                    {
+                        "finish_reason": "stop",
+                        "message": {"content": reserved_run},
+                    }
+                ],
+                "timings": {"predicted_per_second": 50.0},
+            }
+        )
+        self.assertNotEqual(run_probe(valid_ollama, mtp_reserved).returncode, 0)
+
+        mtp_empty = json.dumps(
+            {
+                "choices": [{"finish_reason": "stop", "message": {"content": ""}}],
+                "timings": {"predicted_per_second": 50.0},
+            }
+        )
+        self.assertNotEqual(run_probe(valid_ollama, mtp_empty).returncode, 0)
+
     def test_ci_runs_on_push_and_pull_request_with_static_linters(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
             encoding="utf-8"
