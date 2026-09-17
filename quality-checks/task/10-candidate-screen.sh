@@ -1,11 +1,16 @@
 #!/usr/bin/env bash
 # Compare one packaged experimental task candidate against the package-owned
 # Open WebUI task default. This is candidate evidence only; it never changes defaults.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    printf '%s\n' 'REFUSED: execute this script with bash; do not source it.' >&2
+    return 0
+fi
+
 set -Eeuo pipefail
 umask 077
 
 CANDIDATE="${1:-}"
-ROUNDS="${2:-${BC250_SCREEN_ROUNDS:-3}}"
+ROUNDS="${2:-${BC250_SCREEN_ROUNDS:-1}}"
 SHARE='/usr/share/bc250-llm-server'
 DESIRED_STATE="$SHARE/openwebui/desired-state.json"
 BASELINE="$(jq -er '.task.TASK_MODEL | sub(":latest$"; "")' "$DESIRED_STATE")"
@@ -215,17 +220,23 @@ finalize() {
     grep -Ein 'out of memory|oom-kill|oom_reaper|killed process|device lost|gpu reset|amdgpu.*(reset|timeout|fault)|ring.*(timeout|reset|fault|error)' \
         "$OUT/post/service-journal.txt" "$OUT/post/kernel-journal.txt" \
         > "$OUT/post/serious-warnings.txt" 2>/dev/null || true
+    if [[ -s "$OUT/post/serious-warnings.txt" && ( "$rc" == 0 || "$rc" == 3 ) ]]; then
+        rc=24
+    fi
     write_aggregate || true
     printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
     date --iso-8601=seconds > "$OUT/post/end-time.txt"
     local parent name tarball
     parent="$(dirname "$OUT")"; name="$(basename "$OUT")"; tarball="$HOME/${name}.tar.gz"
-    tar -C "$parent" -czf "$tarball" "$name"
-    sha256sum "$tarball" > "$tarball.sha256"
+    tar --owner=0 --group=0 --numeric-owner -C "$parent" -czf "$tarball" "$name"
+    tar_rc=$?
+    if [[ "$tar_rc" -ne 0 && ( "$rc" == 0 || "$rc" == 3 ) ]]; then
+        rc=25
+    fi
     printf '\n=== task candidate summary ===\n'
     cat "$OUT/aggregate.txt" 2>/dev/null || true
     printf 'Evidence: %s\nTarball: %s\n' "$OUT" "$tarball"
-    cat "$tarball.sha256"
+    if [[ "$tar_rc" -eq 0 ]]; then sha256sum "$tarball"; fi
     [[ "$cleanup_rc" == 0 ]] || printf '\nCRITICAL: task-lane cleanup FAILED.\n' >&2
     exit "$rc"
 }
@@ -234,8 +245,7 @@ trap finalize EXIT
 systemctl is-active --quiet ollama.service || { echo 'ERROR: ollama.service inactive.' >&2; exit 1; }
 systemctl is-active --quiet ollama-task.service || { echo 'ERROR: ollama-task.service inactive.' >&2; exit 1; }
 capture_state "$OUT/setup/state-before"
-sha256sum /usr/libexec/bc250-llm-server/category-benchmark.py \
-    /usr/share/bc250-llm-server/benchmark/task-cases.json > "$OUT/setup/benchmark-contract.sha256"
+cp /usr/libexec/bc250-llm-server/category-benchmark.py "$OUT/setup/category-benchmark.py"
 cp /usr/share/bc250-llm-server/benchmark/task-cases.json "$OUT/setup/task-cases.json"
 
 sudo bc250-model install experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-install.txt"

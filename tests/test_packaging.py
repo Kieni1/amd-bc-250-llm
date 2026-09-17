@@ -381,6 +381,48 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("llama-server flags", runner)
         self.assertNotIn('UBATCH="384"', runner)
 
+    def test_task_recovery_gate_reloads_main_and_ignores_preexisting_faults(self) -> None:
+        recovery = (ROOT / "quality-checks/task/30-appliance-recovery-check.sh").read_text(encoding="utf-8")
+        self.assertIn('WARM_MAIN="${WARM_MAIN:-1}"', recovery)
+        self.assertIn('--until "$CHECK_START"', recovery)
+        self.assertIn('--since "$CHECK_START"', recovery)
+        self.assertIn('new serious kernel events during recovery probe', recovery)
+
+    def test_task_safety_gates_cover_normal_embedding_service(self) -> None:
+        scripts = (
+            ROOT / "quality-checks/task/20-survival-gate.sh",
+            ROOT / "quality-checks/task/30-appliance-recovery-check.sh",
+        )
+        for script in scripts:
+            with self.subTest(script=script.name):
+                source = script.read_text(encoding="utf-8")
+                self.assertIn("ollama-embedding.service", source)
+
+    def test_translation_final_status_is_written_after_privacy_and_updated_on_tar_failure(self) -> None:
+        source = (ROOT / "quality-checks/translation/10-direct-candidate-screen.sh").read_text(encoding="utf-8")
+        privacy_pos = source.index("privacy_rc=$?")
+        status_pos = source.index("printf '%s\\n' \"$rc\" > \"$OUT/post/script-exit-rc.txt\"", privacy_pos)
+        tar_pos = source.index('tar --owner=0 --group=0 --numeric-owner', status_pos)
+        failure_rewrite_pos = source.index("printf '%s\\n' \"$rc\" > \"$OUT/post/script-exit-rc.txt\"", tar_pos)
+        self.assertLess(privacy_pos, status_pos)
+        self.assertLess(status_pos, tar_pos)
+        self.assertGreater(failure_rewrite_pos, tar_pos)
+        self.assertIn('write_run_manifest "$rc"', source[failure_rewrite_pos:])
+
+    def test_current_quality_archives_print_sha_without_sidecar_files(self) -> None:
+        scripts = (
+            ROOT / "quality-checks/task/10-candidate-screen.sh",
+            ROOT / "quality-checks/task/20-survival-gate.sh",
+            ROOT / "quality-checks/translation/10-direct-candidate-screen.sh",
+            ROOT / "quality-checks/translation/20-owui-candidate-screen.sh",
+        )
+        for script in scripts:
+            with self.subTest(script=script.name):
+                text = script.read_text(encoding="utf-8")
+                self.assertIn("sha256sum", text)
+                self.assertNotIn('> "$tarball.sha256"', text)
+                self.assertNotIn('> "$TARBALL.sha256"', text)
+
     def test_compare_mtp_enforces_completion_integrity_behaviorally(self) -> None:
         script = ROOT / "models/experiments/compare-mtp.sh"
 
