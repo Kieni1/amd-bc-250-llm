@@ -69,7 +69,7 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## 6. Recommended work order from 0.11.1-0.10
+## 6. Recommended work order from 0.11.1-0.11
 
 ### Lane A — general operations / office availability / power
 
@@ -110,22 +110,32 @@ Use a **small production control set**, not every model:
 Once the benchmark substrate is trusted, specialist lanes can reuse it without
 revalidating every formatter on every run.
 
-### Lane C — translation
+### Lane C — task and translation role decisions
 
-Current production remains `prod-lfm25-8b-a1b-liquidai-q6-k`; the strongest recorded
-LFM prompt result is 69/80 and prompt/sampling micro-tuning is exhausted for now.
+The current task search is **not** an open invitation to keep trying larger models.
+`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production default. Qwen3 4B is a
+role-specific rejection despite 5/6 quality because both exact-source and bounded-4K
+task staging caused global OOM and warm-main loss. Future materially larger task
+challengers must pass one cheap quality screen, then the tiny warm-main survival gate,
+before product-path or repeated quality work.
 
-Use this funnel:
+For translation, the repaired eight-case DE<->FR screen is saturated and must no longer
+be used as a ranking loop for models already known to reach 8/8. Production LFM remains
+the default only because no challenger has completed the harder/product-path gates.
 
-1. production LFM direct control on the current fixture;
-2. direct candidate screen for Hunyuan-MT 7B and Translate-Gemma E4B;
-3. stop candidates that do not materially beat the production failure pattern;
-4. authenticated Open WebUI candidate path for finalists;
-5. latency/residency/resource confirmation only after quality survives the real path;
-6. repeat broader office-language cases before promotion.
+Next translation sequence:
 
-Preserve numbers, identifiers, formality and direction. Do not weaken the evaluator to
-make a challenger pass.
+1. run the prepared Stage-2 hard corpus on Translate-Gemma E4B, Ministral 8B and TIR
+   Qwen3.5 9B non-thinking; retain Qwen3.6 35B only as a quality upper-bound comparator;
+2. narrow to the 2-3 candidates with a real promotion case;
+3. run the exact authenticated Open WebUI translation path for those finalists;
+4. confirm latency/residency/resource behavior only for product-path survivors;
+5. broaden office-language cases before any production switch.
+
+Hunyuan's reproducible CHF-preservation defect and production LFM's known semantic/
+invoice weaknesses are already established; do not repeat the same short screen unless
+the model/request/evaluator contract changes materially. Preserve numbers, identifiers,
+formality and direction, and do not weaken the evaluator to make a challenger pass.
 
 ### Lane D — RAG / office documents
 
