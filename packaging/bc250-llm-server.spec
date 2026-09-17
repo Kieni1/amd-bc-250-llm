@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.1
-Release:        0.10%{?dist}
+Release:        0.11%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Thu Sep 17 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.11
+- Harden task-model qualification around cheap screening, warm-main survival and post-failure recovery; record current active-model task measurements while retaining LFM2.5 1.2B Q6_K as the production task model.
+- Record the current German/French translation campaign, add explicit translation thinking-policy control and richer runtime provenance, and keep the saturated canonical short screen as a gate rather than promoting any challenger before harder-corpus/product-path qualification.
+- Keep role-specific campaign evidence in MODELS.md and Git-only development records rather than runtime Modelfiles; print evidence archive SHA-256 without creating checksum sidecar files, and keep experiment archive/privacy handling separate from package source-integrity checks.
+- Make the post-OOM task recovery probe actively reload the warm main by default, fail only on new recovery-time OOM/GPU faults, and avoid direct-translation privacy false positives from the harness's own HOME-prefixed result paths.
+- Keep the embedding lane in task survival/recovery health checks, keep translation final status consistent with privacy/archive outcomes, and consolidate temporary dated specialist handovers into durable decision/model-run memory.
+
 * Mon Sep 14 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.10
 - Make the quick MTP comparison fail closed on backend completion-integrity failures, require a non-empty usable content/reasoning completion, and align reserved-token corruption detection with the repeated-run semantics used by the main generation benchmark.
 - Keep missing draft-acceptance counters distinct from corrupt inference: report them as insufficient MTP qualification evidence without failing otherwise valid completion.
