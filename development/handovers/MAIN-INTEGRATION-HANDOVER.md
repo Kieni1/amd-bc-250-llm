@@ -37,16 +37,17 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.1
-RPM Release   0.10%{?dist}
-NVR           0.11.1-0.10
+RPM Release   0.11%{?dist}
+NVR           0.11.1-0.11
 ```
 
-The current `0.11.1-0.10` source keeps the 0.8 maintenance fixes and the 0.9
-evidence-only main-model/MTP qualification improvements, then closes the quick MTP
-completion-integrity gap: backend integrity failures now return nonzero while missing
-draft-acceptance telemetry remains a qualification-evidence limitation rather than a
-corruption signal. Production model/runtime, KV, governor and CU defaults remain unchanged.
-The `development/` tree remains Git-only.
+The current unpublished `0.11.1-0.11` source keeps the 0.8 maintenance fixes and
+0.9/0.10 main-model/MTP qualification work, then integrates the 2026-09-17 task and
+German/French translation campaigns. Production model/runtime/topology defaults remain
+unchanged. The new role-specific tools enforce cheap task screening before warm-main
+survival and make translation reasoning policy explicit, while the saturated eight-case
+translation fixture is retained only as a screening gate. Detailed campaign evidence
+stays in Git-only `development/` memory rather than runtime Modelfiles.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -394,21 +395,19 @@ explicit direction roles           69/80
 temperature 0                      60/80
 ```
 
-Prompt/sampling micro-tuning is considered exhausted for now. Production LFM remains in
-place while model-level challengers are screened.
+Prompt/sampling micro-tuning is considered exhausted. The 2026-09-17 repaired eight-case
+direct screen is now saturated and must be treated as a gate rather than a ranking loop.
+Fresh production LFM evidence was 6/8, reproducing known semantic/preservation weakness.
+Translate-Gemma E4B and Ministral both produced 24/24 canonical confirmation; TIR Qwen3.5
+9B reached 8/8 under an explicit non-thinking request contract. Hunyuan remains viable
+but has a reproducible CHF-preservation defect. Large Qwen 27B/35B results are quality
+upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
-Important remaining challengers:
-
-```text
-exp-hunyuan-mt-7b-mungert-q4-k-m
-exp-translate-gemma4-sub-e4b-17s-q4-k-xl
-```
-
-Ministral remains mainly a short comparison control due to prior weak results.
-
-A challenger must first beat the production failure pattern on the direct fixture, then
-survive the real authenticated Open WebUI path, then resource/latency and broader office
-confirmation. Do not infer promotion from one short screen.
+The next translation gate is **Stage-2 harder-corpus discrimination**, not another repeat
+of the same eight cases. Current Stage-2 set: Translate-Gemma E4B, Ministral 8B, TIR
+Qwen3.5 9B non-thinking, and Qwen3.6 35B only as an upper-bound comparator. Only the
+narrowed finalists then proceed to the authenticated Open WebUI product path and resource
+confirmation. No production translation change is justified yet.
 
 ## Higher-quality office — Qwen3.5 9B
 
@@ -448,12 +447,17 @@ This replaced Gemma 3 1B as default.
 Gemma 3 1B remains a low-memory fallback/control. Its historical task baseline was only
 6/18 with systematic language/relevance misses.
 
-Important retired task candidate:
+Important task-role rejections:
 
-`exp-qwen38-4b-distill-empero-q6-k` improved focused quality, but deliberate simultaneous
-residency with warm GPT-OSS caused severe memory pressure and the task service was
-OOM-killed. Do not retest under the same topology merely because its quality looked
-better. See `development/DECISIONS.md`.
+- `exp-qwen38-4b-distill-empero-q6-k` improved focused quality, but deliberate simultaneous
+  residency with warm GPT-OSS caused severe memory pressure and the task service was
+  OOM-killed.
+- `exp-qwen3-4b-lmstudio-q6-k` scored 5/6 twice in the current cheap screen, but both
+  exact-source task staging and a bounded 4096-context task alias caused global OOM and
+  killed warm GPT-OSS/other user services.
+
+Do not retest either model for the concurrent background-task role under the same memory
+envelope merely because isolated quality looked better. See `development/DECISIONS.md`.
 
 ## Embeddings
 
@@ -1025,8 +1029,8 @@ measurement semantics and state restoration before a large new quality campaign.
 
 ## P1 — translation
 
-Production weakness is known; model-level challengers are ready. Direct screen first,
-then real authenticated Open WebUI only for finalists.
+The short DE/FR screen is already saturated. Run Stage-2 hard-corpus discrimination
+next; only narrowed finalists proceed to authenticated Open WebUI and resource checks.
 
 ## P1 — RAG / office documents
 
@@ -1114,6 +1118,10 @@ other history is shortened:
     verification.**
 12. **Do not claim MTP success from tok/s alone.** Acceptance rate, quality, resource
     behavior and runtime stability matter.
+13. **Do not retest Qwen3 4B for the concurrent task role under the same memory envelope.**
+    Two staging variants caused global OOM despite strong cheap-screen quality.
+14. **Do not rank translation finalists by repeating the saturated eight-case screen.**
+    Advance known 8/8 survivors to Stage-2 harder-corpus discrimination instead.
 
 Canonical reasoning lives in `development/DECISIONS.md`; add new entries when an easy-
 to-reverse decision becomes important.
@@ -1125,10 +1133,12 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.1-0.10 source needs an external GitHub RPM build before it can replace the
-  currently observed 0.11.1-0.6 appliance package;
+- unpublished 0.11.1-0.11 source needs an external GitHub RPM build before release;
+  current task/translation campaign evidence was gathered on installed 0.11.1-0.10 while
+  the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
-- translation challengers still need direct → live OWUI → resource progression;
+- translation finalists still need Stage-2 hard-corpus discrimination → narrowed live
+  OWUI product-path qualification → resource confirmation;
 - RAG quality corpus should expand around absent/multisource/conflict/table/multilingual
   cases;
 - agent quality should broaden beyond the small static 3/3 contract into documented
@@ -1148,7 +1158,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. **Operations Batch 1:** after installing 0.11.1-0.10, re-check package health and the affected benchmark evidence path,
+1. **Operations Batch 1:** after building/installing 0.11.1-0.11, re-check package health and the affected benchmark evidence path,
    current maintenance state, office readiness and WOL configuration baseline.
 2. Analyze returned evidence.
 3. If clean, **Operations Batch 2:** one real S5 Wake-on-LAN cycle.
