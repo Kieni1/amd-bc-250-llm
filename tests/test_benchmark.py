@@ -727,6 +727,14 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertEqual((matched, total), (1, 3))
         self.assertEqual(category.task_language_hint(value, "de"), "other")
 
+    def test_translation_cli_exposes_explicit_think_policy(self) -> None:
+        with patch.object(sys, "argv", ["bc250-benchmark", "translation", "--think", "false", "prod-test"]), \
+             patch.object(category, "benchmark_translation", return_value=0) as run:
+            self.assertEqual(category.main(), 0)
+        args = run.call_args.args[0]
+        self.assertEqual(args.think, "false")
+        self.assertEqual(args.models, ["prod-test"])
+
     def test_translation_identifier_fragment_is_not_meaningful_translation(self) -> None:
         fragment = "AB-42 4 septembre 2026"
         self.assertLess(len(common.normalize_words(fragment)), 6)

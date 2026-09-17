@@ -1796,11 +1796,13 @@ def benchmark_translation(args: argparse.Namespace) -> int:
     translation_num_predict = int(os.environ.get("TRANSLATION_NUM_PREDICT", "1024"))
     if translation_num_predict <= 0:
         raise BenchmarkError("TRANSLATION_NUM_PREDICT must be a positive integer")
+    think_policy = args.think
     write_meta(
         meta_path, client, "translation", models, fixture,
         options={
             "explicit_direction": True,
             "num_predict_default": translation_num_predict,
+            "think_policy": think_policy,
             "prompt_profiles": {model: translation_prompt_profile(model) for model in models},
         },
     )
@@ -1817,11 +1819,15 @@ def benchmark_translation(args: argparse.Namespace) -> int:
         "preserved_ok",
         "language_hint",
         "language_ok",
+        "think_policy",
         "answer_chars",
         "thinking_chars",
         "wall_s",
         "load_s",
+        "prompt_eval_count",
+        "prompt_eval_s",
         "eval_count",
+        "eval_s",
         "done_reason",
         "temp_max_c",
         "mem_available_min_mib",
@@ -1846,6 +1852,8 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                             "num_predict": int(case.get("num_predict", translation_num_predict))
                         },
                     }
+                    if think_policy != "auto":
+                        payload["think"] = think_policy == "true"
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
                     start_time = time.monotonic()
                     try:
@@ -1894,6 +1902,8 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         diagnostics.append("output-budget")
                         if not content.strip() and thinking.strip():
                             diagnostics.append("thinking-budget")
+                    if think_policy == "false" and thinking.strip():
+                        diagnostics.append("thinking-present-despite-false")
 
                     row = {
                         "timestamp": iso_now(),
@@ -1908,11 +1918,15 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         "preserved_ok": int(preserved_ok),
                         "language_hint": language_hint,
                         "language_ok": int(language_ok),
+                        "think_policy": think_policy,
                         "answer_chars": len(content),
                         "thinking_chars": len(thinking),
                         "wall_s": f"{wall:.3f}",
                         "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
+                        "prompt_eval_count": response.get("prompt_eval_count", 0),
+                        "prompt_eval_s": f"{ns_to_s(response.get('prompt_eval_duration')):.3f}",
                         "eval_count": response.get("eval_count", 0),
+                        "eval_s": f"{ns_to_s(response.get('eval_duration')):.3f}",
                         "done_reason": done_reason,
                         "temp_max_c": telemetry.get("temp_max_c"),
                         "mem_available_min_mib": telemetry.get(
@@ -1940,10 +1954,17 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                             },
                             metrics={
                                 "wall_s": wall,
+                                "load_s": ns_to_s(response.get("load_duration")),
+                                "prompt_eval_count": response.get("prompt_eval_count", 0),
+                                "prompt_eval_s": ns_to_s(response.get("prompt_eval_duration")),
                                 "eval_count": response.get("eval_count", 0),
+                                "eval_s": ns_to_s(response.get("eval_duration")),
                                 "answer_chars": len(content),
+                                "thinking_chars": len(thinking),
                             },
                             timestamp=iso_now(),
+                            think_policy=think_policy,
+                            done_reason=done_reason,
                             source_language=case["source_language"],
                             target_language=case["target_language"],
                             response=content,
@@ -1954,7 +1975,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                     print(
                         f"  {case['id']}: pass={ok} lang={language_hint} "
                         f"semantic={semantic_ok} preserve={preserved_ok} "
-                        f"wall={wall:.2f}s"
+                        f"think={think_policy} wall={wall:.2f}s"
                     )
             finally:
                 try:
@@ -2611,6 +2632,12 @@ def main() -> int:
         "translation", help="DE/FR office translation acceptance"
     )
     add_common(translation, "http://127.0.0.1:11434")
+    translation.add_argument(
+        "--think",
+        choices=("auto", "true", "false"),
+        default=os.environ.get("TRANSLATION_THINK", "auto"),
+        help="translation reasoning policy: runtime default, force on, or force off",
+    )
     rag = sub.add_parser(
         "rag-cycle",
         help="measure dedicated embedding activity while the main answer model stays resident",

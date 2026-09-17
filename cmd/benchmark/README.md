@@ -154,11 +154,14 @@ not a general model ranking score.
 ## Translation
 
 ```bash
-bc250-benchmark translation [MODEL ...]
+bc250-benchmark translation [--think auto|true|false] [MODEL ...]
 ```
 
 Records target-language adherence, semantic anchors, preserved identifiers/numbers,
-source-language leakage and meaningful-content checks. Explicit-vs-implicit direction
+source-language leakage, meaningful-content checks, answer/thinking sizes, prompt/eval
+counts and timings, load/wall time and device telemetry. `--think auto` preserves the
+runtime default; `--think true` and `--think false` make a direct-transform reasoning
+contract explicit and record it in result provenance. Explicit-vs-implicit direction
 belongs here as a comparison; routine revalidation tests only the packaged production
 translation preset.
 
