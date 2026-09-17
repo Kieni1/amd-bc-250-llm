@@ -2,6 +2,11 @@
 # Second-stage translation integration check. Temporarily points the existing
 # Open WebUI translation preset at one experimental model, verifies live readback,
 # runs the production-style source-only inputs, and restores the exact preset.
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    printf '%s\n' 'REFUSED: execute this script with bash; do not source it.' >&2
+    return 0
+fi
+
 set -Eeuo pipefail
 umask 077
 
@@ -417,7 +422,10 @@ capture_provenance() {
     curl -sS --connect-timeout 5 --max-time 30 -H 'Content-Type: application/json' \
         -d "$(jq -cn --arg model "$CANDIDATE" '{model:$model}')" "$MAIN_URL/api/show" \
         > "$OUT/setup/candidate-ollama-show.json" 2>&1 || true
-    sha256sum "$PROMPT_FILE" "$BENCH" "$FIXTURE" "$PROVIDER_HELPER" > "$OUT/setup/evidence-contract.sha256"
+    cp "$PROMPT_FILE" "$OUT/setup/prompt.txt"
+    cp "$BENCH" "$OUT/setup/category-benchmark.py"
+    cp "$FIXTURE" "$OUT/setup/translation-office.json"
+    cp "$PROVIDER_HELPER" "$OUT/setup/owui-provider-config.py"
     local category resolved sidecar
     category=experiments; [[ "$INSTALL_EXPERIMENT" == 0 ]] && category=production
     resolved="$(bc250-model resolve "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
@@ -522,8 +530,15 @@ finalize() {
     parent="$(dirname "$OUT")"; name="$(basename "$OUT")"; tarball="$HOME/${name}.tar.gz"
     printf '\n=== OWUI translation candidate summary ===\n'; cat "$OUT/aggregate.txt" 2>/dev/null || true
     if [[ "$archive_ok" == 1 ]]; then
-        tar -C "$parent" -czf "$tarball" "$name"; sha256sum "$tarball" > "$tarball.sha256"
-        printf 'Evidence: %s\nTarball: %s\n' "$OUT" "$tarball"; cat "$tarball.sha256"
+        tar --owner=0 --group=0 --numeric-owner -C "$parent" -czf "$tarball" "$name"
+        tar_rc=$?
+        if [[ "$tar_rc" != 0 ]]; then
+            printf 'ERROR: evidence archive creation failed rc=%s\n' "$tar_rc" >&2
+            [[ "$rc" == 0 || "$rc" == 3 ]] && rc=27
+        else
+            printf 'Evidence: %s\nTarball: %s\n' "$OUT" "$tarball"
+            sha256sum "$tarball"
+        fi
     else
         printf 'Evidence: %s\nTarball: WITHHELD because credential/root-temp safety checks failed.\n' "$OUT" >&2
     fi
