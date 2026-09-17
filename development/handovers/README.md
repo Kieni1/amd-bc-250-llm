@@ -28,3 +28,10 @@ The main handover intentionally remains detailed about hardware, software topolo
 resource constraints, model roles and proven negative results. Historical release-by-
 release narration belongs in the changelog, `development/DECISIONS.md`, and
 `development/model-runs/` rather than being copied indefinitely into every prompt.
+
+Temporary specialist handovers are working prompts, not durable project memory. Once a
+campaign has been integrated, move consequential observations, evidence pointers,
+decisions and retest conditions into `development/model-runs/` and
+`development/DECISIONS.md`, then remove the dated specialist prompt from the live tree.
+This keeps current guidance small and avoids maintaining parallel copies of the same
+campaign state.

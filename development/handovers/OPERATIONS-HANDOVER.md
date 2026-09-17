@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current 0.11.1-0.10 source
+# BC-250 support / operations handover — current unpublished 0.11.1-0.11 source
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,12 +10,14 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.1
-RPM Release:  0.10
-source base:  amd-bc-250-llm-0.11.1-0.10.zip
+RPM Release:  0.11
+source base:  amd-bc-250-llm-current-0.11.1-0.11.zip
 ```
 
-This handover does **not** assert that a 0.11.1-0.10 RPM has already been installed or
-hardware-qualified. Capture installed NEVRA before interpreting machine evidence.
+This handover does **not** assert that the unpublished 0.11.1-0.11 RPM has already
+been built, installed or hardware-qualified. Capture installed NEVRA before interpreting
+machine evidence. Task/translation campaign evidence from 2026-09-17 was gathered on
+installed 0.11.1-0.10 and remains role evidence, not 0.11 package qualification.
 
 ## Validation ownership
 
@@ -88,10 +90,11 @@ main/task/embedding service topology, office HTTP :80 ready, and `bc250-verify` 
 48 ok / 0 warn / 0 fail when authenticated Open WebUI verification was skipped. Local
 config/users backups were enabled, pruning remained DRY_RUN=1, warm-up and automatic
 night shutdown were disabled, and Pi companion/export were skipped. The same run exposed
-the stale installed path used by `bc250-maintenance contract`; the current 0.11.1-0.10
-source contains that fix plus retained-key validation, independent SSH preparation for
-backup export, and the fail-closed MTP comparison integrity follow-up.
-Treat the 0.6 machine evidence as historical until 0.10 is installed.
+the stale installed path used by `bc250-maintenance contract`; current source contains
+that fix plus retained-key validation, independent SSH preparation for backup export and
+the fail-closed MTP comparison integrity follow-up. Separate task/translation campaign
+evidence is current through installed 0.11.1-0.10, but the 0.6 operations/power evidence
+remains historical until the current package is rechecked on-device.
 
 ## Storage lessons to preserve
 
@@ -136,7 +139,7 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-After GitHub builds and the appliance installs `0.11.1-0.10`, run one bounded re-check of:
+After GitHub builds and the appliance installs `0.11.1-0.11`, run one bounded re-check of:
 
 ```text
 installed RPM NEVRA
