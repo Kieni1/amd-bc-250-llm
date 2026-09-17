@@ -25,7 +25,14 @@ and they do not build RPMs.
 Prefer extending an existing generic screen over adding one wrapper per model. Preserve
 `rc=0` pass, `rc=3` quality failure, and other-nonzero infrastructure-failure semantics.
 A script that mutates Open WebUI must restore the exact original state and keep secrets
-out of evidence. Do not put GGUF weights in evidence bundles.
+out of evidence. Do not put GGUF weights in evidence bundles. Evidence tarballs from these experiment scripts intentionally have no `.sha256`
+sidecar files, but the scripts print the archive SHA-256 so the returned evidence can be
+identified exactly. Copy the exact contract inputs into evidence when provenance is needed.
+
+For task candidates, reject cheaply: one quality screen first, then the tiny warm-main
+survival gate for materially larger models, then product-path/overlap work. For direct
+translation, keep the main lane empty, record the reasoning policy (`auto|true|false`),
+and wait for memory recovery before moving to another large foreground model.
 
 When a run materially changes a model decision, record the exact model/settings/results,
 evidence filename + SHA-256, interpretation, decision, and **retest conditions** in the

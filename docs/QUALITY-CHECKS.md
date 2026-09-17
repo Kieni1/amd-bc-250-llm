@@ -47,14 +47,33 @@ compare it against the current package-owned task default with the generic form:
   EXPERIMENT-MODEL [ROUNDS]
 ```
 
-The screen downloads the candidate through the normal experiment catalog and
-temporarily mirrors its Ollama registration into the task service. This makes
-baseline and candidate use the same task-lane 4096-context, q8 KV-cache and
-keep-alive policy. The temporary task registration is removed on exit. The main
-lane is still unloaded around each candidate request series so an experimental
-task model is not accidentally measured while a warm GPT-OSS model is resident.
-That isolation is a quality-screen safety measure; a separate coexistence/resource
-test is mandatory before any task promotion.
+The generic screen defaults to one canonical round. It downloads the candidate through
+the normal experiment catalog and temporarily mirrors its Ollama registration into the
+task service for a cheap same-lane comparison. The temporary task registration is
+removed on exit. This is quality evidence only. For a materially larger candidate, do
+not spend repeated task/product-path calls until the dedicated warm-main safety gate
+passes:
+
+```bash
+CANDIDATE_MODEL=tmp-task-candidate:latest \
+  /usr/share/bc250-llm-server/quality-checks/task/20-survival-gate.sh
+```
+
+The survival gate is intentionally a low-level safety probe: it expects a uniquely named
+temporary task-lane alias that has already been staged and definition-checked by the
+specialist campaign. It does not install or clone a model itself, which avoids hiding
+model-definition changes inside the safety measurement.
+
+That gate uses a tiny eight-token request beside warm GPT-OSS, requires task unload,
+main residency, the normal main/task/embedding/Open WebUI/Tika services to stay active,
+minimum memory/swap guardrails and no new serious kernel warning. Any global OOM or main-residency loss rejects the concurrent task role.
+After an OOM experiment, use `task/30-appliance-recovery-check.sh` before continuing.
+By default it actively reloads/warm-checks GPT-OSS if needed, requires the normal
+main/task/embedding/Open WebUI/Tika services, an empty task lane, and fails on serious
+GPU/OOM events that occur during the recovery probe. Serious events
+from the preceding failed experiment are printed separately as context and do not by
+themselves make recovery impossible to prove. Set `WARM_MAIN=0` only for an explicitly
+read-only residency check.
 
 Task benchmark metadata records the actual request contract: task requests use
 `keep_alive=0`, titles mirror Open WebUI 0.11.3's 1000-token fallback, and the
@@ -63,9 +82,11 @@ silently enlarge those budgets to improve a candidate's score.
 
 ## Translation candidates
 
-Start with a short LFM reference under the same current evaluator, keep the
-previously weak Ministral candidate to a short comparison screen, then prioritize
-Hunyuan-MT and Translate-Gemma:
+Use the eight-case DE<->FR suite as a short screening gate, not a ranking benchmark.
+Once a candidate reaches the known saturated ceiling, advance it only if the current
+Stage-2 decision record gives it a real promotion case. Do not repeat the short screen to
+rank already-saturated models. No challenger is promoted until the harder corpus and
+exact product path are complete. Useful current wrappers remain:
 
 ```bash
 /usr/share/bc250-llm-server/quality-checks/translation/14-lfm-direct-reference.sh
@@ -79,8 +100,13 @@ changes to the translation evaluator, output budget, or specialist prompt profil
 do not get compared only against a historical score produced under an older
 contract. Run one batch at a time.
 
-Direct screening uses explicit source/target direction, defaults to a 1024-token
-output budget, and does not mutate Open WebUI. Hunyuan-MT uses its upstream
+Direct screening uses explicit source/target direction, defaults to one round and a
+1024-token output budget, and does not mutate Open WebUI. The main lane must be empty
+before a foreground direct screen; the harness refuses to unload a model that was
+already resident. Set `BC250_TRANSLATION_THINK=auto|true|false` to make the reasoning
+request contract explicit. Several Qwen-family candidates produced empty answers when
+the default reasoning path consumed the budget and then passed 8/8 with `think:false`,
+so thinking policy is part of translation provenance. Hunyuan-MT uses its upstream
 target-language user prompt; Translate-Gemma uses a `CURRENT_SOURCE`-shaped
 system/user exchange; other models use the generic explicit-direction prompt.
 A candidate that clearly survives the direct screen can then be tested through
@@ -137,7 +163,9 @@ The scripts retain the package's quality-result semantics:
 
 The standalone direct and Open WebUI wrappers propagate this return-code contract
 after evidence finalization; do not infer success merely because an evidence
-directory or tarball exists. The OWUI wrapper deliberately withholds the tarball
+directory or tarball exists. The direct translation harness writes its authoritative
+local final status after privacy scanning; if archive creation itself fails, it rewrites
+the local status/manifest with the archive-failure return code. The OWUI wrapper deliberately withholds the tarball
 if credential scanning or root-only temporary-file cleanup fails. Their summaries include per-round, per-direction and per-case quality
 plus latency/resource extrema.
 
@@ -148,4 +176,6 @@ model mistakes into passes.
 Historical Batch 1–3D scripts are installed under `quality-checks/history/` only
 for reproducibility. Prefer the generic current screens for new comparisons.
 
-Before production translation promotion, use a separate broader 24–40 case corpus covering both directions, office prose, invoices/tables, IDs/dates/amounts, negation, formatting, proper nouns and source-language leakage. The 8-case short screen remains a screening gate, not promotion proof.
+Before production translation promotion, use a harder corpus covering both directions, inclusive deadlines, contractual modality, exact amounts/references, negation, protected paths/keys/quotes and structured formatting. The current eight-case short screen remains a screening gate, not promotion proof.
+
+Evidence tarballs from the current generic task/translation checks intentionally have no `.sha256` sidecar files, but each script prints the archive SHA-256 for exact evidence identification. Preserve the exact fixture/evaluator/prompt material inside evidence where needed, normalize archive ownership metadata, and keep archive/delivery bookkeeping separate from model-quality conclusions.

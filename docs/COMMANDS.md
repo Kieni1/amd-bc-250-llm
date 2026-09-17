@@ -408,7 +408,7 @@ bc250-benchmark embeddings [MODEL ...]
 bc250-benchmark ocr [MODEL ...]
 bc250-benchmark task [MODEL ...]
 bc250-benchmark usecase [MODEL ...]
-bc250-benchmark translation [MODEL ...]
+bc250-benchmark translation [--think auto|true|false] [MODEL ...]
 bc250-benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
 bc250-benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
 bc250-benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]

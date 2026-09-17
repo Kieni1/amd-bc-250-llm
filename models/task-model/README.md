@@ -19,13 +19,13 @@ model store. It is part of required normal mode. With no selection,
 
 Current packaged task models:
 
-- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **default**. Real BC-250 evidence on 2026-09-12: 15/18 direct
-  qualification (5/6 each round), 15/18 again through the actual Open WebUI
-  title/tag/query endpoints with the package-owned prompts, and 9/9 successful
-  true-overlap trials while warm GPT-OSS remained resident. The known residual
-  miss is the French-title relevance fixture.
-- `task-gemma3-1b-unsloth-ud-q4-k-xl` — retained as the previous low-memory fallback/control, but no
-  longer selected by default.
+- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **default**. Promotion evidence remains 15/18 direct,
+  15/18 through the actual Open WebUI title/tag/query endpoints with package-owned
+  prompts, and 9/9 true-overlap trials while warm GPT-OSS remained resident. Current
+  cheap canonical screens place its reference envelope around 4/6-5/6. The open
+  quality issue is concise first-turn tag robustness; coexistence remains proven.
+- `task-gemma3-1b-unsloth-ud-q4-k-xl` — retained as the previous low-memory fallback/control.
+  The current task screen is about 2/6 with substantial language/relevance misses.
 
 The default LFM Modelfile deliberately omits a fixed `SYSTEM` prompt. A generic
 SYSTEM was tested and caused task-shape contamination (for example title responses
@@ -57,3 +57,28 @@ The earlier Qwen3.8 4B Distill task candidate is retired from routine discovery:
 although quality was promising, simultaneous residency with warm GPT-OSS
 OOM-killed the task service. The smaller promoted LFM survived nine true-overlap
 trials with no additional swap growth or serious GPU/OOM warning.
+
+## Current candidate funnel
+
+Use cheap rejection and expensive acceptance. A new candidate should normally pass:
+
+1. one cheap canonical quality screen;
+2. for any materially larger model, `quality-checks/task/20-survival-gate.sh` beside
+   the warm production GPT-OSS model;
+   The gate expects a separately staged, uniquely named temporary task alias; staging and
+   definition parity are campaign responsibilities rather than hidden gate behavior.
+3. concise first-turn DE/EN/FR usefulness/robustness;
+4. repeated canonical direct quality;
+5. authenticated Open WebUI task routing;
+6. real first-turn persistence; and only then
+7. true concurrent overlap/stability.
+
+After any OOM experiment, use `quality-checks/task/30-appliance-recovery-check.sh` to
+prove the normal main/task/embedding/UI/Tika service topology, reload/warm GPT-OSS when
+necessary, confirm main residency and an empty task lane, and detect any new serious
+faults caused by the recovery probe. The preceding experiment's OOM remains visible as
+historical context but is not itself a reason for the recovery check to fail.
+
+Current role-specific rejections and their retest conditions belong in
+`development/DECISIONS.md`; the 2026-09-17 Qwen3 4B result is recorded as DEC-007 with
+its evidence summary under `development/model-runs/`.
