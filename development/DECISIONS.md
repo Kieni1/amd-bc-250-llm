@@ -113,3 +113,43 @@ model promotion without real BC-250 evidence.
 
 **Retest only if:** upstream/runtime changes invalidate one of these gates, or real BC-250
 evidence shows that a gate is either insufficient or unnecessarily expensive.
+
+## DEC-007 — Reject Qwen3 4B for the concurrent background-task role
+
+**Status:** ACTIVE / ROLE-SPECIFIC REJECTION  
+**Exact model:** `exp-qwen3-4b-lmstudio-q6-k`
+
+**Observed:** Two cheap canonical task screens reached 5/6, making this the strongest
+current task-quality challenger. Exact-source task-lane staging then caused global OOM.
+A second task-tuned staging attempt bounded to 4096 context and 128 predicted tokens
+still caused global OOM during a tiny survival request, killing the warm GPT-OSS main
+model and other user services.
+
+**Decision:** Do not spend further qualification time on this model for the concurrent
+background-task role on the current 16 GB topology. This is a role-specific rejection;
+it does not retire the model from unrelated general/main experiments.
+
+**Retest only if:** the physical/runtime memory envelope changes materially, or a
+materially smaller source/quant is being evaluated for the task role.
+
+## DEC-008 — Treat the eight-case DE/FR suite as a translation screening gate
+
+**Status:** ACTIVE
+
+**Observed:** The repaired canonical eight-case German/French screen is saturated:
+several materially different candidates reach 8/8. Translate-Gemma E4B and Ministral
+both produced 24/24 confirmation evidence; TIR Qwen3.5 9B reached 8/8 when tested with
+an explicit non-thinking request contract. Production LFM reproduced known weaknesses
+at 6/8. Large 27B/35B models can also reach 8/8 while leaving impractically little
+memory headroom.
+
+**Decision:** An 8/8 result means "advance to harder discrimination", not promotion or
+model equality. Do not repeat the same canonical screen merely to rank models already
+known to saturate it. The next translation decision gate is the harder Stage-2 corpus,
+followed by the real authenticated Open WebUI product path for the narrowed finalists.
+
+**Current Stage-2 set:** Translate-Gemma E4B, Ministral 8B, TIR Qwen3.5 9B non-thinking,
+and Qwen3.6 35B only as a quality upper-bound comparator.
+
+**Retest only if:** the canonical fixture/evaluator or the tested model definition/request
+contract changes materially enough that the earlier screen is no longer comparable.

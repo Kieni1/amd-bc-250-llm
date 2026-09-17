@@ -161,6 +161,30 @@ Do not infer promotion from a short candidate screen. A translation challenger
 must beat the LFM quality pattern, then pass the real Open WebUI integration
 path, and only then receive latency/memory and broader-corpus confirmation.
 
+## 2026-09-17 task and translation campaign follow-up
+
+Production defaults are unchanged. Durable campaign detail lives in
+`development/model-runs/` and the corresponding decisions in
+`development/DECISIONS.md`; runtime Modelfiles remain measurement-free.
+
+### Task role
+
+`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production task model. Qwen3 4B is
+role-rejected for concurrent background-task use after repeated global-OOM failures
+beside warm GPT-OSS despite stronger cheap-screen quality. Future materially larger task
+candidates must pass the tiny warm-main survival gate before repeated quality or product-
+path work. See `development/model-runs/2026-09-17-task-active-candidate-campaign.md` and
+DEC-007.
+
+### German/French translation role
+
+The canonical eight-case DE<->FR screen is saturated: 8/8 now means advance to harder
+discrimination, not promotion or equality. Production LFM remains unchanged while
+Translate-Gemma E4B, Ministral 8B and TIR Qwen3.5 9B non-thinking advance to Stage 2;
+Qwen3.6 35B is retained only as a quality upper-bound comparator. Thinking policy is
+part of the request contract for reasoning-capable direct-transform models. See
+`development/model-runs/2026-09-17-translation-de-fr-campaign.md` and DEC-008.
+
 ### Production residency follow-up
 
 The 2026-08-31 production run predates the dedicated 11437 embedding service.

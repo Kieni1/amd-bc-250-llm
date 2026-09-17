@@ -80,6 +80,12 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         }
         self.assertTrue(required <= {model["name"] for model in load("production")[1]})
 
+    def test_runtime_modelfiles_do_not_embed_campaign_measurement_notes(self) -> None:
+        for path in MODELFILES.glob("*.Modelfile"):
+            with self.subTest(path=path.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertNotIn("measurement note, 2026-09-17", text)
+
     def test_all_modelfiles_keep_required_bc250_gpu_and_context_settings(self) -> None:
         for path in MODELFILES.glob("*.Modelfile"):
             with self.subTest(path=path.name):
