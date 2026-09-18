@@ -28,6 +28,11 @@ one candidate.
 
 Never substitute an unavailable local check with an imitation and report it as real.
 
+The deterministic source/unit gate must remain host-independent. Runtime shell integrations
+that depend on packaged tools such as `jq` belong to installed-package/BC-250 qualification;
+source tests should exercise the underlying data/format contracts without invoking those runtime
+dependencies.
+
 ## 3. Common promotion funnel
 
 For a candidate change, stop as soon as it no longer has a promotion case.

@@ -31,7 +31,7 @@ do not rewrite either record to the current source NVR.
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — `make validate` passed repository/RPM preflight, packaged shell syntax and 367/367 deterministic tests on current 0.11.3-0.2 source | PENDING/EXTERNAL | N/A | Ruff/ShellCheck remain workstation-owned and were not run here; GitHub build remains external |
+| repository/unit validation | SOURCE PASS — `make validate` passed repository/RPM preflight, packaged shell syntax and 366/366 deterministic tests on current 0.11.3-0.2 source | PENDING/EXTERNAL | N/A | Ruff/ShellCheck remain workstation-owned and were not run here; GitHub build remains external |
 | RPM build/install | source metadata and release closure are current at 0.11.3-0.2 | PENDING/EXTERNAL for 0.11.3-0.2 | HISTORICAL REAL DEVICE — 0.11.2-0.5.fc44 installed cleanly | GitHub builds 0.11.3-0.2; capture exact installed NEVRA before device conclusions |
 | normal service topology | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 full revalidation/restoration PASS | unchanged by the 0.11.3 model-manager rewrite; verify normal topology after install |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 Open WebUI reachable/drift none | include in normal post-install verifier; power campaign remains separate |
@@ -40,7 +40,7 @@ do not rewrite either record to the current source NVR.
 | real S5 Wake-on-LAN | N/A | N/A | PENDING | highest-value next power qualification, but do not mix with agent campaign |
 | safe shutdown defer/allow | SOURCE PASS | external | PENDING | test busy/defer then idle/allow only after S5 WOL succeeds |
 | optional backup export | SOURCE PASS | external | PENDING | lower priority; no need to gate agent/source qualification |
-| model lifecycle/reconciliation | SOURCE PASS — new list/status/path/apply/refresh/unregister/remove/purge-retired contract, active callers, migration hints and lifecycle state semantics are covered by the current 367/367 source gate | external | HISTORICAL REAL DEVICE for pre-rewrite lifecycle | qualify reconciliation on installed 0.11.3-0.2 before treating it as current device evidence |
+| model lifecycle/reconciliation | SOURCE PASS — new list/status/path/apply/refresh/unregister/remove/purge-retired contract, active callers, migration hints and lifecycle state semantics are covered by the current 366/366 source gate | external | HISTORICAL REAL DEVICE for pre-rewrite lifecycle | qualify reconciliation on installed 0.11.3-0.2 before treating it as current device evidence |
 | storage transient-import behavior | N/A | N/A | HISTORICAL REAL DEVICE | preserve prior Ollama cleanup/dedupe lessons |
 | XFS dedupe correctness | SOURCE PASS | external | HISTORICAL/PARTIAL | preserve GGUFs; batched implementation still deserves performance qualification |
 | benchmark result contract | SOURCE PASS — mixed-quality summaries retain failed case IDs; task structural failure attribution is non-cascading | external | HISTORICAL REAL DEVICE on 0.5 pre-change reporting | first 0.11.3 device benchmark should confirm case-level status UX without changing acceptance |

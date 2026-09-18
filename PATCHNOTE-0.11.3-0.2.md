@@ -51,15 +51,17 @@ Current source validation after the corrections:
 make validate
   repository/RPM preflight   PASS
   packaged shell syntax      PASS
-  deterministic tests        367 / 367 PASS
+  deterministic tests        366 / 366 PASS
 
 all repository .sh files     bash -n PASS
 packaging/bc250 dispatcher    bash -n PASS
 touched Python               compile PASS
 ```
 
-Ruff and ShellCheck were not available here. RPM build/install and real BC-250 MTP
-runtime qualification remain external/device work.
+Ruff and ShellCheck were not available here. The deterministic source suite intentionally
+does not execute the jq-backed `record_edge_diagnostics` integration path; the RPM declares
+`Requires: jq`, while that shell/runtime integration belongs to installed BC-250 qualification.
+RPM build/install and real BC-250 MTP runtime qualification remain external/device work.
 
 ## Release identity
 

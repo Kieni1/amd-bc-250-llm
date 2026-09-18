@@ -53,7 +53,7 @@ used. The preceding 0.11.2-0.6 task/coding-agent diagnostic changes and agent ch
 remain carried forward unchanged.
 
 Current `0.11.3-0.2` source release closure is complete at source level: `make validate`
-passed repository/RPM preflight, packaged shell syntax and 367/367 deterministic tests.
+passed repository/RPM preflight, packaged shell syntax and 366/366 deterministic tests.
 Ruff and ShellCheck were not run in this environment; GitHub RPM/SRPM build and BC-250
 runtime qualification remain later gates. Do not inherit older installed evidence as if it
 qualified the new model-manager or revalidation-v4.2 behavior.

@@ -29,7 +29,7 @@ should not be rewritten as current.
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
 runtime/hardware qualification. Current `0.11.3-0.2` passed the local source gate: repository/RPM
-preflight, packaged shell syntax and 367/367 deterministic tests. Ruff/ShellCheck were not run
+preflight, packaged shell syntax and 366/366 deterministic tests. Ruff/ShellCheck were not run
 here; GitHub RPM build and BC-250 execution are not yet claimed.
 
 ## Normal service topology

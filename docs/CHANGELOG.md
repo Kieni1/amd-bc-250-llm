@@ -7,6 +7,7 @@
 - Enforce `--revision` / `--sha256` as true one-model overrides before an `all` selection is split into per-category operations.
 - Improve MTP operator flow and evidence guidance: exact fetch/status/run commands, missing-source recovery guidance, explicit download-only removal semantics, and current real-device qualification requirements are documented. MTP remains experimental, disabled by default and unqualified on BC-250 until the external llama.cpp campaign runs.
 - Reconcile secondary lifecycle surfaces: package asset discovery now uses unprivileged `bc250-model list`, current handovers agree on Release 0.2, and README/TLDR/model/specialist guidance exposes the explicit disabled-MTP preparation route.
+- Keep the deterministic source gate host-independent by removing the jq-backed edge-diagnostic integration case from unit coverage; the RPM still requires `jq`, and that shell/runtime path is qualified on the installed BC-250 instead.
 - Keep production model roles, Open WebUI policy, Ollama topology, revalidation v4.2 semantics, governor/CU policy and quality thresholds unchanged.
 
 ## 0.11.3-0.1 - 2026-09-18
