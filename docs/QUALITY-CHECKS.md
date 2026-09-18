@@ -75,8 +75,10 @@ read-only residency check.
 
 Task benchmark metadata records the actual request contract: task requests use
 `keep_alive=0`, titles mirror Open WebUI 0.11.3's 1000-token fallback, and the
-packaged tag/query paths retain the 128-token task budget. The screen does not
-silently enlarge those budgets to improve a candidate's score.
+packaged tag/query paths retain the 128-token task budget. The tag prompt explicitly
+requires broad and specific tags in one array and exactly one raw JSON object; repeated
+objects remain a `format-contract` quality failure. The screen does not silently enlarge
+those budgets or weaken the strict parser to improve a candidate's score.
 
 
 ## Agentic/coding qualification

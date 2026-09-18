@@ -144,7 +144,10 @@ retrieval-query generation remain off. `TASK_MODEL_PARAMS` stays `{}` so Open
 WebUI v0.11.3 retains its upstream task-token behavior. The helper first reads the
 complete v0.11.3 task configuration and then updates only reviewed fields. Those
 reviewed fields now include package-owned title, tag and retrieval-query prompt
-templates so live Open WebUI and direct task qualification share one prompt policy.
+templates so live Open WebUI and direct task qualification share one prompt policy. The
+0.11.3-0.3 tag prompt keeps broad themes and specific subtopics in one `tags` array and
+requires exactly one raw JSON object with no second object, prose or Markdown; the task
+model and 128-token tag budget are unchanged.
 
 ## RAG baseline
 

@@ -1073,6 +1073,7 @@ check_edge_generation_sanity() {
   local jsonl="$1" policy="$2" out="$3"
   python3 - "$jsonl" "$policy" "$out" <<'PY_EDGE'
 import json
+import re
 import statistics
 import sys
 from pathlib import Path
@@ -1207,12 +1208,16 @@ for model, limits in policy["models"].items():
         if row in severe:
             continue
         notes = [str(note) for note in row.get("notes", []) if "context truncation" in str(note).lower()]
+        detail = notes[0] if notes else "context truncation observed"
+        match = re.search(r"\((\d+)\s*->\s*(\d+)\)", detail)
+        previous_prompt_eval_count = int(match.group(1)) if match else None
+        current_prompt_eval_count = int(row.get("metrics", {}).get("prompt_eval_count") or 0)
         diagnostics.append({
             "model": model,
             "case_id": str(row.get("case_id") or "unknown"),
             "kind": "context-truncation",
-            "prompt_eval_count": int(row.get("metrics", {}).get("prompt_eval_count") or 0),
-            "detail": notes[0] if notes else "context truncation observed",
+            "previous_prompt_eval_count": previous_prompt_eval_count,
+            "prompt_eval_count": current_prompt_eval_count,
         })
 
 result = {"passed": not failures, "policy": policy, "checks": checks, "failures": failures, "diagnostics": diagnostics}
@@ -1225,12 +1230,16 @@ PY_EDGE
 }
 
 record_edge_diagnostics() {
-  local sanity_json="$1" label="$2" model case_id prompt_eval detail
+  local sanity_json="$1" label="$2" model case_id previous prompt_eval
   [[ -r $sanity_json ]] || return 0
-  while IFS=$'\t' read -r model case_id prompt_eval detail; do
+  while IFS=$'\t' read -r model case_id previous prompt_eval; do
     [[ -n $model ]] || continue
-    record_event "$label" diagnostic info "$model $case_id: $detail; prompt_eval_count=$prompt_eval; within qualification policy"
-  done < <(jq -r '.diagnostics[]? | [.model, .case_id, (.prompt_eval_count|tostring), .detail] | @tsv' "$sanity_json")
+    if [[ $previous =~ ^[0-9]+$ ]]; then
+      record_event "$label" diagnostic info "$model $case_id: context truncation observed: $previous -> $prompt_eval prompt tokens; policy=PASS (not severe)"
+    else
+      record_event "$label" diagnostic info "$model $case_id: context truncation observed at $prompt_eval prompt tokens; policy=PASS (not severe)"
+    fi
+  done < <(jq -r '.diagnostics[]? | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
 }
 
 diagnostic_report() {

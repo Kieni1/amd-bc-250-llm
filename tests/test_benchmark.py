@@ -969,6 +969,9 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertNotIn("m0", tags)
         self.assertIn("m1", tags)
         self.assertIn("1-3 broad theme tags plus 1-3 specific", tags)
+        self.assertIn('same single "tags" array', tags)
+        self.assertIn("exactly one raw JSON object and nothing else", tags)
+        self.assertIn("Never emit a second JSON object", tags)
         self.assertIn('["General"]', tags)
         self.assertIn("Today's date is", query)
         self.assertIn("err on the side", query)
@@ -1364,6 +1367,12 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
 
 
 class TelemetryTests(unittest.TestCase):
+    def test_revalidation_context_diagnostic_is_concise_and_policy_explicit(self) -> None:
+        source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn('"previous_prompt_eval_count": previous_prompt_eval_count', source)
+        self.assertIn("context truncation observed:", source)
+        self.assertIn("prompt tokens; policy=PASS (not severe)", source)
+
     def test_percentile_interpolates_and_empty_summary_is_safe(self) -> None:
         self.assertEqual(common.percentile([1.0], 95), 1.0)
         self.assertAlmostEqual(common.percentile([1.0, 2.0, 3.0, 4.0], 50), 2.5)
