@@ -17,7 +17,6 @@ dir	0755	-	{share}/model-management/modelfiles
 dir	0755	-	{share}/ollama-profiles
 dir	0755	-	{share}/openwebui
 dir	0755	-	{share}/quality-checks
-dir	0755	-	{share}/quality-checks/history
 dir	0755	-	{share}/quality-checks/main
 dir	0755	-	{share}/quality-checks/package
 dir	0755	-	{share}/quality-checks/task
@@ -146,7 +145,6 @@ file	0644	models/modelfiles/*.Modelfile	{share}/model-management/modelfiles/
 file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-management/MODEL-TEMPLATE.Modelfile.example
 file	0644	models/retired-models.json	{share}/model-management/retired-models.json
 file	0644	quality-checks/README.md	{share}/quality-checks/README.md
-file	0755	quality-checks/history/*.sh	{share}/quality-checks/history/
 file	0755	quality-checks/main/*.sh	{share}/quality-checks/main/
 file	0755	quality-checks/package/*.sh	{share}/quality-checks/package/
 file	0755	quality-checks/task/*.sh	{share}/quality-checks/task/
