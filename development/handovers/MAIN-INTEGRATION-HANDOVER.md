@@ -403,11 +403,12 @@ Translate-Gemma E4B and Ministral both produced 24/24 canonical confirmation; TI
 but has a reproducible CHF-preservation defect. Large Qwen 27B/35B results are quality
 upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
-The next translation gate is **Stage-2 harder-corpus discrimination**, not another repeat
-of the same eight cases. Current Stage-2 set: Translate-Gemma E4B, Ministral 8B, TIR
-Qwen3.5 9B non-thinking, and Qwen3.6 35B only as an upper-bound comparator. Only the
-narrowed finalists then proceed to the authenticated Open WebUI product path and resource
-confirmation. No production translation change is justified yet.
+Stage-2E has now settled the model/configuration question. Translate-Gemma E4B is the
+selected candidate with exact explicit-direction v1, thinking omitted and
+`max_tokens=2048`; TIR is closed as the normal deployment choice. Production LFM remains
+the live/default role until the package-owned DE→FR / FR→DE direction roles pass one
+bounded authenticated Open WebUI requalification. Do not reopen broad model discovery
+or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
 
@@ -1029,8 +1030,9 @@ measurement semantics and state restoration before a large new quality campaign.
 
 ## P1 — translation
 
-The short DE/FR screen is already saturated. Run Stage-2 hard-corpus discrimination
-next; only narrowed finalists proceed to authenticated Open WebUI and resource checks.
+Broad DE/FR comparison is closed. Requalify only the integrated Translate-Gemma
+DE→FR / FR→DE package roles against the bounded final Stage-2 target set; keep LFM
+production/default until that gate passes.
 
 ## P1 — RAG / office documents
 
@@ -1137,8 +1139,8 @@ Keep these explicit until solved or superseded:
   current task/translation campaign evidence was gathered on installed 0.11.1-0.10 while
   the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
-- translation finalists still need Stage-2 hard-corpus discrimination → narrowed live
-  OWUI product-path qualification → resource confirmation;
+- Translate-Gemma is selected but still needs bounded qualification of the final
+  package-owned direction roles before the production LFM switch;
 - RAG quality corpus should expand around absent/multisource/conflict/table/multilingual
   cases;
 - agent quality should broaden beyond the small static 3/3 contract into documented

@@ -63,6 +63,9 @@ Ollama installer commit:
 standard office     prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 RAG answer          prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 translation         prod-lfm25-8b-a1b-liquidai-q6-k
+translation candidate roles:
+  bc250-office-translation-de-fr -> exp-translate-gemma4-sub-e4b-17s-q4-k-xl
+  bc250-office-translation-fr-de -> exp-translate-gemma4-sub-e4b-17s-q4-k-xl
 higher-quality      prod-qwen35-9b-unsloth-q6-k
 deep/warm main      prod-gpt-oss20b-ggml-org-mxfp4
 embedding           embed-jina-v5-small-retrieval-q4-k-m

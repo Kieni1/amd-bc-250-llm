@@ -29,9 +29,13 @@ resource constraints, model roles and proven negative results. Historical releas
 release narration belongs in the changelog, `development/DECISIONS.md`, and
 `development/model-runs/` rather than being copied indefinitely into every prompt.
 
-Temporary specialist handovers are working prompts, not durable project memory. Once a
-campaign has been integrated, move consequential observations, evidence pointers,
-decisions and retest conditions into `development/model-runs/` and
-`development/DECISIONS.md`, then remove the dated specialist prompt from the live tree.
-This keeps current guidance small and avoids maintaining parallel copies of the same
-campaign state.
+Dated specialist handovers are evidence/method snapshots, not automatically current
+workflow policy. When their procedural advice conflicts with `DEVELOPMENT-WORKFLOW.md`,
+`development/DECISIONS.md`, current operator docs or newer source behavior, preserve the
+historical handover but follow the newer authority. In particular, current experiment
+scripts may print an evidence archive SHA-256 without creating `.sha256` sidecar files.
+
+Dated specialist evidence handovers may also be retained here as source-only `.txt`
+references when they capture a large campaign that should not be collapsed into the
+operator documentation. The 2026-09-17 task-model and DE<->FR translation handovers
+are such references; current decisions are summarized separately in `development/model-runs/`.
