@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current unpublished 0.11.2-0.3 source
+# BC-250 support / operations handover — current unpublished 0.11.2-0.4 source
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,13 +10,16 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.2
-RPM Release:  0.1
-source base:  amd-bc-250-llm-current-0.11.2-0.3.zip
+RPM Release:  0.4
+source base:  amd-bc-250-llm-0.11.2-0.4.zip
 ```
 
-This handover does **not** assert that the unpublished 0.11.2-0.3 RPM has already
+This handover does **not** assert that the unpublished 0.11.2-0.4 RPM has already
 been built, installed or hardware-qualified. Capture installed NEVRA before interpreting
-machine evidence. Task campaign evidence was gathered on installed 0.11.1-0.10; Stage-2E translation evidence was gathered on installed 0.11.1-0.11. Both remain role evidence, not 0.11.2-0.3 package qualification.
+machine evidence. Installed `0.11.2-0.3.fc44` is now the immediate real-device baseline:
+its full revalidation completed with infrastructure/restoration PASS, direct translation
+8/8, direct RAG 4/4 and authenticated Open WebUI RAG 3/3. The exact run is recorded in
+`development/model-runs/2026-09-18-installed-0.11.2-0.3-revalidation.md`.
 
 ## Validation ownership
 
@@ -86,15 +89,20 @@ Do not revive graveyard models merely because an old handover names them.
 - Stock CPU operation exposes 6C/12T even though 8C/16T silicon exists; CPU unlock is
   separate and not required for the appliance.
 
-Latest retained real-device evidence is from installed `0.11.1-0.6` after a completed
-`bc250-install`: Fedora kernel 7.2.4-200.fc44, healthy 40/40 live routing, normal
-main/task/embedding service topology, office HTTP :80 ready, and `bc250-verify` at
-48 ok / 0 warn / 0 fail when authenticated Open WebUI verification was skipped. Local
+Latest general appliance evidence is from installed `0.11.2-0.3.fc44`: Fedora kernel
+7.2.5-200.fc44, Mesa 26.2.2-6.fc44, healthy 40/40 live routing, normal
+main/task/embedding service topology, authenticated Open WebUI desired-state drift none,
+and install verification at 49 ok / 0 warn / 0 fail. Local
 config/users backups were enabled, pruning remained DRY_RUN=1, warm-up and automatic
 night shutdown were disabled, and Pi companion/export were skipped. The same run exposed
 the stale installed path used by `bc250-maintenance contract`; current source contains
 that fix plus retained-key validation, independent SSH preparation for backup export and
-the fail-closed MTP comparison integrity follow-up. Task campaign evidence was gathered on installed 0.11.1-0.10 and Stage-2E translation evidence on installed 0.11.1-0.11; the 0.6 operations/power evidence remains historical until the current package is rechecked on-device.
+the fail-closed MTP comparison integrity follow-up. The same 0.11.2-0.3 machine completed whole-appliance revalidation v4.0 with full
+coverage, infrastructure/restoration PASS, task 5/6 due to an evaluator vocabulary gap,
+agent 2/3 due to fenced Bash output, direct production translation 8/8, direct RAG 4/4
+and authenticated OWUI RAG 3/3. A subsequent authenticated production-translation smoke
+proved both live direction roles and left desired-state drift at none. Power/WOL evidence
+remains older and still needs qualification.
 
 ## Storage lessons to preserve
 
@@ -139,18 +147,19 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-After GitHub builds and the appliance installs `0.11.2-0.3`, run one bounded re-check of:
+After GitHub builds and the appliance installs `0.11.2-0.4`, run one bounded re-check of:
 
 ```text
 installed RPM NEVRA
-bc250-maintenance contract
-bc250-maintenance status
-bc250-maintenance companion status
-bc250-verify
+bc250-verify --owui-token-file FILE
+bc250-openwebui-setup status --verbose --owui-token-file FILE
+bc250-revalidate start --owui-token-file FILE
+maintenance contract/status and companion status
 ```
 
-If that is clean, configure/confirm the intended WOL interface and power policy, then run
-one real S5 Wake-on-LAN cycle. Only after S5 WOL succeeds should the safe-shutdown
+The v4.1 run should confirm required active-role base registration, task 6/6 expectation
+and the new authenticated `owui-translation` screen. If that is clean, configure/confirm
+the intended WOL interface and power policy, then run one real S5 Wake-on-LAN cycle. Only after S5 WOL succeeds should the safe-shutdown
 busy/defer and later idle/allow cases be tested. Keep optional backup export and dedupe
 performance separate.
 
