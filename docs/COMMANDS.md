@@ -74,15 +74,17 @@ only pending work where practical and
 combines kernel update plus TTM configuration before the primary reboot. After
 that reboot it prepares 40-CU support for the exact running kernel. The base
 Open WebUI Quadlet is intentionally dormant across the primary reboot; after
-baseline task/Jina registration the installer adds its small `[Install]` drop-in,
+all active role base models plus task/Jina defaults are registered, the installer adds
+its small `[Install]` drop-in,
 reloads systemd and starts Open WebUI. A second reboot is requested only when
 persistent 40-CU mode is already configured and the prepared replacement module
 is not yet running.
 
-The installer ensures the baseline task and embedding models without printing the
-full catalog, then presents one full optional model catalog and one selection query.
-Use global indexes, ranges, exact names, `recommended`, `production` or `all`;
-Enter skips.
+The installer ensures every base model required by active package-owned Open WebUI
+roles, plus the task and embedding defaults, without printing the full catalog. It then
+presents one catalog for experiments, rollback/reference, agent and other optional
+extras. Use global indexes, ranges, exact names, `recommended`, `production` or `all`;
+Enter skips optional extras only.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
 across transcript PTY creation, so unattended runs never become interactive by
 accident. `BC250_HF_ANONYMOUS=1` forces anonymous Hugging Face downloads. The model manager
@@ -339,6 +341,7 @@ sudo bc250-status
 sudo bc250-verify
 sudo bc250-verify --summary
 sudo bc250-verify --owui-token-file /root/owui-test.key
+sudo bc250-openwebui-setup status --verbose --owui-token-file /root/owui-test.key
 RUN_MODEL_TESTS=1 sudo bc250-verify
 bc250-verify-lan SERVER_IP
 sudo llm-run-diagnose --no-load
@@ -353,7 +356,7 @@ sudo bc250-revalidate abort
 sudo bc250-revalidate cleanup
 ```
 
-`bc250-revalidate` harness v4.0 is the root-only systemd-backed package
+`bc250-revalidate` harness v4.1 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
@@ -372,7 +375,10 @@ SPI/WGP routing table with no off/problem cells; it does not hard-code `40/40`.
 Benchmark quality exit `3` is recorded and nonfatal. Other benchmark/helper errors
 are infrastructure failures and enter the single top-level restoration/finalization
 path. Authenticated packaged Open WebUI qualification accepts
-`--owui-token-file FILE`. Final bundles remain under
+`--owui-token-file FILE` and now exercises both the production DE↔FR role/filter path
+and the packaged RAG path. The direct translation stage pins the promoted 2048-token
+budget; the Open WebUI stage sends source text through the real production role IDs rather
+than rebuilding the Filter contract in the harness. Final bundles remain under
 `/var/lib/bc250-llm-server/revalidation/results/`; completed work remains
 inspectable until `cleanup` or a later `start`.
 
@@ -384,7 +390,9 @@ state after its result bundle is no longer needed. Neither command is a substitu
 for ordinary service stop/start management. `bc250-status` is a short overview including CPU
 topology/power-state exposure, RAM, memory pressure, zram, disk swap, swappiness
 and appliance storage. `bc250-verify` is the detailed pass/fail check and accepts
-`--owui-token-file FILE` for the authenticated package-owned Open WebUI drift check. `bc250-check-temp` refreshes every
+`--owui-token-file FILE` for the authenticated package-owned Open WebUI drift check.
+The detailed verifier also checks that every active package-owned Open WebUI role has its
+base model registered on the main Ollama lane. `bc250-check-temp` refreshes every
 second by default; use `--once` only when a single sample is useful. Verification includes kernel/module alignment, CU state, Ollama version,
 internal Ollama listener/firewall policy, service health, optional GFX1013
 compute queues and recent Vulkan/AMDGPU failure patterns. `bc250-verify-lan`
@@ -419,6 +427,7 @@ sudo bc250-agent-mode leave
 
 bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
 bc250-benchmark num-batch MODEL [MODEL ...]
+bc250-benchmark owui-translation --token-file FILE
 bc250-benchmark owui-rag MODEL --token-file FILE
 bc250-benchmark owui-embedding-batch --token-file FILE
 bc250-benchmark owui-chunk-min MODEL --token-file FILE

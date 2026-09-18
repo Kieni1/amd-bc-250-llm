@@ -32,7 +32,7 @@ sudo bc250-openwebui-setup init
 sudo bc250-openwebui-setup init --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
-sudo bc250-openwebui-setup status --token-file /root/owui-test.key
+sudo bc250-openwebui-setup status --verbose --token-file /root/owui-test.key
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
@@ -42,7 +42,9 @@ the default choice without asking for the same path a second time. It is never
 consumed silently: the operator still selects whether to use it, sign in, create
 the first administrator, or choose a different API key file. `status` without a key checks reachability only. With a
 temporary administrator key or `--token-file` it also compares the package-owned
-settings with the reviewed desired state. The helper does not persist credentials;
+settings with the reviewed desired state. Add `--verbose` to print the verified active
+role/base-model mapping, translation budget/filter attachment, task/RAG defaults and
+package-owned Function state. The helper does not persist credentials;
 the install orchestrator may hold the authenticated token briefly under `/run` so
 its final verification can reuse the same session, then removes it on exit.
 A reported difference may be an intentional operator override; `status` does not
@@ -57,7 +59,7 @@ environment variables:
 - normal Open WebUI Ollama providers: main `11434` and task `11435`;
 - the local task model and conservative task-generation toggles;
 - the RAG/Tika baseline and dedicated embedding endpoint `11437`;
-- five additive BC-250 workspace model presets from the versioned
+- package-owned BC-250 workspace model presets from the versioned
   `config/openwebui/models.json` payload.
 
 The operator owns users, credentials, custom prompts, unrelated workspace models,
@@ -111,13 +113,15 @@ prompt, `max_tokens=2048`, and leave `think` unspecified. The package-owned non-
 `bc250_translation_direction` Filter prepends only the tested DE→FR or FR→DE wrapper to
 the current text user message.
 
-Install the production translation base before applying desired state if it is not
-already present:
+`bc250-install` now ensures the base model behind every active package-owned Open WebUI
+role before applying desired state, including the production Translate-Gemma role. Manual
+model installation is therefore needed only for experiments/rollback paths or deliberate
+operator changes.
+
+To inspect the live verified contract:
 
 ```bash
-sudo bc250-model install production prod-translate-gemma4-sub-e4b-17s-q4-k-xl
-sudo bc250-openwebui-setup apply
-sudo bc250-openwebui-setup status
+sudo bc250-openwebui-setup status --verbose --token-file /root/owui-test.key
 ```
 
 The legacy LFM preset is intentionally inactive. Its base model now lives in the

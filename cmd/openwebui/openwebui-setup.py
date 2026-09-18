@@ -279,7 +279,50 @@ def require_list(value: Any, label: str) -> list[Any]:
     return value
 
 
-def status(client: Client, authenticated: bool) -> int:
+def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str, Any]]) -> None:
+    print()
+    print("Package-owned Open WebUI roles")
+    for model in models:
+        if not bool(model.get("is_active")):
+            continue
+        model_id = str(model.get("id") or "unknown")
+        base = str(model.get("base_model_id") or "unknown")
+        params = model.get("params") if isinstance(model.get("params"), dict) else {}
+        meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
+        filters = meta.get("filterIds") if isinstance(meta.get("filterIds"), list) else []
+        extras: list[str] = []
+        if "max_tokens" in params:
+            extras.append(f"max_tokens={params['max_tokens']}")
+        if "think" in params:
+            extras.append(f"think={params['think']}")
+        elif "translation" in model_id:
+            extras.append("think=omitted")
+        if filters:
+            extras.append("filters=" + ",".join(str(value) for value in filters))
+        suffix = f"  ({'; '.join(extras)})" if extras else ""
+        print(f"  {model_id:<36} -> {base}{suffix}")
+
+    print()
+    print("Task and RAG")
+    print(f"  task model:       {TASK_MODEL}")
+    print(f"  embedding model:  {EMBED_MODEL}")
+    print(f"  extraction:       {DESIRED['rag'].get('CONTENT_EXTRACTION_ENGINE', 'unknown')}")
+    print(
+        "  chunks:           "
+        f"{DESIRED['rag'].get('CHUNK_SIZE', 'unknown')} / "
+        f"overlap {DESIRED['rag'].get('CHUNK_OVERLAP', 'unknown')}"
+    )
+
+    if functions:
+        print()
+        print("Package-owned functions")
+        for function in functions:
+            state = "active" if bool(function.get("is_active")) else "inactive"
+            scope = "global" if bool(function.get("is_global")) else "model-specific"
+            print(f"  {function.get('id', 'unknown')}: {state}, {scope}")
+
+
+def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int:
     try:
         client.probe("/")
     except ApiError as exc:
@@ -287,7 +330,9 @@ def status(client: Client, authenticated: bool) -> int:
         return 1
     print("Open WebUI: reachable")
     if not authenticated:
-        print("Desired-state drift: skipped (set OWUI_API_KEY for authenticated comparison)")
+        print("Desired-state drift: skipped (set OWUI_API_KEY or --token-file for authenticated comparison)")
+        if verbose:
+            print("Verbose verified summary: skipped (administrator API key required)")
         return 0
 
     problems: list[str] = []
@@ -370,6 +415,8 @@ def status(client: Client, authenticated: bool) -> int:
             print(f"  - {problem}")
         return 2
     print("Desired-state drift: none in package-owned settings")
+    if verbose:
+        print_verbose_summary(load_models()["models"], load_functions())
     return 0
 
 
@@ -426,6 +473,11 @@ def parser() -> argparse.ArgumentParser:
         "--token-output",
         help="write the authenticated token to a protected temporary file for the caller",
     )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="show the verified active role, task, RAG and package-function summary",
+    )
     return p
 
 
@@ -435,7 +487,7 @@ def main() -> int:
     token = read_token_file(args.token_file) if args.token_file else env_token
     client = Client(args.url, token)
     if args.command == "status":
-        return status(client, bool(token))
+        return status(client, bool(token), verbose=args.verbose)
     if args.command == "init":
         if args.token_file:
             print(f"Using Open WebUI administrator API key file: {args.token_file}")
@@ -496,7 +548,7 @@ def main() -> int:
 
     apply(client)
     print("Open WebUI package-owned baseline applied through supported APIs.")
-    return status(client, True)
+    return status(client, True, verbose=args.verbose)
 
 
 if __name__ == "__main__":
