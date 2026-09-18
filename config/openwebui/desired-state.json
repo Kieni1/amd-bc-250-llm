@@ -13,6 +13,7 @@
           "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
           "prod-gpt-oss20b-ggml-org-mxfp4:latest",
           "prod-lfm25-8b-a1b-liquidai-q6-k:latest",
+          "exp-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
           "prod-qwen35-9b-unsloth-q6-k:latest"
         ],
         "tags": [

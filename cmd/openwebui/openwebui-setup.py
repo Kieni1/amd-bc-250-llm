@@ -19,6 +19,8 @@ DEFAULT_MODELS = Path("/usr/share/bc250-llm-server/openwebui/models.json")
 SOURCE_MODELS = Path(__file__).resolve().parents[2] / "config/openwebui/models.json"
 DEFAULT_DESIRED = Path("/usr/share/bc250-llm-server/openwebui/desired-state.json")
 SOURCE_DESIRED = Path(__file__).resolve().parents[2] / "config/openwebui/desired-state.json"
+DEFAULT_FUNCTIONS = Path("/usr/share/bc250-llm-server/openwebui/functions.json")
+SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
 
 def desired_file() -> Path:
@@ -125,6 +127,55 @@ def load_models() -> dict[str, Any]:
     return data
 
 
+def functions_file() -> Path:
+    override = os.environ.get("BC250_OWUI_FUNCTIONS_FILE")
+    if override:
+        return Path(override)
+    if DEFAULT_FUNCTIONS.is_file():
+        return DEFAULT_FUNCTIONS
+    return SOURCE_FUNCTIONS
+
+
+def load_functions() -> list[dict[str, Any]]:
+    path = functions_file()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ApiError(f"cannot read Open WebUI function manifest {path}: {exc}") from exc
+    entries = data.get("functions") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        raise ApiError(f"invalid Open WebUI function manifest: {path}")
+
+    functions: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ApiError(f"invalid Open WebUI function entry in {path}")
+        function_id = entry.get("id")
+        name = entry.get("name")
+        content_file = entry.get("content_file")
+        meta = entry.get("meta", {})
+        if not all(isinstance(value, str) and value for value in (function_id, name, content_file)):
+            raise ApiError(f"invalid Open WebUI function identity in {path}")
+        if not isinstance(meta, dict):
+            raise ApiError(f"invalid Open WebUI function metadata for {function_id}")
+        source = path.parent / content_file
+        try:
+            content = source.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ApiError(f"cannot read Open WebUI function source {source}: {exc}") from exc
+        functions.append(
+            {
+                "id": function_id,
+                "name": name,
+                "content": content,
+                "meta": meta,
+                "is_active": bool(entry.get("is_active", True)),
+                "is_global": bool(entry.get("is_global", False)),
+            }
+        )
+    return functions
+
+
 def desired_ollama() -> dict[str, Any]:
     return dict(DESIRED["ollama"])
 
@@ -169,6 +220,35 @@ def authenticate(client: Client, action: str) -> str:
     return token
 
 
+def apply_functions(client: Client) -> None:
+    listed = require_list(client.get("/api/v1/functions/list"), "function list")
+    existing_ids = {
+        item.get("id") for item in listed if isinstance(item, dict) and item.get("id")
+    }
+    for desired in load_functions():
+        payload = {
+            "id": desired["id"],
+            "name": desired["name"],
+            "content": desired["content"],
+            "meta": desired["meta"],
+        }
+        if desired["id"] in existing_ids:
+            result = client.post(f"/api/v1/functions/id/{desired['id']}/update", payload)
+        else:
+            result = client.post("/api/v1/functions/create", payload)
+        current = require_object(result, f"function {desired['id']}")
+        if bool(current.get("is_active")) != desired["is_active"]:
+            current = require_object(
+                client.post(f"/api/v1/functions/id/{desired['id']}/toggle", {}),
+                f"function {desired['id']} active toggle",
+            )
+        if bool(current.get("is_global")) != desired["is_global"]:
+            require_object(
+                client.post(f"/api/v1/functions/id/{desired['id']}/toggle/global", {}),
+                f"function {desired['id']} global toggle",
+            )
+
+
 def apply(client: Client) -> None:
     client.post("/ollama/config/update", desired_ollama())
 
@@ -179,6 +259,7 @@ def apply(client: Client) -> None:
     client.post("/api/v1/tasks/config/update", task)
     client.post("/api/v1/retrieval/embedding/update", desired_embedding())
     client.post("/api/v1/retrieval/config/update", desired_rag())
+    apply_functions(client)
     client.post("/api/v1/models/import", load_models())
 
 
@@ -242,11 +323,46 @@ def status(client: Client, authenticated: bool) -> int:
         if canonical(rag.get(key)) != canonical(value):
             problems.append(f"RAG config differs: {key}")
 
+    exported_functions = require_list(
+        client.get("/api/v1/functions/export"), "function export"
+    )
+    live_functions = {
+        item.get("id"): item for item in exported_functions if isinstance(item, dict)
+    }
+    for desired_function in load_functions():
+        function_id = desired_function["id"]
+        live = live_functions.get(function_id)
+        if not isinstance(live, dict):
+            problems.append(f"Package function missing: {function_id}")
+            continue
+        if live.get("name") != desired_function["name"]:
+            problems.append(f"Package function name differs: {function_id}")
+        if live.get("content") != desired_function["content"]:
+            problems.append(f"Package function content differs: {function_id}")
+        live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
+        if live_meta.get("description") != desired_function["meta"].get("description"):
+            problems.append(f"Package function description differs: {function_id}")
+        if bool(live.get("is_active")) != desired_function["is_active"]:
+            problems.append(f"Package function active state differs: {function_id}")
+        if bool(live.get("is_global")) != desired_function["is_global"]:
+            problems.append(f"Package function global state differs: {function_id}")
+
     exported = require_list(client.get("/api/v1/models/export"), "model export")
-    existing_ids = {item.get("id") for item in exported if isinstance(item, dict)}
+    live_models = {item.get("id"): item for item in exported if isinstance(item, dict)}
     for model in load_models()["models"]:
-        if model["id"] not in existing_ids:
-            problems.append(f"Package model preset missing: {model['id']}")
+        model_id = model["id"]
+        live = live_models.get(model_id)
+        if not isinstance(live, dict):
+            problems.append(f"Package model preset missing: {model_id}")
+            continue
+        for key in ("base_model_id", "name", "params", "is_active"):
+            if canonical(live.get(key)) != canonical(model.get(key)):
+                problems.append(f"Package model preset differs: {model_id}.{key}")
+        desired_meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
+        live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
+        for key in ("description", "tags", "filterIds", "defaultFilterIds"):
+            if key in desired_meta and canonical(live_meta.get(key)) != canonical(desired_meta[key]):
+                problems.append(f"Package model preset differs: {model_id}.meta.{key}")
 
     if problems:
         print("Desired-state drift: detected")
