@@ -502,6 +502,25 @@ if [[ -n "$ollama_tags" ]]; then
     task_count="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null | jq '.models | length' 2>/dev/null || echo '?')"
     embedding_count="$(curl -fsS http://127.0.0.1:11437/api/tags 2>/dev/null | jq '.models | length' 2>/dev/null || echo '?')"
     info "registered models by lane: main=$tag_count task=$task_count embedding=$embedding_count; main currently loaded=$loaded_count"
+
+    owui_models_file="${BC250_OWUI_MODELS_FILE:-/usr/share/bc250-llm-server/openwebui/models.json}"
+    if [[ ! -r "$owui_models_file" ]]; then
+      owui_models_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/models.json"
+    fi
+    if [[ -r "$owui_models_file" ]]; then
+      while IFS= read -r required_model; do
+        [[ -n "$required_model" ]] || continue
+        if jq -e --arg model "$required_model" \
+            'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
+            <<< "$ollama_tags" >/dev/null 2>&1; then
+          ok "active Open WebUI role base model is registered: $required_model"
+        else
+          bad "active Open WebUI role base model is not registered on main Ollama: $required_model"
+        fi
+      done < <(jq -r '.models[] | select(.is_active == true) | .base_model_id // empty | sub(":latest$"; "")' "$owui_models_file" | awk 'NF && !seen[$0]++')
+    else
+      bad "package Open WebUI model preset file is unavailable for active base-model verification"
+    fi
   fi
 else
   bad "active Ollama API unavailable at $OLLAMA_URL"

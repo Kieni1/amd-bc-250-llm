@@ -350,10 +350,10 @@ class PackagingTests(unittest.TestCase):
         )
         task = desired["task"]["TASK_MODEL"].removesuffix(":latest")
         self.assertEqual(task, "task-lfm25-1.2b-instruct-liquidai-q6-k")
-        self.assertIn(
-            f'"{task},embed-jina-v5-small-retrieval-q4-k-m"',
-            (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8"),
-        )
+        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
+        self.assertIn(".task.TASK_MODEL", installer)
+        self.assertIn(".embedding.RAG_EMBEDDING_MODEL", installer)
+        self.assertIn("select(.is_active == true)", installer)
         self.assertIn(
             f"readonly TASK_MODEL={task}",
             (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8"),
