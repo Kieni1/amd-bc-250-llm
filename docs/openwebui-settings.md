@@ -100,8 +100,35 @@ This is intentional on the BC-250 unified-memory pool.
 | Office – Standard | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
 | Office – Documents | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
 | Office – Translation DE/FR | `prod-lfm25-8b-a1b-liquidai-q6-k` |
+| Office – Translation DE → FR (Candidate) | `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` |
+| Office – Translation FR → DE (Candidate) | `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` |
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
+
+The two Translate-Gemma candidate presets reproduce the Stage-2E product contract rather
+than changing the shared system prompt by direction. Both use the exact installed
+`openwebui/prompts/translation-explicit-direction-v1.txt` prompt, `max_tokens=2048`,
+and leave `think` unspecified. The package-owned non-global
+`bc250_translation_direction` Filter rewrites only the current text user message into
+the exact tested DE→FR or FR→DE wrapper before inference. The generic LFM translation
+preset remains the production/default role until bounded final qualification succeeds.
+
+The Filter is installed and reconciled through Open WebUI's supported Functions API by
+`bc250-openwebui-setup`; it is not global and is attached only to those two candidate
+model presets. `bc250-openwebui-setup status` verifies its source/active/global state and
+the relevant model-preset parameters as part of package desired-state drift.
+
+Because Translate-Gemma remains an experimental candidate rather than a baseline-installed
+production model, install it before the bounded qualification and then reapply
+Open WebUI desired state:
+
+```bash
+sudo bc250-model install experiments exp-translate-gemma4-sub-e4b-17s-q4-k-xl
+sudo bc250-openwebui-setup apply
+```
+
+The existing `bc250-office-translation` LFM role remains usable if the candidate is
+not installed.
 
 The Qwen3.5 preset carries request-level `think=false`; the package keeps
 Ollama's native renderer/parser rather than replacing the model template.

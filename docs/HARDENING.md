@@ -83,6 +83,18 @@ sudo systemctl disable --now ollama.service ollama-task.service ollama-embedding
 For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250-agent-mode leave`; use `enter` only for exclusive coding tests. Rerun `sudo bc250-install` to restore Open WebUI boot enablement after deliberately removing its Quadlet drop-in.
 
 
+## Package-owned Open WebUI Function
+
+The two Translate-Gemma candidate translation roles use one package-owned, non-global
+Open WebUI Filter Function (`bc250_translation_direction`) to prepend the exact tested
+direction wrapper to the current text user message. Open WebUI Functions execute Python
+inside the application server, so treat any Function as executable server code. The
+package-owned filter is intentionally tiny: it performs no network, filesystem, process,
+credential or tool access and is attached only to the two translation candidate presets.
+`bc250-openwebui-setup apply` restores its reviewed source and active/non-global state;
+`status` reports drift. Do not mark it global or replace it with unreviewed community
+code on a confidential appliance.
+
 ## Open WebUI local/offline policy
 
 Open WebUI is configured with `OFFLINE_MODE=true` and `HF_HUB_OFFLINE=1`, with

@@ -24,7 +24,7 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/share/doc/bc250-llm-server/` | Installed documentation preserving repository-relative paths, including `MODELS.md`, `docs/` and `cmd/benchmark/README.md` |
 | `/usr/lib/systemd/system/` | Packaged services and timers |
 | `/usr/share/containers/systemd/` | Open WebUI and Tika Quadlets |
-| `/usr/share/bc250-llm-server/openwebui/` | Open WebUI desired state and additive model presets |
+| `/usr/share/bc250-llm-server/openwebui/` | Open WebUI desired state, additive model presets, reviewed package-owned Functions and exact prompt assets |
 
 The package also owns its governor, nginx, sensor-module, sysusers, tmpfiles
 and systemd-preset configuration in the standard Fedora directories.
