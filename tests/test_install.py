@@ -102,11 +102,14 @@ step_3_install_ollama
         self.assertIn("bc250-agent-mode status", commands)
         self.assertIn("bc250-storage status", commands)
 
-    def test_one_unified_model_selection_is_used_after_required_baseline(self) -> None:
+    def test_one_unified_model_selection_is_used_after_required_active_roles(self) -> None:
         source = INSTALLER.read_text()
         self.assertIn("bc250-model list all --all", source)
-        self.assertIn('BC250_MODEL_SELECTION', source)
-        self.assertIn('task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m', source)
+        self.assertIn("BC250_MODEL_SELECTION", source)
+        self.assertIn("select(.is_active == true)", source)
+        self.assertIn(".task.TASK_MODEL", source)
+        self.assertIn(".embedding.RAG_EMBEDDING_MODEL", source)
+        self.assertIn('bc250-model install all "$required_csv"', source)
         self.assertIn('bc250-model install all "$selection" --include-disabled', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -121,7 +124,16 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:list all --all", result.stdout)
-        self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
+        for model in (
+            "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+            "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+            "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
+            "prod-qwen35-9b-unsloth-q6-k",
+            "prod-gpt-oss20b-ggml-org-mxfp4",
+            "task-lfm25-1.2b-instruct-liquidai-q6-k",
+            "embed-jina-v5-small-retrieval-q4-k-m",
+        ):
+            self.assertIn(model, result.stdout)
         self.assertIn("no additional models selected", result.stdout)
         self.assertEqual(result.stdout.count("model:install"), 1)
 
@@ -136,7 +148,9 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:install all recommended,19-20 --include-disabled", result.stdout)
-        self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
+        self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl", result.stdout)
+        self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k", result.stdout)
+        self.assertIn("embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
         self.assertEqual(result.stdout.count("model:install"), 2)
 
     def test_original_noninteractive_input_survives_transcript_pty(self) -> None:
@@ -371,11 +385,9 @@ step_8_application_services
             )
             self.assertEqual(resumed.returncode, 0, resumed.stdout)
             calls = log.read_text()
-            baseline = calls.index(
-                "model:install all task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m"
-            )
+            required = calls.index("model:install all prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl")
             owui = calls.index("systemctl:start tika.service open-webui.service")
-            self.assertLess(baseline, owui)
+            self.assertLess(required, owui)
             self.assertIn("mode:leave", calls)
             self.assertTrue(enable_target.is_file())
             self.assertIn("WantedBy=multi-user.target", enable_target.read_text())

@@ -34,7 +34,7 @@ and a newly prepared replacement module is not yet running.
 
 Use --models-only to reconcile runtime topology, models and Open WebUI without system/kernel setup.
 Use --owui-token-file FILE to apply/verify Open WebUI with an existing protected admin API-key file.
-Set BC250_MODEL_SELECTION for unattended model selection; Enter skips models.
+Set BC250_MODEL_SELECTION for unattended extra-model selection; Enter skips optional extras.
 Set BC250_UPDATE_OLLAMA=1 to refresh official Ollama explicitly.
 Set BC250_OWUI_TOKEN_FILE to provide the same token-file path non-interactively.
 USAGE
@@ -344,23 +344,37 @@ step_7_models() {
   chmod 0600 "$HF_SESSION_FILE"
   export BC250_HF_SESSION_FILE="$HF_SESSION_FILE"
 
-  echo "Ensuring baseline Open WebUI infrastructure models."
+  local owui_models_file="${BC250_OWUI_MODELS_FILE:-/usr/share/bc250-llm-server/openwebui/models.json}"
+  local owui_desired_file="${BC250_OWUI_DESIRED_STATE:-/usr/share/bc250-llm-server/openwebui/desired-state.json}"
+  local required_csv
+  [[ -r "$owui_models_file" ]] || owui_models_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/models.json"
+  [[ -r "$owui_desired_file" ]] || owui_desired_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
+  required_csv="$({
+    jq -r '.models[] | select(.is_active == true) | .base_model_id // empty | sub(":latest$"; "")' "$owui_models_file"
+    jq -r '(.task.TASK_MODEL // empty | sub(":latest$"; "")), (.embedding.RAG_EMBEDDING_MODEL // empty | sub(":latest$"; ""))' "$owui_desired_file"
+  } | awk 'NF && !seen[$0]++' | paste -sd, -)"
+  [[ -n "$required_csv" ]] || { echo "ERROR: package-owned Open WebUI required-model set is empty." >&2; return 1; }
+
+  echo "Ensuring models required by active package-owned Open WebUI roles."
+  echo "A fresh install may download all active production role models before Open WebUI starts."
+  printf '%s
+' "$required_csv" | tr ',' '
+' | sed 's/^/  - /'
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
-    bc250-model install all \
-    "task-lfm25-1.2b-instruct-liquidai-q6-k,embed-jina-v5-small-retrieval-q4-k-m"
+    bc250-model install all "$required_csv"
 
   echo
-  echo "Optional production, experiment, agent and additional model selection:"
+  echo "Optional experiments, rollback/reference, agent and additional model selection:"
   bc250-model list all --all
   local selection="${BC250_MODEL_SELECTION:-}"
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 ]]; then
     read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
   elif [[ -z "$selection" ]]; then
     echo "BC250_MODEL_SELECTION is unset; no additional models selected in non-interactive mode."
-    echo "Baseline task + embedding models are installed."
+    echo "All models required by active package-owned Open WebUI roles are installed."
     return 0
   fi
-  [[ -n "$selection" ]] || { echo "Skipping additional models; baseline models are installed."; return 0; }
+  [[ -n "$selection" ]] || { echo "Skipping additional models; required Open WebUI role models are installed."; return 0; }
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
     bc250-model install all "$selection" --include-disabled
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
@@ -459,7 +473,7 @@ show_plan() {
   printf '  swap                  %s\n' "$swap"
   printf '  40-CU                 %s\n' "$cu"
   printf '  storage headroom      %s available\n' "$(df -h --output=avail /var/lib/bc250-llm-server 2>/dev/null | awk 'NR==2{print $1}' || echo unknown)"
-  printf '  models                ensure baseline + optional model selection\n'
+  printf '  models                ensure active role models + optional extras\n'
   printf '  Open WebUI            start after models, then apply/status\n'
   printf '  core verification     run before optional power/remote-maintenance setup\n'
   printf '  maintenance / Pi      optional guided WOL, safe-shutdown and export setup\n'
@@ -676,7 +690,7 @@ main() {
   echo "  Appliance status:       sudo bc250-status"
   completion_owui_token="${OWUI_TOKEN_FILE:-${BC250_OWUI_TOKEN_FILE:-}}"
   if [[ -n "$completion_owui_token" && -f "$completion_owui_token" && -r "$completion_owui_token" ]]; then
-    echo "  Open WebUI status:      sudo bc250-openwebui-setup status --owui-token-file $completion_owui_token"
+    echo "  Open WebUI status:      sudo bc250-openwebui-setup status --verbose --owui-token-file $completion_owui_token"
   else
     echo "  Open WebUI status:      bc250-openwebui-setup status"
   fi
