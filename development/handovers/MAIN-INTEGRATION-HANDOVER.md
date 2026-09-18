@@ -37,20 +37,33 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.2
-RPM Release   0.5%{?dist}
-NVR           0.11.2-0.5
+RPM Release   0.6%{?dist}
+NVR           0.11.2-0.6
 ```
 
-The current unpublished `0.11.2-0.5` source keeps the 0.8 maintenance fixes and
-0.9/0.10 main-model/MTP qualification work, the 2026-09-17 task and German/French
-translation campaigns, and the v4.1 production-translation revalidation path. It corrects
-package-resource resolution so source checkouts and installed RPMs use the appropriate
-benchmark/share layout without changing runtime/service topology, Ollama, KV, CU, governor
-policy, production models, quality thresholds or Open WebUI role policy. LFM2.5 1.2B remains
-the sole task model and Stage-2E-selected Translate-Gemma remains the production translation
-base behind the two explicit direction roles. The former LFM translator is retained only as
-an experimental rollback/reference. Detailed campaign evidence stays in Git-only
-`development/` memory rather than runtime Modelfiles.
+The current unpublished `0.11.2-0.6` source builds on the real-device-qualified `0.5`
+resource fix. It keeps runtime/service topology, Ollama, KV, CU, governor policy, office
+production models, quality thresholds and Open WebUI role policy unchanged while improving
+quality diagnosis and the coding-agent product path. Task structural failures no longer
+cascade into synthetic language/relevance causes; revalidation can surface failed case IDs
+and canonical evidence paths. `bc250-code` now separates native reasoning through Ollama
+`/api/chat`, fails closed on nonterminal/truncated/reasoning-contaminated output, and keeps
+atomic destination replacement. Two compact agent challengers are added for opt-in
+comparison; Ornith remains the default. LFM2.5 1.2B remains the sole task model and
+Stage-2E-selected Translate-Gemma remains the production translation base. Detailed
+campaign evidence stays in Git-only `development/` memory rather than runtime Modelfiles.
+
+Local release-closure evidence for this exact source: `make validate` passed RPM/source
+preflight plus 349/349 deterministic tests; the preceding focused
+benchmark/catalog/packaging/documentation run passed 211/211, post-closure
+documentation regressions passed 9/9, and changed shell syntax passed `bash -n`. Ruff and ShellCheck were unavailable here and were not run. No GitHub
+RPM build or 0.11.2-0.6 BC-250 runtime/model qualification has run yet.
+
+Installed `bc250-llm-server-0.11.2-0.5.fc44.x86_64` is now the newest real-device package
+evidence: installer verification was 54/0/0 and revalidation v4.1 completed with
+infrastructure/restoration PASS, full coverage, Open WebUI translation PASS, agent 3/3,
+and one genuine task `tags-de` format quality miss. Exact evidence is recorded in
+`development/model-runs/2026-09-18-installed-0.11.2-0.5-revalidation.md`.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -408,7 +421,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` subsequently verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical device testing on `0.11.2-0.4` reached the routine v4.1 Open WebUI translation stage but exposed the installed fixture-path defect before translation quality evaluation. Current `0.11.2-0.5` fixes that package-resource lookup without changing the model/evaluator contract. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. Current `0.11.2-0.6` does not change the translation model/evaluator contract. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -482,12 +495,20 @@ unless scanned-document workflows become a stronger product requirement.
 
 ## Agent
 
-Current default `agentic-ornith15-9b-ornith-q5-k-m` at temperature 0 and 3072-token
-Bash/Python budget passed 3/3 in three consecutive retained BC-250 runs.
+Current default `agentic-ornith15-9b-ornith-q5-k-m` remains the baseline. Installed
+`0.11.2-0.5.fc44` passed the canonical agent benchmark 3/3 during full revalidation.
+Separate coding-helper evidence showed that the old `/api/generate` product route could
+write native reasoning before a useful final answer and could also exhaust its 3072-token
+budget before a complete answer. Those are product-path completion/integrity defects, not
+reasons to weaken the benchmark or retire Ornith.
 
-That evidence is promising but narrow. `bc250-code` is a local coding helper, not an
-autonomous repository agent. Broaden representative modes before expanding the product
-claim.
+Current `0.11.2-0.6` moves `bc250-code` to `/api/chat` with separated thinking/final
+content, terminal-completion checks, explicit truncation refusal and reasoning-marker
+rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
+package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
+4B Q6_K → Gemma 4 E4B Q4_K_M → Ornith baseline. Gemma 4 12B is retained only if an
+E4B result leaves a final 12B comparison useful. Do not graveyard Qwen2.5-Coder from the
+summary alone; the raw campaign archive was not supplied to this integration pass.
 
 ---
 
@@ -821,7 +842,11 @@ Current coding helper model is Ornith in the exclusive agent lane.
 
 `bc250-code` supports bounded local coding assistance such as generation, refactor,
 review, documentation, tests and commit-message work. It is **not** a fully autonomous
-repository agent and generated output is not automatically applied/executed.
+repository agent and generated output is not automatically applied/executed. Current
+source uses `/api/chat` with `think:true`, writes only terminal non-empty final content,
+refuses `done_reason=length` and reasoning-marker contamination, and preserves an existing
+destination on those failures. The default request budget stays 3072 pending real-device
+A/B evidence.
 
 Keep two test layers:
 
@@ -1130,13 +1155,13 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- unpublished 0.11.2-0.5 source needs an external GitHub RPM build before release;
-  historical installed 0.11.2-0.4 device evidence reached revalidation v4.1 phase 5/6 before the `owui-translation` fixture-path infrastructure failure, while installed 0.11.2-0.3 completed full revalidation v4.0 with infrastructure/restoration PASS, direct Translate-Gemma 8/8, direct RAG 4/4 and OWUI RAG 3/3; exact 0.11.2-0.3 evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.2-0.3-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
+- unpublished 0.11.2-0.6 source needs an external GitHub RPM build before release;
+  installed 0.11.2-0.5.fc44 is the newest full appliance evidence and completed v4.1 with infrastructure/restoration PASS, full coverage, Open WebUI translation PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.2-0.5-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
-- Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke; historical 0.11.2-0.4 revalidation reached the routine product-path stage but failed on package-resource lookup before quality evaluation; current 0.11.2-0.5 corrects that lookup, while the external Stage-2E hard corpus remains separate evidence;
+- Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
 - packaged RAG plumbing passed direct 4/4 plus authenticated OWUI 3/3 on 0.11.2-0.3, but real office documents/Tika/OCR breadth still needs qualification around absent/multisource/conflict/table/multilingual cases;
-- Ornith revalidation on 0.11.2-0.3 was 2/3 because otherwise valid Bash was wrapped in Markdown fences; agent quality should broaden into documented `bc250-code` workflows before promotion claims;
+- Ornith passed canonical agent qualification 3/3 on installed 0.11.2-0.5.fc44, but the changed 0.11.2-0.6 `bc250-code` `/api/chat` product route and output budget still require bounded real-device qualification before stronger coding-helper claims;
 - MTP needs real llama.cpp runtime qualification and quality/resource-aware comparison;
 - current batched XFS dedupe deserves a performance run when storage work becomes a
   priority;
@@ -1152,14 +1177,17 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. Build/install `0.11.2-0.5`, then run one current `bc250-verify --owui-token-file` plus revalidation v4.1 to confirm required-role model registration, task 6/6 expectation and live OWUI translation coverage.
-2. Analyze returned evidence; do not expand agent/RAG campaigns in the same batch.
-3. If clean, **Operations Batch 2:** one real S5 Wake-on-LAN cycle.
-4. If clean, **Operations Batch 3:** safe-shutdown busy/defer and later idle/allow.
-5. Then establish a small **benchmark-operations control run** so subsequent translation,
-   RAG/general/agent/MTP results share a trusted current measurement layer.
-6. Open only the next highest-value specialist lane and progress it through its promotion
-   funnel.
+1. GitHub-build/install `0.11.2-0.6`, capture the exact NEVRA, and run the normal verifier.
+2. Run one bounded Ornith `bc250-code` route/completion check first. Confirm final-content
+   separation, no file replacement on `done_reason=length`, and compare 3072 vs 6144 only
+   when 3072 explicitly truncates.
+3. If the product route is healthy, run the four-model agent funnel: Ornith baseline →
+   Qwable 9B → Qwen3.5 4B → Gemma 4 E4B → Ornith baseline. Keep static/integrity gates
+   cheap before broader product workflows.
+4. Keep power qualification separate: when returning to operations, do one real S5 WOL
+   cycle, then safe-shutdown busy/defer and idle/allow.
+5. Do not reopen unrelated RAG/main/translation campaigns unless their current evidence or
+   changed source requires it.
 
 That sequencing protects the product's current top priorities without losing the deeper
 quality program.

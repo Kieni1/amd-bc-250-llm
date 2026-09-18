@@ -27,8 +27,9 @@ results.csv     optional category export where useful
 
 `meta.json` uses one shared envelope for package identity, kernel, benchmark version,
 runtime endpoints/versions, model names/digests, fixture SHA-256 values and effective
-benchmark options. `summary.json` includes a small category-specific aggregate section
-so the canonical summary is useful without reopening every case record.
+benchmark options. `summary.json` includes category aggregates plus case-level
+`quality_failures`, so a mixed result identifies the failing model/case without reopening
+every record. `results.jsonl` remains the canonical per-case evidence.
 
 `results.jsonl` uses the common envelope:
 
@@ -139,8 +140,11 @@ sudo bc250-agent-mode leave
 ```
 
 The agent benchmark is a safe static contract check. It records raw-format, syntax
-and required-structure evidence; it does not execute generated Bash/Python as root
-and does not claim arbitrary behavioral correctness.
+and required-structure evidence; literal thinking markers in final output are a format
+failure. NUL-safe `xargs -0 -r ... basename` is accepted for the basename contract,
+while omitting `-r` remains an empty-input robustness miss. The benchmark does not
+execute generated Bash/Python as root and does not claim arbitrary behavioral
+correctness.
 
 ## Production use-case acceptance
 

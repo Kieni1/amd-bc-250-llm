@@ -227,3 +227,27 @@ required before calling the new release fully qualified on the appliance.
 
 **Retest only if:** a retired model gains a materially new role, runtime/hardware envelope,
 or evidence that directly addresses its recorded rejection/supersession reason.
+
+## DEC-011 — Fail closed on coding-helper completion integrity
+
+**Status:** ACTIVE
+
+**Decision:** `bc250-code` must keep native model reasoning separate from the final
+product output. The package uses Ollama `/api/chat` with `think:true`, consumes only
+terminal non-empty `message.content`, rejects `done_reason=length` and literal reasoning
+markers in final content, and must not replace an existing destination file unless all of
+those checks pass. Output replacement remains atomic.
+
+The package default request budget remains 3072 tokens. A larger default is not adopted
+merely because one workflow truncated; use `CODING_AGENT_NUM_PREDICT` for bounded
+real-device A/B evidence first. Static agent evaluation likewise treats reasoning leakage
+as a format failure and must not weaken syntax/requirement checks to hide model misses.
+
+**Why:** real product-path evidence showed that useful final code could be preceded by
+reasoning, and that some responses could exhaust the output budget before a complete final
+answer. Writing either form directly into a target file violates the coding-helper product
+contract even when the underlying model is otherwise capable.
+
+**Retest only if:** Ollama changes the chat completion/thinking contract, the default agent
+model changes materially, or bounded BC-250 evidence supports changing the default output
+budget.

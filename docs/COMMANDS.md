@@ -523,9 +523,13 @@ bc250-run-mtp {27b|4b|ID}
 ```
 
 `MODE` is `generate`, `refactor`, `review`, `document`, `test` or `commit`.
-`CODING_AGENT_MODEL` selects an installed agentic model;
-`OLLAMA_HOST`/`OLLAMA_URL` override its endpoint. Coding helpers do not stage,
-push, approve or merge without the command's explicit local action.
+`CODING_AGENT_MODEL` selects an installed agentic model; `OLLAMA_HOST`/`OLLAMA_URL`
+override its endpoint, and `CODING_AGENT_NUM_PREDICT` overrides the positive output
+token budget (default 3072). `bc250-code` uses `/api/chat` with `think:true` and writes
+only terminal non-empty `message.content`. It returns `3` and leaves an existing output
+file unchanged if completion is nonterminal, stops at `done_reason=length`, or final
+content contains literal reasoning markers. Coding helpers do not stage, push, approve
+or merge without the command's explicit local action.
 
 The quick MTP comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
 `NUM_PREDICT` and `PROMPT`. It is a speed-oriented Ollama-vs-llama.cpp helper and

@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current unpublished 0.11.2-0.5 source
+# BC-250 support / operations handover — current unpublished 0.11.2-0.6 source
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,27 +10,29 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.2
-RPM Release:  0.5
-source base:  amd-bc-250-llm-0.11.2-0.5.zip
+RPM Release:  0.6
+source base:  amd-bc-250-llm-0.11.2-0.6.zip
 ```
 
-This handover does **not** assert that the unpublished 0.11.2-0.5 RPM has already
+This handover does **not** assert that the unpublished 0.11.2-0.6 RPM has already
 been built, installed or hardware-qualified. Capture installed NEVRA before interpreting
-machine evidence. The newest supplied real-device evidence is historical `0.11.2-0.4`:
-revalidation v4.1 reached phase 5/6 and then infrastructure-failed before translation
-quality evaluation because the installed benchmark script resolved its fixture as
-`/usr/examples/benchmark/translation-office.json`. The supplied transcript did not capture
-the distro suffix of that installed NEVRA, so do not invent it. Installed
-`0.11.2-0.3.fc44` remains the last full revalidation completion: infrastructure/restoration
-PASS, direct translation 8/8, direct RAG 4/4 and authenticated Open WebUI RAG 3/3. Its
+machine evidence. The newest real-device package evidence is historical
+`bc250-llm-server-0.11.2-0.5.fc44.x86_64`: installer verification was 54/0/0 and
+revalidation v4.1 completed with infrastructure/restoration PASS, full coverage,
+`owui-translation` PASS, agent 3/3 and task 5/6 due to one double-JSON format miss. Its
 exact run is recorded in
-`development/model-runs/2026-09-18-installed-0.11.2-0.3-revalidation.md`.
+`development/model-runs/2026-09-18-installed-0.11.2-0.5-revalidation.md`. Older
+`0.11.2-0.4` fixture-path failure and `0.11.2-0.3.fc44` evidence remain historical and
+should not be rewritten as current.
 
 ## Validation ownership
 
-GitHub owns RPM/package builds. Workstation owns Ruff. BC-250 owns runtime/hardware
-qualification. Do not attempt unavailable tools locally and do not claim checks that did
-not run.
+GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
+runtime/hardware qualification. For this exact `0.11.2-0.6` source, local `make validate`
+passed RPM/source preflight plus 349/349 deterministic tests; the earlier focused
+benchmark/catalog/packaging/documentation run passed 211/211, post-closure
+documentation regressions passed 9/9, and changed shell syntax passed `bash -n`. Ruff and ShellCheck were unavailable here and were not run. No GitHub
+RPM build or 0.11.2-0.6 BC-250 execution is claimed.
 
 ## Normal service topology
 
@@ -94,20 +96,21 @@ Do not revive graveyard models merely because an old handover names them.
 - Stock CPU operation exposes 6C/12T even though 8C/16T silicon exists; CPU unlock is
   separate and not required for the appliance.
 
-Latest **full** general appliance evidence is from installed `0.11.2-0.3.fc44`: Fedora kernel
-7.2.5-200.fc44, Mesa 26.2.2-6.fc44, healthy 40/40 live routing, normal
-main/task/embedding service topology, authenticated Open WebUI desired-state drift none,
-and install verification at 49 ok / 0 warn / 0 fail. Local
+Latest **full** general appliance evidence is from installed `0.11.2-0.5.fc44`: Fedora kernel
+7.2.5-200.fc44, healthy 40/40 live routing, normal main/task/embedding service topology,
+authenticated Open WebUI desired-state drift none, and install verification at 54 ok /
+0 warn / 0 fail. Local
 config/users backups were enabled, pruning remained DRY_RUN=1, warm-up and automatic
-night shutdown were disabled, and Pi companion/export were skipped. The same run exposed
-the stale installed path used by `bc250-maintenance contract`; current source contains
-that fix plus retained-key validation, independent SSH preparation for backup export and
-the fail-closed MTP comparison integrity follow-up. The same 0.11.2-0.3 machine completed whole-appliance revalidation v4.0 with full
-coverage, infrastructure/restoration PASS, task 5/6 due to an evaluator vocabulary gap,
-agent 2/3 due to fenced Bash output, direct production translation 8/8, direct RAG 4/4
-and authenticated OWUI RAG 3/3. A subsequent authenticated production-translation smoke
-proved both live direction roles and left desired-state drift at none. Power/WOL evidence
-remains older and still needs qualification.
+night shutdown were disabled, and Pi companion/export were skipped. The `bc250-maintenance contract` installed-documentation path defect had already been
+fixed in the 0.11.1-0.7 line; the 0.11.2-0.5 transcript successfully printed that
+contract, so it is not a current 0.5 finding. Current source also retains the later
+retained-key validation, independent SSH preparation for backup export and fail-closed
+MTP comparison-integrity work. Installed 0.11.2-0.5 completed whole-appliance
+revalidation v4.1 with full coverage,
+infrastructure/restoration PASS, canonical Open WebUI translation PASS, agent 3/3 and one
+task quality miss at 5/6 because `tags-de` emitted two JSON objects. Source 0.11.2-0.6
+changes the diagnosis of that task miss but not its acceptance. Power/WOL evidence remains
+older and still needs qualification.
 
 ## Storage lessons to preserve
 
@@ -152,21 +155,21 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-After GitHub builds and the appliance installs `0.11.2-0.5`, run one bounded re-check of:
+After GitHub builds and the appliance installs `0.11.2-0.6`, capture the exact NEVRA and
+run one bounded source-change check:
 
 ```text
-installed RPM NEVRA
 bc250-verify --owui-token-file FILE
-bc250-openwebui-setup status --verbose --owui-token-file FILE
-bc250-revalidate start --owui-token-file FILE
-maintenance contract/status and companion status
+one Ornith bc250-code route/completion probe
+normal topology restored after agent mode
 ```
 
-The v4.1 run should confirm required active-role base registration, task 6/6 expectation
-and the new authenticated `owui-translation` screen. If that is clean, configure/confirm
-the intended WOL interface and power policy, then run one real S5 Wake-on-LAN cycle. Only after S5 WOL succeeds should the safe-shutdown
-busy/defer and later idle/allow cases be tested. Keep optional backup export and dedupe
-performance separate.
+The coding probe should establish that final content is separated from native reasoning
+and that a nonterminal or `done_reason=length` result does not replace the requested file.
+Only after that focused product-path check should main integration run the comparative
+agent funnel. Keep WOL/power qualification as a separate operations batch: one real S5
+Wake-on-LAN cycle first, then safe-shutdown busy/defer and later idle/allow. Do not mix
+that power batch with the agent campaign.
 
 ## Other operations work after power qualification
 

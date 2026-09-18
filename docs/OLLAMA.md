@@ -106,8 +106,10 @@ uses the top-level `/api/generate` `system` override without `raw=true`; product
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` as supported by 0.34.0. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
 lane; RAG-quality uses 11437 for vectors and 11434 for the answer model. Model
-allocation comes from `/api/ps`. The `bc250-benchmark agent` lane uses `/api/chat`
-on exclusive port 11436 and does not globally force reasoning off.
+allocation comes from `/api/ps`. The `bc250-benchmark agent` lane and `bc250-code`
+product helper use `/api/chat` on exclusive port 11436. `bc250-code` requests
+`think:true`, consumes only final `message.content`, and fails closed on nonterminal or
+output-limit-truncated completion instead of writing a partial file.
 
 The benchmark samples BC-250 temperature and memory/AMDGPU counters during each
 request. `RUN_THERMAL=1` adds sustained decode windows; no second `watch` terminal

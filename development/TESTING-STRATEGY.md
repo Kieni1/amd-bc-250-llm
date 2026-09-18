@@ -229,12 +229,23 @@ Keep two test layers separate:
 2. actual `bc250-code` workflows on disposable inputs — review, refactor, tests,
    documentation, structured config work and commit-message generation.
 
+The product helper must consume final content separately from native reasoning and fail
+closed on nonterminal completion, output-limit truncation or literal reasoning markers.
+Do not treat a successful HTTP response as valid inference unless terminal completion
+integrity passes. Keep the package default output budget at 3072 until a bounded A/B
+shows that a higher default improves complete product outputs without unacceptable cost;
+use `CODING_AGENT_NUM_PREDICT` for that comparison.
+
 Generated code must not be automatically executed as root. If behavior needs execution,
 run deliberately reviewed output in a disposable/safe context and then run the relevant
 real tests. The product claim remains a local coding helper, not an autonomous repository
 agent.
 
-Only compare alternative agent models after the production Ornith baseline is current.
+For the next comparative funnel, use Ornith as baseline, then Qwable 9B, Qwen3.5 4B
+Q6_K and Gemma 4 E4B Q4_K_M, followed by the baseline again. Reject cheaply on
+completion integrity/static semantics before promoting candidates into broader real
+`bc250-code` workflows. Only revisit Gemma 4 12B if the E4B comparison leaves that
+question open.
 
 ### Lane G — MTP / speculative decoding
 

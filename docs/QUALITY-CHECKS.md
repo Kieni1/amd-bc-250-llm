@@ -78,6 +78,22 @@ Task benchmark metadata records the actual request contract: task requests use
 packaged tag/query paths retain the 128-token task budget. The screen does not
 silently enlarge those budgets to improve a candidate's score.
 
+
+## Agentic/coding qualification
+
+Use the package-owned `bc250-benchmark agent` as the cheap static gate before product
+workflow testing. Reasoning that leaks into final output through literal `<think>`-style
+markers is a format failure even when the cleaned code body would otherwise parse. Bash
+validation recognizes NUL-safe `xargs -0 -r -n1 basename` as valid basename extraction;
+`xargs` without `-r` remains a real empty-directory robustness failure.
+
+`bc250-code` itself is a product-path check, not a replacement for the static benchmark.
+It consumes Ollama chat final content separately from native thinking and refuses to
+replace a file on nonterminal completion, `done_reason=length`, empty final content or
+literal reasoning contamination. Keep the 3072-token default until real-device evidence
+supports a different package default; use `CODING_AGENT_NUM_PREDICT` for bounded A/B
+work.
+
 ## Translation qualification
 
 The broad DE↔FR tournament is closed. `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is the package production translation
@@ -132,8 +148,11 @@ if credential scanning or root-only temporary-file cleanup fails. Their summarie
 plus latency/resource extrema.
 
 Output-budget diagnostics are evidence and must not automatically be relabeled as
-model-quality defects. Likewise, evaluators must not be weakened to turn genuine
-model mistakes into passes.
+model-quality defects. Likewise, evaluators must not be weakened to turn genuine model
+mistakes into passes. When a structural/parse failure makes downstream language or
+semantic checks meaningless, report the structural failure without cascading synthetic
+causes. Canonical mixed-quality summaries should identify the failed case and retain a
+path back to `results.jsonl`.
 
 Historical campaign scripts remain in source under `quality-checks/history/` for reproducibility and archaeology; they are not installed as the current operator interface. The supported current screens carry forward the lifecycle properties that still matter: bounded lane isolation, pre/post state capture, exact Open WebUI/provider restoration, credential/privacy checks, serious-warning capture, memory recovery, normalized evidence archives and authoritative final-RC recording. Prefer those current screens for new comparisons.
 
