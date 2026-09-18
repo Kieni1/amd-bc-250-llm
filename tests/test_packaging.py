@@ -388,6 +388,48 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('--since "$CHECK_START"', recovery)
         self.assertIn('new serious kernel events during recovery probe', recovery)
 
+    def test_task_safety_gates_cover_normal_embedding_service(self) -> None:
+        scripts = (
+            ROOT / "quality-checks/task/20-survival-gate.sh",
+            ROOT / "quality-checks/task/30-appliance-recovery-check.sh",
+        )
+        for script in scripts:
+            with self.subTest(script=script.name):
+                source = script.read_text(encoding="utf-8")
+                self.assertIn("ollama-embedding.service", source)
+
+    def test_translation_final_status_is_written_after_privacy_and_updated_on_tar_failure(self) -> None:
+        source = (ROOT / "quality-checks/translation/10-direct-candidate-screen.sh").read_text(encoding="utf-8")
+        privacy_pos = source.index("privacy_rc=$?")
+        status_pos = source.index("printf '%s\\n' \"$rc\" > \"$OUT/post/script-exit-rc.txt\"", privacy_pos)
+        tar_pos = source.index('tar --owner=0 --group=0 --numeric-owner', status_pos)
+        failure_rewrite_pos = source.index("printf '%s\\n' \"$rc\" > \"$OUT/post/script-exit-rc.txt\"", tar_pos)
+        self.assertLess(privacy_pos, status_pos)
+        self.assertLess(status_pos, tar_pos)
+        self.assertGreater(failure_rewrite_pos, tar_pos)
+        self.assertIn('write_run_manifest "$rc"', source[failure_rewrite_pos:])
+
+    def test_owui_translation_final_status_updates_after_archive_failure(self) -> None:
+        source = (ROOT / "quality-checks/translation/20-owui-candidate-screen.sh").read_text(encoding="utf-8")
+        credential_pos = source.index("credential_scan")
+        status_pos = source.index("test-script-rc.txt", credential_pos)
+        manifest_pos = source.index('write_run_manifest "$rc"', status_pos)
+        tar_pos = source.index('tar --owner=0 --group=0 --numeric-owner', manifest_pos)
+        rc_change_pos = source.index('rc=27', tar_pos)
+        status_rewrite_pos = source.index("test-script-rc.txt", rc_change_pos)
+        manifest_rewrite_pos = source.index('write_run_manifest "$rc"', status_rewrite_pos)
+        self.assertLess(status_pos, manifest_pos)
+        self.assertLess(manifest_pos, tar_pos)
+        self.assertLess(tar_pos, rc_change_pos)
+        self.assertLess(rc_change_pos, status_rewrite_pos)
+        self.assertLess(status_rewrite_pos, manifest_rewrite_pos)
+
+    def test_historical_quality_scripts_are_source_only(self) -> None:
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertNotIn("quality-checks/history", manifest)
+        self.assertTrue((ROOT / "quality-checks/history/01-task-matrix.sh").is_file())
+        self.assertTrue((ROOT / "quality-checks/history/README.md").is_file())
+
     def test_current_quality_archives_print_sha_without_sidecar_files(self) -> None:
         scripts = (
             ROOT / "quality-checks/task/10-candidate-screen.sh",
