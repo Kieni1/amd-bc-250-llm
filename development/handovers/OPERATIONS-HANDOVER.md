@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current unpublished 0.11.2-0.6 source
+# BC-250 support / operations handover — current source-ready 0.11.3-0.2
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -9,14 +9,14 @@ Semantic model promotion belongs to the relevant quality lane/main integration.
 Newest supplied source is authoritative over this handover. At the time of this refresh:
 
 ```text
-VERSION:      0.11.2
-RPM Release:  0.6
-source base:  amd-bc-250-llm-0.11.2-0.6.zip
+VERSION:      0.11.3
+RPM Release:  0.2
+source base:  0.11.3-0.1 lifecycle rewrite + 0.11.3-0.2 MTP/lifecycle corrections
 ```
 
-This handover does **not** assert that the unpublished 0.11.2-0.6 RPM has already
-been built, installed or hardware-qualified. Capture installed NEVRA before interpreting
-machine evidence. The newest real-device package evidence is historical
+Source release closure for `0.11.3-0.2` is complete, but this handover does **not** assert
+that the RPM has already been built by GitHub, installed or hardware-qualified. Capture
+installed NEVRA before interpreting machine evidence. The newest real-device package evidence is historical
 `bc250-llm-server-0.11.2-0.5.fc44.x86_64`: installer verification was 54/0/0 and
 revalidation v4.1 completed with infrastructure/restoration PASS, full coverage,
 `owui-translation` PASS, agent 3/3 and task 5/6 due to one double-JSON format miss. Its
@@ -28,11 +28,9 @@ should not be rewritten as current.
 ## Validation ownership
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. For this exact `0.11.2-0.6` source, local `make validate`
-passed RPM/source preflight, packaged shell syntax checks and 348/348 deterministic
-tests; documentation regressions separately passed 9/9. Ruff and ShellCheck were
-unavailable here and were not run. No GitHub RPM build or 0.11.2-0.6 BC-250 execution
-is claimed.
+runtime/hardware qualification. Current `0.11.3-0.2` passed the local source gate: repository/RPM
+preflight, packaged shell syntax and 367/367 deterministic tests. Ruff/ShellCheck were not run
+here; GitHub RPM build and BC-250 execution are not yet claimed.
 
 ## Normal service topology
 
@@ -108,7 +106,7 @@ retained-key validation, independent SSH preparation for backup export and fail-
 MTP comparison-integrity work. Installed 0.11.2-0.5 completed whole-appliance
 revalidation v4.1 with full coverage,
 infrastructure/restoration PASS, canonical Open WebUI translation PASS, agent 3/3 and one
-task quality miss at 5/6 because `tags-de` emitted two JSON objects. Source 0.11.2-0.6
+task quality miss at 5/6 because `tags-de` emitted two JSON objects. The 0.11.2-0.6 source
 changes the diagnosis of that task miss but not its acceptance. Power/WOL evidence remains
 older and still needs qualification.
 
@@ -155,7 +153,7 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-After GitHub builds and the appliance installs `0.11.2-0.6`, capture the exact NEVRA and
+GitHub builds and the appliance installs `0.11.3-0.2`; capture the exact NEVRA and
 run one bounded source-change check:
 
 ```text

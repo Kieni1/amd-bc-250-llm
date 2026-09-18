@@ -10,8 +10,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.11.2
-Release:        0.6%{?dist}
+Version:        0.11.3
+Release:        0.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,18 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.2
+- Fix the public bc250-fetch-mtp dispatcher for the 0.11.3 lifecycle grammar and make it an explicit opt-in path for disabled MTP experiments without changing generic convergence policy.
+- Keep MTP display indexes globally stable between category and combined views, and enforce one-model revision/checksum overrides before combined selections are split by category.
+- Make the MTP preparation/run workflow operationally coherent and document the remaining real-device llama.cpp qualification boundary; no MTP model is promoted or enabled by default.
+- Reconcile secondary lifecycle surfaces: use unprivileged catalog discovery in the installed-assets check and align current handover/model guidance with the 0.2 MTP route.
+
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.1
+- Redesign bc250-model around explicit catalog/status/apply/refresh/unregister/remove lifecycle operations and a shared read-only model-state inspector.
+- Improve model-manager guidance for incomplete and legacy command forms while preserving strict source provenance, checksum and registration safety.
+- Migrate active package callers and current-facing documentation to the new lifecycle vocabulary; historical release/campaign evidence retains the commands it actually used.
+- Advance package revalidation to v4.2 for the 0.11.3 target, surface bounded context-truncation diagnostics, avoid duplicate GPT-OSS edge performance work, and use lightweight successful intermediate checkpoints while retaining full high-value snapshots.
+
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.6
 - Make task/revalidation quality diagnostics non-cascading and case-addressable while preserving the same qualification thresholds and return-code semantics.
 - Harden the local coding helper around Ollama chat completion integrity: separate thinking from final content, refuse nonterminal/truncated/reasoning-contaminated output, and keep file replacement atomic.

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.3-0.2 - 2026-09-18
+
+- Repair the `bc250-fetch-mtp` public route after the model-manager grammar rewrite: it now explicitly dispatches to `apply mtp --include-disabled`, so packaged disabled MTP candidates can be downloaded for bounded testing without editing the catalog or making them part of generic convergence.
+- Preserve stable global model indexes for the separate MTP TOML catalog, matching the documented selection contract between category and combined views.
+- Enforce `--revision` / `--sha256` as true one-model overrides before an `all` selection is split into per-category operations.
+- Improve MTP operator flow and evidence guidance: exact fetch/status/run commands, missing-source recovery guidance, explicit download-only removal semantics, and current real-device qualification requirements are documented. MTP remains experimental, disabled by default and unqualified on BC-250 until the external llama.cpp campaign runs.
+- Reconcile secondary lifecycle surfaces: package asset discovery now uses unprivileged `bc250-model list`, current handovers agree on Release 0.2, and README/TLDR/model/specialist guidance exposes the explicit disabled-MTP preparation route.
+- Keep production model roles, Open WebUI policy, Ollama topology, revalidation v4.2 semantics, governor/CU policy and quality thresholds unchanged.
+
+## 0.11.3-0.1 - 2026-09-18
+
+- Redesign `bc250-model` around explicit catalog/state/lifecycle operations: `list`, `status`, `path`, `apply`, `refresh`, `unregister`, `remove`, and `purge-retired`; keep legacy forms as actionable migration errors rather than aliases.
+- Make one shared model-state inspector authoritative for source/provenance validity, runtime Modelfile drift, registration state and optional moving-revision update checks; `apply` consumes the same state that `status` exposes.
+- Separate reconciliation from deliberate source refetch: `apply` reuses verified GGUFs and repairs registration/Modelfile drift, while `refresh` explicitly fetches source bytes again. `unregister` keeps manager-owned GGUF/state; `remove` deletes it only after registration removal succeeds.
+- Migrate active installer/model wrappers/current quality harnesses and current-facing documentation to the new command contract. Preserve historical campaign/changelog command syntax as historical evidence.
+- Advance `bc250-revalidate` to harness v4.2 for the 0.11.3 package target: surface non-severe context truncation as an informational diagnostic, keep the dedicated GPT-OSS/Jina stage as the deep GPT-OSS resource check instead of repeating GPT-OSS in the generic edge sweep, and replace successful intermediate full snapshots with lightweight checkpoints while retaining full preflight/agent/final/failure evidence.
+- Keep runtime topology, model definitions, Open WebUI role policy, quality thresholds and the 0.11.2-0.6 coding-agent/task behavior unchanged in this model-manager rewrite.
+
 ## 0.11.2-0.6 - 2026-09-18
 
 - Preserve genuine task quality failures without cascading parse failures into misleading language/relevance causes; canonical benchmark summaries and `bc250-revalidate status` now identify failed case IDs and point at their canonical `results.jsonl` evidence.
