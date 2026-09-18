@@ -36,16 +36,18 @@ The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
 the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
 TTM activation into one primary reboot. After reboot it prepares 40-CU support
 for the exact running kernel, establishes the static main/task/embedding normal
-mode, installs the promoted task and Jina embedding infrastructure models, then
-presents one global prompt for additional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
+mode, installs every model required by the active package-owned Open WebUI roles
+plus the task and Jina embedding defaults, then presents one global prompt only for
+experiments, rollback/reference, agent and other optional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
 desired state, then offers optional office-maintenance/WOL and Raspberry Pi
 companion setup after core appliance verification. The companion setup keeps HTTP :80 as
 the office endpoint and uses only restricted SSH :22; it does not expose internal
 Open WebUI/Ollama ports. A second reboot is requested only if persistent 40-CU mode was already configured
 and its newly prepared replacement module is not yet loaded.
 
-The model prompt accepts global indexes, ranges, exact names, `recommended`,
-`production` or `all`; Enter skips. For unattended setup use
+The optional-model prompt accepts global indexes, ranges, exact names, `recommended`,
+`production` or `all`; Enter skips optional extras only. Active package-owned role bases
+are reconciled before this prompt. For unattended extra-model setup use
 `BC250_MODEL_SELECTION`. Runtime routing remains main 11434, task 11435,
 embedding 11437 and exclusive agent 11436.
 
@@ -145,7 +147,7 @@ sudo bc250-maintenance run backup
 sudo bc250-maintenance run prune      # preflights the protected Open WebUI API key
 # Optional Pi setup: companion enable = safe shutdown over SSH; backup export is separate.
 # Check/apply package-owned Open WebUI state when needed:
-bc250-openwebui-setup status
+sudo bc250-openwebui-setup status --verbose --owui-token-file /root/owui-test.key
 sudo bc250-maintenance clean-cache
 sudo bc250-revalidate status          # opt-in appliance revalidation state
 # Destructive greenfield reset (operator documents are preserved):

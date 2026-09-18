@@ -162,7 +162,8 @@ growth. `bc250-uninstall` remains a compatibility alias. Read
 sudo bc250-revalidate start --owui-token-file /root/owui-test.key
 ```
 
-It is opt-in/root-only and stores final bundles under
+It is opt-in/root-only, includes authenticated production translation-role and RAG
+checks when an Open WebUI key is supplied, and stores final bundles under
 `/var/lib/bc250-llm-server/revalidation/results/`. See `cmd/benchmark/README.md`
 (installed at the same relative path under `/usr/share/doc/bc250-llm-server/`) for
 result directories, tuning commands, RAG qualification and thermal profiles.
