@@ -43,23 +43,28 @@ NVR           0.11.3-0.4
 
 The current `0.11.3-0.4` source keeps the greenfield `bc250-model` lifecycle, v4.2
 revalidation architecture, state-rich installer/status UX and strict task-tag prompt from
-0.11.3-0.3. Release 0.4 changes only the still-experimental MTP lane before its first
-hardware campaign: a bounded four-entry candidate set, exact-ID/safe runtime preflight,
-llama-server privilege drop to the `ollama` account, and same-target MTP-off versus MTP-on
-evidence capture. Runtime/service topology, Ollama/KV/CU/governor policy, production model
-identities, Open WebUI roles and benchmark thresholds are unchanged.
+0.11.3-0.3. Release 0.4 hardens the still-experimental MTP lane before its first hardware
+campaign and now also includes the final same-Release installer/model-pass refinements found
+by the first 0.4 device smoke: catalog suppression is honored, fully current required models
+summarize by category, compact current/deferred rows are shorter, registration probes are
+bounded/agent-aware, and generic combined convergence cannot select MTP. Runtime/service
+topology, Ollama/KV/CU/governor policy, production model identities, Open WebUI roles,
+GGUF provenance/SHA policy and benchmark thresholds are unchanged.
 
 The exact `0.11.3-0.4` source tree and a clean extraction of the release ZIP both passed
-`make validate` with RPM/source preflight, packaged shell syntax and 371/371 deterministic
+`make validate` with RPM/source preflight, packaged shell syntax and 378/378 deterministic
 tests. Source/archive closure is complete. Ruff/ShellCheck remain workstation-owned;
 GitHub RPM/SRPM build and BC-250 runtime/MTP qualification remain later gates.
 
-Installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` is the newest real-device package
-evidence: installer verification was 54/0/0 and revalidation v4.2 completed with
-infrastructure/restoration PASS and full coverage. Direct translation 8/8, direct RAG 4/4,
-Open WebUI translation 8/8, Open WebUI RAG 3/3, embeddings qualification and agent 3/3
-passed. Task remained 5/6 because `tags-de` emitted two JSON objects; the non-severe
-GPT-OSS/Jina context diagnostic also surfaced as intended. Exact evidence is recorded in
+A pre-refinement same-NVR `bc250-llm-server-0.11.3-0.4.fc44.x86_64` device smoke is now
+the newest install/verification evidence: guided install completed with normal topology and
+`bc250-verify` reported 54 ok / 0 warn / 0 fail. That exact RPM predates the final
+installer/model-pass source refinements and must not be treated as qualification of the final
+0.4 bytes. Installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` remains the newest full
+appliance revalidation evidence: v4.2 completed with infrastructure/restoration PASS and full
+coverage; direct translation 8/8, direct RAG 4/4, Open WebUI translation 8/8, Open WebUI RAG
+3/3, embeddings qualification and agent 3/3 passed, while task remained 5/6 because `tags-de`
+emitted two JSON objects. Exact 0.2 evidence is recorded in
 `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
@@ -1182,8 +1187,7 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-0.4 source is release-closed/source-ready after its final local + clean-archive 371/371 gates and still needs an external GitHub RPM build plus installed-device qualification;
-  installed 0.11.3-0.2.fc44 is the newest full appliance evidence and completed v4.2 with infrastructure/restoration PASS, full coverage, Open WebUI translation/RAG PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
+- current 0.11.3-0.4 source is release-closed/source-ready after its final local + clean-archive 378/378 gates and still needs an external rebuild plus exact-source installed qualification; a pre-refinement same-NVR `0.11.3-0.4.fc44` guided install completed with normal topology and verifier 54/0/0, but that RPM predates the final installer/model-pass source refinements; installed 0.11.3-0.2.fc44 remains the newest full appliance revalidation evidence and completed v4.2 with infrastructure/restoration PASS, full coverage, Open WebUI translation/RAG PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact 0.2 evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
@@ -1204,18 +1208,17 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-build/install exact `0.11.3-0.4` and capture the installed NEVRA before device conclusions.
-2. Confirm the installer model picker shows compact state-rich entries and sample
-   `bc250-model status --verbose` for one production model; packaged source identity should
-   remain verified/current and `Upstream: not checked` should point to `--online`.
-3. Apply the Open WebUI desired state and rerun the six-case task qualification. The key
-   regression is `tags-de`: keep the strict evaluator unchanged and check whether the new
-   single-array/single-object prompt removes the repeated format miss.
-4. Run normal v4.2 revalidation once. The GPT-OSS/Jina bounded context observation, if it
-   recurs, should remain PASS but render as a concise previous→current prompt-token
-   diagnostic. Preserve the exact 0.11.3-0.2 result as historical evidence.
-5. Continue the agent/product-route and WOL/power campaigns separately; do not mix them
-   into this focused 0.3 regression unless another source change requires it.
+1. GitHub-rebuild/reinstall the final refined `0.11.3-0.4` and capture installed NEVRA plus the RPM/source artifact SHA. The earlier same-NVR device smoke is pre-refinement evidence only.
+2. Confirm the model phase no longer emits the redundant initial catalog; fully current required models collapse to concise category summaries; the optional picker appears promptly with `[CURRENT]` ordinary rows, short deferred agent rows and **no MTP candidates**. Then sample `sudo bc250-model status production MODEL --verbose`; packaged source identity should remain verified/current and `Upstream: not checked` should point to `--online`.
+3. Run normal v4.2 revalidation once as the exact-source appliance gate. This already exercises
+   the strict six-case task contract (watch `tags-de`) plus the GPT-OSS/Jina diagnostic; do not add a
+   redundant standalone task run unless v4.2 exposes a task-specific regression that needs isolation.
+4. Start the MTP hardware campaign as a separate bounded batch with `qwen3.5-9b-mtp` only; inspect
+   same-target no-MTP/MTP quality, throughput, acceptance, memory/swap and GPU/kernel evidence before
+   advancing to the retained 27B control or heavier challengers.
+5. Restore/confirm normal appliance health, then run the support-operations batch separately: S5 WOL,
+   busy shutdown/defer, idle shutdown/allow + wake, then bounded recovery/lifecycle UX. Do not mix MTP
+   runtime/resource failures into power evidence or vice versa.
 
 That sequencing protects the product's current top priorities without losing the deeper
 quality program.

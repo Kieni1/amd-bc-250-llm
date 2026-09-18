@@ -11,20 +11,21 @@ Newest supplied source is authoritative over this handover. At the time of this 
 ```text
 VERSION:      0.11.3
 RPM Release:  0.4
-source base:  0.11.3-0.3 UX/task-diagnostic line + 0.11.3-0.4 MTP qualification-lane hardening
+source base:  0.11.3-0.3 UX/task-diagnostic line + 0.11.3-0.4 MTP hardening + final installer/model-pass refinements
 ```
 
 The exact `0.11.3-0.4` source tree and a clean extraction of the release ZIP both passed
-`make validate` with RPM/source preflight, packaged shell syntax and 371/371 deterministic
-tests. Source/archive closure is complete. This handover does **not** assert that the 0.4
-RPM has already been built by GitHub, installed or hardware-qualified. Capture
-installed NEVRA before interpreting machine evidence. The newest real-device package evidence is historical
-`bc250-llm-server-0.11.3-0.2.fc44.x86_64`: installer verification was 54/0/0 and
-revalidation v4.2 completed with infrastructure/restoration PASS and full coverage. Task
-remained 5/6 because `tags-de` emitted two JSON objects; the bounded GPT-OSS/Jina context
-diagnostic surfaced under `Diagnostics` without changing PASS. Its exact run is recorded in
-`development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`. Older evidence
-retains the exact release on which it was collected.
+`make validate` with RPM/source preflight, packaged shell syntax and 378/378 deterministic
+tests. Source/archive closure is complete. A pre-refinement same-NVR
+`bc250-llm-server-0.11.3-0.4.fc44.x86_64` guided install has already completed on hardware
+with normal topology and verifier 54/0/0; that run exposed the slow/noisy model-pass UX now
+fixed in source. Because the final 0.4 source bytes changed without an RPM Release bump by
+explicit maintainer direction, rebuild/reinstall is required before interpreting later hardware
+evidence as qualification of this exact source. The newest full appliance revalidation remains
+historical `bc250-llm-server-0.11.3-0.2.fc44.x86_64`: v4.2 completed with infrastructure/
+restoration PASS and full coverage, task 5/6 on `tags-de`, and the bounded GPT-OSS/Jina
+context diagnostic under `Diagnostics` without changing PASS. Exact 0.2 evidence is recorded
+in `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`.
 
 ## Validation ownership
 
@@ -154,23 +155,25 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-GitHub builds and the appliance installs `0.11.3-0.4`; capture the exact NEVRA and
-run one bounded source-change check:
+GitHub rebuilds and the appliance reinstalls the final refined `0.11.3-0.4`; capture the
+exact NEVRA plus RPM/source artifact SHA and run one bounded source-change check:
 
 ```text
 sudo bc250-verify --owui-token-file FILE
-installer picker shows state-rich model status
+model phase has no redundant initial catalog
+required-current models are summarized
+optional picker appears promptly, uses compact current/deferred rows and excludes MTP
 sudo bc250-model status production MODEL --verbose
-six-case task qualification after desired-state apply
 one full v4.2 revalidation
 ```
 
 The model-status check should show packaged/current verified state and explicit `--online`
-guidance. The task check should focus on the repeated `tags-de` single-object contract;
-do not weaken the evaluator if it still fails. The full revalidation should preserve the
-same infrastructure/restoration semantics and show any bounded GPT-OSS/Jina context
-observation in the concise informational format. Keep agent and WOL/power qualification
-as separate later batches.
+guidance. v4.2 already exercises the strict six-case task contract, including the repeated
+`tags-de` case, so do not duplicate it unless a failure needs isolation and do not weaken the
+evaluator. The full revalidation should preserve the same infrastructure/restoration semantics
+and concise bounded GPT-OSS/Jina diagnostic. After that exact-source gate, run MTP and support
+operations as separate bounded hardware batches: MTP starts with qwen3.5-9b-mtp; support starts
+with S5 WOL, then busy defer and idle allow+wake.
 
 ## Other operations work after power qualification
 
