@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Second-stage translation integration check. Temporarily points the existing
-# Open WebUI translation preset at one experimental model, verifies live readback,
-# runs the production-style source-only inputs, and restores the exact preset.
+# Translation integration check. Temporarily points the legacy comparison preset at
+# one experiment/reference, verifies live readback, runs the source-only fixture, and
+# restores the exact provider/preset state.
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
     printf '%s\n' 'REFUSED: execute this script with bash; do not source it.' >&2
     return 0
@@ -50,10 +50,10 @@ SERIOUS_WARNING_COUNT=0
 }
 if [[ "$CANDIDATE" == exp-* ]]; then
     INSTALL_EXPERIMENT=1
-elif [[ "$ALLOW_PRODUCTION_REFERENCE" == 1 && "$CANDIDATE" == prod-lfm25-8b-a1b-liquidai-q6-k ]]; then
+elif [[ "$ALLOW_PRODUCTION_REFERENCE" == 1 && "$CANDIDATE" == prod-* ]]; then
     INSTALL_EXPERIMENT=0
 else
-    echo 'ERROR: model must be an exp-* candidate (or the explicit production LFM reference wrapper).' >&2
+    echo 'ERROR: model must be an exp-* candidate (or an explicitly enabled packaged prod-* reference).' >&2
     exit 2
 fi
 [[ -r "$PROMPT_FILE" ]] || { printf 'ERROR: prompt file unreadable: %s\n' "$PROMPT_FILE" >&2; exit 2; }
@@ -141,6 +141,7 @@ owui_sensitive_request() {
     fi
 }
 
+# Capture package-adjacent provider state before any temporary mutation.
 save_original_ollama_config() {
     make_root_tmp ORIGINAL_OLLAMA_CONFIG 'bc250-owui-original-ollama-config'
     owui_sensitive_request 'capture-original-provider' GET '/ollama/config' '' \
@@ -149,6 +150,7 @@ save_original_ollama_config() {
     ORIGINAL_OLLAMA_CONFIG_SAVED=1
 }
 
+# Temporarily expose experiments without weakening the persistent provider allow-list.
 prepare_candidate_provider() {
     [[ "$INSTALL_EXPERIMENT" == 1 ]] || return 0
     make_root_tmp CANDIDATE_OLLAMA_CONFIG 'bc250-owui-candidate-ollama-config'
@@ -475,8 +477,6 @@ finalize() {
     if [[ -n "$TELEMETRY_STOP" ]]; then touch "$TELEMETRY_STOP" 2>/dev/null || true; fi
     if [[ -n "$TELEMETRY_PID" ]]; then wait "$TELEMETRY_PID" 2>/dev/null || true; fi
     TELEMETRY_PID=''; TELEMETRY_STOP=''
-    printf '%s\n' "$rc" > "$OUT/post/test-script-rc.txt"
-
     if ! restore_original_preset; then
         printf '%s\n' 'ERROR: preset restoration failed.' >&2
         preset_restore_rc=1
@@ -524,6 +524,8 @@ finalize() {
         rc=26
         archive_ok=0
     fi
+    # Restoration, credential scanning and cleanup are part of the authoritative result.
+    printf '%s\n' "$rc" > "$OUT/post/test-script-rc.txt"
     write_run_manifest "$rc"
     printf '%s\n' "$(date --iso-8601=seconds)" > "$OUT/post/end-time.txt"
     local parent name tarball
@@ -534,7 +536,12 @@ finalize() {
         tar_rc=$?
         if [[ "$tar_rc" != 0 ]]; then
             printf 'ERROR: evidence archive creation failed rc=%s\n' "$tar_rc" >&2
-            [[ "$rc" == 0 || "$rc" == 3 ]] && rc=27
+            if [[ "$rc" == 0 || "$rc" == 3 ]]; then
+                rc=27
+                # Archive failure changes the authoritative local result as well.
+                printf '%s\n' "$rc" > "$OUT/post/test-script-rc.txt"
+                write_run_manifest "$rc"
+            fi
         else
             printf 'Evidence: %s\nTarball: %s\n' "$OUT" "$tarball"
             sha256sum "$tarball"

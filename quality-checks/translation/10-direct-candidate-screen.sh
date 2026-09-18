@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Direct translation screen for one packaged experimental model. This uses the
-# installed benchmark's explicit source/target direction and does not mutate OWUI.
+# Direct translation screen for one packaged experiment or explicitly enabled
+# production reference. Uses the installed benchmark contract and does not mutate OWUI.
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
     printf '%s\n' 'REFUSED: execute this script with bash; do not source it.' >&2
     return 0
@@ -258,7 +258,6 @@ PY2
     SERIOUS_WARNING_COUNT="$(wc -l < "$OUT/post/serious-warnings.txt" | tr -d ' ')"
     [[ "$SERIOUS_WARNING_COUNT" == 0 ]] || { [[ "$rc" == 0 || "$rc" == 3 ]] && rc=30; }
     write_aggregate || true
-    printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
     date --iso-8601=seconds > "$OUT/post/end-time.txt"
     # The benchmark prints its result paths. Redact this script's expected local HOME
     # prefix from console captures before the privacy scan so the scanner still catches
@@ -297,13 +296,20 @@ print('privacy_scan=PASS')
 PY2
     privacy_rc=$?
     if [[ "$privacy_rc" != 0 && ( "$rc" == 0 || "$rc" == 3 ) ]]; then rc=32; fi
+    # Privacy is part of the result: do not persist a final rc before it is known.
+    printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
     write_run_manifest "$rc"
     local parent name tarball
     parent="$(dirname "$OUT")"; name="$(basename "$OUT")"; tarball="$HOME/${name}.tar.gz"
     if [[ "$privacy_rc" == 0 ]]; then
         tar --owner=0 --group=0 --numeric-owner -C "$parent" -czf "$tarball" "$name"
         tar_rc=$?
-        [[ "$tar_rc" == 0 ]] || { [[ "$rc" == 0 || "$rc" == 3 ]] && rc=31; }
+        if [[ "$tar_rc" != 0 && ( "$rc" == 0 || "$rc" == 3 ) ]]; then
+            rc=31
+            # Archive failure changes the authoritative local result as well.
+            printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
+            write_run_manifest "$rc"
+        fi
     fi
     printf '\n=== direct translation candidate summary ===\n'
     cat "$OUT/aggregate.txt" 2>/dev/null || true
@@ -313,6 +319,7 @@ PY2
 }
 trap finalize EXIT
 
+# Preflight an intentionally empty main lane; never evict an operator workload.
 systemctl is-active --quiet ollama.service || { echo 'ERROR: ollama.service inactive.' >&2; exit 1; }
 exec 9>"$LOCK_FILE"
 flock -n 9 || { echo 'ERROR: another direct translation screen is active.' >&2; exit 26; }
@@ -329,6 +336,7 @@ else
 fi
 model_present || { echo 'ERROR: candidate/reference model is not registered on main Ollama.' >&2; exit 1; }
 capture_provenance
+# Run identical rounds sequentially so candidate comparisons share one contract.
 for n in $(seq 1 "$ROUNDS"); do run_round "$n"; done
 write_aggregate
 [[ "$QUALITY_FAIL" == 0 ]] || exit 3
