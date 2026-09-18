@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        0.2%{?dist}
+Release:        0.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.3
+- Restore state-rich installer model selection through compact shared model-state inspection while keeping bc250-model list catalog-only.
+- Tighten the package-owned Open WebUI tag-generation prompt so broad and specific tags share one array and exactly one raw JSON object is emitted.
+- Improve model status auditability with explicit online-check guidance plus source repository/revision/SHA output, and make bounded context-truncation diagnostics concise while preserving qualification policy.
+- Record the installed 0.11.3-0.2.fc44 v4.2 revalidation as historical device evidence for this new source release; production roles/topology and benchmark thresholds remain unchanged.
+
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.2
 - Fix the public bc250-fetch-mtp dispatcher for the 0.11.3 lifecycle grammar and make it an explicit opt-in path for disabled MTP experiments without changing generic convergence policy.
 - Keep MTP display indexes globally stable between category and combined views, and enforce one-model revision/checksum overrides before combined selections are split by category.

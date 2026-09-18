@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.3-0.3 - 2026-09-18
+
+- Restore the install-time model picker to state-rich output by consuming compact shared model-state inspection instead of turning `bc250-model list` back into a runtime/protected-state operation.
+- Improve `bc250-model status` UX: `Upstream: not checked` now points to `--online`, while `--verbose` shows catalog source repository, revision and verified local SHA-256 when available.
+- Tighten the package-owned Open WebUI tag-generation prompt after repeated real-device `tags-de` double-JSON failures: broad and specific tags must share one `tags` array and the task must emit exactly one raw JSON object with no prose/Markdown. The strict evaluator and 128-token budget are unchanged.
+- Make non-severe GPT-OSS/Jina context diagnostics concise and policy-explicit (`previous -> current prompt tokens`, PASS/not-severe) without changing the severe-truncation threshold or qualification outcome.
+- Record installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` revalidation v4.2 as historical device evidence: installer verification 54/0/0, infrastructure/restoration/full coverage PASS, task 5/6 on `tags-de`, and the bounded GPT-OSS/Jina context diagnostic surfaced as intended.
+- Keep production model identities, normal service topology, CU/governor policy, Open WebUI role assignments and benchmark thresholds unchanged.
+
 ## 0.11.3-0.2 - 2026-09-18
 
 - Repair the `bc250-fetch-mtp` public route after the model-manager grammar rewrite: it now explicitly dispatches to `apply mtp --include-disabled`, so packaged disabled MTP candidates can be downloaded for bounded testing without editing the catalog or making them part of generic convergence.
