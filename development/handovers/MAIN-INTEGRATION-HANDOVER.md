@@ -36,18 +36,19 @@ Project: **AMD BC-250 local-LLM office appliance**.
 Current source baseline at this handover refresh:
 
 ```text
-VERSION       0.11.1
-RPM Release   0.11%{?dist}
-NVR           0.11.1-0.11
+VERSION       0.11.2
+RPM Release   0.3%{?dist}
+NVR           0.11.2-0.3
 ```
 
-The current unpublished `0.11.1-0.11` source keeps the 0.8 maintenance fixes and
+The current unpublished `0.11.2-0.3` source keeps the 0.8 maintenance fixes and
 0.9/0.10 main-model/MTP qualification work, then integrates the 2026-09-17 task and
-German/French translation campaigns. Production model/runtime/topology defaults remain
-unchanged. The new role-specific tools enforce cheap task screening before warm-main
-survival and make translation reasoning policy explicit, while the saturated eight-case
-translation fixture is retained only as a screening gate. Detailed campaign evidence
-stays in Git-only `development/` memory rather than runtime Modelfiles.
+German/French translation campaigns. Runtime/service topology, Ollama, KV, CU and governor
+policy remain unchanged, but model-role policy is normalized: LFM2.5 1.2B is the sole task
+model and Stage-2E-selected Translate-Gemma is the production translation base behind the
+two explicit direction roles. The former LFM translator is retained only as an
+experimental rollback/reference. Detailed campaign evidence stays in Git-only
+`development/` memory rather than runtime Modelfiles.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -355,12 +356,12 @@ Current production roles:
 |---|---|
 | standard office | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
 | document/RAG answer | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
-| DE↔FR translation | `prod-lfm25-8b-a1b-liquidai-q6-k` |
+| DE↔FR translation | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` via explicit direction roles |
 | higher-quality office | `prod-qwen35-9b-unsloth-q6-k` |
 | deep reasoning / warm main | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | embeddings | `embed-jina-v5-small-retrieval-q4-k-m` |
 | task default | `task-lfm25-1.2b-instruct-liquidai-q6-k` |
-| task fallback/control | `task-gemma3-1b-unsloth-ud-q4-k-xl` |
+| task retired control | `task-gemma3-1b-unsloth-ud-q4-k-xl` (graveyard) |
 | exclusive agent default | `agentic-ornith15-9b-ornith-q5-k-m` |
 
 Do not revive retired/graveyard models because an older handover names them.
@@ -403,11 +404,9 @@ Translate-Gemma E4B and Ministral both produced 24/24 canonical confirmation; TI
 but has a reproducible CHF-preservation defect. Large Qwen 27B/35B results are quality
 upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
-Stage-2E has now settled the model/configuration question. Translate-Gemma E4B is the
-selected candidate with exact explicit-direction v1, thinking omitted and
-`max_tokens=2048`; TIR is closed as the normal deployment choice. Production LFM remains
-the live/default role until the package-owned DE→FR / FR→DE direction roles pass one
-bounded authenticated Open WebUI requalification. Do not reopen broad model discovery
+Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
+exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. The first installed 0.11.2-0.3 run must still verify the package-owned DE→FR / FR→DE roles on the real BC-250. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -445,8 +444,7 @@ no serious OOM/GPU warning in those trials
 
 This replaced Gemma 3 1B as default.
 
-Gemma 3 1B remains a low-memory fallback/control. Its historical task baseline was only
-6/18 with systematic language/relevance misses.
+Gemma 3 1B is retired from active task discovery; its historical baseline was only 6/18 with systematic language/relevance misses.
 
 Important task-role rejections:
 
@@ -504,8 +502,7 @@ exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
-exp-hunyuan-mt-7b-mungert-q4-k-m
-exp-ministral3-8b-unsloth-ud-q5-k-xl
+exp-lfm25-8b-a1b-liquidai-q6-k
 exp-ovisocr2-abiray-q8-0
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
@@ -516,7 +513,6 @@ exp-qwen38-27b-unsloth-ud-iq3-s
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
-exp-translate-gemma4-sub-e4b-17s-q4-k-xl
 ```
 
 Do not confuse active `exp-qwen38-4b-empero-q6-k` with the retired
@@ -634,7 +630,7 @@ Main connection publishes these production IDs:
 prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 prod-gpt-oss20b-ggml-org-mxfp4
-prod-lfm25-8b-a1b-liquidai-q6-k
+prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 prod-qwen35-9b-unsloth-q6-k
 ```
 
@@ -642,7 +638,6 @@ Task connection publishes:
 
 ```text
 task-lfm25-1.2b-instruct-liquidai-q6-k
-task-gemma3-1b-unsloth-ud-q4-k-xl
 ```
 
 Current task desired state:
@@ -1030,9 +1025,7 @@ measurement semantics and state restoration before a large new quality campaign.
 
 ## P1 — translation
 
-Broad DE/FR comparison is closed. Requalify only the integrated Translate-Gemma
-DE→FR / FR→DE package roles against the bounded final Stage-2 target set; keep LFM
-production/default until that gate passes.
+Broad DE/FR comparison is closed. Translate-Gemma is the package production base; requalify only the integrated DE→FR / FR→DE roles on the installed release. The former LFM translator is experimental rollback/reference only.
 
 ## P1 — RAG / office documents
 
@@ -1135,12 +1128,11 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- unpublished 0.11.1-0.11 source needs an external GitHub RPM build before release;
-  current task/translation campaign evidence was gathered on installed 0.11.1-0.10 while
-  the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
+- unpublished 0.11.2-0.3 source needs an external GitHub RPM build before release;
+  task campaign evidence was gathered on installed 0.11.1-0.10; Stage-2E translation evidence was gathered on installed 0.11.1-0.11; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
-- Translate-Gemma is selected but still needs bounded qualification of the final
-  package-owned direction roles before the production LFM switch;
+- Translate-Gemma is source-promoted and still needs bounded installed-device verification of the final package-owned direction roles;
+- exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
 - RAG quality corpus should expand around absent/multisource/conflict/table/multilingual
   cases;
 - agent quality should broaden beyond the small static 3/3 contract into documented
@@ -1160,7 +1152,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. **Operations Batch 1:** after building/installing 0.11.1-0.11, re-check package health and the affected benchmark evidence path,
+1. **Operations Batch 1:** after building/installing 0.11.2-0.3, re-check package health and the affected benchmark evidence path,
    current maintenance state, office readiness and WOL configuration baseline.
 2. Analyze returned evidence.
 3. If clean, **Operations Batch 2:** one real S5 Wake-on-LAN cycle.

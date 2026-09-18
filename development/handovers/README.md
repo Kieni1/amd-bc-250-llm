@@ -37,5 +37,5 @@ scripts may print an evidence archive SHA-256 without creating `.sha256` sidecar
 
 Dated specialist evidence handovers may also be retained here as source-only `.txt`
 references when they capture a large campaign that should not be collapsed into the
-operator documentation. The 2026-09-17 task-model and DE<->FR translation handovers
-are such references; current decisions are summarized separately in `development/model-runs/`.
+operator documentation. The 2026-09-17 task/translation specialist snapshots were
+retired after their durable evidence was integrated into model-run and decision records.

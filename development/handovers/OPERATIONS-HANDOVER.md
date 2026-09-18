@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current unpublished 0.11.1-0.11 source
+# BC-250 support / operations handover — current unpublished 0.11.2-0.3 source
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -9,15 +9,14 @@ Semantic model promotion belongs to the relevant quality lane/main integration.
 Newest supplied source is authoritative over this handover. At the time of this refresh:
 
 ```text
-VERSION:      0.11.1
-RPM Release:  0.11
-source base:  amd-bc-250-llm-current-0.11.1-0.11.zip
+VERSION:      0.11.2
+RPM Release:  0.1
+source base:  amd-bc-250-llm-current-0.11.2-0.3.zip
 ```
 
-This handover does **not** assert that the unpublished 0.11.1-0.11 RPM has already
+This handover does **not** assert that the unpublished 0.11.2-0.3 RPM has already
 been built, installed or hardware-qualified. Capture installed NEVRA before interpreting
-machine evidence. Task/translation campaign evidence from 2026-09-17 was gathered on
-installed 0.11.1-0.10 and remains role evidence, not 0.11 package qualification.
+machine evidence. Task campaign evidence was gathered on installed 0.11.1-0.10; Stage-2E translation evidence was gathered on installed 0.11.1-0.11. Both remain role evidence, not 0.11.2-0.3 package qualification.
 
 ## Validation ownership
 
@@ -62,15 +61,15 @@ Ollama installer commit:
 ```text
 standard office     prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 RAG answer          prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-translation         prod-lfm25-8b-a1b-liquidai-q6-k
-translation candidate roles:
-  bc250-office-translation-de-fr -> exp-translate-gemma4-sub-e4b-17s-q4-k-xl
-  bc250-office-translation-fr-de -> exp-translate-gemma4-sub-e4b-17s-q4-k-xl
+translation         prod-translate-gemma4-sub-e4b-17s-q4-k-xl
+translation roles:
+  bc250-office-translation-de-fr -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
+  bc250-office-translation-fr-de -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 higher-quality      prod-qwen35-9b-unsloth-q6-k
 deep/warm main      prod-gpt-oss20b-ggml-org-mxfp4
 embedding           embed-jina-v5-small-retrieval-q4-k-m
 task default        task-lfm25-1.2b-instruct-liquidai-q6-k
-task control        task-gemma3-1b-unsloth-ud-q4-k-xl
+task retired        task-gemma3-1b-unsloth-ud-q4-k-xl (graveyard)
 agent default       agentic-ornith15-9b-ornith-q5-k-m
 ```
 
@@ -95,9 +94,7 @@ config/users backups were enabled, pruning remained DRY_RUN=1, warm-up and autom
 night shutdown were disabled, and Pi companion/export were skipped. The same run exposed
 the stale installed path used by `bc250-maintenance contract`; current source contains
 that fix plus retained-key validation, independent SSH preparation for backup export and
-the fail-closed MTP comparison integrity follow-up. Separate task/translation campaign
-evidence is current through installed 0.11.1-0.10, but the 0.6 operations/power evidence
-remains historical until the current package is rechecked on-device.
+the fail-closed MTP comparison integrity follow-up. Task campaign evidence was gathered on installed 0.11.1-0.10 and Stage-2E translation evidence on installed 0.11.1-0.11; the 0.6 operations/power evidence remains historical until the current package is rechecked on-device.
 
 ## Storage lessons to preserve
 
@@ -142,7 +139,7 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-After GitHub builds and the appliance installs `0.11.1-0.11`, run one bounded re-check of:
+After GitHub builds and the appliance installs `0.11.2-0.3`, run one bounded re-check of:
 
 ```text
 installed RPM NEVRA
