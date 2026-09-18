@@ -16,7 +16,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
 | `bc250-code` | Local generate/refactor/review/document/test helper |
 | `bc250-code-commit` | Propose and optionally create a local Git commit |
-| `bc250-compare-mtp` | Compare an Ollama baseline with a running llama.cpp MTP server |
+| `bc250-compare-mtp` | Run a same-GGUF llama.cpp baseline-vs-MTP evidence comparison |
 | `bc250-cu-status` | Kernel/RADV diagnostics plus the full live-routing dashboard |
 | `bc250-cu-live-manager` | Pinned interactive live WGP manager |
 | `bc250-fetch-mtp` | Explicitly download/reconcile a selected MTP experiment, including disabled catalog entries |
@@ -194,9 +194,9 @@ in accidentally. Use the explicit opt-in helper to select one:
 
 ```bash
 bc250-model list mtp --all
-sudo bc250-fetch-mtp qwen3.6-27b-mtp
-sudo bc250-model status mtp qwen3.6-27b-mtp --include-disabled --verbose
-LLAMACPP=/path/to/llama-server bc250-run-mtp 27b
+sudo bc250-fetch-mtp qwen3.5-9b-mtp
+sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 ```
 
 Running `sudo bc250-fetch-mtp` without a selection shows the disabled experiment entries
@@ -540,8 +540,8 @@ and [`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
 bc250-code MODE INPUT [OUTPUT] [TASK...]
 bc250-code-commit [--yes]
 bc250-gitea-review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
-bc250-compare-mtp
-bc250-run-mtp {27b|4b|ID}
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp MTP_ID
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-run-mtp MTP_ID
 ```
 
 `MODE` is `generate`, `refactor`, `review`, `document`, `test` or `commit`.
@@ -556,18 +556,19 @@ or merge without the command's explicit local action.
 Prepare a candidate first with `sudo bc250-fetch-mtp ID`; the explicit helper exposes
 the packaged disabled experiments without making them part of normal convergence.
 
-The quick MTP comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
-`NUM_PREDICT` and `PROMPT`. It is a speed-oriented Ollama-vs-llama.cpp helper and
-returns nonzero when either backend fails terminal completion integrity, emits a
-pathological repeated reserved/unused-token run, or returns no usable completion.
-Missing MTP draft-acceptance telemetry is reported as insufficient qualification
-evidence rather than inference corruption. Use `bc250-benchmark` for category
-quality/correctness comparisons. MTP requires
-a compatible external llama.cpp
-server binary through `LLAMACPP`; `PORT`, `CTX` and `DRAFT_N_MAX` override its
-runtime values. When supported, the runner passes `--cache-ram 0` and
-`--no-cache-idle-slots` to avoid shared serialized prompt-cache state and its
-RAM reservation.
+`bc250-compare-mtp` is a controlled same-target qualification helper: it starts the
+same GGUF through the same external llama.cpp build and runtime settings first with
+MTP disabled, then with `draft-mtp` enabled. `NUM_PREDICT` and `PROMPT` may override
+the bounded completion probe. The result bundle records throughput, terminal
+completion integrity, draft accepted/proposed counts and acceptance percentage,
+minimum available memory, swap growth, model/source identity, llama.cpp identity and
+relevant kernel/GPU faults. Missing MTP draft-acceptance telemetry is insufficient
+qualification evidence rather than inference corruption. Use `bc250-benchmark` for
+category quality/correctness comparisons. MTP requires a compatible external
+llama.cpp server binary through `LLAMACPP`; `PORT`, `CTX`, `DRAFT_N_MAX` and optional
+`UBATCH` override runtime values. When supported, the runner passes `--cache-ram 0`
+and `--no-cache-idle-slots` to avoid shared serialized prompt-cache state and its RAM
+reservation.
 
 ## Reset / package removal
 

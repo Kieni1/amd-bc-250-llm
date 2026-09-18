@@ -296,3 +296,31 @@ addresses the demonstrated ambiguity while preserving the acceptance contract.
 failure after the 0.11.3-0.3 prompt, Open WebUI changes its task prompt/template contract,
 or the production task model changes. Do not increase the budget or relax single-object
 JSON merely to make the current model pass.
+
+
+## DEC-014 — Measure MTP against the same target/runtime and keep the external server unprivileged
+
+**Status:** ACTIVE — source contract; BC-250 runtime evidence pending.
+
+**Decision:** The first MTP qualification campaign compares each selected target GGUF with
+the same llama.cpp build, context/cache/ubatch/request settings twice: speculative decoding
+disabled, then `draft-mtp` enabled. An unrelated Ollama model is not a valid speedup baseline.
+The runner verifies manager-owned source state/SHA, port/process/memory/runtime prerequisites,
+and launches the external `llama-server` as the `ollama` service user rather than root.
+Qualification evidence must include draft accepted/proposed counts, completion integrity,
+throughput, MemAvailable/swap, exact model/runtime identity and severe GPU/kernel faults.
+Missing draft-acceptance telemetry is an incomplete MTP qualification, not a silent pass.
+
+The bounded first-campaign set is Qwen3.5 9B, retained Qwen3.6 27B control, HauhauCS
+Qwen3.8 27B IQ2_M and Qwen3.6 35B-A3B. All remain disabled/download-only and outside
+generic convergence.
+
+**Why:** The pre-hardware helper compared an MTP server to an unrelated Ollama baseline,
+which could not isolate speculative-decoding speedup, and it lacked one evidence bundle for
+resource/runtime/fault analysis. Manager-owned GGUF permissions also made direct ordinary-user
+launch ambiguous. The 0.11.3-0.4 lane resolves those measurement/privilege defects before the
+first real campaign without turning MTP into a production dependency.
+
+**Retest only if:** real BC-250 evidence shows a concrete runner/comparison defect, llama.cpp
+changes the MTP telemetry/CLI contract, or a candidate requires a materially different runtime
+path. Do not keep polishing the framework without hardware evidence.

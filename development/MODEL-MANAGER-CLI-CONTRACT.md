@@ -1,6 +1,6 @@
 # BC-250 model-manager CLI contract
 
-Current implementation target: `0.11.3-0.3`.
+Current implementation target: `0.11.3-0.4`.
 
 This document records the current greenfield model-manager command surface after the
 repository-wide caller/document migration. It is the lifecycle contract that current

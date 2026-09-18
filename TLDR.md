@@ -66,7 +66,8 @@ bc250-model list task
 bc250-model list agentic
 bc250-model list embedding
 bc250-model list mtp --all
-sudo bc250-fetch-mtp qwen3.6-27b-mtp  # explicit opt-in MTP preparation
+sudo bc250-fetch-mtp qwen3.5-9b-mtp  # explicit opt-in MTP preparation
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 
 sudo bc250-model status agentic MODEL
 sudo bc250-model status agentic MODEL --verbose

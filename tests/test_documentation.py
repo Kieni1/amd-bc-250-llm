@@ -208,6 +208,13 @@ class DocumentationTests(unittest.TestCase):
             self.assertIn("bc250-model list mtp --all", text, relative)
             self.assertIn("bc250-fetch-mtp", text, relative)
 
+    def test_mtp_command_reference_matches_same_target_contract(self) -> None:
+        reference = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        self.assertIn("controlled same-target qualification helper", reference)
+        self.assertIn("draft accepted/proposed counts", reference)
+        self.assertNotIn("The quick MTP comparison accepts `BASELINE_MODEL`", reference)
+        self.assertNotIn("speed-oriented Ollama-vs-llama.cpp helper", reference)
+
     def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")

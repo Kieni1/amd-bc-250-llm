@@ -264,7 +264,11 @@ question open.
 
 ### Lane G — MTP / speculative decoding
 
-MTP is experimental and should stay behind the production-office lanes.
+MTP is experimental, but it is now one of the two immediate next hardware batches together
+with support operations. Keep those batches separate so an external llama.cpp/resource
+failure cannot contaminate WOL/power evidence and vice versa. After the 0.11.3-0.4
+pre-flight polish, freeze the MTP harness again until real BC-250 evidence exposes a
+concrete defect or measurement gap.
 
 Prerequisites:
 
@@ -272,20 +276,24 @@ Prerequisites:
   disabled candidates without making them part of generic convergence);
 - pinned/recorded GGUF identity;
 - an external `llama-server` whose CLI supports the required options;
-- reviewed baseline is llama.cpp `b10069` / commit
-  `178a6c44937154dc4c4eff0d166f4a044c4fceba`, but compatible newer releases may be
+- reviewed baseline is llama.cpp `b10964` / commit
+  `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4`, but compatible newer releases may be
   tested and must be recorded.
 
-Prepare and verify one MTP model at a time:
+Prepare and verify one MTP model at a time. The first funnel is 9B -> retained 27B
+control -> Qwen3.8 27B -> 35B-A3B; stop when a candidate no longer has a useful case:
 
 ```bash
 bc250-model list mtp --all
-sudo bc250-fetch-mtp ID
-sudo bc250-model status mtp ID --include-disabled --verbose
-LLAMACPP=/path/to/llama-server bc250-run-mtp ID
+sudo bc250-fetch-mtp qwen3.5-9b-mtp
+sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 ```
 
-A useful MTP comparison must include:
+`bc250-compare-mtp` owns the controlled speedup measurement: the same target GGUF is run
+sequentially through the same llama.cpp build/settings with speculative decoding disabled
+and enabled. `bc250-run-mtp [--no-mtp] ID` remains the manual diagnostic path. A useful
+MTP comparison must include:
 
 ```text
 same or closely comparable task/prompt
@@ -299,7 +307,7 @@ stability and error logs
 output-quality regressions
 ```
 
-`models/experiments/compare-mtp.sh` is a quick speed probe, not a promotion evaluator.
+`models/experiments/compare-mtp.sh` is an evidence harness, not by itself a production-promotion evaluator. Its archive must still be interpreted for useful answer quality and appliance safety.
 Do not claim an MTP win from tok/s alone. A speedup that changes answer quality,
 exhausts memory, or relies on a fragile external runtime is not a production win.
 
