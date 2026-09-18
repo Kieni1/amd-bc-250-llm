@@ -22,6 +22,7 @@ Usage:
   bc250-benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
   bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
   bc250-benchmark num-batch MODEL [MODEL ...]
+  bc250-benchmark owui-translation --token-file FILE
   bc250-benchmark owui-rag MODEL --token-file FILE
   bc250-benchmark owui-embedding-batch --token-file FILE
   bc250-benchmark owui-chunk-min MODEL --token-file FILE
@@ -45,7 +46,7 @@ case "$command" in
   concurrency|num-batch)
     exec python3 "$RUNTIME" "$@"
     ;;
-  owui-rag|owui-embedding-batch|owui-chunk-min|owui-system-context)
+  owui-translation|owui-rag|owui-embedding-batch|owui-chunk-min|owui-system-context)
     exec python3 "$OPENWEBUI" "$@"
     ;;
   -h|--help)

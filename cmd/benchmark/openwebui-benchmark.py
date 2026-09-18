@@ -8,14 +8,17 @@ import hashlib
 import json
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -29,6 +32,7 @@ from benchmark_common import (
     finalize_active_infrastructure_failure,
     finalize_benchmark_metadata,
     fixture_metadata,
+    normalize_words,
     prepare_result_dir,
     result_record,
     write_benchmark_metadata,
@@ -390,6 +394,85 @@ def response_text(result: dict[str, Any]) -> str:
     return str(message.get("content") or "")
 
 
+def plain_chat(client: JsonClient, model: str, text: str) -> dict[str, Any]:
+    """Send one normal chat request through the selected Open WebUI role."""
+    return client.post(
+        "/api/chat/completions",
+        {
+            "model": model,
+            "messages": [{"role": "user", "content": text}],
+            "stream": False,
+            "background_tasks": {
+                "title_generation": False,
+                "tags_generation": False,
+                "follow_up_generation": False,
+            },
+        },
+    )
+
+
+def translation_acceptance_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text).translate(
+        str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
+    )
+    normalized = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", normalized)
+    return " ".join(normalized.casefold().split())
+
+
+def translation_numeric_values(text: str) -> set[Decimal]:
+    values: set[Decimal] = set()
+    for raw in re.findall(r"(?<![\w-])\d(?:[\d\s.,'’]*\d)?(?![\w-])", text):
+        token = raw.strip().replace(" ", "").replace("'", "").replace("’", "")
+        if not token:
+            continue
+        decimal_pos = max(token.rfind("."), token.rfind(","))
+        fractional_digits = len(token) - decimal_pos - 1 if decimal_pos >= 0 else 0
+        if decimal_pos >= 0 and fractional_digits in {1, 2}:
+            whole = re.sub(r"[.,]", "", token[:decimal_pos]) or "0"
+            token = whole + "." + token[decimal_pos + 1 :]
+        else:
+            token = re.sub(r"[.,]", "", token)
+        try:
+            values.add(Decimal(token))
+        except InvalidOperation:
+            continue
+    return values
+
+
+def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
+    folded = translation_acceptance_text(content)
+    required_ok = all(
+        translation_acceptance_text(term) in folded for term in case.get("required", [])
+    )
+    choices = case.get("required_any", [])
+    if choices:
+        required_ok = required_ok and any(
+            translation_acceptance_text(term) in folded for term in choices
+        )
+    forbidden_ok = not any(
+        translation_acceptance_text(term) in folded for term in case.get("forbidden", [])
+    )
+    preserved_ok = all(
+        translation_acceptance_text(term) in folded for term in case.get("preserve", [])
+    )
+    expected_numbers = {Decimal(str(value)) for value in case.get("numeric_values", [])}
+    if expected_numbers:
+        preserved_ok = preserved_ok and expected_numbers.issubset(
+            translation_numeric_values(content)
+        )
+    meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
+    failures: list[str] = []
+    if not content.strip():
+        failures.append("empty-output")
+    if not required_ok or not meaningful_ok:
+        failures.append("semantic")
+    if not forbidden_ok:
+        failures.append("source-leakage")
+    if not preserved_ok:
+        failures.append("preservation")
+    return not failures, failures
+
+
 def usage_row(result: dict[str, Any]) -> dict[str, Any]:
     usage = result.get("usage") if isinstance(result, dict) else {}
     if not isinstance(usage, dict):
@@ -556,6 +639,83 @@ def run_owui_rag_case(
     finally:
         cleanup_kb(client, kb_id, file_id, kb_name)
     return failures
+
+
+def cmd_owui_translation(args: argparse.Namespace) -> int:
+    """Qualify the packaged production translation roles through Open WebUI."""
+    fixture = Path(__file__).resolve().parents[2] / "examples/benchmark/translation-office.json"
+    cases = json.loads(fixture.read_text(encoding="utf-8"))
+    paths = prepare_result_dir("owui-translation", args.output_dir)
+    client = owui_client(args)
+    base_model = "prod-translate-gemma4-sub-e4b-17s-q4-k-xl"
+    roles = {
+        ("de", "fr"): "bc250-office-translation-de-fr",
+        ("fr", "de"): "bc250-office-translation-fr-de",
+    }
+    simple_meta(
+        paths,
+        "owui-translation",
+        url=args.url,
+        model=base_model,
+        translation_fixture=str(fixture),
+        production_roles={"de-fr": roles[("de", "fr")], "fr-de": roles[("fr", "de")]},
+        max_tokens_contract=2048,
+        think_policy="omitted",
+        request_timeout_s=getattr(args, "timeout", DEFAULT_TIMEOUT),
+    )
+    shutil.copy2(fixture, paths.fixtures_dir / fixture.name)
+    failures = 0
+    try:
+        for case in cases:
+            direction = (str(case["source_language"]), str(case["target_language"]))
+            role = roles.get(direction)
+            if role is None:
+                raise Failure(f"unsupported packaged translation direction: {direction!r}")
+            started = time.monotonic()
+            result = plain_chat(client, role, str(case["input"]))
+            wall = time.monotonic() - started
+            content = response_text(result)
+            ok, failure_kinds = owui_translation_checks(content, case)
+            failures += int(not ok)
+            append_result(
+                paths.results_jsonl,
+                result_record(
+                    category="owui-translation",
+                    model=role,
+                    case_id=str(case["id"]),
+                    result_type="qualification",
+                    outcome="pass" if ok else "quality-fail",
+                    failure_kinds=failure_kinds,
+                    checks={
+                        "semantic": "semantic" not in failure_kinds,
+                        "preservation": "preservation" not in failure_kinds,
+                        "source_leakage": "source-leakage" not in failure_kinds,
+                    },
+                    metrics={"wall_s": wall, **usage_row(result)},
+                    source_language=case["source_language"],
+                    target_language=case["target_language"],
+                    response=content,
+                    role=role,
+                ),
+            )
+            print(f"  {case['id']}: role={role} pass={ok} wall={wall:.2f}s")
+    except Failure as exc:
+        append_result(
+            paths.results_jsonl,
+            result_record(
+                category="owui-translation",
+                model=base_model,
+                case_id="packaged-runtime",
+                result_type="qualification",
+                outcome="infra-fail",
+                failure_kinds=["runtime-api"],
+                error=str(exc),
+            ),
+        )
+        finish(paths, "owui-translation")
+        return 1
+    finish(paths, "owui-translation")
+    return 3 if failures else 0
 
 
 def cmd_owui_rag(args: argparse.Namespace) -> int:
@@ -998,6 +1158,13 @@ def main() -> int:
         description="Explicit Open WebUI RAG/tuning benchmarks with restoration.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    owui_translation = sub.add_parser(
+        "owui-translation",
+        help="qualify the packaged DE↔FR production translation roles through Open WebUI",
+    )
+    add_owui(owui_translation)
+    owui_translation.set_defaults(func=cmd_owui_translation)
 
     owui_rag = sub.add_parser("owui-rag", help="qualify the currently packaged OWUI RAG path")
     add_owui(owui_rag)

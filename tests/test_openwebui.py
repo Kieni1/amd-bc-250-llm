@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import importlib.util
 import sys
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +88,19 @@ class OpenWebUIStatusTests(unittest.TestCase):
 
     def test_status_accepts_well_formed_api_responses(self) -> None:
         self.assertEqual(OPENWEBUI.status(FakeClient(), True), 0)
+
+    def test_verbose_status_surfaces_verified_role_contracts(self) -> None:
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(OPENWEBUI.status(FakeClient(), True, verbose=True), 0)
+        text = output.getvalue()
+        self.assertIn("Package-owned Open WebUI roles", text)
+        self.assertIn("bc250-office-translation-de-fr", text)
+        self.assertIn("max_tokens=2048", text)
+        self.assertIn("think=omitted", text)
+        self.assertIn("filters=bc250_translation_direction", text)
+        self.assertIn("Task and RAG", text)
+        self.assertIn("Package-owned functions", text)
 
     def test_status_rejects_non_object_config_responses(self) -> None:
         endpoints = (
