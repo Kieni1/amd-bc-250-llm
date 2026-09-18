@@ -102,7 +102,11 @@ kept only in the source graveyard and are not
 exposed through normal model discovery. The installed retirement catalog lets
 `sudo bc250-model status` identify stale package-retired registrations and
 `sudo bc250-model purge-retired` remove only those explicitly catalogued models.
-Experimental models are never silent replacements for the defaults above.
+Experimental models are never silent replacements for the defaults above. During `bc250-install`,
+required role models are converged first; entries that are already fully current are summarized rather
+than printed model-by-model. The optional picker shows compact runtime state for ordinary Ollama
+catalog entries only. Download-only MTP candidates never participate in that generic picker or
+`apply all`; prepare them explicitly with `bc250-fetch-mtp`.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,

@@ -33,6 +33,12 @@ that depend on packaged tools such as `jq` belong to installed-package/BC-250 qu
 source tests should exercise the underlying data/format contracts without invoking those runtime
 dependencies.
 
+Installer/model-manager source coverage must also protect the setup UX contract: catalog suppression
+must actually suppress the redundant pre-apply catalog, local registration discovery must be bounded
+and skip the known-inactive agent lane, combined `apply all` / `refresh all` must never acquire MTP,
+and unchanged required models may collapse to concise category summaries without hiding any real
+repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
+
 ## 3. Common promotion funnel
 
 For a candidate change, stop as soon as it no longer has a promotion case.

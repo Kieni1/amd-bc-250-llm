@@ -215,6 +215,18 @@ class DocumentationTests(unittest.TestCase):
         self.assertNotIn("The quick MTP comparison accepts `BASELINE_MODEL`", reference)
         self.assertNotIn("speed-oriented Ollama-vs-llama.cpp helper", reference)
 
+    def test_current_docs_keep_mtp_out_of_generic_installer_convergence(self) -> None:
+        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        contract = (ROOT / "development/MODEL-MANAGER-CLI-CONTRACT.md").read_text(encoding="utf-8")
+        models = (ROOT / "models/README.md").read_text(encoding="utf-8")
+        for text in (commands, contract, models):
+            self.assertIn("apply all", text)
+            self.assertIn("MTP", text)
+        self.assertIn("never include MTP", commands)
+        self.assertIn("never select the MTP category", contract)
+        self.assertIn("MTP is deliberately absent from that picker", models)
+        self.assertNotIn("optional model selection across production, experiments,\nagentic, embedding, task and MTP entries", models)
+
     def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")

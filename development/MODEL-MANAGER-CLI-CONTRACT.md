@@ -61,8 +61,12 @@ upstream state has not been checked.
 
 `--verbose` adds catalog source repository/revision, verified local SHA-256 when
 available, and resolved source/state/runtime paths. `--compact` uses the same
-inspector but emits one state-rich line per model; the installer uses this mode
-for selection so `list` remains a catalog-only operation.
+inspector but keeps healthy interactive views short: an ordinary fully current model
+renders as `[CURRENT]`, an intentionally inactive agent-lane model renders as a short
+deferred state, and non-current models retain source/Modelfile/registration detail.
+The installer uses this mode so `list` remains catalog-only. Local registration discovery
+is bounded, and the known-inactive agent lane is skipped during normal combined inspection;
+GGUF identity/SHA verification semantics are unchanged.
 
 ### `path`
 
@@ -98,10 +102,12 @@ retaining the catalog definition. A missing selection never means implicit
 
 ### MTP explicit opt-in
 
-Packaged MTP entries may remain `enabled = false` so they are excluded from generic
-combined-catalog convergence. `bc250-fetch-mtp [SELECTION]` is the explicit operator
-opt-in and dispatches to `apply mtp --include-disabled`; no catalog edit is required just
-to download a candidate for a bounded llama.cpp experiment. MTP remains download-only,
+Packaged MTP entries may remain `enabled = false` so they are hidden from ordinary combined
+status views. More importantly, combined `apply all` / `refresh all` never select the MTP category,
+even with `--include-disabled`; this keeps installer/generic convergence incapable of acquiring
+experimental llama.cpp artifacts. `bc250-fetch-mtp [SELECTION]` is the explicit operator opt-in
+and dispatches to `apply mtp --include-disabled`; no catalog edit is required just to download a
+candidate for a bounded llama.cpp experiment. MTP remains download-only,
 so it supports source `status/apply/refresh/remove/path` but not `unregister`.
 
 ### `purge-retired`

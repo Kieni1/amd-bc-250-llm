@@ -1,10 +1,11 @@
 # Model management
 
-The guided installer establishes the required task and embedding baseline, then
-offers one unified optional model selection across production, experiments,
-agentic, embedding, task and MTP entries. The model manager keeps lane routing
-and exclusive agent-mode transitions internal. Use the commands below later to
-add, refresh or remove models.
+The guided installer establishes the required production/task/embedding baseline, then offers one
+unified optional selection across ordinary Ollama-backed production, experiments, agentic, embedding
+and task entries. MTP is deliberately absent from that picker and from combined `apply all` /
+`refresh all`; use `bc250-fetch-mtp` for explicit speculative-decoding preparation. The model manager
+keeps lane routing and exclusive agent-mode transitions internal. Use the commands below later to add,
+refresh or remove models.
 
 ## Commands
 
@@ -21,7 +22,8 @@ LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 
 sudo bc250-model status agentic MODEL
 sudo bc250-model status agentic MODEL --online
-sudo bc250-model status all --include-disabled --compact  # state-rich one-line view
+sudo bc250-model status all --compact  # compact ordinary-model view used by the installer
+sudo bc250-model status mtp --include-disabled --compact  # explicit MTP state view
 
 sudo bc250-model apply production MODEL-NAME
 sudo bc250-model refresh production MODEL-NAME
@@ -35,8 +37,9 @@ read-only runtime/state view and normally needs `sudo` for the protected GGUF/st
 It reports source/provenance validity, Modelfile drift, registration state and a recommended
 action. `--online` checks moving upstream revisions without mutating local state; normal
 status output points to that option when upstream state was not checked. `--verbose` adds
-source repository/revision/SHA and resolved paths. `--compact` uses the same inspector for
-one-line state-rich catalog output, including the installer model picker.
+source repository/revision/SHA and resolved paths. `--compact` uses the same inspector for one-line
+state output. Fully current ordinary entries collapse to `[CURRENT]`; inactive agent entries show a
+short deferred state, while drift/missing entries retain the detailed reason needed for action.
 
 Selections accept a full name, displayed index, comma list, range such as `0,2-4`, or
 `all`; global indexes remain stable across category-filtered list/status/action views.
@@ -61,8 +64,8 @@ The public categories are `production`, `experiments`, `task`, `agentic`,
 `embedding`, `mtp` and `all`; legacy aliases are intentionally not accepted. MTP
 is the only exception to Modelfile discovery: its download-only entries remain in
 a TOML runtime catalog because they have no Ollama model or Modelfile. Packaged MTP
-entries stay disabled from generic convergence; use `sudo bc250-fetch-mtp ID` when
-deliberately preparing one for a bounded llama.cpp experiment.
+entries are excluded from combined mutation convergence regardless of enabled state; use
+`sudo bc250-fetch-mtp ID` when deliberately preparing one for a bounded llama.cpp experiment.
 
 ## Add or override a model
 

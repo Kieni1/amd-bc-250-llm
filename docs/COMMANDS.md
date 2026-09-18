@@ -81,10 +81,14 @@ persistent 40-CU mode is already configured and the prepared replacement module
 is not yet running.
 
 The installer ensures every base model required by active package-owned Open WebUI
-roles, plus the task and embedding defaults, without printing the full catalog. It then
-presents one catalog for experiments, rollback/reference, agent and other optional
-extras. Use global indexes, ranges, exact names, `recommended`, `production` or `all`;
-Enter skips optional extras only.
+roles, plus the task and embedding defaults, without printing the full catalog. Fully
+unchanged required models are summarized by category; downloads or repairs remain verbose.
+It then presents compact state for ordinary production/experiment/task/agent/embedding
+extras. Fully current rows collapse to `[CURRENT]`, and the intentionally inactive agent
+lane is shown as deferred without waiting on that stopped Ollama instance. MTP is not part
+of this generic picker; use `bc250-model list mtp --all` plus `bc250-fetch-mtp ID` explicitly.
+Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips
+optional extras only.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
 across transcript PTY creation, so unattended runs never become interactive by
 accident. `BC250_HF_ANONYMOUS=1` forces anonymous Hugging Face downloads. The model manager
@@ -128,9 +132,13 @@ manager-owned GGUF/state trees are protected. It evaluates the same state contra
 definition differs from the rendered runtime Modelfile, registration state on the
 category-owned Ollama lane, and the recommended next action. When upstream state has not
 been checked, normal output points to `--online`. `--verbose` adds source repository,
-revision, verified local SHA-256 when available, and resolved paths. `--compact` renders
-one state-rich line per model and is used by the installer picker. `--online` checks moving
-upstream revisions such as `latest` without downloading or modifying the local model.
+revision, verified local SHA-256 when available, and resolved paths. `--compact` uses the
+same inspection contract but keeps healthy interactive views short: ordinary fully-current
+entries render as `[CURRENT]`, inactive agent entries render as deferred, and non-current
+entries keep the detailed source/Modelfile/registration reason. Local registration probes are
+bounded; the known-inactive agent lane is skipped during normal status-all inspection.
+`--online` checks moving upstream revisions such as `latest` without downloading or modifying
+the local model.
 Pinned revisions are reported as pinned rather than mislabelled as needing an update.
 
 `path` is the narrow machine-readable resolver used by package tooling. It prints the
@@ -178,7 +186,7 @@ Common options for `apply` and `refresh`:
 - `--destination PATH`: override the manager-owned GGUF root;
 - `--min-free-bytes BYTES`: require free space before downloading;
 - `--token-file PATH`: read a Hugging Face token from a protected file;
-- `--include-disabled`: allow disabled MTP entries to be selected;
+- `--include-disabled`: allow disabled MTP entries to be selected for an explicit `mtp` category operation; combined `apply all` / `refresh all` never include MTP;
 - `--modelfile-dir PATH`: add a Modelfile search directory;
 - `--source PATH`: use another MTP TOML catalog.
 
@@ -188,9 +196,10 @@ authentication is requested only when a manager download actually needs it.
 
 ### MTP lifecycle
 
-MTP entries are download-only llama.cpp experiments and are intentionally disabled in
-the packaged catalog so generic `apply all` and installer convergence cannot pull them
-in accidentally. Use the explicit opt-in helper to select one:
+MTP entries are download-only llama.cpp experiments and are intentionally outside generic
+combined convergence. The installer picker excludes them, and `apply all` / `refresh all` never
+select MTP even when `--include-disabled` is supplied. Use the explicit `mtp` category or the
+opt-in helper to select one:
 
 ```bash
 bc250-model list mtp --all
@@ -206,9 +215,9 @@ helper is therefore safe to use without editing `/etc/bc250-llm-server/mtp-model
 Ollama registration, so `unregister mtp` is invalid; `remove mtp ID` removes only the
 manager-owned source/state after confirmation.
 
-Keep `enabled = false` for candidates that should remain outside generic catalog-wide
-operations. Setting an entry true is an operator policy choice, not a qualification or
-promotion signal.
+Keep `enabled = false` for candidates that should remain hidden from ordinary combined status
+views. The combined mutation path still excludes the MTP category regardless of that flag; setting
+an entry true is an operator visibility policy choice, not a qualification or promotion signal.
 
 The manager records schema-3 source/model/category identity plus SHA-256 and file stat
 metadata. Unchanged stat metadata can use the validated fast path; changed or legacy state

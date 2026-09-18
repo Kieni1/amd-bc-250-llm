@@ -42,6 +42,7 @@ bc250-model list mtp --all
 # MTP stays opt-in even though it shares the lifecycle manager:
 sudo bc250-fetch-mtp qwen3.5-9b-mtp
 
+# Generic installer / apply-all convergence never selects MTP.
 sudo bc250-model status agentic MODEL
 sudo bc250-model status agentic MODEL --online
 
@@ -374,8 +375,9 @@ cleanup decision from one comparable dataset. Notable additions are:
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,
 runtime and the OS. Draft/MTP heads are not standalone Ollama role models and stay in the dedicated MTP
-workflow. Packaged MTP entries remain disabled from generic convergence and have no
-Ollama Modelfiles. The first hardware funnel is `qwen3.5-9b-mtp`, retained
+workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from combined
+`apply all` / `refresh all` convergence regardless of their enabled flag; explicit
+`bc250-fetch-mtp` / `apply mtp` remains the preparation boundary. The first hardware funnel is `qwen3.5-9b-mtp`, retained
 `qwen3.6-27b-mtp` control, `qwen3.8-27b-hauhaucs-mtp`, then
 `qwen3.6-35b-a3b-mtp`, one candidate at a time. `bc250-fetch-mtp [SELECTION]` is the
 explicit opt-in downloader/reconciler. Qualification should use `bc250-compare-mtp ID`,

@@ -4,10 +4,11 @@ MTP entries are optional **download-only** llama.cpp experiments. They are not O
 role models and remain excluded from normal `apply all` / installer convergence until
 real BC-250 qualification justifies a stronger integration decision.
 
-The packaged entries are intentionally `enabled = false`. Ordinary `bc250-model list mtp`,
-`apply mtp` and combined-catalog operations therefore do not select them accidentally.
-`bc250-fetch-mtp` is the explicit opt-in workflow and deliberately exposes those disabled
-experiment definitions. MTP entries intentionally have no Ollama Modelfile.
+The packaged entries are intentionally `enabled = false`. Ordinary `bc250-model list mtp` and
+`apply mtp` therefore do not select them accidentally. Combined `apply all` / `refresh all` excludes
+the MTP category entirely, even when `--include-disabled` is supplied. `bc250-fetch-mtp` is the
+explicit opt-in workflow and deliberately exposes those disabled experiment definitions. MTP entries
+intentionally have no Ollama Modelfile.
 
 ## Current first-campaign set
 

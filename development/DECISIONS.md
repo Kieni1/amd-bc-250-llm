@@ -324,3 +324,32 @@ first real campaign without turning MTP into a production dependency.
 **Retest only if:** real BC-250 evidence shows a concrete runner/comparison defect, llama.cpp
 changes the MTP telemetry/CLI contract, or a candidate requires a materially different runtime
 path. Do not keep polishing the framework without hardware evidence.
+
+## DEC-015 — Keep install-time model reconciliation fast, bounded and MTP-safe
+
+**Status:** ACTIVE
+
+**Decision:** `bc250-install` may use the shared model-state inspector to render its optional
+ordinary-model picker, but install-time state discovery must not turn into an unbounded runtime
+probe or an accidental MTP acquisition path. Generic combined `apply all` / `refresh all`
+therefore never select the MTP category; disabled MTP preparation remains explicit through
+`bc250-fetch-mtp` / `bc250-model apply mtp ... --include-disabled`. The known-inactive agent
+Ollama lane is skipped during registration discovery, and remaining local registration probes
+have a short timeout rather than being allowed to stall setup indefinitely. GGUF integrity is
+unchanged: matching schema-3 file identity may use the recorded verified SHA fast path, while
+changed/legacy identity still forces a full checksum. Required models that are fully unchanged
+may be summarized by category, but any actual download, source metadata/permission repair,
+Modelfile drift or registration repair must remain visible.
+
+**Why:** Installed pre-refinement `0.11.3-0.4.fc44` showed correct model state and a clean
+54/0/0 verifier, but the optional picker took noticeably long to appear and the initial required
+convergence printed a redundant catalog/current-model stream. The same run also demonstrated that
+showing disabled MTP indexes inside the generic installer picker creates an unnecessary path for
+operator ambiguity even though MTP is a separate experimental llama.cpp lane. These are UX/runtime
+probe issues, not reasons to weaken source verification.
+
+**Retest only if:** a bounded active-lane registration timeout causes false UNKNOWN states on a
+healthy BC-250, a future topology changes which Ollama lanes are intentionally inactive during
+normal setup, or the package deliberately changes MTP from an explicit experiment into normal
+appliance convergence. Do not speed setup by skipping checksum validation when recorded file
+identity has changed.

@@ -69,6 +69,7 @@ bc250-model list mtp --all
 sudo bc250-fetch-mtp qwen3.5-9b-mtp  # explicit opt-in MTP preparation
 LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 
+# Generic installer / `apply all` selection never includes MTP; use bc250-fetch-mtp explicitly.
 sudo bc250-model status agentic MODEL
 sudo bc250-model status agentic MODEL --verbose
 sudo bc250-model apply production
