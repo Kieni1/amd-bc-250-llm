@@ -150,7 +150,7 @@ step_3_install_ollama
 
     def test_one_unified_model_selection_is_used_after_required_active_roles(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn("bc250-model list all --all", source)
+        self.assertIn("bc250-model status all --include-disabled --compact", source)
         self.assertIn("BC250_MODEL_SELECTION", source)
         self.assertIn("select(.is_active == true)", source)
         self.assertIn(".task.TASK_MODEL", source)
@@ -169,7 +169,7 @@ bc250-model() { printf 'model:%s\n' "$*"; }
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("model:list all --all", result.stdout)
+        self.assertIn("model:status all --include-disabled --compact", result.stdout)
         for model in (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",

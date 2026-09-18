@@ -262,7 +262,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "bc250-memory-profile ensure",
             "bc250-swap-profile ensure",
             "BC250_MODEL_SELECTION",
-            "bc250-model list all --all",
+            "bc250-model status all --include-disabled --compact",
             "bc250-model apply all",
             "request_primary_reboot_if_needed",
         ),

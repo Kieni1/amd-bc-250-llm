@@ -365,7 +365,7 @@ step_7_models() {
 
   echo
   echo "Optional experiments, rollback/reference, agent and additional model selection:"
-  bc250-model list all --all
+  bc250-model status all --include-disabled --compact
   local selection="${BC250_MODEL_SELECTION:-}"
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 ]]; then
     read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection

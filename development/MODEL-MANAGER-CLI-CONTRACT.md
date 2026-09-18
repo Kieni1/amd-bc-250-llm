@@ -1,6 +1,6 @@
 # BC-250 model-manager CLI contract
 
-Current implementation target: `0.11.3-0.2`.
+Current implementation target: `0.11.3-0.3`.
 
 This document records the current greenfield model-manager command surface after the
 repository-wide caller/document migration. It is the lifecycle contract that current
@@ -24,7 +24,7 @@ own path/provenance guesses.
 
 ```text
 bc250-model list [CATEGORY]
-sudo bc250-model status [CATEGORY] [SELECTION] [--online]
+sudo bc250-model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
 bc250-model path CATEGORY ID
 
 sudo bc250-model apply CATEGORY [SELECTION]
@@ -56,7 +56,13 @@ because manager-owned GGUF/state directories are protected.
 `--online` is opt-in. For `@ latest` manager-owned Hugging Face sources it
 compares remote file SHA metadata with the locally verified SHA without
 modifying or downloading the model. Pinned revisions are reported as pinned,
-not as update candidates.
+not as update candidates. Normal output explicitly points to `--online` when
+upstream state has not been checked.
+
+`--verbose` adds catalog source repository/revision, verified local SHA-256 when
+available, and resolved source/state/runtime paths. `--compact` uses the same
+inspector but emits one state-rich line per model; the installer uses this mode
+for selection so `list` remains a catalog-only operation.
 
 ### `path`
 

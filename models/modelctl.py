@@ -1813,8 +1813,12 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument(
         "--token-file", type=Path, help="Hugging Face token file for --online"
     )
-    status.add_argument(
-        "--verbose", action="store_true", help="show resolved source/runtime paths"
+    display = status.add_mutually_exclusive_group()
+    display.add_argument(
+        "--verbose", action="store_true", help="show source identity and resolved paths"
+    )
+    display.add_argument(
+        "--compact", action="store_true", help="show one state-rich catalog line per model"
     )
     status.add_argument(
         "--include-disabled",
@@ -1973,6 +1977,62 @@ def recommended_status_action(inspection: ModelInspection) -> str | None:
     return None
 
 
+def compact_inspection_details(inspection: ModelInspection) -> list[str]:
+    """Return concise state labels suitable for interactive model selection."""
+    model = inspection.model
+    details = [model["provider"], definition_origin(model)]
+    source = {
+        "current": "source verified",
+        "missing": "source missing",
+        "drift": "source drift",
+        "unavailable": "source unavailable",
+        "ollama-managed": "source Ollama-managed",
+    }.get(inspection.source_status, f"source {inspection.source_status}")
+    details.append(source)
+    if model["provider"] != "download-only":
+        modelfile = {
+            "current": "Modelfile current",
+            "missing": "Modelfile missing",
+            "drift": "Modelfile drift",
+            "unavailable": "Modelfile unavailable",
+        }.get(inspection.modelfile_status, f"Modelfile {inspection.modelfile_status}")
+        details.append(modelfile)
+        if inspection.registration_status == "current":
+            details.append("registered")
+        elif (
+            model.get("category") == "agentic"
+            and inspection.registration_status == "unavailable"
+        ):
+            details.append("registration deferred (agent lane inactive)")
+        else:
+            registration = {
+                "missing": "not registered",
+                "unavailable": "registration unavailable",
+            }.get(
+                inspection.registration_status,
+                f"registration {inspection.registration_status}",
+            )
+            details.append(registration)
+    if (
+        model.get("category") == "agentic"
+        and inspection.registration_status == "unavailable"
+        and inspection.source_status in {"current", "ollama-managed"}
+        and inspection.modelfile_status == "current"
+    ):
+        details.append("runtime deferred")
+    else:
+        details.append(inspection.overall_status)
+    return details
+
+
+def print_model_inspection_compact(inspection: ModelInspection) -> None:
+    model = inspection.model
+    index = int(model.get("index", 0))
+    label = model.get("name", model["id"])
+    details = compact_inspection_details(inspection)
+    print(f"  {index:2d}) {label:<56} [{', '.join(details)}]")
+
+
 def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> None:
     model = inspection.model
     label = model.get("name", model["id"])
@@ -1989,7 +2049,10 @@ def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> Non
             "unavailable": "unavailable",
         }.get(inspection.registration_status, inspection.registration_status)
         print(f"  Registration:   {registration}")
-    print(f"  Upstream:       {inspection.remote_status}")
+    upstream = inspection.remote_status
+    if upstream == "not checked":
+        upstream += " (use --online)"
+    print(f"  Upstream:       {upstream}")
     if inspection.remote_detail:
         print(f"    detail:       {inspection.remote_detail}")
     print(f"  Status:         {inspection.overall_status}")
@@ -1997,6 +2060,14 @@ def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> Non
     if action:
         print(f"  Recommended:    {action}")
     if verbose:
+        repository = str(model.get("repository") or "")
+        revision = str(model.get("revision") or "")
+        if repository:
+            print(f"  Source repo:    {repository}")
+        if revision:
+            print(f"  Source revision: {revision}")
+        if inspection.source_checksum:
+            print(f"  Source SHA-256: {inspection.source_checksum}")
         if inspection.source_path:
             print(f"  Source path:    {inspection.source_path}")
         if inspection.state_path:
@@ -2256,9 +2327,15 @@ def main(argv: list[str] | None = None) -> int:
                 host = defaults.get("ollama_host")
                 if host and host not in registrations:
                     registrations[host] = registered_models(host)
-                for model in models:
-                    if (model["category"], model["id"]) not in selected_ids:
-                        continue
+                category_models = [
+                    model
+                    for model in models
+                    if (model["category"], model["id"]) in selected_ids
+                ]
+                if args.compact and category_models:
+                    category = defaults["category"]
+                    print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+                for model in category_models:
                     inspection = inspect_model_state(
                         defaults,
                         model,
@@ -2266,7 +2343,10 @@ def main(argv: list[str] | None = None) -> int:
                         online=args.online,
                         token=token,
                     )
-                    print_model_inspection(inspection, verbose=args.verbose)
+                    if args.compact:
+                        print_model_inspection_compact(inspection)
+                    else:
+                        print_model_inspection(inspection, verbose=args.verbose)
             return 0
 
         defaults, models = load_models(category, directories=directories, source=source)
@@ -2280,6 +2360,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         host = defaults.get("ollama_host")
         registrations = registered_models(host) if host else None
+        if args.compact and selected:
+            print(f"{'MTP' if category == 'mtp' else category.title()} models:")
         for model in selected:
             inspection = inspect_model_state(
                 defaults,
@@ -2288,7 +2370,10 @@ def main(argv: list[str] | None = None) -> int:
                 online=args.online,
                 token=token,
             )
-            print_model_inspection(inspection, verbose=args.verbose)
+            if args.compact:
+                print_model_inspection_compact(inspection)
+            else:
+                print_model_inspection(inspection, verbose=args.verbose)
         return 0
 
     if args.category is None:

@@ -601,6 +601,95 @@ class SelectionTests(unittest.TestCase):
 
 
 class StatusTests(unittest.TestCase):
+    def test_compact_status_exposes_state_rich_picker_labels(self) -> None:
+        model = {
+            "id": "prod-test",
+            "name": "prod-test",
+            "category": "production",
+            "provider": "ollama",
+            "origin": "packaged",
+            "index": 3,
+        }
+        inspection = modelctl.ModelInspection(
+            model=model,
+            source_path=Path("/tmp/model.gguf"),
+            state_path=Path("/tmp/model.gguf.bc250.json"),
+            source_status="current",
+            source_detail="verified",
+            source_checksum="a" * 64,
+            runtime_modelfile=Path("/tmp/prod-test.Modelfile"),
+            modelfile_status="current",
+            registration_status="current",
+            overall_status="CURRENT",
+        )
+        output = StringIO()
+        with redirect_stdout(output):
+            modelctl.print_model_inspection_compact(inspection)
+        text = output.getvalue()
+        self.assertIn("  3) prod-test", text)
+        self.assertIn("packaged", text)
+        self.assertIn("source verified", text)
+        self.assertIn("Modelfile current", text)
+        self.assertIn("registered", text)
+        self.assertIn("CURRENT", text)
+
+    def test_compact_agent_status_marks_inactive_lane_as_deferred(self) -> None:
+        model = {
+            "id": "agent-test",
+            "name": "agent-test",
+            "category": "agentic",
+            "provider": "ollama",
+            "origin": "packaged",
+            "index": 26,
+        }
+        inspection = modelctl.ModelInspection(
+            model=model,
+            source_path=Path("/tmp/agent.gguf"),
+            state_path=Path("/tmp/agent.gguf.bc250.json"),
+            source_status="current",
+            source_detail="verified",
+            source_checksum="c" * 64,
+            runtime_modelfile=Path("/tmp/agent-test.Modelfile"),
+            modelfile_status="current",
+            registration_status="unavailable",
+            overall_status="UNKNOWN",
+        )
+        details = modelctl.compact_inspection_details(inspection)
+        self.assertIn("registration deferred (agent lane inactive)", details)
+        self.assertIn("runtime deferred", details)
+        self.assertNotIn("UNKNOWN", details)
+
+    def test_verbose_status_explains_online_check_and_source_identity(self) -> None:
+        model = {
+            "id": "prod-test",
+            "name": "prod-test",
+            "category": "production",
+            "provider": "ollama",
+            "origin": "packaged",
+            "repository": "example/repo",
+            "revision": "latest",
+        }
+        inspection = modelctl.ModelInspection(
+            model=model,
+            source_path=Path("/tmp/model.gguf"),
+            state_path=Path("/tmp/model.gguf.bc250.json"),
+            source_status="current",
+            source_detail="verified",
+            source_checksum="b" * 64,
+            runtime_modelfile=Path("/tmp/prod-test.Modelfile"),
+            modelfile_status="current",
+            registration_status="current",
+            overall_status="CURRENT",
+        )
+        output = StringIO()
+        with redirect_stdout(output):
+            modelctl.print_model_inspection(inspection, verbose=True)
+        text = output.getvalue()
+        self.assertIn("Upstream:       not checked (use --online)", text)
+        self.assertIn("Source repo:    example/repo", text)
+        self.assertIn("Source revision: latest", text)
+        self.assertIn(f"Source SHA-256: {'b' * 64}", text)
+
     def test_disabled_mtp_status_recommends_an_action_that_can_select_it(self) -> None:
         model = {
             "id": "qwen3.6-27b-mtp",
