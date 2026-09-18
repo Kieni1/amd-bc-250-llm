@@ -163,27 +163,101 @@ path, and only then receive latency/memory and broader-corpus confirmation.
 
 ## 2026-09-17 task and translation campaign follow-up
 
-Production defaults are unchanged. Durable campaign detail lives in
-`development/model-runs/` and the corresponding decisions in
-`development/DECISIONS.md`; runtime Modelfiles remain measurement-free.
+The latest task and translation campaigns refine the 2026-09-10 conclusions without
+changing production defaults. Detailed dated evidence is retained under
+`development/model-runs/` and `development/handovers/`; runtime Modelfiles intentionally
+remain measurement-free so campaign-note edits cannot trigger needless Ollama
+registration reconciliation.
 
 ### Task role
 
-`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production task model. Qwen3 4B is
-role-rejected for concurrent background-task use after repeated global-OOM failures
-beside warm GPT-OSS despite stronger cheap-screen quality. Future materially larger task
-candidates must pass the tiny warm-main survival gate before repeated quality or product-
-path work. See `development/model-runs/2026-09-17-task-active-candidate-campaign.md` and
-DEC-007.
+`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production task model. Its
+proven promotion evidence is still 15/18 direct, 15/18 through authenticated Open
+WebUI with package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS.
+Recent cheap canonical screens place its normal reference envelope around 4/6-5/6;
+the open quality issue is concise first-turn tag robustness.
+
+`exp-qwen3-4b-lmstudio-q6-k` was the strongest active replacement-quality signal at
+5/6 in two independent cheap screens. It is nevertheless **rejected for the concurrent
+background-task role**: exact-source task staging caused global OOM, and a second
+staging attempt bounded to 4096 context and 128 predicted tokens still caused global
+OOM during a tiny eight-token survival request, killing the warm main model and other
+user services. Do not spend more task-role qualification time on this model unless the
+hardware/topology memory envelope changes. The other active compact/extended task
+candidates screened at <=3/6 and did not earn expensive task qualification.
+
+Future substantially larger task candidates must pass a tiny warm-main survival gate
+before repeated quality/product-path work. Quality and deployment safety are separate
+dimensions.
 
 ### German/French translation role
 
-The canonical eight-case DE<->FR screen is saturated: 8/8 now means advance to harder
-discrimination, not promotion or equality. Production LFM remains unchanged while
-Translate-Gemma E4B, Ministral 8B and TIR Qwen3.5 9B non-thinking advance to Stage 2;
-Qwen3.6 35B is retained only as a quality upper-bound comparator. Thinking policy is
-part of the request contract for reasoning-capable direct-transform models. See
-`development/model-runs/2026-09-17-translation-de-fr-campaign.md` and DEC-008.
+The repaired eight-case canonical DE<->FR screen is now a **screening gate, not a
+ranking benchmark**: several materially different models reach 8/8. Stage-2E has now
+selected Translate-Gemma E4B as the deployment candidate, but the production LFM role
+remains unchanged until the integrated package-owned direction roles pass one bounded
+final Open WebUI requalification.
+
+Current evidence of interest:
+
+- `exp-translate-gemma4-sub-e4b-17s-q4-k-xl`: 24/24 fresh canonical evidence;
+  later 8/8 closing anchors, about 0.68 s representative warm mean and about 8.3 GiB
+  minimum MemAvailable. Current small specialist leader and Stage-2 finalist.
+- `exp-ministral3-8b-unsloth-ud-q5-k-xl`: 24/24 canonical confirmation; real
+  survivor, with manual-review caveats around formatting/wording.
+- `exp-tir-qwen35-9b-nonthinking-v2-q6-k`: 0/8 when reasoning consumed the answer
+  budget, then 8/8 with explicit `think:false`; selected 9B Stage-2 finalist.
+- `prod-qwen35-9b-unsloth-q6-k`, `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`,
+  `exp-qwen38-9b-empero-q6-k`, and `exp-qwen35-9b-hauhaucs-uncensored-q6-k` also
+  reached 8/8 under their fair direct-transform contracts, but harder discrimination
+  is still needed.
+- `exp-hunyuan-mt-7b-mungert-q4-k-m`: 21/24 with a reproducible CHF preservation
+  defect; viable specialist but currently behind Translate-Gemma.
+- `prod-lfm25-8b-a1b-liquidai-q6-k`: fresh 6/8, reproducing known semantic and
+  invoice-preservation weaknesses; retain as the current production/reference model
+  until a challenger completes the product path.
+- 27B/35B Qwen-family models can match 8/8 but reached only about 116-228 MiB
+  minimum MemAvailable while resident. They remain quality upper bounds rather than
+  practical default candidates.
+
+For reasoning-capable direct-transform models, translation qualification must record
+and control the request thinking policy. A default-thinking 0/8 caused by an exhausted
+reasoning budget is not equivalent to a translation-quality failure; use explicit
+`--think false` when that is the intended product contract and record models that
+continue to emit thinking despite the request.
+
+#### Stage-2E selected translation candidate
+
+Real authenticated Open WebUI Stage-2E evidence selected
+`exp-translate-gemma4-sub-e4b-17s-q4-k-xl` with the exact explicit-direction v1
+contract, thinking policy omitted, and `max_tokens=2048`. It scored 10/16 hard passes
+(2/8 DE→FR, 8/8 FR→DE), 16/16 target-language checks and 72/78 advisory semantic
+dimensions. Mean wall time was 6.91 s, p95 23.01 s and minimum MemAvailable 8362 MiB.
+The 2048-token budget is required: the long FR→DE case that truncated at exactly 1024
+output tokens completed at 1376 tokens under the selected configuration.
+
+TIR Qwen3.5 9B also reached 10/16, but with 65/78 semantic dimensions, non-deterministic
+repeated outputs, slower mean wall time (10.60 s) and lower minimum MemAvailable
+(5871 MiB). TIR is therefore closed as the normal deployment choice under current
+evidence. Revisit it only if the integrated Translate-Gemma path cannot meet the product
+contract or a materially different model/runtime appears.
+
+Do **not** force `think:false` for Translate-Gemma: Stage-2E reproduced an FR→DE
+`Avoir` regression under that setting. The stronger preservation prompt also failed to
+prevent DE→FR localization of protected financial typography, and the selected model
+reproducibly omitted the trailing ordinary-language sentence in one DE→FR bullet case.
+Those are final-integration caveats, not reasons to reopen broad model discovery. The
+package fixes the evaluator so one-decimal locale forms such as `8.1` and `8,1` compare
+as the same numeric value; byte-for-byte protected-literal preservation remains a
+separate product requirement and is not claimed by this integration.
+
+The package-owned candidate roles are `bc250-office-translation-de-fr` and
+`bc250-office-translation-fr-de`. They share the exact tested system prompt and a
+2048-token budget; a non-global package-owned Open WebUI Filter injects only the tested
+direction-specific user wrapper. The existing `bc250-office-translation` LFM role stays
+production/default until the bounded integrated requalification passes. Stage-2E
+evidence: `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
+`63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
 
 ### Production residency follow-up
 

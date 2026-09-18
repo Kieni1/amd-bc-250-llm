@@ -28,16 +28,11 @@ Retest only if:
 - Qwen3 4B: hardware/topology memory envelope materially changes.
 - LFM prompt work: use a broader first-turn corpus rather than another single-case micro-tuning loop.
 
-Evidence tarballs referenced by the campaign:
+Evidence tarballs:
 - bc250-task-batch-v2-20260917-053931.tar.gz
 - bc250-task-batch-v2-20260917-054737.tar.gz
-- bc250-q3-stage-20260917-165956.tar.gz
 - bc250-q3-stage-20260917-170719.tar.gz
 - bc250-q3-task-20260917-171403.tar.gz
-- bc250-tags-c-overlap-20260916-213403.tar.gz
-- bc250-tags-fr-load-ab-20260916-214035.tar.gz
-- bc250-tags-fr-payload-ab-20260916-214605.tar.gz
-- bc250-task-tags-ui-lifecycle-candidate-b-20260916-205349.tar.gz
-Restoration status: clean recovery was verified after the destructive Qwen3 4B safety failures before further appliance work.
-Credential-scan status: campaign evidence handling was reported clean; raw bundles are external and are not committed here.
+Restoration status: recorded cleanly by campaign handover except catastrophic model-safety failures that were followed by appliance recovery verification.
+Credential-scan status: campaign handover records clean evidence handling.
 Caveats: role-specific rejection does not retire Qwen3 4B globally.

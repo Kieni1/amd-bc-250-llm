@@ -1,7 +1,7 @@
 ID: TRANSLATION-20260917-01
 Status: ACTIVE — STAGE-2 PENDING
 Package: 0.11.1-0.10.fc44
-Exact models: current DE<->FR specialist/generalist/upper-bound pool; see this record, `MODELS.md`, and DEC-008
+Exact models: current DE<->FR specialist/generalist/upper-bound pool; see this record plus `MODELS.md` and the dated translation handover
 Role: German <-> French office translation
 Tests actually run: repaired canonical short screen, confirmations, reasoning-policy retries, large-model upper-bound batches
 Tests not run: Stage-2 harder corpus; final real Open WebUI product-path comparison; deployment-mode/coexistence decision
@@ -30,14 +30,7 @@ Decision:
 Retest only if:
 - Proceed with the prepared harder DE<->FR corpus and then narrow to 2-3 product-path finalists.
 
-Pending Stage-2 artifact:
-- external/generated script: `bc250-translation-stage2a-hard-de-fr-direct-rsync-0.11.1-0.10.sh`
-- generated against installed 0.10 and not yet run when this record was created; verify or regenerate it against the current installed package before execution
-- intended set: Translate-Gemma E4B, Ministral 8B, TIR Qwen3.5 9B non-thinking, Qwen3.6 35B upper bound
-- intended corpus: 14 DE<->FR cases covering inclusive deadlines, percentages/caps, contractual modality, exact CHF/VAT/references, negation and role scope, protected paths/keys/quotes, bullets and pipe-delimited tables
-- review dimensions separately: target language, semantics, exact preservation, source leakage, target constraints, formatting, and thinking/output-budget diagnostics
-
-Evidence tarballs: multiple campaign bundles were reviewed during the 2026-09-17 campaign; no single canonical bundle filename was preserved in source.
+Evidence tarball: multiple batch bundles summarized in TRANSLATION_MODEL_TESTING_HANDOVER_2026-09-17.
 Restoration status: direct foreground runs left model definitions unchanged and recovered the main lane between models.
 Credential-scan status: current harness method requires privacy scrub/scan before bundling.
 Caveats: English is secondary and not part of current candidate ranking.
