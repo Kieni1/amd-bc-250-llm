@@ -44,10 +44,10 @@
     },
     {
       "id": "bc250-office-translation",
-      "base_model_id": "prod-lfm25-8b-a1b-liquidai-q6-k:latest",
-      "name": "Office - Translation DE/FR",
+      "base_model_id": "exp-lfm25-8b-a1b-liquidai-q6-k:latest",
+      "name": "Office - Translation DE/FR (Legacy LFM reference)",
       "meta": {
-        "description": "High-throughput German/French office translation role.",
+        "description": "Inactive rollback/reference preset for the former LFM production translator. Install the experimental LFM model explicitly before deliberate comparison.",
         "tags": [
           {
             "name": "BC250"
@@ -56,19 +56,22 @@
             "name": "translation"
           },
           {
-            "name": "DE-FR"
+            "name": "legacy"
+          },
+          {
+            "name": "experiment"
           }
         ]
       },
       "params": {},
-      "is_active": true
+      "is_active": false
     },
     {
       "id": "bc250-office-translation-de-fr",
-      "base_model_id": "exp-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
-      "name": "Office - Translation DE → FR (Candidate)",
+      "base_model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
+      "name": "Office - Translation DE → FR",
       "meta": {
-        "description": "Stage-2E selected Translate-Gemma candidate for explicit German-to-French translation; production LFM role remains unchanged pending bounded final qualification.",
+        "description": "Production German-to-French translation role using the selected Stage-2E Translate-Gemma contract.",
         "tags": [
           {
             "name": "BC250"
@@ -78,9 +81,6 @@
           },
           {
             "name": "DE-FR"
-          },
-          {
-            "name": "candidate"
           }
         ],
         "filterIds": [
@@ -95,10 +95,10 @@
     },
     {
       "id": "bc250-office-translation-fr-de",
-      "base_model_id": "exp-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
-      "name": "Office - Translation FR → DE (Candidate)",
+      "base_model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
+      "name": "Office - Translation FR → DE",
       "meta": {
-        "description": "Stage-2E selected Translate-Gemma candidate for explicit French-to-German translation; production LFM role remains unchanged pending bounded final qualification.",
+        "description": "Production French-to-German translation role using the selected Stage-2E Translate-Gemma contract.",
         "tags": [
           {
             "name": "BC250"
@@ -108,9 +108,6 @@
           },
           {
             "name": "FR-DE"
-          },
-          {
-            "name": "candidate"
           }
         ],
         "filterIds": [

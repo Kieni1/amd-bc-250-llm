@@ -28,14 +28,14 @@ class Filter:
 
         messages = body.get("messages")
         if not isinstance(messages, list):
-            raise ValueError("BC-250 translation role requires a messages list")
+            raise TypeError("BC-250 translation role requires a messages list")
 
         for message in reversed(messages):
             if not isinstance(message, dict) or message.get("role") != "user":
                 continue
             content = message.get("content")
             if not isinstance(content, str):
-                raise ValueError("BC-250 translation role requires a text-only user message")
+                raise TypeError("BC-250 translation role requires a text-only user message")
             if not content.startswith(wrapper):
                 message["content"] = wrapper + content
             return body

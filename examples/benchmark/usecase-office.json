@@ -32,8 +32,8 @@
   },
   {
     "id": "implicit-de-fr-translation",
-    "model": "prod-lfm25-8b-a1b-liquidai-q6-k",
-    "prompt": "Bitte senden Sie die Unterlagen bis Freitag, 4. September 2026, mit Referenz AB-42 zurück.",
+    "model": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
+    "prompt": "Translate from German to French. Return only the translation.\n\n[CURRENT_SOURCE]\nBitte senden Sie die Unterlagen bis Freitag, 4. September 2026, mit Referenz AB-42 zurück.",
     "required": [
       "4 septembre 2026",
       "AB-42"
