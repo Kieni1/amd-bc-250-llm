@@ -13,18 +13,17 @@ Status vocabulary:
 - **PENDING** — no sufficient evidence yet.
 - **N/A** — that validation class does not apply.
 
-Current source baseline while this file was refreshed: `0.11.1-0.11`.
-This release keeps production model/runtime/topology policy unchanged while integrating
-current task/translation campaign evidence and safer role-specific qualification tools.
+Current source baseline while this file was refreshed: `0.11.2-0.3`.
+This release keeps runtime/topology policy unchanged while normalizing task/translation model roles: LFM2.5 1.2B remains the sole task model and Translate-Gemma becomes the production translation base, with the former LFM translator retained as an experimental rollback/reference.
 Task campaign results were collected on installed `0.11.1-0.10`; Stage-2E translation
 configuration evidence was collected through authenticated Open WebUI on installed
 `0.11.1-0.11` before the package-owned direction-role integration in this source. Older
 operations/power evidence from `0.11.1-0.6` remains historical. None of those runs by
-itself qualifies the final integrated unpublished `0.11.1-0.11` source.
+itself qualifies the final integrated unpublished `0.11.2-0.3` source.
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — 328 tests on reviewed current 0.11 source | external | N/A | rerun after source edits; report exact checks |
+| repository/unit validation | SOURCE PARTIAL — focused affected tests/syntax on 0.11.2-0.3; prior 336-test full source evidence belongs to 0.11.2-0.2 | external | N/A | GitHub/workstation own full build/lint validation; do not relabel prior counts as current |
 | RPM build/install | preflight only | PENDING/EXTERNAL | PENDING for regenerated source | GitHub owns package build; do not emulate it locally |
 | normal service topology | SOURCE PASS | external | HISTORICAL REAL DEVICE | re-check with `bc250-verify` after installing the unpublished 0.11 RPM before new hardware campaigns |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE | include in first operations/power batch |
@@ -39,8 +38,8 @@ itself qualifies the final integrated unpublished `0.11.1-0.11` source.
 | benchmark result contract | SOURCE PASS | external | HISTORICAL/PARTIAL | re-establish one current production baseline; new main-candidate gates need real BC-250 evidence |
 | whole-appliance revalidation v4 | SOURCE PASS | external | HISTORICAL/PARTIAL | use for milestone/release qualification, not after every small patch |
 | task default: LFM2.5 1.2B | SOURCE PASS | external | HISTORICAL REAL DEVICE — current campaign on 0.10 | promotion evidence remains 15/18 direct + 15/18 live + 9/9 overlap; Qwen3 4B is role-rejected after global OOM despite 5/6 quality |
-| translation production LFM8B | SOURCE PASS | external | HISTORICAL REAL DEVICE | retain as production/default until the integrated Translate-Gemma direction roles pass the bounded final OWUI gate |
-| translation selected candidate | SOURCE PASS — exact Stage-2E prompt/wrapper/2048 contract encoded | external | HISTORICAL REAL DEVICE — Stage-2E on pre-integration 0.11 | Translate-Gemma selected; broad comparison closed; next gate is only bounded integrated OWUI requalification |
+| translation production Translate-Gemma | SOURCE PASS — promoted production identity + exact Stage-2E role contract | external | HISTORICAL REAL DEVICE — Stage-2E on 0.11.1-0.11; current release verification pending | run bounded installed DE→FR / FR→DE product-path verification; LFM is experimental rollback/reference |
+
 | RAG direct quality | SOURCE PASS | external | HISTORICAL/PARTIAL | broaden absent-answer, multisource, table/invoice and multilingual cases |
 | Open WebUI RAG path | SOURCE PASS | external | HISTORICAL/PARTIAL | qualify packaged settings before tuning; restore every mutation |
 | embeddings | SOURCE PASS | external | HISTORICAL REAL DEVICE | Jina baseline; Qwen remains comparison; revisit only if RAG evidence justifies |

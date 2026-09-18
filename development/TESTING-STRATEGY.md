@@ -69,7 +69,7 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## 6. Recommended work order from 0.11.1-0.11
+## 6. Recommended work order from 0.11.2-0.3
 
 ### Lane A — general operations / office availability / power
 
@@ -121,14 +121,16 @@ before product-path or repeated quality work.
 
 For translation, broad model/configuration qualification is now closed. Stage-2E selected
 Translate-Gemma E4B with the exact explicit-direction v1 contract, thinking omitted and
-`max_tokens=2048`. Production LFM remains the default only until the integrated
-package-owned direction roles pass one bounded final product-path gate. TIR is closed as
-the normal deployment choice under current evidence.
+`max_tokens=2048`. By maintainer decision, Translate-Gemma is now the package production
+translation base behind the two package-owned direction roles. The current release still
+needs one bounded post-install product-path verification before it is called fully
+hardware-qualified. LFM is retained only as an experimental rollback/reference; TIR is
+closed as the normal deployment choice under current evidence.
 
 Next translation sequence:
 
-1. install the selected experiment with
-   `sudo bc250-model install experiments exp-translate-gemma4-sub-e4b-17s-q4-k-xl`,
+1. install the production translation model with
+   `sudo bc250-model install production prod-translate-gemma4-sub-e4b-17s-q4-k-xl`,
    then apply the source-owned `bc250-office-translation-de-fr` and
    `bc250-office-translation-fr-de` desired state;
 2. verify the exact system prompt, non-global direction Filter, `max_tokens=2048`, and
@@ -138,8 +140,9 @@ Next translation sequence:
    cases;
 4. verify preset/provider/function restoration or desired-state integrity, privacy,
    memory and serious GPU/OOM warnings;
-5. promote only if that integrated path is acceptable. Otherwise classify the remaining
-   defect before deciding whether it is model-level or needs product-layer handling.
+5. if the integrated production path is unacceptable, classify the remaining defect
+   before deciding whether rollback or product-layer handling is required; do not silently
+   reopen broad model discovery.
 
 Do not restart the broad translation candidate campaign or resume preservation prompt
 micro-tuning. Exact byte-for-byte protected financial typography is not claimed by the
