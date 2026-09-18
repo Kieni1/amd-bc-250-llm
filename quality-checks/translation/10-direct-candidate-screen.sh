@@ -258,6 +258,7 @@ PY2
     SERIOUS_WARNING_COUNT="$(wc -l < "$OUT/post/serious-warnings.txt" | tr -d ' ')"
     [[ "$SERIOUS_WARNING_COUNT" == 0 ]] || { [[ "$rc" == 0 || "$rc" == 3 ]] && rc=30; }
     write_aggregate || true
+    printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
     date --iso-8601=seconds > "$OUT/post/end-time.txt"
     # The benchmark prints its result paths. Redact this script's expected local HOME
     # prefix from console captures before the privacy scan so the scanner still catches
@@ -296,21 +297,13 @@ print('privacy_scan=PASS')
 PY2
     privacy_rc=$?
     if [[ "$privacy_rc" != 0 && ( "$rc" == 0 || "$rc" == 3 ) ]]; then rc=32; fi
-    # At this point all evidence-generation checks except archive creation are final.
-    # A successful archive therefore contains the authoritative exit status. If the
-    # archive itself fails, rewrite the local status/manifest below with rc=31.
-    printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
     write_run_manifest "$rc"
     local parent name tarball
     parent="$(dirname "$OUT")"; name="$(basename "$OUT")"; tarball="$HOME/${name}.tar.gz"
     if [[ "$privacy_rc" == 0 ]]; then
         tar --owner=0 --group=0 --numeric-owner -C "$parent" -czf "$tarball" "$name"
         tar_rc=$?
-        if [[ "$tar_rc" != 0 && ( "$rc" == 0 || "$rc" == 3 ) ]]; then
-            rc=31
-            printf '%s\n' "$rc" > "$OUT/post/script-exit-rc.txt"
-            write_run_manifest "$rc"
-        fi
+        [[ "$tar_rc" == 0 ]] || { [[ "$rc" == 0 || "$rc" == 3 ]] && rc=31; }
     fi
     printf '\n=== direct translation candidate summary ===\n'
     cat "$OUT/aggregate.txt" 2>/dev/null || true
