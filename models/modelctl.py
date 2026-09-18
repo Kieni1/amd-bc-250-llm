@@ -35,7 +35,7 @@ CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 RECOMMENDED_MODELS = {
     "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
     "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
-    "prod-lfm25-8b-a1b-liquidai-q6-k",
+    "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
     "prod-qwen35-9b-unsloth-q6-k",
     "prod-gpt-oss20b-ggml-org-mxfp4",
     "task-lfm25-1.2b-instruct-liquidai-q6-k",

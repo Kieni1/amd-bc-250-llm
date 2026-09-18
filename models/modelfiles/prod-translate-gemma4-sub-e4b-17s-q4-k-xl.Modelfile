@@ -1,0 +1,20 @@
+# BC250 category: production
+# Ollama model: prod-translate-gemma4-sub-e4b-17s-q4-k-xl
+# Source: 17slever17/translate-gemma-4-sub-e4b-GGUF @ main
+# GGUF: translate_gemma4_sub-E4B-Q4_K_XL.gguf
+# SHA256: 0b3d302f371fefa42945371635cbb2355a74c1c8a5ecf80670b21ccf421027d9
+# License: Apache-2.0
+# Role: production German/French translation base selected by Stage-2E.
+#
+# The exact DE→FR / FR→DE product contract is owned by the package Open WebUI
+# model presets and direction filter. Keep this base free of a second SYSTEM prompt.
+
+FROM /var/lib/bc250-llm-server/gguf/production/translate_gemma4_sub-E4B-Q4_K_XL.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 8192
+# Stage-2E showed 1024 could truncate long output; 2048 is the selected budget.
+PARAMETER num_predict 2048
+# Published Translate-Gemma examples and the selected BC-250 contract are deterministic.
+PARAMETER temperature 0

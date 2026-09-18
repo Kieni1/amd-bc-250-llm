@@ -137,8 +137,8 @@ direct benchmark; with upstream/default OWUI prompts the live result was only
 6/18. Finally, nine deliberate simultaneous GPT-OSS/LFM generations completed
 with both models observed resident, no additional swap growth, and no serious
 OOM/GPU warnings. `task-lfm25-1.2b-instruct-liquidai-q6-k` is therefore the
-package default. Gemma 3 1B
-remains an optional fallback/control. The exhausted compact task candidates and
+package default. At that historical point Gemma 3 1B remained an optional
+fallback/control; the current decision below retires it to the source graveyard. The exhausted compact task candidates and
 the unsafe Qwen3.8 4B task candidate are source-graveyard entries.
 
 Translation evidence on the actual authenticated Open WebUI path:
@@ -151,113 +151,61 @@ Translation evidence on the actual authenticated Open WebUI path:
 - minimal prompt plus temperature 0: **60/80**, making two bad modes
   deterministic.
 
-Prompt/sampling tuning for LFM is therefore paused. The production LFM model remains
-unchanged while model-level challengers are screened. The priority
-translation experiments are Hunyuan-MT 7B Q4_K_M and Translate-Gemma 4 Sub E4B
-Q4_K_XL; the existing Ministral 8B experiment remains only a short comparison
-control because prior testing was not strong.
+Those LFM results are historical pre-Stage-2 evidence. Subsequent Stage-2E testing
+selected Translate-Gemma and closed the broad translation tournament; see the current
+decision section below and `development/model-runs/2026-09-17-translation-stage2e.md`.
+The old LFM identity is no longer the production default in this source.
 
-Do not infer promotion from a short candidate screen. A translation challenger
-must beat the LFM quality pattern, then pass the real Open WebUI integration
-path, and only then receive latency/memory and broader-corpus confirmation.
+## 2026-09-17 task and translation decisions
 
-## 2026-09-17 task and translation campaign follow-up
-
-The latest task and translation campaigns refine the 2026-09-10 conclusions without
-changing production defaults. Detailed dated evidence is retained under
-`development/model-runs/` and `development/handovers/`; runtime Modelfiles intentionally
-remain measurement-free so campaign-note edits cannot trigger needless Ollama
-registration reconciliation.
+Detailed campaign evidence lives under `development/model-runs/`; runtime Modelfiles
+remain concise so evidence-note edits do not trigger needless Ollama reconciliation.
 
 ### Task role
 
-`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production task model. Its
-proven promotion evidence is still 15/18 direct, 15/18 through authenticated Open
-WebUI with package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS.
-Recent cheap canonical screens place its normal reference envelope around 4/6-5/6;
-the open quality issue is concise first-turn tag robustness.
-
-`exp-qwen3-4b-lmstudio-q6-k` was the strongest active replacement-quality signal at
-5/6 in two independent cheap screens. It is nevertheless **rejected for the concurrent
-background-task role**: exact-source task staging caused global OOM, and a second
-staging attempt bounded to 4096 context and 128 predicted tokens still caused global
-OOM during a tiny eight-token survival request, killing the warm main model and other
-user services. Do not spend more task-role qualification time on this model unless the
-hardware/topology memory envelope changes. The other active compact/extended task
-candidates screened at <=3/6 and did not earn expensive task qualification.
-
-Future substantially larger task candidates must pass a tiny warm-main survival gate
-before repeated quality/product-path work. Quality and deployment safety are separate
-dimensions.
+`task-lfm25-1.2b-instruct-liquidai-q6-k` is the sole active task-lane model. Its
+promotion evidence remains 15/18 direct, 15/18 through authenticated Open WebUI with
+package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS. The previous
+Gemma 3 1B fallback/control is retired to the source graveyard after its weak ~2/6
+current-task behavior. `exp-qwen3-4b-lmstudio-q6-k` remains an experiment but is
+explicitly rejected for concurrent background-task deployment because both task staging
+attempts caused global OOM and warm-main loss.
 
 ### German/French translation role
 
-The repaired eight-case canonical DE<->FR screen is now a **screening gate, not a
-ranking benchmark**: several materially different models reach 8/8. Stage-2E has now
-selected Translate-Gemma E4B as the deployment candidate, but the production LFM role
-remains unchanged until the integrated package-owned direction roles pass one bounded
-final Open WebUI requalification.
+Stage-2E closed the broad translation tournament.
+`prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the production translation base.
+The two Open WebUI production roles are:
 
-Current evidence of interest:
+- `bc250-office-translation-de-fr`;
+- `bc250-office-translation-fr-de`.
 
-- `exp-translate-gemma4-sub-e4b-17s-q4-k-xl`: 24/24 fresh canonical evidence;
-  later 8/8 closing anchors, about 0.68 s representative warm mean and about 8.3 GiB
-  minimum MemAvailable. Current small specialist leader and Stage-2 finalist.
-- `exp-ministral3-8b-unsloth-ud-q5-k-xl`: 24/24 canonical confirmation; real
-  survivor, with manual-review caveats around formatting/wording.
-- `exp-tir-qwen35-9b-nonthinking-v2-q6-k`: 0/8 when reasoning consumed the answer
-  budget, then 8/8 with explicit `think:false`; selected 9B Stage-2 finalist.
-- `prod-qwen35-9b-unsloth-q6-k`, `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`,
-  `exp-qwen38-9b-empero-q6-k`, and `exp-qwen35-9b-hauhaucs-uncensored-q6-k` also
-  reached 8/8 under their fair direct-transform contracts, but harder discrimination
-  is still needed.
-- `exp-hunyuan-mt-7b-mungert-q4-k-m`: 21/24 with a reproducible CHF preservation
-  defect; viable specialist but currently behind Translate-Gemma.
-- `prod-lfm25-8b-a1b-liquidai-q6-k`: fresh 6/8, reproducing known semantic and
-  invoice-preservation weaknesses; retain as the current production/reference model
-  until a challenger completes the product path.
-- 27B/35B Qwen-family models can match 8/8 but reached only about 116-228 MiB
-  minimum MemAvailable while resident. They remain quality upper bounds rather than
-  practical default candidates.
+Both use the exact Stage-2E system prompt, the package-owned non-global direction
+filter, thinking omitted, and `max_tokens=2048`. The selected configuration produced
+10/16 hard passes, 16/16 target-language checks and 72/78 advisory semantic dimensions
+with 6.91 s mean wall time, 23.01 s p95 and 8362 MiB minimum MemAvailable. The 2048
+budget is required because the long FR→DE case truncated at 1024 and completed at 1376
+output tokens under the selected configuration.
 
-For reasoning-capable direct-transform models, translation qualification must record
-and control the request thinking policy. A default-thinking 0/8 caused by an exhausted
-reasoning budget is not equivalent to a translation-quality failure; use explicit
-`--think false` when that is the intended product contract and record models that
-continue to emit thinking despite the request.
+Known caveats remain evidence, not hidden product claims: DE→FR may localize financial
+typography, one targeted bullet case omitted a trailing ordinary-language sentence, and
+the focused `Avoir AV-19` case did not produce the preferred explicit `Gutschrift` word.
+The numeric evaluator correctly treats locale-equivalent values such as `8.1` and `8,1`
+as equal without claiming byte-for-byte formatting preservation.
 
-#### Stage-2E selected translation candidate
+The former `prod-lfm25-8b-a1b-liquidai-q6-k` identity is retired; the same LFM family is
+retained as `exp-lfm25-8b-a1b-liquidai-q6-k` only for deliberate rollback/reference
+comparisons. Hunyuan-MT and Ministral translation-only challengers are retired to the
+source graveyard. TIR Qwen3.5 9B remains active only as a broader office/RAG experiment;
+its translation deployment path is closed under current evidence. The old experimental
+Translate-Gemma identity is also retired after promotion to the production name.
 
-Real authenticated Open WebUI Stage-2E evidence selected
-`exp-translate-gemma4-sub-e4b-17s-q4-k-xl` with the exact explicit-direction v1
-contract, thinking policy omitted, and `max_tokens=2048`. It scored 10/16 hard passes
-(2/8 DE→FR, 8/8 FR→DE), 16/16 target-language checks and 72/78 advisory semantic
-dimensions. Mean wall time was 6.91 s, p95 23.01 s and minimum MemAvailable 8362 MiB.
-The 2048-token budget is required: the long FR→DE case that truncated at exactly 1024
-output tokens completed at 1376 tokens under the selected configuration.
-
-TIR Qwen3.5 9B also reached 10/16, but with 65/78 semantic dimensions, non-deterministic
-repeated outputs, slower mean wall time (10.60 s) and lower minimum MemAvailable
-(5871 MiB). TIR is therefore closed as the normal deployment choice under current
-evidence. Revisit it only if the integrated Translate-Gemma path cannot meet the product
-contract or a materially different model/runtime appears.
-
-Do **not** force `think:false` for Translate-Gemma: Stage-2E reproduced an FR→DE
-`Avoir` regression under that setting. The stronger preservation prompt also failed to
-prevent DE→FR localization of protected financial typography, and the selected model
-reproducibly omitted the trailing ordinary-language sentence in one DE→FR bullet case.
-Those are final-integration caveats, not reasons to reopen broad model discovery. The
-package fixes the evaluator so one-decimal locale forms such as `8.1` and `8,1` compare
-as the same numeric value; byte-for-byte protected-literal preservation remains a
-separate product requirement and is not claimed by this integration.
-
-The package-owned candidate roles are `bc250-office-translation-de-fr` and
-`bc250-office-translation-fr-de`. They share the exact tested system prompt and a
-2048-token budget; a non-global package-owned Open WebUI Filter injects only the tested
-direction-specific user wrapper. The existing `bc250-office-translation` LFM role stays
-production/default until the bounded integrated requalification passes. Stage-2E
-evidence: `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
+The Stage-2E evidence archive is
+`bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
 `63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
+The first installed `0.11.2-0.3` run must still verify the integrated Open WebUI product
+path on the real BC-250; source promotion is not a claim that this newer package has
+already been hardware-qualified.
 
 ### Production residency follow-up
 
@@ -274,44 +222,33 @@ model passed true overlap without additional swap growth and replaced Gemma as t
 default; the unsafe Qwen3.8 4B task candidate moved to the source graveyard. Agentic/coding
 results are separate because agent mode is exclusive by design.
 
-### Exhausted comparison candidates
+### Retired / exhausted catalog
 
-"Exhausted" here means that the latest comparable benchmark no longer gives the
-model a plausible **promotion case for the role it was testing**. It does not
-mean the GGUF is corrupt or that the model must be deleted. The active comparison
-catalog may retain measured controls even when their promotion path is exhausted.
-The source-only graveyard is reserved for models explicitly retired from routine
-operator-facing discovery because continued comparison no longer justifies their
-catalog presence. Graveyard Modelfiles are not packaged or discovered. Their canonical identities
-and manager-owned paths are mirrored in the installed `retired-models.json`
-catalog solely so `bc250-model list` can distinguish stale package-retired
-registrations from operator-created unmanaged models and `cleanup-retired` can
-remove them safely.
+The source-only graveyard is for models with no current routine promotion path. Graveyard
+Modelfiles are not packaged or discovered. Their canonical manager-owned identities are
+mirrored in `models/retired-models.json` so stale installed registrations remain
+distinguishable from operator-created unmanaged models and can be removed safely with
+`bc250-model cleanup-retired`.
 
-The source graveyard currently contains twelve retired definitions in
-`models/modelfiles-graveyard/`. That directory is a source depot only and must
-contain Modelfiles only; it is intentionally outside every model discovery root.
+The graveyard currently contains 17 definitions. Important recent role changes are:
 
 | Model | Why it is retired from routine discovery |
 |---|---|
-| `exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
-| `exp-lfm25-1.2b-instruct-liquidai-q6-k` | experimental alias retired after the same Q6_K weights were promoted as `task-lfm25-1.2b-instruct-liquidai-q6-k`; its generic SYSTEM caused cross-task output contamination |
-| `exp-minicpm5-2b-openbmb-q4-k-m` | 4/18 with 12 output-budget diagnostics; tag/query outputs were exhausted by reasoning under the deployed budget |
-| `exp-qwen3-1.7b-ggml-q4-k-m` | 3/18 with 13 output-budget diagnostics and all tag/query cases failing |
-| `exp-qwen38-2b-distill-empero-q6-k` | 8/18 with nine output-budget diagnostics; strong titles did not compensate for unreliable tag/query generation |
-| `exp-qwen38-4b-distill-empero-q6-k` | promising quality, but simultaneous residency with warm GPT-OSS OOM-killed the task service, making it unsafe for the normal task role |
-| `exp-granite42-8b-ibm-q5-k-m` | ~8.3 GiB resident for ~50 tok/s and weak long-prompt throughput; no demonstrated office/RAG quality win over the production set |
-| `exp-ling30-tiny-bloomer-q5-k-m` | very high raw decode (~144 tok/s) but the shared reasoning cap was repeatedly consumed before a usable final answer |
-| `exp-qwen35-9b-davidau-defiant-fable-q6-k` | older comparable run had much worse answer-start latency with no throughput/UX case against production Qwen3.5 or GPT-OSS |
-| `exp-qwen36-14b-a3b-tvall43-fablevibes-q4-k-m` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
-| `exp-qwythos9b-empero-q6-k` | earlier retired legacy comparison; no current promotion path is retained in the active catalog |
-| `task-lfm25-2.6b-liquidai-q6-k` | retired task-lane experiment; superseded by the smaller promoted LFM2.5 1.2B task model |
+| `task-gemma3-1b-unsloth-ud-q4-k-xl` | superseded by the proven LFM 1.2B task model; current task quality remained about 2/6 |
+| `prod-lfm25-8b-a1b-liquidai-q6-k` | former production translation identity; superseded by production Translate-Gemma, with LFM retained only as `exp-lfm25-8b-a1b-liquidai-q6-k` |
+| `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | experimental identity retired after the same selected weights were promoted under the production name |
+| `exp-hunyuan-mt-7b-mungert-q4-k-m` | translation-only challenger behind Translate-Gemma with reproducible CHF preservation weakness |
+| `exp-ministral3-8b-unsloth-ud-q5-k-xl` | translation-only finalist superseded when Stage-2E selected Translate-Gemma |
+| `exp-qwen38-4b-distill-empero-q6-k` | task quality was promising but simultaneous warm-main residency OOM-killed the task service |
+| `task-lfm25-2.6b-liquidai-q6-k` | superseded by the smaller promoted LFM2.5 1.2B task model |
 
-Still-open comparisons include the Hunyuan/Translate-Gemma translation
-challengers, both embedding models, OCR candidates, the remaining general-model
-experiments, and the agentic models. Granite 4.2 3B remains a measured
-control despite its poor task-contract result. The latest evidence is not sufficient
-to call the other open candidates exhausted.
+Other older graveyard entries remain documented by their Modelfiles, decision history and
+retired catalog. Do not resurrect them because of an isolated benchmark score; require a
+new role, changed hardware/runtime envelope or other explicit retest condition.
+
+Active experiments must retain a current comparison purpose. The former production LFM
+translation model is an explicit rollback/reference; TIR remains a broader office/RAG
+comparison; general-main, OCR, embedding and agent experiments keep their separate lanes.
 
 Use the role-specific lanes before changing defaults:
 
@@ -340,8 +277,7 @@ exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
-exp-hunyuan-mt-7b-mungert-q4-k-m
-exp-ministral3-8b-unsloth-ud-q5-k-xl
+exp-lfm25-8b-a1b-liquidai-q6-k
 exp-ovisocr2-abiray-q8-0
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
@@ -352,7 +288,6 @@ exp-qwen38-27b-unsloth-ud-iq3-s
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
-exp-translate-gemma4-sub-e4b-17s-q4-k-xl
 ```
 <!-- ACTIVE_EXPERIMENTS:END -->
 
@@ -374,8 +309,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
-| `exp-hunyuan-mt-7b-mungert-q4-k-m` | checksum-pinned dedicated translation challenger; screen explicit DE/FR direction first, then OWUI integration |
-| `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | checksum-pinned translation-specialist Gemma E4B challenger for DE/FR office text |
+| `exp-lfm25-8b-a1b-liquidai-q6-k` | former production DE/FR translator retained as rollback/reference while the promoted Translate-Gemma product path is verified |
 | `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; temperature 0 + 3072-token Bash/Python budget passed 3/3 in three consecutive BC-250 runs |
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use experiment for the exclusive 11436 lane; compare against Qwen2.5-Coder and Ornith before any role change |
 
