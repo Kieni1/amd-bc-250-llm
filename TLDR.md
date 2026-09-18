@@ -108,6 +108,7 @@ bc250-benchmark task
 
 sudo bc250-agent-mode enter
 bc250-benchmark agent
+bc250-code review path/to/file review.md
 sudo bc250-agent-mode leave
 
 bc250-check-temp --once

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.2-0.6 - 2026-09-18
+
+- Preserve genuine task quality failures without cascading parse failures into misleading language/relevance causes; canonical benchmark summaries and `bc250-revalidate status` now identify failed case IDs and point at their canonical `results.jsonl` evidence.
+- Tighten agent static qualification: literal reasoning markers are a format failure, while NUL-safe `xargs -0 -r -n1 basename` is accepted as valid basename extraction and omission of `-r` remains an empty-directory robustness failure.
+- Move `bc250-code` from raw `/api/generate` response extraction to `/api/chat` with `think:true`; write only `message.content`, require terminal completion, refuse `done_reason=length`, reject reasoning-marker contamination, preserve exact final-content bytes, and retain atomic file replacement. `CODING_AGENT_NUM_PREDICT` is an explicit positive-integer override; the default remains 3072 pending real-device route/budget qualification.
+- Add `agentic-qwen35-4b-khazarai-q6-k` and `agentic-gemma4-e4b-sol-fable-q4-k-m` as opt-in compact challengers. Ornith remains the coding/agent baseline; no candidate is promoted or retired by this release.
+- Record the installed `0.11.2-0.5.fc44` full revalidation: infrastructure/restoration/full coverage passed, Open WebUI translation passed, agent passed 3/3, and task remained a real 5/6 quality result because `tags-de` emitted two JSON objects.
+
 ## 0.11.2-0.5 - 2026-09-18
 
 - Fix the installed `bc250-revalidate` `owui-translation` stage: benchmark fixtures now resolve through the package share tree (`/usr/share/bc250-llm-server/benchmark`) instead of deriving a source-only `/usr/examples/...` path from the installed libexec location.

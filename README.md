@@ -96,7 +96,8 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 
 The packaged comparison catalog retains active measured challengers, including
 `exp-granite42-3b-ibm-q6-k`, the former LFM translator as an explicit rollback/reference,
-and broader office/RAG/main-lane experiments. Exhausted task/translation comparisons are
+and the compact `agentic-qwen35-4b-khazarai-q6-k` /
+`agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
 kept only in the source graveyard and are not
 exposed through normal model discovery. The installed retirement catalog lets
 `bc250-model list` identify stale package-retired registrations and
@@ -190,7 +191,9 @@ the runtime refresh.
 See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.
-Coding/agent mode uses `11436` exclusively and stops the normal lanes. Keep all
+Coding/agent mode uses `11436` exclusively and stops the normal lanes. `bc250-code`
+uses the chat API so native thinking is separated from final content and refuses to
+write nonterminal, output-limit-truncated or reasoning-contaminated results. Keep all
 unauthenticated Ollama APIs blocked from untrusted networks.
 
 ## Source and build
