@@ -134,7 +134,7 @@ capture_provenance() {
         > "$OUT/setup/candidate-ollama-show.json" 2>&1 || true
     local category resolved sidecar
     category=experiments; [[ "$INSTALL_EXPERIMENT" == 0 ]] && category=production
-    resolved="$(bc250-model resolve "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
+    resolved="$(bc250-model path "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
     if [[ -n "$resolved" ]]; then
         printf '%s\n' "$resolved" > "$OUT/setup/candidate-source-path.txt"
         sidecar="${resolved}.bc250.json"
@@ -330,9 +330,9 @@ MAIN_LANE_CLEANUP_ALLOWED=1
 cp /usr/libexec/bc250-llm-server/category-benchmark.py "$OUT/setup/category-benchmark.py"
 cp /usr/share/bc250-llm-server/benchmark/translation-office.json "$OUT/setup/translation-office.json"
 if [[ "$INSTALL_EXPERIMENT" == 1 ]]; then
-    sudo bc250-model install experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-install.txt"
+    sudo bc250-model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
 else
-    printf 'production reference: using existing registered model %s\n' "$CANDIDATE" | tee "$OUT/setup/candidate-install.txt"
+    printf 'production reference: using existing registered model %s\n' "$CANDIDATE" | tee "$OUT/setup/candidate-apply.txt"
 fi
 model_present || { echo 'ERROR: candidate/reference model is not registered on main Ollama.' >&2; exit 1; }
 capture_provenance

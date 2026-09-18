@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-exec bc250-model install embedding "$@"
+exec bc250-model apply embedding "$@"

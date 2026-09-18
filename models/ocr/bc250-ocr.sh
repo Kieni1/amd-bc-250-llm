@@ -39,7 +39,7 @@ case "${1:-}" in
   install)
     [[ $# -eq 2 ]] || { usage >&2; exit 2; }
     model="$(model_name "$2")"
-    "$MANAGER" install experiments "$model"
+    "$MANAGER" apply experiments "$model"
     ;;
   show)
     [[ $# -eq 2 ]] || { usage >&2; exit 2; }

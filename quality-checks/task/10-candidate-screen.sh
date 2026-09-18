@@ -89,7 +89,7 @@ register_candidate_on_task() {
         printf 'ERROR: packaged candidate Modelfile unavailable: %s\n' "$modelfile" >&2
         return 1
     }
-    # bc250-model installs experimental GGUFs in the package experiment store and
+    # bc250-model applies experimental GGUFs in the package experiment store and
     # registers them on main Ollama. Mirror only the Ollama registration into the
     # task service so quality/resource evidence uses the same q8 KV-cache, 4096
     # context and keep-alive policy as the deployment target.
@@ -248,7 +248,7 @@ capture_state "$OUT/setup/state-before"
 cp /usr/libexec/bc250-llm-server/category-benchmark.py "$OUT/setup/category-benchmark.py"
 cp /usr/share/bc250-llm-server/benchmark/task-cases.json "$OUT/setup/task-cases.json"
 
-sudo bc250-model install experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-install.txt"
+sudo bc250-model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
 model_present "$MAIN_URL" "$CANDIDATE" || { echo 'ERROR: candidate is not registered on main Ollama.' >&2; exit 1; }
 model_present "$TASK_URL" "$BASELINE" || { echo 'ERROR: packaged task baseline is not registered.' >&2; exit 1; }
 register_candidate_on_task

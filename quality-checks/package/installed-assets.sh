@@ -51,9 +51,9 @@ tmp_task=/tmp/bc250-quality-task-list.$$
 tmp_prod=/tmp/bc250-quality-production-list.$$
 tmp_exp=/tmp/bc250-quality-model-list.$$
 tmp_all=/tmp/bc250-quality-all-models.$$
-sudo bc250-model list task > "$tmp_task" 2>&1
-sudo bc250-model list production > "$tmp_prod" 2>&1
-sudo bc250-model list experiments > "$tmp_exp" 2>&1
+bc250-model list task > "$tmp_task" 2>&1
+bc250-model list production > "$tmp_prod" 2>&1
+bc250-model list experiments > "$tmp_exp" 2>&1
 cat "$tmp_task" "$tmp_prod" "$tmp_exp" > "$tmp_all"
 trap 'rm -f "$tmp_task" "$tmp_prod" "$tmp_exp" "$tmp_all"' EXIT
 grep -Fq 'task-lfm25-1.2b-instruct-liquidai-q6-k' "$tmp_task" || {

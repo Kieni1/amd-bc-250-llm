@@ -149,11 +149,11 @@ install_candidate() {
         printf 'Candidate already registered; leaving it installed after the matrix: %s\n' "$model"
         return 0
     fi
-    printf '\n=== install %s ===\n' "$model"
-    sudo env BC250_HF_ANONYMOUS=1 bc250-model install experiments "$model" \
-        2>&1 | tee "$OUT/setup/${model}.install.txt"
+    printf '\n=== apply %s ===\n' "$model"
+    sudo env BC250_HF_ANONYMOUS=1 bc250-model apply experiments "$model" \
+        2>&1 | tee "$OUT/setup/${model}.apply.txt"
     model_present "$MAIN_URL" "$model" || {
-        printf 'ERROR: candidate did not appear after installation: %s\n' "$model" >&2
+        printf 'ERROR: candidate did not appear after apply: %s\n' "$model" >&2
         return 1
     }
     CREATED+=("$model")
@@ -168,9 +168,9 @@ cleanup_candidate() {
 
     unload_normal_lanes || true
     if [[ "$KEEP_GGUF" == 1 ]]; then
-        sudo bc250-model cleanup experiments "$model" --keep-gguf --yes
+        sudo bc250-model unregister experiments "$model" --yes
     else
-        sudo bc250-model cleanup experiments "$model" --yes
+        sudo bc250-model remove experiments "$model" --yes
     fi
     CLEANED["$model"]=1
 }

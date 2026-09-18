@@ -263,7 +263,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "bc250-swap-profile ensure",
             "BC250_MODEL_SELECTION",
             "bc250-model list all --all",
-            "bc250-model install all",
+            "bc250-model apply all",
             "request_primary_reboot_if_needed",
         ),
         "cmd/system/storage.py": (

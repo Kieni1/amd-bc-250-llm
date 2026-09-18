@@ -155,8 +155,8 @@ step_3_install_ollama
         self.assertIn("select(.is_active == true)", source)
         self.assertIn(".task.TASK_MODEL", source)
         self.assertIn(".embedding.RAG_EMBEDDING_MODEL", source)
-        self.assertIn('bc250-model install all "$required_csv"', source)
-        self.assertIn('bc250-model install all "$selection" --include-disabled', source)
+        self.assertIn('bc250-model apply all "$required_csv"', source)
+        self.assertIn('bc250-model apply all "$selection" --include-disabled', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
 
@@ -181,7 +181,7 @@ step_7_models
         ):
             self.assertIn(model, result.stdout)
         self.assertIn("no additional models selected", result.stdout)
-        self.assertEqual(result.stdout.count("model:install"), 1)
+        self.assertEqual(result.stdout.count("model:apply"), 1)
 
     def test_noninteractive_unified_selection_dispatches_once(self) -> None:
         result = source_probe('''
@@ -193,11 +193,11 @@ BC250_MODEL_SELECTION='recommended,19-20'
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("model:install all recommended,19-20 --include-disabled", result.stdout)
+        self.assertIn("model:apply all recommended,19-20 --include-disabled", result.stdout)
         self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl", result.stdout)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k", result.stdout)
         self.assertIn("embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
-        self.assertEqual(result.stdout.count("model:install"), 2)
+        self.assertEqual(result.stdout.count("model:apply"), 2)
 
     def test_original_noninteractive_input_survives_transcript_pty(self) -> None:
         result = source_probe('''
@@ -211,7 +211,7 @@ input_is_interactive && exit 9 || exit 0
         source = INSTALLER.read_text()
         block = source[source.index("step_7_models() {"):source.index("step_8_application_services() {")]
         self.assertIn("require_progress_terminal", block)
-        self.assertLess(block.index("require_progress_terminal"), block.index("bc250-model install all"))
+        self.assertLess(block.index("require_progress_terminal"), block.index("bc250-model apply all"))
 
     def test_runtime_topology_is_established_before_model_registration(self) -> None:
         source = INSTALLER.read_text()
@@ -433,7 +433,7 @@ step_8_application_services
             )
             self.assertEqual(resumed.returncode, 0, resumed.stdout)
             calls = log.read_text()
-            required = calls.index("model:install all prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl")
+            required = calls.index("model:apply all prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl")
             owui = calls.index("systemctl:start tika.service open-webui.service")
             self.assertLess(required, owui)
             self.assertIn("mode:leave", calls)
