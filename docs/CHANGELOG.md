@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.2-0.5 - 2026-09-18
+
+- Fix the installed `bc250-revalidate` `owui-translation` stage: benchmark fixtures now resolve through the package share tree (`/usr/share/bc250-llm-server/benchmark`) instead of deriving a source-only `/usr/examples/...` path from the installed libexec location.
+- Move package-resource selection into `benchmark_common.py` and reuse it for category fixtures, Open WebUI translation fixtures and the package-owned Open WebUI desired state. Explicit `BC250_BENCH_FIXTURES` / `BC250_SHARE` overrides stay authoritative, while source-tree runs prefer their own checkout instead of an older installed RPM.
+- Add focused regression coverage for source/install/override resource resolution and for the Open WebUI translation command consuming the shared resolver.
+- Carry forward the GitHub validation fixes from the 0.4 follow-up: installer tests provide a hermetic `jq` test double instead of depending on the CI image, and `tests/test_openwebui.py` has Ruff-compliant import ordering.
+- Keep all model, runtime, topology, quality thresholds and revalidation harness policy unchanged; this is a packaging/qualification reliability release.
+
 ## 0.11.2-0.4 - 2026-09-18
 
 - Make active package-owned Open WebUI roles operationally complete by ensuring all of their base models during `bc250-install`; optional selection now means experiments/rollback/agent/other extras rather than models required by active UI roles.
