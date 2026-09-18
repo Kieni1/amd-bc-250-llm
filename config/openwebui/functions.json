@@ -1,0 +1,14 @@
+{
+  "functions": [
+    {
+      "id": "bc250_translation_direction",
+      "name": "BC-250 Translation Direction Wrapper",
+      "content_file": "functions/bc250_translation_direction.py",
+      "meta": {
+        "description": "Package-owned non-global filter that applies the tested Stage-2E DE↔FR user wrapper to the two BC-250 translation roles."
+      },
+      "is_active": true,
+      "is_global": false
+    }
+  ]
+}
