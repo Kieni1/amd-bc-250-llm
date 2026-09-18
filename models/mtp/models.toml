@@ -7,7 +7,19 @@ download_namespace = "mtp"
 layout = "by-id"
 
 # MTP entries are download-only llama.cpp inputs and intentionally have no
-# Ollama name or Modelfile.
+# Ollama name or Modelfile. They remain disabled from generic convergence.
+# Exact downloaded SHA-256 values are recorded in manager state at fetch time;
+# moving upstream revisions are not silently treated as qualification evidence.
+[[models]]
+enabled = false
+provider = "download-only"
+id = "qwen3.5-9b-mtp"
+repository = "unsloth/Qwen3.5-9B-MTP-GGUF"
+revision = "latest"
+gguf = "Qwen3.5-9B-UD-Q4_K_XL.gguf"
+context = 16384
+draft = 3
+
 [[models]]
 enabled = false
 provider = "download-only"
@@ -21,9 +33,19 @@ draft = 2
 [[models]]
 enabled = false
 provider = "download-only"
-id = "qwen3.5-4b-mtp"
-repository = "unsloth/Qwen3.5-4B-MTP-GGUF"
+id = "qwen3.8-27b-hauhaucs-mtp"
+repository = "HauhauCS/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-MTP-GGUF"
 revision = "latest"
-gguf = "Qwen3.5-4B-UD-Q4_K_XL.gguf"
-context = 16384
-draft = 3
+gguf = "Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-IQ2_M.gguf"
+context = 8192
+draft = 2
+
+[[models]]
+enabled = false
+provider = "download-only"
+id = "qwen3.6-35b-a3b-mtp"
+repository = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+revision = "latest"
+gguf = "Qwen3.6-35B-A3B-UD-IQ3_S.gguf"
+context = 8192
+draft = 2

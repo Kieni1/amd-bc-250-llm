@@ -291,8 +291,17 @@ class ModelfileDiscoveryTests(unittest.TestCase):
     def test_mtp_keeps_its_download_only_runtime_catalog(self) -> None:
         defaults, models = modelctl.load_mtp_catalog(ROOT / "models/mtp/models.toml")
         self.assertEqual(defaults["category"], "mtp")
-        self.assertEqual(len(models), 2)
+        self.assertEqual(
+            [model["id"] for model in models],
+            [
+                "qwen3.5-9b-mtp",
+                "qwen3.6-27b-mtp",
+                "qwen3.8-27b-hauhaucs-mtp",
+                "qwen3.6-35b-a3b-mtp",
+            ],
+        )
         self.assertTrue(all(model["provider"] == "download-only" for model in models))
+        self.assertTrue(all(model["enabled"] is False for model in models))
 
     def test_mtp_filtered_view_preserves_global_catalog_indexes(self) -> None:
         _defaults, mtp_only = modelctl.load_models(

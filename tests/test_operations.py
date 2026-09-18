@@ -143,12 +143,14 @@ class RuntimeConvenienceTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("qwen3.6-27b-mtp", result.stdout)
-        self.assertIn("qwen3.5-4b-mtp", result.stdout)
+        self.assertIn("qwen3.5-9b-mtp", result.stdout)
+        self.assertIn("qwen3.8-27b-hauhaucs-mtp", result.stdout)
+        self.assertIn("qwen3.6-35b-a3b-mtp", result.stdout)
         self.assertNotIn("set LLAMACPP", result.stdout)
 
     def test_mtp_runner_missing_source_points_to_exact_fetch_before_runtime(self) -> None:
         result = subprocess.run(
-            [str(ROOT / "models/mtp/run-mtp-llamacpp.sh"), "27b"],
+            [str(ROOT / "models/mtp/run-mtp-llamacpp.sh"), "qwen3.6-27b-mtp"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
