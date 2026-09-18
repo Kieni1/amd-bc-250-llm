@@ -190,6 +190,7 @@ revalidation unless a promoted setting is later exercised there.
 bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
 bc250-benchmark num-batch MODEL [MODEL ...]
 
+bc250-benchmark owui-translation --token-file FILE
 bc250-benchmark owui-rag MODEL --token-file FILE
 bc250-benchmark owui-embedding-batch --token-file FILE
 bc250-benchmark owui-chunk-min MODEL --token-file FILE
@@ -204,10 +205,13 @@ observe, change only the named benchmark setting, use temporary knowledge/file s
 and restore the original setting before returning. Restoration failure is an
 infrastructure failure.
 
-`owui-rag` does not tune configuration; it qualifies the currently configured
-Open WebUI RAG path with deterministic multi-turn grounding/citation checks.
+`owui-translation` and `owui-rag` do not tune configuration. `owui-translation`
+qualifies the canonical eight-case DE↔FR screen through the actual package-owned
+production role IDs, so the live model-specific direction Filter and 2048-token preset are
+part of the path. `owui-rag` qualifies the currently configured Open WebUI RAG path with
+deterministic multi-turn grounding/citation checks.
 
-## Revalidation harness v4
+## Revalidation harness v4.1
 
 ```bash
 sudo bc250-revalidate start --owui-token-file /root/owui-test.key
@@ -223,7 +227,7 @@ The systemd-owned worker uses six phases:
 2. production roles;
 3. resource edge;
 4. exclusive agent mode;
-5. packaged Open WebUI RAG;
+5. packaged Open WebUI translation + RAG;
 6. restore/report.
 
 The complete live SPI/WGP routing table is the CU authority. A particular machine may

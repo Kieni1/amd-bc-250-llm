@@ -108,9 +108,12 @@ merely to repeat a closed tournament.
 The production product path is the pair of package-owned roles
 `bc250-office-translation-de-fr` and `bc250-office-translation-fr-de`. Both use the
 exact Stage-2E system prompt, `max_tokens=2048`, thinking omitted, and the non-global
-`bc250_translation_direction` filter. After installing this release, run a bounded
-real-device product-path verification before calling the new default fully requalified.
-The exact Stage-2E evidence archive remains
+`bc250_translation_direction` filter. Installed `0.11.2-0.3` subsequently passed an
+authenticated live DE→FR / FR→DE role smoke with correct direction, preserved identifiers
+and dates, and no desired-state drift. Revalidation harness v4.1 now includes the canonical
+eight-case `owui-translation` screen through those real role IDs so future release checks
+do not depend on an ad-hoc curl command. This remains distinct from the external Stage-2E
+hard corpus. The exact Stage-2E evidence archive remains
 `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
 `63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
 

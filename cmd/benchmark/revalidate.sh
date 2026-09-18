@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.0
+# BC-250 package revalidation harness v4.1
 #
 # Intended target: bc250-llm-server 0.11.2 on Fedora 44; release suffix is not hard-coded.
 # `start` launches one systemd-owned qualification worker. Routine revalidation
@@ -9,7 +9,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.0
+HARNESS_VERSION=4.1
 TARGET_VERSION=0.11.2
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
@@ -50,7 +50,7 @@ SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.0 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.1 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250-benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -168,7 +168,7 @@ qualification_benchmark() {
   env \
     -u OLLAMA_URL -u OLLAMA_HOST -u EMBEDDING_OLLAMA_URL \
     -u BC250_SHARE -u BC250_BENCH_FIXTURES -u AGENT_TEMPERATURE \
-    -u TRANSLATION_MODEL \
+    -u TRANSLATION_MODEL -u TRANSLATION_NUM_PREDICT -u TRANSLATION_THINK \
     -u RAG_EMBED_MODEL -u RAG_ANSWER_MODEL -u RAG_QUALITY_TOP_K \
     -u RAG_QUALITY_NUM_PREDICT -u EMBED_REPEATS -u EMBED_QUERY_PREFIX \
     -u EMBED_CONTENT_PREFIX -u KEEP_ALIVE -u REQUEST_TIMEOUT \
@@ -545,6 +545,10 @@ dashboard_text() {
   printf 'Quality steps   %s pass / %s quality-fail / %s skipped\n' "$p" "$q" "$skipped"
   printf '\nRecent results\n'
   recent_step_results
+  if ((q > 0)) && [[ $phase == done || $phase == failed ]]; then
+    printf '\nQuality failures\n'
+    quality_cause_report
+  fi
   if [[ $phase != done && $phase != failed ]]; then
     printf '\nCtrl-C detaches; the worker continues under systemd.\n'
   fi
@@ -1230,9 +1234,9 @@ phase_roles() {
   warm_embedding > "$RAW/roles/embed-warm.txt" 2>&1
   run_step roles embeddings quality qualification_benchmark bc250-benchmark embeddings "$EMBED_MODEL" --ollama-url http://127.0.0.1:11437 --output-dir "$RAW/roles/embeddings/results"
   run_step roles task quality qualification_benchmark bc250-benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
-  # Qualify the package's shipped translation behavior only. Direction A/B remains
-  # an explicit standalone benchmark and cannot leak in through manager environment.
-  run_step roles translation quality qualification_benchmark bc250-benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
+  # Direct model/configuration sanity uses the promoted 2048-token production budget.
+  # The authenticated OWUI phase separately proves the live role/filter product path.
+  run_step roles translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 TRANSLATION_THINK=auto bc250-benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
   warm_embedding >/dev/null 2>&1 || true
   run_step roles rag-quality quality qualification_benchmark bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
   run_step roles usecase quality qualification_benchmark bc250-benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
@@ -1284,11 +1288,12 @@ phase_agent() {
 }
 
 phase_owui() {
-  set_phase owui "qualifying packaged Open WebUI RAG configuration"
+  set_phase owui "qualifying packaged Open WebUI translation and RAG paths"
   local dir="$RAW/owui" rc
   install -d -m 0700 "$dir"
   if [[ ${SKIP_OWUI:-0} -eq 1 ]]; then
     echo "SKIP: authenticated Open WebUI qualification explicitly disabled by --skip-owui" > "$dir/skipped.txt"
+    record_event "openwebui-translation" coverage skipped "explicit --skip-owui"
     record_event "openwebui-rag" coverage skipped "explicit --skip-owui"
     snapshot owui/skipped
     write_phase_report openwebui-results owui
@@ -1297,6 +1302,7 @@ phase_owui() {
   validate_owui_token > "$dir/token-recheck.txt" 2>&1
   if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-before.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state drift/API failure rc=$rc" >&2; return "$rc"; }
+  run_step owui owui-translation quality qualification_benchmark bc250-benchmark owui-translation --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-translation/results"
   run_step owui owui-rag quality qualification_benchmark bc250-benchmark owui-rag "$OWUI_RAG_MODEL" --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-rag/results"
   if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state changed during qualification rc=$rc" >&2; return "$rc"; }

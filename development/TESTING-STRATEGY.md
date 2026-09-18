@@ -69,18 +69,20 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## 6. Recommended work order from 0.11.2-0.3
+## 6. Recommended work order from 0.11.2-0.4
 
 ### Lane A — general operations / office availability / power
 
 This is currently the highest product priority because the Pi/maintenance contract was
 added after much of the older hardware evidence.
 
-First batch is read-only:
+First batch is read-only plus one bounded qualification run:
 
 ```text
 installed NEVRA and runtime versions
-bc250-verify
+bc250-verify --owui-token-file FILE
+bc250-openwebui-setup status --verbose --owui-token-file FILE
+bc250-revalidate start --owui-token-file FILE
 normal service topology
 HTTP :80 readiness
 maintenance contract/status
@@ -88,6 +90,9 @@ companion status
 WOL NIC state
 firewall/listener state
 ```
+
+The current harness v4.1 includes the actual package-owned production translation roles
+and should replace the ad-hoc translation smoke used after 0.11.2-0.3.
 
 If clean, next batch is a real powered-off/S5 WOL test. Only after S5 wake succeeds
 should safe shutdown be exercised: first a deliberately busy/defer case, then an idle
