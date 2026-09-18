@@ -2,11 +2,13 @@
 
 ## 0.11.1-0.11 - 2026-09-17
 
+- Integrate the Stage-2E selected Translate-Gemma configuration as two package-owned candidate Open WebUI roles with the exact explicit-direction v1 system prompt, direction-specific user wrappers, `max_tokens=2048`, and no forced thinking policy; keep the existing LFM translation role production/default pending one bounded final product-path requalification.
+- Add one reviewed non-global Open WebUI Filter Function to apply only the tested DE→FR / FR→DE wrapper, reconcile it through supported Functions APIs, and extend desired-state status checks to detect function/preset drift without synchronizing away unrelated operator Functions.
+- Fix translation numeric-value parsing so one-decimal locale equivalents such as `8.1` and `8,1` compare as the same value, while retaining Stage-2E's known protected-format and trailing-line caveats rather than weakening acceptance semantics.
 - Harden task-model qualification around a one-round cheap screen, a dedicated warm-main tiny survival gate and a post-OOM appliance recovery check. Keep LFM2.5 1.2B Q6_K as the production task model; record Qwen3 4B as quality-promising but unsafe for the concurrent task role after both exact-source and bounded 4K staging caused global OOM/main-model loss.
 - Bring German/French translation qualification in line with the current campaign: add `bc250-benchmark translation --think auto|true|false`, record richer reasoning/runtime provenance, require an empty main lane for generic foreground direct screens, and retain the eight-case canonical suite as a screening gate rather than promoting any challenger before harder-corpus/product-path work.
 - Retain dated task/translation campaign evidence in `MODELS.md` and Git-only development records rather than modifying runtime Modelfiles for measurement notes. Update operator/development guidance, print evidence archive SHA-256 without creating `.sha256` sidecars, normalize archive ownership, and keep production model/prompt/topology defaults unchanged.
 - Fix the new post-OOM task recovery gate so it reloads/warm-checks GPT-OSS by default and distinguishes historical experiment faults from new faults during recovery; redact only the harness's expected local HOME prefix before direct-translation privacy scanning so normal benchmark path output does not suppress valid evidence archives.
-- Complete the reviewed qualification contract by keeping the embedding lane in task survival/recovery health checks, making direct-translation local final status authoritative after privacy/archive outcomes, and consolidating dated specialist handovers into durable decisions/model-run records instead of keeping duplicated campaign bibles.
 
 ## 0.11.1-0.10 - 2026-09-14
 

@@ -211,11 +211,13 @@ fi
 
 %changelog
 * Thu Sep 17 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.11
+- Integrate the Stage-2E selected Translate-Gemma configuration as explicit DE-to-FR and FR-to-DE candidate Open WebUI roles using the exact tested v1 system/user contract, 2048 output budget and no forced thinking policy while retaining LFM as the production/default translation role.
+- Package one reviewed non-global Open WebUI direction Filter, reconcile it through supported Function APIs, verify its source/state and package model-preset fields through desired-state status, and preserve unrelated operator Functions.
+- Correct one-decimal locale numeric parsing in translation evaluation and record the bounded final integration gate plus known protected-format/completeness caveats without reopening broad model discovery.
 - Harden task-model qualification around cheap screening, warm-main survival and post-failure recovery; record current active-model task measurements while retaining LFM2.5 1.2B Q6_K as the production task model.
 - Record the current German/French translation campaign, add explicit translation thinking-policy control and richer runtime provenance, and keep the saturated canonical short screen as a gate rather than promoting any challenger before harder-corpus/product-path qualification.
 - Keep role-specific campaign evidence in MODELS.md and Git-only development records rather than runtime Modelfiles; print evidence archive SHA-256 without creating checksum sidecar files, and keep experiment archive/privacy handling separate from package source-integrity checks.
 - Make the post-OOM task recovery probe actively reload the warm main by default, fail only on new recovery-time OOM/GPU faults, and avoid direct-translation privacy false positives from the harness's own HOME-prefixed result paths.
-- Keep the embedding lane in task survival/recovery health checks, keep translation final status consistent with privacy/archive outcomes, and consolidate temporary dated specialist handovers into durable decision/model-run memory.
 
 * Mon Sep 14 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.10
 - Make the quick MTP comparison fail closed on backend completion-integrity failures, require a non-empty usable content/reasoning completion, and align reserved-token corruption detection with the repeated-run semantics used by the main generation benchmark.
