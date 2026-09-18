@@ -69,7 +69,7 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## 6. Recommended work order from 0.11.2-0.4
+## 6. Recommended current work order
 
 ### Lane A — general operations / office availability / power
 

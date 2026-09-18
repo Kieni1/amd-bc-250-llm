@@ -37,17 +37,19 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.2
-RPM Release   0.3%{?dist}
-NVR           0.11.2-0.4
+RPM Release   0.5%{?dist}
+NVR           0.11.2-0.5
 ```
 
-The current unpublished `0.11.2-0.4` source keeps the 0.8 maintenance fixes and
-0.9/0.10 main-model/MTP qualification work, then integrates the 2026-09-17 task and
-German/French translation campaigns. Runtime/service topology, Ollama, KV, CU and governor
-policy remain unchanged, but model-role policy is normalized: LFM2.5 1.2B is the sole task
-model and Stage-2E-selected Translate-Gemma is the production translation base behind the
-two explicit direction roles. The former LFM translator is retained only as an
-experimental rollback/reference. Detailed campaign evidence stays in Git-only
+The current unpublished `0.11.2-0.5` source keeps the 0.8 maintenance fixes and
+0.9/0.10 main-model/MTP qualification work, the 2026-09-17 task and German/French
+translation campaigns, and the v4.1 production-translation revalidation path. It corrects
+package-resource resolution so source checkouts and installed RPMs use the appropriate
+benchmark/share layout without changing runtime/service topology, Ollama, KV, CU, governor
+policy, production models, quality thresholds or Open WebUI role policy. LFM2.5 1.2B remains
+the sole task model and Stage-2E-selected Translate-Gemma remains the production translation
+base behind the two explicit direction roles. The former LFM translator is retained only as
+an experimental rollback/reference. Detailed campaign evidence stays in Git-only
 `development/` memory rather than runtime Modelfiles.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
@@ -406,7 +408,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` subsequently verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. `0.11.2-0.4` folds that live path into routine revalidation rather than relying on an ad-hoc smoke command. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` subsequently verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical device testing on `0.11.2-0.4` reached the routine v4.1 Open WebUI translation stage but exposed the installed fixture-path defect before translation quality evaluation. Current `0.11.2-0.5` fixes that package-resource lookup without changing the model/evaluator contract. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -1128,10 +1130,10 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- unpublished 0.11.2-0.4 source needs an external GitHub RPM build before release;
-  installed 0.11.2-0.3 completed full revalidation v4.0 with infrastructure/restoration PASS, direct Translate-Gemma 8/8, direct RAG 4/4 and OWUI RAG 3/3; exact evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.2-0.3-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
+- unpublished 0.11.2-0.5 source needs an external GitHub RPM build before release;
+  historical installed 0.11.2-0.4 device evidence reached revalidation v4.1 phase 5/6 before the `owui-translation` fixture-path infrastructure failure, while installed 0.11.2-0.3 completed full revalidation v4.0 with infrastructure/restoration PASS, direct Translate-Gemma 8/8, direct RAG 4/4 and OWUI RAG 3/3; exact 0.11.2-0.3 evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.2-0.3-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
-- Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke; 0.11.2-0.4 revalidation now makes that product-path check routine, while the external Stage-2E hard corpus remains separate evidence;
+- Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke; historical 0.11.2-0.4 revalidation reached the routine product-path stage but failed on package-resource lookup before quality evaluation; current 0.11.2-0.5 corrects that lookup, while the external Stage-2E hard corpus remains separate evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
 - packaged RAG plumbing passed direct 4/4 plus authenticated OWUI 3/3 on 0.11.2-0.3, but real office documents/Tika/OCR breadth still needs qualification around absent/multisource/conflict/table/multilingual cases;
 - Ornith revalidation on 0.11.2-0.3 was 2/3 because otherwise valid Bash was wrapped in Markdown fences; agent quality should broaden into documented `bc250-code` workflows before promotion claims;
@@ -1150,7 +1152,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. Build/install `0.11.2-0.4`, then run one current `bc250-verify --owui-token-file` plus revalidation v4.1 to confirm required-role model registration, task 6/6 expectation and live OWUI translation coverage.
+1. Build/install `0.11.2-0.5`, then run one current `bc250-verify --owui-token-file` plus revalidation v4.1 to confirm required-role model registration, task 6/6 expectation and live OWUI translation coverage.
 2. Analyze returned evidence; do not expand agent/RAG campaigns in the same batch.
 3. If clean, **Operations Batch 2:** one real S5 Wake-on-LAN cycle.
 4. If clean, **Operations Batch 3:** safe-shutdown busy/defer and later idle/allow.

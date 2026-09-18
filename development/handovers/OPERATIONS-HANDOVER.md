@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current unpublished 0.11.2-0.4 source
+# BC-250 support / operations handover — current unpublished 0.11.2-0.5 source
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,15 +10,20 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.2
-RPM Release:  0.4
-source base:  amd-bc-250-llm-0.11.2-0.4.zip
+RPM Release:  0.5
+source base:  amd-bc-250-llm-0.11.2-0.5.zip
 ```
 
-This handover does **not** assert that the unpublished 0.11.2-0.4 RPM has already
+This handover does **not** assert that the unpublished 0.11.2-0.5 RPM has already
 been built, installed or hardware-qualified. Capture installed NEVRA before interpreting
-machine evidence. Installed `0.11.2-0.3.fc44` is now the immediate real-device baseline:
-its full revalidation completed with infrastructure/restoration PASS, direct translation
-8/8, direct RAG 4/4 and authenticated Open WebUI RAG 3/3. The exact run is recorded in
+machine evidence. The newest supplied real-device evidence is historical `0.11.2-0.4`:
+revalidation v4.1 reached phase 5/6 and then infrastructure-failed before translation
+quality evaluation because the installed benchmark script resolved its fixture as
+`/usr/examples/benchmark/translation-office.json`. The supplied transcript did not capture
+the distro suffix of that installed NEVRA, so do not invent it. Installed
+`0.11.2-0.3.fc44` remains the last full revalidation completion: infrastructure/restoration
+PASS, direct translation 8/8, direct RAG 4/4 and authenticated Open WebUI RAG 3/3. Its
+exact run is recorded in
 `development/model-runs/2026-09-18-installed-0.11.2-0.3-revalidation.md`.
 
 ## Validation ownership
@@ -89,7 +94,7 @@ Do not revive graveyard models merely because an old handover names them.
 - Stock CPU operation exposes 6C/12T even though 8C/16T silicon exists; CPU unlock is
   separate and not required for the appliance.
 
-Latest general appliance evidence is from installed `0.11.2-0.3.fc44`: Fedora kernel
+Latest **full** general appliance evidence is from installed `0.11.2-0.3.fc44`: Fedora kernel
 7.2.5-200.fc44, Mesa 26.2.2-6.fc44, healthy 40/40 live routing, normal
 main/task/embedding service topology, authenticated Open WebUI desired-state drift none,
 and install verification at 49 ok / 0 warn / 0 fail. Local
@@ -147,7 +152,7 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-After GitHub builds and the appliance installs `0.11.2-0.4`, run one bounded re-check of:
+After GitHub builds and the appliance installs `0.11.2-0.5`, run one bounded re-check of:
 
 ```text
 installed RPM NEVRA
