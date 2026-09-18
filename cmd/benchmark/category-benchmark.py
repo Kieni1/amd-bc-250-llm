@@ -1728,7 +1728,6 @@ def translation_prompt(case: dict[str, Any]) -> str:
 
 def translation_messages(case: dict[str, Any], model: str) -> list[dict[str, str]]:
     names = {"de": "German", "fr": "French", "en": "English"}
-    source = names.get(case["source_language"], case["source_language"])
     target = names.get(case["target_language"], case["target_language"])
     profile = translation_prompt_profile(model)
     if profile == "hunyuan-mt-upstream":
@@ -1806,7 +1805,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
     fixture = Path(args.fixture or FIXTURE_ROOT / "translation-office.json")
     cases = json.loads(fixture.read_text(encoding="utf-8"))
     models = args.models or [
-        os.environ.get("TRANSLATION_MODEL", "prod-lfm25-8b-a1b-liquidai-q6-k")
+        os.environ.get("TRANSLATION_MODEL", "prod-translate-gemma4-sub-e4b-17s-q4-k-xl")
     ]
     available = {
         str(row.get("name") or row.get("model") or "").removesuffix(":latest")

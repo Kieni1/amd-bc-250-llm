@@ -245,15 +245,15 @@ class CategoryPolicyTests(unittest.TestCase):
             {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
-                "prod-lfm25-8b-a1b-liquidai-q6-k",
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
                 "prod-qwen35-9b-unsloth-q6-k",
                 "prod-gpt-oss20b-ggml-org-mxfp4",
             },
         )
         qwen = next(case for case in usecase if "qwen35" in case["model"])
         self.assertIs(qwen["think"], False)
-        lfm = next(case for case in usecase if "lfm25" in case["model"])
-        self.assertNotIn("translate", lfm["prompt"].casefold())
+        translator = next(case for case in usecase if "translate-gemma" in case["model"])
+        self.assertIn("translate from german to french", translator["prompt"].casefold())
         translation = json.loads(
             (ROOT / "examples/benchmark/translation-office.json").read_text(encoding="utf-8")
         )
@@ -1749,7 +1749,7 @@ quality_state
         for model in (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
-            "prod-lfm25-8b-a1b-liquidai-q6-k",
+            "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
             "prod-qwen35-9b-unsloth-q6-k",
             "prod-gpt-oss20b-ggml-org-mxfp4",
         ):
@@ -1778,7 +1778,7 @@ quality_state
             specs = {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": (100.0, 32768),
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": (60.0, 32768),
-                "prod-lfm25-8b-a1b-liquidai-q6-k": (120.0, 32768),
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": (60.0, 8192),
                 "prod-qwen35-9b-unsloth-q6-k": (40.0, 32768),
                 "prod-gpt-oss20b-ggml-org-mxfp4": (70.0, 16384),
             }
@@ -1933,7 +1933,7 @@ phase_roles
             lines = completed.stdout.splitlines()
             self.assertEqual(lines[0], "unset|unset|unset|unset")
             output = "\n".join(lines[1:])
-            self.assertIn("translation quality qualification_benchmark bc250-benchmark translation prod-lfm25-8b-a1b-liquidai-q6-k --ollama-url http://127.0.0.1:11434", output)
+            self.assertIn("translation quality qualification_benchmark bc250-benchmark translation prod-translate-gemma4-sub-e4b-17s-q4-k-xl --ollama-url http://127.0.0.1:11434", output)
             self.assertIn("--ollama-url http://127.0.0.1:11437", output)
             self.assertIn("--embedding-ollama-url http://127.0.0.1:11437", output)
             self.assertIn("--ollama-url http://127.0.0.1:11435", output)
@@ -1945,7 +1945,7 @@ phase_roles
             specs = {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
-                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": 8192,
                 "prod-qwen35-9b-unsloth-q6-k": 32768,
                 "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
             }
@@ -2111,7 +2111,7 @@ phase_roles
             specs = {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
-                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": 8192,
                 "prod-qwen35-9b-unsloth-q6-k": 32768,
                 "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
             }
@@ -2164,7 +2164,7 @@ phase_roles
             specs = {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
-                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": 8192,
                 "prod-qwen35-9b-unsloth-q6-k": 32768,
                 "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
             }
@@ -2744,7 +2744,7 @@ raise SystemExit(module.entrypoint())
             specs = {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
-                "prod-lfm25-8b-a1b-liquidai-q6-k": 32768,
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": 8192,
                 "prod-qwen35-9b-unsloth-q6-k": 32768,
                 "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
             }
