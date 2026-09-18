@@ -70,7 +70,7 @@ class OcrInstallTests(unittest.TestCase):
             destination=None,
             min_free_bytes=None,
             token_file=None,
-            refresh=False,
+            command="apply",
             host=None,
         )
         completed = SimpleNamespace(returncode=0)
@@ -86,7 +86,7 @@ class OcrInstallTests(unittest.TestCase):
             ) as command_path,
             patch.object(modelctl, "run_as_ollama", return_value=completed) as run,
         ):
-            self.assertEqual(modelctl.install_models(defaults, [model], args), 0)
+            self.assertEqual(modelctl.apply_models(defaults, [model], args), 0)
             rendered = Path(temporary, model["modelfile"]).read_text(encoding="utf-8")
 
         requested = [call.args[0] for call in command_path.call_args_list]

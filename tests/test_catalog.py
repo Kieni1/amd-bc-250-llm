@@ -294,6 +294,19 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertEqual(len(models), 2)
         self.assertTrue(all(model["provider"] == "download-only" for model in models))
 
+    def test_mtp_filtered_view_preserves_global_catalog_indexes(self) -> None:
+        _defaults, mtp_only = modelctl.load_models(
+            "mtp", directories=[MODELFILES], source=ROOT / "models/mtp/models.toml"
+        )
+        catalogs = modelctl.load_all_catalogs(
+            directories=[MODELFILES], source=ROOT / "models/mtp/models.toml"
+        )
+        combined = next(models for defaults, models in catalogs if defaults["category"] == "mtp")
+        self.assertEqual(
+            [(model["id"], model["index"]) for model in mtp_only],
+            [(model["id"], model["index"]) for model in combined],
+        )
+
     def test_granite42_context_is_explicitly_bounded_for_bc250(self) -> None:
         source = (ROOT / "models/modelfiles" / "exp-granite42-3b-ibm-q6-k.Modelfile").read_text(encoding="utf-8")
         self.assertIn("PARAMETER num_ctx 32768", source)
@@ -317,58 +330,131 @@ class CategoryInterfaceTests(unittest.TestCase):
         for legacy in ("experimental", "tasker", "coding", "embedded", "embed"):
             self.assertNotIn(legacy, modelctl.CATEGORIES)
 
-    def test_list_requires_sudo_to_avoid_protected_source_unknown_status(self) -> None:
+    def test_no_argument_help_explains_common_workflows(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(modelctl.main([]), 0)
+        text = output.getvalue()
+        self.assertIn("bc250-model status agentic", text)
+        self.assertIn("bc250-model apply agentic MODEL", text)
+        self.assertIn("bc250-model unregister agentic MODEL", text)
+        self.assertIn("bc250-model remove agentic MODEL", text)
+
+    def test_list_is_catalog_only_and_does_not_require_sudo(self) -> None:
+        output = StringIO()
         with (
             patch.object(modelctl.os, "geteuid", return_value=1000),
-            self.assertRaisesRegex(modelctl.ModelError, "sudo bc250-model list"),
-        ):
-            modelctl.main(["list"])
-
-    def test_targeted_cleanup_suppresses_category_catalog_by_default(self) -> None:
-        defaults = {"category": "experiments", "ollama_host": "127.0.0.1:11434"}
-        models = [{"category": "experiments", "id": "m", "name": "exp-m", "enabled": True}]
-        with (
-            patch.object(modelctl.os, "geteuid", return_value=0),
-            patch.object(modelctl, "load_models", return_value=(defaults, models)),
-            patch.object(modelctl, "print_models") as printed,
-            patch.object(modelctl, "run_category_operation", return_value=0),
-        ):
-            self.assertEqual(modelctl.main(["cleanup", "experiments", "m", "--yes"]), 0)
-        printed.assert_not_called()
-
-    def test_cleanup_all_without_selection_selects_every_catalog_entry(self) -> None:
-        catalogs = [
-            (
-                {"category": "production"},
-                [{"category": "production", "id": "p", "name": "prod-p"}],
-            ),
-            (
-                {"category": "mtp"},
-                [
-                    {
-                        "category": "mtp",
-                        "id": "m",
-                        "name": "mtp-m",
-                        "enabled": False,
-                    }
-                ],
-            ),
-        ]
-        with (
-            patch.object(modelctl.os, "geteuid", return_value=0),
-            patch.object(modelctl, "load_all_catalogs", return_value=catalogs),
-            patch.object(modelctl, "print_catalogs"),
-            patch.object(modelctl, "run_all_catalog_operation", return_value=0) as run,
+            patch.object(modelctl, "registered_models") as registered,
+            redirect_stdout(output),
         ):
             self.assertEqual(
-                modelctl.main(["cleanup", "all", "--keep-gguf", "--yes"]), 0
+                modelctl.main(
+                    ["list", "production", "--modelfile-dir", str(MODELFILES)]
+                ),
+                0,
             )
-        self.assertEqual(
-            {(model["category"], model["id"]) for model in run.call_args.args[1]},
-            {("production", "p"), ("mtp", "m")},
-        )
+        registered.assert_not_called()
+        self.assertIn("Production models:", output.getvalue())
 
-    def test_all_install_switches_modes_around_agent_models(self) -> None:
+    def test_status_requires_sudo_for_protected_runtime_state(self) -> None:
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=1000),
+            self.assertRaisesRegex(modelctl.ModelError, "sudo bc250-model status"),
+        ):
+            modelctl.main(["status", "agentic"])
+
+    def test_incomplete_and_legacy_commands_get_actionable_guidance(self) -> None:
+        cases = (
+            (["apply"], "apply: model category is required"),
+            (["--install"], "bc250-model apply <category>"),
+            (["--refresh"], "bc250-model refresh <category>"),
+            (["install", "agentic"], "'install' was replaced by 'apply'"),
+            (
+                ["cleanup", "agentic", "x", "--keep-gguf"],
+                "'cleanup' was replaced by 'unregister'",
+            ),
+            (["cleanup-retired"], "'cleanup-retired' was replaced by 'purge-retired'"),
+            (["resolve", "mtp", "x"], "'resolve' was replaced by 'path'"),
+            (["all", "--install"], "bc250-model apply all"),
+        )
+        for argv, expected in cases:
+            with self.subTest(argv=argv), self.assertRaisesRegex(
+                modelctl.ModelError, expected
+            ):
+                modelctl.main(argv)
+
+
+    def test_active_package_callers_use_new_model_manager_lifecycle(self) -> None:
+        callers = (
+            "cmd/system/install.sh",
+            "models/coding-agent/setup-ollama.sh",
+            "models/embedding/setup-ollama.sh",
+            "models/task-model/setup-ollama.sh",
+            "models/ocr/bc250-ocr.sh",
+            "models/mtp/run-mtp-llamacpp.sh",
+            "quality-checks/main/10-main-model-candidate-matrix.sh",
+            "quality-checks/task/10-candidate-screen.sh",
+            "quality-checks/translation/10-direct-candidate-screen.sh",
+            "quality-checks/translation/20-owui-candidate-screen.sh",
+            "quality-checks/package/installed-assets.sh",
+            "scripts/validate.py",
+        )
+        forbidden = (
+            "bc250-model install",
+            "bc250-model cleanup",
+            "bc250-model cleanup-retired",
+            "bc250-model resolve",
+            '"$MANAGER" install',
+            '"$MANAGER" resolve',
+            "--keep-gguf",
+            "sudo bc250-model list",
+            "sudo bc250-model path",
+        )
+        for relative in callers:
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            for old in forbidden:
+                self.assertNotIn(old, text, f"{relative}: stale model-manager call {old}")
+
+    def test_global_source_override_requires_exactly_one_selected_model(self) -> None:
+        catalogs = [
+            ({"category": "production"}, [{"category": "production", "id": "p", "name": "prod-p"}]),
+            ({"category": "task"}, [{"category": "task", "id": "t", "name": "task-t"}]),
+        ]
+        selected = [catalogs[0][1][0], catalogs[1][1][0]]
+        for field, value in (("revision", "main"), ("sha256", "a" * 64)):
+            args = modelctl.argparse.Namespace(
+                command="refresh", quiet=False, revision=None, sha256=None
+            )
+            setattr(args, field, value)
+            with (
+                self.subTest(field=field),
+                self.assertRaisesRegex(modelctl.ModelError, "require one selected model"),
+                patch.object(modelctl, "operate_models") as operate,
+            ):
+                modelctl.run_all_catalog_operation(catalogs, selected, args)
+            operate.assert_not_called()
+
+    def test_explicit_mtp_apply_can_select_packaged_disabled_candidate(self) -> None:
+        defaults = {"category": "mtp", "destination": "/tmp/mtp", "download_namespace": "mtp"}
+        model = {
+            "category": "mtp", "id": "qwen3.6-27b-mtp", "provider": "download-only",
+            "enabled": False, "index": 32,
+        }
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "load_models", return_value=(defaults, [model])),
+            patch.object(modelctl, "print_catalog_models"),
+            patch.object(modelctl, "run_category_operation", return_value=0) as run,
+        ):
+            self.assertEqual(
+                modelctl.main([
+                    "apply", "mtp", "qwen3.6-27b-mtp", "--include-disabled"
+                ]),
+                0,
+            )
+        self.assertEqual(run.call_args.args[1], [model])
+
+    def test_apply_all_switches_modes_around_agent_models(self) -> None:
         catalogs = [
             ({"category": "production"}, [{"category": "production", "id": "p", "name": "prod-p"}]),
             ({"category": "task"}, [{"category": "task", "id": "t", "name": "task-t"}]),
@@ -377,7 +463,7 @@ class CategoryInterfaceTests(unittest.TestCase):
             ({"category": "mtp"}, [{"category": "mtp", "id": "m", "name": "mtp-m"}]),
         ]
         selected = [model for _defaults, models in catalogs for model in models]
-        args = modelctl.argparse.Namespace(command="install")
+        args = modelctl.argparse.Namespace(command="apply", quiet=False)
         operations = []
         modes = []
 
@@ -389,32 +475,63 @@ class CategoryInterfaceTests(unittest.TestCase):
             patch.object(modelctl, "set_appliance_mode", side_effect=modes.append),
             patch.object(modelctl, "operate_models", side_effect=operate),
         ):
-            self.assertEqual(modelctl.run_all_catalog_operation(catalogs, selected, args), 0)
+            self.assertEqual(
+                modelctl.run_all_catalog_operation(catalogs, selected, args), 0
+            )
 
         self.assertEqual(modes, ["normal", "agent", "normal"])
-        self.assertEqual(operations, ["production", "task", "embedding", "agentic", "mtp"])
+        self.assertEqual(
+            operations, ["production", "task", "embedding", "agentic", "mtp"]
+        )
 
-    def test_cleanup_confirmation_happens_before_mode_switch(self) -> None:
+    def test_unregister_confirmation_happens_before_mode_switch(self) -> None:
         defaults = {
             "category": "agentic",
             "ollama_host": "127.0.0.1:11436",
             "destination": "/tmp",
         }
         model = {
-            "category": "agentic", "id": "a", "name": "agent-a",
-            "provider": "ollama", "from": "/tmp/a.gguf", "gguf": "a.gguf",
+            "category": "agentic",
+            "id": "a",
+            "name": "agent-a",
+            "provider": "ollama",
+            "from": "/tmp/a.gguf",
+            "gguf": "a.gguf",
         }
         args = modelctl.argparse.Namespace(
-            command="cleanup", yes=False, keep_gguf=False, host=None, destination=None
+            command="unregister", yes=False, host=None, destination=None
         )
         with (
             patch.object(modelctl, "prompt_line", return_value="n"),
             patch.object(modelctl, "set_appliance_mode") as mode,
         ):
-            self.assertEqual(modelctl.run_category_operation(defaults, [model], args), 0)
+            self.assertEqual(
+                modelctl.run_category_operation(defaults, [model], args), 0
+            )
         mode.assert_not_called()
 
-    def test_all_cleanup_dispatches_each_selected_category(self) -> None:
+    def test_remove_all_without_selection_does_not_implicitly_select_everything(self) -> None:
+        catalogs = [
+            (
+                {"category": "production"},
+                [{"category": "production", "id": "p", "name": "prod-p", "provider": "ollama"}],
+            ),
+            (
+                {"category": "mtp"},
+                [{"category": "mtp", "id": "m", "name": "mtp-m", "provider": "download-only", "enabled": False}],
+            ),
+        ]
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "load_all_catalogs", return_value=catalogs),
+            patch.object(modelctl, "print_catalogs_basic"),
+            patch.object(modelctl, "prompt_line", return_value=""),
+            patch.object(modelctl, "run_all_catalog_operation") as run,
+        ):
+            self.assertEqual(modelctl.main(["remove", "all", "--yes"]), 0)
+        run.assert_not_called()
+
+    def test_all_remove_dispatches_each_selected_category(self) -> None:
         catalogs = [
             (
                 {"category": "production"},
@@ -426,16 +543,16 @@ class CategoryInterfaceTests(unittest.TestCase):
             ),
         ]
         selected = [catalogs[0][1][0], catalogs[1][1][0]]
-        args = modelctl.argparse.Namespace(command="cleanup", yes=True)
+        args = modelctl.argparse.Namespace(command="remove", yes=True, quiet=False)
         with (
             patch.object(modelctl, "set_appliance_mode"),
-            patch.object(modelctl, "cleanup_models", return_value=0) as cleanup,
+            patch.object(modelctl, "remove_models", return_value=0) as remove,
         ):
             self.assertEqual(
                 modelctl.run_all_catalog_operation(catalogs, selected, args), 0
             )
-        self.assertEqual(cleanup.call_count, 2)
-        self.assertTrue(all(call.args[2].yes for call in cleanup.call_args_list))
+        self.assertEqual(remove.call_count, 2)
+        self.assertTrue(all(call.args[2].yes for call in remove.call_args_list))
 
 
 class SelectionTests(unittest.TestCase):
@@ -484,6 +601,34 @@ class SelectionTests(unittest.TestCase):
 
 
 class StatusTests(unittest.TestCase):
+    def test_disabled_mtp_status_recommends_an_action_that_can_select_it(self) -> None:
+        model = {
+            "id": "qwen3.6-27b-mtp",
+            "category": "mtp",
+            "provider": "download-only",
+            "enabled": False,
+        }
+        missing = modelctl.ModelInspection(
+            model=model, source_path=None, state_path=None, source_status="missing",
+            source_detail="not downloaded", source_checksum="", runtime_modelfile=None,
+            modelfile_status="not applicable", registration_status="not applicable",
+            overall_status="MISSING", remote_status="not checked", remote_detail="",
+        )
+        self.assertEqual(
+            modelctl.recommended_status_action(missing),
+            "sudo bc250-fetch-mtp qwen3.6-27b-mtp",
+        )
+        update = modelctl.ModelInspection(
+            model=model, source_path=None, state_path=None, source_status="current",
+            source_detail="verified", source_checksum="a" * 64, runtime_modelfile=None,
+            modelfile_status="not applicable", registration_status="not applicable",
+            overall_status="CURRENT", remote_status="update available", remote_detail="remote differs",
+        )
+        self.assertEqual(
+            modelctl.recommended_status_action(update),
+            "sudo bc250-model refresh mtp qwen3.6-27b-mtp --include-disabled",
+        )
+
     def test_combined_status_handles_protected_sources_and_unmanaged_models(
         self,
     ) -> None:

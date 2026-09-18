@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Discover BC-250 Modelfiles, download their GGUFs and register them."""
+"""Manage BC-250 model catalog, verified local sources and runtime registrations."""
 
 from __future__ import annotations
 
@@ -18,6 +18,10 @@ import stat
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
 from pathlib import Path
 
 import tomllib
@@ -93,6 +97,24 @@ class ModelError(RuntimeError):
     """A concise error suitable for command-line output."""
 
 
+@dataclass(frozen=True)
+class ModelInspection:
+    """Read-only view of one catalog entry across source and runtime state."""
+
+    model: dict
+    source_path: Path | None
+    state_path: Path | None
+    source_status: str
+    source_detail: str
+    source_checksum: str
+    runtime_modelfile: Path | None
+    modelfile_status: str
+    registration_status: str
+    overall_status: str
+    remote_status: str = "not checked"
+    remote_detail: str = ""
+
+
 def set_appliance_mode(mode: str) -> None:
     """Switch the package-defined Ollama topology before registration work."""
     if mode not in {"normal", "agent"}:
@@ -111,9 +133,11 @@ def set_appliance_mode(mode: str) -> None:
 
 
 def operate_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
-    if args.command == "cleanup":
-        return cleanup_models(defaults, models, args)
-    return install_models(defaults, models, args)
+    if args.command in {"apply", "refresh"}:
+        return apply_models(defaults, models, args)
+    if args.command in {"unregister", "remove"}:
+        return remove_models(defaults, models, args)
+    raise ModelError(f"unsupported model operation: {args.command}")
 
 
 def canonical_category(value: str) -> str:
@@ -315,6 +339,9 @@ def discover_models(directories: list[Path]) -> list[dict]:
         found_directory = True
         for path in sorted(directory.glob("*.Modelfile")):
             model = load_modelfile(path)
+            previous = discovered.get(model["name"])
+            if previous is not None:
+                model["overrides_origin"] = previous.get("origin", "catalog")
             discovered[model["name"]] = model
     if not found_directory:
         joined = ", ".join(str(path) for path in directories)
@@ -385,7 +412,19 @@ def load_models(
 ) -> tuple[dict, list[dict]]:
     canonical = canonical_category(category)
     if canonical == "mtp":
-        return load_mtp_catalog(source or default_mtp_catalog())
+        defaults, models = load_mtp_catalog(source or default_mtp_catalog())
+        # MTP is a separate TOML catalog, but displayed indexes are global across
+        # every bc250-model view. Keep the same MTP index whether the operator
+        # lists only MTP entries or the combined catalog.
+        next_index = len(discover_models(model_directories(directories)))
+        normalized: list[dict] = []
+        for model in models:
+            value = dict(model)
+            value["category"] = "mtp"
+            value["index"] = next_index
+            next_index += 1
+            normalized.append(value)
+        return defaults, normalized
     if source is not None:
         raise ModelError("--source is only supported for the MTP catalog")
     defaults = dict(CATEGORY_DEFAULTS[canonical])
@@ -571,7 +610,7 @@ def retired_present(item: dict, registrations: dict[str, set[str] | None]) -> bo
     return source.exists() or state_path(source).exists() or runtime.exists() or registered
 
 
-def cleanup_retired(*, yes: bool) -> int:
+def purge_retired(*, yes: bool) -> int:
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
     retired = load_retired_models()
@@ -741,31 +780,233 @@ def load_state(path: Path) -> dict:
 
 
 def state_matches(state: dict, model: dict, output: Path) -> bool:
-    """Validate the current GGUF, using stat metadata only as a safe fast path."""
+    """Compatibility helper backed by the canonical source-state inspector."""
+    return inspect_local_source(state, model, output)[0] == "current"
+
+
+def inspect_local_source(state: dict, model: dict, output: Path) -> tuple[str, str, str]:
+    """Return (status, detail, checksum) for one manager-owned GGUF."""
     if not output.is_file():
-        return False
-    stat = output.stat()
-    if stat.st_size <= 0:
-        return False
+        return "missing", "GGUF is not present", ""
+    try:
+        stat_result = output.stat()
+    except OSError as error:
+        return "unavailable", f"cannot stat GGUF: {error}", ""
+    if stat_result.st_size <= 0:
+        return "drift", "GGUF is empty", ""
+    if not state:
+        return "drift", "state sidecar is missing or invalid", ""
+
     recorded = str(state.get("sha256", ""))
-    expected = model.get("sha256", "")
+    expected = str(model.get("sha256", ""))
     provenance = ("repository", "revision", "gguf")
-    if (
-        not all(state.get(key) == model[key] for key in provenance)
-        or re.fullmatch(r"[0-9a-f]{64}", recorded) is None
-        or (expected and recorded != expected)
-    ):
-        return False
+    changed = [key for key in provenance if state.get(key) != model.get(key)]
+    if changed:
+        return "drift", f"state provenance differs: {', '.join(changed)}", recorded
+    if re.fullmatch(r"[0-9a-f]{64}", recorded) is None:
+        return "drift", "state sidecar has no valid SHA-256", ""
+    if expected and recorded != expected:
+        return "drift", "recorded SHA-256 differs from current catalog pin", recorded
+
     if (
         state.get("schema") in {2, 3}
-        and state.get("size") == stat.st_size
-        and state.get("mtime_ns") == stat.st_mtime_ns
-        and state.get("ctime_ns") == stat.st_ctime_ns
+        and state.get("size") == stat_result.st_size
+        and state.get("mtime_ns") == stat_result.st_mtime_ns
+        and state.get("ctime_ns") == stat_result.st_ctime_ns
     ):
-        return True
-    # Old sidecars and files whose stat metadata changed are re-hashed. This
-    # catches corruption/modification without reading multi-GiB GGUFs on every list/install.
-    return sha256(output) == recorded
+        return "current", "verified by recorded file identity", recorded
+
+    try:
+        actual = sha256(output)
+    except OSError as error:
+        return "unavailable", f"cannot hash GGUF: {error}", recorded
+    if actual != recorded:
+        return "drift", "GGUF content differs from recorded SHA-256", recorded
+    return "current", "verified by SHA-256", recorded
+
+
+def rendered_modelfile_content(source: Path, model: dict, output: Path | None) -> str:
+    """Render the runtime Modelfile without mutating the filesystem."""
+    rendered: list[str] = []
+    for line in source.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# Source: "):
+            line = f"# Source: {model['repository']} @ {model['revision']}"
+        elif line.startswith("# GGUF: "):
+            line = f"# GGUF: {model['gguf']}"
+        elif line.startswith("FROM ") and output is not None:
+            line = f"FROM {output}"
+        rendered.append(line)
+    return "\n".join(rendered) + "\n"
+
+
+def runtime_modelfile_path(
+    defaults: dict, model: dict, output: Path | None
+) -> Path | None:
+    if not model.get("modelfile"):
+        return None
+    configured = os.environ.get("MODELFILE_DIR") or defaults.get(
+        "modelfile_destination", ""
+    )
+    if configured:
+        return Path(configured) / model["modelfile"]
+    if output is not None:
+        return output.parent / model["modelfile"]
+    return Path(model["template"])
+
+
+def inspect_runtime_modelfile(
+    model: dict, runtime: Path | None, output: Path | None
+) -> tuple[str, str]:
+    if model["provider"] == "download-only":
+        return "not applicable", "download-only model"
+    if runtime is None:
+        return "unavailable", "runtime Modelfile path is unavailable"
+    try:
+        expected = rendered_modelfile_content(model["template"], model, output)
+    except OSError as error:
+        return "unavailable", f"cannot render catalog Modelfile: {error}"
+    try:
+        current = runtime.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return "missing", "runtime Modelfile is missing"
+    except OSError as error:
+        return "unavailable", f"cannot read runtime Modelfile: {error}"
+    if current == expected:
+        return "current", "matches current catalog definition"
+    return "drift", "runtime Modelfile differs from current catalog definition"
+
+
+def _strip_etag(value: str) -> str:
+    value = value.strip()
+    value = value.removeprefix("W/")
+    return value.strip('"')
+
+
+def remote_file_sha256(model: dict, token: str = "") -> str:
+    """Resolve a Hugging Face file SHA from response metadata without downloading it."""
+    revision = "main" if model["revision"] == "latest" else model["revision"]
+    repository = urllib.parse.quote(model["repository"], safe="/")
+    revision_q = urllib.parse.quote(revision, safe="")
+    filename = urllib.parse.quote(model["gguf"], safe="")
+    url = f"https://huggingface.co/{repository}/resolve/{revision_q}/{filename}"
+    headers = {"User-Agent": f"{PROJECT}/model-status"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, headers=headers, method="HEAD")
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            candidates = (
+                response.headers.get("X-Linked-Etag", ""),
+                response.headers.get("ETag", ""),
+            )
+    except (OSError, urllib.error.HTTPError, urllib.error.URLError) as error:
+        raise ModelError(f"remote metadata lookup failed: {error}") from error
+    for candidate in candidates:
+        digest = _strip_etag(candidate)
+        if digest.startswith("sha256:"):
+            digest = digest.removeprefix("sha256:")
+        if re.fullmatch(r"[0-9a-f]{64}", digest):
+            return digest
+    raise ModelError("remote metadata did not expose a comparable SHA-256")
+
+
+def status_token(token_file: Path | None) -> str:
+    if token_file:
+        try:
+            return token_file.read_text(encoding="utf-8").strip()
+        except OSError as error:
+            raise ModelError(f"cannot read token file {token_file}: {error}") from error
+    return os.environ.get("HF_TOKEN", "").strip()
+
+
+def inspect_model_state(
+    defaults: dict,
+    model: dict,
+    *,
+    registrations: set[str] | None = None,
+    destination: str | None = None,
+    online: bool = False,
+    token: str = "",
+) -> ModelInspection:
+    """Inspect catalog, local source, runtime Modelfile and registration as one contract."""
+    output: Path | None = None
+    metadata: Path | None = None
+    source_checksum = ""
+    if model["provider"] == "ollama-hf":
+        source_status = "ollama-managed"
+        source_detail = "source/model projector blobs are managed by Ollama"
+    else:
+        output = model_path(defaults, model, destination)
+        metadata = state_path(output)
+        state = load_state(metadata)
+        source_status, source_detail, source_checksum = inspect_local_source(
+            state, model, output
+        )
+
+    runtime = runtime_modelfile_path(defaults, model, output)
+    modelfile_status, _modelfile_detail = inspect_runtime_modelfile(
+        model, runtime, output
+    )
+
+    if model["provider"] == "download-only":
+        registration_status = "not applicable"
+    elif registrations is None:
+        registration_status = "unavailable"
+    elif model["name"] in registrations:
+        registration_status = "current"
+    else:
+        registration_status = "missing"
+
+    statuses = {source_status, modelfile_status, registration_status}
+    if source_status == "missing":
+        overall = "MISSING"
+    elif "drift" in statuses or "missing" in statuses:
+        overall = "DRIFT"
+    elif "unavailable" in statuses:
+        overall = "UNKNOWN"
+    else:
+        overall = "CURRENT"
+
+    remote_status = "not checked"
+    remote_detail = ""
+    if online:
+        if model["revision"] != "latest":
+            remote_status = "pinned"
+            remote_detail = f"catalog pins revision {model['revision']}"
+        elif model["provider"] == "ollama-hf":
+            remote_status = "unavailable"
+            remote_detail = "Ollama-managed source cannot be compared to manager-owned GGUF state"
+        elif source_status != "current" or not source_checksum:
+            remote_status = "unavailable"
+            remote_detail = "local source is not verified, so update comparison is unsafe"
+        else:
+            try:
+                remote_checksum = remote_file_sha256(model, token)
+            except ModelError as error:
+                remote_status = "unavailable"
+                remote_detail = str(error)
+            else:
+                if remote_checksum == source_checksum:
+                    remote_status = "current"
+                    remote_detail = "remote file SHA-256 matches local verified source"
+                else:
+                    remote_status = "update available"
+                    remote_detail = f"remote SHA-256 {remote_checksum}"
+
+    return ModelInspection(
+        model=model,
+        source_path=output,
+        state_path=metadata,
+        source_status=source_status,
+        source_detail=source_detail,
+        source_checksum=source_checksum,
+        runtime_modelfile=runtime,
+        modelfile_status=modelfile_status,
+        registration_status=registration_status,
+        overall_status=overall,
+        remote_status=remote_status,
+        remote_detail=remote_detail,
+    )
 
 
 def sha256(path: Path) -> str:
@@ -1046,56 +1287,10 @@ def remove_hf_backing_registration(ollama_bin: str, host: str, model: dict) -> N
 
 
 
-def registration_current(
-    name: str,
-    registrations: set[str] | None,
-    *,
-    refresh: bool,
-    source_changed: bool,
-    template_changed: bool,
-) -> bool:
-    return (
-        not refresh
-        and not source_changed
-        and not template_changed
-        and registrations is not None
-        and name in registrations
-    )
-
-def registration_drift_reason(
-    name: str,
-    registrations: set[str] | None,
-    *,
-    refresh: bool,
-    source_changed: bool,
-    template_changed: bool,
-) -> str:
-    reasons: list[str] = []
-    if refresh:
-        reasons.append("refresh requested")
-    if source_changed:
-        reasons.append("GGUF/source changed")
-    if template_changed:
-        reasons.append("Modelfile changed")
-    if registrations is None:
-        reasons.append("registration state unavailable")
-    elif name not in registrations:
-        reasons.append("registration missing")
-    return ", ".join(reasons) or "registration reconciliation required"
-
-def render_modelfile(
+def write_runtime_modelfile(
     source: Path, model: dict, output: Path | None, destination: Path
 ) -> bool:
-    rendered: list[str] = []
-    for line in source.read_text(encoding="utf-8").splitlines():
-        if line.startswith("# Source: "):
-            line = f"# Source: {model['repository']} @ {model['revision']}"
-        elif line.startswith("# GGUF: "):
-            line = f"# GGUF: {model['gguf']}"
-        elif line.startswith("FROM ") and output is not None:
-            line = f"FROM {output}"
-        rendered.append(line)
-    content = "\n".join(rendered) + "\n"
+    content = rendered_modelfile_content(source, model, output)
     try:
         if destination.read_text(encoding="utf-8") == content:
             return False
@@ -1111,11 +1306,35 @@ def render_modelfile(
     return True
 
 
-def install_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
+def reconciliation_reason(
+    inspection: ModelInspection,
+    *,
+    force_download: bool,
+    source_changed: bool,
+    template_changed: bool,
+) -> str:
+    reasons: list[str] = []
+    if force_download:
+        reasons.append("refresh requested")
+    if source_changed:
+        reasons.append("GGUF/source changed")
+    if template_changed:
+        reasons.append("Modelfile changed")
+    if inspection.registration_status == "unavailable":
+        reasons.append("registration state unavailable")
+    elif inspection.registration_status != "current":
+        reasons.append("registration missing")
+    return ", ".join(reasons) or "registration reconciliation required"
+
+
+def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
+    """Converge selected models to the current catalog definition."""
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
     if len(models) != 1 and (args.revision is not None or args.sha256 is not None):
         raise ModelError("--revision and --sha256 require one selected model")
+
+    force_download = args.command == "refresh"
     uid, gid = ollama_identity()
     command_path("runuser")
     needs_download = any(m["provider"] != "ollama-hf" for m in models)
@@ -1157,37 +1376,39 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         expected = model.get("sha256", "")
         if expected and re.fullmatch(r"[0-9a-f]{64}", expected) is None:
             raise ModelError("--sha256 must be 64 lowercase hexadecimal characters")
+
         label = model.get("name", model["id"])
         print(f"\n>>> {label} [{model['provider']}]")
         try:
+            inspection = inspect_model_state(
+                defaults,
+                model,
+                registrations=registrations,
+                destination=args.destination or os.environ.get("DEST"),
+            )
             if model["provider"] == "ollama-hf":
-                if (
-                    args.revision is not None
-                    or args.sha256 is not None
-                    or args.destination
-                ):
+                if args.revision is not None or args.sha256 is not None or args.destination:
                     raise ModelError(
                         "remote Ollama-managed models do not accept source overrides"
                     )
-                runtime_template = (
-                    modelfile_root / model["modelfile"]
-                    if modelfile_root
-                    else model["template"]
+                runtime_template = inspection.runtime_modelfile or model["template"]
+                template_changed = write_runtime_modelfile(
+                    model["template"], model, None, runtime_template
                 )
-                template_changed = False
-                if modelfile_root:
-                    template_changed = render_modelfile(model["template"], model, None, runtime_template)
-                    os.chown(runtime_template, 0, gid)
-                    os.chmod(runtime_template, 0o640)
-                if registration_current(
-                    model["name"], registrations, refresh=args.refresh,
-                    source_changed=False, template_changed=template_changed,
+                os.chown(runtime_template, 0, gid)
+                os.chmod(runtime_template, 0o640)
+                if (
+                    not force_download
+                    and not template_changed
+                    and inspection.registration_status == "current"
                 ):
                     print("    already current; skipping")
                     continue
-                reason = registration_drift_reason(
-                    model["name"], registrations, refresh=args.refresh,
-                    source_changed=False, template_changed=template_changed,
+                reason = reconciliation_reason(
+                    inspection,
+                    force_download=force_download,
+                    source_changed=False,
+                    template_changed=template_changed,
                 )
                 print(f"    registration drift: {reason}; reconciling")
                 result = run_as_ollama(
@@ -1201,18 +1422,19 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 remove_hf_backing_registration(ollama_bin, host, model)
                 print("    registered with Ollama; source blobs are Ollama-managed")
                 continue
-            output = model_path(
+
+            output = inspection.source_path or model_path(
                 defaults, model, args.destination or os.environ.get("DEST")
             )
             ensure_directory(output.parent, uid, gid)
             metadata = state_path(output)
-            state = load_state(metadata)
             source_changed = True
-            if state_matches(state, model, output) and not args.refresh:
+            if inspection.source_status == "current" and not force_download:
                 source_changed = False
-                checksum = state["sha256"]
+                checksum = inspection.source_checksum
                 permissions_changed = ensure_file_permissions(output, 0, gid, 0o640)
                 current = output.stat()
+                state = load_state(metadata)
                 if (
                     state.get("schema") != 3
                     or state.get("size") != current.st_size
@@ -1231,7 +1453,10 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 free = shutil.disk_usage(output.parent).free
                 print(f"    filesystem free: {free / 1024**3:.1f} GiB")
                 if free < LOW_FREE_BYTES:
-                    print("    WARNING: low filesystem headroom before model download", file=sys.stderr)
+                    print(
+                        "    WARNING: low filesystem headroom before model download",
+                        file=sys.stderr,
+                    )
                 if minimum and free < minimum:
                     raise ModelError(
                         f"{free / 1024**3:.1f} GiB free; {minimum / 1024**3:.1f} GiB required"
@@ -1281,23 +1506,27 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                 print("    ready for llama.cpp")
                 continue
 
-            runtime_template = (
-                modelfile_root / model["modelfile"]
-                if modelfile_root
-                else output.parent / model["modelfile"]
+            runtime_template = inspection.runtime_modelfile or (
+                output.parent / model["modelfile"]
             )
-            template_changed = render_modelfile(model["template"], model, output, runtime_template)
+            template_changed = write_runtime_modelfile(
+                model["template"], model, output, runtime_template
+            )
             os.chown(runtime_template, 0, gid)
             os.chmod(runtime_template, 0o640)
-            if registration_current(
-                model["name"], registrations, refresh=args.refresh,
-                source_changed=source_changed, template_changed=template_changed,
+            if (
+                not force_download
+                and not source_changed
+                and not template_changed
+                and inspection.registration_status == "current"
             ):
                 print("    already current; skipping")
                 continue
-            reason = registration_drift_reason(
-                model["name"], registrations, refresh=args.refresh,
-                source_changed=source_changed, template_changed=template_changed,
+            reason = reconciliation_reason(
+                inspection,
+                force_download=force_download,
+                source_changed=source_changed,
+                template_changed=template_changed,
             )
             print(f"    registration drift: {reason}; reconciling")
             result = run_as_ollama(
@@ -1312,6 +1541,7 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
         except (ModelError, OSError) as error:
             print(f"    ERROR: {error}", file=sys.stderr)
             failures.append(label)
+
     if failures:
         print(f"\nFailed: {' '.join(failures)}", file=sys.stderr)
         return 2
@@ -1319,14 +1549,14 @@ def install_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     return 0
 
 
-def show_cleanup_plan(
+def show_removal_plan(
     groups: list[tuple[dict, list[dict]]], args: argparse.Namespace
 ) -> None:
-    print("Cleanup plan:")
-    keep = getattr(args, "keep_gguf", False)
+    keep_source = args.command == "unregister"
+    title = "Unregister plan:" if keep_source else "Removal plan:"
+    print(title)
     for defaults, models in groups:
         host = ollama_host(defaults, getattr(args, "host", None))
-        runtime_root = defaults.get("modelfile_destination")
         for model in models:
             label = model.get("name", model["id"])
             print(f"\n{label}")
@@ -1334,28 +1564,48 @@ def show_cleanup_plan(
                 print(f"  Registration: remove from {host}")
             else:
                 print("  Registration: none (download-only)")
-            if runtime_root and model.get("modelfile"):
-                print(f"  Runtime Modelfile: remove {Path(runtime_root) / model['modelfile']}")
+            runtime = runtime_modelfile_path(
+                defaults,
+                model,
+                None if model["provider"] == "ollama-hf" else model_path(
+                    defaults, model, getattr(args, "destination", None)
+                ),
+            )
+            if runtime and model["provider"] != "download-only":
+                print(f"  Runtime Modelfile: remove {runtime}")
             if model["provider"] == "ollama-hf":
                 print("  Manager-owned source: none (Ollama-managed model/projector blobs)")
             else:
                 output = model_path(defaults, model, getattr(args, "destination", None))
-                size = f" ({output.stat().st_size / 1024**3:.1f} GiB)" if output.is_file() else ""
-                action = "retain" if keep else "remove"
+                try:
+                    size = (
+                        f" ({output.stat().st_size / 1024**3:.1f} GiB)"
+                        if output.is_file()
+                        else ""
+                    )
+                except OSError:
+                    size = ""
+                action = "retain" if keep_source else "remove"
                 print(f"  Manager-owned source: {action} {output}{size}")
                 print(f"  State sidecar: {action} {state_path(output)}")
-            print("  Packaged/source Modelfile definition: retain")
+            print("  Catalog definition: retain")
 
 
-def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
+def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
+    """Unregister or fully remove selected manager-owned model state."""
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
+    keep_source = args.command == "unregister"
+    if keep_source and any(model["provider"] == "download-only" for model in models):
+        raise ModelError("download-only MTP models have no registration; use 'remove'")
     if not args.yes:
-        show_cleanup_plan([(defaults, models)], args)
+        show_removal_plan([(defaults, models)], args)
         names = ", ".join(model.get("name", model["id"]) for model in models)
-        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
-            print("Cleanup cancelled.")
+        verb = "Unregister" if keep_source else "Remove"
+        if prompt_line(f"{verb} {names}? [y/N] ").lower() not in {"y", "yes"}:
+            print(f"{verb} cancelled.")
             return 0
+
     _uid, _gid = ollama_identity()
     host = ollama_host(defaults, getattr(args, "host", None))
     ollama_bin = shutil.which("ollama")
@@ -1363,7 +1613,8 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
     removed = 0
     for model in models:
         label = model.get("name", model["id"])
-        print(f"\n>>> removing {label}")
+        verb = "unregistering" if keep_source else "removing"
+        print(f"\n>>> {verb} {label}")
         if model["provider"].startswith("ollama"):
             if not ollama_bin:
                 print(
@@ -1385,53 +1636,78 @@ def cleanup_models(defaults: dict, models: list[dict], args: argparse.Namespace)
                     )
                     failures.append(label)
                     continue
-        paths: list[Path] = []
+
         output = None
-        retained: list[Path] = []
         if model["provider"] != "ollama-hf":
             output = model_path(defaults, model, getattr(args, "destination", None))
-            if args.keep_gguf:
-                retained.extend((output, state_path(output)))
-            else:
-                paths.extend((output, state_path(output)))
-        elif args.keep_gguf:
+        elif keep_source:
             print(
                 "    no manager-owned GGUF/state to retain; "
                 "multimodal source/projector blobs are Ollama-managed"
             )
-        destination = defaults.get("modelfile_destination")
-        if destination and model.get("modelfile"):
-            paths.append(Path(destination) / model["modelfile"])
+        runtime = runtime_modelfile_path(defaults, model, output)
+        paths: list[Path] = []
+        if runtime and model["provider"] != "download-only":
+            paths.append(runtime)
+        if output is not None and not keep_source:
+            paths.extend((output, state_path(output)))
         for path in paths:
             if path.exists():
                 path.unlink()
                 print(f"    removed {path}")
-        if output is not None and not args.keep_gguf:
+        if output is not None and keep_source:
+            for path in (output, state_path(output)):
+                if path.exists():
+                    print(f"    retained local source {path}")
+        if output is not None and not keep_source:
             try:
                 output.parent.rmdir()
             except OSError:
                 pass
-        for path in retained:
-            if path.exists():
-                print(f"    retained local source {path}")
         removed += 1
-    suffix = (
-        " Manager-owned local GGUF/state retained where present."
-        if args.keep_gguf
-        else " Manager-owned local GGUF/state removed where present."
-    )
-    print(f"\nRemoved {removed} model(s). Source Modelfiles were retained.{suffix}")
+
+    if keep_source:
+        print(
+            f"\nUnregistered {removed} model(s). Verified GGUF/state retained where present."
+        )
+    else:
+        print(
+            f"\nRemoved {removed} model(s). Catalog definitions were retained; "
+            "manager-owned GGUF/state removed where present."
+        )
     if failures:
         print(f"Failed: {' '.join(failures)}", file=sys.stderr)
         return 2
     return 0
 
 
+
+class FriendlyArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise ModelError(message)
+
+
+CLI_EPILOG = """Common workflows:
+  bc250-model list
+  sudo bc250-model status agentic
+  sudo bc250-model apply agentic MODEL
+  sudo bc250-model refresh agentic MODEL
+  sudo bc250-model unregister agentic MODEL
+  sudo bc250-model remove agentic MODEL
+  sudo bc250-model purge-retired
+
+Use 'bc250-model COMMAND --help' for command-specific options.
+"""
+
+
 def catalog_arguments(
     parser: argparse.ArgumentParser, *, category_optional: bool = False
 ) -> None:
     parser.add_argument(
-        "category", choices=CATEGORIES, nargs="?" if category_optional else None
+        "category",
+        choices=CATEGORIES,
+        nargs="?" if category_optional else None,
+        help="model category; use 'all' for the combined catalog",
     )
     parser.add_argument("--source", type=Path, help="alternate MTP TOML catalog")
     parser.add_argument(
@@ -1442,84 +1718,292 @@ def catalog_arguments(
     )
 
 
+def selection_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "selection",
+        nargs="?",
+        help="model id/index/range or comma-separated selection; also recommended, production or all",
+    )
+
+
+def mutation_common_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="suppress catalog and topology-transition chatter",
+    )
+    parser.add_argument(
+        "--host",
+        help="override the target Ollama API for this invocation",
+    )
+    parser.add_argument(
+        "--destination",
+        help="override the manager-owned GGUF destination root",
+    )
+
+
+def apply_arguments(parser: argparse.ArgumentParser) -> None:
+    catalog_arguments(parser, category_optional=True)
+    selection_arguments(parser)
+    mutation_common_arguments(parser)
+    parser.add_argument(
+        "--revision",
+        help="one-model source revision override for this invocation",
+    )
+    parser.add_argument(
+        "--sha256",
+        help="one-model expected GGUF SHA-256 override for this invocation",
+    )
+    parser.add_argument(
+        "--min-free-bytes",
+        type=int,
+        help="minimum free bytes required before a source download",
+    )
+    parser.add_argument(
+        "--token-file",
+        type=Path,
+        help="Hugging Face token file for downloads",
+    )
+    parser.add_argument(
+        "--include-disabled",
+        action="store_true",
+        help="allow disabled MTP entries to be selected",
+    )
+
+
+def removal_arguments(parser: argparse.ArgumentParser) -> None:
+    catalog_arguments(parser, category_optional=True)
+    selection_arguments(parser)
+    mutation_common_arguments(parser)
+    parser.add_argument("--yes", action="store_true", help="skip confirmation")
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="bc250-model", description=__doc__)
-    commands = parser.add_subparsers(dest="command", required=True)
+    parser = FriendlyArgumentParser(
+        prog="bc250-model",
+        description=(
+            "Manage BC-250 model catalog definitions, verified local sources and "
+            "Ollama registrations."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=CLI_EPILOG,
+    )
+    commands = parser.add_subparsers(dest="command")
+
     listing = commands.add_parser(
         "list",
-        help="list discovered templates (run with sudo to inspect protected GGUF state)",
+        help="list catalog definitions without inspecting protected runtime state",
     )
     catalog_arguments(listing, category_optional=True)
     listing.add_argument(
         "--all", action="store_true", help="include disabled MTP entries"
     )
-    resolving = commands.add_parser("resolve", help="resolve one model id")
-    catalog_arguments(resolving)
-    resolving.add_argument("id")
-    installing = commands.add_parser(
-        "install", help="download and register selected models"
+
+    status = commands.add_parser(
+        "status",
+        help="inspect source, provenance, Modelfile and registration state",
     )
-    catalog_arguments(installing)
-    installing.add_argument("selection", nargs="?")
-    installing.add_argument("--list", action="store_true")
-    installing.add_argument(
-        "--quiet", action="store_true",
-        help="suppress the repeated model catalog and mode-transition chatter",
+    catalog_arguments(status, category_optional=True)
+    selection_arguments(status)
+    status.add_argument(
+        "--online",
+        action="store_true",
+        help="for moving revisions, compare the verified local GGUF with upstream metadata",
     )
-    installing.add_argument("--host")
-    installing.add_argument("--revision")
-    installing.add_argument("--sha256")
-    installing.add_argument("--destination")
-    installing.add_argument("--min-free-bytes", type=int)
-    installing.add_argument("--token-file", type=Path)
-    installing.add_argument(
+    status.add_argument(
+        "--token-file", type=Path, help="Hugging Face token file for --online"
+    )
+    status.add_argument(
+        "--verbose", action="store_true", help="show resolved source/runtime paths"
+    )
+    status.add_argument(
         "--include-disabled",
         action="store_true",
-        help="include disabled MTP entries for this invocation",
+        help="include disabled MTP entries",
     )
-    installing.add_argument("--refresh", action="store_true")
-    cleaning = commands.add_parser(
-        "cleanup", help="remove selected deployed models (requires sudo)"
+
+    path = commands.add_parser(
+        "path",
+        help="print the resolved source path and MTP context metadata for one model",
     )
-    catalog_arguments(cleaning)
-    cleaning.add_argument("selection", nargs="?")
-    cleaning.add_argument("--list", action="store_true")
-    cleaning.add_argument(
-        "--quiet", action="store_true",
-        help="suppress the repeated model catalog and mode-transition chatter",
+    catalog_arguments(path, category_optional=True)
+    path.add_argument("id", nargs="?", help="exact catalog model id")
+
+    applying = commands.add_parser(
+        "apply",
+        help="make selected models match the current catalog; reuse verified GGUFs",
     )
-    cleaning.add_argument("--yes", action="store_true")
-    cleaning.add_argument(
-        "--host",
-        help="override the target Ollama API; use the same override as installation",
+    apply_arguments(applying)
+
+    refreshing = commands.add_parser(
+        "refresh",
+        help="re-fetch selected model sources and then apply the current catalog",
     )
-    cleaning.add_argument(
-        "--destination",
-        help="override the GGUF root; use the same override as installation",
+    apply_arguments(refreshing)
+
+    unregistering = commands.add_parser(
+        "unregister",
+        help="remove Ollama registration/runtime Modelfile but retain GGUF and state",
     )
-    cleaning.add_argument(
-        "--keep-gguf",
-        action="store_true",
-        help="remove Ollama registration/runtime Modelfile but retain local GGUF and state sidecar",
+    removal_arguments(unregistering)
+
+    removing = commands.add_parser(
+        "remove",
+        help="remove registration plus manager-owned GGUF/state; retain catalog definition",
     )
+    removal_arguments(removing)
+
     retired = commands.add_parser(
-        "cleanup-retired", help="purge models explicitly retired by the package"
+        "purge-retired",
+        help="purge models explicitly retired by the package",
     )
-    retired.add_argument("--yes", action="store_true")
+    retired.add_argument("--yes", action="store_true", help="skip confirmation")
     return parser
 
 
-def require_admin_status(command: str) -> None:
-    if os.geteuid() == 0:
-        return
-    if command == "list":
+def legacy_cli_hint(argv: list[str]) -> str | None:
+    if not argv:
+        return None
+    first = argv[0]
+    if first in {"--install", "-install"}:
+        return "'--install' is not a command; use: sudo bc250-model apply <category> [selection]"
+    if first == "--refresh":
+        return "'--refresh' is now an explicit operation; use: sudo bc250-model refresh <category> [selection]"
+    if first == "install":
+        if "--refresh" in argv[1:]:
+            cleaned = " ".join(item for item in argv[1:] if item != "--refresh")
+            return f"'install --refresh' was replaced by 'refresh'; use: sudo bc250-model refresh {cleaned}".rstrip()
+        rest = " ".join(argv[1:])
+        return f"'install' was replaced by 'apply'; use: sudo bc250-model apply {rest}".rstrip()
+    if first == "cleanup":
+        keep = "--keep-gguf" in argv[1:]
+        rest = " ".join(item for item in argv[1:] if item != "--keep-gguf")
+        replacement = "unregister" if keep else "remove"
+        return f"'cleanup' was replaced by '{replacement}'; use: sudo bc250-model {replacement} {rest}".rstrip()
+    if first == "cleanup-retired":
+        return "'cleanup-retired' was replaced by 'purge-retired'; use: sudo bc250-model purge-retired"
+    if first == "resolve":
+        rest = " ".join(argv[1:])
+        return f"'resolve' was replaced by 'path'; use: bc250-model path {rest}".rstrip()
+    if first in CATEGORIES:
+        if "--install" in argv[1:] or "-install" in argv[1:]:
+            return f"command comes before category; use: sudo bc250-model apply {first} [selection]"
+        if "--refresh" in argv[1:]:
+            return f"command comes before category; use: sudo bc250-model refresh {first} [selection]"
+    return None
+
+
+def category_required(command: str) -> ModelError:
+    categories = ", ".join(CATEGORIES)
+    example = {
+        "apply": "sudo bc250-model apply agentic",
+        "refresh": "sudo bc250-model refresh agentic MODEL",
+        "unregister": "sudo bc250-model unregister agentic MODEL",
+        "remove": "sudo bc250-model remove agentic MODEL",
+        "path": "bc250-model path agentic MODEL",
+    }.get(command, f"bc250-model {command} agentic")
+    return ModelError(
+        f"{command}: model category is required; choose one of: {categories}. Example: {example}"
+    )
+
+
+def require_privilege(command: str) -> None:
+    if command == "status" and os.geteuid() != 0:
         raise ModelError(
-            "run 'sudo bc250-model list ...'; local GGUF/state directories are intentionally protected"
+            "status inspects protected GGUF/state directories; run: sudo bc250-model status ..."
         )
-    if command == "cleanup-retired":
-        raise ModelError(
-            "run 'sudo bc250-model cleanup-retired'; retired package-managed data is protected"
+    if command in {"apply", "refresh", "unregister", "remove", "purge-retired"} and os.geteuid() != 0:
+        raise ModelError(f"{command} changes package-managed model state; run with sudo")
+
+
+def definition_origin(model: dict) -> str:
+    origin = str(model.get("origin", "catalog"))
+    if model.get("overrides_origin"):
+        return f"{origin} override"
+    if model.get("category") == "mtp":
+        return "enabled" if model.get("enabled") else "disabled"
+    return origin
+
+
+def print_catalog_models(models: list[dict]) -> None:
+    for offset, model in enumerate(models):
+        index = model.get("index", offset)
+        label = model.get("name", model["id"])
+        details = [model["provider"], definition_origin(model)]
+        print(f"  {index:2d}) {label:<56} [{', '.join(details)}]")
+
+
+def print_catalogs_basic(
+    catalogs: list[tuple[dict, list[dict]]], *, include_disabled_mtp: bool
+) -> None:
+    for defaults, models in catalogs:
+        category = defaults["category"]
+        available = (
+            models
+            if category != "mtp" or include_disabled_mtp
+            else [model for model in models if model["enabled"]]
         )
+        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        print_catalog_models(available)
+
+
+def status_source_text(inspection: ModelInspection) -> str:
+    mapping = {
+        "current": "present, verified",
+        "missing": "missing",
+        "drift": "present, not current",
+        "unavailable": "unavailable",
+        "ollama-managed": "Ollama-managed",
+    }
+    return mapping.get(inspection.source_status, inspection.source_status)
+
+
+def recommended_status_action(inspection: ModelInspection) -> str | None:
+    model = inspection.model
+    category = model["category"]
+    name = model.get("name", model["id"])
+    if inspection.remote_status == "update available":
+        if category == "mtp" and not model.get("enabled", False):
+            return f"sudo bc250-model refresh mtp {name} --include-disabled"
+        return f"sudo bc250-model refresh {category} {name}"
+    if inspection.overall_status in {"MISSING", "DRIFT"}:
+        if category == "mtp" and not model.get("enabled", False):
+            return f"sudo bc250-fetch-mtp {name}"
+        return f"sudo bc250-model apply {category} {name}"
+    return None
+
+
+def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> None:
+    model = inspection.model
+    label = model.get("name", model["id"])
+    print(label)
+    print(f"  Definition:     {definition_origin(model)}")
+    print(f"  GGUF/source:    {status_source_text(inspection)}")
+    if inspection.source_status not in {"current", "ollama-managed"}:
+        print(f"    detail:       {inspection.source_detail}")
+    if model["provider"] != "download-only":
+        print(f"  Modelfile:      {inspection.modelfile_status}")
+        registration = {
+            "current": "present",
+            "missing": "missing",
+            "unavailable": "unavailable",
+        }.get(inspection.registration_status, inspection.registration_status)
+        print(f"  Registration:   {registration}")
+    print(f"  Upstream:       {inspection.remote_status}")
+    if inspection.remote_detail:
+        print(f"    detail:       {inspection.remote_detail}")
+    print(f"  Status:         {inspection.overall_status}")
+    action = recommended_status_action(inspection)
+    if action:
+        print(f"  Recommended:    {action}")
+    if verbose:
+        if inspection.source_path:
+            print(f"  Source path:    {inspection.source_path}")
+        if inspection.state_path:
+            print(f"  State sidecar:  {inspection.state_path}")
+        if inspection.runtime_modelfile:
+            print(f"  Runtime file:   {inspection.runtime_modelfile}")
+    print()
 
 
 def all_available_models(
@@ -1528,11 +2012,27 @@ def all_available_models(
     available: list[dict] = []
     for defaults, models in catalogs:
         category = defaults["category"]
-        if category == "mtp" and command != "cleanup" and not include_disabled:
+        if category == "mtp" and command == "unregister":
+            continue
+        if category == "mtp" and command in {"apply", "refresh", "status"} and not include_disabled:
             available.extend(model for model in models if model["enabled"])
         else:
             available.extend(models)
     return available
+
+
+def confirm_removal(
+    groups: list[tuple[dict, list[dict]]], selected: list[dict], args: argparse.Namespace
+) -> bool:
+    if args.yes:
+        return True
+    show_removal_plan(groups, args)
+    names = ", ".join(model.get("name", model["id"]) for model in selected)
+    verb = "Unregister" if args.command == "unregister" else "Remove"
+    if prompt_line(f"{verb} {names}? [y/N] ").lower() not in {"y", "yes"}:
+        print(f"{verb} cancelled.")
+        return False
+    return True
 
 
 def run_all_catalog_operation(
@@ -1540,15 +2040,25 @@ def run_all_catalog_operation(
     selected: list[dict],
     args: argparse.Namespace,
 ) -> int:
+    # Source overrides are deliberately a one-model operation. Enforce that
+    # invariant before the combined catalog is split into per-category groups.
+    if (
+        args.command in {"apply", "refresh"}
+        and len(selected) != 1
+        and (getattr(args, "revision", None) is not None or getattr(args, "sha256", None) is not None)
+    ):
+        raise ModelError("--revision and --sha256 require one selected model")
+
     selected_ids = {(model["category"], model["id"]) for model in selected}
     if (
-        args.command == "install"
+        args.command in {"apply", "refresh"}
         and os.environ.get("BC250_MODELCTL_SELECTION_SUMMARY") == "1"
     ):
         print("Selected models:")
         for model in selected:
             print(f"  {model.get('name', model['id'])}")
         print(f"\nProcessing {len(selected)} selected model(s)...")
+
     groups: dict[str, tuple[dict, list[dict]]] = {}
     for defaults, models in catalogs:
         chosen = [
@@ -1559,12 +2069,11 @@ def run_all_catalog_operation(
         if chosen:
             groups[defaults["category"]] = (defaults, chosen)
 
-    if args.command == "cleanup" and not args.yes:
-        show_cleanup_plan(list(groups.values()), args)
-        names = ", ".join(model.get("name", model["id"]) for model in selected)
-        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
-            print("Cleanup cancelled.")
+    if args.command in {"unregister", "remove"}:
+        if not confirm_removal(list(groups.values()), selected, args):
             return 0
+        args = argparse.Namespace(**vars(args))
+        args.yes = True
 
     status = 0
     normal_selected = any(category in groups for category in NORMAL_CATEGORIES)
@@ -1574,12 +2083,8 @@ def run_all_catalog_operation(
         set_appliance_mode("normal")
         for category in NORMAL_CATEGORIES:
             group = groups.get(category)
-            if not group:
-                continue
-            group_args = argparse.Namespace(**vars(args))
-            if args.command == "cleanup":
-                group_args.yes = True
-            status = max(status, operate_models(*group, group_args))
+            if group:
+                status = max(status, operate_models(*group, args))
 
     if agent_selected:
         quiet_mode = (
@@ -1587,40 +2092,32 @@ def run_all_catalog_operation(
             or os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1"
         )
         if quiet_mode:
-            print("Switching temporarily to exclusive agent mode for agent model setup.")
+            print("Switching temporarily to exclusive agent mode for agent model management.")
         set_appliance_mode("agent")
         try:
-            defaults, chosen = groups["agentic"]
-            group_args = argparse.Namespace(**vars(args))
-            if args.command == "cleanup":
-                group_args.yes = True
-            status = max(status, operate_models(defaults, chosen, group_args))
+            status = max(status, operate_models(*groups["agentic"], args))
         finally:
             set_appliance_mode("normal")
             if quiet_mode:
-                print("Normal mode restored after agent model setup.")
+                print("Normal mode restored after agent model management.")
 
     if "mtp" in groups:
-        defaults, chosen = groups["mtp"]
-        group_args = argparse.Namespace(**vars(args))
-        if args.command == "cleanup":
-            group_args.yes = True
-        status = max(status, operate_models(defaults, chosen, group_args))
-
+        status = max(status, operate_models(*groups["mtp"], args))
     return status
 
 
 def run_category_operation(
     defaults: dict, selected: list[dict], args: argparse.Namespace
 ) -> int:
-    if args.command == "cleanup" and not args.yes:
-        show_cleanup_plan([(defaults, selected)], args)
-        names = ", ".join(model.get("name", model["id"]) for model in selected)
-        if prompt_line(f"Remove {names}? [y/N] ").lower() not in {"y", "yes"}:
-            print("Cleanup cancelled.")
+    if args.command in {"unregister", "remove"}:
+        if not confirm_removal([(defaults, selected)], selected, args):
             return 0
-        args = argparse.Namespace(**vars(args)); args.yes = True
+        args = argparse.Namespace(**vars(args))
+        args.yes = True
+
     category = defaults["category"]
+    if category == "mtp" and args.command == "unregister":
+        raise ModelError("MTP models are download-only and cannot be unregistered; use 'remove'")
     if category == "mtp" or getattr(args, "host", None):
         return operate_models(defaults, selected, args)
     if category in NORMAL_CATEGORIES:
@@ -1635,151 +2132,208 @@ def run_category_operation(
     return operate_models(defaults, selected, args)
 
 
+def resolve_one_model(
+    category: str,
+    model_id: str,
+    *,
+    directories: list[Path] | None,
+    source: Path | None,
+) -> tuple[dict, dict]:
+    if category == "all":
+        for defaults, models in load_all_catalogs(directories=directories, source=source):
+            for model in models:
+                if model["id"] == model_id:
+                    return defaults, model
+        raise ModelError(f"model id not found: {model_id}")
+    defaults, models = load_models(category, directories=directories, source=source)
+    for model in models:
+        if model["id"] == model_id:
+            return defaults, model
+    raise ModelError(f"model id not found: {model_id}")
+
+
+def selected_models_for_catalog(
+    models: list[dict], selection: str | None, *, interactive: bool
+) -> list[dict]:
+    if not models:
+        return []
+    if selection is None and not interactive:
+        return models
+    if selection is None:
+        selection = prompt_line(
+            "Models (id/index/range/recommended/production/all; Enter to cancel): "
+        )
+    if not selection:
+        return []
+    return select_models(models, selection)
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         reconfigure = getattr(stream, "reconfigure", None)
         if reconfigure:
             reconfigure(line_buffering=True)
-    args = build_parser().parse_args(argv)
+
+    values = list(sys.argv[1:] if argv is None else argv)
+    parser = build_parser()
+    if not values:
+        parser.print_help()
+        return 0
+    if hint := legacy_cli_hint(values):
+        raise ModelError(hint)
+
+    args = parser.parse_args(values)
+    if args.command is None:
+        parser.print_help()
+        return 0
+    require_privilege(args.command)
     if getattr(args, "quiet", False):
         os.environ["BC250_MODELCTL_SUPPRESS_MODE_OUTPUT"] = "1"
         os.environ["BC250_MODELCTL_SUPPRESS_CATALOG"] = "1"
-    # One transient authentication decision is shared by all selected categories
-    # in this process, including a temporary switch into the agent lane.
     args.hf_session = {"resolved": False, "token": ""}
-    require_admin_status(args.command)
-    if args.command == "cleanup-retired":
-        return cleanup_retired(yes=args.yes)
+
+    if args.command == "purge-retired":
+        return purge_retired(yes=args.yes)
 
     source = args.source or (
         Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None
     )
     directories = args.modelfile_dir
 
-    if args.command == "list" and args.category is None:
-        if source or args.all:
-            raise ModelError("--source and --all require the MTP or all category")
-        print_all_models(model_directories(directories))
+    if args.command == "list":
+        category = args.category or "all"
+        if category == "all":
+            catalogs = load_all_catalogs(directories=directories, source=source)
+            print_catalogs_basic(catalogs, include_disabled_mtp=args.all)
+            return 0
+        defaults, models = load_models(category, directories=directories, source=source)
+        available = (
+            models
+            if category != "mtp" or args.all
+            else [model for model in models if model["enabled"]]
+        )
+        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        print_catalog_models(available)
         return 0
 
+    if args.command == "path":
+        if args.category is None:
+            raise category_required("path")
+        if not args.id:
+            raise ModelError(
+                "path: model id is required. Example: bc250-model path agentic MODEL"
+            )
+        defaults, model = resolve_one_model(
+            canonical_category(args.category),
+            args.id,
+            directories=directories,
+            source=source,
+        )
+        resolved = (
+            model["from"]
+            if model["provider"] == "ollama-hf"
+            else model_path(defaults, model)
+        )
+        print(f"{resolved}\t{model.get('context', '')}\t{model.get('draft', '')}")
+        return 0
+
+    if args.command == "status":
+        category = args.category or "all"
+        token = status_token(args.token_file) if args.online else ""
+        if category == "all":
+            catalogs = load_all_catalogs(directories=directories, source=source)
+            available = all_available_models(
+                catalogs,
+                command="status",
+                include_disabled=args.include_disabled,
+            )
+            selected = selected_models_for_catalog(
+                available, args.selection, interactive=False
+            )
+            selected_ids = {(model["category"], model["id"]) for model in selected}
+            registrations: dict[str, set[str] | None] = {}
+            for defaults, models in catalogs:
+                host = defaults.get("ollama_host")
+                if host and host not in registrations:
+                    registrations[host] = registered_models(host)
+                for model in models:
+                    if (model["category"], model["id"]) not in selected_ids:
+                        continue
+                    inspection = inspect_model_state(
+                        defaults,
+                        model,
+                        registrations=registrations.get(host) if host else None,
+                        online=args.online,
+                        token=token,
+                    )
+                    print_model_inspection(inspection, verbose=args.verbose)
+            return 0
+
+        defaults, models = load_models(category, directories=directories, source=source)
+        available = (
+            models
+            if category != "mtp" or args.include_disabled
+            else [model for model in models if model["enabled"]]
+        )
+        selected = selected_models_for_catalog(
+            available, args.selection, interactive=False
+        )
+        host = defaults.get("ollama_host")
+        registrations = registered_models(host) if host else None
+        for model in selected:
+            inspection = inspect_model_state(
+                defaults,
+                model,
+                registrations=registrations,
+                online=args.online,
+                token=token,
+            )
+            print_model_inspection(inspection, verbose=args.verbose)
+        return 0
+
+    if args.category is None:
+        raise category_required(args.command)
     category = canonical_category(args.category)
     if category == "all":
         catalogs = load_all_catalogs(directories=directories, source=source)
-        if args.command == "list":
-            print_catalogs(catalogs, include_disabled_mtp=args.all)
-            return 0
-        if args.command == "resolve":
-            for defaults, models in catalogs:
-                for model in models:
-                    if model["id"] != args.id:
-                        continue
-                    if defaults["category"] == "mtp" and not model["enabled"]:
-                        continue
-                    resolved = (
-                        model["from"]
-                        if model["provider"] == "ollama-hf"
-                        else model_path(defaults, model)
-                    )
-                    print(
-                        f"{resolved}\t{model.get('context', '')}\t{model.get('draft', '')}"
-                    )
-                    return 0
-            raise ModelError(f"model id not found: {args.id}")
-
         available = all_available_models(
             catalogs,
             command=args.command,
             include_disabled=getattr(args, "include_disabled", False),
         )
-        targeted_cleanup = (
-            args.command == "cleanup" and args.selection is not None and not args.list
-        )
-        if not targeted_cleanup and not getattr(args, "quiet", False) and os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") != "1":
-            print("Available all models:")
-            print_catalogs(
+        if not getattr(args, "quiet", False):
+            print("Available models:")
+            print_catalogs_basic(
                 catalogs,
                 include_disabled_mtp=(
-                    args.command == "cleanup" or getattr(args, "include_disabled", False)
+                    args.command == "remove"
+                    or getattr(args, "include_disabled", False)
                 ),
             )
-        if args.list:
-            return 0
-        if not available:
-            print("No selectable models were found.")
-            return 0
-        selection = args.selection
-        if selection is None and args.command == "cleanup":
-            selection = "all"
-        elif selection is None:
-            selection = prompt_line("Models (id/index/range/recommended/production/all; Enter to cancel): ")
-        if not selection:
+        selected = selected_models_for_catalog(
+            available, args.selection, interactive=True
+        )
+        if not selected:
             print("No models selected.")
             return 0
-        selected = select_models(available, selection)
         return run_all_catalog_operation(catalogs, selected, args)
 
-    defaults, models = load_models(
-        category,
-        directories=directories,
-        source=source,
-    )
-
-    if args.command == "list":
-        available = (
-            models
-            if category != "mtp" or args.all
-            else [m for m in models if m["enabled"]]
-        )
-        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
-        host = defaults.get("ollama_host")
-        print_models(defaults, available, registered_models(host) if host else None)
-        return 0
-    if args.command == "resolve":
-        for model in models:
-            if model["id"] == args.id and (category != "mtp" or model["enabled"]):
-                resolved = (
-                    model["from"]
-                    if model["provider"] == "ollama-hf"
-                    else model_path(defaults, model)
-                )
-                print(
-                    f"{resolved}\t{model.get('context', '')}\t{model.get('draft', '')}"
-                )
-                return 0
-        raise ModelError(f"model id not found: {args.id}")
-
+    defaults, models = load_models(category, directories=directories, source=source)
     available = models
-    if category == "mtp" and args.command != "cleanup" and not args.include_disabled:
-        available = [model for model in models if model["enabled"]]
-    targeted_cleanup = (
-        args.command == "cleanup" and args.selection is not None and not args.list
-    )
-    if not targeted_cleanup and not getattr(args, "quiet", False):
+    if category == "mtp":
+        if args.command == "unregister":
+            raise ModelError(
+                "MTP models are download-only and cannot be unregistered; use 'remove'"
+            )
+        if args.command in {"apply", "refresh"} and not args.include_disabled:
+            available = [model for model in models if model["enabled"]]
+    if not getattr(args, "quiet", False):
         print(f"Available {category} models:")
-    host = (
-        ollama_host(defaults, getattr(args, "host", None))
-        if defaults.get("ollama_host")
-        else None
-    )
-    if not targeted_cleanup and not getattr(args, "quiet", False):
-        print_models(
-            defaults,
-            available,
-            registered_models(host) if host else None,
-            destination=getattr(args, "destination", None),
-        )
-    if args.list:
-        return 0
-    if not available:
-        print(f"No selectable {category} models were found.")
-        return 0
-    selection = args.selection
-    if selection is None:
-        selection = prompt_line("Models (id/index/range/recommended/production/all; Enter to cancel): ")
-    if not selection:
+        print_catalog_models(available)
+    selected = selected_models_for_catalog(available, args.selection, interactive=True)
+    if not selected:
         print("No models selected.")
         return 0
-    selected = select_models(available, selection)
     return run_category_operation(defaults, selected, args)
 
 
