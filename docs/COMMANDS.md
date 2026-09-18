@@ -19,21 +19,21 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-compare-mtp` | Compare an Ollama baseline with a running llama.cpp MTP server |
 | `bc250-cu-status` | Kernel/RADV diagnostics plus the full live-routing dashboard |
 | `bc250-cu-live-manager` | Pinned interactive live WGP manager |
-| `bc250-fetch-mtp` | Download enabled MTP catalog entries |
+| `bc250-fetch-mtp` | Explicitly download/reconcile a selected MTP experiment, including disabled catalog entries |
 | `bc250-gitea-review` | Generate an optional Gitea pull-request review |
 | `bc250-install` | Apply/resume the packaged appliance setup |
 | `bc250-install-ollama` | Install or normalize official Ollama |
 | `bc250-maintenance` | Backups, safe power/WOL policy and optional Pi companion access |
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
-| `bc250-model` | Unified model discovery, installation and cleanup |
+| `bc250-model` | Model catalog, state inspection and lifecycle reconciliation |
 | `bc250-ocr` | Experimental office OCR model list/install/test helper |
 | `bc250-rag-import` | Validate and incrementally sync the operator document tree |
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
 | `bc250-openwebui-setup` | Initialize/apply/check package-owned Open WebUI state |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
-| `bc250-model install agentic` | Register agent model(s), switching temporarily to exclusive agent mode |
-| `bc250-model install embedding` | Register embedding model(s) on the required dedicated lane |
-| `bc250-model install task` | Register task model(s) on the required dedicated lane |
+| `bc250-model apply agentic` | Reconcile agent model(s), switching temporarily to exclusive agent mode |
+| `bc250-model apply embedding` | Reconcile embedding model(s) on the required dedicated lane |
+| `bc250-model apply task` | Reconcile task model(s) on the required dedicated lane |
 | `bc250-status` | Concise read-only appliance status |
 | `bc250-storage` | Report/dedupe/prune package-owned storage |
 | `bc250-swap-profile` | Inspect or change zram/disk-swap policy |
@@ -94,109 +94,125 @@ a no-op update with current model sources does not ask for one.
 
 ## Models
 
+The model manager deliberately separates read-only discovery/state inspection from
+mutating lifecycle operations:
+
 ```bash
-sudo bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
-bc250-model resolve CATEGORY ID
-sudo bc250-model install CATEGORY [SELECTION] [OPTIONS]
-# add --quiet for scripted reconciliation without repeated catalog/mode chatter
-sudo bc250-model cleanup CATEGORY [SELECTION] [--keep-gguf] [--host HOST[:PORT]] [--destination PATH] [--list] [--yes]
-sudo bc250-model cleanup-retired [--yes]
+bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
+sudo bc250-model status [CATEGORY] [SELECTION] [--online] [--verbose]
+bc250-model path CATEGORY ID
+
+sudo bc250-model apply CATEGORY [SELECTION] [OPTIONS]
+sudo bc250-model refresh CATEGORY [SELECTION] [OPTIONS]
+sudo bc250-model unregister CATEGORY [SELECTION] [--host HOST[:PORT]] [--destination PATH] [--yes]
+sudo bc250-model remove CATEGORY [SELECTION] [--host HOST[:PORT]] [--destination PATH] [--yes]
+sudo bc250-model purge-retired [--yes]
 ```
 
-Categories are `production`, `experiments`, `task`, `agentic`, `embedding`,
-`mtp` and `all`. Legacy category aliases are intentionally not accepted. `all`
-combines the discovered categories for status/install/cleanup operations;
-`cleanup all --keep-gguf` removes registrations/runtime copies across every
-category while retaining manager-owned GGUF/state pairs. MTP is the only
-TOML-backed, download-only category; the other categories are discovered from strict Modelfiles. The packaged OCR comparison pair uses a
-strict experimental `hf.co/...` FROM exception so Ollama can manage each model's paired
-vision projector and model blobs.
+Categories are `production`, `experiments`, `task`, `agentic`, `embedding`, `mtp`
+and `all`. Legacy aliases are intentionally not accepted. Selections accept a full
+model name, displayed global catalog index, comma list, range such as `0,2-4`,
+`recommended`, `production`, or `all`. Prefer full names in long-lived automation.
 
-With no category, `list` shows every Ollama-backed category as one catalog with
-global indexes. A category filters the same catalog without renumbering it.
-`list all` also includes the enabled MTP catalog; add `--all` to include disabled
-MTP entries.
+### Discovery and state
 
-`cleanup-retired` is separate from ordinary catalog cleanup. It operates only on
-models named in the package-installed retirement catalog, previews canonical
-name/category/registration/source size, and requires confirmation unless `--yes`
-is supplied. It fails closed if expected registration state is unavailable or a
-retired model is detected on an unexpected package-owned Ollama lane; arbitrary
-unmanaged models are never selected.
+`list` is catalog-only and does not require `sudo`. It shows definitions and stable
+global indexes without probing protected GGUF/state or Ollama registration state. A
+category filters the same catalog without renumbering it, including the separate MTP
+TOML catalog. `list all` includes enabled MTP entries; add `--all` to include disabled
+MTP definitions.
 
-For an explicitly named cleanup target, the manager skips the full category listing.
-Without `--yes`, it prints the exact registration/runtime/source/state actions first
-and asks for confirmation; `--keep-gguf` changes the source/state actions to retain.
-`cleanup CATEGORY --list` remains the discovery view rather than a destructive-effects
-preview. For manager-owned local GGUF models, `cleanup --keep-gguf` removes the Ollama
-registration/runtime Modelfile while retaining the local GGUF and its state sidecar
-for fast reuse. Without it, cleanup also deletes the local GGUF/state.
-If a model was installed with `--host` or `--destination`, pass the same override
-to `cleanup` so removal targets that registration and manager-owned source tree.
-Ollama remains responsible for pruning registration manifests and unreferenced
-blob data, so shared blobs are not deleted manually.
+`status` is the read-only runtime inspector and normally runs with `sudo` because
+manager-owned GGUF/state trees are protected. It evaluates the same state contract that
+`apply` consumes: source presence and checksum/provenance validity, whether the selected
+definition differs from the rendered runtime Modelfile, registration state on the
+category-owned Ollama lane, and the recommended next action. `--verbose` adds resolved
+paths. `--online` checks moving upstream revisions such as `latest` without downloading
+or modifying the local model. Pinned revisions are reported as pinned rather than
+mislabelled as needing an update.
 
-Every Ollama entry reports its definition origin, download state and whether it
-is registered on the category's Ollama instance. Listing requires `sudo` because
-manager-owned GGUF/state directories remain intentionally protected (`0750`). A
-GGUF retained with `cleanup --keep-gguf` therefore reports `downloaded` even
-after its Ollama registration is removed; the next install still verifies the
-sidecar/checksum before reuse. Remote experimental vision definitions instead display `source Ollama-managed (main+projector)`
-because their main model and projector live in Ollama's blob store rather than
-as a manager-owned GGUF/state pair. `cleanup --keep-gguf` cannot retain a
-package-local OCR source that does not exist; it reports this explicitly. Registrations
-without a current Modelfile are reported separately as unmanaged models; known
-models found on the wrong Ollama instance are reported as misplaced.
+`path` is the narrow machine-readable resolver used by package tooling. It prints the
+resolved source path and MTP context/draft metadata for one exact model; it replaces the
+old technical `resolve` verb and is not a lifecycle action.
 
-`SELECTION` accepts a full model name, displayed global catalog index, comma
-list, range such as `0,2-4`, `recommended`, `production`, or `all`. The named
-groups are convenience expansions; lane routing is unchanged. With no selection,
-a terminal prompts and Enter cancels. Prefer full names in long-lived automation.
+### Lifecycle operations
 
-Important install options:
+`apply` means **make the selected model match the current catalog definition**. It reuses
+a verified existing GGUF when source identity and recorded state still match, repairs
+Modelfile/registration drift without an unnecessary download, and downloads only when the
+source is missing or invalid. Agentic selections temporarily enter exclusive agent mode
+and restore normal mode afterward.
 
-- `--list`: show the current status without downloading;
-- `--revision REVISION`: override one model's commit, tag, branch or `latest`;
+`refresh` is the explicit source-update/reinstall operation. It deliberately refetches
+source bytes and then performs the same reconciliation as `apply`. Use it when
+`status --online` reports a changed moving source or when you intentionally want to
+replace otherwise valid cached bytes. It is not an automatic side effect of `apply`.
+
+`unregister` removes the Ollama registration and rendered runtime Modelfile while
+retaining manager-owned GGUF plus `.bc250.json` provenance/state where those exist. It is
+the correct operation when you want to free the Ollama registration/store reference but
+retain verified source for a later fast `apply`. Remote OCR sources are Ollama-managed and
+therefore have no separate package-local GGUF/state pair to retain.
+
+`remove` removes the registration/runtime Modelfile and then manager-owned GGUF/state. A
+failed registration removal leaves local source intact and returns failure. Destructive
+commands preview their effects and require confirmation unless `--yes` is supplied; an
+omitted selection never silently turns into destructive `all`. If a model was applied
+with `--host` or `--destination`, pass the same override to `unregister`/`remove`.
+
+`purge-retired` is separate from ordinary removal. It targets only models named in the
+package retirement catalog, previews canonical identity/registration/source state, and
+fails closed on unavailable or misplaced registration state. It never selects arbitrary
+unmanaged operator models.
+
+### Apply / refresh options
+
+Common options for `apply` and `refresh`:
+
+- `--quiet`: suppress repeated catalog/topology-transition chatter for scripts;
+- `--revision REVISION`: one-model source revision override;
 - `--sha256 DIGEST`: require an exact downloaded-file checksum;
-- `--refresh`: deliberately download new bytes, then register again;
 - `--host HOST[:PORT]`: override the target Ollama API;
-- `--destination PATH`: override the GGUF root;
+- `--destination PATH`: override the manager-owned GGUF root;
 - `--min-free-bytes BYTES`: require free space before downloading;
 - `--token-file PATH`: read a Hugging Face token from a protected file;
-- `--include-disabled`: include disabled MTP entries;
+- `--include-disabled`: allow disabled MTP entries to be selected;
 - `--modelfile-dir PATH`: add a Modelfile search directory;
 - `--source PATH`: use another MTP TOML catalog.
 
-Remote experimental `hf.co/...` definitions do not accept `--revision`,
-`--sha256` or `--destination`; Ollama owns those source blobs.
+Remote experimental `hf.co/...` definitions do not accept local-GGUF revision/checksum/
+destination overrides because Ollama owns their model/projector blobs. Hugging Face
+authentication is requested only when a manager download actually needs it.
 
-Authentication is requested only when a download is required. A validated GGUF
-is reused only while its recorded repository, revision and filename match and
-its schema-2/3 size/mtime/ctime metadata is unchanged. New sidecars use schema 3
-and additionally record canonical model/category identity. If those stat values or a
-legacy sidecar differ, the manager recalculates SHA-256 before reuse.
-If source state, rendered Modelfile and the registration on the correct Ollama
-instance all match, installation prints `already current; skipping`. Modelfile-only
-edits rebuild the registration without downloading again; changed source provenance
-downloads the requested bytes. `HF_TOKEN` or `--token-file` is
-validated as the `ollama` account; an empty or rejected token falls back to
-anonymous access.
-Tokens are not persisted by the manager.
+### MTP lifecycle
 
-Convenience commands:
+MTP entries are download-only llama.cpp experiments and are intentionally disabled in
+the packaged catalog so generic `apply all` and installer convergence cannot pull them
+in accidentally. Use the explicit opt-in helper to select one:
 
 ```bash
-sudo bc250-model install production [SELECTION]
-sudo bc250-model install experiments [SELECTION]
-sudo bc250-model install embedding [SELECTION]
-sudo bc250-fetch-mtp [SELECTION]
-sudo bc250-model install task [SELECTION]
-sudo bc250-model install agentic [SELECTION]
+bc250-model list mtp --all
+sudo bc250-fetch-mtp qwen3.6-27b-mtp
+sudo bc250-model status mtp qwen3.6-27b-mtp --include-disabled --verbose
+LLAMACPP=/path/to/llama-server bc250-run-mtp 27b
 ```
 
-For office document retrieval, use the existing embedding workflow with
-Open WebUI/Tika; see [`RAG.md`](RAG.md). There is no separate RAG daemon or
-vector store. `bc250-rag-import` is only a metadata-aware Open WebUI sync client.
+Running `sudo bc250-fetch-mtp` without a selection shows the disabled experiment entries
+and prompts for one. It maps to `bc250-model apply mtp --include-disabled`; the explicit
+helper is therefore safe to use without editing `/etc/bc250-llm-server/mtp-models.toml`.
+`refresh mtp ... --include-disabled` deliberately re-fetches source bytes. MTP has no
+Ollama registration, so `unregister mtp` is invalid; `remove mtp ID` removes only the
+manager-owned source/state after confirmation.
+
+Keep `enabled = false` for candidates that should remain outside generic catalog-wide
+operations. Setting an entry true is an operator policy choice, not a qualification or
+promotion signal.
+
+The manager records schema-3 source/model/category identity plus SHA-256 and file stat
+metadata. Unchanged stat metadata can use the validated fast path; changed or legacy state
+forces a full checksum before reuse. Source repository, revision and GGUF filename must
+also match. This is what lets a Modelfile-only change re-register from retained bytes
+without silently accepting modified source data.
 
 ## Documents / RAG import
 
@@ -356,7 +372,7 @@ sudo bc250-revalidate abort
 sudo bc250-revalidate cleanup
 ```
 
-`bc250-revalidate` harness v4.1 is the root-only systemd-backed package
+`bc250-revalidate` harness v4.2 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
@@ -365,6 +381,10 @@ before run state is created. The worker remains systemd-owned; Ctrl-C detaches a
 `--detach` returns immediately. The dashboard reports stage elapsed time, worker
 state and the age of the last real progress event rather than treating a periodic
 heartbeat as progress.
+Harness v4.2 also surfaces non-failing resource observations such as context truncation
+under a separate `Diagnostics` section. These diagnostics do not weaken or replace the
+existing infrastructure/quality gates. Intermediate successful phases use lighter
+checkpoints while high-value topology/restoration boundaries retain full snapshots.
 
 Revalidation tests only promoted package defaults. Configuration-decision work
 (`num_batch`, embedding batch, chunk-min, `RAG_SYSTEM_CONTEXT`, thinking-policy,
@@ -530,6 +550,9 @@ only terminal non-empty `message.content`. It returns `3` and leaves an existing
 file unchanged if completion is nonterminal, stops at `done_reason=length`, or final
 content contains literal reasoning markers. Coding helpers do not stage, push, approve
 or merge without the command's explicit local action.
+
+Prepare a candidate first with `sudo bc250-fetch-mtp ID`; the explicit helper exposes
+the packaged disabled experiments without making them part of normal convergence.
 
 The quick MTP comparison accepts `BASELINE_MODEL`, `OLLAMA_URL`, `MTP_URL`,
 `NUM_PREDICT` and `PROMPT`. It is a speed-oriented Ollama-vs-llama.cpp helper and

@@ -68,7 +68,7 @@ Storage visibility and explicit reclamation:
 
 ```bash
 sudo bc250-storage status          # protected accounting requires sudo
-sudo bc250-model cleanup-retired   # preview/purge package-retired model data
+sudo bc250-model purge-retired     # preview/purge package-retired model data
 sudo bc250-storage dedupe          # confirmed XFS extent sharing
 sudo bc250-storage prune-sources   # optional verified offline-source removal
 sudo bc250-storage prune-40cu      # removed-kernel build caches only
@@ -100,8 +100,8 @@ and the compact `agentic-qwen35-4b-khazarai-q6-k` /
 `agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
 kept only in the source graveyard and are not
 exposed through normal model discovery. The installed retirement catalog lets
-`bc250-model list` identify stale package-retired registrations and
-`sudo bc250-model cleanup-retired` remove only those explicitly catalogued models.
+`sudo bc250-model status` identify stale package-retired registrations and
+`sudo bc250-model purge-retired` remove only those explicitly catalogued models.
 Experimental models are never silent replacements for the defaults above.
 
 These are starting points, not a fixed production set. Packaged and
@@ -120,13 +120,17 @@ review every model's current license before use.
 
 ```bash
 # Models
-sudo bc250-model list production
-sudo bc250-model install production
-sudo bc250-model install experiments
-sudo bc250-model install embedding
-sudo bc250-model install task
-sudo bc250-model install agentic   # temporarily switches to agent mode, then restores normal
-sudo bc250-model cleanup experiments MODEL  # concise target + interactive effects preview
+bc250-model list production
+bc250-model list mtp --all          # experimental/download-only candidates
+sudo bc250-fetch-mtp qwen3.6-27b-mtp  # explicit opt-in; not generic convergence
+sudo bc250-model status production
+sudo bc250-model apply production
+sudo bc250-model apply experiments
+sudo bc250-model apply embedding
+sudo bc250-model apply task
+sudo bc250-model apply agentic     # temporarily switches to agent mode, then restores normal
+sudo bc250-model unregister experiments MODEL  # keep verified source/state for later reuse
+sudo bc250-model remove experiments MODEL      # also remove manager-owned source/state
 bc250-ocr list
 sudo bc250-rag-import plan /srv/bc250-documents
 sudo bc250-openwebui-setup init

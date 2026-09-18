@@ -1,9 +1,9 @@
 # Embedding models
 
 ```bash
-sudo bc250-model list embedding
-sudo bc250-model install embedding
-sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
+bc250-model list embedding
+sudo bc250-model apply embedding
+sudo bc250-model apply embedding embed-jina-v5-small-retrieval-q4-k-m
 ```
 
 Embeddings use the dedicated `ollama-embedding.service` on port `11437`. Current choices are:
@@ -35,6 +35,6 @@ curl -fsS http://127.0.0.1:11437/api/embed \
 
 The dedicated service and packaged embedding Modelfiles use a 4K context and
 10-minute keepalive. The installer treats Jina as baseline infrastructure. To recreate an embedding registration manually, run
-`sudo bc250-model install embedding`. The
+`sudo bc250-model apply embedding`. The
 lane is stopped automatically in exclusive agent mode, keeping normal RAG
 residency bounded.

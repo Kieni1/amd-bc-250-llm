@@ -72,7 +72,7 @@ class DocumentationTests(unittest.TestCase):
         privileged = (
             r"bc250-install(?:-ollama)?(?:\s|$)",
             r"bc250-maintenance(?:\s|$)",
-            r"bc250-model\s+(?:list|install|cleanup|cleanup-retired)(?:\s|$)",
+            r"bc250-model\s+(?:status|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
             r"bc250-storage(?:\s|$)",
             r"bc250-revalidate(?:\s|$)",
             r"bc250-rag-import(?:\s|$)",
@@ -124,6 +124,89 @@ class DocumentationTests(unittest.TestCase):
             for block in re.findall(r"```bash\n(.*?)```", text, re.DOTALL):
                 for command in forbidden:
                     self.assertNotIn(command, block, f"{relative}: {command}")
+
+
+    def test_model_manager_current_docs_use_new_lifecycle_contract(self) -> None:
+        current_docs = (
+            "README.md",
+            "MODELS.md",
+            "TLDR.md",
+            "docs/COMMANDS.md",
+            "docs/MAINTENANCE.md",
+            "docs/RAG.md",
+            "models/README.md",
+            "models/coding-agent/README.md",
+            "models/embedding/README.md",
+            "models/experiments/README.md",
+            "models/mtp/README.md",
+            "models/task-model/README.md",
+            "development/TESTING-STRATEGY.md",
+            "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
+        )
+        forbidden = (
+            "bc250-model install",
+            "bc250-model cleanup",
+            "bc250-model cleanup-retired",
+            "bc250-model resolve",
+            "--keep-gguf",
+        )
+        for relative in current_docs:
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            for old in forbidden:
+                self.assertNotIn(old, text, f"{relative}: stale model-manager command {old}")
+
+    def test_model_manager_read_only_examples_do_not_require_sudo(self) -> None:
+        current_docs = (
+            "README.md",
+            "MODELS.md",
+            "TLDR.md",
+            "docs/COMMANDS.md",
+            "docs/MAINTENANCE.md",
+            "docs/RAG.md",
+            "models/README.md",
+            "models/coding-agent/README.md",
+            "models/embedding/README.md",
+            "models/experiments/README.md",
+            "models/mtp/README.md",
+            "models/task-model/README.md",
+        )
+        forbidden = (
+            "sudo bc250-model list",
+            "sudo bc250-model path",
+        )
+        for relative in current_docs:
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            for command in forbidden:
+                self.assertNotIn(command, text, f"{relative}: {command}")
+
+
+    def test_current_release_identity_matches_spec_and_handovers(self) -> None:
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        version_match = re.search(r"^Version:\s*(\S+)", spec, re.MULTILINE)
+        release_match = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
+        self.assertIsNotNone(version_match)
+        self.assertIsNotNone(release_match)
+        self.assertEqual(version_match.group(1), version)
+        release = release_match.group(1)
+        nvr = f"{version}-{release}"
+
+        main = (ROOT / "development/handovers/MAIN-INTEGRATION-HANDOVER.md").read_text(encoding="utf-8")
+        operations = (ROOT / "development/handovers/OPERATIONS-HANDOVER.md").read_text(encoding="utf-8")
+        patchnote = (ROOT / f"PATCHNOTE-{nvr}.md").read_text(encoding="utf-8")
+
+        self.assertIn(f"VERSION       {version}", main)
+        self.assertIn(f"RPM Release   {release}%{{?dist}}", main)
+        self.assertIn(f"NVR           {nvr}", main)
+        self.assertIn(f"VERSION:      {version}", operations)
+        self.assertIn(f"RPM Release:  {release}", operations)
+        self.assertIn(f"Expected NVR: `bc250-llm-server-{nvr}`", patchnote)
+
+    def test_secondary_model_docs_expose_explicit_mtp_opt_in(self) -> None:
+        for relative in ("README.md", "TLDR.md", "MODELS.md", "models/README.md", "models/mtp/README.md"):
+            text = (ROOT / relative).read_text(encoding="utf-8")
+            self.assertIn("bc250-model list mtp --all", text, relative)
+            self.assertIn("bc250-fetch-mtp", text, relative)
 
     def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

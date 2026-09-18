@@ -8,8 +8,8 @@ maintain a second status table here.
 ## Operator entry points
 
 ```bash
-sudo bc250-model list experiments
-sudo bc250-model install experiments
+bc250-model list experiments
+sudo bc250-model apply experiments
 bc250-benchmark
 ```
 

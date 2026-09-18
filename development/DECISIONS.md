@@ -251,3 +251,28 @@ contract even when the underlying model is otherwise capable.
 **Retest only if:** Ollama changes the chat completion/thinking contract, the default agent
 model changes materially, or bounded BC-250 evidence supports changing the default output
 budget.
+
+
+## DEC-012 — Make model lifecycle state explicit in the public CLI
+
+**Status:** ACTIVE
+
+**Decision:** Treat model management as three explicit states—catalog definition, manager-owned
+source/provenance, and Ollama registration—and expose lifecycle verbs that match those states:
+`list`, `status`, `path`, `apply`, `refresh`, `unregister`, `remove`, and `purge-retired`.
+Do not preserve the pre-0.11.3 `install`/`cleanup`/`resolve` grammar as aliases; legacy forms
+produce migration hints instead.
+
+`apply` converges to the current catalog while reusing verified source bytes; `refresh`
+explicitly re-fetches source; `unregister` retains verified GGUF/state; `remove` also removes
+manager-owned source/state. `status` and `apply` consume the same read-only inspection model so
+currentness is not inferred independently by multiple callers.
+
+**Why:** the old interface hid materially different operations behind `install --refresh` and
+`cleanup --keep-gguf`, made reinstall/update/drift handling unclear to operators, and encouraged
+callers to reason about state separately. The package is pre-v1.0 and intentionally chose a
+clean contract over compatibility aliases.
+
+**Retest only if:** real operator use shows the new verbs remain ambiguous, a lifecycle operation
+cannot be represented without unsafe flag combinations, or a future package state model changes
+materially. Do not restore old aliases merely to avoid updating callers/docs.

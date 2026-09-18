@@ -33,21 +33,20 @@ For this non-commercial test branch, Jina v5 remains the default because it is
 already the package's retrieval recommendation:
 
 ```bash
-sudo bc250-model install production prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-sudo bc250-model install embedding embed-jina-v5-small-retrieval-q4-k-m
-sudo bc250-model list
+sudo bc250-model apply production prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+sudo bc250-model apply embedding embed-jina-v5-small-retrieval-q4-k-m
+bc250-model list
 ```
 
 The packaged Jina Q4_K_M file is the upstream refresh that includes
 `pooling_type` GGUF metadata used by current Ollama to identify embedding models.
-If an existing test index was built with the older package GGUF, refresh/reinstall
-the model and **reindex** that Jina-backed Knowledge data.
+If an existing test index was built with the older package GGUF, refresh the model with `sudo bc250-model refresh embedding embed-jina-v5-small-retrieval-q4-k-m` and **reindex** that Jina-backed Knowledge data.
 
 Jina v5 uses `CC-BY-NC-4.0`. If the deployment later needs unrestricted
 commercial use, select the packaged Apache-2.0 Qwen alternative instead:
 
 ```bash
-sudo bc250-model install embedding embed-qwen3-0.6b-q8-0
+sudo bc250-model apply embedding embed-qwen3-0.6b-q8-0
 ```
 
 Do not mix embedding models or prefix schemes inside one existing index. Changing

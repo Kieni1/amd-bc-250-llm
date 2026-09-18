@@ -60,26 +60,36 @@ See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; u
 ## Models
 
 ```bash
-sudo bc250-model list production
-sudo bc250-model list experiments
-sudo bc250-model list task
-sudo bc250-model list agentic
-sudo bc250-model list embedding
+bc250-model list production
+bc250-model list experiments
+bc250-model list task
+bc250-model list agentic
+bc250-model list embedding
+bc250-model list mtp --all
+sudo bc250-fetch-mtp qwen3.6-27b-mtp  # explicit opt-in MTP preparation
 
-sudo bc250-model install production
-sudo bc250-model install experiments
-sudo bc250-model install task
-sudo bc250-model install agentic
-sudo bc250-model install embedding
+sudo bc250-model status agentic MODEL
+sudo bc250-model apply production
+sudo bc250-model apply experiments
+sudo bc250-model apply task
+sudo bc250-model apply agentic
+sudo bc250-model apply embedding
 
-bc250-ocr list
-sudo bc250-model cleanup production --list
-sudo bc250-model cleanup production MODEL-NAME
+# Deliberately fetch source bytes again
+sudo bc250-model refresh experiments MODEL
+
+# Remove registration only; retain verified GGUF/state
+sudo bc250-model unregister experiments MODEL
+
+# Remove registration plus manager-owned GGUF/state
+sudo bc250-model remove experiments MODEL
 ```
 
 Selections accept a full name, displayed index, ranges such as `0,2-4`, or `all`.
-Enter cancels an interactive selection. Preserve downloaded GGUFs where practical;
-use package lifecycle tools rather than deleting `/var/lib` content manually.
+`list` is catalog-only; use `sudo bc250-model status` when you need downloaded,
+registration or Modelfile-drift state. Enter cancels an interactive selection. Preserve
+downloaded GGUFs where practical; use package lifecycle commands rather than deleting
+`/var/lib` content manually.
 
 ## Profiles and hardware
 

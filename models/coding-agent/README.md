@@ -3,10 +3,10 @@
 ## Setup
 
 ```bash
-sudo bc250-model install agentic
+sudo bc250-model apply agentic
 
 # Current measured coding-helper starting point
-sudo bc250-model install agentic agentic-ornith15-9b-ornith-q5-k-m
+sudo bc250-model apply agentic agentic-ornith15-9b-ornith-q5-k-m
 ```
 
 The package ships static `ollama-agent.service` on port `11436` with its own model
@@ -26,7 +26,7 @@ main/task/embedding lanes. Current choices are:
 - `agentic-gemma4-12b-fable5-tau2-q4-k-m` — retained 12B Gemma 4 comparison
   until the E4B challenger establishes whether another 12B round is useful.
 
-With no selection, `bc250-model install agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
+With no selection, `bc250-model apply agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to
 Open WebUI only when interactive agent access is wanted. Use this service
 exclusively rather than alongside a large main-model workload.

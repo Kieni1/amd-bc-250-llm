@@ -27,30 +27,53 @@ starts only 11436; `leave` restores normal mode.
 
 The package owns all four Ollama service definitions statically. Normal mode requires main, task and embedding; model registration automatically switches into temporary agent mode when an agentic selection is included and restores normal mode afterwards.
 
-## List, install, replace
+## Inspect, apply, refresh and remove
+
+`bc250-model` separates catalog discovery, state inspection and lifecycle actions:
 
 ```bash
-sudo bc250-model list
-sudo bc250-model list production
-sudo bc250-model list experiments
-sudo bc250-model list task
-sudo bc250-model list agentic
-sudo bc250-model list embedding
-sudo bc250-model list mtp --all
+bc250-model list
+bc250-model list production
+bc250-model list experiments
+bc250-model list task
+bc250-model list agentic
+bc250-model list embedding
+bc250-model list mtp --all
+# MTP stays opt-in even though it shares the lifecycle manager:
+sudo bc250-fetch-mtp qwen3.6-27b-mtp
 
-sudo bc250-model install production MODEL
-sudo bc250-model install experiments MODEL
-sudo bc250-model install embedding MODEL
-sudo bc250-model install task MODEL
-sudo bc250-model install agentic MODEL
+sudo bc250-model status agentic MODEL
+sudo bc250-model status agentic MODEL --online
+
+sudo bc250-model apply production MODEL
+sudo bc250-model apply experiments MODEL
+sudo bc250-model apply embedding MODEL
+sudo bc250-model apply task MODEL
+sudo bc250-model apply agentic MODEL
+
+sudo bc250-model refresh experiments MODEL
+sudo bc250-model unregister experiments MODEL
+sudo bc250-model remove experiments MODEL
+sudo bc250-model purge-retired
 ```
 
-Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer
-names in scripts. A moving source revision such as `latest` or `main` is allowed
-on purpose: this package is a model-testing tool and easy swapping is more useful
-than release-style weight pinning before 1.0. The manager records the downloaded
-source identity/digest; use `--refresh` when you deliberately want new bytes from
-a moving source.
+`list` is catalog-only and does not require root. `status` is the read-only runtime
+inspection command: it reports source/provenance validity, current-definition and
+runtime-Modelfile drift, registration state and a recommended reconciliation action.
+`--online` additionally checks moving upstream revisions without mutating local state.
+
+`apply` converges a selected model to the current catalog definition and reuses an
+existing verified GGUF whenever possible. `refresh` deliberately fetches source bytes
+again before applying the definition. `unregister` removes the Ollama registration and
+runtime Modelfile while retaining manager-owned GGUF/state. `remove` additionally removes
+that manager-owned GGUF/state. `purge-retired` is restricted to the explicit package
+retirement catalog.
+
+Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer names
+in scripts. A moving source revision such as `latest` or `main` is allowed on purpose:
+this package is a model-testing tool. The manager records source identity/digest so
+`status --online` can identify an upstream change and `refresh` is an explicit decision
+to fetch it.
 
 To add or override a model, copy the installed template to the operator directory:
 
@@ -59,38 +82,46 @@ sudo install -m0644 \
   /usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example \
   /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
 sudoedit /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
-sudo bc250-model install experiments exp-example-source-q4-k-m
+sudo bc250-model status experiments exp-example-source-q4-k-m
+sudo bc250-model apply experiments exp-example-source-q4-k-m
 ```
 
-A same-name operator Modelfile overrides the packaged definition. Keep category
-prefix, source metadata, GGUF/FROM and BC-250 parameters consistent with the
-template; invalid definitions are rejected before download.
+A same-name operator Modelfile overrides the packaged definition. Keep category prefix,
+source metadata, GGUF/FROM and BC-250 parameters consistent with the template; invalid
+definitions are rejected before download. `status` makes an override or Modelfile drift
+visible before an action is taken.
 
-## Cleanup and reindexing
+## Source retention and reindexing
+
+Use the package lifecycle commands rather than deleting source GGUFs or Ollama blobs by
+hand. To remove only the registration while keeping a verified source for quick reuse:
 
 ```bash
-sudo bc250-model cleanup production --list
-sudo bc250-model cleanup production MODEL
-sudo bc250-model cleanup production MODEL --keep-gguf
+sudo bc250-model unregister production MODEL
+sudo bc250-model apply production MODEL
 ```
 
-Use the package tools rather than deleting source GGUFs or Ollama blobs by hand.
+To remove registration plus manager-owned source/state:
+
+```bash
+sudo bc250-model remove production MODEL
+```
+
 Local GGUF models can occupy both source storage and imported Ollama storage;
-`sudo bc250-storage status` reports verified duplication and `dedupe` can share
-identical XFS extents without deleting either path. `prune-sources` is a separate,
-explicit hash-verified option. Remote OCR registrations remain Ollama-managed.
+`sudo bc250-storage status` reports verified duplication and `dedupe` can share identical
+XFS extents without deleting either path. `prune-sources` remains a separate, explicit
+hash-verified storage action. Remote OCR registrations remain Ollama-managed.
 
-Changing an embedding model, its GGUF bytes, or its query/document prefix scheme
-requires an explicit RAG reindex. Since 0.9.7-0.4 the packaged Jina Q4_K_M source uses the refreshed upstream
-GGUF carrying `pooling_type` metadata; refresh that model and reindex if an
-earlier package copy had already been used for RAG. Keep OCR extraction in the
-source language and review the Markdown before it enters the active document
-library. Translation remains a separate step.
+Changing an embedding model, its GGUF bytes, or its query/document prefix scheme requires
+an explicit RAG reindex. Since 0.9.7-0.4 the packaged Jina Q4_K_M source uses the refreshed
+upstream GGUF carrying `pooling_type` metadata; refresh that model and reindex if an earlier
+package copy had already been used for RAG. Keep OCR extraction in the source language and
+review Markdown before it enters the active document library. Translation remains a
+separate step.
 
-For the full Modelfile metadata/storage contract see
-[`models/README.md`](models/README.md). For deployed role presets see
-[`docs/openwebui-settings.md`](docs/openwebui-settings.md), and for exact command
-syntax see [`docs/COMMANDS.md`](docs/COMMANDS.md).
+For the full Modelfile metadata/storage contract see [`models/README.md`](models/README.md).
+For deployed role presets see [`docs/openwebui-settings.md`](docs/openwebui-settings.md),
+and for exact command syntax see [`docs/COMMANDS.md`](docs/COMMANDS.md).
 
 ## 2026-08-31 benchmark status
 
@@ -230,7 +261,7 @@ The source-only graveyard is for models with no current routine promotion path. 
 Modelfiles are not packaged or discovered. Their canonical manager-owned identities are
 mirrored in `models/retired-models.json` so stale installed registrations remain
 distinguishable from operator-created unmanaged models and can be removed safely with
-`bc250-model cleanup-retired`.
+`bc250-model purge-retired`.
 
 The graveyard currently contains 17 definitions. Important recent role changes are:
 
@@ -338,6 +369,8 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,
-runtime and the OS. Draft/MTP heads are not standalone models and stay in the
-dedicated MTP workflow.
+runtime and the OS. Draft/MTP heads are not standalone Ollama role models and stay in the dedicated MTP
+workflow. Packaged MTP entries remain disabled from generic convergence;
+`bc250-fetch-mtp [SELECTION]` is the explicit opt-in downloader/reconciler before a
+`bc250-run-mtp` llama.cpp experiment.
 
