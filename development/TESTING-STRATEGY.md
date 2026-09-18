@@ -119,23 +119,31 @@ task staging caused global OOM and warm-main loss. Future materially larger task
 challengers must pass one cheap quality screen, then the tiny warm-main survival gate,
 before product-path or repeated quality work.
 
-For translation, the repaired eight-case DE<->FR screen is saturated and must no longer
-be used as a ranking loop for models already known to reach 8/8. Production LFM remains
-the default only because no challenger has completed the harder/product-path gates.
+For translation, broad model/configuration qualification is now closed. Stage-2E selected
+Translate-Gemma E4B with the exact explicit-direction v1 contract, thinking omitted and
+`max_tokens=2048`. Production LFM remains the default only until the integrated
+package-owned direction roles pass one bounded final product-path gate. TIR is closed as
+the normal deployment choice under current evidence.
 
 Next translation sequence:
 
-1. run the prepared Stage-2 hard corpus on Translate-Gemma E4B, Ministral 8B and TIR
-   Qwen3.5 9B non-thinking; retain Qwen3.6 35B only as a quality upper-bound comparator;
-2. narrow to the 2-3 candidates with a real promotion case;
-3. run the exact authenticated Open WebUI translation path for those finalists;
-4. confirm latency/residency/resource behavior only for product-path survivors;
-5. broaden office-language cases before any production switch.
+1. install the selected experiment with
+   `sudo bc250-model install experiments exp-translate-gemma4-sub-e4b-17s-q4-k-xl`,
+   then apply the source-owned `bc250-office-translation-de-fr` and
+   `bc250-office-translation-fr-de` desired state;
+2. verify the exact system prompt, non-global direction Filter, `max_tokens=2048`, and
+   no forced `think` through authenticated Open WebUI desired state;
+3. run one or two repetitions of the bounded final set only: canonical sanity plus the
+   Stage-2 targeted protected-finance, bullets/table, `Avoir`, and both long-document
+   cases;
+4. verify preset/provider/function restoration or desired-state integrity, privacy,
+   memory and serious GPU/OOM warnings;
+5. promote only if that integrated path is acceptable. Otherwise classify the remaining
+   defect before deciding whether it is model-level or needs product-layer handling.
 
-Hunyuan's reproducible CHF-preservation defect and production LFM's known semantic/
-invoice weaknesses are already established; do not repeat the same short screen unless
-the model/request/evaluator contract changes materially. Preserve numbers, identifiers,
-formality and direction, and do not weaken the evaluator to make a challenger pass.
+Do not restart the broad translation candidate campaign or resume preservation prompt
+micro-tuning. Exact byte-for-byte protected financial typography is not claimed by the
+current integration; preserve the known caveat rather than weakening the evaluator.
 
 ### Lane D — RAG / office documents
 
