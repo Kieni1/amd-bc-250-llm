@@ -457,8 +457,10 @@ OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 use a protected administrator API-key file. The guided installer exposes the same
 choice and suggests `/root/owui-test.key` when it already exists with protected
 permissions. It applies the package-owned main/task provider, dedicated embedding,
-task/RAG and additive model-preset baseline. Credentials/tokens are not persisted
-by the package. Unrelated
+task/RAG, reviewed package-owned Open WebUI Functions and additive model-preset baseline.
+`status` also verifies the package Function source/state and package-owned preset fields
+needed by the selected translation candidate contract. Credentials/tokens are not
+persisted by the package. Unrelated
 operator models, users, prompts and knowledge are not synchronized away.
 
 Agent mode is separate from Open WebUI:

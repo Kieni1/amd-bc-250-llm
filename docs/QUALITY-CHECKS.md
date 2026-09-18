@@ -65,12 +65,11 @@ specialist campaign. It does not install or clone a model itself, which avoids h
 model-definition changes inside the safety measurement.
 
 That gate uses a tiny eight-token request beside warm GPT-OSS, requires task unload,
-main residency, the normal main/task/embedding/Open WebUI/Tika services to stay active,
-minimum memory/swap guardrails and no new serious kernel warning. Any global OOM or main-residency loss rejects the concurrent task role.
+main residency, healthy services, minimum memory/swap guardrails and no new serious
+kernel warning. Any global OOM or main-residency loss rejects the concurrent task role.
 After an OOM experiment, use `task/30-appliance-recovery-check.sh` before continuing.
-By default it actively reloads/warm-checks GPT-OSS if needed, requires the normal
-main/task/embedding/Open WebUI/Tika services, an empty task lane, and fails on serious
-GPU/OOM events that occur during the recovery probe. Serious events
+By default it actively reloads/warm-checks GPT-OSS if needed, requires an empty task lane,
+and fails on serious GPU/OOM events that occur during the recovery probe. Serious events
 from the preceding failed experiment are printed separately as context and do not by
 themselves make recovery impossible to prove. Set `WARM_MAIN=0` only for an explicitly
 read-only residency check.
@@ -83,10 +82,11 @@ silently enlarge those budgets to improve a candidate's score.
 ## Translation candidates
 
 Use the eight-case DE<->FR suite as a short screening gate, not a ranking benchmark.
-Once a candidate reaches the known saturated ceiling, advance it only if the current
-Stage-2 decision record gives it a real promotion case. Do not repeat the short screen to
-rank already-saturated models. No challenger is promoted until the harder corpus and
-exact product path are complete. Useful current wrappers remain:
+It is now saturated by several strong candidates. Stage-2E selected Translate-Gemma
+E4B with explicit-direction v1, thinking omitted and `max_tokens=2048`; broad model
+comparison is closed. Production LFM remains in place until one bounded requalification
+proves the new package-owned direction roles on the final Open WebUI path. Useful
+historical/current screening wrappers remain:
 
 ```bash
 /usr/share/bc250-llm-server/quality-checks/translation/14-lfm-direct-reference.sh
@@ -101,14 +101,16 @@ do not get compared only against a historical score produced under an older
 contract. Run one batch at a time.
 
 Direct screening uses explicit source/target direction, defaults to one round and a
-1024-token output budget, and does not mutate Open WebUI. The main lane must be empty
+1024-token output budget for generic candidates; the selected Translate-Gemma wrapper
+pins 2048 from Stage-2E unless explicitly overridden. It does not mutate Open WebUI.
+The main lane must be empty
 before a foreground direct screen; the harness refuses to unload a model that was
 already resident. Set `BC250_TRANSLATION_THINK=auto|true|false` to make the reasoning
 request contract explicit. Several Qwen-family candidates produced empty answers when
 the default reasoning path consumed the budget and then passed 8/8 with `think:false`,
-so thinking policy is part of translation provenance. Hunyuan-MT uses its upstream
-target-language user prompt; Translate-Gemma uses a `CURRENT_SOURCE`-shaped
-system/user exchange; other models use the generic explicit-direction prompt.
+so thinking policy is part of translation provenance. Hunyuan-MT uses its upstream target-language user prompt. Translate-Gemma direct
+screening now uses the exact Stage-2E explicit-direction v1 system/user contract; other
+models use the generic explicit-direction prompt.
 A candidate that clearly survives the direct screen can then be tested through
 the actual authenticated Open WebUI translation preset. Before the first challenger
 OWUI run, re-anchor the best historical LFM prompt once under the same current
@@ -148,10 +150,11 @@ for provider/model/chat operations, and captures per-request wall time plus BC-2
 temperature/memory/swap telemetry. On exit it restores the preset first and exact
 provider config second, refreshes effective models, verifies both persisted and
 effective restoration, scans evidence for the admin token and all provider secrets,
-and writes runtime provenance plus `run-manifest.json`. Translate-Gemma uses its
-dedicated auto-direction prompt shaped around the fine-tune's `CURRENT_SOURCE`
-contract. Treat any restoration, telemetry, HTTP-contract or credential-scan
-failure as infrastructure failure.
+and writes runtime provenance plus `run-manifest.json`. The generic mutation harness
+remains for reproducibility, but the next Translate-Gemma gate should exercise the
+package-owned `bc250-office-translation-de-fr` / `bc250-office-translation-fr-de` roles
+rather than inventing another temporary prompt. Treat any restoration, telemetry,
+HTTP-contract or credential-scan failure as infrastructure failure.
 
 ## Evidence semantics
 
@@ -163,9 +166,7 @@ The scripts retain the package's quality-result semantics:
 
 The standalone direct and Open WebUI wrappers propagate this return-code contract
 after evidence finalization; do not infer success merely because an evidence
-directory or tarball exists. The direct translation harness writes its authoritative
-local final status after privacy scanning; if archive creation itself fails, it rewrites
-the local status/manifest with the archive-failure return code. The OWUI wrapper deliberately withholds the tarball
+directory or tarball exists. The OWUI wrapper deliberately withholds the tarball
 if credential scanning or root-only temporary-file cleanup fails. Their summaries include per-round, per-direction and per-case quality
 plus latency/resource extrema.
 
@@ -176,6 +177,6 @@ model mistakes into passes.
 Historical Batch 1–3D scripts are installed under `quality-checks/history/` only
 for reproducibility. Prefer the generic current screens for new comparisons.
 
-Before production translation promotion, use a harder corpus covering both directions, inclusive deadlines, contractual modality, exact amounts/references, negation, protected paths/keys/quotes and structured formatting. The current eight-case short screen remains a screening gate, not promotion proof.
+Stage-2E has completed the broad hard-corpus/model-configuration comparison. Before production translation promotion, install `exp-translate-gemma4-sub-e4b-17s-q4-k-xl`, apply the package-owned Open WebUI desired state, and run only the bounded integrated Open WebUI gate against the package-owned direction roles: canonical sanity plus the targeted protected-finance, bullets/table, `Avoir`, and both long-document cases from the Stage-2 evidence. Do not restart broad candidate discovery unless that integration fails for a model-level reason.
 
 Evidence tarballs from the current generic task/translation checks intentionally have no `.sha256` sidecar files, but each script prints the archive SHA-256 for exact evidence identification. Preserve the exact fixture/evaluator/prompt material inside evidence where needed, normalize archive ownership metadata, and keep archive/delivery bookkeeping separate from model-quality conclusions.
