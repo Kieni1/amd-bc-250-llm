@@ -10,8 +10,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.11.1
-Release:        0.11%{?dist}
+Version:        0.11.2
+Release:        0.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,21 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.3
+- Keep the maintainer-approved Translate-Gemma production switch and reconcile development/docs so the source policy no longer describes LFM as the current production translator.
+- Make historical quality scripts source-only after carrying forward their still-useful lifecycle lessons into the supported task/translation screens.
+- Make Open WebUI translation evidence final-RC recording authoritative if archive creation changes the final result.
+
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.2
+- Normalize task/translation catalogs: keep LFM2.5 1.2B as the sole active task model, promote Translate-Gemma as the production DE↔FR base, retain former LFM translation as an experiment, and retire superseded task/translation identities safely.
+- Restore embedding-lane coverage in task survival/recovery and authoritative translation evidence exit-status handling.
+- Refresh operator documentation, desired Open WebUI roles, validation/development memory and model lifecycle records; retire duplicated dated specialist handovers.
+
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.1
+- Start the 0.11.2 line with the Stage-2E translation integration retained from the unpublished 0.11.1-0.11 candidate.
+- Resolve Ruff findings in the translation benchmark, package-owned Open WebUI direction filter and its focused regression tests without changing the tested Stage-2E prompt/wrapper contract.
+- Advance the package qualification target from 0.11.1 to 0.11.2; historical 0.11.1 campaign evidence remains unchanged.
+
 * Thu Sep 17 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.1-0.11
 - Integrate the Stage-2E selected Translate-Gemma configuration as explicit DE-to-FR and FR-to-DE candidate Open WebUI roles using the exact tested v1 system/user contract, 2048 output budget and no forced thinking policy while retaining LFM as the production/default translation role.
 - Package one reviewed non-global Open WebUI direction Filter, reconcile it through supported Function APIs, verify its source/state and package model-preset fields through desired-state status, and preserve unrelated operator Functions.

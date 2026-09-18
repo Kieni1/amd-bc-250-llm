@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.11.2-0.3 - 2026-09-18
+
+- Keep the maintainer-approved Translate-Gemma production switch and reconcile decisions/testing docs so LFM is consistently rollback/reference rather than the current production translator.
+- Make `quality-checks/history/` source-only in the RPM; retain historical campaigns for archaeology while the supported current task/translation screens carry forward the relevant safety lifecycle.
+- Make Open WebUI translation evidence final-RC recording authoritative after restoration, credential cleanup and archive creation, matching the direct-screen evidence-integrity rule.
+- Keep the exact Stage-2E prompt/wrappers, `max_tokens=2048`, omitted thinking policy, task model, runtime topology, CU/governor policy and production model identities otherwise unchanged.
+
+## 0.11.2-0.2 - 2026-09-18
+
+- Make `task-lfm25-1.2b-instruct-liquidai-q6-k` the sole active task-lane model and retire the weak Gemma 3 1B fallback/control to the source graveyard.
+- Promote Stage-2E-selected Translate-Gemma to `prod-translate-gemma4-sub-e4b-17s-q4-k-xl`; make the explicit DE→FR / FR→DE Open WebUI roles production roles, retain LFM 8B only as `exp-lfm25-8b-a1b-liquidai-q6-k`, and retire superseded Hunyuan/Ministral/experimental-Translate identities.
+- Restore `ollama-embedding.service` coverage in task survival/recovery checks and restore authoritative translation evidence final-RC handling after privacy/archive finalization.
+- Refresh `COMMANDS.md` executable fences/privilege coverage, current model/quality docs, validation strategy and durable handovers; remove duplicated dated specialist handovers after preserving their durable evidence.
+- Keep runtime/Ollama/KV/CU/governor topology unchanged; the new production translation identity still requires installed-device product-path verification on the BC-250.
+
+## 0.11.2-0.1 - 2026-09-18
+
+- Start the 0.11.2 line from the unpublished Stage-2E translation integration while keeping its exact system prompt, direction wrappers, 2048-token budget and production-promotion boundary unchanged.
+- Resolve Ruff findings by removing one unused translation variable/import, using `TypeError` for invalid message container/content types, and making the focused wrapper-test string construction explicit.
+- Advance package/revalidation current-version metadata to 0.11.2 while retaining prior 0.11.1 task/translation and operations results as historical evidence.
+
 ## 0.11.1-0.11 - 2026-09-17
 
 - Integrate the Stage-2E selected Translate-Gemma configuration as two package-owned candidate Open WebUI roles with the exact explicit-direction v1 system prompt, direction-specific user wrappers, `max_tokens=2048`, and no forced thinking policy; keep the existing LFM translation role production/default pending one bounded final product-path requalification.

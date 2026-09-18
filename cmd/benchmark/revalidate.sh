@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # BC-250 package revalidation harness v4.0
 #
-# Intended target: bc250-llm-server 0.11.1 on Fedora 44; release suffix is not hard-coded.
+# Intended target: bc250-llm-server 0.11.2 on Fedora 44; release suffix is not hard-coded.
 # `start` launches one systemd-owned qualification worker. Routine revalidation
 # exercises packaged defaults only; tuning and hardware A/B decisions are explicit
 # benchmark/diagnostic work. Per-phase reports are retained and exclusive-agent state
@@ -10,7 +10,7 @@ set -Eeuo pipefail
 umask 0077
 
 HARNESS_VERSION=4.0
-TARGET_VERSION=0.11.1
+TARGET_VERSION=0.11.2
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
 
@@ -57,7 +57,7 @@ PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfe
 # overrides; candidate selection belongs exclusively to bc250-benchmark.
 readonly E2B_MODEL=prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 readonly E4B_MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-readonly LFM_MODEL=prod-lfm25-8b-a1b-liquidai-q6-k
+readonly TRANSLATION_ROLE_MODEL=prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 readonly QWEN_MODEL=prod-qwen35-9b-unsloth-q6-k
 readonly GPT_OSS_MODEL=prod-gpt-oss20b-ggml-org-mxfp4
 readonly EMBED_MODEL=embed-jina-v5-small-retrieval-q4-k-m
@@ -65,14 +65,14 @@ readonly TASK_MODEL=task-lfm25-1.2b-instruct-liquidai-q6-k
 readonly AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m
 readonly OWUI_RAG_MODEL=bc250-office-documents
 readonly -a PACKAGE_PROD_MODELS=(
-  "$E2B_MODEL" "$E4B_MODEL" "$LFM_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
+  "$E2B_MODEL" "$E4B_MODEL" "$TRANSLATION_ROLE_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
 )
 
 # Gross-regression gates only. These floors are intentionally conservative and
 # package-owned; ordinary run-to-run performance variation must not fail qualification.
 # Gross-regression qualification policy, not performance targets. Same-board decode
 # baselines in MODELS.md map conservatively to these floors: E2B ~112 -> 50,
-# E4B ~72 -> 30, LFM ~147 -> 65, Qwen9B ~46 -> 20, GPT-OSS ~80 -> 35 tok/s.
+# E4B ~72 -> 30; production Translate-Gemma uses the same conservative 30 tok/s gross floor pending its first installed baseline; Qwen9B ~46 -> 20, GPT-OSS ~80 -> 35 tok/s.
 # Residency 0.90 catches major CPU spill; 128 MiB MemAvailable is a deliberately
 # unsafe floor rather than desired headroom; 85 C matches the benchmark's highest
 # thermal warning/qualification ceiling.
@@ -308,7 +308,7 @@ current_relevant_args() {
 install_unit() {
   cat > "$UNIT_PATH" <<EOFUNIT
 [Unit]
-Description=BC-250 0.11.1 package qualification v${HARNESS_VERSION}
+Description=BC-250 0.11.2 package qualification v${HARNESS_VERSION}
 After=network-online.target cyan-skillfish-governor-smu.service ollama.service open-webui.service
 Wants=network-online.target
 
@@ -792,7 +792,7 @@ write_phase_report() {
   stamp="$(date +%Y%m%dT%H%M%S)"
   file="$PHASE_REPORT_DIR/$(run_id)-${label}-${stamp}.txt"
   {
-    echo "# BC-250 0.11.1 revalidation v${HARNESS_VERSION} phase report"
+    echo "# BC-250 0.11.2 revalidation v${HARNESS_VERSION} phase report"
     echo "generated=$(now)"
     echo "run_id=$(run_id)"
     echo "phase=$(cat "$PHASE_FILE")"
@@ -1027,7 +1027,7 @@ write_edge_policy() {
   "models": {
     "$E2B_MODEL": {"min_decode_tps": 50.0, "min_context": 32768},
     "$E4B_MODEL": {"min_decode_tps": 30.0, "min_context": 32768},
-    "$LFM_MODEL": {"min_decode_tps": 65.0, "min_context": 32768},
+    "$TRANSLATION_ROLE_MODEL": {"min_decode_tps": 30.0, "min_context": 8192},
     "$QWEN_MODEL": {"min_decode_tps": 20.0, "min_context": 32768},
     "$GPT_OSS_MODEL": {"min_decode_tps": 35.0, "min_context": 16384}
   }
@@ -1232,7 +1232,7 @@ phase_roles() {
   run_step roles task quality qualification_benchmark bc250-benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
   # Qualify the package's shipped translation behavior only. Direction A/B remains
   # an explicit standalone benchmark and cannot leak in through manager environment.
-  run_step roles translation quality qualification_benchmark bc250-benchmark translation "$LFM_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
+  run_step roles translation quality qualification_benchmark bc250-benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
   warm_embedding >/dev/null 2>&1 || true
   run_step roles rag-quality quality qualification_benchmark bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
   run_step roles usecase quality qualification_benchmark bc250-benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
