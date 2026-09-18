@@ -73,12 +73,11 @@ Use cheap rejection and expensive acceptance. A new candidate should normally pa
 6. real first-turn persistence; and only then
 7. true concurrent overlap/stability.
 
-After any OOM experiment, use `quality-checks/task/30-appliance-recovery-check.sh` to
-prove the normal main/task/embedding/UI/Tika service topology, reload/warm GPT-OSS when
-necessary, confirm main residency and an empty task lane, and detect any new serious
-faults caused by the recovery probe. The preceding experiment's OOM remains visible as
-historical context but is not itself a reason for the recovery check to fail.
-
-Current role-specific rejections and their retest conditions belong in
-`development/DECISIONS.md`; the 2026-09-17 Qwen3 4B result is recorded as DEC-007 with
-its evidence summary under `development/model-runs/`.
+`exp-qwen3-4b-lmstudio-q6-k` is the current safety regression case: it scored 5/6
+twice, but both exact-source task staging and a 4096-context task-tuned alias caused
+global OOM and killed the warm main model. Do not retest it for the concurrent task
+role unless the hardware/topology memory envelope changes. After any OOM experiment, use `quality-checks/task/30-appliance-recovery-check.sh` to
+prove normal services, reload/warm GPT-OSS when necessary, confirm main residency and an
+empty task lane, and detect any new serious faults caused by the recovery probe. The
+preceding experiment's OOM remains visible as historical context but is not itself a
+reason for the recovery check to fail.
