@@ -75,7 +75,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
             "prod-gpt-oss20b-ggml-org-mxfp4",
-            "prod-lfm25-8b-a1b-liquidai-q6-k",
+            "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
             "prod-qwen35-9b-unsloth-q6-k",
         }
         self.assertTrue(required <= {model["name"] for model in load("production")[1]})
@@ -186,7 +186,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             with self.subTest(category=category):
                 _defaults, models = load(category)
                 self.assertIn(name, {model["name"] for model in models})
-        self.assertIn(
+        self.assertNotIn(
             "task-gemma3-1b-unsloth-ud-q4-k-xl",
             {model["name"] for model in load("task")[1]},
         )
@@ -231,10 +231,12 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("German-, French-, and English-speaking users", qwen)
         self.assertIn("PARAMETER temperature 0.7", qwen)
         self.assertIn("PARAMETER top_p 0.8", qwen)
-        lfm = (MODELFILES / "prod-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
-        self.assertIn("dedicated professional German↔French translator", lfm)
-        self.assertIn("provides German text without another explicit task", lfm)
-        self.assertNotIn("Do not assume that a German or French input should be translated", lfm)
+        translator = (MODELFILES / "prod-translate-gemma4-sub-e4b-17s-q4-k-xl.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("production German/French translation base", translator)
+        self.assertIn("PARAMETER num_predict 2048", translator)
+        self.assertNotRegex(translator, r"(?m)^SYSTEM\s")
+        lfm = (MODELFILES / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("experimental rollback/control", lfm)
 
     def test_task_model_accepts_open_webui_integrated_task_prompts(self) -> None:
         source = MODELFILES / "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
