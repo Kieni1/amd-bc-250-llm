@@ -36,7 +36,7 @@ Suggested lane references:
 - translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
 - general/main: `MODELS.md`, generation/usecase benchmarks;
 - agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling;
-- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `compare-mtp.sh`.
+- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`.
 
 ## Required specialist handoff
 

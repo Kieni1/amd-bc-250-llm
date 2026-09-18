@@ -18,7 +18,7 @@ ROUTES=(
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
   "cu-status|$LIBEXEC/cu-status.sh"
-  "fetch-mtp|$LIBEXEC/modelctl|install|mtp"
+  "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install|$LIBEXEC/install.sh"
   "install-ollama|$LIBEXEC/install-ollama.sh"

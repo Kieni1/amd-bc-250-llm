@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run one enabled MTP/download-only catalog entry with llama.cpp.
+# Run one MTP/download-only catalog entry with llama.cpp.
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,8 +15,39 @@ PORT="${PORT:-8090}"
 LLAMACPP="${LLAMACPP:-}"
 UBATCH="${UBATCH:-}"
 REVIEWED_LLAMACPP_RELEASE="b10069"
-[[ -x "$LLAMACPP" ]] || { echo "ERROR: set LLAMACPP to an executable llama-server." >&2; exit 1; }
 [[ -x "$MANAGER" ]] || { echo "ERROR: model manager is not executable: $MANAGER" >&2; exit 1; }
+
+show_usage() {
+  local stream="${1:-1}"
+  if [[ "$stream" == 2 ]]; then
+    echo "Usage: LLAMACPP=/path/to/llama-server $0 {27b|4b|ID}" >&2
+    "$MANAGER" list mtp --all --source "$SOURCE_FILE" >&2
+  else
+    echo "Usage: LLAMACPP=/path/to/llama-server $0 {27b|4b|ID}"
+    "$MANAGER" list mtp --all --source "$SOURCE_FILE"
+  fi
+}
+
+choice="${1:-}"
+case "$choice" in
+  -h|--help) show_usage; exit 0 ;;
+  27b) choice=qwen3.6-27b-mtp ;;
+  4b)  choice=qwen3.5-4b-mtp ;;
+  "") show_usage 2; exit 2 ;;
+esac
+
+resolved="$("$MANAGER" path mtp "$choice" --source "$SOURCE_FILE")" || exit 1
+IFS=$'\t' read -r GGUF DEFAULT_CTX DEFAULT_DRAFT <<< "$resolved"
+CTX="${CTX:-$DEFAULT_CTX}"
+DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
+[[ -s "$GGUF" ]] || {
+  echo "ERROR: missing $GGUF." >&2
+  echo "Fetch this exact experiment first with:" >&2
+  echo "  sudo bc250-fetch-mtp $choice" >&2
+  exit 1
+}
+
+[[ -x "$LLAMACPP" ]] || { echo "ERROR: set LLAMACPP to an executable llama-server." >&2; exit 1; }
 
 help_output="$("$LLAMACPP" --help 2>&1 || true)"
 missing_flags=()
@@ -39,23 +70,6 @@ fi
 cache_flags=()
 grep -Fq -- '--cache-ram' <<< "$help_output" && cache_flags+=(--cache-ram 0)
 grep -Fq -- '--no-cache-idle-slots' <<< "$help_output" && cache_flags+=(--no-cache-idle-slots)
-
-choice="${1:-}"
-case "$choice" in
-  27b) choice=qwen3.6-27b-mtp ;;
-  4b)  choice=qwen3.5-4b-mtp ;;
-esac
-if [[ -z "$choice" ]]; then
-  echo "Usage: LLAMACPP=/path/to/llama-server $0 {27b|4b|ID}" >&2
-  "$MANAGER" list mtp --source "$SOURCE_FILE" >&2
-  exit 2
-fi
-
-resolved="$("$MANAGER" resolve mtp "$choice" --source "$SOURCE_FILE")" || exit 1
-IFS=$'\t' read -r GGUF DEFAULT_CTX DEFAULT_DRAFT <<< "$resolved"
-CTX="${CTX:-$DEFAULT_CTX}"
-DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
-[[ -s "$GGUF" ]] || { echo "ERROR: missing $GGUF; run bc250-fetch-mtp first." >&2; exit 1; }
 
 args=(
   -m "$GGUF"

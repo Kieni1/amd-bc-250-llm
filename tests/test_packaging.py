@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -145,6 +146,31 @@ class PackagingTests(unittest.TestCase):
             "MODELS.md\t{docdir}/MODELS.md",
         ):
             self.assertIn(entry, manifest)
+
+    def test_fetch_mtp_dispatches_to_explicit_disabled_entry_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            modelctl = libexec / "modelctl"
+            modelctl.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\n' \"$@\"\n", encoding="utf-8"
+            )
+            modelctl.chmod(0o755)
+            result = subprocess.run(
+                [
+                    str(ROOT / "packaging/bc250"),
+                    "fetch-mtp",
+                    "qwen3.6-27b-mtp",
+                ],
+                env={**os.environ, "BC250_LIBEXEC": str(libexec)},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.splitlines(),
+            ["apply", "mtp", "--include-disabled", "qwen3.6-27b-mtp"],
+        )
 
     def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(
         self,

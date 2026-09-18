@@ -132,6 +132,35 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("continuous watch is the default", result.stdout)
 
+    def test_mtp_runner_help_does_not_require_llamacpp(self) -> None:
+        result = subprocess.run(
+            [str(ROOT / "models/mtp/run-mtp-llamacpp.sh"), "--help"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            env={"PATH": "/usr/bin:/bin"},
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("qwen3.6-27b-mtp", result.stdout)
+        self.assertIn("qwen3.5-4b-mtp", result.stdout)
+        self.assertNotIn("set LLAMACPP", result.stdout)
+
+    def test_mtp_runner_missing_source_points_to_exact_fetch_before_runtime(self) -> None:
+        result = subprocess.run(
+            [str(ROOT / "models/mtp/run-mtp-llamacpp.sh"), "27b"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            env={"PATH": "/usr/bin:/bin"},
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "sudo bc250-fetch-mtp qwen3.6-27b-mtp", result.stdout
+        )
+        self.assertNotIn("set LLAMACPP", result.stdout)
+
     def test_mtp_disables_shared_prompt_cache_when_supported(self) -> None:
         source = (ROOT / "models/mtp/run-mtp-llamacpp.sh").read_text(encoding="utf-8")
         self.assertIn("grep -Fq -- '--cache-ram'", source)
