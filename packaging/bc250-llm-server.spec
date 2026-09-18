@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        0.3%{?dist}
+Release:        0.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.4
+- Harden the experimental MTP lane before first BC-250 qualification: exact-ID candidates, protected-state verification, safe llama-server privilege drop, launch resource/port/stale-process preflight, and same-model no-MTP versus MTP comparison evidence.
+- Expand the disabled MTP catalog to Qwen3.5 9B, Qwen3.6 27B control, Qwen3.8 27B HauhauCS IQ2_M and Qwen3.6 35B-A3B while keeping MTP outside generic convergence and production roles.
+- Keep MTP qualification fail-closed on completion integrity, kernel-journal capture, draft-acceptance evidence and severe GPU/kernel faults; move the reviewed external llama.cpp starting baseline to b10964/v0.4.1 for the Qwen3.8-capable funnel; no production model or runtime topology changes.
+
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.3
 - Restore state-rich installer model selection through compact shared model-state inspection while keeping bc250-model list catalog-only.
 - Tighten the package-owned Open WebUI tag-generation prompt so broad and specific tags share one array and exactly one raw JSON object is emitted.

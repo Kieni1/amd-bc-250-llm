@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.3-0.4 - 2026-09-18
+
+- Harden the experimental MTP lane before its first BC-250 hardware campaign: `bc250-run-mtp` now verifies protected manager state/SHA, refuses an occupied port or stale llama-server, enforces a launch-memory floor, validates runtime flags/access, and launches the external server as the `ollama` service user rather than root.
+- Replace unrelated Ollama-vs-MTP timing with a controlled same-target comparison: `bc250-compare-mtp ID` runs the same GGUF sequentially through the same llama.cpp build/settings with MTP disabled and enabled, then records throughput, draft acceptance, memory/swap, runtime/model identity, server logs and kernel/GPU-fault evidence.
+- Expand the disabled download-only MTP catalog to a bounded first-campaign set: Qwen3.5 9B, retained Qwen3.6 27B control, HauhauCS Qwen3.8 27B IQ2_M, and Qwen3.6 35B-A3B. MTP remains outside generic convergence and has no Ollama Modelfiles.
+- Keep MTP qualification fail-closed on completion integrity, server survival, kernel-journal capture, severe GPU/kernel faults and draft-acceptance evidence; move the reviewed external llama.cpp starting baseline to `b10964` / v0.4.1 now that Qwen3.8 is in the funnel. No production model, Open WebUI role, normal Ollama topology, quality threshold, CU/governor policy or revalidation acceptance rule changes.
+
 ## 0.11.3-0.3 - 2026-09-18
 
 - Restore the install-time model picker to state-rich output by consuming compact shared model-state inspection instead of turning `bc250-model list` back into a runtime/protected-state operation.
