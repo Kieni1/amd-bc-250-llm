@@ -987,6 +987,13 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertTrue(category.translation_content_checks(locale_de, fr_de)[2])
         self.assertFalse(category.translation_content_checks(wrong_de, fr_de)[2])
 
+    def test_translation_numeric_values_accept_one_decimal_locale_forms(self) -> None:
+        self.assertEqual(category.numeric_values("8.1 %"), {category.Decimal("8.1")})
+        self.assertEqual(category.numeric_values("8,1 %"), {category.Decimal("8.1")})
+        self.assertEqual(category.numeric_values("CHF 1 250.00"), {category.Decimal("1250.00")})
+        self.assertEqual(category.numeric_values("CHF 1 250,00"), {category.Decimal("1250.00")})
+        self.assertEqual(category.numeric_values("1,250"), {category.Decimal("1250")})
+
     def test_translation_prompt_profiles_match_specialist_contracts(self) -> None:
         case = {
             "source_language": "de",
@@ -1004,8 +1011,13 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
             case, "exp-translate-gemma4-sub-e4b-17s-q4-k-xl"
         )
         self.assertEqual([message["role"] for message in gemma], ["system", "user"])
-        self.assertIn("TASK: Translate German", gemma[0]["content"])
-        self.assertTrue(gemma[1]["content"].startswith("[CURRENT_SOURCE]"))
+        self.assertEqual(
+            gemma[0]["content"], category.TRANSLATE_GEMMA_EXPLICIT_DIRECTION_V1
+        )
+        self.assertEqual(
+            gemma[1]["content"],
+            category.TRANSLATE_GEMMA_DIRECTION_WRAPPERS[("de", "fr")] + case["input"],
+        )
 
     def test_translation_generic_prompt_does_not_contradict_localized_dates(self) -> None:
         case = {
