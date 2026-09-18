@@ -1,0 +1,829 @@
+# BC-250 Translation Testing Code & Method Handover
+## Reusable conventions for future batches
+
+This file records the testing conventions learned during the 0.11.1-0.10 translation campaign so they do not need to be rediscovered.
+
+## 1. Scope
+
+Primary translation scope:
+
+```text
+German ↔ French
+```
+
+Do not add English to advancement/ranking unless explicitly requested later.
+
+Package boundary currently used:
+
+```text
+bc250-llm-server 0.11.1-0.10.fc44
+```
+
+Version checks must accept RPM distro suffixes:
+
+```text
+expected VERSION = 0.11.1
+expected RELEASE prefix = 0.10
+
+valid:
+0.11.1-0.10
+0.11.1-0.10.fc44
+```
+
+Do not compare the full release string to the unsuffixed value.
+
+## 2. Work batchwise
+
+The BC-250 can run about 30 minutes at a time.
+
+Prefer small, interpretable batches:
+
+```text
+short-screen batch:
+  3–4 models
+  1 canonical round/model
+
+confirmation:
+  only models that earned it
+
+hard-corpus batch:
+  ~3–4 selected models
+  one pass through a richer corpus
+
+large models:
+  few models per batch
+  aggressive memory recovery checks
+```
+
+Do not run the whole candidate catalog in one session.
+
+## 3. Never let a test kill the SSH/login shell
+
+This is a hard requirement.
+
+Do not paste a block into the login shell that can execute `exit`, inherit `set -e`, or return a nonzero command before the block's final status handling.
+
+Preferred pattern:
+
+```bash
+SCRIPT="$HOME/<script>.sh"
+
+if [[ -r "$SCRIPT" ]]; then
+    bash "$SCRIPT" || true
+else
+    printf '%s\n' 'ERROR: test script is missing or unreadable.'
+fi
+
+printf '\nLauncher finished; SSH/login shell remains active.\n'
+true
+```
+
+Inside reusable scripts:
+
+- run as a child process;
+- refuse accidental `source`;
+- do not use a top-level failure path that can affect the parent;
+- print a separate `MEASUREMENT_RC`;
+- finish with process `exit 0`.
+
+Example guard:
+
+```bash
+if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
+    printf '%s\n' 'REFUSED: execute this script with bash; do not source it.' >&2
+    return 0
+fi
+```
+
+Example final status:
+
+```bash
+main "$@"
+measurement_rc=$?
+
+printf 'MEASUREMENT_RC=%s\n' "$measurement_rc"
+printf '%s\n' 'PROCESS_RC=0'
+
+exit 0
+```
+
+Interpret `MEASUREMENT_RC`, not the child process exit code.
+
+## 4. Return-code semantics
+
+For package quality wrappers:
+
+```text
+rc=0  quality pass
+rc=3  legitimate quality failure with useful evidence
+other nonzero  infrastructure/integrity failure
+```
+
+For newer safe batch scripts:
+
+```text
+model result:
+  0 = model passed that test contract
+  3 = valid quality fail
+  other = infrastructure fail
+
+batch:
+  MEASUREMENT_RC=0 = infrastructure completed
+  nonzero MEASUREMENT_RC = infrastructure/preflight/bundle failure
+  PROCESS_RC=0 always
+```
+
+A quality fail must not be relabeled as infrastructure failure.
+
+A transfer failure must never change the quality or measurement result.
+
+## 5. No SHA sidecars for evidence tar files
+
+Current convention:
+
+```text
+DO NOT:
+- create .sha256 sidecars for result tarballs
+- require sha256sum before running or uploading
+- make checksum success part of qualification
+```
+
+Rationale:
+
+- it created unnecessary launcher failure paths;
+- a missing script/checksum previously interacted badly with inherited `set -e`;
+- the current workflow transfers one self-contained evidence bundle.
+
+Hashes may still be useful internally for package/evaluator provenance, but they are not required for tar transfer UX.
+
+## 6. One bundle per batch
+
+Preferred evidence structure:
+
+```text
+/tmp/bc250-translation-evidence/
+    translation-<batch>-<model-A>-<timestamp>.tar.gz
+    translation-<batch>-<model-B>-<timestamp>.tar.gz
+    translation-<batch>-<anchor>-<timestamp>.tar.gz
+
+/tmp/bc250-translation-bundles/
+    bc250-translation-<batch>-bundle-<timestamp>.tar.gz
+```
+
+The final bundle should contain:
+
+```text
+batch-summary.txt
+fixture used by the batch
+per-model evidence archive A
+per-model evidence archive B
+...
+closing-anchor evidence archive, if applicable
+```
+
+The bundle should **not** contain:
+
+- SHA sidecars
+- raw SSH/rsync logs
+- raw full journals
+- bearer tokens
+- API keys
+- authorization headers
+- email addresses
+- local usernames
+- `$HOME` paths
+- token files
+- Open WebUI credentials
+
+Normalize tar ownership metadata:
+
+```bash
+tar --owner=0 --group=0 --numeric-owner \
+    -C "$STAGE" \
+    -czf "$BUNDLE" .
+```
+
+This prevents the local login name from being stored as tar-owner metadata.
+
+## 7. Rsync UX: keep it plain
+
+The user-preferred transfer UX is the original direct form.
+
+After **all measurement, privacy scanning and bundle creation** is finished, execute exactly one ordinary rsync:
+
+```bash
+rsync -avz --progress \
+  /tmp/bc250-translation-bundles/bc250-translation-<batch>-bundle-<timestamp>.tar.gz \
+  <review-user>@<review-host>:<review-path>/
+```
+
+Expected interaction:
+
+```text
+aqua@192.168.1.118's password:
+```
+
+That is intentional.
+
+Do not use:
+
+- destination selection prompts
+- hidden destination prompts
+- SSH_ASKPASS
+- `BatchMode=yes`
+- transfer wizards
+- one rsync command per model
+- multiline manual fallback that leaves filenames as separate shell commands
+
+Transfer result is delivery-only:
+
+```text
+rsync_rc=0     transfer succeeded
+rsync_rc!=0    local bundle retained; measurements remain valid
+```
+
+Never store rsync stdout/stderr inside the evidence bundle.
+
+## 8. Privacy requirements
+
+Evidence must be privacy-scrubbed before archive creation.
+
+Scan/scrub textual evidence for at least:
+
+```text
+Authorization: Bearer ...
+Bearer <token>
+api_key / access_token / auth_token
+email addresses
+local usernames
+$HOME
+```
+
+Do not archive:
+
+```text
+/root/owui-test.key
+temporary auth-header files
+full Open WebUI provider configs containing secrets
+raw transfer logs
+```
+
+For translation foreground/direct batches, there should normally be no reason to touch Open WebUI credentials at all.
+
+Terminal-only rsync/SSH prompts are not evidence, but should never be redirected into evidence files.
+
+## 9. Main-lane safety
+
+Before a foreground direct batch:
+
+```text
+main Ollama lane must be empty
+```
+
+Do not unload a model that was already resident before the experiment.
+
+For each tested model:
+
+```text
+precondition:
+  lane empty
+
+test:
+  load model
+  run all cases for that model while it remains warm
+
+postcondition:
+  unload that model
+  prove lane empty
+```
+
+For large models, require memory recovery before starting another model.
+
+Current conservative recovery gate:
+
+```text
+MemAvailable >= 8192 MiB
+```
+
+This was raised after 27B/35B models reached extremely low headroom while resident.
+
+## 10. Model registration and immutability
+
+Use package-managed registration when required:
+
+```bash
+sudo bc250-model install experiments <model>
+```
+
+or:
+
+```bash
+sudo bc250-model install production <model>
+```
+
+Capture `/api/show` before and after the run.
+
+Required result:
+
+```text
+model_definition_unchanged=true
+```
+
+Do not modify Modelfiles, package desired state, or Open WebUI state merely to make a direct candidate screen pass.
+
+## 11. Thinking policy is part of the test contract
+
+This campaign proved that reasoning defaults can make translation results meaningless.
+
+Several Qwen models initially did:
+
+```text
+1024 generated tokens
+all consumed in thinking
+empty final answer
+```
+
+That is not evidence of poor translation quality.
+
+For direct transformation models known to reason by default, explicitly test:
+
+```json
+"think": false
+```
+
+Keep the answer budget unchanged.
+
+Record:
+
+```text
+request_think
+thinking_chars
+thinking_nonempty
+done_reason
+output-budget
+thinking-budget
+thinking-present-despite-false
+```
+
+If a model continues to emit thinking despite `think:false`, report that as a runtime/model-contract property.
+
+Do not “fix” thinking exhaustion merely by granting thousands of extra reasoning tokens unless the product is actually intended to pay that cost.
+
+## 12. Prompt policy
+
+Use package evaluator/prompt primitives wherever possible:
+
+```text
+/usr/libexec/bc250-llm-server/category-benchmark.py
+/usr/libexec/bc250-llm-server/benchmark_common.py
+```
+
+For the canonical short screen, use the package fixture.
+
+For experimental harder corpora:
+
+- copy the exact fixture into evidence;
+- copy the exact evaluator/common Python into evidence;
+- label the experimental contract clearly;
+- do not pretend the experimental score replaced the canonical package evaluator.
+
+Specialist vs generalist prompting must remain explicit in provenance.
+
+## 13. What to measure per request
+
+At minimum record:
+
+```text
+case_id
+source_language
+target_language
+outcome
+failure_kinds
+diagnostics
+
+raw final response
+raw thinking field
+request think policy
+
+wall_s
+load_s
+prompt_eval_count
+eval_count
+eval_s
+answer_chars
+thinking_chars
+done_reason
+
+MemAvailable minimum
+swap-used maximum
+temperature maximum
+```
+
+Do not print full generated translations to the terminal by default. Keep them inside evidence for review.
+
+## 14. What to measure per model
+
+At minimum:
+
+```text
+quality pass/total
+DE→FR pass/total
+FR→DE pass/total
+
+failure counts:
+  language
+  source leakage
+  semantic
+  preservation
+  formatting
+  empty output
+  output budget
+  thinking budget
+
+first_request_wall_s
+first_request_load_s
+warm_wall_mean_s
+wall_mean_s
+wall_p95_s
+
+min_mem_available_mib
+max_swap_used_mib
+max_temp_c
+
+start_swap_used_mib
+end_swap_used_mib
+swap_delta_mib
+
+thinking_nonempty / total
+exact-preservation / total
+introduced Markdown
+introduced newlines
+```
+
+Also capture a resident `/api/ps` snapshot after the first request for foreground resource context.
+
+## 15. Swap: report deltas, not only absolute maxima
+
+Do not attribute an absolute swap value to a model without context.
+
+Always record:
+
+```text
+start_swap_used_mib
+end_swap_used_mib
+swap_delta_mib
+```
+
+Example interpretation:
+
+```text
+max swap during model = 900 MiB
+start = 895 MiB
+end = 896 MiB
+
+=> model did not create a 900 MiB swap regression;
+   most swap was pre-existing.
+```
+
+This became important during B/D batches.
+
+## 16. Journals and GPU/OOM health
+
+Do not archive full service/kernel journals.
+
+During each model window, search them for serious signals only:
+
+```text
+out of memory
+oom-kill
+oom_reaper
+killed process
+device lost
+gpu reset
+amdgpu reset/timeout/fault
+ring timeout/reset/fault/error
+```
+
+Archive only matched serious-warning lines.
+
+No matches:
+
+```text
+serious runtime warnings: none
+```
+
+Any real OOM/device-loss/GPU reset is infrastructure/resource failure, not a quality result.
+
+## 17. Canonical quality vs extra diagnostics
+
+Keep separate:
+
+```text
+canonical package result
+manual/product diagnostics
+experimental hard-corpus result
+```
+
+Do not silently change the canonical evaluator mid-campaign.
+
+Examples of issues the canonical 8-case screen may accept:
+
+- `bis` translated too strictly as `avant`
+- introduced Markdown emphasis
+- typography normalization of amounts
+- semantically plausible but less exact legal terminology
+
+Use extra diagnostics to compare survivors, but do not rewrite historical pass counts after the fact unless there is a proved evaluator bug and stored-output rescore is clearly documented.
+
+## 18. Harder DE↔FR Stage-2 dimensions
+
+Once many candidates reach 8/8, test harder distinctions:
+
+```text
+inclusive deadline:
+  bis / spätestens / au plus tard
+  reject “avant” when the deadline date itself is allowed
+
+numbers:
+  2 % vs 20 %
+  0,5 % vs 5 %
+  exact CHF amounts
+
+legal/modality:
+  only if
+  may / must / shall
+  prior written consent
+  negation scope
+
+protected content:
+  references
+  service names
+  file paths
+  config keys
+  quoted text that must remain unchanged
+
+format:
+  bullets
+  tables
+  pipe separators
+
+roles:
+  named people
+  pronoun/conditional scope
+```
+
+Score separately:
+
+```text
+language
+semantics
+exact preservation
+target constraint
+source leakage
+format
+thinking/output budget
+```
+
+Do not hide the failure reason inside only `12/14`.
+
+## 19. Closing anchors
+
+Long or risky batches should close with the strongest small anchor when useful.
+
+Current preferred anchor:
+
+```text
+exp-translate-gemma4-sub-e4b-17s-q4-k-xl
+```
+
+Purpose:
+
+```text
+prove runtime/benchmark did not degrade across the batch
+```
+
+Do not over-repeat the anchor; one closing canonical round is normally enough.
+
+## 20. Model-selection interpretation
+
+Do not choose only by pass count.
+
+A practical appliance translator must balance:
+
+```text
+semantic fidelity
+target-language quality
+exact amount/date/reference preservation
+format preservation
+latency
+memory headroom
+swap behavior
+thinking behavior
+product-path reliability
+```
+
+Example:
+
+```text
+Qwen 35B:
+  can score 8/8
+  but reached ~116 MiB MemAvailable
+
+Translate-Gemma:
+  also scores 8/8
+  much faster warm
+  >8 GiB MemAvailable in late anchors
+```
+
+The large model is therefore a useful quality upper bound, not automatically the better deployment choice.
+
+## 21. Direct foreground results do not prove coexistence
+
+Explicitly distinguish:
+
+```text
+foreground quality/resource screen
+```
+
+from:
+
+```text
+true concurrent residency test
+```
+
+A model can be an excellent sequential/foreground translator even if it cannot coexist with warm GPT-OSS.
+
+Possible deployment modes remain:
+
+### Concurrent translator
+
+```text
+main stays warm
+translator loads alongside it
+```
+
+Requires true overlap qualification.
+
+### Foreground translation workload
+
+```text
+translation requested
+main may unload
+translator loads
+translation completes
+translator unloads
+main restored/warmed as required
+```
+
+Large specialists/generalists can remain valid candidates under this design.
+
+Do not reject a quality leader solely because coexistence has not yet been proven.
+
+## 22. Real product path comes after direct narrowing
+
+For the final 2–3 candidates, use the exact translation product path that will ship:
+
+```text
+real Open WebUI authenticated path
+real preset/template
+real language selection behavior
+raw model generation
+final user-visible output
+```
+
+Verify:
+
+```text
+no explanation leakage
+format preservation
+empty input handling
+long input behavior
+source/target selection
+error/cancellation behavior
+preset/config restoration
+credential hygiene
+```
+
+If Open WebUI state must be mutated:
+
+- save exact original state;
+- apply only candidate delta;
+- read back and verify;
+- restore in an exit-safe transaction;
+- verify exact restoration;
+- keep secrets only in root-owned temporary files;
+- never put full secret-bearing provider config in evidence.
+
+## 23. Example: simple shell-safe launcher
+
+```bash
+SCRIPT="$HOME/bc250-translation-stage2a-hard-de-fr-direct-rsync-0.11.1-0.10.sh"
+
+if [[ -r "$SCRIPT" ]]; then
+    bash "$SCRIPT" || true
+else
+    printf '%s\n' 'ERROR: Stage 2A script is missing or unreadable.'
+fi
+
+printf '\nLauncher finished; SSH/login shell remains active.\n'
+true
+```
+
+## 24. Example: final one-bundle rsync
+
+Preferred final transfer:
+
+```bash
+rsync -avz --progress \
+  /tmp/bc250-translation-bundles/bc250-translation-stage2a-bundle-20260917-XXXXXX.tar.gz \
+  <review-user>@<review-host>:<review-path>/
+```
+
+Normal SSH interaction:
+
+```text
+aqua@192.168.1.118's password:
+```
+
+No extra transfer UI is necessary.
+
+## 25. Example: paste-ready result summary
+
+```text
+TRANSLATION BATCH HANDOFF
+
+Package:
+- bc250-llm-server 0.11.1-0.10.fc44
+
+Batch:
+- <batch name>
+- scope: DE↔FR
+- path: direct foreground
+
+Model:
+- <model>
+- think policy: <omit|false>
+
+Quality:
+- overall: <pass>/<total>
+- DE→FR: <pass>/<total>
+- FR→DE: <pass>/<total>
+- failures:
+  - semantic: <n>
+  - language: <n>
+  - source leakage: <n>
+  - preservation: <n>
+  - format: <n>
+  - output budget: <n>
+  - thinking budget: <n>
+
+Runtime:
+- first request wall: <s>
+- first load: <s>
+- warm mean: <s>
+- p95 wall: <s>
+- min MemAvailable: <MiB>
+- swap start/end/delta: <MiB>
+- max temperature: <C>
+- serious warning matches: <none/details>
+
+Integrity:
+- model definition unchanged: <yes/no>
+- lane empty after unload: <yes/no>
+- memory recovery gate: <pass/fail>
+- privacy scan: <pass/fail>
+
+Interpretation:
+- <advance / confirm / reject / upper-bound only>
+
+Evidence:
+- one batch bundle:
+  /tmp/bc250-translation-bundles/<bundle>.tar.gz
+
+Delivery:
+- rsync_rc=<n>
+- delivery RC does not alter measurement validity
+```
+
+## 26. Current next script
+
+At the time of this handover, the next generated script is:
+
+```text
+bc250-translation-stage2a-hard-de-fr-direct-rsync-0.11.1-0.10.sh
+```
+
+It uses:
+
+- four selected models;
+- 14 harder DE↔FR cases;
+- one batch bundle;
+- no SHA sidecars;
+- direct ordinary rsync to the established review machine;
+- standard SSH password prompt only;
+- process RC 0 with separate `MEASUREMENT_RC`;
+- privacy scrub/scan;
+- numeric tar ownership metadata;
+- 8192 MiB post-unload recovery gate.
+
+This script has been syntax/embedded-Python checked, but Stage 2A results are not yet available.
