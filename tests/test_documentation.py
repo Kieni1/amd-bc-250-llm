@@ -217,7 +217,7 @@ class DocumentationTests(unittest.TestCase):
         recommended = (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
-            "prod-lfm25-8b-a1b-liquidai-q6-k",
+            "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
             "prod-gpt-oss20b-ggml-org-mxfp4",
             "embed-jina-v5-small-retrieval-q4-k-m",
             "task-lfm25-1.2b-instruct-liquidai-q6-k",

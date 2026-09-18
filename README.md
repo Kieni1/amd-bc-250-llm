@@ -85,7 +85,7 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 |---|---|
 | Standard office work | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
 | Documents and RAG | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
-| German–French translation | `prod-lfm25-8b-a1b-liquidai-q6-k` |
+| German–French translation | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` via explicit DE→FR / FR→DE Open WebUI roles |
 | General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` |
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
@@ -93,8 +93,9 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
 
 The packaged comparison catalog retains active measured challengers, including
-`exp-granite42-3b-ibm-q6-k` plus the compact task and translation candidates under
-`quality-checks/`. Exhausted comparisons are kept only in the source graveyard and are not
+`exp-granite42-3b-ibm-q6-k`, the former LFM translator as an explicit rollback/reference,
+and broader office/RAG/main-lane experiments. Exhausted task/translation comparisons are
+kept only in the source graveyard and are not
 exposed through normal model discovery. The installed retirement catalog lets
 `bc250-model list` identify stale package-retired registrations and
 `sudo bc250-model cleanup-retired` remove only those explicitly catalogued models.

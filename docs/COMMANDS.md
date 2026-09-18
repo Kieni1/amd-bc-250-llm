@@ -52,7 +52,7 @@ host or service-owned data normally require `sudo`.
 
 Repository bootstrap:
 
-```text
+```bash
 sudo ./install [RPM-FILE-OR-DIRECTORY]
 ```
 
@@ -62,7 +62,7 @@ from `%post`.
 
 Packaged orchestrator:
 
-```text
+```bash
 sudo bc250-install
 sudo bc250-install --models-only
 sudo bc250-install --owui-token-file /root/owui-test.key
@@ -92,7 +92,7 @@ a no-op update with current model sources does not ask for one.
 
 ## Models
 
-```text
+```bash
 sudo bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 bc250-model resolve CATEGORY ID
 sudo bc250-model install CATEGORY [SELECTION] [OPTIONS]
@@ -198,7 +198,7 @@ vector store. `bc250-rag-import` is only a metadata-aware Open WebUI sync client
 
 ## Documents / RAG import
 
-```text
+```bash
 sudo bc250-rag-import plan [ROOT]
 sudo bc250-rag-import sync [ROOT] --token-file FILE [--prune]
 ```
@@ -223,7 +223,7 @@ file or `OPEN_WEBUI_API_KEY`.
 
 ## Experimental OCR
 
-```text
+```bash
 bc250-ocr list
 sudo bc250-ocr install glm|ovis
 bc250-ocr show glm|ovis
@@ -253,7 +253,7 @@ See [`../MODELS.md`](../MODELS.md) for model roles/swapping and
 
 ## Storage
 
-```text
+```bash
 sudo bc250-storage status
 sudo bc250-storage dedupe [--yes]
 sudo bc250-storage prune-sources [--yes]
@@ -280,7 +280,7 @@ kernel no longer exists under `/usr/lib/modules`. No storage cleanup is automati
 
 ## Runtime profiles
 
-```text
+```bash
 bc250-memory-profile status
 bc250-memory-profile recommend
 sudo bc250-memory-profile ensure
@@ -308,7 +308,7 @@ sudo bc250-ollama-profile reset
 
 ## CU tools
 
-```text
+```bash
 bc250-cu-status
 bc250-cu-status --summary
 sudo bc250-40cu status
@@ -443,7 +443,7 @@ for result schema, category contracts and Ollama 0.34.0 request policy. The inst
 
 ## Open WebUI setup
 
-```text
+```bash
 sudo bc250-openwebui-setup init
 sudo bc250-openwebui-setup init --token-file /root/owui-test.key
 sudo bc250-openwebui-setup init --owui-token-file /root/owui-test.key  # alias
@@ -459,13 +459,13 @@ choice and suggests `/root/owui-test.key` when it already exists with protected
 permissions. It applies the package-owned main/task provider, dedicated embedding,
 task/RAG, reviewed package-owned Open WebUI Functions and additive model-preset baseline.
 `status` also verifies the package Function source/state and package-owned preset fields
-needed by the selected translation candidate contract. Credentials/tokens are not
+needed by the selected production translation contract. Credentials/tokens are not
 persisted by the package. Unrelated
 operator models, users, prompts and knowledge are not synchronized away.
 
 Agent mode is separate from Open WebUI:
 
-```text
+```bash
 bc250-agent-mode status
 sudo bc250-agent-mode enter
 sudo bc250-agent-mode leave
@@ -476,7 +476,7 @@ backend; leaving restores normal mode.
 
 ## Maintenance
 
-```text
+```bash
 sudo bc250-maintenance setup [--defaults]
 sudo bc250-maintenance status
 sudo bc250-maintenance contract
@@ -505,7 +505,7 @@ and [`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
 
 ## Coding and experiments
 
-```text
+```bash
 bc250-code MODE INPUT [OUTPUT] [TASK...]
 bc250-code-commit [--yes]
 bc250-gitea-review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
@@ -533,7 +533,7 @@ RAM reservation.
 
 ## Reset / package removal
 
-```text
+```bash
 sudo bc250-reset [--yes]
 bc250-reset-info
 sudo bc250-uninstall [--yes]  # compatibility alias

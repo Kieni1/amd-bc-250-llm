@@ -85,12 +85,12 @@ For the normal appliance, restore all three normal Ollama lanes together with `s
 
 ## Package-owned Open WebUI Function
 
-The two Translate-Gemma candidate translation roles use one package-owned, non-global
+The two Translate-Gemma production translation roles use one package-owned, non-global
 Open WebUI Filter Function (`bc250_translation_direction`) to prepend the exact tested
 direction wrapper to the current text user message. Open WebUI Functions execute Python
 inside the application server, so treat any Function as executable server code. The
 package-owned filter is intentionally tiny: it performs no network, filesystem, process,
-credential or tool access and is attached only to the two translation candidate presets.
+credential or tool access and is attached only to the two production translation presets.
 `bc250-openwebui-setup apply` restores its reviewed source and active/non-global state;
 `status` reports drift. Do not mark it global or replace it with unreviewed community
 code on a confidential appliance.

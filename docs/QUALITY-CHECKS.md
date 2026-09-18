@@ -7,8 +7,7 @@ from `bc250-revalidate` and from deterministic package-build validation.
 Use them only on the real BC-250 when investigating model quality. They can
 download/register experimental GGUFs, make model requests, and create evidence
 bundles below `${BC250_QUALITY_ROOT:-$HOME/bc250-quality}` with a matching
-`.tar.gz` in `$HOME`. They do **not** build the RPM and do not constitute final
-v1.0 qualification.
+`.tar.gz` in `$HOME`. They do **not** build the RPM and do not replace whole-appliance revalidation or production-promotion evidence.
 
 ## Package-level smoke
 
@@ -79,82 +78,41 @@ Task benchmark metadata records the actual request contract: task requests use
 packaged tag/query paths retain the 128-token task budget. The screen does not
 silently enlarge those budgets to improve a candidate's score.
 
-## Translation candidates
+## Translation qualification
 
-Use the eight-case DE<->FR suite as a short screening gate, not a ranking benchmark.
-It is now saturated by several strong candidates. Stage-2E selected Translate-Gemma
-E4B with explicit-direction v1, thinking omitted and `max_tokens=2048`; broad model
-comparison is closed. Production LFM remains in place until one bounded requalification
-proves the new package-owned direction roles on the final Open WebUI path. Useful
-historical/current screening wrappers remain:
+The broad DE↔FR tournament is closed. `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is the package production translation
+base and the two package-owned Open WebUI roles provide the selected Stage-2E direction
+contract. The former LFM production model is retained only as `exp-lfm25-8b-a1b-liquidai-q6-k` for explicit
+rollback/reference comparisons. Hunyuan and Ministral translation-only challengers are
+retired to the source graveyard; TIR remains experimental only for broader office/RAG work.
+
+Current direct checks:
 
 ```bash
-/usr/share/bc250-llm-server/quality-checks/translation/14-lfm-direct-reference.sh
-/usr/share/bc250-llm-server/quality-checks/translation/11-ministral-direct.sh
-/usr/share/bc250-llm-server/quality-checks/translation/12-hunyuan-direct.sh
 /usr/share/bc250-llm-server/quality-checks/translation/13-translate-gemma-direct.sh
+/usr/share/bc250-llm-server/quality-checks/translation/14-lfm-direct-reference.sh
 ```
 
-The LFM reference does not install or mutate the production model. It exists so
-changes to the translation evaluator, output budget, or specialist prompt profiles
-do not get compared only against a historical score produced under an older
-contract. Run one batch at a time.
-
-Direct screening uses explicit source/target direction, defaults to one round and a
-1024-token output budget for generic candidates; the selected Translate-Gemma wrapper
-pins 2048 from Stage-2E unless explicitly overridden. It does not mutate Open WebUI.
-The main lane must be empty
-before a foreground direct screen; the harness refuses to unload a model that was
-already resident. Set `BC250_TRANSLATION_THINK=auto|true|false` to make the reasoning
-request contract explicit. Several Qwen-family candidates produced empty answers when
-the default reasoning path consumed the budget and then passed 8/8 with `think:false`,
-so thinking policy is part of translation provenance. Hunyuan-MT uses its upstream target-language user prompt. Translate-Gemma direct
-screening now uses the exact Stage-2E explicit-direction v1 system/user contract; other
-models use the generic explicit-direction prompt.
-A candidate that clearly survives the direct screen can then be tested through
-the actual authenticated Open WebUI translation preset. Before the first challenger
-OWUI run, re-anchor the best historical LFM prompt once under the same current
-OWUI evaluator:
+Current restoring Open WebUI comparisons:
 
 ```bash
-/usr/share/bc250-llm-server/quality-checks/translation/23-lfm-owui-reference.sh
-/usr/share/bc250-llm-server/quality-checks/translation/21-hunyuan-owui.sh
 /usr/share/bc250-llm-server/quality-checks/translation/22-translate-gemma-owui.sh
+/usr/share/bc250-llm-server/quality-checks/translation/23-lfm-owui-reference.sh
 ```
 
-Run only the reference and the challenger that actually survived direct screening;
-do not automatically mutate Open WebUI for a failed direct candidate.
+The generic `10-direct-candidate-screen.sh` and `20-owui-candidate-screen.sh` remain
+available for a deliberately selected active `exp-*` model. They preserve the same
+return-code, restoration, privacy and evidence rules. Do not resurrect graveyard models
+merely to repeat a closed tournament.
 
-The generic integration form is:
-
-```bash
-/usr/share/bc250-llm-server/quality-checks/translation/20-owui-candidate-screen.sh \
-  EXPERIMENT-MODEL \
-  /usr/share/bc250-llm-server/quality-checks/translation/prompts/auto-direction-minimal.txt \
-  [ROUNDS]
-```
-
-The integration check serializes temporary Open WebUI mutations with an exclusive
-lock. It saves the exact `bc250-office-translation` preset and complete Ollama
-provider config, keeping the unredacted provider config only in root-owned mode-0600
-files under `/run`. For an experimental model it locates the enabled main provider
-by port 11434 and, only when that provider already has a restrictive `model_ids`
-list, appends the raw candidate exactly once; an absent/empty list remains
-unrestricted. `prefix_id` is honored for the effective model ID. Zero/multiple
-11434 providers or a disabled provider fail closed. Evidence receives only redacted
-provider snapshots.
-
-The check then proves effective candidate/base-preset visibility, disables
-background title/tag/follow-up jobs, preserves curl rc + HTTP status + response body
-for provider/model/chat operations, and captures per-request wall time plus BC-250
-temperature/memory/swap telemetry. On exit it restores the preset first and exact
-provider config second, refreshes effective models, verifies both persisted and
-effective restoration, scans evidence for the admin token and all provider secrets,
-and writes runtime provenance plus `run-manifest.json`. The generic mutation harness
-remains for reproducibility, but the next Translate-Gemma gate should exercise the
-package-owned `bc250-office-translation-de-fr` / `bc250-office-translation-fr-de` roles
-rather than inventing another temporary prompt. Treat any restoration, telemetry,
-HTTP-contract or credential-scan failure as infrastructure failure.
+The production product path is the pair of package-owned roles
+`bc250-office-translation-de-fr` and `bc250-office-translation-fr-de`. Both use the
+exact Stage-2E system prompt, `max_tokens=2048`, thinking omitted, and the non-global
+`bc250_translation_direction` filter. After installing this release, run a bounded
+real-device product-path verification before calling the new default fully requalified.
+The exact Stage-2E evidence archive remains
+`bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
+`63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
 
 ## Evidence semantics
 
@@ -174,9 +132,8 @@ Output-budget diagnostics are evidence and must not automatically be relabeled a
 model-quality defects. Likewise, evaluators must not be weakened to turn genuine
 model mistakes into passes.
 
-Historical Batch 1–3D scripts are installed under `quality-checks/history/` only
-for reproducibility. Prefer the generic current screens for new comparisons.
+Historical campaign scripts remain in source under `quality-checks/history/` for reproducibility and archaeology; they are not installed as the current operator interface. The supported current screens carry forward the lifecycle properties that still matter: bounded lane isolation, pre/post state capture, exact Open WebUI/provider restoration, credential/privacy checks, serious-warning capture, memory recovery, normalized evidence archives and authoritative final-RC recording. Prefer those current screens for new comparisons.
 
-Stage-2E has completed the broad hard-corpus/model-configuration comparison. Before production translation promotion, install `exp-translate-gemma4-sub-e4b-17s-q4-k-xl`, apply the package-owned Open WebUI desired state, and run only the bounded integrated Open WebUI gate against the package-owned direction roles: canonical sanity plus the targeted protected-finance, bullets/table, `Avoir`, and both long-document cases from the Stage-2 evidence. Do not restart broad candidate discovery unless that integration fails for a model-level reason.
+Stage-2E completed the broad hard-corpus/model-configuration comparison and selected Translate-Gemma. This source promotes those weights as `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` behind the two package-owned direction roles. After installing the built RPM, run only the bounded integrated Open WebUI verification: canonical sanity plus the targeted protected-finance, bullets/table, `Avoir`, and both long-document cases from the Stage-2E evidence. Do not restart broad candidate discovery unless that product-path verification exposes a model-level reason.
 
 Evidence tarballs from the current generic task/translation checks intentionally have no `.sha256` sidecar files, but each script prints the archive SHA-256 for exact evidence identification. Preserve the exact fixture/evaluator/prompt material inside evidence where needed, normalize archive ownership metadata, and keep archive/delivery bookkeeping separate from model-quality conclusions.
