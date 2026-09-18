@@ -630,6 +630,7 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
     failures: dict[str, int] = {}
     infra_failures: dict[str, int] = {}
     diagnostics: dict[str, int] = {}
+    quality_failures: list[dict[str, Any]] = []
     for row in records:
         outcome = str(row["outcome"])
         result_type = str(row["result_type"])
@@ -638,8 +639,19 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
         if result_type == "qualification" and outcome in qualification_counts:
             qualification_counts[outcome] += 1
         if result_type == "qualification" and outcome == "quality-fail":
-            for name in row.get("failure_kinds", []):
-                failures[str(name)] = failures.get(str(name), 0) + 1
+            row_failures = [str(name) for name in row.get("failure_kinds", [])]
+            for name in row_failures:
+                failures[name] = failures.get(name, 0) + 1
+            quality_failures.append(
+                {
+                    "model": str(row.get("model") or "unknown"),
+                    "case_id": str(row.get("case_id") or "unknown"),
+                    "failure_kinds": row_failures,
+                    "diagnostics": [
+                        str(name) for name in row.get("diagnostics", [])
+                    ],
+                }
+            )
         if outcome == "infra-fail":
             for name in row.get("failure_kinds", []):
                 infra_failures[str(name)] = infra_failures.get(str(name), 0) + 1
@@ -666,6 +678,7 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
         "infrastructure": infrastructure,
         "quality": quality,
         "failure_kinds": dict(sorted(failures.items())),
+        "quality_failures": quality_failures,
         "infrastructure_failure_kinds": dict(sorted(infra_failures.items())),
         "diagnostics": dict(sorted(diagnostics.items())),
         "aggregates": aggregates,
@@ -698,6 +711,13 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
         lines += ["", "Failure kinds"] + [
             f"  {name:<20} {count}" for name, count in sorted(failures.items())
         ]
+    if quality_failures:
+        lines += ["", "Failed cases"]
+        for item in quality_failures:
+            causes = ", ".join(item["failure_kinds"]) or "quality-fail"
+            lines.append(
+                f"  {item['model']} / {item['case_id']}: {causes}"
+            )
     if diagnostics:
         lines += ["", "Diagnostics"] + [
             f"  {name:<20} {count}" for name, count in sorted(diagnostics.items())

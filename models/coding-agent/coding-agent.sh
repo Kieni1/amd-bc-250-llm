@@ -51,6 +51,11 @@ OLLAMA_URL="${OLLAMA_URL:-${OLLAMA_HOST:-127.0.0.1:11436}}"
 [[ "$OLLAMA_URL" == *://* ]] || OLLAMA_URL="http://$OLLAMA_URL"
 OLLAMA_URL="${OLLAMA_URL%/}"
 MAX_INPUT_BYTES="${CODING_AGENT_MAX_INPUT_BYTES:-60000}"
+NUM_PREDICT="${CODING_AGENT_NUM_PREDICT:-3072}"
+[[ "$NUM_PREDICT" =~ ^[1-9][0-9]*$ ]] || {
+  echo "ERROR: CODING_AGENT_NUM_PREDICT must be a positive integer." >&2
+  exit 2
+}
 
 for cmd in curl jq mktemp; do
   command -v "$cmd" >/dev/null 2>&1 || {
@@ -68,7 +73,8 @@ fi
 input_file="$(mktemp)"
 response_file="$(mktemp)"
 prompt_file="$(mktemp)"
-trap 'rm -f "$input_file" "$response_file" "$prompt_file" "${tmp_out:-}"' EXIT
+raw_response="$(mktemp)"
+trap 'rm -f "$input_file" "$response_file" "$prompt_file" "$raw_response" "${tmp_out:-}"' EXIT
 
 if [[ "$input" == "-" ]]; then
   cat > "$input_file"
@@ -118,13 +124,35 @@ esac
 payload="$(jq -n \
   --arg model "$MODEL" \
   --rawfile prompt "$prompt_file" \
-  '{model:$model,prompt:$prompt,stream:false}')"
+  --argjson num_predict "$NUM_PREDICT" \
+  '{model:$model,messages:[{role:"user",content:$prompt}],stream:false,think:true,options:{num_predict:$num_predict}}')"
 
 curl --fail --silent --show-error \
   --connect-timeout 5 --max-time 3600 \
   -H 'Content-Type: application/json' \
-  -d "$payload" "${OLLAMA_URL}/api/generate" |
-  jq -er '.response' > "$response_file"
+  -d "$payload" "${OLLAMA_URL}/api/chat" > "$raw_response"
+
+done="$(jq -r '.done // false' "$raw_response")"
+done_reason="$(jq -r '.done_reason // ""' "$raw_response")"
+if [[ "$done" != true ]]; then
+  echo "ERROR: coding-agent response did not report terminal completion; refusing to write output." >&2
+  exit 3
+fi
+if [[ "$done_reason" == "length" ]]; then
+  echo "ERROR: coding-agent generation reached the output limit; refusing to write a truncated file." >&2
+  exit 3
+fi
+
+jq -ejr '.message.content | select(type=="string" and length>0)' \
+  "$raw_response" > "$response_file" || {
+    echo "ERROR: coding-agent response did not contain non-empty final message.content." >&2
+    exit 3
+  }
+
+if grep -Eiq '</?think([[:space:]>])|<\|/?think\|>' "$response_file"; then
+  echo "ERROR: final content contains reasoning markers; refusing to write contaminated output." >&2
+  exit 3
+fi
 
 if [[ "$output" == "-" ]]; then
   cat "$response_file"

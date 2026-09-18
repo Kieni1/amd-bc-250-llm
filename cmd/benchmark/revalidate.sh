@@ -1343,7 +1343,10 @@ for path in sorted(root.rglob("summary.json")):
     if failed <= 0:
         continue
     covered_labels.add(category)
-    entry = aggregate.setdefault(category, {"pass": 0, "fail": 0, "causes": defaultdict(int)})
+    entry = aggregate.setdefault(
+        category,
+        {"pass": 0, "fail": 0, "causes": defaultdict(int), "cases": [], "evidence": []},
+    )
     entry["pass"] += passed
     entry["fail"] += failed
     failures = summary.get("failure_kinds") or {}
@@ -1352,6 +1355,28 @@ for path in sorted(root.rglob("summary.json")):
         continue
     for name, count in failures.items():
         entry["causes"][str(name)] += int(count)
+
+    case_failures = summary.get("quality_failures")
+    if case_failures is not None:
+        if not isinstance(case_failures, list):
+            invalid.append(f"{path}: quality_failures is not an array")
+            continue
+        for item in case_failures:
+            if not isinstance(item, dict):
+                invalid.append(f"{path}: quality_failures item is not an object")
+                continue
+            entry["cases"].append({
+                "model": str(item.get("model") or "unknown"),
+                "case_id": str(item.get("case_id") or "unknown"),
+                "failure_kinds": [str(value) for value in item.get("failure_kinds") or []],
+            })
+    results_path = path.parent / "results.jsonl"
+    try:
+        evidence = str(results_path.relative_to(root))
+    except ValueError:
+        evidence = str(results_path)
+    if evidence not in entry["evidence"]:
+        entry["evidence"].append(evidence)
 
 failed_steps = []
 if events.exists():
@@ -1366,13 +1391,24 @@ else:
     for category, entry in sorted(aggregate.items()):
         total = entry["pass"] + entry["fail"]
         print(f"  {category:<28} {entry['pass']}/{total}")
-        for name, count in sorted(entry["causes"].items()):
-            print(f"    {name}={count}")
+        if entry["cases"]:
+            multiple_models = len({case["model"] for case in entry["cases"]}) > 1
+            for case in entry["cases"]:
+                label = (
+                    f"{case['model']}/{case['case_id']}"
+                    if multiple_models
+                    else case["case_id"]
+                )
+                causes = ", ".join(case["failure_kinds"]) or "quality-fail"
+                print(f"    {label}: {causes}")
+        else:
+            for name, count in sorted(entry["causes"].items()):
+                print(f"    {name}={count}")
+        for evidence in entry["evidence"]:
+            print(f"    evidence: {evidence}")
     for detail in invalid:
         print(f"  canonical summary unavailable — {detail}")
     for label in sorted(set(failed_steps)):
-        # Step labels and benchmark categories usually match. If canonical evidence
-        # did not yield any failure details, surface that fact rather than hiding it.
         if label not in covered_labels and not any(label in key for key in aggregate):
             print(f"  {label:<28} quality-fail — canonical summary unavailable")
 PY_CAUSES

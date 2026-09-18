@@ -538,6 +538,27 @@ def task_request_options(case: dict[str, Any]) -> dict[str, Any]:
     return {"num_predict": TASK_NUM_PREDICT.get(str(case.get("type")), 128)}
 
 
+def task_failure_kinds(
+    content: str,
+    *,
+    valid_json: bool,
+    structure_ok: bool,
+    language_pass: bool,
+    semantic_ok: bool,
+) -> list[str]:
+    """Classify independent task-quality failures without cascading parse errors."""
+    if not content.strip():
+        return ["empty-output"]
+    if not valid_json or not structure_ok:
+        return ["format-contract"]
+    failures: list[str] = []
+    if not language_pass:
+        failures.append("language")
+    if not semantic_ok:
+        failures.append("relevance")
+    return failures
+
+
 def benchmark_task(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "task-cases.json")
@@ -656,15 +677,13 @@ def benchmark_task(args: argparse.Namespace) -> int:
                 passed += int(ok)
                 scores.append(score if structure_ok else 0.0)
                 done_reason = str(response.get("done_reason") or "")
-                failures: list[str] = []
-                if not content.strip():
-                    failures.append("empty-output")
-                elif not valid_json or not structure_ok:
-                    failures.append("format-contract")
-                if not language_pass:
-                    failures.append("language")
-                if not semantic_ok:
-                    failures.append("relevance")
+                failures = task_failure_kinds(
+                    content,
+                    valid_json=valid_json,
+                    structure_ok=structure_ok,
+                    language_pass=language_pass,
+                    semantic_ok=semantic_ok,
+                )
                 diagnostics: list[str] = []
                 if done_reason == "length":
                     diagnostics.append("output-budget")
@@ -690,7 +709,11 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     category="task", model=model, case_id=case["id"],
                     result_type="qualification", outcome="pass" if ok else "quality-fail", failure_kinds=failures,
                     diagnostics=diagnostics,
-                    checks={"structure": structure_ok, "language": language_pass, "relevance": semantic_ok},
+                    checks={
+                        "structure": structure_ok,
+                        "language": language_pass if structure_ok else None,
+                        "relevance": semantic_ok if structure_ok else None,
+                    },
                     metrics={"keyword_score": score, "semantic_groups": semantic_groups, "wall_s": wall, "load_s": ns_to_s(response.get("load_duration")), "eval_count": response.get("eval_count", 0)},
                     timestamp=iso_now(), case=case, response=content, thinking=thinking,
                     valid_json=valid_json, strict_json=strict_json, language_hint=language_hint,
@@ -1060,14 +1083,37 @@ def _bash_contract(body: str, case: dict[str, Any]) -> list[str]:
         r"\bawk\s+-F\s*['\"]?/['\"]?\s+['\"]\{[^{}\n]*\bprint\s+\$NF\b[^{}\n]*\}['\"]",
         body,
     )
+    xargs_match = re.search(r"\bxargs\b(?P<args>[^\n|;&]*)\bbasename\b", body)
+    xargs_basename = False
+    xargs_no_run_if_empty = False
+    if xargs_match:
+        xargs_args = xargs_match.group("args")
+        xargs_null = bool(
+            re.search(r"(?:^|\s)(?:-0|--null)(?:\s|$)", xargs_args)
+        )
+        xargs_single = bool(
+            re.search(r"(?:^|\s)-n\s*1(?:\s|$)", xargs_args)
+            or re.search(
+                r"(?:^|\s)--max-args(?:=|\s+)1(?:\s|$)", xargs_args
+            )
+        )
+        xargs_basename = xargs_null and xargs_single
+        xargs_no_run_if_empty = bool(
+            re.search(
+                r"(?:^|\s)(?:-r|--no-run-if-empty)(?:\s|$)", xargs_args
+            )
+        )
     if not (
         basename_command
         or re.search(r"%f", body)
         or re.search(r"\$\{[^}]+##\*/\}", body)
         or sed_basename
         or awk_basename
+        or xargs_basename
     ):
         problems.append("missing basename extraction")
+    if xargs_basename and not xargs_no_run_if_empty:
+        problems.append("xargs basename may run on empty input (missing -r)")
     if not re.search(r"\bsort\b", body):
         problems.append("missing sort")
     if "*.Modelfile" not in body:
@@ -1078,7 +1124,14 @@ def evaluate_agent_output(text: str, case: dict[str, Any]) -> dict[str, Any]:
     stripped = text.strip()
     body = clean_code_output(text)
     fenced = stripped.startswith("```")
-    format_ok = bool(body) and not (case.get("raw_only") and fenced)
+    reasoning_contaminated = bool(
+        re.search(r"</?think\b|<\|/?think\|>", text, flags=re.IGNORECASE)
+    )
+    format_ok = (
+        bool(body)
+        and not (case.get("raw_only") and fenced)
+        and not reasoning_contaminated
+    )
     problems: list[str] = []
     if not body:
         problems.append("empty final answer")
@@ -1122,6 +1175,8 @@ def evaluate_agent_output(text: str, case: dict[str, Any]) -> dict[str, Any]:
         problems.extend(_bash_contract(body, case))
     if case.get("raw_only") and fenced:
         problems.append("raw-only response was wrapped in a Markdown fence")
+    if reasoning_contaminated:
+        problems.append("reasoning contamination")
     if parsed_json is not None:
         missing_keys = [key for key in case.get("json_keys", []) if key not in parsed_json]
         if missing_keys:
@@ -1134,6 +1189,7 @@ def evaluate_agent_output(text: str, case: dict[str, Any]) -> dict[str, Any]:
         for problem in problems
         if not problem.startswith("syntax:")
         and "Markdown fence" not in problem
+        and problem != "reasoning contamination"
         and problem != "empty final answer"
     ]
     requirements_ok = not requirement_problems

@@ -18,9 +18,13 @@ main/task/embedding lanes. Current choices are:
   real BC-250 runs with identical final answers;
 - `agentic-qwen25-coder7b-unsloth-q5-k-m` — retained as an alternative coding
   model, but no longer the package default;
-- `agentic-qwable9b-empero-q6-k` — native-reasoning comparison candidate;
-- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — Gemma 4 12B coding/tool-use
-  experiment at Q4_K_M and 16K context.
+- `agentic-qwable9b-empero-q6-k` — active 9B native-reasoning challenger;
+- `agentic-qwen35-4b-khazarai-q6-k` — compact Qwen3.5 Q6_K agentic-coding
+  challenger with the supplied precise-coding sampling profile;
+- `agentic-gemma4-e4b-sol-fable-q4-k-m` — compact Gemma 4 E4B Q4_K_M
+  challenger using a conservative 16K deterministic BC-250 test profile;
+- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — retained 12B Gemma 4 comparison
+  until the E4B challenger establishes whether another 12B round is useful.
 
 With no selection, `bc250-model install agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to
@@ -38,11 +42,20 @@ CODING_AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m \
 ```
 
 Modes are `generate`, `refactor`, `review`, `document`, `test` and `commit`.
+`bc250-code` uses Ollama `/api/chat` with `think:true` so native reasoning remains
+separate from the final file content. It writes only terminal non-empty
+`message.content`, refuses `done_reason=length` and literal reasoning markers, and
+uses an atomic replacement when an output path is supplied. The default request
+budget is 3072 tokens; set `CODING_AGENT_NUM_PREDICT` to another positive integer
+for a deliberate comparison. A truncation failure is evidence to adjust/test the
+budget, not permission to keep a partial file.
+
 Generated output is never applied automatically; review it and run the real test
 suite. `bc250-benchmark agent` checks Bash/Python syntax and small static semantic
 requirements without executing model-generated code, including raw-output
-format, space-safe Bash patterns, explicit Python range rejection and JSON key
-shapes. It records native thinking separately when the runtime exposes it.
+format/reasoning contamination, space-safe Bash patterns, explicit Python range
+rejection and JSON key shapes. It records native thinking separately when the runtime
+exposes it.
 
 ## Local commits and Gitea review
 

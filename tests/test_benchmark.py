@@ -442,6 +442,59 @@ def parse_ports(value: str) -> list[int]:
         self.assertFalse(nested_result["requirements_ok"])
         self.assertIn("missing duplicate removal", nested_result["problems"])
 
+    def test_task_format_failure_does_not_cascade_language_or_relevance(self) -> None:
+        observed = (
+            '{"tags":["Vertragsanalyse","Fristen"]}\n'
+            '{"tags":["Verträge","Kündigungsfristen"]}'
+        )
+        failures = category.task_failure_kinds(
+            observed,
+            valid_json=False,
+            structure_ok=False,
+            language_pass=False,
+            semantic_ok=False,
+        )
+        self.assertEqual(failures, ["format-contract"])
+        self.assertEqual(
+            category.task_failure_kinds(
+                '{"tags":["wrong"]}',
+                valid_json=True,
+                structure_ok=True,
+                language_pass=False,
+                semantic_ok=False,
+            ),
+            ["language", "relevance"],
+        )
+
+    def test_agent_reasoning_contamination_is_format_failure_not_hidden(self) -> None:
+        case = next(
+            item
+            for item in json.loads(
+                (ROOT / "examples/benchmark/agent-cases.json").read_text(encoding="utf-8")
+            )
+            if item["id"] == "python-port-parser"
+        )
+        body = """\
+<think>Need a set and a range guard.</think>
+def parse_ports(value: str) -> list[int]:
+    ports = set()
+    for item in value.split(','):
+        item = item.strip()
+        if not item:
+            continue
+        port = int(item)
+        if not 1 <= port <= 65535:
+            raise ValueError
+        ports.add(port)
+    return sorted(ports)
+"""
+        result = category.evaluate_agent_output(body, case)
+        self.assertTrue(result["syntax_ok"])
+        self.assertTrue(result["requirements_ok"])
+        self.assertFalse(result["format_ok"])
+        self.assertFalse(result["accepted"])
+        self.assertIn("reasoning contamination", result["problems"])
+
     def test_agent_python_contract_requires_dedup_and_associated_range_raise(self) -> None:
         case = next(
             item
@@ -679,6 +732,28 @@ fi
 find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
 """
         self.assertTrue(category.evaluate_agent_output(find_good, case)["accepted"])
+
+        xargs_good = """\
+#!/usr/bin/env bash
+if [ "$#" -ne 1 ]; then
+    exit 2
+fi
+find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 basename | sort
+"""
+        xargs_result = category.evaluate_agent_output(xargs_good, case)
+        self.assertTrue(xargs_result["syntax_ok"])
+        self.assertTrue(xargs_result["requirements_ok"])
+        self.assertNotIn("missing basename extraction", xargs_result["problems"])
+
+        xargs_without_r = xargs_good.replace("xargs -0 -r -n1", "xargs -0 -n1")
+        no_r_result = category.evaluate_agent_output(xargs_without_r, case)
+        self.assertTrue(no_r_result["syntax_ok"])
+        self.assertFalse(no_r_result["requirements_ok"])
+        self.assertNotIn("missing basename extraction", no_r_result["problems"])
+        self.assertIn(
+            "xargs basename may run on empty input (missing -r)",
+            no_r_result["problems"],
+        )
 
     def test_usecase_acceptance_checks_required_any_and_forbidden(self) -> None:
         case = {
@@ -1348,7 +1423,18 @@ class TelemetryTests(unittest.TestCase):
             self.assertEqual(summary["quality"], "mixed")
             self.assertEqual(summary["failure_kinds"], {"language": 1})
             self.assertEqual(summary["diagnostics"], {"output-budget": 1})
-            self.assertIn("Quality        MIXED", summary_txt.read_text(encoding="utf-8"))
+            self.assertEqual(
+                summary["quality_failures"],
+                [{
+                    "model": "m",
+                    "case_id": "b",
+                    "failure_kinds": ["language"],
+                    "diagnostics": ["output-budget"],
+                }],
+            )
+            text = summary_txt.read_text(encoding="utf-8")
+            self.assertIn("Quality        MIXED", text)
+            self.assertIn("m / b: language", text)
 
     def test_result_directory_is_canonical_and_refuses_reuse(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1914,6 +2000,36 @@ quality_state
             self.assertIn("3/6", completed.stdout)
             self.assertIn("language=2", completed.stdout)
             self.assertIn("relevance=1", completed.stdout)
+
+    def test_revalidation_quality_cause_report_surfaces_failed_case_and_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            result_dir = t / "roles" / "task"
+            result_dir.mkdir(parents=True)
+            (result_dir / "results.jsonl").write_text("{}\n", encoding="utf-8")
+            (result_dir / "summary.json").write_text(
+                json.dumps({
+                    "category": "task",
+                    "qualification_counts": {"pass": 5, "quality-fail": 1, "skipped": 0},
+                    "failure_kinds": {"format-contract": 1},
+                    "quality_failures": [{
+                        "model": "task-model",
+                        "case_id": "tags-de",
+                        "failure_kinds": ["format-contract"],
+                        "diagnostics": [],
+                    }],
+                }),
+                encoding="utf-8",
+            )
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f'source "{source}" help >/dev/null\nRAW="{t}"\nquality_cause_report\n'
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("task", completed.stdout)
+            self.assertIn("5/6", completed.stdout)
+            self.assertIn("tags-de: format-contract", completed.stdout)
+            self.assertIn("evidence: roles/task/results.jsonl", completed.stdout)
 
     def test_rag_cycle_residency_loss_is_infrastructure_failure(self) -> None:
         self.assertEqual(category.rag_cycle_outcome(True, False), ("infra-fail", ["coexistence"], 1))
