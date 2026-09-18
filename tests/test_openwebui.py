@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib.util
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -128,11 +127,14 @@ class OpenWebUIStatusTests(unittest.TestCase):
             )
             self.assertEqual(
                 model["base_model_id"],
-                "exp-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
             )
 
         allowed = OPENWEBUI.desired_ollama()["OLLAMA_API_CONFIGS"]["0"]["model_ids"]
-        self.assertIn("exp-translate-gemma4-sub-e4b-17s-q4-k-xl:latest", allowed)
+        self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest", allowed)
+        legacy = models["bc250-office-translation"]
+        self.assertEqual(legacy["base_model_id"], "exp-lfm25-8b-a1b-liquidai-q6-k:latest")
+        self.assertFalse(legacy["is_active"])
 
     def test_translation_direction_filter_wraps_source_exactly(self) -> None:
         path = ROOT / "config/openwebui/functions/bc250_translation_direction.py"
@@ -145,14 +147,14 @@ class OpenWebUIStatusTests(unittest.TestCase):
         cases = {
             "bc250-office-translation-de-fr": (
                 "Translate from German to French. Translate every ordinary-language source word "
-                "and preserve the document structure. Return only the translation.\n\n"
-                "[CURRENT_SOURCE]\n",
+                + "and preserve the document structure. Return only the translation.\n\n"
+                + "[CURRENT_SOURCE]\n",
                 "Guten Tag.\nZweite Zeile.",
             ),
             "bc250-office-translation-fr-de": (
                 "Translate from French to German. Translate every ordinary-language source word "
-                "and preserve the document structure. Return only the translation.\n\n"
-                "[CURRENT_SOURCE]\n",
+                + "and preserve the document structure. Return only the translation.\n\n"
+                + "[CURRENT_SOURCE]\n",
                 "Bonjour.\nDeuxième ligne.",
             ),
         }
