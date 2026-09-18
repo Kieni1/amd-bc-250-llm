@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -636,11 +638,9 @@ class StatusTests(unittest.TestCase):
             modelctl.print_model_inspection_compact(inspection)
         text = output.getvalue()
         self.assertIn("  3) prod-test", text)
-        self.assertIn("packaged", text)
-        self.assertIn("source verified", text)
-        self.assertIn("Modelfile current", text)
-        self.assertIn("registered", text)
-        self.assertIn("CURRENT", text)
+        self.assertIn("[CURRENT]", text)
+        self.assertNotIn("source verified", text)
+        self.assertNotIn("Modelfile current", text)
 
     def test_compact_agent_status_marks_inactive_lane_as_deferred(self) -> None:
         model = {
@@ -664,9 +664,123 @@ class StatusTests(unittest.TestCase):
             overall_status="UNKNOWN",
         )
         details = modelctl.compact_inspection_details(inspection)
-        self.assertIn("registration deferred (agent lane inactive)", details)
-        self.assertIn("runtime deferred", details)
-        self.assertNotIn("UNKNOWN", details)
+        self.assertEqual(details, ["agent lane inactive", "deferred"])
+
+    def test_registration_probe_skips_known_inactive_agent_lane(self) -> None:
+        with (
+            patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+            patch.object(modelctl, "systemd_unit_active", return_value=False),
+            patch.object(modelctl.subprocess, "run") as run,
+        ):
+            self.assertIsNone(
+                modelctl.registered_models(
+                    modelctl.CATEGORY_DEFAULTS["agentic"]["ollama_host"]
+                )
+            )
+        run.assert_not_called()
+
+    def test_registration_probe_is_bounded_when_ollama_is_unresponsive(self) -> None:
+        with (
+            patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+            patch.object(
+                modelctl.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(["ollama", "list"], 5),
+            ) as run,
+        ):
+            self.assertIsNone(modelctl.registered_models("127.0.0.1:11434"))
+        self.assertEqual(run.call_args.kwargs["timeout"], modelctl.REGISTRATION_PROBE_TIMEOUT)
+
+    def test_catalog_views_do_not_print_an_empty_mtp_heading(self) -> None:
+        output = StringIO()
+        with redirect_stdout(output):
+            rc = modelctl.main(["list"])
+        self.assertEqual(rc, 0)
+        self.assertNotIn("MTP models:", output.getvalue())
+
+        output = StringIO()
+        with redirect_stdout(output):
+            rc = modelctl.main(["list", "mtp"])
+        self.assertEqual(rc, 0)
+        self.assertIn("no enabled models; use --all", output.getvalue())
+
+    def test_suppressed_catalog_environment_is_honored_for_mutations(self) -> None:
+        defaults, models = load("production")
+        selected = [models[0]]
+        output = StringIO()
+        with (
+            patch.dict(os.environ, {"BC250_MODELCTL_SUPPRESS_CATALOG": "1"}),
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "load_models", return_value=(defaults, models)),
+            patch.object(modelctl, "run_category_operation", return_value=0),
+            redirect_stdout(output),
+        ):
+            rc = modelctl.main(["apply", "production", selected[0]["id"]])
+        self.assertEqual(rc, 0)
+        self.assertNotIn("Available production models", output.getvalue())
+
+    def test_generic_all_apply_excludes_disabled_mtp_candidates(self) -> None:
+        catalogs = modelctl.load_all_catalogs(directories=[MODELFILES])
+        for include_disabled in (False, True):
+            available = modelctl.all_available_models(
+                catalogs, command="apply", include_disabled=include_disabled
+            )
+            self.assertFalse(any(model["category"] == "mtp" for model in available))
+        self.assertTrue(
+            any(model["id"] == "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl" for model in available)
+        )
+
+    def test_apply_summary_collapses_unchanged_models_without_hiding_changes(self) -> None:
+        model = {
+            "id": "exp-remote-test",
+            "name": "exp-remote-test",
+            "category": "experiments",
+            "provider": "ollama-hf",
+            "origin": "packaged",
+            "from": "hf.co/example/test:Q4_K_M",
+            "template": Path("/tmp/exp-remote-test.Modelfile"),
+            "modelfile": "exp-remote-test.Modelfile",
+            "revision": "latest",
+            "repository": "example/test",
+            "gguf": "test.gguf",
+        }
+        defaults = dict(modelctl.CATEGORY_DEFAULTS["experiments"], category="experiments")
+        inspection = modelctl.ModelInspection(
+            model=model,
+            source_path=None,
+            state_path=None,
+            source_status="ollama-managed",
+            source_detail="managed",
+            source_checksum="",
+            runtime_modelfile=Path("/tmp/exp-remote-test.Modelfile"),
+            modelfile_status="current",
+            registration_status="current",
+            overall_status="CURRENT",
+        )
+        args = argparse.Namespace(
+            command="apply", revision=None, sha256=None, host=None, destination=None,
+            min_free_bytes=None, token_file=None, hf_session={"resolved": False, "token": ""},
+        )
+        output = StringIO()
+        with (
+            patch.dict(os.environ, {"BC250_MODELCTL_CURRENT_SUMMARY": "1"}),
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "ollama_identity", return_value=(0, 0)),
+            patch.object(modelctl, "command_path", return_value="/bin/true"),
+            patch.object(modelctl, "registered_models", return_value={model["name"]}),
+            patch.object(modelctl, "ensure_directory"),
+            patch.object(modelctl, "inspect_model_state", return_value=inspection),
+            patch.object(modelctl, "write_runtime_modelfile", return_value=False),
+            patch.object(modelctl.os, "chown"),
+            patch.object(modelctl.os, "chmod"),
+            redirect_stdout(output),
+        ):
+            rc = modelctl.apply_models(defaults, [model], args)
+        self.assertEqual(rc, 0)
+        text = output.getvalue()
+        self.assertIn("Experiments: 1/1 already current; no changes needed.", text)
+        self.assertNotIn(">>> exp-remote-test", text)
+        self.assertNotIn("already current; skipping", text)
 
     def test_verbose_status_explains_online_check_and_source_identity(self) -> None:
         model = {

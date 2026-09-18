@@ -150,13 +150,17 @@ step_3_install_ollama
 
     def test_one_unified_model_selection_is_used_after_required_active_roles(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn("bc250-model status all --include-disabled --compact", source)
+        self.assertIn("bc250-model status all --compact", source)
+        self.assertNotIn("bc250-model status all --include-disabled --compact", source)
         self.assertIn("BC250_MODEL_SELECTION", source)
         self.assertIn("select(.is_active == true)", source)
         self.assertIn(".task.TASK_MODEL", source)
         self.assertIn(".embedding.RAG_EMBEDDING_MODEL", source)
         self.assertIn('bc250-model apply all "$required_csv"', source)
-        self.assertIn('bc250-model apply all "$selection" --include-disabled', source)
+        self.assertIn('bc250-model apply all "$selection"', source)
+        self.assertNotIn('bc250-model apply all "$selection" --include-disabled', source)
+        self.assertIn('BC250_MODELCTL_CURRENT_SUMMARY=1', source)
+        self.assertIn('MTP models are separate opt-in downloads', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
 
@@ -169,7 +173,8 @@ bc250-model() { printf 'model:%s\n' "$*"; }
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("model:status all --include-disabled --compact", result.stdout)
+        self.assertIn("model:status all --compact", result.stdout)
+        self.assertNotIn("--include-disabled", result.stdout)
         for model in (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
@@ -193,7 +198,8 @@ BC250_MODEL_SELECTION='recommended,19-20'
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("model:apply all recommended,19-20 --include-disabled", result.stdout)
+        self.assertIn("model:apply all recommended,19-20", result.stdout)
+        self.assertNotIn("--include-disabled", result.stdout)
         self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl", result.stdout)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k", result.stdout)
         self.assertIn("embed-jina-v5-small-retrieval-q4-k-m", result.stdout)

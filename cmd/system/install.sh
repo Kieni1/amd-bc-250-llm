@@ -361,11 +361,13 @@ step_7_models() {
 ' "$required_csv" | tr ',' '
 ' | sed 's/^/  - /'
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
+    BC250_MODELCTL_CURRENT_SUMMARY=1 \
     bc250-model apply all "$required_csv"
 
   echo
   echo "Optional experiments, rollback/reference, agent and additional model selection:"
-  bc250-model status all --include-disabled --compact
+  bc250-model status all --compact
+  echo "MTP models are separate opt-in downloads; use: bc250-model list mtp --all"
   local selection="${BC250_MODEL_SELECTION:-}"
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 ]]; then
     read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
@@ -376,7 +378,7 @@ step_7_models() {
   fi
   [[ -n "$selection" ]] || { echo "Skipping additional models; required Open WebUI role models are installed."; return 0; }
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
-    bc250-model apply all "$selection" --include-disabled
+    bc250-model apply all "$selection"
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
 }
 

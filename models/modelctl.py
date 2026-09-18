@@ -47,6 +47,9 @@ RECOMMENDED_MODELS = {
     "embed-jina-v5-small-retrieval-q4-k-m",
 }
 LOW_FREE_BYTES = 20 * 1024**3
+REGISTRATION_PROBE_TIMEOUT = 5
+SYSTEMD_PROBE_TIMEOUT = 2
+AGENT_OLLAMA_SERVICE = "ollama-agent.service"
 CATEGORY_PREFIXES = {
     "production": "prod-",
     "experiments": "exp-",
@@ -493,16 +496,41 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
     return [models[index] for index in dict.fromkeys(selected)]
 
 
+def systemd_unit_active(unit: str) -> bool | None:
+    """Return local systemd activity when cheaply knowable, otherwise None."""
+    if not (systemctl := shutil.which("systemctl")):
+        return None
+    try:
+        result = subprocess.run(
+            [systemctl, "is-active", "--quiet", unit],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=SYSTEMD_PROBE_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.returncode == 0
+
+
 def registered_models(host: str) -> set[str] | None:
     if not (ollama := shutil.which("ollama")):
         return None
-    result = subprocess.run(
-        [ollama, "list"],
-        env={**os.environ, "OLLAMA_HOST": host},
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    if host == CATEGORY_DEFAULTS["agentic"]["ollama_host"]:
+        active = systemd_unit_active(AGENT_OLLAMA_SERVICE)
+        if active is False:
+            return None
+    try:
+        result = subprocess.run(
+            [ollama, "list"],
+            env={**os.environ, "OLLAMA_HOST": host},
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=REGISTRATION_PROBE_TIMEOUT,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
     return (
         None
         if result.returncode
@@ -1367,6 +1395,11 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
 
     token: str | None = None
     failures: list[str] = []
+    summarize_current = (
+        os.environ.get("BC250_MODELCTL_CURRENT_SUMMARY") == "1"
+        and not force_download
+    )
+    current_skipped = 0
     for configured in models:
         model = dict(configured)
         if args.revision is not None:
@@ -1378,7 +1411,17 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
             raise ModelError("--sha256 must be 64 lowercase hexadecimal characters")
 
         label = model.get("name", model["id"])
-        print(f"\n>>> {label} [{model['provider']}]")
+        header_printed = False
+
+        def show_header(
+            current_label: str = label,
+            current_provider: str = model["provider"],
+        ) -> None:
+            nonlocal header_printed
+            if not header_printed:
+                print(f"\n>>> {current_label} [{current_provider}]")
+                header_printed = True
+
         try:
             inspection = inspect_model_state(
                 defaults,
@@ -1386,6 +1429,8 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 registrations=registrations,
                 destination=args.destination or os.environ.get("DEST"),
             )
+            if not summarize_current:
+                show_header()
             if model["provider"] == "ollama-hf":
                 if args.revision is not None or args.sha256 is not None or args.destination:
                     raise ModelError(
@@ -1402,8 +1447,12 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                     and not template_changed
                     and inspection.registration_status == "current"
                 ):
-                    print("    already current; skipping")
+                    if summarize_current:
+                        current_skipped += 1
+                    else:
+                        print("    already current; skipping")
                     continue
+                show_header()
                 reason = reconciliation_reason(
                     inspection,
                     force_download=force_download,
@@ -1429,22 +1478,26 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
             ensure_directory(output.parent, uid, gid)
             metadata = state_path(output)
             source_changed = True
+            source_metadata_changed = False
             if inspection.source_status == "current" and not force_download:
                 source_changed = False
                 checksum = inspection.source_checksum
                 permissions_changed = ensure_file_permissions(output, 0, gid, 0o640)
                 current = output.stat()
                 state = load_state(metadata)
-                if (
+                source_metadata_changed = (
                     state.get("schema") != 3
                     or state.get("size") != current.st_size
                     or state.get("mtime_ns") != current.st_mtime_ns
                     or state.get("ctime_ns") != current.st_ctime_ns
                     or permissions_changed
-                ):
+                )
+                if source_metadata_changed:
                     write_state(metadata, model, checksum, gid)
-                print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
+                if not summarize_current:
+                    print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
             else:
+                show_header()
                 minimum = (
                     args.min_free_bytes
                     if args.min_free_bytes is not None
@@ -1503,6 +1556,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 print(f"    recorded SHA-256 {checksum}")
 
             if model["provider"] == "download-only":
+                show_header()
                 print("    ready for llama.cpp")
                 continue
 
@@ -1520,8 +1574,15 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 and not template_changed
                 and inspection.registration_status == "current"
             ):
+                if summarize_current and not source_metadata_changed:
+                    current_skipped += 1
+                    continue
+                show_header()
+                if source_metadata_changed:
+                    print("    refreshed source metadata/permissions")
                 print("    already current; skipping")
                 continue
+            show_header()
             reason = reconciliation_reason(
                 inspection,
                 force_download=force_download,
@@ -1539,8 +1600,17 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 registrations.add(model["name"])
             print("    registered with Ollama")
         except (ModelError, OSError) as error:
+            show_header()
             print(f"    ERROR: {error}", file=sys.stderr)
             failures.append(label)
+
+    if summarize_current and current_skipped:
+        category = str(defaults.get("category", "models"))
+        title = "MTP" if category == "mtp" else category.title()
+        if current_skipped == len(models) and not failures:
+            print(f"{title}: {current_skipped}/{len(models)} already current; no changes needed.")
+        else:
+            print(f"{title}: {current_skipped}/{len(models)} already current.")
 
     if failures:
         print(f"\nFailed: {' '.join(failures)}", file=sys.stderr)
@@ -1947,6 +2017,8 @@ def print_catalogs_basic(
             if category != "mtp" or include_disabled_mtp
             else [model for model in models if model["enabled"]]
         )
+        if not available:
+            continue
         print(f"{'MTP' if category == 'mtp' else category.title()} models:")
         print_catalog_models(available)
 
@@ -1980,6 +2052,16 @@ def recommended_status_action(inspection: ModelInspection) -> str | None:
 def compact_inspection_details(inspection: ModelInspection) -> list[str]:
     """Return concise state labels suitable for interactive model selection."""
     model = inspection.model
+    if (
+        model.get("category") == "agentic"
+        and inspection.registration_status == "unavailable"
+        and inspection.source_status in {"current", "ollama-managed"}
+        and inspection.modelfile_status == "current"
+    ):
+        return ["agent lane inactive", "deferred"]
+    if inspection.overall_status == "CURRENT":
+        return ["CURRENT"]
+
     details = [model["provider"], definition_origin(model)]
     source = {
         "current": "source verified",
@@ -1997,33 +2079,17 @@ def compact_inspection_details(inspection: ModelInspection) -> list[str]:
             "unavailable": "Modelfile unavailable",
         }.get(inspection.modelfile_status, f"Modelfile {inspection.modelfile_status}")
         details.append(modelfile)
-        if inspection.registration_status == "current":
-            details.append("registered")
-        elif (
-            model.get("category") == "agentic"
-            and inspection.registration_status == "unavailable"
-        ):
-            details.append("registration deferred (agent lane inactive)")
-        else:
-            registration = {
-                "missing": "not registered",
-                "unavailable": "registration unavailable",
-            }.get(
-                inspection.registration_status,
-                f"registration {inspection.registration_status}",
-            )
-            details.append(registration)
-    if (
-        model.get("category") == "agentic"
-        and inspection.registration_status == "unavailable"
-        and inspection.source_status in {"current", "ollama-managed"}
-        and inspection.modelfile_status == "current"
-    ):
-        details.append("runtime deferred")
-    else:
-        details.append(inspection.overall_status)
+        registration = {
+            "current": "registered",
+            "missing": "not registered",
+            "unavailable": "registration unavailable",
+        }.get(
+            inspection.registration_status,
+            f"registration {inspection.registration_status}",
+        )
+        details.append(registration)
+    details.append(inspection.overall_status)
     return details
-
 
 def print_model_inspection_compact(inspection: ModelInspection) -> None:
     model = inspection.model
@@ -2083,9 +2149,12 @@ def all_available_models(
     available: list[dict] = []
     for defaults, models in catalogs:
         category = defaults["category"]
-        if category == "mtp" and command == "unregister":
+        if category == "mtp" and command in {"apply", "refresh", "unregister"}:
+            # MTP is never part of generic all-category convergence. Preparing an
+            # MTP candidate must be an explicit mtp-category operation so normal
+            # appliance setup cannot acquire experimental llama.cpp artifacts.
             continue
-        if category == "mtp" and command in {"apply", "refresh", "status"} and not include_disabled:
+        if category == "mtp" and command == "status" and not include_disabled:
             available.extend(model for model in models if model["enabled"])
         else:
             available.extend(models)
@@ -2283,6 +2352,9 @@ def main(argv: list[str] | None = None) -> int:
             if category != "mtp" or args.all
             else [model for model in models if model["enabled"]]
         )
+        if category == "mtp" and not available:
+            print("MTP models: no enabled models; use --all to include disabled opt-in models.")
+            return 0
         print(f"{'MTP' if category == 'mtp' else category.title()} models:")
         print_catalog_models(available)
         return 0
@@ -2386,14 +2458,15 @@ def main(argv: list[str] | None = None) -> int:
             command=args.command,
             include_disabled=getattr(args, "include_disabled", False),
         )
-        if not getattr(args, "quiet", False):
+        suppress_catalog = (
+            getattr(args, "quiet", False)
+            or os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") == "1"
+        )
+        if not suppress_catalog:
             print("Available models:")
             print_catalogs_basic(
                 catalogs,
-                include_disabled_mtp=(
-                    args.command == "remove"
-                    or getattr(args, "include_disabled", False)
-                ),
+                include_disabled_mtp=(args.command == "remove"),
             )
         selected = selected_models_for_catalog(
             available, args.selection, interactive=True
@@ -2412,7 +2485,11 @@ def main(argv: list[str] | None = None) -> int:
             )
         if args.command in {"apply", "refresh"} and not args.include_disabled:
             available = [model for model in models if model["enabled"]]
-    if not getattr(args, "quiet", False):
+    suppress_catalog = (
+        getattr(args, "quiet", False)
+        or os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") == "1"
+    )
+    if not suppress_catalog:
         print(f"Available {category} models:")
         print_catalog_models(available)
     selected = selected_models_for_catalog(available, args.selection, interactive=True)
