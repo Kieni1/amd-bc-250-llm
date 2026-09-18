@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import tempfile
 import textwrap
@@ -11,15 +12,60 @@ BOOTSTRAP = ROOT / "install"
 INSTALLER = ROOT / "cmd/system/install.sh"
 
 
-def source_probe(body: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["bash", "-c", f'source "$1"\n{body}', "installer-test", str(INSTALLER)],
-        stdin=subprocess.DEVNULL,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        check=False,
+def _write_fake_jq(fake_bin: Path) -> None:
+    fake_bin.mkdir(exist_ok=True)
+    jq = fake_bin / "jq"
+    jq.write_text(
+        r'''#!/usr/bin/env python3
+import json
+import sys
+
+args = sys.argv[1:]
+if len(args) != 3 or args[0] != "-r":
+    raise SystemExit(64)
+query, path = args[1:]
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+
+
+def emit(value):
+    if not value:
+        return
+    if value.endswith(":latest"):
+        value = value[:-7]
+    print(value)
+
+
+if query == '.models[] | select(.is_active == true) | .base_model_id // empty | sub(":latest$"; "")':
+    for model in data.get("models", []):
+        if model.get("is_active") is True:
+            emit(model.get("base_model_id"))
+elif query == '(.task.TASK_MODEL // empty | sub(":latest$"; "")), (.embedding.RAG_EMBEDDING_MODEL // empty | sub(":latest$"; ""))':
+    emit(data.get("task", {}).get("TASK_MODEL"))
+    emit(data.get("embedding", {}).get("RAG_EMBEDDING_MODEL"))
+else:
+    raise SystemExit(64)
+''',
+        encoding="utf-8",
     )
+    jq.chmod(0o755)
+
+
+def source_probe(body: str) -> subprocess.CompletedProcess[str]:
+    with tempfile.TemporaryDirectory() as tmp:
+        fake_bin = Path(tmp) / "bin"
+        _write_fake_jq(fake_bin)
+        env = os.environ.copy()
+        env["PATH"] = f"{fake_bin}:{env.get('PATH', '')}"
+        return subprocess.run(
+            ["bash", "-c", f'source "$1"\n{body}', "installer-test", str(INSTALLER)],
+            stdin=subprocess.DEVNULL,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+            check=False,
+        )
 
 
 class InstallerTests(unittest.TestCase):
@@ -368,8 +414,10 @@ step_6_runtime_topology
 step_7_models
 step_8_application_services
 '''
+            fake_bin = tmpdir / "bin"
+            _write_fake_jq(fake_bin)
             env = {
-                "PATH": "/usr/bin:/bin",
+                "PATH": f"{fake_bin}:/usr/bin:/bin",
                 "BC250_TEST_LOG": str(log),
                 "BC250_OWUI_ENABLE_SOURCE": str(enable_source),
                 "BC250_OWUI_ENABLE_DROPIN": str(enable_target),
