@@ -30,6 +30,15 @@ or change production office roles.
 - Replace the weak 4B MTP candidate with Qwen3.5 9B; retain Qwen3.6 27B as a control; add
   HauhauCS Qwen3.8 27B IQ2_M and Qwen3.6 35B-A3B. All four remain `enabled = false`,
   download-only and have no Ollama Modelfiles.
+- Refine installer/model-state UX after the first installed `0.11.3-0.4.fc44` smoke:
+  honor the existing catalog-suppression contract; summarize fully current required models by
+  category; collapse ordinary current picker rows to `[CURRENT]`; show inactive agent entries as
+  short deferred rows; skip the intentionally inactive agent registration probe; and bound other
+  local Ollama registration probes to five seconds. GGUF verification is unchanged: schema-3
+  identity uses the recorded verified SHA fast path, while changed/legacy identity still hashes.
+- Remove MTP from the generic installer picker and strengthen the lifecycle invariant so combined
+  `apply all` / `refresh all` never select MTP, even with `--include-disabled`. MTP preparation
+  remains explicit through `bc250-fetch-mtp` / an explicit `mtp` category operation.
 
 ## First hardware funnel
 
@@ -69,13 +78,20 @@ its exact identity and effective flags are captured.
 ## Validation
 
 The exact 0.11.3-0.4 source tree and a clean extraction of the release ZIP both passed
-RPM/source preflight, packaged shell syntax and 371/371 deterministic tests. Source/archive
+RPM/source preflight, packaged shell syntax and 378/378 deterministic tests. Source/archive
 closure is complete. Ruff/ShellCheck remain workstation-owned,
 GitHub owns RPM/SRPM build, and MTP runtime/GPU/model qualification belongs to the BC-250.
 
-## Real-device next steps
+## Current device evidence and next steps
 
-1. GitHub-build and install exact `0.11.3-0.4`; capture installed NEVRA.
+A pre-refinement `bc250-llm-server-0.11.3-0.4.fc44.x86_64` build was installed on the BC-250.
+Its guided install completed with normal topology and `bc250-verify` reported 54 ok / 0 warn /
+0 fail. That run exposed the slow/noisy model-picker UX addressed by this same-Release source
+refinement. Because the source bytes changed without an RPM Release bump by explicit maintainer
+direction, rebuild and reinstall the final `0.11.3-0.4` artifact before treating subsequent
+hardware evidence as qualification of this exact source.
+
+1. GitHub-rebuild and reinstall the final exact `0.11.3-0.4`; capture installed NEVRA plus RPM/source artifact SHA.
 2. Keep the MTP campaign and support/power campaign as separate bounded hardware batches.
 3. Run the Qwen3.5 9B MTP comparison first; inspect answer usefulness, acceptance, speedup,
    memory/swap and GPU/kernel evidence before deciding whether to advance.
