@@ -29,10 +29,10 @@ should not be rewritten as current.
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
 runtime/hardware qualification. For this exact `0.11.2-0.6` source, local `make validate`
-passed RPM/source preflight plus 349/349 deterministic tests; the earlier focused
-benchmark/catalog/packaging/documentation run passed 211/211, post-closure
-documentation regressions passed 9/9, and changed shell syntax passed `bash -n`. Ruff and ShellCheck were unavailable here and were not run. No GitHub
-RPM build or 0.11.2-0.6 BC-250 execution is claimed.
+passed RPM/source preflight, packaged shell syntax checks and 348/348 deterministic
+tests; documentation regressions separately passed 9/9. Ruff and ShellCheck were
+unavailable here and were not run. No GitHub RPM build or 0.11.2-0.6 BC-250 execution
+is claimed.
 
 ## Normal service topology
 

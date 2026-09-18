@@ -54,10 +54,9 @@ Stage-2E-selected Translate-Gemma remains the production translation base. Detai
 campaign evidence stays in Git-only `development/` memory rather than runtime Modelfiles.
 
 Local release-closure evidence for this exact source: `make validate` passed RPM/source
-preflight plus 349/349 deterministic tests; the preceding focused
-benchmark/catalog/packaging/documentation run passed 211/211, post-closure
-documentation regressions passed 9/9, and changed shell syntax passed `bash -n`. Ruff and ShellCheck were unavailable here and were not run. No GitHub
-RPM build or 0.11.2-0.6 BC-250 runtime/model qualification has run yet.
+preflight, packaged shell syntax checks and 348/348 deterministic tests; documentation
+regressions separately passed 9/9. Ruff and ShellCheck were unavailable here and were
+not run. No GitHub RPM build or 0.11.2-0.6 BC-250 runtime/model qualification has run yet.
 
 Installed `bc250-llm-server-0.11.2-0.5.fc44.x86_64` is now the newest real-device package
 evidence: installer verification was 54/0/0 and revalidation v4.1 completed with

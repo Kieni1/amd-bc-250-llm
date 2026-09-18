@@ -31,7 +31,7 @@ do not rewrite either record to the current source NVR.
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — `make validate` passed RPM/source preflight + 349/349 deterministic tests; focused benchmark/catalog/packaging/documentation run passed 211/211; post-closure documentation regressions passed 9/9; changed shell syntax passed `bash -n` | PENDING/EXTERNAL | N/A | Ruff/ShellCheck were unavailable and not run locally; GitHub/workstation own package build and lint gates |
+| repository/unit validation | SOURCE PASS — on the final corrected source, `make validate` passed RPM/source preflight, packaged shell syntax checks and 348/348 deterministic tests; documentation regressions separately passed 9/9 | PENDING/EXTERNAL | N/A | Ruff/ShellCheck were unavailable and not run locally; GitHub/workstation own package build and lint gates |
 | RPM build/install | preflight/source only | PENDING/EXTERNAL for 0.11.2-0.6 | HISTORICAL REAL DEVICE — 0.11.2-0.5.fc44 installed cleanly | GitHub builds 0.6; capture exact installed NEVRA before device conclusions |
 | normal service topology | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 full revalidation/restoration PASS | unchanged by 0.6; verify normal topology after the agent product-path probe |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 Open WebUI reachable/drift none | include in normal post-install verifier; power campaign remains separate |
@@ -53,7 +53,7 @@ do not rewrite either record to the current source NVR.
 | standard/general office roles | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 production use-case 5/5 | no main-role change in 0.6 |
 | large main-lane candidates | SOURCE PASS | external | PENDING full fit/performance | unchanged; do not mix with current agent funnel |
 | agent default Ornith static benchmark | SOURCE PASS — reasoning leakage is now an explicit format failure | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 canonical agent 3/3 | keep Ornith baseline; static success is not product-path completion proof |
-| `bc250-code` product route | SOURCE PASS — chat/final-content/completion guards covered locally | external | PENDING for 0.11.2-0.6 | first bounded device check: final-content separation, terminal/length refusal, 3072 vs 6144 only on explicit truncation |
+| `bc250-code` product route | SOURCE PASS — route/default/fail-closed/atomic-update contract asserted from source and shell syntax checked; no live helper execution | external | PENDING for 0.11.2-0.6 | first bounded device check: final-content separation, terminal/length refusal, 3072 vs 6144 only on explicit truncation |
 | new Qwen3.5 4B / Gemma E4B agent challengers | SOURCE PASS — Modelfiles discoverable/strict | external | PENDING | compare only after baseline product route is proven; no promotion claims yet |
 | agent mode restoration | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.2-0.5 restoration PASS | verify again after focused 0.6 product-route check |
 | OCR comparison | SOURCE PASS | external | HISTORICAL REAL DEVICE | GLM leads current small fidelity baseline; unchanged |

@@ -44,12 +44,13 @@ quality miss; `0.6` changes its diagnosis, not its acceptance.
 
 ## Validation scope
 
-Local release-closure validation ran `make validate` against this exact `0.11.2-0.6`
-source and passed the RPM/source preflight plus **349/349** deterministic unit/regression
-tests. A focused pre-closure run of benchmark, catalog, packaging and documentation tests
-also passed **211/211** before the full gate. After release-closure documentation
-reconciliation, the documentation regression suite passed **9/9**. Shell syntax for the
-changed coding helper and revalidation script was checked with `bash -n`.
+On the final corrected `0.11.2-0.6` source, `make validate` passed RPM/source
+preflight, packaged shell syntax checks, and **348/348** deterministic unit/regression
+tests. The documentation regression suite separately passed **9/9**. The GitHub runner
+had exposed one test-only host dependency: a redundant coding-helper subprocess
+simulation required `jq` from the runner image. That simulation was removed in favor of
+the existing direct helper-contract assertions and the repository shell-syntax gate;
+shipped runtime behavior is unchanged.
 
 Ruff and ShellCheck were **not run locally because they are unavailable in this
 environment**. No GitHub RPM build and no `0.11.2-0.6` BC-250 runtime/model execution has

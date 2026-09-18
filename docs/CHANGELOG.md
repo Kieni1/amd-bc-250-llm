@@ -7,6 +7,7 @@
 - Move `bc250-code` from raw `/api/generate` response extraction to `/api/chat` with `think:true`; write only `message.content`, require terminal completion, refuse `done_reason=length`, reject reasoning-marker contamination, preserve exact final-content bytes, and retain atomic file replacement. `CODING_AGENT_NUM_PREDICT` is an explicit positive-integer override; the default remains 3072 pending real-device route/budget qualification.
 - Add `agentic-qwen35-4b-khazarai-q6-k` and `agentic-gemma4-e4b-sol-fable-q4-k-m` as opt-in compact challengers. Ornith remains the coding/agent baseline; no candidate is promoted or retired by this release.
 - Record the installed `0.11.2-0.5.fc44` full revalidation: infrastructure/restoration/full coverage passed, Open WebUI translation passed, agent passed 3/3, and task remained a real 5/6 quality result because `tags-de` emitted two JSON objects.
+- Keep coding-helper source validation host-independent: remove the redundant fake-runtime subprocess case that accidentally required runner `jq`; retain direct contract assertions and packaged shell-syntax validation. Runtime `bc250-code` still requires `jq` as declared by the RPM.
 
 ## 0.11.2-0.5 - 2026-09-18
 
