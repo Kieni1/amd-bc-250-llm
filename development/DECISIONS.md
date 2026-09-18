@@ -153,3 +153,43 @@ and Qwen3.6 35B only as a quality upper-bound comparator.
 
 **Retest only if:** the canonical fixture/evaluator or the tested model definition/request
 contract changes materially enough that the earlier screen is no longer comparable.
+
+## DEC-009 — Select Translate-Gemma E4B for bounded translation integration
+
+**Status:** ACTIVE / SELECTED CANDIDATE / PRODUCTION SWITCH BLOCKED
+**Exact model:** `exp-translate-gemma4-sub-e4b-17s-q4-k-xl`
+
+**Observed:** Stage-2E on the authenticated Open WebUI product path compared seven
+configurations against the hard DE↔FR corpus. The strongest deployment configuration
+was Translate-Gemma with the exact explicit-direction v1 system contract, direction in
+the user wrapper, thinking policy omitted and `max_tokens=2048`. It reached 10/16 hard
+passes (2/8 DE→FR, 8/8 FR→DE), 16/16 target-language checks and 72/78 advisory semantic
+dimensions, with 6.91 s mean wall time, 23.01 s p95 and 8362 MiB minimum MemAvailable.
+The 1024-token configuration truncated the long FR→DE case at exactly 1024 output
+tokens; the 2048-token configuration completed it at 1376 output tokens.
+
+TIR Qwen3.5 9B also reached 10/16 but only 65/78 semantic dimensions, produced different
+outputs on every repeated case, averaged 10.60 s and fell to 5871 MiB minimum
+MemAvailable. Forcing `think:false` on Translate-Gemma reproducibly broke the focused
+FR→DE `Avoir` case and is therefore rejected for this role.
+
+**Decision:** Stop broad translation-model comparison. Integrate Translate-Gemma as two
+explicit-direction package-owned candidate roles while leaving the existing LFM
+translation role production/default. Both roles must use the exact Stage-2E system
+prompt, omit a forced thinking policy, use `max_tokens=2048`, and inject direction only
+through the exact tested user wrapper. Run one bounded final authenticated Open WebUI
+requalification against those integrated roles before any production switch.
+
+**Known caveats:** Translate-Gemma still localizes protected DE→FR financial typography,
+omits the trailing ordinary-language sentence in one targeted bullet case, and renders
+the focused `Avoir AV-19` concept as `AV-19:` rather than an explicit accounting term.
+The package does not claim byte-for-byte protected-literal preservation. Numeric
+comparison must nevertheless treat locale-equivalent one-decimal forms such as `8.1`
+and `8,1` as the same value.
+
+**TIR retest only if:** the integrated Translate-Gemma path cannot meet the required
+product contract for a model-level reason, or a materially different TIR model/runtime
+becomes available.
+
+**Evidence:** `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`,
+SHA-256 `63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
