@@ -1822,7 +1822,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
     paths = prepare_result_dir("translation", args.output_dir)
     csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
     copy_fixtures(paths, fixture)
-    translation_num_predict = int(os.environ.get("TRANSLATION_NUM_PREDICT", "1024"))
+    translation_num_predict = int(os.environ.get("TRANSLATION_NUM_PREDICT", "2048"))
     if translation_num_predict <= 0:
         raise BenchmarkError("TRANSLATION_NUM_PREDICT must be a positive integer")
     think_policy = args.think

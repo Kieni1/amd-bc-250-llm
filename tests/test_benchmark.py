@@ -718,6 +718,15 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -printf '%f\n' | sort
         self.assertEqual(noisy[4], 1.0)  # exact required fields still present
 
 
+    def test_task_french_reglementaire_title_matches_regulation_semantics(self) -> None:
+        cases = json.loads((ROOT / "examples/benchmark/task-cases.json").read_text(encoding="utf-8"))
+        case = next(item for item in cases if item["id"] == "title-fr")
+        matched, total = category.semantic_groups_score(
+            "Traduction réglementaire", case["semantic_groups"]
+        )
+        self.assertGreaterEqual(matched, case["min_semantic_groups"])
+        self.assertEqual(total, 4)
+
     def test_task_semantic_groups_gate_relevance_without_wrapper_text(self) -> None:
         parsed = {"queries": ["privacy policy", "cloud storage confidentiality"]}
         value = category.task_value_text(parsed, "query")
@@ -1296,7 +1305,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.0", source)
+        self.assertIn("HARNESS_VERSION=4.1", source)
         start = source.index("run_qualification_sequence() {")
         sequence = source[start:source.index("\nworker() {", start)]
         for phase in ("phase_preflight", "phase_roles", "phase_edge", "phase_agent", "phase_owui", "phase_restore_report"):
@@ -1933,7 +1942,12 @@ phase_roles
             lines = completed.stdout.splitlines()
             self.assertEqual(lines[0], "unset|unset|unset|unset")
             output = "\n".join(lines[1:])
-            self.assertIn("translation quality qualification_benchmark bc250-benchmark translation prod-translate-gemma4-sub-e4b-17s-q4-k-xl --ollama-url http://127.0.0.1:11434", output)
+            self.assertIn(
+                "translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 "
+                "TRANSLATION_THINK=auto bc250-benchmark translation "
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl --ollama-url http://127.0.0.1:11434",
+                output,
+            )
             self.assertIn("--ollama-url http://127.0.0.1:11437", output)
             self.assertIn("--embedding-ollama-url http://127.0.0.1:11437", output)
             self.assertIn("--ollama-url http://127.0.0.1:11435", output)
@@ -2291,6 +2305,26 @@ status_raw
         self.assertFalse(openwebui_workflow.sysctx_restoration_matches("", "false"))
         self.assertTrue(openwebui_workflow.sysctx_restoration_matches("false", "FALSE"))
 
+    def test_owui_translation_acceptance_uses_locale_numeric_equivalence(self) -> None:
+        case = {
+            "required": ["INV-1"],
+            "required_any": ["facture", "montant"],
+            "preserve": ["INV-1"],
+            "forbidden": ["Rechnung"],
+            "numeric_values": ["8.1"],
+            "min_words": 3,
+        }
+        ok, failures = openwebui_workflow.owui_translation_checks(
+            "Facture INV-1 avec montant 8,1 %.", case
+        )
+        self.assertTrue(ok, failures)
+        bad, failures = openwebui_workflow.owui_translation_checks(
+            "Rechnung INV-1 81 %.", case
+        )
+        self.assertFalse(bad)
+        self.assertIn("source-leakage", failures)
+        self.assertIn("preservation", failures)
+
     def test_owui_rag_cleanup_failure_is_classified_as_restoration(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)
@@ -2351,6 +2385,7 @@ status_raw
         self.assertNotIn("owui-test-helper.py", source)
         self.assertNotIn("write_helper()", source)
         self.assertIn("bc250-benchmark concurrency", source)
+        self.assertIn("bc250-benchmark owui-translation", source)
         self.assertIn("bc250-benchmark owui-rag", source)
 
     def test_round2b_workflows_use_common_results_and_explicit_restoration(self) -> None:
@@ -2358,7 +2393,7 @@ status_raw
         owui_source = (ROOT / "cmd/benchmark/openwebui-benchmark.py").read_text(encoding="utf-8")
         for command in ("num-batch", "concurrency"):
             self.assertIn(f'"{command}"', runtime_source)
-        for command in ("owui-rag", "owui-embedding-batch", "owui-chunk-min", "owui-system-context"):
+        for command in ("owui-translation", "owui-rag", "owui-embedding-batch", "owui-chunk-min", "owui-system-context"):
             self.assertIn(f'"{command}"', owui_source)
         for source in (runtime_source, owui_source):
             self.assertIn("prepare_result_dir", source)
