@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.1
+# BC-250 package revalidation harness v4.2
 #
-# Intended target: bc250-llm-server 0.11.2 on Fedora 44; release suffix is not hard-coded.
+# Intended target: bc250-llm-server 0.11.3 on Fedora 44; release suffix is not hard-coded.
 # `start` launches one systemd-owned qualification worker. Routine revalidation
 # exercises packaged defaults only; tuning and hardware A/B decisions are explicit
 # benchmark/diagnostic work. Per-phase reports are retained and exclusive-agent state
@@ -9,8 +9,8 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.1
-TARGET_VERSION=0.11.2
+HARNESS_VERSION=4.2
+TARGET_VERSION=0.11.3
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
 
@@ -50,7 +50,7 @@ SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.1 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.2 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250-benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -66,6 +66,12 @@ readonly AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m
 readonly OWUI_RAG_MODEL=bc250-office-documents
 readonly -a PACKAGE_PROD_MODELS=(
   "$E2B_MODEL" "$E4B_MODEL" "$TRANSLATION_ROLE_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
+)
+# GPT-OSS receives its deeper performance/resource qualification in the dedicated
+# GPT-OSS/Jina coexistence step. Avoid repeating that expensive context workload in
+# the generic production edge sweep.
+readonly -a EDGE_GENERIC_MODELS=(
+  "$E2B_MODEL" "$E4B_MODEL" "$TRANSLATION_ROLE_MODEL" "$QWEN_MODEL"
 )
 
 # Gross-regression gates only. These floors are intentionally conservative and
@@ -308,7 +314,7 @@ current_relevant_args() {
 install_unit() {
   cat > "$UNIT_PATH" <<EOFUNIT
 [Unit]
-Description=BC-250 0.11.2 package qualification v${HARNESS_VERSION}
+Description=BC-250 0.11.3 package qualification v${HARNESS_VERSION}
 After=network-online.target cyan-skillfish-governor-smu.service ollama.service open-webui.service
 Wants=network-online.target
 
@@ -548,6 +554,10 @@ dashboard_text() {
   if ((q > 0)) && [[ $phase == done || $phase == failed ]]; then
     printf '\nQuality failures\n'
     quality_cause_report
+  fi
+  if [[ $phase == done || $phase == failed ]] && awk -F '\t' '$4=="diagnostic" && $5=="info" {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
+    printf '\nDiagnostics\n'
+    diagnostic_report
   fi
   if [[ $phase != done && $phase != failed ]]; then
     printf '\nCtrl-C detaches; the worker continues under systemd.\n'
@@ -791,12 +801,32 @@ snapshot() {
   journalctl -k -b --no-pager -n 1200 > "$dir/kernel-journal.txt" 2>&1 || true
 }
 
+checkpoint() {
+  local label="$1" dir="$RAW/$1" unit port
+  record_progress "capturing checkpoint: $label"
+  install -d -m 0700 "$dir"
+  {
+    echo "timestamp=$(now)"
+    echo "kernel=$(uname -r)"
+    echo "package=$(rpm -q bc250-llm-server 2>/dev/null || true)"
+    for unit in ollama.service ollama-task.service ollama-embedding.service ollama-agent.service open-webui.service tika.service nginx.service; do
+      printf '%s=%s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
+    done
+  } > "$dir/checkpoint.txt" 2>&1
+  capture_cmd "$dir/bc250-status.txt" bc250-status
+  for port in 11434 11435 11436 11437; do
+    curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
+  done
+  capture_cmd "$dir/free.txt" free -h
+  capture_cmd "$dir/swapon.txt" swapon --show
+}
+
 write_phase_report() {
   local label="$1" scope="$2" stamp file
   stamp="$(date +%Y%m%dT%H%M%S)"
   file="$PHASE_REPORT_DIR/$(run_id)-${label}-${stamp}.txt"
   {
-    echo "# BC-250 0.11.2 revalidation v${HARNESS_VERSION} phase report"
+    echo "# BC-250 0.11.3 revalidation v${HARNESS_VERSION} phase report"
     echo "generated=$(now)"
     echo "run_id=$(run_id)"
     echo "phase=$(cat "$PHASE_FILE")"
@@ -1059,6 +1089,7 @@ for line_no, line in enumerate(jsonl.read_text(encoding="utf-8").splitlines(), 1
 
 failures = []
 checks = {}
+diagnostics = []
 for model, limits in policy["models"].items():
     rows = [r for r in records if str(r.get("model", "")).removesuffix(":latest") == model]
     passed = [r for r in rows if r.get("outcome") == "pass"]
@@ -1163,23 +1194,48 @@ for model, limits in policy["models"].items():
     else:
         model_checks["temp_max_c"] = None
 
+    truncated = [r for r in passed if "context-truncation" in r.get("diagnostics", [])]
     severe = [
-        r for r in passed
-        if "context-truncation" in r.get("diagnostics", [])
-        and int(r.get("metrics", {}).get("prompt_eval_count") or 0) < int(policy["severe_context_tokens"])
+        r for r in truncated
+        if int(r.get("metrics", {}).get("prompt_eval_count") or 0) < int(policy["severe_context_tokens"])
     ]
     model_checks["severe_early_context_truncation"] = bool(severe)
     if severe:
         failures.append(f"{model}: severe early context truncation below {policy['severe_context_tokens']} evaluated tokens")
     checks[model] = model_checks
+    for row in truncated:
+        if row in severe:
+            continue
+        notes = [str(note) for note in row.get("notes", []) if "context truncation" in str(note).lower()]
+        diagnostics.append({
+            "model": model,
+            "case_id": str(row.get("case_id") or "unknown"),
+            "kind": "context-truncation",
+            "prompt_eval_count": int(row.get("metrics", {}).get("prompt_eval_count") or 0),
+            "detail": notes[0] if notes else "context truncation observed",
+        })
 
-result = {"passed": not failures, "policy": policy, "checks": checks, "failures": failures}
+result = {"passed": not failures, "policy": policy, "checks": checks, "failures": failures, "diagnostics": diagnostics}
 output.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 if failures:
     for failure in failures:
         print(f"ERROR: {failure}", file=sys.stderr)
     raise SystemExit(1)
 PY_EDGE
+}
+
+record_edge_diagnostics() {
+  local sanity_json="$1" label="$2" model case_id prompt_eval detail
+  [[ -r $sanity_json ]] || return 0
+  while IFS=$'\t' read -r model case_id prompt_eval detail; do
+    [[ -n $model ]] || continue
+    record_event "$label" diagnostic info "$model $case_id: $detail; prompt_eval_count=$prompt_eval; within qualification policy"
+  done < <(jq -r '.diagnostics[]? | [.model, .case_id, (.prompt_eval_count|tostring), .detail] | @tsv' "$sanity_json")
+}
+
+diagnostic_report() {
+  [[ -s $EVENTS ]] || return 0
+  awk -F '\t' '$4=="diagnostic" && $5=="info" {print "  " $3 "\n    " $6}' "$EVENTS"
 }
 
 check_recent_device_errors() {
@@ -1240,31 +1296,34 @@ phase_roles() {
   warm_embedding >/dev/null 2>&1 || true
   run_step roles rag-quality quality qualification_benchmark bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
   run_step roles usecase quality qualification_benchmark bc250-benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
-  snapshot roles/final
+  checkpoint roles/final
   write_phase_report production-role-results roles
 }
 
 phase_edge() {
   set_phase edge "checking bounded production performance and coexistence"
-  local policy="$RAW/edge/edge-policy.json" gpt_policy="$RAW/edge/gpt-oss-policy.json"
+  local policy="$RAW/edge/edge-policy.json" generic_policy="$RAW/edge/generic-edge-policy.json" gpt_policy="$RAW/edge/gpt-oss-policy.json"
   install -d -m 0700 "$RAW/edge"
   write_edge_policy "$policy"
+  jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key != $m))' "$policy" > "$generic_policy"
 
   warm_embedding >/dev/null 2>&1
-  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${PACKAGE_PROD_MODELS[@]}"
-  run_step edge production-sanity infra check_edge_generation_sanity     "$RAW/edge/production-generation/results/results.jsonl" "$policy" "$RAW/edge/production-generation/sanity.json"
+  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${EDGE_GENERIC_MODELS[@]}"
+  run_step edge production-sanity infra check_edge_generation_sanity     "$RAW/edge/production-generation/results/results.jsonl" "$generic_policy" "$RAW/edge/production-generation/sanity.json"
+  record_edge_diagnostics "$RAW/edge/production-generation/sanity.json" production-generation
 
   api_ready 11434 || ensure_normal_mode
   warm_embedding >/dev/null 2>&1
   jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key == $m))' "$policy" > "$gpt_policy"
   run_step edge gpt-oss-jina infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 PREFILL_SENTENCES=352 CTX_POINTS="352 704" NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/gpt-oss-jina/results" "$GPT_OSS_MODEL"
   run_step edge gpt-oss-sanity infra check_edge_generation_sanity     "$RAW/edge/gpt-oss-jina/results/results.jsonl" "$gpt_policy" "$RAW/edge/gpt-oss-jina/sanity.json"
+  record_edge_diagnostics "$RAW/edge/gpt-oss-jina/sanity.json" gpt-oss-jina
   run_step edge jina-still-resident infra model_loaded 11437 "$EMBED_MODEL"
 
   api_ready 11434 || ensure_normal_mode
   run_step edge main-embedding-concurrency infra qualification_benchmark bc250-benchmark concurrency "$E2B_MODEL" "$EMBED_MODEL" --main-url http://127.0.0.1:11434 --embed-url http://127.0.0.1:11437 --output-dir "$RAW/edge/main-embedding-concurrency/results"
   run_step edge device-errors infra check_recent_device_errors "$RAW/edge/kernel-device-errors.txt"
-  snapshot edge/final
+  checkpoint edge/final
   write_phase_report resource-edge-results edge
 }
 
@@ -1295,7 +1354,7 @@ phase_owui() {
     echo "SKIP: authenticated Open WebUI qualification explicitly disabled by --skip-owui" > "$dir/skipped.txt"
     record_event "openwebui-translation" coverage skipped "explicit --skip-owui"
     record_event "openwebui-rag" coverage skipped "explicit --skip-owui"
-    snapshot owui/skipped
+    checkpoint owui/skipped
     write_phase_report openwebui-results owui
     return 0
   fi
@@ -1307,7 +1366,7 @@ phase_owui() {
   if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state changed during qualification rc=$rc" >&2; return "$rc"; }
   record_event "openwebui-state-unchanged" infra pass "package-owned settings unchanged"
-  snapshot owui/final
+  checkpoint owui/final
   write_phase_report openwebui-results owui
 }
 
@@ -1435,6 +1494,11 @@ create_summary() {
     echo
     echo "Quality failures"
     quality_cause_report
+    if awk -F '\t' '$4=="diagnostic" && $5=="info" {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
+      echo
+      echo "Diagnostics"
+      diagnostic_report
+    fi
     echo
     echo "Result root"
     echo "  $RAW"

@@ -215,7 +215,7 @@ production role IDs, so the live model-specific direction Filter and 2048-token 
 part of the path. `owui-rag` qualifies the currently configured Open WebUI RAG path with
 deterministic multi-turn grounding/citation checks.
 
-## Revalidation harness v4.1
+## Revalidation harness v4.2
 
 ```bash
 sudo bc250-revalidate start --owui-token-file /root/owui-test.key
@@ -243,3 +243,10 @@ errors are infrastructure failures. Final status reports run state, infrastructu
 quality and restoration separately. Worker liveness and the age of the last real
 progress event are also separate; a free-running pulse is never presented as proof
 of benchmark progress.
+
+Harness v4.2 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
+deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
+Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
+snapshots remain at preflight, agent-mode transitions, final restoration and failures.
+Non-severe context truncation is surfaced under `Diagnostics` without changing PASS
+criteria; severe early truncation remains an infrastructure qualification failure.

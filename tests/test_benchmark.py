@@ -1469,7 +1469,8 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.1", source)
+        self.assertIn("HARNESS_VERSION=4.2", source)
+        self.assertIn("TARGET_VERSION=0.11.3", source)
         start = source.index("run_qualification_sequence() {")
         sequence = source[start:source.index("\nworker() {", start)]
         for phase in ("phase_preflight", "phase_roles", "phase_edge", "phase_agent", "phase_owui", "phase_restore_report"):
@@ -1931,7 +1932,11 @@ quality_state
         self.assertNotIn("installed_prod_models()", source)
         self.assertNotIn("${GPT_OSS_MODEL:-", source)
         edge = source[source.index("phase_edge() {"):source.index("phase_agent() {")]
-        self.assertIn('"${PACKAGE_PROD_MODELS[@]}"', edge)
+        self.assertIn('"${EDGE_GENERIC_MODELS[@]}"', edge)
+        generic_start = source.index("readonly -a EDGE_GENERIC_MODELS=(")
+        generic = source[generic_start:source.index("\n)", generic_start)]
+        self.assertNotIn("$GPT_OSS_MODEL", generic)
+        self.assertIn('"$GPT_OSS_MODEL"', edge)
 
     def test_revalidation_token_is_validated_before_run_state_without_curl_bearer_argv(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
@@ -2126,6 +2131,7 @@ mkdir -p "$RAW/roles"
 set_phase() {{ :; }}
 warm_embedding() {{ :; }}
 snapshot() {{ :; }}
+checkpoint() {{ :; }}
 write_phase_report() {{ :; }}
 run_step() {{ printf '%s\n' "$*"; }}
 phase_roles
@@ -2192,6 +2198,94 @@ phase_roles
             for name in cases:
                 result = json.loads((t / f"{name}.out.json").read_text(encoding="utf-8"))
                 self.assertFalse(result["passed"], name)
+
+    def test_edge_nonsevere_context_truncation_is_visible_diagnostic_not_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            model = "prod-gpt-oss20b-ggml-org-mxfp4"
+            base_metrics = {
+                "tokens_per_second": 70.0,
+                "allocated_context": 16384,
+                "resident_size_bytes": 1000,
+                "resident_vram_bytes": 1000,
+                "mem_available_min_mib": 512,
+                "temp_max_c": 70,
+                "prompt_eval_count": 8320,
+            }
+            rows = [
+                {
+                    "category": "generation", "model": model, "case_id": "short-1",
+                    "result_type": "measurement", "outcome": "pass",
+                    "diagnostics": [], "notes": [], "metrics": dict(base_metrics),
+                },
+                {
+                    "category": "generation", "model": model, "case_id": "ctx_704-1",
+                    "result_type": "measurement", "outcome": "pass",
+                    "diagnostics": ["context-truncation"],
+                    "notes": [
+                        "prompt_eval_count stopped growing (8662 -> 8320); possible context truncation"
+                    ],
+                    "metrics": dict(base_metrics),
+                },
+            ]
+            jsonl = t / "results.jsonl"
+            jsonl.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            policy = t / "policy.json"
+            policy.write_text(
+                json.dumps({
+                    "min_residency_ratio": 0.9,
+                    "min_mem_available_mib": 128,
+                    "max_temp_c": 85,
+                    "severe_context_tokens": 4096,
+                    "models": {model: {"min_decode_tps": 35.0, "min_context": 16384}},
+                }),
+                encoding="utf-8",
+            )
+            events = t / "events.tsv"
+            events.write_text("", encoding="utf-8")
+            lines = [
+                f'source "{source}" help >/dev/null',
+                f'RAW="{t}"',
+                f'EVENTS="{events}"',
+                f'PHASE_FILE="{t / "phase"}"',
+                f'LAST_EVENT_FILE="{t / "last-event"}"',
+                'printf "edge\n" > "$PHASE_FILE"',
+                f'check_edge_generation_sanity "{jsonl}" "{policy}" "{t / "sanity.json"}"',
+                f'record_edge_diagnostics "{t / "sanity.json"}" gpt-oss-jina',
+                'diagnostic_report',
+            ]
+            completed = subprocess.run(
+                ["bash", "-c", "\n".join(lines)],
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            sanity = json.loads((t / "sanity.json").read_text(encoding="utf-8"))
+            self.assertTrue(sanity["passed"])
+            self.assertEqual(sanity["diagnostics"][0]["prompt_eval_count"], 8320)
+            self.assertIn("8662 -> 8320", completed.stdout)
+            self.assertIn("within qualification policy", completed.stdout)
+
+    def test_revalidation_uses_full_snapshots_only_at_high_value_boundaries(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("snapshot preflight/final", source)
+        self.assertIn("snapshot agent/active", source)
+        self.assertIn("snapshot agent/restored", source)
+        self.assertIn("snapshot final", source)
+        self.assertIn('snapshot "$label" || true', source)
+        for checkpoint in (
+            "checkpoint roles/final",
+            "checkpoint edge/final",
+            "checkpoint owui/final",
+        ):
+            self.assertIn(checkpoint, source)
+        self.assertNotIn("snapshot roles/final", source)
+        self.assertNotIn("snapshot edge/final", source)
+        self.assertNotIn("snapshot owui/final", source)
 
     def test_initialized_benchmark_failures_finalize_canonical_evidence(self) -> None:
         def assert_failed_run(root: Path, category_name: str) -> None:

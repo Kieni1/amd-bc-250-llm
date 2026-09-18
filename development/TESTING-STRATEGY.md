@@ -91,8 +91,14 @@ WOL NIC state
 firewall/listener state
 ```
 
-The current harness v4.1 includes the actual package-owned production translation roles
+The current harness v4.2 includes the actual package-owned production translation roles
 and should replace the ad-hoc translation smoke used after 0.11.2-0.3.
+
+To preserve evidence value while avoiding redundant runtime, v4.2 keeps direct and
+product-path semantic checks distinct, but removes the duplicate generic GPT-OSS edge
+performance pass because the dedicated GPT-OSS/Jina coexistence stage is the stronger
+resource check. Successful intermediate phases use lightweight checkpoints; full
+snapshots remain at preflight, agent transitions, final restoration and failures.
 
 If clean, next batch is a real powered-off/S5 WOL test. Only after S5 wake succeeds
 should safe shutdown be exercised: first a deliberately busy/defer case, then an idle
@@ -135,7 +141,7 @@ closed as the normal deployment choice under current evidence.
 Next translation sequence:
 
 1. install the production translation model with
-   `sudo bc250-model install production prod-translate-gemma4-sub-e4b-17s-q4-k-xl`,
+   `sudo bc250-model apply production prod-translate-gemma4-sub-e4b-17s-q4-k-xl`,
    then apply the source-owned `bc250-office-translation-de-fr` and
    `bc250-office-translation-fr-de` desired state;
 2. verify the exact system prompt, non-global direction Filter, `max_tokens=2048`, and
@@ -253,14 +259,24 @@ MTP is experimental and should stay behind the production-office lanes.
 
 Prerequisites:
 
-- explicitly enabled MTP catalog entry;
+- one explicitly selected MTP catalog entry (`bc250-fetch-mtp ID` exposes packaged
+  disabled candidates without making them part of generic convergence);
 - pinned/recorded GGUF identity;
 - an external `llama-server` whose CLI supports the required options;
 - reviewed baseline is llama.cpp `b10069` / commit
   `178a6c44937154dc4c4eff0d166f4a044c4fceba`, but compatible newer releases may be
   tested and must be recorded.
 
-Test one MTP model at a time. A useful MTP comparison must include:
+Prepare and verify one MTP model at a time:
+
+```bash
+bc250-model list mtp --all
+sudo bc250-fetch-mtp ID
+sudo bc250-model status mtp ID --include-disabled --verbose
+LLAMACPP=/path/to/llama-server bc250-run-mtp ID
+```
+
+A useful MTP comparison must include:
 
 ```text
 same or closely comparable task/prompt
