@@ -127,8 +127,13 @@ file	0644	unlock-src/README.md	{share}/40cu/README-upstream.md
 text	0644	{unlock_commit}	{share}/40cu/SOURCE-REVISION
 
 file	0644	cmd/system/ollama-profiles/*.conf	{share}/ollama-profiles/
+dir	0755	-	{share}/openwebui/functions
+dir	0755	-	{share}/openwebui/prompts
 file	0644	config/openwebui/models.json	{share}/openwebui/models.json
 file	0644	config/openwebui/desired-state.json	{share}/openwebui/desired-state.json
+file	0644	config/openwebui/functions.json	{share}/openwebui/functions.json
+file	0644	config/openwebui/functions/*.py	{share}/openwebui/functions/
+file	0644	config/openwebui/prompts/*.txt	{share}/openwebui/prompts/
 file	0644	config/openwebui/open-webui-enable.conf	{share}/openwebui/open-webui-enable.conf
 file	0644	cmd/maintenance/*.service	{unitdir}/
 file	0644	cmd/maintenance/*.timer	{unitdir}/
