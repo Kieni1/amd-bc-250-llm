@@ -203,9 +203,11 @@ Translate-Gemma identity is also retired after promotion to the production name.
 The Stage-2E evidence archive is
 `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
 `63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
-The first installed `0.11.2-0.3` run must still verify the integrated Open WebUI product
-path on the real BC-250; source promotion is not a claim that this newer package has
-already been hardware-qualified.
+Installed `0.11.2-0.3.fc44` first verified the integrated authenticated direction roles,
+and installed `0.11.2-0.5.fc44` subsequently completed revalidation v4.1 with the
+canonical `owui-translation` stage passing. The Stage-2E hard corpus remains separate
+historical selection evidence; the real-device package path is now verified through the
+0.5 release.
 
 ### Production residency follow-up
 
@@ -291,6 +293,23 @@ exp-tir-qwen35-9b-nonthinking-v2-q6-k
 ```
 <!-- ACTIVE_EXPERIMENTS:END -->
 
+## Agent/coding lifecycle
+
+`agentic-ornith15-9b-ornith-q5-k-m` remains the package default and baseline. Installed
+`0.11.2-0.5.fc44` passed the canonical agent benchmark 3/3 during full revalidation.
+Separate product-path evidence then showed why static benchmark success is not sufficient:
+a coding helper that writes reasoning or a truncated final answer into a file is a product
+contract failure even when the cleaned body is useful. Source `0.11.2-0.6` therefore
+separates native thinking from final content through `/api/chat` and fails closed on
+nonterminal/truncated/reasoning-contaminated output.
+
+The next comparison funnel keeps Ornith as baseline, Qwable 9B as a serious challenger,
+and adds Qwen3.5 4B Q6_K plus Gemma 4 E4B Q4_K_M as compact challengers. Gemma 4 12B
+remains available for one final comparison only if the E4B result leaves that useful.
+Qwen2.5-Coder 7B is not moved to the graveyard in this source because the raw campaign
+archive was not supplied to this integration pass. No weights are deleted by catalog
+status changes.
+
 ## Current comparison policy
 
 Production roles stay stable until a measured replacement wins its real use case.
@@ -310,8 +329,12 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
 | `exp-lfm25-8b-a1b-liquidai-q6-k` | former production DE/FR translator retained as rollback/reference while the promoted Translate-Gemma product path is verified |
-| `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; temperature 0 + 3072-token Bash/Python budget passed 3/3 in three consecutive BC-250 runs |
-| `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use experiment for the exclusive 11436 lane; compare against Qwen2.5-Coder and Ornith before any role change |
+| `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; retain as the baseline while product-path completion/extraction is qualified |
+| `agentic-qwable9b-empero-q6-k` | active 9B coding/agent challenger; retain for the next comparative funnel |
+| `agentic-qwen35-4b-khazarai-q6-k` | new compact Qwen3.5 agentic-coding challenger; Q6_K with the Qwen precise-coding sampling profile; qualification pending |
+| `agentic-gemma4-e4b-sol-fable-q4-k-m` | new compact Gemma 4 E4B agentic/coding challenger; conservative 16K deterministic BC-250 test profile; qualification pending |
+| `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use comparison; retain until the E4B challenger establishes whether a final 12B comparison is useful |
+| `agentic-qwen25-coder7b-unsloth-q5-k-m` | legacy coding comparison; lifecycle decision remains pending canonical campaign-evidence reconciliation |
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,

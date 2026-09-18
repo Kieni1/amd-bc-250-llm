@@ -4,6 +4,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -168,6 +169,34 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("PARAMETER temperature 0", coder)
         self.assertIn("PARAMETER top_p 0.95", coder)
 
+    def test_new_agentic_challenger_profiles_are_discoverable_and_bounded(self) -> None:
+        expected = {
+            "agentic-qwen35-4b-khazarai-q6-k",
+            "agentic-gemma4-e4b-sol-fable-q4-k-m",
+        }
+        discovered = {
+            model["name"]: model for model in modelctl.discover_models([MODELFILES])
+        }
+        self.assertTrue(expected <= discovered.keys())
+        self.assertTrue(all(discovered[name]["category"] == "agentic" for name in expected))
+
+        qwen = (MODELFILES / "agentic-qwen35-4b-khazarai-q6-k.Modelfile").read_text()
+        self.assertIn("PARAMETER num_ctx 32768", qwen)
+        self.assertIn("PARAMETER num_predict 3072", qwen)
+        self.assertIn("PARAMETER temperature 0.6", qwen)
+        self.assertIn("PARAMETER top_p 0.95", qwen)
+        self.assertIn("PARAMETER top_k 20", qwen)
+        self.assertIn("PARAMETER min_p 0.0", qwen)
+        self.assertIn("PARAMETER repeat_penalty 1.0", qwen)
+
+        gemma = (MODELFILES / "agentic-gemma4-e4b-sol-fable-q4-k-m.Modelfile").read_text()
+        self.assertIn("PARAMETER num_ctx 16384", gemma)
+        self.assertIn("PARAMETER num_predict 3072", gemma)
+        self.assertIn("PARAMETER temperature 0", gemma)
+        self.assertIn("PARAMETER top_p 0.95", gemma)
+        self.assertIn("PARAMETER top_k 64", gemma)
+        self.assertIn("PARAMETER repeat_penalty 1.1", gemma)
+
     def test_coding_helper_defaults_to_measured_ornith(self) -> None:
         helper = (ROOT / "models/coding-agent/coding-agent.sh").read_text(
             encoding="utf-8"
@@ -175,6 +204,91 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn(
             "CODING_AGENT_MODEL:-agentic-ornith15-9b-ornith-q5-k-m", helper
         )
+        self.assertIn("CODING_AGENT_NUM_PREDICT:-3072", helper)
+        self.assertIn('"${OLLAMA_URL}/api/chat"', helper)
+        self.assertIn("think:true", helper)
+        self.assertIn(".message.content", helper)
+        self.assertIn('[[ "$done" != true ]]', helper)
+        self.assertIn('[[ "$done_reason" == "length" ]]', helper)
+        self.assertNotIn('"${OLLAMA_URL}/api/generate"', helper)
+
+    def test_coding_helper_refuses_incomplete_or_reasoning_contaminated_output(self) -> None:
+        helper = ROOT / "models/coding-agent/coding-agent.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            curl = fake_bin / "curl"
+            curl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -eu\n"
+                "url=\"${!#}\"\n"
+                "case \"$url\" in\n"
+                "  */api/tags) printf '{}\\n' ;;\n"
+                "  */api/chat) printf '%s\\n' \"$FAKE_CHAT_JSON\" ;;\n"
+                "  *) exit 22 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            curl.chmod(0o755)
+            input_path = root / "input.py"
+            input_path.write_text("print('input')\n", encoding="utf-8")
+            output_path = root / "output.py"
+            output_path.write_text("preserve me\n", encoding="utf-8")
+            output_path.chmod(0o640)
+
+            base_env = os.environ.copy()
+            base_env["PATH"] = f"{fake_bin}:{base_env['PATH']}"
+
+            def run(response: dict[str, object]) -> subprocess.CompletedProcess[str]:
+                env = base_env.copy()
+                env["FAKE_CHAT_JSON"] = json.dumps(response)
+                return subprocess.run(
+                    [str(helper), "generate", str(input_path), str(output_path)],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                    env=env,
+                )
+
+            valid = run({
+                "done": True,
+                "done_reason": "stop",
+                "message": {
+                    "thinking": "private reasoning",
+                    "content": "print('final')\n",
+                },
+            })
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "print('final')\n")
+            self.assertEqual(output_path.stat().st_mode & 0o777, 0o640)
+
+            output_path.write_text("preserve me\n", encoding="utf-8")
+            truncated = run({
+                "done": True,
+                "done_reason": "length",
+                "message": {"content": "partial"},
+            })
+            self.assertEqual(truncated.returncode, 3)
+            self.assertIn("output limit", truncated.stderr)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "preserve me\n")
+
+            nonterminal = run({
+                "done": False,
+                "message": {"content": "partial"},
+            })
+            self.assertEqual(nonterminal.returncode, 3)
+            self.assertIn("terminal completion", nonterminal.stderr)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "preserve me\n")
+
+            contaminated = run({
+                "done": True,
+                "done_reason": "stop",
+                "message": {"content": "<think>hidden</think>\nprint('final')\n"},
+            })
+            self.assertEqual(contaminated.returncode, 3)
+            self.assertIn("reasoning markers", contaminated.stderr)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "preserve me\n")
 
     def test_recommended_tooling_models_are_discoverable(self) -> None:
         expected = {

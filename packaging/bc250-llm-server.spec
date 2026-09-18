@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.2
-Release:        0.5%{?dist}
+Release:        0.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.6
+- Make task/revalidation quality diagnostics non-cascading and case-addressable while preserving the same qualification thresholds and return-code semantics.
+- Harden the local coding helper around Ollama chat completion integrity: separate thinking from final content, refuse nonterminal/truncated/reasoning-contaminated output, and keep file replacement atomic.
+- Add compact Qwen3.5 4B and Gemma 4 E4B agentic challengers without changing the Ornith default or promoting/retiring candidates.
+
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.5
 - Fix installed Open WebUI translation qualification so packaged fixtures resolve from /usr/share/bc250-llm-server instead of the nonexistent /usr/examples tree.
 - Centralize benchmark package-resource resolution across category and Open WebUI checks, preserving explicit overrides while preventing source tests from silently consuming stale installed fixtures.

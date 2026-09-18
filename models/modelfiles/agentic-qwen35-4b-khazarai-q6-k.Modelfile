@@ -1,0 +1,36 @@
+# BC250 category: agentic
+# Ollama model: agentic-qwen35-4b-khazarai-q6-k
+# Source: mradermacher/Qwen3.5-4B-Agentic-Coding-GGUF @ latest
+# GGUF: Qwen3.5-4B-Agentic-Coding.Q6_K.gguf
+# License: Apache-2.0
+#
+# Underlying fine-tune:
+# - khazarai/Qwen3.5-4B-Agentic-Coding
+# - mradermacher static Q6_K quant of the same fine-tune
+#
+# Intended role:
+# - Compact agentic coding challenger
+# - Bash/Python generation, refactoring, repository work, and tool interaction
+# - Q6_K is a high-quality ~3.6 GB class quant, appropriate for the exclusive lane
+#
+# Sampling follows Qwen3.5 precise-coding guidance where Ollama supports it.
+
+FROM /var/lib/bc250-llm-server/gguf/agent/Qwen3.5-4B-Agentic-Coding.Q6_K.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER num_predict 3072
+
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0.0
+PARAMETER repeat_penalty 1.0
+
+SYSTEM """You are a precise coding and tool-using agent.
+Follow the requested output format exactly.
+For file-generation tasks, return only the requested file content when instructed.
+Prefer correct executable code and minimal repository changes.
+Use tools deliberately when available and verify results before concluding.
+Never claim that commands ran, tests passed, files exist, or changes succeeded unless the available evidence proves it."""

@@ -1,0 +1,34 @@
+# BC250 category: agentic
+# Ollama model: agentic-gemma4-e4b-sol-fable-q4-k-m
+# Source: deadbydawn101/gemma-4-E4B-Agentic-Sol-Fable-Reasoning-GeminiCLI-GGUF @ latest
+# GGUF: gemma-4-E4B-v2-Sol-Fable-Q4_K_M.gguf
+# License: Gemma
+#
+# Intended role:
+# - Compact Gemma 4 E4B agentic/coding challenger
+# - Coding, refactoring, repository analysis, and tool-use experiments
+# - Q4_K_M is the upstream recommended balance for this GGUF
+#
+# BC-250 test profile:
+# - exclusive agent lane
+# - conservative 16K context for first qualification
+# - deterministic generation to favor exact raw-file contracts
+
+FROM /var/lib/bc250-llm-server/gguf/agent/gemma-4-E4B-v2-Sol-Fable-Q4_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 16384
+PARAMETER num_predict 3072
+
+PARAMETER temperature 0
+PARAMETER top_p 0.95
+PARAMETER top_k 64
+PARAMETER repeat_penalty 1.1
+
+SYSTEM """You are a precise coding, terminal, and tool-using agent.
+Follow the requested output format exactly.
+For file-generation tasks, return only the requested file content when instructed.
+Inspect available state before acting when context is incomplete.
+Prefer minimal correct changes and preserve existing behavior unless asked otherwise.
+Never claim that commands ran, tests passed, files exist, or changes succeeded unless the available evidence proves it."""
