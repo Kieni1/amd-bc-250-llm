@@ -1,10 +1,10 @@
 ID: TRANSLATION-20260917-01
-Status: ACTIVE — STAGE-2 PENDING
+Status: SUPERSEDED — ADVANCED TO STAGE-2E
 Package: 0.11.1-0.10.fc44
 Exact models: current DE<->FR specialist/generalist/upper-bound pool; see this record plus `MODELS.md` and the dated translation handover
 Role: German <-> French office translation
 Tests actually run: repaired canonical short screen, confirmations, reasoning-policy retries, large-model upper-bound batches
-Tests not run: Stage-2 harder corpus; final real Open WebUI product-path comparison; deployment-mode/coexistence decision
+Tests not run in this early campaign: Stage-2 harder corpus; those questions were subsequently addressed by `2026-09-17-translation-stage2e.md`.
 
 Observed facts:
 - The eight-case canonical screen is saturated: several materially different candidates reach 8/8.
@@ -23,9 +23,12 @@ Interpretation:
 - Short-screen 8/8 means advance, not promotion or equality.
 - Direct foreground quality does not prove Open WebUI product-path reliability or concurrent residency.
 
-Decision:
-- NO PRODUCTION CHANGE in this release.
-- Stage-2 recommended set: Translate-Gemma E4B, Ministral 8B, TIR Qwen3.5 9B non-thinking, Qwen3.6 35B upper bound.
+Decision at the time:
+- NO PRODUCTION CHANGE from this early screen.
+- Advance Translate-Gemma E4B, Ministral 8B, TIR Qwen3.5 9B non-thinking and Qwen3.6 35B upper bound to harder discrimination.
+
+Superseding result:
+- Stage-2E selected Translate-Gemma E4B; see `2026-09-17-translation-stage2e.md` and DEC-009/DEC-010.
 
 Retest only if:
 - Proceed with the prepared harder DE<->FR corpus and then narrow to 2-3 product-path finalists.

@@ -156,7 +156,7 @@ contract changes materially enough that the earlier screen is no longer comparab
 
 ## DEC-009 — Select Translate-Gemma E4B for bounded translation integration
 
-**Status:** ACTIVE / SELECTED CANDIDATE / PRODUCTION SWITCH BLOCKED
+**Status:** SUPERSEDED BY DEC-010 — historical pre-promotion decision
 **Exact model:** `exp-translate-gemma4-sub-e4b-17s-q4-k-xl`
 
 **Observed:** Stage-2E on the authenticated Open WebUI product path compared seven
@@ -173,12 +173,13 @@ outputs on every repeated case, averaged 10.60 s and fell to 5871 MiB minimum
 MemAvailable. Forcing `think:false` on Translate-Gemma reproducibly broke the focused
 FR→DE `Avoir` case and is therefore rejected for this role.
 
-**Decision:** Stop broad translation-model comparison. Integrate Translate-Gemma as two
-explicit-direction package-owned candidate roles while leaving the existing LFM
-translation role production/default. Both roles must use the exact Stage-2E system
-prompt, omit a forced thinking policy, use `max_tokens=2048`, and inject direction only
-through the exact tested user wrapper. Run one bounded final authenticated Open WebUI
-requalification against those integrated roles before any production switch.
+**Decision at the time of Stage-2E:** Stop broad translation-model comparison. Integrate
+Translate-Gemma as two explicit-direction package-owned roles using the exact Stage-2E
+system prompt, no forced thinking policy, `max_tokens=2048`, and direction only through
+the exact tested user wrapper. The maintainer subsequently accepted the production
+identity switch in DEC-010 before post-install package verification. This record remains
+the evidence boundary for how the model/configuration was selected; it is not the current
+production-state decision.
 
 **Known caveats:** Translate-Gemma still localizes protected DE→FR financial typography,
 omits the trailing ordinary-language sentence in one targeted bullet case, and renders
@@ -193,3 +194,36 @@ becomes available.
 
 **Evidence:** `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`,
 SHA-256 `63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
+
+## DEC-010 — Normalize task/translation production identities for 0.11.2-0.2+
+
+**Status:** ACCEPTED — source policy; installed-device verification still required.
+
+**Context:** The task lane has one proven deployable model, LFM2.5 1.2B. The older
+Gemma 3 1B fallback/control remains materially weaker. Stage-2E selected Translate-Gemma
+E4B and closed the broad translation tournament, while the old LFM production translator
+is useful only as a rollback/reference. Keeping all of those identities simultaneously
+in active task/production discovery obscures the actual appliance defaults.
+
+**Decision:**
+
+- keep `task-lfm25-1.2b-instruct-liquidai-q6-k` as the sole active task-lane model;
+- retire `task-gemma3-1b-unsloth-ud-q4-k-xl` to the source graveyard;
+- promote the selected translation weights as
+  `prod-translate-gemma4-sub-e4b-17s-q4-k-xl`;
+- make the explicit `bc250-office-translation-de-fr` and
+  `bc250-office-translation-fr-de` presets the active production translation roles;
+- retire the old `prod-lfm25-8b-a1b-liquidai-q6-k` identity and retain the same LFM
+  family only as `exp-lfm25-8b-a1b-liquidai-q6-k` for deliberate rollback/comparison;
+- retire Hunyuan-MT and Ministral translation-only challengers and the old experimental
+  Translate-Gemma alias from routine discovery;
+- keep TIR Qwen3.5 9B experimental because it still has a broader office/RAG comparison
+  purpose independent of its closed translation deployment path.
+
+**Boundary:** This is a source/catalog promotion based on the accepted Stage-2E evidence
+and maintainer decision. It does not claim that the newly named production identity has
+already passed the post-install current-release real-device gate. That verification remains
+required before calling the new release fully qualified on the appliance.
+
+**Retest only if:** a retired model gains a materially new role, runtime/hardware envelope,
+or evidence that directly addresses its recorded rejection/supersession reason.

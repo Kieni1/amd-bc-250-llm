@@ -61,13 +61,23 @@ evidence.
 - Numeric evaluator parsing must treat one-decimal locale forms such as `8,1` as 8.1,
   not 81.
 
-## Integration decision
+## Integration decision at the time of Stage-2E
 
-Add package-owned DE→FR and FR→DE candidate roles that reproduce the exact tested
-contract, but retain the existing LFM translation production/default role. Do not run
-another broad model campaign. Requalify only the integrated final path using canonical
-sanity plus the targeted protected-finance, bullets/table, `Avoir`, and both long
-translation cases. Promote only after that bounded gate passes.
+The immediate Stage-2E handoff proposed package-owned DE→FR and FR→DE roles that
+reproduce the exact tested contract while temporarily retaining LFM as production. That
+pre-promotion boundary is historical: the maintainer subsequently accepted the
+Translate-Gemma production identity switch in DEC-010. The exact Stage-2E contract and
+evidence remain unchanged, and the first installed current release still needs a bounded
+product-path verification rather than another broad model campaign.
 
 Preset/provider restoration was verified for every Stage-2E configuration. Privacy
 scans passed and serious-warning evidence was empty.
+
+## Later source promotion
+
+`0.11.2-0.2` and later releases promote these selected weights under the production identity
+`prod-translate-gemma4-sub-e4b-17s-q4-k-xl` and retires the experimental alias.
+This does not change which model/configuration produced the historical Stage-2E evidence.
+The exact evidence archive and prompt SHA above remain the provenance anchors.
+
+The exact final hard-corpus case payloads are preserved in that evidence archive rather than duplicated into this source tree. A byte-for-byte rerun therefore requires the recorded archive; if it is unavailable, do not invent replacement cases and call them the same Stage-2E gate.
