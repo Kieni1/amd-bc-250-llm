@@ -69,6 +69,7 @@ bc250-model list mtp --all
 sudo bc250-fetch-mtp qwen3.6-27b-mtp  # explicit opt-in MTP preparation
 
 sudo bc250-model status agentic MODEL
+sudo bc250-model status agentic MODEL --verbose
 sudo bc250-model apply production
 sudo bc250-model apply experiments
 sudo bc250-model apply task
@@ -87,7 +88,8 @@ sudo bc250-model remove experiments MODEL
 
 Selections accept a full name, displayed index, ranges such as `0,2-4`, or `all`.
 `list` is catalog-only; use `sudo bc250-model status` when you need downloaded,
-registration or Modelfile-drift state. Enter cancels an interactive selection. Preserve
+registration or Modelfile-drift state. `--verbose` also shows source repository/revision,
+verified SHA-256 when available and resolved paths; `--online` checks moving upstream state. Enter cancels an interactive selection. Preserve
 downloaded GGUFs where practical; use package lifecycle commands rather than deleting
 `/var/lib` content manually.
 

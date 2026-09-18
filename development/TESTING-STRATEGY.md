@@ -129,11 +129,15 @@ revalidating every formatter on every run.
 ### Lane C — task and translation role decisions
 
 The current task search is **not** an open invitation to keep trying larger models.
-`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production default. Qwen3 4B is a
-role-specific rejection despite 5/6 quality because both exact-source and bounded-4K
-task staging caused global OOM and warm-main loss. Future materially larger task
-challengers must pass one cheap quality screen, then the tiny warm-main survival gate,
-before product-path or repeated quality work.
+`task-lfm25-1.2b-instruct-liquidai-q6-k` remains the production default. Installed
+0.11.3-0.2 again produced the same `tags-de` double-JSON format miss, so 0.11.3-0.3
+tightens only the tag prompt: broad/specific tags share one array and exactly one raw JSON
+object is allowed. First retest the existing six canonical task cases; do not change the
+strict evaluator or 128-token budget to make that result green. Qwen3 4B remains a
+role-specific rejection despite 5/6 quality because both exact-source and bounded-4K task
+staging caused global OOM and warm-main loss. Future materially larger task challengers
+must pass one cheap quality screen, then the tiny warm-main survival gate, before
+product-path or repeated quality work.
 
 For translation, broad model/configuration qualification is now closed. Stage-2E selected
 Translate-Gemma E4B with the exact explicit-direction v1 contract, thinking omitted and

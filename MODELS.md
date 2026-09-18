@@ -196,11 +196,15 @@ remain concise so evidence-note edits do not trigger needless Ollama reconciliat
 
 `task-lfm25-1.2b-instruct-liquidai-q6-k` is the sole active task-lane model. Its
 promotion evidence remains 15/18 direct, 15/18 through authenticated Open WebUI with
-package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS. The previous
-Gemma 3 1B fallback/control is retired to the source graveyard after its weak ~2/6
-current-task behavior. `exp-qwen3-4b-lmstudio-q6-k` remains an experiment but is
-explicitly rejected for concurrent background-task deployment because both task staging
-attempts caused global OOM and warm-main loss.
+package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS. Installed
+0.11.3-0.2 still produced one `tags-de` format miss by emitting two JSON objects; 0.11.3-0.3
+clarifies the package-owned tag prompt so broad and specific tags share one array and only
+one raw JSON object is allowed. The model, strict evaluator and 128-token tag budget are
+unchanged pending focused device retest. The previous Gemma 3 1B fallback/control is
+retired to the source graveyard after its weak ~2/6 current-task behavior.
+`exp-qwen3-4b-lmstudio-q6-k` remains an experiment but is explicitly rejected for
+concurrent background-task deployment because both task staging attempts caused global
+OOM and warm-main loss.
 
 ### German/French translation role
 

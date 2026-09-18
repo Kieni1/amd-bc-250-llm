@@ -99,7 +99,7 @@ mutating lifecycle operations:
 
 ```bash
 bc250-model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
-sudo bc250-model status [CATEGORY] [SELECTION] [--online] [--verbose]
+sudo bc250-model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
 bc250-model path CATEGORY ID
 
 sudo bc250-model apply CATEGORY [SELECTION] [OPTIONS]
@@ -126,10 +126,12 @@ MTP definitions.
 manager-owned GGUF/state trees are protected. It evaluates the same state contract that
 `apply` consumes: source presence and checksum/provenance validity, whether the selected
 definition differs from the rendered runtime Modelfile, registration state on the
-category-owned Ollama lane, and the recommended next action. `--verbose` adds resolved
-paths. `--online` checks moving upstream revisions such as `latest` without downloading
-or modifying the local model. Pinned revisions are reported as pinned rather than
-mislabelled as needing an update.
+category-owned Ollama lane, and the recommended next action. When upstream state has not
+been checked, normal output points to `--online`. `--verbose` adds source repository,
+revision, verified local SHA-256 when available, and resolved paths. `--compact` renders
+one state-rich line per model and is used by the installer picker. `--online` checks moving
+upstream revisions such as `latest` without downloading or modifying the local model.
+Pinned revisions are reported as pinned rather than mislabelled as needing an update.
 
 `path` is the narrow machine-readable resolver used by package tooling. It prints the
 resolved source path and MTP context/draft metadata for one exact model; it replaces the

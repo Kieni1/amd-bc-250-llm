@@ -37,32 +37,31 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.3
-RPM Release   0.2%{?dist}
-NVR           0.11.3-0.2
+RPM Release   0.3%{?dist}
+NVR           0.11.3-0.3
 ```
 
-The current source-ready `0.11.3-0.2` source contains a deliberate greenfield rewrite of
-`bc250-model` while keeping runtime/service topology, Ollama, KV, CU, governor policy,
-office production models, quality thresholds and Open WebUI role policy unchanged. The
-model manager now separates catalog discovery (`list`), runtime inspection (`status`),
-technical path resolution (`path`), reconciliation (`apply`), explicit source refetch
-(`refresh`), registration-only removal (`unregister`), full manager-owned source removal
-(`remove`) and retirement cleanup (`purge-retired`). Current callers and operator docs have
-been migrated to that contract; historical evidence retains the command syntax it actually
-used. The preceding 0.11.2-0.6 task/coding-agent diagnostic changes and agent challengers
-remain carried forward unchanged.
+The current source-ready `0.11.3-0.3` source keeps the greenfield `bc250-model`
+lifecycle contract and v4.2 revalidation architecture from 0.11.3-0.2. This release
+restores state-rich install-time model selection through compact shared state inspection,
+adds clearer source/update identity to `bc250-model status`, tightens the package-owned
+tag-generation prompt around the existing strict single-object JSON contract, and makes
+non-severe context-truncation diagnostics concise and policy-explicit. Runtime/service
+topology, Ollama/KV/CU/governor policy, production model identities and benchmark
+thresholds are unchanged.
 
-Current `0.11.3-0.2` source release closure is complete at source level: `make validate`
-passed repository/RPM preflight, packaged shell syntax and 366/366 deterministic tests.
+Current `0.11.3-0.3` source release closure is complete at source level: `make validate`
+passed repository/RPM preflight, packaged shell syntax and 370/370 deterministic tests.
 Ruff and ShellCheck were not run in this environment; GitHub RPM/SRPM build and BC-250
-runtime qualification remain later gates. Do not inherit older installed evidence as if it
-qualified the new model-manager or revalidation-v4.2 behavior.
+runtime qualification remain later gates.
 
-Installed `bc250-llm-server-0.11.2-0.5.fc44.x86_64` is now the newest real-device package
-evidence: installer verification was 54/0/0 and revalidation v4.1 completed with
-infrastructure/restoration PASS, full coverage, Open WebUI translation PASS, agent 3/3,
-and one genuine task `tags-de` format quality miss. Exact evidence is recorded in
-`development/model-runs/2026-09-18-installed-0.11.2-0.5-revalidation.md`.
+Installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` is the newest real-device package
+evidence: installer verification was 54/0/0 and revalidation v4.2 completed with
+infrastructure/restoration PASS and full coverage. Direct translation 8/8, direct RAG 4/4,
+Open WebUI translation 8/8, Open WebUI RAG 3/3, embeddings qualification and agent 3/3
+passed. Task remained 5/6 because `tags-de` emitted two JSON objects; the non-severe
+GPT-OSS/Jina context diagnostic also surfaced as intended. Exact evidence is recorded in
+`development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -420,7 +419,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. Current `0.11.3-0.2` carries that translation model/evaluator contract forward unchanged. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. Current `0.11.3-0.3` carries that translation model/evaluator contract forward unchanged. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -501,7 +500,7 @@ write native reasoning before a useful final answer and could also exhaust its 3
 budget before a complete answer. Those are product-path completion/integrity defects, not
 reasons to weaken the benchmark or retire Ornith.
 
-The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-0.2` carries that product route forward unchanged
+The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-0.3` carries that product route forward unchanged
 content, terminal-completion checks, explicit truncation refusal and reasoning-marker
 rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
 package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
@@ -1174,8 +1173,8 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-0.2 source is release-closed/source-ready but still needs an external GitHub RPM build and installed-device qualification;
-  installed 0.11.2-0.5.fc44 is the newest full appliance evidence and completed v4.1 with infrastructure/restoration PASS, full coverage, Open WebUI translation PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.2-0.5-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
+- current 0.11.3-0.3 source is release-closed/source-ready but still needs an external GitHub RPM build and installed-device qualification;
+  installed 0.11.3-0.2.fc44 is the newest full appliance evidence and completed v4.2 with infrastructure/restoration PASS, full coverage, Open WebUI translation/RAG PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
@@ -1196,17 +1195,18 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-build/install exact `0.11.3-0.2` and capture the installed NEVRA before device conclusions.
-2. Run one bounded Ornith `bc250-code` route/completion check first. Confirm final-content
-   separation, no file replacement on `done_reason=length`, and compare 3072 vs 6144 only
-   when 3072 explicitly truncates.
-3. If the product route is healthy, run the four-model agent funnel: Ornith baseline →
-   Qwable 9B → Qwen3.5 4B → Gemma 4 E4B → Ornith baseline. Keep static/integrity gates
-   cheap before broader product workflows.
-4. Keep power qualification separate: when returning to operations, do one real S5 WOL
-   cycle, then safe-shutdown busy/defer and idle/allow.
-5. Do not reopen unrelated RAG/main/translation campaigns unless their current evidence or
-   changed source requires it.
+1. GitHub-build/install exact `0.11.3-0.3` and capture the installed NEVRA before device conclusions.
+2. Confirm the installer model picker shows compact state-rich entries and sample
+   `bc250-model status --verbose` for one production model; packaged source identity should
+   remain verified/current and `Upstream: not checked` should point to `--online`.
+3. Apply the Open WebUI desired state and rerun the six-case task qualification. The key
+   regression is `tags-de`: keep the strict evaluator unchanged and check whether the new
+   single-array/single-object prompt removes the repeated format miss.
+4. Run normal v4.2 revalidation once. The GPT-OSS/Jina bounded context observation, if it
+   recurs, should remain PASS but render as a concise previous→current prompt-token
+   diagnostic. Preserve the exact 0.11.3-0.2 result as historical evidence.
+5. Continue the agent/product-route and WOL/power campaigns separately; do not mix them
+   into this focused 0.3 regression unless another source change requires it.
 
 That sequencing protects the product's current top priorities without losing the deeper
 quality program.

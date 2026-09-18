@@ -124,6 +124,7 @@ bc250-model list production
 bc250-model list mtp --all          # experimental/download-only candidates
 sudo bc250-fetch-mtp qwen3.6-27b-mtp  # explicit opt-in; not generic convergence
 sudo bc250-model status production
+sudo bc250-model status production MODEL --verbose
 sudo bc250-model apply production
 sudo bc250-model apply experiments
 sudo bc250-model apply embedding

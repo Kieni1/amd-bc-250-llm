@@ -276,3 +276,23 @@ clean contract over compatibility aliases.
 **Retest only if:** real operator use shows the new verbs remain ambiguous, a lifecycle operation
 cannot be represented without unsafe flag combinations, or a future package state model changes
 materially. Do not restore old aliases merely to avoid updating callers/docs.
+
+## DEC-013 — Keep task-tag JSON strict; fix repeated double-object output in the prompt
+
+**Status:** ACTIVE
+
+**Decision:** Keep the existing strict task evaluator and 128-token tag budget. The
+package-owned tag-generation prompt must explicitly place broad themes and specific
+subtopics together in one `tags` array and require exactly one raw JSON object with no
+second object, prose or Markdown.
+
+**Why:** Installed 0.11.2-0.5 and 0.11.3-0.2 both produced the same `tags-de` failure:
+the model emitted two individually sensible JSON objects, apparently separating broad
+and specific tags. The evaluator correctly rejects that product output. Reclassifying or
+loosening the evaluator would hide a real format-contract defect; clarifying the prompt
+addresses the demonstrated ambiguity while preserving the acceptance contract.
+
+**Retest only if:** the focused six-case task qualification still shows repeated structural
+failure after the 0.11.3-0.3 prompt, Open WebUI changes its task prompt/template contract,
+or the production task model changes. Do not increase the budget or relax single-object
+JSON merely to make the current model pass.

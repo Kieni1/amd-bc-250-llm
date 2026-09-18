@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source-ready 0.11.3-0.2
+# BC-250 support / operations handover — current source-ready 0.11.3-0.3
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,26 +10,25 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.3
-RPM Release:  0.2
-source base:  0.11.3-0.1 lifecycle rewrite + 0.11.3-0.2 MTP/lifecycle corrections
+RPM Release:  0.3
+source base:  0.11.3-0.2 lifecycle/MTP line + 0.11.3-0.3 UX/task-diagnostic refinement
 ```
 
-Source release closure for `0.11.3-0.2` is complete, but this handover does **not** assert
-that the RPM has already been built by GitHub, installed or hardware-qualified. Capture
+Source release closure for `0.11.3-0.3` is complete, but this handover does **not** assert
+that the 0.3 RPM has already been built by GitHub, installed or hardware-qualified. Capture
 installed NEVRA before interpreting machine evidence. The newest real-device package evidence is historical
-`bc250-llm-server-0.11.2-0.5.fc44.x86_64`: installer verification was 54/0/0 and
-revalidation v4.1 completed with infrastructure/restoration PASS, full coverage,
-`owui-translation` PASS, agent 3/3 and task 5/6 due to one double-JSON format miss. Its
-exact run is recorded in
-`development/model-runs/2026-09-18-installed-0.11.2-0.5-revalidation.md`. Older
-`0.11.2-0.4` fixture-path failure and `0.11.2-0.3.fc44` evidence remain historical and
-should not be rewritten as current.
+`bc250-llm-server-0.11.3-0.2.fc44.x86_64`: installer verification was 54/0/0 and
+revalidation v4.2 completed with infrastructure/restoration PASS and full coverage. Task
+remained 5/6 because `tags-de` emitted two JSON objects; the bounded GPT-OSS/Jina context
+diagnostic surfaced under `Diagnostics` without changing PASS. Its exact run is recorded in
+`development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`. Older evidence
+retains the exact release on which it was collected.
 
 ## Validation ownership
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. Current `0.11.3-0.2` passed the local source gate: repository/RPM
-preflight, packaged shell syntax and 366/366 deterministic tests. Ruff/ShellCheck were not run
+runtime/hardware qualification. Current `0.11.3-0.3` passed the local source gate: repository/RPM
+preflight, packaged shell syntax and 370/370 deterministic tests. Ruff/ShellCheck were not run
 here; GitHub RPM build and BC-250 execution are not yet claimed.
 
 ## Normal service topology
@@ -153,21 +152,23 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-GitHub builds and the appliance installs `0.11.3-0.2`; capture the exact NEVRA and
+GitHub builds and the appliance installs `0.11.3-0.3`; capture the exact NEVRA and
 run one bounded source-change check:
 
 ```text
-bc250-verify --owui-token-file FILE
-one Ornith bc250-code route/completion probe
-normal topology restored after agent mode
+sudo bc250-verify --owui-token-file FILE
+installer picker shows state-rich model status
+sudo bc250-model status production MODEL --verbose
+six-case task qualification after desired-state apply
+one full v4.2 revalidation
 ```
 
-The coding probe should establish that final content is separated from native reasoning
-and that a nonterminal or `done_reason=length` result does not replace the requested file.
-Only after that focused product-path check should main integration run the comparative
-agent funnel. Keep WOL/power qualification as a separate operations batch: one real S5
-Wake-on-LAN cycle first, then safe-shutdown busy/defer and later idle/allow. Do not mix
-that power batch with the agent campaign.
+The model-status check should show packaged/current verified state and explicit `--online`
+guidance. The task check should focus on the repeated `tags-de` single-object contract;
+do not weaken the evaluator if it still fails. The full revalidation should preserve the
+same infrastructure/restoration semantics and show any bounded GPT-OSS/Jina context
+observation in the concise informational format. Keep agent and WOL/power qualification
+as separate later batches.
 
 ## Other operations work after power qualification
 

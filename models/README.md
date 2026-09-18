@@ -20,6 +20,7 @@ sudo bc250-fetch-mtp qwen3.6-27b-mtp  # explicit opt-in for disabled MTP experim
 
 sudo bc250-model status agentic MODEL
 sudo bc250-model status agentic MODEL --online
+sudo bc250-model status all --include-disabled --compact  # state-rich one-line view
 
 sudo bc250-model apply production MODEL-NAME
 sudo bc250-model refresh production MODEL-NAME
@@ -31,7 +32,10 @@ sudo bc250-model purge-retired
 `list` reports catalog definitions only and therefore does not need root. `status` is the
 read-only runtime/state view and normally needs `sudo` for the protected GGUF/state tree.
 It reports source/provenance validity, Modelfile drift, registration state and a recommended
-action. `--online` checks moving upstream revisions without mutating local state.
+action. `--online` checks moving upstream revisions without mutating local state; normal
+status output points to that option when upstream state was not checked. `--verbose` adds
+source repository/revision/SHA and resolved paths. `--compact` uses the same inspector for
+one-line state-rich catalog output, including the installer model picker.
 
 Selections accept a full name, displayed index, comma list, range such as `0,2-4`, or
 `all`; global indexes remain stable across category-filtered list/status/action views.
