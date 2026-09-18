@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.2
-Release:        0.3%{?dist}
+Release:        0.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.4
+- Ensure every model behind an active package-owned Open WebUI role is installed before application setup, and verify active role base registrations explicitly.
+- Advance revalidation to harness v4.1 with an explicit 2048-token direct translation contract, authenticated production-role translation coverage and clearer mixed-quality summaries.
+- Accept the observed French task title adjective in the semantic fixture, add verbose Open WebUI desired-state reporting, and record the installed 0.11.2-0.3 appliance evidence without changing production model/runtime policy.
+
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.2-0.3
 - Keep the maintainer-approved Translate-Gemma production switch and reconcile development/docs so the source policy no longer describes LFM as the current production translator.
 - Make historical quality scripts source-only after carrying forward their still-useful lifecycle lessons into the supported task/translation screens.

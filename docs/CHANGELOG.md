@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.2-0.4 - 2026-09-18
+
+- Make active package-owned Open WebUI roles operationally complete by ensuring all of their base models during `bc250-install`; optional selection now means experiments/rollback/agent/other extras rather than models required by active UI roles.
+- Advance `bc250-revalidate` to harness v4.1: pin direct Translate-Gemma qualification to the promoted 2048-token budget, add an authenticated canonical `owui-translation` screen through the actual DE→FR / FR→DE role IDs, and show canonical quality-failure causes in the completed dashboard.
+- Fix the French task-title semantic fixture to recognize `réglementaire`/`reglementaire`, matching the useful live `Traduction réglementaire` result instead of reporting a false relevance failure.
+- Add `bc250-openwebui-setup status --verbose` for human-readable verified role/task/RAG/Function state and make `bc250-verify` require every active Open WebUI role base model to be registered on the main lane.
+- Record the real installed `0.11.2-0.3` revalidation baseline and authenticated production translation smoke; keep the production model, Stage-2E prompt/filter, Ollama/KV/CU/governor and power policy unchanged.
+
 ## 0.11.2-0.3 - 2026-09-18
 
 - Keep the maintainer-approved Translate-Gemma production switch and reconcile decisions/testing docs so LFM is consistently rollback/reference rather than the current production translator.
