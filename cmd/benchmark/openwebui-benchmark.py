@@ -28,6 +28,7 @@ from benchmark_common import (
     BenchmarkError,
     OllamaClient,
     append_result,
+    benchmark_fixture_path,
     benchmark_metadata,
     finalize_active_infrastructure_failure,
     finalize_benchmark_metadata,
@@ -643,7 +644,7 @@ def run_owui_rag_case(
 
 def cmd_owui_translation(args: argparse.Namespace) -> int:
     """Qualify the packaged production translation roles through Open WebUI."""
-    fixture = Path(__file__).resolve().parents[2] / "examples/benchmark/translation-office.json"
+    fixture = benchmark_fixture_path("translation-office.json")
     cases = json.loads(fixture.read_text(encoding="utf-8"))
     paths = prepare_result_dir("owui-translation", args.output_dir)
     client = owui_client(args)

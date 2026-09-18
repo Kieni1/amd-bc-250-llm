@@ -36,6 +36,84 @@ runtime_workflow = load_module("runtime_benchmark_test", BENCH / "runtime-benchm
 openwebui_workflow = load_module("openwebui_benchmark_test", BENCH / "openwebui-benchmark.py")
 
 
+class BenchmarkResourceResolutionTests(unittest.TestCase):
+    def test_fixture_resolution_prefers_source_tree_without_explicit_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_root = root / "source"
+            source_fixtures = source_root / "examples" / "benchmark"
+            installed_share = root / "installed-share"
+            source_fixtures.mkdir(parents=True)
+            (installed_share / "benchmark").mkdir(parents=True)
+
+            with (
+                patch.object(common, "SOURCE_ROOT", source_root),
+                patch.object(common, "DEFAULT_PACKAGE_SHARE", installed_share),
+                patch.dict(os.environ, {}, clear=False),
+            ):
+                os.environ.pop("BC250_SHARE", None)
+                os.environ.pop("BC250_BENCH_FIXTURES", None)
+                self.assertEqual(common.benchmark_fixture_root(), source_fixtures)
+
+    def test_fixture_resolution_uses_installed_share_and_explicit_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_root = root / "source-without-fixtures"
+            installed_share = root / "installed-share"
+            explicit_share = root / "explicit-share"
+            explicit_fixtures = root / "explicit-fixtures"
+
+            with (
+                patch.object(common, "SOURCE_ROOT", source_root),
+                patch.object(common, "DEFAULT_PACKAGE_SHARE", installed_share),
+                patch.dict(os.environ, {}, clear=False),
+            ):
+                os.environ.pop("BC250_SHARE", None)
+                os.environ.pop("BC250_BENCH_FIXTURES", None)
+                self.assertEqual(
+                    common.benchmark_fixture_root(), installed_share / "benchmark"
+                )
+
+                os.environ["BC250_SHARE"] = str(explicit_share)
+                self.assertEqual(
+                    common.benchmark_fixture_root(), explicit_share / "benchmark"
+                )
+
+                os.environ["BC250_BENCH_FIXTURES"] = str(explicit_fixtures)
+                self.assertEqual(common.benchmark_fixture_root(), explicit_fixtures)
+
+    def test_owui_translation_uses_shared_fixture_resolution(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixture = root / "translation-office.json"
+            fixture.write_text("[]\n", encoding="utf-8")
+            output = root / "results"
+            args = SimpleNamespace(
+                output_dir=str(output),
+                url="http://127.0.0.1:3000",
+                timeout=1.0,
+                token_file=str(root / "unused-token"),
+            )
+
+            with (
+                patch.object(
+                    openwebui_workflow,
+                    "benchmark_fixture_path",
+                    return_value=fixture,
+                ) as resolver,
+                patch.object(openwebui_workflow, "owui_client", return_value=object()),
+                patch.object(openwebui_workflow, "simple_meta"),
+                patch.object(openwebui_workflow, "finish"),
+            ):
+                self.assertEqual(openwebui_workflow.cmd_owui_translation(args), 0)
+
+            resolver.assert_called_once_with("translation-office.json")
+            self.assertEqual(
+                (output / "fixtures" / fixture.name).read_text(encoding="utf-8"),
+                "[]\n",
+            )
+
+
 class GenerationPolicyTests(unittest.TestCase):
     def test_neutral_generate_overrides_system_without_raw_mode(self) -> None:
         payload = generation.generate_payload(

@@ -35,6 +35,49 @@ VALID_RESULT_TYPES = {"measurement", "qualification"}
 
 PACKAGE_NAME = "bc250-llm-server"
 BENCHMARK_METADATA_VERSION = 1
+DEFAULT_PACKAGE_SHARE = Path("/usr/share/bc250-llm-server")
+SOURCE_ROOT = Path(__file__).resolve().parents[2]
+
+
+def resolve_package_resource(
+    source_relative: str | Path,
+    installed_relative: str | Path,
+    *,
+    override_env: str | None = None,
+) -> Path:
+    """Resolve one package-owned resource consistently in source and RPM layouts.
+
+    Explicit test/operator overrides win.  Otherwise a source checkout uses its own
+    resource so an installed older package cannot silently contaminate source tests;
+    an installed script falls back to the package share directory.
+    """
+    if override_env:
+        override = os.environ.get(override_env)
+        if override:
+            return Path(override)
+
+    share_override = os.environ.get("BC250_SHARE")
+    if share_override:
+        return Path(share_override) / installed_relative
+
+    source = SOURCE_ROOT / source_relative
+    if source.exists():
+        return source
+    return DEFAULT_PACKAGE_SHARE / installed_relative
+
+
+def benchmark_fixture_root() -> Path:
+    """Return the canonical benchmark fixture directory for this execution layout."""
+    return resolve_package_resource(
+        "examples/benchmark",
+        "benchmark",
+        override_env="BC250_BENCH_FIXTURES",
+    )
+
+
+def benchmark_fixture_path(*parts: str) -> Path:
+    """Return a path below the canonical benchmark fixture directory."""
+    return benchmark_fixture_root().joinpath(*parts)
 
 
 def iso_now() -> str:

@@ -28,6 +28,7 @@ from benchmark_common import (
     OllamaClient,
     TelemetrySampler,
     append_result,
+    benchmark_fixture_root,
     benchmark_metadata,
     copy_fixtures,
     cosine,
@@ -37,29 +38,19 @@ from benchmark_common import (
     mean,
     normalize_words,
     prepare_result_dir,
+    resolve_package_resource,
     result_record,
     write_benchmark_metadata,
     write_result_summary,
 )
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-SOURCE_FIXTURES = SCRIPT_DIR.parent.parent / "examples" / "benchmark"
-INSTALLED_FIXTURES = (
-    Path(os.environ.get("BC250_SHARE", "/usr/share/bc250-llm-server")) / "benchmark"
-)
-FIXTURE_ROOT = (
-    Path(os.environ.get("BC250_BENCH_FIXTURES", ""))
-    if os.environ.get("BC250_BENCH_FIXTURES")
-    else (INSTALLED_FIXTURES if INSTALLED_FIXTURES.exists() else SOURCE_FIXTURES)
-)
+FIXTURE_ROOT = benchmark_fixture_root()
 TELEMETRY_INTERVAL = float(os.environ.get("TELEMETRY_INTERVAL", "0.5"))
 KEEP_ALIVE = os.environ.get("KEEP_ALIVE", "30m")
-INSTALLED_OWUI_DESIRED_STATE = (
-    Path(os.environ.get("BC250_SHARE", "/usr/share/bc250-llm-server"))
-    / "openwebui"
-    / "desired-state.json"
+OWUI_DESIRED_STATE = resolve_package_resource(
+    "config/openwebui/desired-state.json",
+    "openwebui/desired-state.json",
 )
-SOURCE_OWUI_DESIRED_STATE = SCRIPT_DIR.parent.parent / "config" / "openwebui" / "desired-state.json"
 
 
 def iso_now() -> str:
@@ -403,11 +394,7 @@ TASK_PROMPT_KEYS = {
 
 
 def task_prompt_state_path() -> Path:
-    return (
-        INSTALLED_OWUI_DESIRED_STATE
-        if INSTALLED_OWUI_DESIRED_STATE.is_file()
-        else SOURCE_OWUI_DESIRED_STATE
-    )
+    return OWUI_DESIRED_STATE
 
 
 def task_prompt_templates() -> dict[str, str]:
