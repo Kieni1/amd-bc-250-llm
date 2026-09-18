@@ -37,23 +37,22 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.3
-RPM Release   0.3%{?dist}
-NVR           0.11.3-0.3
+RPM Release   0.4%{?dist}
+NVR           0.11.3-0.4
 ```
 
-The current source-ready `0.11.3-0.3` source keeps the greenfield `bc250-model`
-lifecycle contract and v4.2 revalidation architecture from 0.11.3-0.2. This release
-restores state-rich install-time model selection through compact shared state inspection,
-adds clearer source/update identity to `bc250-model status`, tightens the package-owned
-tag-generation prompt around the existing strict single-object JSON contract, and makes
-non-severe context-truncation diagnostics concise and policy-explicit. Runtime/service
-topology, Ollama/KV/CU/governor policy, production model identities and benchmark
-thresholds are unchanged.
+The current `0.11.3-0.4` source keeps the greenfield `bc250-model` lifecycle, v4.2
+revalidation architecture, state-rich installer/status UX and strict task-tag prompt from
+0.11.3-0.3. Release 0.4 changes only the still-experimental MTP lane before its first
+hardware campaign: a bounded four-entry candidate set, exact-ID/safe runtime preflight,
+llama-server privilege drop to the `ollama` account, and same-target MTP-off versus MTP-on
+evidence capture. Runtime/service topology, Ollama/KV/CU/governor policy, production model
+identities, Open WebUI roles and benchmark thresholds are unchanged.
 
-Current `0.11.3-0.3` source release closure is complete at source level: `make validate`
-passed repository/RPM preflight, packaged shell syntax and 370/370 deterministic tests.
-Ruff and ShellCheck were not run in this environment; GitHub RPM/SRPM build and BC-250
-runtime qualification remain later gates.
+The exact `0.11.3-0.4` source tree and a clean extraction of the release ZIP both passed
+`make validate` with RPM/source preflight, packaged shell syntax and 371/371 deterministic
+tests. Source/archive closure is complete. Ruff/ShellCheck remain workstation-owned;
+GitHub RPM/SRPM build and BC-250 runtime/MTP qualification remain later gates.
 
 Installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` is the newest real-device package
 evidence: installer verification was 54/0/0 and revalidation v4.2 completed with
@@ -419,7 +418,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. Current `0.11.3-0.3` carries that translation model/evaluator contract forward unchanged. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-0.4` leaves it unchanged. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -500,7 +499,7 @@ write native reasoning before a useful final answer and could also exhaust its 3
 budget before a complete answer. Those are product-path completion/integrity defects, not
 reasons to weaken the benchmark or retire Ornith.
 
-The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-0.3` carries that product route forward unchanged
+The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-0.4` carries that product route forward unchanged: separated thinking/final
 content, terminal-completion checks, explicit truncation refusal and reasoning-marker
 rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
 package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
@@ -871,8 +870,10 @@ explicit opt-in source download/reconcile path and does not imply qualification.
 Current download-only catalog IDs:
 
 ```text
+qwen3.5-9b-mtp
 qwen3.6-27b-mtp
-qwen3.5-4b-mtp
+qwen3.8-27b-hauhaucs-mtp
+qwen3.6-35b-a3b-mtp
 ```
 
 They are disabled by default and have no Ollama name/Modelfile. Files live under:
@@ -885,9 +886,9 @@ Current preparation workflow:
 
 ```bash
 bc250-model list mtp --all
-sudo bc250-fetch-mtp qwen3.6-27b-mtp
-sudo bc250-model status mtp qwen3.6-27b-mtp --include-disabled --verbose
-LLAMACPP=/path/to/llama-server bc250-run-mtp 27b
+sudo bc250-fetch-mtp qwen3.5-9b-mtp
+sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 ```
 
 The MTP catalog uses the same stable global display indexes as the combined model
@@ -896,8 +897,8 @@ catalog. Prefer exact IDs in recorded evidence. Generic `apply all` still exclud
 The RPM does not provide llama.cpp. The reviewed baseline is:
 
 ```text
-llama.cpp release b10069
-commit 178a6c44937154dc4c4eff0d166f4a044c4fceba
+llama.cpp release b10964
+commit b29c606e28a01b1bc8c1351026a0fa6e616bf6c4
 ```
 
 A newer release can be tested if its CLI supports the required GPU-offload, context,
@@ -906,15 +907,22 @@ flash-attention, cache and MTP/speculative options.
 The package runner binds `127.0.0.1:8090` by default and verifies required CLI flags
 before launch.
 
-`models/experiments/compare-mtp.sh` is a quick throughput probe only. It is **not** a
-quality or production-promotion evaluator.
+`models/experiments/compare-mtp.sh` is now the controlled evidence harness: it launches
+the same target GGUF sequentially through the same llama.cpp build/settings with MTP off
+and on, records per-request throughput/acceptance, MemAvailable/swap, model/runtime
+identity, server logs and kernel/GPU faults, and fails closed on missing acceptance evidence
+or severe runtime faults. `bc250-run-mtp [--no-mtp] ID` remains the manual diagnosis path.
+Neither command is itself a production-promotion evaluator.
 
-Any useful MTP qualification must record draft accepted/proposed counts, throughput,
-quality, memory/swap, context/draft settings and runtime identity. A tok/s speedup alone
-is not enough.
+Any useful MTP qualification must still record answer usefulness, accepted/proposed draft
+counts, throughput, memory/swap, context/draft settings, exact runtime/model identity and
+clean restoration. A tok/s speedup alone is not enough. After this 0.11.3-0.4 pre-flight
+polish, freeze the framework again until real BC-250 evidence exposes a concrete defect or
+measurement gap.
 
-MTP should follow higher-priority office, RAG and translation qualification because it
-adds an external runtime and is not currently a production dependency.
+The immediate next hardware work is MTP and support operations as separate bounded batches.
+Do not mix llama.cpp/resource experiments with WOL/power evidence in the same destructive
+sequence.
 
 ---
 
@@ -1086,10 +1094,11 @@ for fit before expensive semantic work.
 
 Reconfirm exclusive-mode restoration and broaden actual documented `bc250-code` modes.
 
-## P3 — MTP
+## P1/P2 — MTP
 
-Experimental external llama.cpp path. Test after production-office lanes unless a new
-product priority elevates it.
+Immediate next bounded hardware batch alongside support operations. Test one exact MTP
+candidate at a time with the 0.11.3-0.4 same-target comparison harness; stop framework
+work until real evidence identifies a blocker.
 
 ## P3 — optional backup export / dedupe performance
 
@@ -1173,7 +1182,7 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-0.3 source is release-closed/source-ready but still needs an external GitHub RPM build and installed-device qualification;
+- current 0.11.3-0.4 source is release-closed/source-ready after its final local + clean-archive 371/371 gates and still needs an external GitHub RPM build plus installed-device qualification;
   installed 0.11.3-0.2.fc44 is the newest full appliance evidence and completed v4.2 with infrastructure/restoration PASS, full coverage, Open WebUI translation/RAG PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
@@ -1195,7 +1204,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-build/install exact `0.11.3-0.3` and capture the installed NEVRA before device conclusions.
+1. GitHub-build/install exact `0.11.3-0.4` and capture the installed NEVRA before device conclusions.
 2. Confirm the installer model picker shows compact state-rich entries and sample
    `bc250-model status --verbose` for one production model; packaged source identity should
    remain verified/current and `Upstream: not checked` should point to `--online`.

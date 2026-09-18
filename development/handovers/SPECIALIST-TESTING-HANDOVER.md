@@ -36,7 +36,7 @@ Suggested lane references:
 - translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
 - general/main: `MODELS.md`, generation/usecase benchmarks;
 - agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling;
-- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`.
+- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; current 0.11.3-0.4 qualification uses same-target baseline-vs-MTP evidence and exact IDs.
 
 ## Required specialist handoff
 

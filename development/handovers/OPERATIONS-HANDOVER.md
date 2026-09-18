@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source-ready 0.11.3-0.3
+# BC-250 support / operations handover — current source-ready 0.11.3-0.4
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,12 +10,14 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.3
-RPM Release:  0.3
-source base:  0.11.3-0.2 lifecycle/MTP line + 0.11.3-0.3 UX/task-diagnostic refinement
+RPM Release:  0.4
+source base:  0.11.3-0.3 UX/task-diagnostic line + 0.11.3-0.4 MTP qualification-lane hardening
 ```
 
-Source release closure for `0.11.3-0.3` is complete, but this handover does **not** assert
-that the 0.3 RPM has already been built by GitHub, installed or hardware-qualified. Capture
+The exact `0.11.3-0.4` source tree and a clean extraction of the release ZIP both passed
+`make validate` with RPM/source preflight, packaged shell syntax and 371/371 deterministic
+tests. Source/archive closure is complete. This handover does **not** assert that the 0.4
+RPM has already been built by GitHub, installed or hardware-qualified. Capture
 installed NEVRA before interpreting machine evidence. The newest real-device package evidence is historical
 `bc250-llm-server-0.11.3-0.2.fc44.x86_64`: installer verification was 54/0/0 and
 revalidation v4.2 completed with infrastructure/restoration PASS and full coverage. Task
@@ -27,8 +29,8 @@ retains the exact release on which it was collected.
 ## Validation ownership
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. Current `0.11.3-0.3` passed the local source gate: repository/RPM
-preflight, packaged shell syntax and 370/370 deterministic tests. Ruff/ShellCheck were not run
+runtime/hardware qualification. Current `0.11.3-0.4` must pass the local source gate before release: repository/RPM
+preflight, packaged shell syntax and the deterministic test suite. Ruff/ShellCheck were not run
 here; GitHub RPM build and BC-250 execution are not yet claimed.
 
 ## Normal service topology
@@ -152,7 +154,7 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-GitHub builds and the appliance installs `0.11.3-0.3`; capture the exact NEVRA and
+GitHub builds and the appliance installs `0.11.3-0.4`; capture the exact NEVRA and
 run one bounded source-change check:
 
 ```text
