@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import io
 import importlib.util
+import io
 import sys
 import unittest
 from contextlib import redirect_stdout
