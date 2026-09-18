@@ -74,16 +74,18 @@ trap cleanup EXIT
 trap 'INFRA_RC=90; exit 90' INT TERM HUP
 SERIOUS_RE='out of memory|oom-kill|oom_reaper|killed process|device lost|gpu reset|amdgpu.*(reset|timeout|fault)|ring.*(timeout|reset|fault|error)'
 
+# Preflight the exact normal topology before loading the candidate.
 for cmd in curl jq python3 journalctl tar sha256sum systemctl awk grep flock; do command -v "$cmd" >/dev/null 2>&1 || INFRA_RC=10; done
 if [[ "$INFRA_RC" -eq 0 ]]; then exec 9>"$LOCK_FILE"; flock -n 9 || INFRA_RC=11; fi
 model_available "$TASK_URL" "$CANDIDATE_MODEL" || INFRA_RC=12
-for svc in ollama.service ollama-task.service open-webui.service tika.service; do
+for svc in ollama.service ollama-task.service ollama-embedding.service open-webui.service tika.service; do
     state="$(systemctl is-active "$svc" 2>/dev/null || true)"; printf '%s=%s\n' "$svc" "$state" >> "$OUT/services-before.txt"; [[ "$state" == active ]] || INFRA_RC=13
 done
 
 if [[ "$INFRA_RC" -eq 0 ]]; then warm_main || INFRA_RC=14; fi
 if [[ "$INFRA_RC" -eq 0 ]]; then wait_unload || INFRA_RC=15; fi
 
+# Run one tiny candidate request while the warm main remains resident.
 if [[ "$INFRA_RC" -eq 0 ]]; then
     read -r PRE_MEM PRE_SWAP < <(sample_resource)
     printf 'pre_mem_available_mib=%s\npre_swap_used_mib=%s\n' "$PRE_MEM" "$PRE_SWAP" > "$OUT/pre-resource.txt"
@@ -103,7 +105,7 @@ fi
 if [[ "$INFRA_RC" -eq 0 ]]; then
     wait_unload || INFRA_RC=17
     model_in_ps "$MAIN_URL" "$MAIN_MODEL" || INFRA_RC=18
-    for svc in ollama.service ollama-task.service open-webui.service tika.service; do
+    for svc in ollama.service ollama-task.service ollama-embedding.service open-webui.service tika.service; do
         state="$(systemctl is-active "$svc" 2>/dev/null || true)"; printf '%s=%s\n' "$svc" "$state" >> "$OUT/services-after.txt"; [[ "$state" == active ]] || INFRA_RC=19
     done
 fi
@@ -131,7 +133,8 @@ PY
     [[ "$RESOURCE_RC" -eq 0 ]] || QUALITY_RC=3
 fi
 
-journalctl -b --since "${TRIAL_START:-$START_ISO}" --no-pager -u ollama.service -u ollama-task.service -u open-webui.service -u tika.service > "$OUT/service-journal.txt" 2>&1 || INFRA_RC=20
+# Treat new service/kernel faults as infrastructure failure, not model-quality evidence.
+journalctl -b --since "${TRIAL_START:-$START_ISO}" --no-pager -u ollama.service -u ollama-task.service -u ollama-embedding.service -u open-webui.service -u tika.service > "$OUT/service-journal.txt" 2>&1 || INFRA_RC=20
 journalctl -k -b --since "${TRIAL_START:-$START_ISO}" --no-pager > "$OUT/kernel-journal.txt" 2>&1 || INFRA_RC=20
 grep -Ein "$SERIOUS_RE" "$OUT/service-journal.txt" "$OUT/kernel-journal.txt" > "$OUT/serious-warnings.txt" 2>/dev/null || true
 [[ ! -s "$OUT/serious-warnings.txt" ]] || INFRA_RC=21

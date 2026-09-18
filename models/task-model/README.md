@@ -17,15 +17,11 @@ model store. It is part of required normal mode. With no selection,
 `bc250-model install task` lists task Modelfiles and prompts. The service uses
 `OLLAMA_KEEP_ALIVE=0`; the final command should show no resident task model.
 
-Current packaged task models:
+Current packaged task model:
 
-- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **default**. Promotion evidence remains 15/18 direct,
-  15/18 through the actual Open WebUI title/tag/query endpoints with package-owned
-  prompts, and 9/9 true-overlap trials while warm GPT-OSS remained resident. Current
-  cheap canonical screens place its reference envelope around 4/6-5/6. The open
-  quality issue is concise first-turn tag robustness; coexistence remains proven.
-- `task-gemma3-1b-unsloth-ud-q4-k-xl` — retained as the previous low-memory fallback/control.
-  The current task screen is about 2/6 with substantial language/relevance misses.
+- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **production default and only active task-lane model**. Promotion evidence remains 15/18 direct, 15/18 through the actual Open WebUI title/tag/query endpoints with package-owned prompts, and 9/9 true-overlap trials while warm GPT-OSS remained resident.
+
+The previous `task-gemma3-1b-unsloth-ud-q4-k-xl` fallback/control is retired to the source graveyard after its ~2/6 current task result. Reinstall it only as an explicit historical experiment, not as a routine fallback.
 
 The default LFM Modelfile deliberately omits a fixed `SYSTEM` prompt. A generic
 SYSTEM was tested and caused task-shape contamination (for example title responses

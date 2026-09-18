@@ -39,7 +39,7 @@ if [[ "$INFRA_RC" -eq 0 && "$WARM_MAIN" == 1 ]] && ! model_in_ps "$MAIN_URL" "$M
 fi
 
 printf '\n=== service health ===\n'
-for svc in ollama.service ollama-task.service open-webui.service tika.service; do
+for svc in ollama.service ollama-task.service ollama-embedding.service open-webui.service tika.service; do
     state="$(systemctl is-active "$svc" 2>/dev/null || true)"; printf '%-28s %s\n' "$svc" "$state"; [[ "$state" == active ]] || QUALITY_RC=3
 done
 printf '\n=== residency ===\n'
