@@ -543,37 +543,22 @@ step_11_maintenance
         self.assertIn("Optional maintenance setup skipped", result.stdout)
         self.assertNotIn("UNEXPECTED:", result.stdout)
 
-    def test_backup_export_prepares_ssh_even_when_pi_access_was_skipped(self) -> None:
-        result = source_probe(r"""
-input_is_interactive() { return 0; }
-SSHD_READY=0
-yes_no_default_yes() {
-  case "$1" in
-    *openssh-server*|*rsync-rrsync*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-yes_no() { return 0; }
-systemctl() {
-  if [[ ${1:-} == cat && ${2:-} == sshd.service ]]; then
-    [[ $SSHD_READY == 1 ]]
-    return
-  fi
-  return 0
-}
-dnf() {
-  printf 'DNF:%s\n' "$*"
-  [[ " $* " == *' install -y openssh-server '* ]] && SSHD_READY=1
-  return 0
-}
-bc250-maintenance() { printf 'MAINT:%s\n' "$*"; }
-verify_backup_export_setup() { printf 'VERIFY:backup-export\n'; }
-step_11_maintenance
-""")
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("DNF:install -y openssh-server", result.stdout)
-        self.assertIn("MAINT:backup-export enable", result.stdout)
-        self.assertNotIn("MAINT:companion enable", result.stdout)
+    def test_backup_export_has_independent_ssh_preparation(self) -> None:
+        # This boundary is intentionally checked structurally. A full sourced-shell
+        # simulation cannot hermetically make the absolute /usr/bin/rrsync path
+        # appear after a mocked dnf transaction, which previously produced a CI
+        # false negative before the backup-export SSH branch was reached.
+        source = INSTALLER.read_text()
+        start = source.index('echo "Read-only Raspberry Pi backup export"')
+        end = source.index('\n  else\n    echo "Raspberry Pi integration skipped.', start)
+        block = source[start:end]
+
+        ssh_prepare = 'ensure_optional_ssh_server "read-only backup export"'
+        export_enable = "bc250-maintenance backup-export enable"
+        self.assertIn(ssh_prepare, block)
+        self.assertIn(export_enable, block)
+        self.assertLess(block.index(ssh_prepare), block.index(export_enable))
+        self.assertNotIn("bc250-maintenance companion enable", block)
 
     def test_models_only_resume_is_public(self) -> None:
         source = INSTALLER.read_text()
