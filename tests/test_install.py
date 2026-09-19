@@ -449,7 +449,7 @@ step_8_application_services
     def test_setup_plan_covers_resume_decision_points(self) -> None:
         source = INSTALLER.read_text()
         block = source[source.index("show_plan() {"):source.index("wait_for_open_webui() {")]
-        for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "storage headroom", "primary reboot"):
+        for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "storage headroom", "reboot required"):
             self.assertIn(label, block)
 
     def test_primary_reboot_happens_after_update_ollama_and_memory(self) -> None:

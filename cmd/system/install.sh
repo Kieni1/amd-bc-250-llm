@@ -479,7 +479,7 @@ show_plan() {
   printf '  Open WebUI            start after models, then apply/status\n'
   printf '  core verification     run before optional power/remote-maintenance setup\n'
   printf '  maintenance / Pi      optional, default-No guided setup after core verification\n'
-  printf '  primary reboot        %s\n' "$reboot"
+  printf '  reboot required       %s\n' "$reboot"
 }
 
 wait_for_open_webui() {
