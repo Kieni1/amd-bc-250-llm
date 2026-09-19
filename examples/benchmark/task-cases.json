@@ -110,7 +110,9 @@
     ],
     "semantic_groups": [
       [
-        "ocr"
+        "ocr",
+        "text recognition",
+        "optical character recognition"
       ],
       [
         "invoice",

@@ -996,6 +996,15 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertGreaterEqual(matched, case["min_semantic_groups"])
         self.assertEqual(total, 4)
 
+    def test_task_ocr_semantic_group_accepts_text_recognition_synonym(self) -> None:
+        cases = json.loads((ROOT / "examples/benchmark/task-cases.json").read_text(encoding="utf-8"))
+        case = next(item for item in cases if item["id"] == "tags-en")
+        matched, total = category.semantic_groups_score(
+            "Document Analysis Text Recognition Multilingual Data", case["semantic_groups"]
+        )
+        self.assertGreaterEqual(matched, case["min_semantic_groups"])
+        self.assertEqual(total, 4)
+
     def test_task_semantic_groups_gate_relevance_without_wrapper_text(self) -> None:
         parsed = {"queries": ["privacy policy", "cloud storage confidentiality"]}
         value = category.task_value_text(parsed, "query")

@@ -45,7 +45,9 @@ Modes are `generate`, `refactor`, `review`, `document`, `test` and `commit`.
 `bc250-code` uses Ollama `/api/chat` with `think:true` so native reasoning remains
 separate from the final file content. It writes only terminal non-empty
 `message.content`, refuses `done_reason=length` and literal reasoning markers, and
-uses an atomic replacement when an output path is supplied. The default request
+rejects an outer Markdown code fence for the raw-output `generate`, `refactor`, `test` and
+`commit` contracts rather than stripping/guessing. It uses an atomic replacement when an
+output path is supplied. The default request
 budget is 3072 tokens; set `CODING_AGENT_NUM_PREDICT` to another positive integer
 for a deliberate comparison. A truncation failure is evidence to adjust/test the
 budget, not permission to keep a partial file.

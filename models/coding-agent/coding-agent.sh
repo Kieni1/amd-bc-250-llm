@@ -154,6 +154,29 @@ if grep -Eiq '</?think([[:space:]>])|<\|/?think\|>' "$response_file"; then
   exit 3
 fi
 
+outer_markdown_fence() {
+  awk '
+    NF {
+      if (!seen) { first=$0; seen=1 }
+      last=$0
+    }
+    END {
+      opening = (first ~ /^[[:space:]]*(```|~~~)/)
+      closing = (last ~ /^[[:space:]]*(```|~~~)[[:space:]]*$/)
+      exit !(opening && closing)
+    }
+  ' "$1"
+}
+
+case "$mode" in
+  generate|refactor|test|commit)
+    if outer_markdown_fence "$response_file"; then
+      echo "ERROR: final content is wrapped in a Markdown code fence; refusing output that violates the raw-output contract." >&2
+      exit 3
+    fi
+    ;;
+esac
+
 if [[ "$output" == "-" ]]; then
   cat "$response_file"
 else
