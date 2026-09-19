@@ -24,9 +24,10 @@ infrastructure; the additional-model prompt accepts indexes/ranges/names or
 `recommended`, `production`, `all`, and Enter skips extras. Unattended selection uses
 `BC250_MODEL_SELECTION`.
 
-Full interactive installs verify the core appliance first, then offer optional
-maintenance/WOL and restricted Raspberry Pi companion setup. Models-only and
-noninteractive runs do not silently enable those remote-maintenance features. Legacy
+Full interactive installs verify the core appliance first, then ask one default-No
+question before any optional maintenance or Raspberry Pi work. If accepted, local
+maintenance and Pi integration are separate choices and selected setup is verified before
+completion. Models-only and noninteractive runs do not silently enable those features. Legacy
 full-unit task/embedding/agent overrides are rejected rather than mixed with the
 package-owned four-lane topology.
 
@@ -141,6 +142,11 @@ sudo bc250-maintenance clean-cache
 configure dry-run upload pruning, optional warm-up and optional after-hours safe power.
 Pi integration uses office HTTP :80 and restricted SSH :22 only; Wake-on-LAN is an
 Ethernet magic packet and opens no host firewall port.
+
+Installed operator documentation is under `/usr/share/doc/bc250-llm-server/`; start with
+`TLDR.md`, `docs/COMMANDS.md`, `MODELS.md` and `docs/FILESTRUCTURE.md`. Runtime
+configuration is under `/etc/bc250-llm-server/`, package state/evidence under
+`/var/lib/bc250-llm-server/`, and installer output under `/var/log/bc250-llm-install.log`.
 
 ## Services
 

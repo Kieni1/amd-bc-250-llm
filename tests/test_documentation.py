@@ -189,18 +189,19 @@ class DocumentationTests(unittest.TestCase):
         self.assertIsNotNone(release_match)
         self.assertEqual(version_match.group(1), version)
         release = release_match.group(1)
-        nvr = f"{version}-{release}"
+        vr = f"{version}-{release}"
+        nvr = f"bc250-llm-server-{vr}"
 
         main = (ROOT / "development/handovers/MAIN-INTEGRATION-HANDOVER.md").read_text(encoding="utf-8")
         operations = (ROOT / "development/handovers/OPERATIONS-HANDOVER.md").read_text(encoding="utf-8")
-        patchnote = (ROOT / f"PATCHNOTE-{nvr}.md").read_text(encoding="utf-8")
+        patchnote = (ROOT / f"PATCHNOTE-{vr}.md").read_text(encoding="utf-8")
 
         self.assertIn(f"VERSION       {version}", main)
         self.assertIn(f"RPM Release   {release}%{{?dist}}", main)
         self.assertIn(f"NVR           {nvr}", main)
         self.assertIn(f"VERSION:      {version}", operations)
         self.assertIn(f"RPM Release:  {release}", operations)
-        self.assertIn(f"Expected NVR: `bc250-llm-server-{nvr}`", patchnote)
+        self.assertIn(f"Expected NVR: `{nvr}`", patchnote)
 
     def test_secondary_model_docs_expose_explicit_mtp_opt_in(self) -> None:
         for relative in ("README.md", "TLDR.md", "MODELS.md", "models/README.md", "models/mtp/README.md"):
@@ -226,6 +227,27 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("never select the MTP category", contract)
         self.assertIn("MTP is deliberately absent from that picker", models)
         self.assertNotIn("optional model selection across production, experiments,\nagentic, embedding, task and MTP entries", models)
+
+    def test_current_docs_preserve_optional_setup_and_diagnostic_contracts(self) -> None:
+        maintenance = (ROOT / "docs/MAINTENANCE.md").read_text(encoding="utf-8")
+        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        quality = (ROOT / "docs/QUALITY-CHECKS.md").read_text(encoding="utf-8")
+
+        self.assertIn("optional maintenance", maintenance)
+        self.assertIn("Raspberry Pi integration", maintenance)
+        self.assertIn("default is No", maintenance)
+        self.assertIn("separate choices", maintenance)
+        self.assertIn("Selected setup is verified", maintenance)
+
+        self.assertIn("default-No question", commands)
+        self.assertIn("512 MiB", commands)
+        self.assertIn("128 MiB hard", commands)
+        self.assertIn("generation output budget", commands)
+        self.assertIn("/usr/share/doc/bc250-llm-server/", commands)
+
+        self.assertIn("<512 MiB", quality)
+        self.assertIn("output-budget", quality)
+        self.assertIn("must not automatically be relabeled as", quality)
 
     def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

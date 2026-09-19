@@ -37,35 +37,46 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.3
-RPM Release   0.4%{?dist}
-NVR           0.11.3-0.4
+RPM Release   1.4%{?dist}
+NVR           bc250-llm-server-0.11.3-1.4
 ```
 
-The current `0.11.3-0.4` source keeps the greenfield `bc250-model` lifecycle, v4.2
-revalidation architecture, state-rich installer/status UX and strict task-tag prompt from
-0.11.3-0.3. Release 0.4 hardens the still-experimental MTP lane before its first hardware
-campaign and now also includes the final same-Release installer/model-pass refinements found
-by the first 0.4 device smoke: catalog suppression is honored, fully current required models
-summarize by category, compact current/deferred rows are shorter, registration probes are
-bounded/agent-aware, and generic combined convergence cannot select MTP. Runtime/service
-topology, Ollama/KV/CU/governor policy, production model identities, Open WebUI roles,
-GGUF provenance/SHA policy and benchmark thresholds are unchanged.
+The current `0.11.3-1.4` source is a pre-v1.0 source-validated integration line on top of
+the release-closed 0.11.3-0.4 MTP/model-manager baseline. It carries forward the unpublished
+installer/maintenance and revalidation-diagnostic refinements, deterministic RAG/Open WebUI
+qualification, and the safe MTP cleanup contract. Release 1.4 records the completed RAG finalist
+decision, restores pre-benchmark model **sets** using each Ollama lane's normal keep-alive policy,
+and names resident-session swap evidence precisely as `swap_peak_delta_mib`. The production
+RAG/document role remains Gemma E4B / `bc250-office-documents` on the current 16 GiB profile;
+Qwen 9B remains a separate heavier higher-quality general-office option. Existing hard resource
+thresholds, GPU/device-error handling, runtime topology, GGUF provenance/SHA policy, model bytes,
+MTP settings and CU/governor policy are unchanged.
 
-The exact `0.11.3-0.4` source tree and a clean extraction of the release ZIP both passed
-`make validate` with RPM/source preflight, packaged shell syntax and 378/378 deterministic
-tests. Source/archive closure is complete. Ruff/ShellCheck remain workstation-owned;
-GitHub RPM/SRPM build and BC-250 runtime/MTP qualification remain later gates.
+Current source validation is **SOURCE PASS**: the full deterministic `make validate` gate completes
+with **401/401 tests PASS**, including 146 benchmark tests and the new lane-default keep-alive
+restoration regression. Changed Python compiles, and packaged shell syntax is checked separately at
+release closure. GitHub RPM/SRPM build and exact-source BC-250 runtime qualification remain external;
+source validation must not be confused with hardware qualification.
 
-A pre-refinement same-NVR `bc250-llm-server-0.11.3-0.4.fc44.x86_64` device smoke is now
-the newest install/verification evidence: guided install completed with normal topology and
-`bc250-verify` reported 54 ok / 0 warn / 0 fail. That exact RPM predates the final
-installer/model-pass source refinements and must not be treated as qualification of the final
-0.4 bytes. Installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` remains the newest full
-appliance revalidation evidence: v4.2 completed with infrastructure/restoration PASS and full
-coverage; direct translation 8/8, direct RAG 4/4, Open WebUI translation 8/8, Open WebUI RAG
-3/3, embeddings qualification and agent 3/3 passed, while task remained 5/6 because `tags-de`
-emitted two JSON objects. Exact 0.2 evidence is recorded in
-`development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`.
+Newest complete real-device appliance evidence is exact installed
+`bc250-llm-server-0.11.3-0.4.fc44.x86_64` from 2026-09-19. The refined guided installer
+completed with the expected concise model pass and `bc250-verify` reported 54 ok / 0 warn /
+0 fail. Revalidation v4.2 completed in 13:56 with infrastructure/restoration PASS, full
+coverage and quality **8 pass / 0 quality-fail / 0 skipped**. Task passed 6/6 including the
+previously failing `tags-de` case; direct translation 8/8, direct RAG 4/4, production use
+cases 5/5, agent 3/3, Open WebUI translation 8/8 and Open WebUI RAG 3/3 also passed.
+GPT-OSS/Jina remained within policy but reached only 193.36 MiB minimum MemAvailable and
+recorded non-severe 8662 -> 8320 context truncation. `office-draft-e2b` passed semantic
+acceptance with an `output-budget` diagnostic. Exact evidence and bundle SHA are recorded
+in `development/model-runs/2026-09-19-installed-0.11.3-0.4-revalidation.md`.
+
+A separate final RAG finalist campaign on the same exact installed 0.11.3-0.4 generation now
+settles the production document/RAG answer role for the current 16 GiB profile. Both Gemma E4B and
+Qwen 9B were functionally strong in direct and short authenticated Open WebUI RAG; Gemma then
+completed 42/42 continuous-residency product-path turns with roughly 2.7 GiB MemAvailable remaining,
+while Qwen reached the campaign's configured 512 MiB safety floor after only a few resident subruns.
+This is a sustained-memory-margin decision, not a Qwen semantic-quality failure. Exact evidence is
+recorded in `development/model-runs/2026-09-19-rag-finalist-qualification.md`.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -300,9 +311,12 @@ parallel       1
 role           normal office / larger production and experimental models
 ```
 
-Keep the main model warm. Historical GPT-OSS evidence showed roughly 24–25 s cold load
-versus 2–3 s warm response. Making main ephemeral to solve memory overlap harmed normal
-multi-turn UX and is not the production strategy.
+Keep the interactive main lane warm. Port 11434 is a shared product-role lane with one loaded
+model at a time; the most recently used main-lane model remains resident according to the normal
+20-minute policy. Historical GPT-OSS evidence showed roughly 24–25 s cold load versus 2–3 s warm
+response, so making the whole lane ephemeral to solve memory overlap harmed normal multi-turn UX.
+Maintenance warm-up defaults to Gemma E2B; GPT-OSS is the deep-reasoning and worst-case-memory
+production reference, not a permanently warm universal main model.
 
 ## Task lane
 
@@ -423,7 +437,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-0.4` leaves it unchanged. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.4` leaves it unchanged. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -432,7 +446,7 @@ Retained evidence is roughly 6.86 GiB and ~46 tok/s with ~0.4–0.7 s warm answe
 It stays as the responsive higher-quality office role until a real use-case challenger
 wins rather than merely benchmarking faster.
 
-## Deep reasoning / warm main — GPT-OSS 20B
+## Deep reasoning / memory-edge reference — GPT-OSS 20B
 
 Retained baseline:
 
@@ -444,8 +458,9 @@ cold load      ~24–25 s
 warm answer    ~2–3 s
 ```
 
-The durable decision is to keep main warm. The 16 GB UMA means other normal lanes must
-fit around that product constraint.
+The durable decision is to keep the interactive main lane warm. The 16 GB UMA means task and
+embedding coexistence must still be safe beside GPT-OSS because it is the worst credible production
+memory case, even though another main-lane model may be resident during ordinary office use.
 
 ## Task default — LFM2.5 1.2B
 
@@ -504,7 +519,7 @@ write native reasoning before a useful final answer and could also exhaust its 3
 budget before a complete answer. Those are product-path completion/integrity defects, not
 reasons to weaken the benchmark or retire Ornith.
 
-The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-0.4` carries that product route forward unchanged: separated thinking/final
+The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.4` carries that product route forward unchanged: separated thinking/final
 content, terminal-completion checks, explicit truncation refusal and reasoning-marker
 rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
 package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
@@ -723,7 +738,9 @@ and exclude credentials from evidence.
 
 # 11. RAG / document workflow
 
-RAG quality must be separated into retrieval and answer generation. Important future
+RAG quality must be separated into retrieval and answer generation. Direct qualification must also
+restore the starting Ollama residency set after isolation and surface chronological resident-session
+MemAvailable/swap behavior; restoration failure is infrastructure failure, not a warning. Important future
 cases include:
 
 - answer absent / correct abstention;
@@ -1087,13 +1104,19 @@ Broad DE/FR comparison is closed. Translate-Gemma is the package production base
 
 ## P1 — RAG / office documents
 
-Core office use case. Expand source-grounding/absent-answer/multisource/table/multilingual
-quality and test packaged Open WebUI path before tuning.
+Answer-model selection is closed for the current 16 GiB profile: Gemma E4B /
+`bc250-office-documents` is the production RAG role. The next RAG gate is **real-document product
+acceptance**, not another answer-model tournament: actual PDFs/Tika extraction, OCR-derived text
+where relevant, tables, multilingual/multi-source questions, collection update/delete/re-upload,
+continued residency and one deliberate unload/reload cycle.
 
 ## P1/P2 — general assistant / main lane
 
-Establish current production use-case/resource baseline, then qualify large candidates
-for fit before expensive semantic work.
+The main unresolved product question is whether GPT-OSS 20B buys enough deep-office reasoning quality
+over Qwen3.5 9B to justify its roughly 4 GiB additional memory cost. Use one bounded 12–16 case
+`usecase` fixture under each model's real production contract; preserve full outputs and use manual
+pairwise review only where deterministic checks cannot safely express quality. Do not start with
+27B/35B challengers unless that comparison gives a concrete reason.
 
 ## P2 — agentic/coding
 
@@ -1187,11 +1210,11 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-0.4 source is release-closed/source-ready after its final local + clean-archive 378/378 gates and still needs an external rebuild plus exact-source installed qualification; a pre-refinement same-NVR `0.11.3-0.4.fc44` guided install completed with normal topology and verifier 54/0/0, but that RPM predates the final installer/model-pass source refinements; installed 0.11.3-0.2.fc44 remains the newest full appliance revalidation evidence and completed v4.2 with infrastructure/restoration PASS, full coverage, Open WebUI translation/RAG PASS, agent 3/3 and task 5/6 due to a real double-JSON format miss; exact 0.2 evidence is recorded in `development/model-runs/2026-09-18-installed-0.11.3-0.2-revalidation.md`; the last bounded operations/power baseline remains older 0.11.1-0.6 evidence;
+- current 0.11.3-1.4 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.4 device qualification remain pending; exact installed 0.11.3-0.4 is still the newest complete whole-appliance evidence and must not be relabelled as 1.4; support/power hardware qualification remains pending;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
-- packaged RAG plumbing passed direct 4/4 plus authenticated OWUI 3/3 on 0.11.2-0.3, but real office documents/Tika/OCR breadth still needs qualification around absent/multisource/conflict/table/multilingual cases;
+- RAG finalist selection is complete for synthetic/direct and authenticated Open WebUI fixtures, but real office documents/Tika/OCR breadth still needs qualification across messy PDFs, tables, collection update/delete/re-import, multilingual synthesis and OCR-derived content;
 - Ornith passed canonical agent qualification 3/3 on installed 0.11.2-0.5.fc44, but the inherited `bc250-code` `/api/chat` product route and output budget still require bounded real-device qualification before stronger coding-helper claims;
 - MTP needs real llama.cpp runtime qualification and quality/resource-aware comparison;
 - current batched XFS dedupe deserves a performance run when storage work becomes a
@@ -1208,17 +1231,17 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-rebuild/reinstall the final refined `0.11.3-0.4` and capture installed NEVRA plus the RPM/source artifact SHA. The earlier same-NVR device smoke is pre-refinement evidence only.
-2. Confirm the model phase no longer emits the redundant initial catalog; fully current required models collapse to concise category summaries; the optional picker appears promptly with `[CURRENT]` ordinary rows, short deferred agent rows and **no MTP candidates**. Then sample `sudo bc250-model status production MODEL --verbose`; packaged source identity should remain verified/current and `Upstream: not checked` should point to `--online`.
-3. Run normal v4.2 revalidation once as the exact-source appliance gate. This already exercises
-   the strict six-case task contract (watch `tags-de`) plus the GPT-OSS/Jina diagnostic; do not add a
-   redundant standalone task run unless v4.2 exposes a task-specific regression that needs isolation.
-4. Start the MTP hardware campaign as a separate bounded batch with `qwen3.5-9b-mtp` only; inspect
-   same-target no-MTP/MTP quality, throughput, acceptance, memory/swap and GPU/kernel evidence before
-   advancing to the retained 27B control or heavier challengers.
+1. GitHub-build the exact 0.11.3-1.4 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
+   plus RPM/source artifact SHA before making a current-release hardware claim.
+2. Run one bounded exact-source appliance verification/revalidation pass, including installer optional-
+   setup behavior and the non-failing tight-resource/output-budget diagnostics.
+3. Run the final Gemma-only real-office-document RAG acceptance campaign: actual PDFs/Tika extraction,
+   multilingual/multi-source/table cases, upload/delete/re-upload, one unload/reload cycle and one long
+   resident session. This is production acceptance, not another answer-model tournament.
+4. Keep MTP as a separate bounded campaign starting with `qwen3.5-9b-mtp`; inspect same-target baseline
+   vs MTP quality, throughput, acceptance, memory/swap and GPU/kernel evidence before advancing.
 5. Restore/confirm normal appliance health, then run the support-operations batch separately: S5 WOL,
-   busy shutdown/defer, idle shutdown/allow + wake, then bounded recovery/lifecycle UX. Do not mix MTP
-   runtime/resource failures into power evidence or vice versa.
+   busy shutdown/defer, idle shutdown/allow + wake, then bounded recovery/lifecycle UX.
 
 That sequencing protects the product's current top priorities without losing the deeper
 quality program.

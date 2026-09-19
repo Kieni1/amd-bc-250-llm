@@ -133,9 +133,9 @@ with the package Vulkan profile; they are not cross-machine leaderboard claims.
 | Role/model | Current evidence | Decision |
 |---|---|---|
 | Gemma E2B | ~1.52 GiB resident, ~112 tok/s, very strong long-prompt ingestion | Keep standard-office default |
-| Gemma E4B | ~2.77 GiB resident, ~72 tok/s; source-grounded production prompt behaves as intended | Keep document/RAG default; validate with `rag-quality` |
+| Gemma E4B | ~2.77 GiB resident, ~72 tok/s; final RAG campaign: 36/36 short OWUI turns and 42/42 continuous-residency turns with ~2.7 GiB MemAvailable remaining | Keep document/RAG default on the 16 GiB profile |
 | LFM2.5 8B-A1B | ~6.83 GiB, ~147 tok/s and strong long-context scaling; `think=false` did not suppress native reasoning | Keep DE<->FR role; judge promotion/retention with `translation` quality |
-| Qwen3.5 9B | ~6.86 GiB, ~46 tok/s but ~0.4-0.7 s warm answer start | Keep responsive higher-quality assistant role |
+| Qwen3.5 9B | ~6.86 GiB, ~46 tok/s, strong short-path RAG quality; long-residency OWUI RAG reached the campaign's 512 MiB safety floor after a few subruns | Keep responsive higher-quality assistant role; not the long-lived RAG default on 16 GiB |
 | GPT-OSS 20B | ~10.8 GiB, ~80 tok/s and usable medium-reasoning latency in the reviewed run | Keep deep-reasoning role; re-test memory headroom with the new resident embedding lane |
 | Jina v5 / Qwen3 Embedding | both 11/13 Recall@1, 13/13 Recall@3 on the harder multilingual near-duplicate fixture | Jina stays baseline; Qwen remains a real licensing/behavior alternative |
 | GLM-OCR / OvisOCR2 | GLM ~0.996 mean word F1 vs Ovis ~0.735, both full field recall on the three-page baseline | GLM leads fidelity; Ovis remains speed/structure comparison |

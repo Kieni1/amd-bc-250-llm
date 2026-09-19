@@ -32,11 +32,11 @@ retest conditions from existing decisions:
 Suggested lane references:
 
 - benchmark operations: `cmd/benchmark/README.md`, benchmark source/tests;
-- RAG: `docs/RAG.md`, `config/openwebui/desired-state.json`;
+- RAG: `docs/RAG.md`, `config/openwebui/desired-state.json`; direct `rag-quality` must preserve starting Ollama residency set and report resident-session MemAvailable/swap state;
 - translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
 - general/main: `MODELS.md`, generation/usecase benchmarks;
 - agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling;
-- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; current 0.11.3-0.4 qualification uses same-target baseline-vs-MTP evidence and exact IDs. Generic installer selection and combined `apply all` / `refresh all` never select MTP; preparation must remain explicit.
+- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; current 0.11.3-1.4 carries forward the 0.11.3-0.4 same-target baseline-vs-MTP evidence contract and exact IDs/settings unchanged, while hardening cleanup so process-group signaling requires SID+PGID ownership proof. Generic installer selection and combined `apply all` / `refresh all` never select MTP; preparation must remain explicit.
 
 ## Required specialist handoff
 

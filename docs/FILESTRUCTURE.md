@@ -1,5 +1,9 @@
 # Installed file structure
 
+The installed documentation root is `/usr/share/doc/bc250-llm-server/`. For day-to-day
+operation start with `README.md`, `TLDR.md`, `docs/COMMANDS.md` and `MODELS.md`; this file
+is the detailed source-to-installed-path map.
+
 Use these commands for the exact state of an installed package:
 
 ```bash

@@ -5,22 +5,26 @@ an older one, but old rationale is retained. Backfilled entries below are ground
 the package's existing `MODELS.md`, changelog and current implementation; no raw
 evidence tarball is invented where it is not present in this source archive.
 
-## DEC-001 — Keep the main GPT-OSS lane warm
+## DEC-001 — Keep the interactive main lane warm
 
 **Status:** ACTIVE  
-**Decision:** Keep normal main-model residency at 20 minutes rather than unloading
-after every request.
+**Decision:** Keep normal main-lane residency at 20 minutes rather than unloading
+after every request. The lane is a shared product-role lane, not a permanently warm
+GPT-OSS lane; whichever production model was used most recently remains resident under
+Ollama's normal single-model keep-alive policy.
 
-**Observed:** Existing BC-250 evidence records roughly 24–25 s GPT-OSS cold load versus
+**Observed:** Historical GPT-OSS evidence records roughly 24–25 s cold load versus
 roughly 2–3 s warm response. Making the main lane ephemeral avoided one overlap case
-but imposed large-model reload latency on subsequent chat.
+but imposed large-model reload latency on subsequent chat. Maintenance warm-up now
+defaults to the routine-office Gemma E2B model, while GPT-OSS remains the deep-reasoning
+and worst-case production memory reference.
 
-**Interpretation:** Normal interactive UX depends on warm-main residency; task-model
-selection must fit safely beside that product constraint rather than solving memory
-pressure by making every chat cold.
+**Interpretation:** Normal interactive UX depends on warm main-lane residency; task-model
+selection must fit safely beside the worst credible warm production model rather than
+solving memory pressure by making every chat cold.
 
-**Retest only if:** the main model/runtime changes enough to materially alter cold-load
-latency or a separately justified product policy changes normal residency.
+**Retest only if:** main-lane model/runtime behavior changes enough to materially alter
+cold-load latency or a separately justified product policy changes normal residency.
 
 ## DEC-002 — Reject Qwen3.8 4B Distill for the normal task role
 
@@ -353,3 +357,129 @@ healthy BC-250, a future topology changes which Ollama lanes are intentionally i
 normal setup, or the package deliberately changes MTP from an explicit experiment into normal
 appliance convergence. Do not speed setup by skipping checksum validation when recorded file
 identity has changed.
+
+## DEC-016 — Gate optional installer maintenance once and surface marginal PASS evidence
+
+**Status:** ACTIVE — carried forward in 0.11.3-1.4.
+
+**Decision:** The guided full installer must finish core appliance verification before any
+optional maintenance or Raspberry Pi work, then ask one top-level default-No question. If the
+operator accepts, local BC-250 maintenance and Raspberry Pi integration are separate choices;
+existing local maintenance may be left unchanged explicitly. Selected optional setup is checked
+for its relevant protected configuration/timer/SSH/account/export invariants before the installer
+reports success. The completion footer stays concise: one block each for validation/benchmark,
+models/runtime lanes and further setup, followed by the installed documentation root and the
+important configuration/state/evidence/log paths.
+
+Whole-appliance revalidation keeps its existing acceptance policy. A minimum MemAvailable below
+512 MiB but still above the unchanged 128 MiB hard floor is an informational tight-headroom
+diagnostic, not a failure. Likewise, a use-case answer that satisfies its acceptance contract but
+ends at its output budget remains PASS while being surfaced under `Diagnostics`.
+
+**Why:** Exact installed 0.11.3-0.4 showed that the appliance can be fully healthy while the
+installer still asks too many optional questions after the operator has no interest in maintenance
+or a Pi. The same revalidation passed 8/8 but exposed two useful marginal facts only in deep
+evidence: GPT-OSS/Jina reached 193.36 MiB minimum MemAvailable, and `office-draft-e2b` passed
+semantic acceptance with `output-budget`. Hiding those facts makes a green summary look roomier
+than the evidence actually is; turning them into failures would instead change policy without a
+quality/safety basis.
+
+**Retest only if:** real operators find the new top-level gate hides a necessary fresh-install
+choice, selected optional setup can pass the post-check while remaining unusable, or repeated
+BC-250 evidence shows the 512 MiB visibility threshold should become an actual qualification
+limit. Do not move the 128 MiB hard floor or convert accepted output-budget events into failures
+without new evidence and an explicit policy decision.
+
+## DEC-017 — Keep RAG qualification deterministic and dimension-separated
+
+**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward in 0.11.3-1.4.
+
+**Decision:** Direct `rag-quality` qualification must remain deterministic and reviewable.
+Acceptance terms use normalized token boundaries so shorter dates, numbers, identifiers or
+currency fragments cannot collide inside larger correct values. Equivalent wording belongs in
+explicit fixture metadata (`required_any`, `required_any_groups`, case-scoped `numeric_values`)
+rather than fuzzy matching or an LLM judge.
+
+RAG evidence keeps target retrieval, all-required-source retrieval, fact/abstention, language
+and citation as independent checks. Language evaluation may report `not-measurable` for short
+numeric/identifier-dominated answers; that state may be non-failing but must not be presented as
+a positive language match. Canonical RAG summaries also validate the expected case-ID set exactly
+once, with structural completeness separate from semantic quality and infrastructure health.
+
+The Open WebUI product-path qualifier must resolve the live model surface before creating
+temporary benchmark state. An exact active preset ID is authoritative; a raw Ollama base model
+may be mapped only when one active preset matches it. Ambiguous/unknown mappings fail early with
+actionable preset IDs. Benchmark evidence retains only the sanitized active
+`preset_id -> base_model` mapping, not the raw authenticated model-export response. Open WebUI
+readiness is HTTP-based rather than inferred from systemd state.
+
+**Why:** The broader RAG campaign exposed scorer false negatives where `9 November` matched inside
+`19 November`, `7 March 2028` inside `17 March 2028`, concise English technical answers lacked
+stopwords, and semantically equivalent office wording was rejected. Those are evaluator defects,
+not model-quality findings. A deterministic explicit schema fixes the defects without weakening the
+quality bar or making benchmark results depend on another model.
+
+**Retest only if:** a demonstrated false positive/negative survives the explicit fixture contract,
+new multilingual cases show deterministic language evidence is systematically insufficient, or a
+new RAG case type requires an additional independently meaningful scoring dimension. Do not add
+fuzzy scoring merely to improve model pass rates.
+
+
+## DEC-018 — Restore benchmark residency and report resident-session resources
+
+**Status:** ACTIVE — introduced in 0.11.3-1.3 source.
+
+**Decision:** Direct `rag-quality` may isolate the answer and embedding lanes for deterministic
+measurement, but it must not leave the appliance in a different Ollama residency state. The
+benchmark snapshots the normalized `/api/ps` residency sets before destructive isolation, restores
+the same model sets on every exit path, verifies the result, and treats restoration failure as an
+infrastructure failure. Reload requests intentionally omit an explicit `keep_alive` so each Ollama
+service applies its configured/default lane policy; exact remaining expiry time is not reconstructed. The shared Ollama client owns this lifecycle helper so benchmark callers do
+not grow separate unload/reload implementations. Embedding-only registrations are restored through
+`/api/embed` when a generation load request is not valid for that model.
+
+RAG resource reporting uses the existing telemetry sampler and chronological aggregation contract.
+Each request retains MemAvailable start/min/end and swap start/peak/end; the canonical RAG summary
+adds a resident-session view with first start, minimum, final state, MemAvailable end delta and
+`swap_peak_delta_mib` (peak observed swap minus starting swap). These are evidence/diagnostic
+improvements only; this contract does not introduce a new memory or swap failure threshold.
+
+**Why:** Current RAG testing showed that per-case swap deltas can hide cumulative pressure while a
+model remains resident, and external harnesses had to restore residency themselves after isolation.
+State restoration and chronological resource visibility are therefore benchmark-integrity concerns,
+not model-tuning features. Reusing the existing client and sampler keeps the pre-v1.0 implementation
+small and avoids a second lifecycle/telemetry framework.
+
+**Retest only if:** Ollama changes its residency/load semantics, a benchmark legitimately needs to
+leave residency changed by explicit operator request, or repeated BC-250 evidence justifies a new
+resource-policy threshold. Do not turn the current diagnostic values into failures without that
+evidence.
+
+
+## DEC-019 — Keep Gemma E4B as the production RAG answer model on the 16 GiB profile
+
+**Status:** ACTIVE — based on the completed 2026-09-19 BC-250 RAG campaign.
+
+**Decision:** Use `bc250-office-documents` /
+`prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` as the production Open WebUI document/RAG answer
+role for the current 16 GiB BC-250 profile. Keep `bc250-office-advanced` /
+`prod-qwen35-9b-unsloth-q6-k` available for its separate higher-quality general-office role,
+but do not present or preload Qwen 9B as an equivalent long-residency RAG default.
+
+**Observed:** Both finalists were functionally strong: the broad fixed-retrieval campaign achieved
+96/96 target retrieval, 96/96 all-required-support retrieval, 8/8 abstention and no truncations
+for each model, and the authenticated Open WebUI product path passed 36/36 turns per model in
+short isolated arms. The deciding evidence was sustained residency. Gemma completed 42/42
+continuous-residency Open WebUI RAG turns with about 2.7 GiB MemAvailable remaining, roughly
+15 MiB swap growth and no safety/residency failure. Qwen remained semantically correct up to the
+abort but fell to roughly 338 MiB minimum MemAvailable and reached the campaign's configured
+512 MiB safety floor after only a few subruns.
+
+**Interpretation:** This is a resource-safety/product-role decision, not a Qwen answer-quality
+rejection. Gemma provides substantially more sustained-residency margin on the present 16 GiB UMA
+profile while retaining comparable RAG quality. The 512 MiB value was the campaign's safety-abort
+setting and does not replace the separate whole-appliance revalidation policy.
+
+**Retest only if:** the BC-250 memory profile changes materially, Qwen/model/runtime memory behavior
+changes materially, or a future document-answer model provides a clear product benefit that justifies
+a new comparison. Do not reopen broad RAG answer-model tournaments without such a trigger.

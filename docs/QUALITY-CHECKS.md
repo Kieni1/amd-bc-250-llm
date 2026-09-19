@@ -9,6 +9,10 @@ download/register experimental GGUFs, make model requests, and create evidence
 bundles below `${BC250_QUALITY_ROOT:-$HOME/bc250-quality}` with a matching
 `.tar.gz` in `$HOME`. They do **not** build the RPM and do not replace whole-appliance revalidation or production-promotion evidence.
 
+Routine whole-appliance revalidation keeps hard resource/quality thresholds separate from
+non-failing diagnostics. Tight (<512 MiB) MemAvailable headroom and accepted output-budget
+exhaustion are surfaced for operator review without changing the existing failure policy.
+
 ## Package-level smoke
 
 After installing an RPM, the lightweight asset check verifies that the new
@@ -166,3 +170,16 @@ Historical campaign scripts remain in source under `quality-checks/history/` for
 Stage-2E completed the broad hard-corpus/model-configuration comparison and selected Translate-Gemma. This source promotes those weights as `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` behind the two package-owned direction roles. After installing the built RPM, run only the bounded integrated Open WebUI verification: canonical sanity plus the targeted protected-finance, bullets/table, `Avoir`, and both long-document cases from the Stage-2E evidence. Do not restart broad candidate discovery unless that product-path verification exposes a model-level reason.
 
 Evidence tarballs from the current generic task/translation checks intentionally have no `.sha256` sidecar files, but each script prints the archive SHA-256 for exact evidence identification. Preserve the exact fixture/evaluator/prompt material inside evidence where needed, normalize archive ownership metadata, and keep archive/delivery bookkeeping separate from model-quality conclusions.
+
+
+## RAG result integrity
+
+Direct `rag-quality` evidence keeps retrieval, fact/abstention, language and citation
+independent and validates the exact expected case set. Missing, duplicate or unexpected
+case IDs are structural failures, not semantic model-quality failures. The benchmark also
+snapshots and restores the starting model residency set on both Ollama lanes. Canonical RAG
+summaries expose the chronological resident-session resource view (MemAvailable start/min/end and
+end delta; swap start/peak/end plus `swap_peak_delta_mib`) so sustained pressure is visible without
+mislabeling peak-minus-start swap as cumulative growth or changing current acceptance thresholds.
+Residency restoration guarantees the starting model set and lets each Ollama lane apply its normal
+keep-alive policy; it does not claim to reconstruct the exact remaining expiry time.

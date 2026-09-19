@@ -39,6 +39,17 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
+The current 0.11.3-1.4 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
+must be behind one default-No gate, local maintenance and Pi integration remain independent,
+and selected setup must be checked rather than assumed successful. Post-install guidance should
+point at a small set of next commands plus the installed documentation/config/state/evidence paths;
+it must not become a second full command reference.
+
+Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
+MemAvailable hard floor unchanged; below 512 MiB may be surfaced as tight headroom. Likewise, an
+accepted use case with `output-budget` remains a PASS but should be visible in the top-level
+Diagnostics section.
+
 ## 3. Common promotion funnel
 
 For a candidate change, stop as soon as it no longer has a promotion case.
@@ -87,23 +98,25 @@ state changes. Restore state before moving to another lane.
 This is currently the highest product priority because the Pi/maintenance contract was
 added after much of the older hardware evidence.
 
-First batch is read-only plus one bounded qualification run:
+Exact 0.11.3-0.4 has now completed the read-only/install/whole-appliance baseline: verifier
+54/0/0 and v4.2 infrastructure/restoration/full coverage PASS with quality 8/8. Preserve that
+artifact as historical evidence for exact 0.4. Current 0.11.3-1.4 has completed the deterministic
+source gate; do not relabel the 0.4 hardware evidence as current. After GitHub builds and the exact
+1.4 RPM is installed, run one exact-source verification/revalidation gate, then continue support
+operations with:
 
 ```text
-installed NEVRA and runtime versions
-bc250-verify --owui-token-file FILE
-bc250-openwebui-setup status --verbose --owui-token-file FILE
-bc250-revalidate start --owui-token-file FILE
-normal service topology
-HTTP :80 readiness
 maintenance contract/status
 companion status
 WOL NIC state
 firewall/listener state
+real powered-off/S5 WOL
+busy safe-shutdown defer
+idle safe-shutdown allow + wake
 ```
 
 The current harness v4.2 includes the actual package-owned production translation roles
-and should replace the ad-hoc translation smoke used after 0.11.2-0.3.
+and remains the milestone whole-appliance gate.
 
 To preserve evidence value while avoiding redundant runtime, v4.2 keeps direct and
 product-path semantic checks distinct, but removes the duplicate generic GPT-OSS edge
@@ -176,14 +189,35 @@ current integration; preserve the known caveat rather than weakening the evaluat
 
 ### Lane D — RAG / office documents
 
-RAG is a core office use case and should be tested in layers:
+RAG is a core office use case and is now model-selected for the current 16 GiB profile. The
+2026-09-19 finalist campaign keeps Gemma E4B / `bc250-office-documents` as the production document
+answer role because both finalists were strong in short product-path RAG but Qwen 9B reached the
+residency campaign's 512 MiB safety floor after only a few resident subruns while Gemma completed
+42/42 continuous-residency turns with about 2.7 GiB MemAvailable remaining. That is a
+resource-safety/product-role decision, not a Qwen semantic-quality rejection.
 
-1. **retrieval correctness** with the embedding lane;
-2. **direct answer quality** via `rag-quality`;
-3. **real Open WebUI path** via `owui-rag` using packaged settings;
-4. only then A/B one tuning axis at a time (`embedding-batch`, `chunk-min`,
-   `system-context`, thinking policy, hybrid search when explicitly tested);
-5. exact restoration after every mutation.
+Future RAG work should therefore proceed in layers without reopening the answer-model tournament:
+
+1. **real document ingestion/extraction** with PDFs and actual Tika output;
+2. **retrieval and grounded answer quality** on messy office material, tables, multilingual and
+   multi-source questions, including abstention;
+3. **collection lifecycle** including upload/delete/re-upload and reindex/reimport behavior;
+4. **long-lived product use** with conversation growth, one deliberate unload/reload cycle and
+   sustained telemetry;
+5. only then A/B one retrieval/tuning axis at a time if real-document evidence exposes a problem.
+
+Direct `rag-quality` isolation must also be state-preserving. Snapshot the main and embedding
+Ollama residency sets before unloading anything, restore and verify the starting residency sets on every
+exit path, and treat restoration failure as infrastructure failure. Resource evidence should show
+resident-session MemAvailable start/min/end/delta and swap start/peak/end/`swap_peak_delta_mib` so
+sustained pressure is visible without falsely describing peak-minus-start swap as cumulative growth.
+These measurements are diagnostics/evidence; do not invent new thresholds from one campaign.
+
+Direct RAG scoring must remain deterministic. Use boundary-aware acceptance for values and
+explicit fixture alternatives/numeric equivalence; keep target/all-support retrieval, fact or
+abstention, language and citation independent. A language-neutral short value may be
+`not-measurable` without being a failure, and canonical quality evidence must contain every
+expected case exactly once before it is treated as complete.
 
 Expand the fixture around the failure modes that matter for office use:
 
@@ -206,10 +240,16 @@ Start with the production role map, not experimental candidates:
 - `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` — standard office;
 - `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` — RAG answer;
 - `prod-qwen35-9b-unsloth-q6-k` — higher-quality office;
-- `prod-gpt-oss20b-ggml-org-mxfp4` — deep reasoning / warm main.
+- `prod-gpt-oss20b-ggml-org-mxfp4` — deep reasoning / worst-case production memory reference.
 
-Keep production GPT-OSS and Ollama `0.34.0` unchanged while the current qualification
-cycle is open. Candidate qualification follows this funnel:
+The main lane itself stays warm under its normal 20-minute policy; GPT-OSS is not a permanently warm
+universal model. Before opening another large-candidate search, answer the bounded product question:
+**does GPT-OSS provide materially better deep-office reasoning than Qwen3.5 9B under their actual
+production contracts, enough to justify its roughly 4 GiB higher memory cost?** Use one reusable
+12–16 case `usecase` fixture with deterministic checks where objective and preserved full outputs for
+manual/pairwise review where quality cannot safely be reduced to keywords.
+
+Candidate qualification follows this funnel:
 
 ```text
 load / resource / backend-aware completion integrity
@@ -272,8 +312,11 @@ question open.
 
 MTP is experimental, but it is now one of the two immediate next hardware batches together
 with support operations. Keep those batches separate so an external llama.cpp/resource
-failure cannot contaminate WOL/power evidence and vice versa. After the 0.11.3-0.4
-pre-flight polish, freeze the MTP harness again until real BC-250 evidence exposes a
+failure cannot contaminate WOL/power evidence and vice versa. The 0.11.3-1.4 source keeps the
+0.11.3-0.4 comparison/catalog/runtime contract unchanged, with one bounded safety hardening:
+process-group termination now requires proof that the launched llama-server PID owns both its
+session and process group. Freeze the MTP harness
+until real BC-250 evidence exposes a
 concrete defect or measurement gap.
 
 Prerequisites:

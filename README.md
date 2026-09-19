@@ -39,10 +39,11 @@ for the exact running kernel, establishes the static main/task/embedding normal
 mode, installs every model required by the active package-owned Open WebUI roles
 plus the task and Jina embedding defaults, then presents one global prompt only for
 experiments, rollback/reference, agent and other optional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
-desired state, then offers optional office-maintenance/WOL and Raspberry Pi
-companion setup after core appliance verification. The companion setup keeps HTTP :80 as
-the office endpoint and uses only restricted SSH :22; it does not expose internal
-Open WebUI/Ollama ports. A second reboot is requested only if persistent 40-CU mode was already configured
+desired state, then offers one default-No optional-setup gate after core appliance
+verification. Only when accepted does it separately offer local BC-250 maintenance and
+Raspberry Pi integration. Selected optional setup is verified before the installer
+finishes. Pi integration keeps HTTP :80 as the office endpoint and uses only restricted
+SSH :22; it does not expose internal Open WebUI/Ollama ports. A second reboot is requested only if persistent 40-CU mode was already configured
 and its newly prepared replacement module is not yet loaded.
 
 The optional-model prompt accepts global indexes, ranges, exact names, `recommended`,
@@ -93,6 +94,13 @@ Persisted providers, task, embedding and RAG settings come from the single packa
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
 | Open WebUI task model | `task-lfm25-1.2b-instruct-liquidai-q6-k` |
 | Coding and agentic work | `agentic-ornith15-9b-ornith-q5-k-m` |
+
+The completed BC-250 RAG finalist campaign keeps Gemma E4B as the document/RAG default for the
+16 GiB profile. Both Gemma E4B and Qwen 9B passed short authenticated Open WebUI RAG testing, but
+Gemma retained about 2.7 GiB MemAvailable through a 42-turn continuous-residency run while Qwen
+reached the campaign's 512 MiB safety floor after only a few resident subruns. Qwen remains the
+separate higher-quality general-office option; this RAG decision is about sustained memory margin,
+not a semantic-quality failure.
 
 The packaged comparison catalog retains active measured challengers, including
 `exp-granite42-3b-ibm-q6-k`, the former LFM translator as an explicit rollback/reference,
