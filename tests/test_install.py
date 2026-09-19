@@ -498,6 +498,7 @@ step_8_application_services
         self.assertIn("Configure Raspberry Pi integration now?", block)
         self.assertIn("bc250-maintenance companion enable", block)
         self.assertIn("bc250-maintenance backup-export enable", block)
+        self.assertIn('ensure_optional_ssh_server "read-only backup export"', block)
         self.assertIn("dnf install -y rsync-rrsync", block)
         self.assertIn("Optional setup verification", block)
         self.assertIn("verify_local_maintenance_setup", source)
@@ -542,38 +543,6 @@ step_11_maintenance
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("Optional maintenance setup skipped", result.stdout)
         self.assertNotIn("UNEXPECTED:", result.stdout)
-
-    def test_backup_export_prepares_ssh_even_when_pi_access_was_skipped(self) -> None:
-        result = source_probe(r"""
-input_is_interactive() { return 0; }
-SSHD_READY=0
-yes_no_default_yes() {
-  case "$1" in
-    *openssh-server*|*rsync-rrsync*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-yes_no() { return 0; }
-systemctl() {
-  if [[ ${1:-} == cat && ${2:-} == sshd.service ]]; then
-    [[ $SSHD_READY == 1 ]]
-    return
-  fi
-  return 0
-}
-dnf() {
-  printf 'DNF:%s\n' "$*"
-  [[ " $* " == *' install -y openssh-server '* ]] && SSHD_READY=1
-  return 0
-}
-bc250-maintenance() { printf 'MAINT:%s\n' "$*"; }
-verify_backup_export_setup() { printf 'VERIFY:backup-export\n'; }
-step_11_maintenance
-""")
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("DNF:install -y openssh-server", result.stdout)
-        self.assertIn("MAINT:backup-export enable", result.stdout)
-        self.assertNotIn("MAINT:companion enable", result.stdout)
 
     def test_models_only_resume_is_public(self) -> None:
         source = INSTALLER.read_text()

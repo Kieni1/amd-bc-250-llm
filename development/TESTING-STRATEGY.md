@@ -29,7 +29,10 @@ one candidate.
 Never substitute an unavailable local check with an imitation and report it as real.
 
 The deterministic source/unit gate must remain host-independent. Runtime shell integrations
-that depend on packaged tools such as `jq` belong to installed-package/BC-250 qualification;
+that depend on packaged tools such as `jq` belong to installed-package/BC-250 qualification.
+Do not build source tests that mock a package-manager install and then expect absolute host files
+(e.g. `/usr/bin/...`) to appear: a fake `dnf` cannot mutate the test host safely. For those
+boundaries, prefer deterministic source/ordering assertions or mock the filesystem probe itself.
 source tests should exercise the underlying data/format contracts without invoking those runtime
 dependencies.
 
@@ -310,55 +313,45 @@ question open.
 
 ### Lane G — MTP / speculative decoding
 
-MTP is experimental, but it is now one of the two immediate next hardware batches together
-with support operations. Keep those batches separate so an external llama.cpp/resource
-failure cannot contaminate WOL/power evidence and vice versa. The 0.11.3-1.4 source keeps the
-0.11.3-0.4 comparison/catalog/runtime contract unchanged, with one bounded safety hardening:
-process-group termination now requires proof that the launched llama-server PID owns both its
-session and process group. Freeze the MTP harness
-until real BC-250 evidence exposes a
-concrete defect or measurement gap.
+MTP basic qualification is now mostly complete; the active question is optimization. Historical
+real-device evidence from exact installed `0.11.3-0.4` with llama.cpp `b10964` / commit
+`b29c606e28a01b1bc8c1351026a0fa6e616bf6c4` passed the Qwen3.5 9B, Qwen3.6 27B and
+HauhauCS Qwen3.8 27B configurations with deterministic baseline/MTP quality parity. Qwen3.6 27B
+showed the strongest sustained long-generation gain but the tightest successful memory margin;
+HauhauCS Qwen3.8 retained more headroom; Qwen3.5 9B remained fastest in absolute terms and strongest
+for short generations.
 
-Prerequisites:
+The stock Qwen3.6 35B-A3B 8192-context/full-GPU baseline is a confirmed fit failure: MemAvailable
+crossed the 128 MiB hard floor during the first baseline load, before MTP inference. Do not rerun that
+exact configuration. The YMQ Qwen3.8 XS-TI entry was added after the historical Phase-1 batch and
+remains pending a matched HauhauCS-control comparison.
 
-- one explicitly selected MTP catalog entry (`bc250-fetch-mtp ID` exposes packaged
-  disabled candidates without making them part of generic convergence);
-- pinned/recorded GGUF identity;
-- an external `llama-server` whose CLI supports the required options;
-- reviewed baseline is llama.cpp `b10964` / commit
-  `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4`, but compatible newer releases may be
-  tested and must be recorded.
+The first long Phase-2 draft-depth sweep accidentally repeated the catalog defaults. Preserve it as
+repeatability evidence only: typical throughput CV was about 0.01–0.19%, so sub-percent changes are
+noise unless later evidence proves otherwise. The corrected override canary proved that an explicit
+`DRAFT_N_MAX=1` reaches the actual Qwen3.5 runtime configuration. The package comparison harness now
+records catalog/requested/effective draft depth and verifies the requested value appears in the
+actual llama-server flags before accepting inference evidence.
 
-Prepare and verify one MTP model at a time. The first funnel is 9B -> retained 27B
-control -> Qwen3.8 27B HauhauCS control -> Qwen3.8 27B YMQ XS-TI challenger -> 35B-A3B; stop when a candidate no longer has a useful case:
-
-```bash
-bc250-model list mtp --all
-sudo bc250-fetch-mtp qwen3.5-9b-mtp
-sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
-```
-
-`bc250-compare-mtp` owns the controlled speedup measurement: the same target GGUF is run
-sequentially through the same llama.cpp build/settings with speculative decoding disabled
-and enabled. `bc250-run-mtp [--no-mtp] ID` remains the manual diagnostic path. A useful
-MTP comparison must include:
+Continue Phase 2 only on the three Phase-1 passers:
 
 ```text
-same or closely comparable task/prompt
-exact llama.cpp build/commit and effective launch flags
-baseline throughput and answer quality
-MTP throughput
-accepted draft tokens / proposed draft tokens / acceptance rate
-context, KV types, draft-n and effective ubatch settings
-resident memory / MemAvailable / swap
-stability and error logs
-output-quality regressions
+models: qwen3.5-9b-mtp, qwen3.6-27b-mtp, qwen3.8-27b-hauhaucs-mtp
+draft depths: 1, 2, 3, 4
+performance budgets: 256, 1024
+exploratory repeats: 1 performance / 1 quality
 ```
 
-`models/experiments/compare-mtp.sh` is an evidence harness, not by itself a production-promotion evaluator. Its archive must still be interpreted for useful answer quality and appliance safety.
-Do not claim an MTP win from tok/s alone. A speedup that changes answer quality,
-exhausts memory, or relies on a fragile external runtime is not a production win.
+Selection rule: quality, completeness, safety and restoration must pass; both 256- and 1024-token
+speedups must remain above baseline; and a non-default depth should improve the balanced result by
+approximately >=1.0% over the catalog default before changing package settings. If one depth wins
+materially, confirm only that model/depth with 3 performance repeats and 2 quality repeats. Do not
+repeat a full four-depth confirmation sweep.
+
+`bc250-compare-mtp` remains the same-target evidence harness; `bc250-run-mtp [--no-mtp] ID` remains
+the manual diagnostic path. MTP stays separate from support/WOL/power testing. Do not promote from
+tok/s alone: useful answer quality, accepted/proposed draft telemetry, memory/swap safety, GPU/kernel
+stability and cleanup/restoration all remain required.
 
 ## 7. Routine revalidation vs specialist campaigns
 
