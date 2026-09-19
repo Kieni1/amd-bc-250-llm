@@ -179,9 +179,20 @@ bc250-benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
 ```
 
 `rag-cycle` checks that the answer model remains available while the dedicated
-embedding lane does work. `rag-quality` records retrieval rank, answer correctness,
-citation/source behavior, thinking/output sizes and multi-cause failure information.
-The canonical thinking-policy A/B is `rag-quality --think true` versus
+embedding lane does work. `rag-quality` records target retrieval, all-required-source
+retrieval, fact/abstention acceptance, deterministic language evidence, citation behavior,
+thinking/output sizes and multi-cause failure information. Acceptance matching is
+boundary-aware for dates/numbers/IDs/currency and fixtures may declare explicit
+`required_any_groups` and case-scoped `numeric_values`; grading remains deterministic.
+Canonical summaries also verify that every expected RAG case appears exactly once, so a
+partial result stream cannot be mistaken for a complete quality run. `rag-quality` snapshots the
+starting main/embedding Ollama residency set, restores and verifies that set on every exit path,
+and treats restoration failure as infrastructure failure. Reloads omit an explicit keep-alive so
+each Ollama service applies its normal configured/default lane policy; exact remaining expiry time
+is not reconstructed. Its canonical resource summary reports resident-session MemAvailable
+start/min/end/delta plus swap start/peak/end and `swap_peak_delta_mib`,
+while keeping the existing qualification thresholds unchanged. The canonical
+thinking-policy A/B is `rag-quality --think true` versus
 `rag-quality --think false`; routine revalidation never performs that comparison and
 qualifies only the policy shipped by the package.
 
@@ -213,7 +224,13 @@ infrastructure failure.
 qualifies the canonical eight-case DE↔FR screen through the actual package-owned
 production role IDs, so the live model-specific direction Filter and 2048-token preset are
 part of the path. `owui-rag` qualifies the currently configured Open WebUI RAG path with
-deterministic multi-turn grounding/citation checks.
+deterministic multi-turn grounding/citation checks. Its MODEL argument may be an exact active
+Open WebUI preset ID or an Ollama base model that maps to exactly one active preset. The
+benchmark resolves that relationship through authenticated Open WebUI metadata before creating
+temporary knowledge/upload state; ambiguous or unknown model selections fail early and list the
+valid matching preset IDs. Only the sanitized active `preset_id -> base_model` mapping is retained
+in benchmark metadata. Open WebUI must answer HTTP readiness before the product-path benchmark
+starts; the readiness allowance is bounded to five minutes for slow application restarts.
 
 ## Revalidation harness v4.2
 
@@ -249,4 +266,7 @@ deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sw
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
 snapshots remain at preflight, agent-mode transitions, final restoration and failures.
 Non-severe context truncation is surfaced under `Diagnostics` without changing PASS
-criteria; severe early truncation remains an infrastructure qualification failure.
+criteria; severe early truncation remains an infrastructure qualification failure. The
+same section also reports tight resource headroom when MemAvailable falls below 512 MiB
+while remaining above the unchanged 128 MiB hard floor, and accepted use cases that reach
+their output budget. These are visibility signals, not relaxed acceptance criteria.

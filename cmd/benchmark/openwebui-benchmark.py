@@ -177,6 +177,67 @@ def require_object(value: Any, context: str) -> dict[str, Any]:
     return value
 
 
+def require_list(value: Any, context: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise Failure(f"{context}: expected JSON list")
+    return value
+
+
+def normalized_model_id(value: str) -> str:
+    return value.strip().removesuffix(":latest")
+
+
+def active_owui_model_map(client: JsonClient) -> dict[str, str]:
+    """Return only the active preset -> base-model mapping needed by benchmarks."""
+    exported = require_list(
+        client.get("/api/v1/models/export"),
+        "Open WebUI model export",
+    )
+    mapping: dict[str, str] = {}
+    for item in exported:
+        if not isinstance(item, dict) or item.get("is_active") is not True:
+            continue
+        preset_id = str(item.get("id") or "").strip()
+        base_model = str(item.get("base_model_id") or "").strip()
+        if preset_id and base_model:
+            mapping[preset_id] = base_model
+    return mapping
+
+
+def resolve_owui_model(client: JsonClient, requested: str) -> tuple[str, str, dict[str, str]]:
+    """Resolve an active Open WebUI preset before creating benchmark state.
+
+    Exact active preset IDs win. A raw Ollama base model may resolve to one active
+    preset, but ambiguous or absent mappings fail before any upload/KB mutation.
+    """
+    mapping = active_owui_model_map(client)
+    requested_normalized = normalized_model_id(requested)
+
+    for preset_id, base_model in mapping.items():
+        if preset_id == requested:
+            return preset_id, base_model, mapping
+
+    matches = sorted(
+        preset_id
+        for preset_id, base_model in mapping.items()
+        if normalized_model_id(base_model) == requested_normalized
+    )
+    if len(matches) == 1:
+        preset_id = matches[0]
+        return preset_id, mapping[preset_id], mapping
+    if len(matches) > 1:
+        raise Failure(
+            "Open WebUI model selection is ambiguous for "
+            f"{requested!r}; matching active presets: {', '.join(matches)}"
+        )
+
+    valid = ", ".join(sorted(mapping)) or "(none)"
+    raise Failure(
+        f"Open WebUI exposes no active preset for {requested!r}; "
+        f"valid active preset IDs: {valid}"
+    )
+
+
 def embedding_config(data: dict[str, Any]) -> dict[str, Any]:
     keys = (
         "RAG_EMBEDDING_ENGINE",
@@ -722,22 +783,27 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
 def cmd_owui_rag(args: argparse.Namespace) -> int:
     paths = prepare_result_dir("owui-rag", args.output_dir)
     client = owui_client(args)
+    wait_owui(args.url, timeout=300.0)
+    resolved_model, base_model, preset_map = resolve_owui_model(client, args.model)
     simple_meta(
         paths,
         "owui-rag",
         url=args.url,
-        model=args.model,
+        model=normalized_model_id(base_model),
+        requested_model=args.model,
+        owui_preset=resolved_model,
+        active_preset_map=preset_map,
         request_timeout_s=getattr(args, "timeout", DEFAULT_TIMEOUT),
     )
     try:
-        failures = run_owui_rag_case(client, paths, args.model, "packaged")
+        failures = run_owui_rag_case(client, paths, resolved_model, "packaged")
     except Failure as exc:
         failure_kind = "restoration" if isinstance(exc, RestorationFailure) else "runtime-api"
         append_result(
             paths.results_jsonl,
             result_record(
                 category="owui-rag",
-                model=args.model,
+                model=resolved_model,
                 case_id="packaged-runtime",
                 result_type="qualification",
                 outcome="infra-fail",
@@ -1019,7 +1085,7 @@ def current_sysctx() -> str:
     return values[-1] if values else ""
 
 
-def wait_owui(url: str, timeout: float = 90.0) -> None:
+def wait_owui(url: str, timeout: float = 300.0) -> None:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:

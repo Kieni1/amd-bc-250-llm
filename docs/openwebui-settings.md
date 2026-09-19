@@ -107,6 +107,12 @@ This is intentional on the BC-250 unified-memory pool.
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` | active |
 
+For the current 16 GiB profile, **Office – Documents** is the production RAG/document role.
+The September 2026 product-path campaign found both Documents/Gemma E4B and Advanced/Qwen 9B
+functionally strong in short sessions, but only Gemma retained comfortable memory headroom during
+continuous residency. Keep Advanced as an optional heavier general-office role rather than treating
+it as an equivalent long-lived RAG default.
+
 The two active Translate-Gemma roles reproduce the selected Stage-2E product contract.
 Both use the exact installed `openwebui/prompts/translation-explicit-direction-v1.txt`
 prompt, `max_tokens=2048`, and leave `think` unspecified. The package-owned non-global

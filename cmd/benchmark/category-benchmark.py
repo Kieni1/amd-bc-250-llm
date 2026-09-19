@@ -1667,27 +1667,199 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
 
 
 
-def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
+def _bounded_acceptance_match(text: str, term: str) -> bool:
+    """Match a normalized acceptance term without colliding inside larger tokens.
+
+    The RAG fixtures contain dates, identifiers and currency values where naïve
+    substring matching can invert a correct answer (for example ``9 November``
+    inside ``19 November``).  Normalization still accepts locale punctuation,
+    while Unicode word boundaries protect the semantic token edges.
+    """
     folded = acceptance_text(text)
-    missing = [term for term in case.get("required", []) if acceptance_text(term) not in folded]
-    choices = case.get("required_any", [])
-    if choices and not any(acceptance_text(term) in folded for term in choices):
+    needle = acceptance_text(term)
+    if not needle:
+        return False
+    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", folded) is not None
+
+
+def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
+    missing = [
+        str(term)
+        for term in case.get("required", [])
+        if not _bounded_acceptance_match(text, str(term))
+    ]
+
+    choices = [str(term) for term in case.get("required_any", [])]
+    if choices and not any(_bounded_acceptance_match(text, term) for term in choices):
         missing.append("one of: " + " | ".join(choices))
-    present_forbidden = [term for term in case.get("forbidden", []) if acceptance_text(term) in folded]
+
+    for raw_group in case.get("required_any_groups", []):
+        if not isinstance(raw_group, list) or not raw_group:
+            missing.append("invalid required_any_groups entry")
+            continue
+        group = [str(term) for term in raw_group]
+        if not any(_bounded_acceptance_match(text, term) for term in group):
+            missing.append("one of: " + " | ".join(group))
+
+    observed_numbers = numeric_values(text)
+    for raw_value in case.get("numeric_values", []):
+        expected = numeric_values(str(raw_value))
+        if not expected or not expected.issubset(observed_numbers):
+            missing.append(f"numeric value {raw_value}")
+
+    present_forbidden = [
+        str(term)
+        for term in case.get("forbidden", [])
+        if _bounded_acceptance_match(text, str(term))
+    ]
     problems = [f"missing {term}" for term in missing]
     problems.extend(f"forbidden {term}" for term in present_forbidden)
     return not problems, problems
 
 
+RAG_LANGUAGE_MARKERS = {
+    "de": {
+        "ab", "beträgt", "darf", "daten", "der", "die", "drei", "fällig",
+        "fälligkeitsdatum", "frist", "gilt", "ist", "kündigungsfrist", "monate",
+        "nicht", "rechnung", "sechs", "sicherheitsprüfung",
+        "sicherheitsüberprüfung", "zulässig",
+    },
+    "fr": {
+        "bureau", "délai", "est", "facture", "français", "le", "les", "mois",
+        "ne", "pas", "résiliation", "six", "s'applique", "trois",
+    },
+    "en": {
+        "allowed", "cloud", "confidential", "data", "engineering", "is", "may",
+        "must", "not", "permissible", "public", "reliability", "represents",
+        "services", "site", "stored",
+    },
+}
+
+
+def rag_language_status(text: str, expected: str) -> str:
+    """Return match/other/not-measurable for deterministic RAG language evidence."""
+    if expected not in RAG_LANGUAGE_MARKERS:
+        raise BenchmarkError(f"unsupported RAG language: {expected}")
+    words = set(normalize_words(text))
+    scores = {
+        language: len(words & markers)
+        for language, markers in RAG_LANGUAGE_MARKERS.items()
+    }
+    best = max(scores.values(), default=0)
+    if best == 0:
+        return "not-measurable"
+    winners = {language for language, score in scores.items() if score == best}
+    if winners == {expected}:
+        return "match"
+    if expected not in winners:
+        return "other"
+    return "not-measurable"
+
+
+def rag_case_evaluation(
+    content: str,
+    case: dict[str, Any],
+    *,
+    ranked_ids: list[str],
+    top_k: int,
+) -> dict[str, Any]:
+    """Evaluate RAG retrieval, answer, language and citation independently."""
+    acceptance_ok, problems = _acceptance_ok(content, case)
+    abstention_required = bool(case.get("abstention", False))
+    target_value = case.get("target")
+    target = str(target_value) if target_value else None
+    if target is None and not abstention_required:
+        raise BenchmarkError(
+            f"RAG case {case.get('id', '<unknown>')} requires target unless abstention=true"
+        )
+
+    selected_ids = ranked_ids[:top_k]
+    target_retrieval_ok: bool | None = (
+        target in selected_ids if target is not None else None
+    )
+    default_sources = [target] if target is not None else []
+    required_sources = [
+        str(value) for value in case.get("required_sources", default_sources)
+    ]
+    all_required_support_retrieval_ok: bool | None = (
+        all(source in selected_ids for source in required_sources)
+        if required_sources
+        else None
+    )
+    retrieval_gate = (
+        target_retrieval_ok is not False
+        and all_required_support_retrieval_ok is not False
+    )
+    retrieval_ok: bool | None = (
+        retrieval_gate
+        if target_retrieval_ok is not None
+        or all_required_support_retrieval_ok is not None
+        else None
+    )
+
+    citation_required = bool(
+        case.get("citation_required", bool(required_sources))
+    )
+    missing_citations = [
+        source
+        for source in required_sources
+        if f"[{source}]".casefold() not in content.casefold()
+    ] if citation_required else []
+    citation_ok: bool | None = (not missing_citations) if citation_required else None
+    problems.extend(f"missing source [{source}]" for source in missing_citations)
+
+    fact_ok: bool | None = None if abstention_required else acceptance_ok
+    abstention_ok: bool | None = acceptance_ok if abstention_required else None
+
+    expected_language = case.get("language")
+    language_required = bool(case.get("language_required", expected_language is not None))
+    if expected_language is None:
+        language_status = "not-required"
+        language_ok = True
+    else:
+        language_status = rag_language_status(content, str(expected_language))
+        language_ok = (
+            not language_required
+            or language_status in {"match", "not-measurable"}
+        )
+        if not language_ok:
+            problems.append(
+                f"language {language_status}; expected {expected_language}"
+            )
+
+    semantic_ok = abstention_ok if abstention_required else fact_ok
+    citation_gate = citation_ok is not False
+    overall_ok = bool(retrieval_gate and semantic_ok and language_ok and citation_gate)
+    return {
+        "retrieval_ok": retrieval_ok,
+        "target_retrieval_ok": target_retrieval_ok,
+        "all_required_support_retrieval_ok": all_required_support_retrieval_ok,
+        "fact_ok": fact_ok,
+        "language_status": language_status,
+        "language_ok": language_ok,
+        "language_not_measurable": language_status == "not-measurable",
+        "citation_ok": citation_ok,
+        "abstention_ok": abstention_ok,
+        "overall_ok": overall_ok,
+        "problems": problems,
+    }
+
+
 def rag_case_checks(
     content: str, case: dict[str, Any], *, target_rank: int, top_k: int
 ) -> tuple[bool, bool, bool, list[str]]:
-    answer_ok, problems = _acceptance_ok(content, case)
-    retrieval_ok = target_rank <= top_k
-    source_cited = f"[{case['target']}]".casefold() in content.casefold()
-    if not source_cited:
-        problems.append(f"missing source [{case['target']}]")
-    return retrieval_ok, answer_ok, source_cited, problems
+    """Compatibility wrapper for the original single-target RAG case contract."""
+    target = str(case["target"])
+    filler = [f"__rank_{index}__" for index in range(1, max(top_k, target_rank) + 1)]
+    filler[target_rank - 1] = target
+    evaluation = rag_case_evaluation(content, case, ranked_ids=filler, top_k=top_k)
+    answer_ok = evaluation["abstention_ok"] if case.get("abstention") else evaluation["fact_ok"]
+    return (
+        bool(evaluation["retrieval_ok"]),
+        bool(answer_ok),
+        bool(evaluation["citation_ok"]),
+        list(evaluation["problems"]),
+    )
 
 def acceptance_text(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).translate(
@@ -2417,6 +2589,9 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
     corpus = json.loads(corpus_path.read_text(encoding="utf-8"))
     documents = corpus["documents"]
     cases = spec["cases"]
+    case_ids = [str(case.get("id") or "") for case in cases]
+    if not all(case_ids) or len(set(case_ids)) != len(case_ids):
+        raise BenchmarkError("RAG-quality fixture case IDs must be non-empty and unique")
     if args.models and len(args.models) != 2:
         raise BenchmarkError(
             "rag-quality requires zero models or exactly EMBED_MODEL ANSWER_MODEL"
@@ -2448,202 +2623,329 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
     if default_num_predict < 1:
         raise BenchmarkError("RAG_QUALITY_NUM_PREDICT must be at least 1")
     query_prefix, doc_prefix, scheme = embedding_scheme(embed_model)
-    embed_client.ensure_unloaded(embed_model)
-    answer_client.ensure_unloaded(answer_model)
-    doc_vectors = embed(
-        embed_client, embed_model, [doc_prefix + item["text"] for item in documents]
-    ).get("embeddings", [])
-    query_vectors = embed(
-        embed_client, embed_model, [query_prefix + item["question"] for item in cases]
-    ).get("embeddings", [])
-    if len(doc_vectors) != len(documents) or len(query_vectors) != len(cases):
-        raise BenchmarkError("RAG-quality embedding count does not match fixture")
-    embed_client.ensure_unloaded(embed_model)
-
-    paths = prepare_result_dir("rag-quality", args.output_dir)
-    csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
-    copy_fixtures(paths, fixture, corpus_path)
-    write_meta(
-        meta_path, answer_client, "rag-quality", [answer_model], fixture,
-        options={
-            "embedding_ollama_url": embed_url,
-            "rag_quality_top_k": top_k,
-            "rag_quality_num_predict_default": default_num_predict,
-            "rag_quality_think_policy": think_policy,
-        },
-    )
-    meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    embed_version = embed_client.version()
-    meta.setdefault("runtimes", []).append({
-        "kind": "ollama",
-        "url": embed_client.base_url,
-        "version": embed_version,
-        "package_standard_version": STANDARD_OLLAMA_VERSION,
-    })
-    meta.setdefault("models", []).append(model_meta(embed_client, embed_model))
-    meta["fixtures"] = fixture_metadata(fixture, corpus_path)
-    write_benchmark_metadata(meta_path, meta)
-    fields = [
-        "timestamp", "case_id", "embed_model", "answer_model", "embedding_scheme",
-        "target_rank", "retrieval_ok", "answer_ok", "source_cited", "passed",
-        "failure_kinds", "num_predict", "think_policy", "answer_chars", "thinking_chars", "done_reason",
-        "wall_s", "load_s", "temp_max_c", "mem_available_min_mib", "swap_peak_delta_mib",
-    ]
-    passed = 0
-    with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        for case, query_vector in zip(cases, query_vectors):
-            scored = sorted(
-                (
-                    (cosine(query_vector, doc_vector), doc)
-                    for doc, doc_vector in zip(documents, doc_vectors)
-                ),
-                key=lambda pair: pair[0],
-                reverse=True,
-            )
-            ranked_ids = [doc["id"] for _score, doc in scored]
-            target_rank = ranked_ids.index(case["target"]) + 1
-            selected = scored[:top_k]
-            context = "\n\n".join(
-                f"[{doc['id']}] {doc['text']}" for _score, doc in selected
-            )
-            prompt = (
-                "Answer only from the retrieved office-document context below. "
-                "When versions conflict, follow the date/place/version requested by the question. "
-                "Do not substitute a similar invoice, office, or archived rule. "
-                "Cite the supporting source id in square brackets.\n\n"
-                f"{context}\n\nQuestion: {case['question']}"
-            )
-            num_predict = int(case.get("num_predict", default_num_predict))
-            sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
-            start = time.monotonic()
-            request = {
-                "model": answer_model,
-                "messages": [{"role": "user", "content": prompt}],
-                "stream": False,
-                "keep_alive": KEEP_ALIVE,
-                "options": {"num_predict": num_predict},
-            }
-            if think_policy != "auto":
-                request["think"] = think_policy == "true"
-            try:
-                response = answer_client.json_request("/api/chat", request)
-            finally:
-                wall = time.monotonic() - start
-                telemetry = sampler.stop()
-            message = (
-                response.get("message")
-                if isinstance(response.get("message"), dict)
-                else {}
-            )
-            content = str(message.get("content") or "")
-            thinking = str(message.get("thinking") or "")
-            retrieval_ok, answer_ok, source_cited, problems = rag_case_checks(
-                content, case, target_rank=target_rank, top_k=top_k
-            )
-            ok = retrieval_ok and answer_ok and source_cited
-            done_reason = str(response.get("done_reason") or "")
-            thinking_exhausted = (
-                not content.strip() and bool(thinking.strip()) and done_reason == "length"
-            )
-            failure_kinds: list[str] = []
-            if not retrieval_ok:
-                failure_kinds.append("retrieval")
-            if not answer_ok:
-                failure_kinds.append("answer")
-            if not source_cited:
-                failure_kinds.append("citation")
-            diagnostics: list[str] = []
-            if thinking_exhausted:
-                diagnostics.extend(["thinking-budget", "output-budget"])
-            elif done_reason == "length":
-                diagnostics.append("output-budget")
-            passed += int(ok)
-            row = {
-                "timestamp": iso_now(),
-                "case_id": case["id"],
-                "embed_model": embed_model,
-                "answer_model": answer_model,
-                "embedding_scheme": scheme,
-                "target_rank": target_rank,
-                "retrieval_ok": int(retrieval_ok),
-                "answer_ok": int(answer_ok),
-                "source_cited": int(source_cited),
-                "passed": int(ok),
-                "failure_kinds": ";".join(failure_kinds),
-                "num_predict": num_predict,
-                "think_policy": think_policy,
-                "answer_chars": len(content),
-                "thinking_chars": len(thinking),
-                "done_reason": done_reason,
-                "wall_s": f"{wall:.3f}",
-                "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
-                "temp_max_c": telemetry.get("temp_max_c"),
-                "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
-                "swap_peak_delta_mib": telemetry.get("swap_peak_delta_mib"),
-            }
-            writer.writerow(row)
-            handle.flush()
-            append_result(
-                jsonl_path,
-                result_record(
-                    category="rag-quality",
-                    model=answer_model,
-                    case_id=case["id"],
-                    result_type="qualification",
-                    outcome="pass" if ok else "quality-fail",
-                    failure_kinds=failure_kinds,
-                    diagnostics=diagnostics,
-                    checks={
-                        "retrieval": retrieval_ok,
-                        "answer": answer_ok,
-                        "citation": source_cited,
-                    },
-                    metrics={
-                        "target_rank": target_rank,
-                        "num_predict": num_predict,
-                        "answer_chars": len(content),
-                        "thinking_chars": len(thinking),
-                        "wall_s": wall,
-                        "load_s": ns_to_s(response.get("load_duration")),
-                        "mem_available_min_mib": telemetry.get(
-                            "mem_available_min_mib"
-                        ),
-                        "swap_peak_delta_mib": telemetry.get(
-                            "swap_peak_delta_mib"
-                        ),
-                        "temp_max_c": telemetry.get("temp_max_c"),
-                    },
-                    timestamp=iso_now(),
-                    embed_model=embed_model,
-                    embedding_scheme=scheme,
-                    think_policy=think_policy,
-                    question=case["question"],
-                    target=case["target"],
-                    top=[(round(score, 6), doc["id"]) for score, doc in selected],
-                    response=content,
-                    thinking=thinking,
-                    problems=problems,
-                    done_reason=done_reason,
-                    telemetry=telemetry,
-                ),
-            )
-            print(
-                f"  {case['id']}: rank={target_rank} retrieval={retrieval_ok} "
-                f"answer={answer_ok} cited={source_cited} pass={ok} "
-                f"failures={','.join(failure_kinds) or 'none'} think={think_policy}"
-            )
+    initial_answer_residency = answer_client.snapshot_residency()
+    initial_embed_residency = embed_client.snapshot_residency()
+    paths = None
     try:
+        embed_client.ensure_unloaded(embed_model)
         answer_client.ensure_unloaded(answer_model)
-    except BenchmarkError as exc:
-        print(f"WARNING: {exc}", file=sys.stderr)
-    _summary_json, summary_txt = write_result_summary(
-        jsonl_path, category="rag-quality"
-    )
-    print(f"\nRAG quality acceptance: {passed}/{len(cases)} passed")
-    print_result_paths(paths, summary_txt)
-    return 0 if passed == len(cases) else 3
+        doc_vectors = embed(
+            embed_client, embed_model, [doc_prefix + item["text"] for item in documents]
+        ).get("embeddings", [])
+        query_vectors = embed(
+            embed_client, embed_model, [query_prefix + item["question"] for item in cases]
+        ).get("embeddings", [])
+        if len(doc_vectors) != len(documents) or len(query_vectors) != len(cases):
+            raise BenchmarkError("RAG-quality embedding count does not match fixture")
+        embed_client.ensure_unloaded(embed_model)
+
+        paths = prepare_result_dir(
+            "rag-quality", args.output_dir, expected_case_ids=case_ids
+        )
+        csv_path, jsonl_path, meta_path = paths.csv_export, paths.results_jsonl, paths.meta_json
+        copy_fixtures(paths, fixture, corpus_path)
+        write_meta(
+            meta_path, answer_client, "rag-quality", [answer_model], fixture,
+            options={
+                "embedding_ollama_url": embed_url,
+                "rag_quality_top_k": top_k,
+                "rag_quality_num_predict_default": default_num_predict,
+                "rag_quality_think_policy": think_policy,
+            },
+        )
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        embed_version = embed_client.version()
+        meta.setdefault("runtimes", []).append({
+            "kind": "ollama",
+            "url": embed_client.base_url,
+            "version": embed_version,
+            "package_standard_version": STANDARD_OLLAMA_VERSION,
+        })
+        meta.setdefault("models", []).append(model_meta(embed_client, embed_model))
+        meta["fixtures"] = fixture_metadata(fixture, corpus_path)
+        write_benchmark_metadata(meta_path, meta)
+        fields = [
+            "timestamp", "case_id", "embed_model", "answer_model", "embedding_scheme",
+            "target_rank", "retrieval_ok", "target_retrieval_ok",
+            "all_required_support_retrieval_ok", "fact_ok", "answer_ok",
+            "language_status", "language_ok", "language_not_measurable",
+            "citation_ok", "source_cited", "abstention_ok", "overall_ok", "passed",
+            "failure_kinds", "num_predict", "think_policy", "answer_chars", "thinking_chars", "done_reason",
+            "wall_s", "load_s", "temp_max_c",
+            "mem_available_start_mib", "mem_available_min_mib", "mem_available_end_mib",
+            "swap_used_start_mib", "swap_used_max_mib", "swap_used_end_mib",
+            "swap_peak_delta_mib",
+        ]
+        passed = 0
+        with csv_path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            for case, query_vector in zip(cases, query_vectors):
+                scored = sorted(
+                    (
+                        (cosine(query_vector, doc_vector), doc)
+                        for doc, doc_vector in zip(documents, doc_vectors)
+                    ),
+                    key=lambda pair: pair[0],
+                    reverse=True,
+                )
+                ranked_ids = [doc["id"] for _score, doc in scored]
+                target = case.get("target")
+                if target is None:
+                    if not case.get("abstention"):
+                        raise BenchmarkError(
+                            f"RAG case {case['id']} has no target and is not an abstention case"
+                        )
+                    target_rank = None
+                else:
+                    try:
+                        target_rank = ranked_ids.index(str(target)) + 1
+                    except ValueError as exc:
+                        raise BenchmarkError(
+                            f"RAG case {case['id']} target is absent from corpus: {target}"
+                        ) from exc
+                selected = scored[:top_k]
+                context = "\n\n".join(
+                    f"[{doc['id']}] {doc['text']}" for _score, doc in selected
+                )
+                prompt = (
+                    "Answer only from the retrieved office-document context below. "
+                    "When versions conflict, follow the date/place/version requested by the question. "
+                    "Do not substitute a similar invoice, office, or archived rule. "
+                    "If the context supports the answer, cite the supporting source id in square brackets. "
+                    "If the requested fact is absent, state that clearly and do not invent a citation.\n\n"
+                    f"{context}\n\nQuestion: {case['question']}"
+                )
+                num_predict = int(case.get("num_predict", default_num_predict))
+                sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
+                start = time.monotonic()
+                request = {
+                    "model": answer_model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": False,
+                    "keep_alive": KEEP_ALIVE,
+                    "options": {"num_predict": num_predict},
+                }
+                if think_policy != "auto":
+                    request["think"] = think_policy == "true"
+                try:
+                    response = answer_client.json_request("/api/chat", request)
+                finally:
+                    wall = time.monotonic() - start
+                    telemetry = sampler.stop()
+                message = (
+                    response.get("message")
+                    if isinstance(response.get("message"), dict)
+                    else {}
+                )
+                content = str(message.get("content") or "")
+                thinking = str(message.get("thinking") or "")
+                evaluation = rag_case_evaluation(
+                    content, case, ranked_ids=ranked_ids, top_k=top_k
+                )
+                retrieval_ok = evaluation["retrieval_ok"]
+                fact_ok = evaluation["fact_ok"]
+                abstention_ok = evaluation["abstention_ok"]
+                answer_ok = abstention_ok if case.get("abstention") else fact_ok
+                language_ok = bool(evaluation["language_ok"])
+                citation_ok = evaluation["citation_ok"]
+                source_cited = citation_ok
+                problems = list(evaluation["problems"])
+                ok = bool(evaluation["overall_ok"])
+                done_reason = str(response.get("done_reason") or "")
+                thinking_exhausted = (
+                    not content.strip() and bool(thinking.strip()) and done_reason == "length"
+                )
+                failure_kinds: list[str] = []
+                if retrieval_ok is False:
+                    failure_kinds.append("retrieval")
+                if case.get("abstention"):
+                    if abstention_ok is False:
+                        failure_kinds.append("abstention")
+                elif fact_ok is False:
+                    failure_kinds.append("fact")
+                if not language_ok:
+                    failure_kinds.append("language")
+                if citation_ok is False:
+                    failure_kinds.append("citation")
+                diagnostics: list[str] = []
+                if thinking_exhausted:
+                    diagnostics.extend(["thinking-budget", "output-budget"])
+                elif done_reason == "length":
+                    diagnostics.append("output-budget")
+                passed += int(ok)
+                row = {
+                    "timestamp": iso_now(),
+                    "case_id": case["id"],
+                    "embed_model": embed_model,
+                    "answer_model": answer_model,
+                    "embedding_scheme": scheme,
+                    "target_rank": "" if target_rank is None else target_rank,
+                    "retrieval_ok": "" if retrieval_ok is None else int(retrieval_ok),
+                    "target_retrieval_ok": (
+                        ""
+                        if evaluation["target_retrieval_ok"] is None
+                        else int(evaluation["target_retrieval_ok"])
+                    ),
+                    "all_required_support_retrieval_ok": (
+                        ""
+                        if evaluation["all_required_support_retrieval_ok"] is None
+                        else int(evaluation["all_required_support_retrieval_ok"])
+                    ),
+                    "fact_ok": "" if fact_ok is None else int(fact_ok),
+                    "answer_ok": int(bool(answer_ok)),
+                    "language_status": evaluation["language_status"],
+                    "language_ok": int(language_ok),
+                    "language_not_measurable": int(
+                        evaluation["language_not_measurable"]
+                    ),
+                    "citation_ok": "" if evaluation["citation_ok"] is None else int(citation_ok),
+                    "source_cited": "" if evaluation["citation_ok"] is None else int(source_cited),
+                    "abstention_ok": "" if abstention_ok is None else int(abstention_ok),
+                    "overall_ok": int(ok),
+                    "passed": int(ok),
+                    "failure_kinds": ";".join(failure_kinds),
+                    "num_predict": num_predict,
+                    "think_policy": think_policy,
+                    "answer_chars": len(content),
+                    "thinking_chars": len(thinking),
+                    "done_reason": done_reason,
+                    "wall_s": f"{wall:.3f}",
+                    "load_s": f"{ns_to_s(response.get('load_duration')):.3f}",
+                    "temp_max_c": telemetry.get("temp_max_c"),
+                    "mem_available_start_mib": telemetry.get("mem_available_start_mib"),
+                    "mem_available_min_mib": telemetry.get("mem_available_min_mib"),
+                    "mem_available_end_mib": telemetry.get("mem_available_end_mib"),
+                    "swap_used_start_mib": telemetry.get("swap_used_start_mib"),
+                    "swap_used_max_mib": telemetry.get("swap_used_max_mib"),
+                    "swap_used_end_mib": telemetry.get("swap_used_end_mib"),
+                    "swap_peak_delta_mib": telemetry.get("swap_peak_delta_mib"),
+                }
+                writer.writerow(row)
+                handle.flush()
+                append_result(
+                    jsonl_path,
+                    result_record(
+                        category="rag-quality",
+                        model=answer_model,
+                        case_id=case["id"],
+                        result_type="qualification",
+                        outcome="pass" if ok else "quality-fail",
+                        failure_kinds=failure_kinds,
+                        diagnostics=diagnostics,
+                        checks={
+                            "retrieval": retrieval_ok,
+                            "target_retrieval": evaluation["target_retrieval_ok"],
+                            "all_required_support_retrieval": evaluation[
+                                "all_required_support_retrieval_ok"
+                            ],
+                            "fact": fact_ok,
+                            "language": language_ok,
+                            "language_not_measurable": evaluation[
+                                "language_not_measurable"
+                            ],
+                            "citation": citation_ok,
+                            "abstention": abstention_ok,
+                            "overall": ok,
+                        },
+                        metrics={
+                            "target_rank": target_rank,
+                            "num_predict": num_predict,
+                            "answer_chars": len(content),
+                            "thinking_chars": len(thinking),
+                            "wall_s": wall,
+                            "load_s": ns_to_s(response.get("load_duration")),
+                            "mem_available_start_mib": telemetry.get(
+                                "mem_available_start_mib"
+                            ),
+                            "mem_available_min_mib": telemetry.get(
+                                "mem_available_min_mib"
+                            ),
+                            "mem_available_end_mib": telemetry.get(
+                                "mem_available_end_mib"
+                            ),
+                            "mem_available_end_delta_mib": telemetry.get(
+                                "mem_available_end_delta_mib"
+                            ),
+                            "swap_used_start_mib": telemetry.get(
+                                "swap_used_start_mib"
+                            ),
+                            "swap_used_max_mib": telemetry.get(
+                                "swap_used_max_mib"
+                            ),
+                            "swap_used_end_mib": telemetry.get(
+                                "swap_used_end_mib"
+                            ),
+                            "swap_peak_delta_mib": telemetry.get(
+                                "swap_peak_delta_mib"
+                            ),
+                            "temp_max_c": telemetry.get("temp_max_c"),
+                        },
+                        timestamp=iso_now(),
+                        embed_model=embed_model,
+                        embedding_scheme=scheme,
+                        think_policy=think_policy,
+                        question=case["question"],
+                        target=case.get("target"),
+                        top=[(round(score, 6), doc["id"]) for score, doc in selected],
+                        response=content,
+                        thinking=thinking,
+                        problems=problems,
+                        done_reason=done_reason,
+                        telemetry=telemetry,
+                    ),
+                )
+                print(
+                    f"  {case['id']}: rank={target_rank if target_rank is not None else 'n/a'} "
+                    f"retrieval={retrieval_ok} "
+                    f"fact={fact_ok} language={evaluation['language_status']}/{language_ok} "
+                    f"citation={citation_ok} abstention={abstention_ok} pass={ok} "
+                    f"failures={','.join(failure_kinds) or 'none'} think={think_policy}"
+                )
+        try:
+            answer_client.ensure_unloaded(answer_model)
+        except BenchmarkError as exc:
+            print(f"WARNING: {exc}", file=sys.stderr)
+        summary_json, summary_txt = write_result_summary(
+            jsonl_path, category="rag-quality", expected_case_ids=case_ids
+        )
+        summary = json.loads(summary_json.read_text(encoding="utf-8"))
+        print(f"\nRAG quality acceptance: {passed}/{len(cases)} passed")
+        print_result_paths(paths, summary_txt)
+        if summary.get("structure") == "fail":
+            return 2
+        return 0 if passed == len(cases) else 3
+    finally:
+        restoration_errors: list[str] = []
+        restored_answer: list[str] | None = None
+        restored_embed: list[str] | None = None
+        try:
+            restored_answer = answer_client.restore_residency(initial_answer_residency)
+        except BenchmarkError as exc:
+            restoration_errors.append(f"main Ollama: {exc}")
+        if embed_client.base_url == answer_client.base_url:
+            restored_embed = restored_answer
+        else:
+            try:
+                restored_embed = embed_client.restore_residency(initial_embed_residency)
+            except BenchmarkError as exc:
+                restoration_errors.append(f"embedding Ollama: {exc}")
+        if paths is not None and paths.meta_json.exists():
+            meta = json.loads(paths.meta_json.read_text(encoding="utf-8"))
+            meta["residency"] = {
+                "main_initial": list(initial_answer_residency),
+                "main_restored": restored_answer,
+                "embedding_initial": list(initial_embed_residency),
+                "embedding_restored": restored_embed,
+                "restore_ok": not restoration_errors,
+                "restore_errors": restoration_errors,
+            }
+            write_benchmark_metadata(paths.meta_json, meta)
+        if restoration_errors:
+            raise BenchmarkError(
+                "RAG-quality residency restoration failed: "
+                + "; ".join(restoration_errors)
+            )
 
 
 def fmt(value: Any, suffix: str) -> str:

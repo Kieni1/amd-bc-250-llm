@@ -171,6 +171,8 @@ bc250-benchmark rag-quality --think true
 bc250-benchmark rag-quality --think false
 bc250-benchmark generation --profile compare \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+bc250-benchmark owui-rag OWUI_RAG_MODEL \
+  --token-file /root/owui-test.key
 sudo bc250-benchmark owui-embedding-batch --token-file /root/owui-test.key
 sudo bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /root/owui-test.key
 sudo bc250-benchmark owui-system-context OWUI_RAG_MODEL \
@@ -181,6 +183,47 @@ The Open WebUI tuning commands are explicit experiments and restore the observed
 package-owned setting before returning. `owui-system-context` performs the repeated
 multi-turn comparison through Open WebUI because standalone Ollama generation cannot
 reproduce Open WebUI's message placement.
+
+`owui-rag` is the non-tuning product-path qualification. Prefer an exact active Open WebUI
+preset such as `bc250-office-documents`. A raw Ollama base-model ID is also accepted when it
+maps to exactly one active preset; ambiguous or unknown mappings fail before temporary
+Knowledge/upload state is created. The benchmark keeps only a sanitized preset-to-base-model
+mapping in its metadata and waits for real Open WebUI HTTP readiness before beginning.
+
+`rag-quality` keeps retrieval, factual/abstention acceptance, output language and citation
+as separate checks. The evaluator uses boundary-aware deterministic matching rather than
+naïve substrings or an LLM judge; fixtures can enumerate semantic alternatives and numeric
+equivalence explicitly. Short numeric/identifier answers may be recorded as
+`language_not_measurable` without becoming a language failure. Its canonical summary also
+checks the exact expected case set so missing, duplicate or unexpected rows are structural
+failures rather than misleading quality results.
+
+### Current production RAG answer-model decision
+
+The completed 2026-09-19 BC-250 campaign keeps **Office – Documents**
+(`bc250-office-documents`) with `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` as the production
+document/RAG answer role for the current 16 GiB profile. This is primarily a sustained-residency
+resource decision, not an answer-quality rejection of Qwen 9B.
+
+| Evidence | Gemma E4B | Qwen 9B |
+|---|---:|---:|
+| Broad direct RAG effective overall | ~95/96 | ~93/96 |
+| Authenticated Open WebUI short-path turns | 36/36 pass | 36/36 pass |
+| Long-residency Open WebUI result | 42/42 pass | safety-aborted after a few subruns |
+| Long-residency minimum MemAvailable | ~2766 MiB | ~338 MiB |
+| End/near-abort MemAvailable | ~2770 MiB | ~426 MiB |
+| Max GPU temperature | 76 C | 76 C |
+
+Gemma's continuous arm completed 14 subruns / 42 turns without unload, with roughly 15 MiB swap
+growth and no safety or residency failure. Qwen produced correct answers/citations before abort but
+reproduced the earlier sustained-memory-pressure behavior on the actual Open WebUI product path.
+The Qwen preset remains useful for its separate higher-quality general-office role; it should not
+silently replace Gemma as the long-lived document/RAG default on this memory profile.
+
+The long-residency campaign used a 512 MiB MemAvailable safety-abort threshold. That experiment
+threshold is not the same as the whole-appliance revalidation hard floor. Historical raw scorer
+counts from the broad campaign also contained known evaluator false negatives; the effective values
+above reflect manual adjudication and must not be hard-coded into fixtures as expected scores.
 
 ## 4. Authoritative document tree and language policy
 

@@ -227,13 +227,25 @@ class BenchmarkPaths:
 
 _ACTIVE_BENCHMARK_PATHS: BenchmarkPaths | None = None
 _ACTIVE_BENCHMARK_CATEGORY = ""
+_ACTIVE_EXPECTED_CASE_IDS: tuple[str, ...] | None = None
 
 
-def prepare_result_dir(category: str, output_dir: str | Path | None = None) -> BenchmarkPaths:
+def prepare_result_dir(
+    category: str,
+    output_dir: str | Path | None = None,
+    *,
+    expected_case_ids: Iterable[str] | None = None,
+) -> BenchmarkPaths:
     """Create one isolated result directory for a benchmark invocation."""
-    global _ACTIVE_BENCHMARK_PATHS, _ACTIVE_BENCHMARK_CATEGORY
+    global _ACTIVE_BENCHMARK_PATHS, _ACTIVE_BENCHMARK_CATEGORY, _ACTIVE_EXPECTED_CASE_IDS
     _ACTIVE_BENCHMARK_PATHS = None
     _ACTIVE_BENCHMARK_CATEGORY = ""
+    _ACTIVE_EXPECTED_CASE_IDS = None
+    if expected_case_ids is not None:
+        expected = tuple(str(case_id) for case_id in expected_case_ids)
+        if not all(expected) or len(set(expected)) != len(expected):
+            raise BenchmarkError("expected_case_ids must be non-empty and unique")
+        _ACTIVE_EXPECTED_CASE_IDS = expected
     if output_dir is None:
         stamp = datetime.now().astimezone().strftime("%Y%m%d_%H%M%S_%f")
         root = Path("bc250-results") / f"{stamp}-{category}"
@@ -352,6 +364,10 @@ def chronological_resource_aggregate(
     def values(key: str) -> list[float]:
         return [value for row in rows if (value := metric(row, key)) is not None]
 
+    mem_starts = values("mem_available_start_mib")
+    mem_ends = values("mem_available_end_mib")
+    mem_start = mem_starts[0] if mem_starts else None
+    mem_end = mem_ends[-1] if mem_ends else None
     starts = values("swap_used_start_mib")
     peaks = values("swap_used_max_mib")
     ends = values("swap_used_end_mib")
@@ -366,7 +382,14 @@ def chronological_resource_aggregate(
     return {
         "temp_max_c": max(values("temp_max_c"), default=None),
         "temp_p95_max_case_c": max(values("temp_p95_c"), default=None),
+        "mem_available_start_mib": mem_start,
         "mem_available_min_mib": min(values("mem_available_min_mib"), default=None),
+        "mem_available_end_mib": mem_end,
+        "mem_available_end_delta_mib": (
+            mem_end - mem_start
+            if mem_start is not None and mem_end is not None
+            else None
+        ),
         "swap_used_start_mib": swap_start,
         "swap_used_max_mib": swap_peak,
         "swap_used_end_mib": swap_end,
@@ -481,13 +504,31 @@ def category_aggregates(records: list[dict[str, Any]], category: str) -> dict[st
                     model_failures[str(name)] = model_failures.get(str(name), 0) + 1
                 for name in row.get("diagnostics", []):
                     model_diagnostics[str(name)] = model_diagnostics.get(str(name), 0) + 1
-            models[model] = {
+            model_summary = {
                 "passed": sum(row.get("outcome") == "pass" for row in quals),
                 "quality_failed": sum(row.get("outcome") == "quality-fail" for row in quals),
                 "total": len(quals),
                 "failure_kinds": dict(sorted(model_failures.items())),
                 "diagnostics": dict(sorted(model_diagnostics.items())),
             }
+            if category == "rag-quality":
+                resources = chronological_resource_aggregate(
+                    quals, nested_metrics=True
+                )
+                model_summary["resource_session"] = {
+                    "mem_available_start_mib": resources["mem_available_start_mib"],
+                    "mem_available_min_mib": resources["mem_available_min_mib"],
+                    "mem_available_end_mib": resources["mem_available_end_mib"],
+                    "mem_available_end_delta_mib": resources[
+                        "mem_available_end_delta_mib"
+                    ],
+                    "swap_used_start_mib": resources["swap_used_start_mib"],
+                    "swap_used_max_mib": resources["swap_used_max_mib"],
+                    "swap_used_end_mib": resources["swap_used_end_mib"],
+                    "swap_peak_delta_mib": resources["swap_peak_delta_mib"],
+                    "temp_max_c": resources["temp_max_c"],
+                }
+            models[model] = model_summary
         aggregates["models"] = models
     elif category in {"rag-cycle", "concurrency"}:
         if records:
@@ -577,8 +618,18 @@ def aggregate_summary_lines(category: str, aggregates: dict[str, Any]) -> list[s
     return lines
 
 
-def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path]:
-    """Write machine/human summaries beside a canonical JSONL case stream."""
+def write_result_summary(
+    jsonl_path: Path,
+    *,
+    category: str,
+    expected_case_ids: Iterable[str] | None = None,
+) -> tuple[Path, Path]:
+    """Write machine/human summaries beside a canonical JSONL case stream.
+
+    When ``expected_case_ids`` is supplied, structural completeness is evaluated
+    independently from quality and infrastructure.  A complete qualification
+    requires each expected case exactly once and no unexpected case IDs.
+    """
     records: list[dict[str, Any]] = []
     if jsonl_path.exists():
         for line_no, line in enumerate(
@@ -624,6 +675,31 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
                         f"{jsonl_path}:{line_no}: {key} must be an object"
                     )
             records.append(row)
+    structure: str | None = None
+    completeness: dict[str, Any] | None = None
+    if expected_case_ids is not None:
+        expected = [str(case_id) for case_id in expected_case_ids]
+        if not all(expected) or len(set(expected)) != len(expected):
+            raise BenchmarkError("expected_case_ids must be non-empty and unique")
+        expected_set = set(expected)
+        observed_counts: dict[str, int] = {}
+        for row in records:
+            case_id = str(row["case_id"])
+            observed_counts[case_id] = observed_counts.get(case_id, 0) + 1
+        missing = [case_id for case_id in expected if observed_counts.get(case_id, 0) == 0]
+        unexpected = sorted(case_id for case_id in observed_counts if case_id not in expected_set)
+        duplicates = sorted(
+            case_id for case_id, count in observed_counts.items()
+            if case_id in expected_set and count > 1
+        )
+        structure = "pass" if not (missing or unexpected or duplicates) else "fail"
+        completeness = {
+            "expected_case_ids": expected,
+            "missing_case_ids": missing,
+            "unexpected_case_ids": unexpected,
+            "duplicate_case_ids": duplicates,
+        }
+
     counts = {name: 0 for name in ("pass", "quality-fail", "infra-fail", "skipped")}
     type_counts = {name: 0 for name in ("measurement", "qualification")}
     qualification_counts = {name: 0 for name in ("pass", "quality-fail", "skipped")}
@@ -683,6 +759,10 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
         "diagnostics": dict(sorted(diagnostics.items())),
         "aggregates": aggregates,
     }
+    if structure is not None:
+        summary["structure"] = structure
+        summary["completeness"] = completeness
+
     if jsonl_path.name == "results.jsonl":
         summary_json = jsonl_path.parent / "summary.json"
         summary_txt = jsonl_path.parent / "summary.txt"
@@ -697,6 +777,10 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
         f"BC-250 benchmark summary: {category}",
         "",
         f"Cases          {len(records)}",
+    ]
+    if structure is not None:
+        lines.append(f"Structure      {structure.upper()}")
+    lines += [
         f"Infrastructure {infrastructure.upper()}",
         f"Quality        {quality.upper()}",
         f"Pass           {counts['pass']}",
@@ -707,6 +791,16 @@ def write_result_summary(jsonl_path: Path, *, category: str) -> tuple[Path, Path
         f"Qual skipped   {qualification_counts['skipped']}",
         f"Infra-fail     {counts['infra-fail']}",
     ]
+    if structure == "fail" and completeness is not None:
+        lines += ["", "Structural completeness"]
+        for key, label in (
+            ("missing_case_ids", "missing"),
+            ("unexpected_case_ids", "unexpected"),
+            ("duplicate_case_ids", "duplicate"),
+        ):
+            values = completeness[key]
+            if values:
+                lines.append(f"  {label:<20} {', '.join(values)}")
     if failures:
         lines += ["", "Failure kinds"] + [
             f"  {name:<20} {count}" for name, count in sorted(failures.items())
@@ -781,7 +875,11 @@ def finalize_active_infrastructure_failure(
         ),
     )
     finalize_benchmark_metadata(paths.meta_json)
-    write_result_summary(paths.results_jsonl, category=category)
+    write_result_summary(
+        paths.results_jsonl,
+        category=category,
+        expected_case_ids=_ACTIVE_EXPECTED_CASE_IDS,
+    )
     return True
 
 
@@ -887,6 +985,76 @@ class OllamaClient:
     def ps(self) -> list[dict[str, Any]]:
         return list(self.json_request("/api/ps").get("models", []))
 
+    @staticmethod
+    def _normalized_model_name(value: Any) -> str:
+        return str(value or "").removesuffix(":latest")
+
+    def resident_models(self) -> list[str]:
+        """Return the normalized models currently reported by /api/ps."""
+        models = {
+            self._normalized_model_name(row.get("name") or row.get("model"))
+            for row in self.ps()
+        }
+        return sorted(model for model in models if model)
+
+    def snapshot_residency(self) -> tuple[str, ...]:
+        """Capture the normalized residency set for later restoration."""
+        return tuple(self.resident_models())
+
+    def _request_model_load(self, model: str, *, keep_alive: str | None = None) -> None:
+        """Load a model, using the Ollama service keep-alive default unless overridden."""
+        generate_payload: dict[str, Any] = {
+            "model": model,
+            "prompt": "",
+            "stream": False,
+            "options": {"num_predict": 1},
+        }
+        if keep_alive is not None:
+            generate_payload["keep_alive"] = keep_alive
+        try:
+            self.json_request("/api/generate", generate_payload)
+            return
+        except BenchmarkError as generate_error:
+            embed_payload: dict[str, Any] = {
+                "model": model,
+                "input": [""],
+                "truncate": False,
+            }
+            if keep_alive is not None:
+                embed_payload["keep_alive"] = keep_alive
+            try:
+                self.json_request("/api/embed", embed_payload)
+                return
+            except BenchmarkError as embed_error:
+                raise BenchmarkError(
+                    f"could not restore model residency for {model}: "
+                    f"generate={generate_error}; embed={embed_error}"
+                ) from embed_error
+
+    def restore_residency(
+        self, snapshot: Iterable[str], *, timeout: float = 30.0
+    ) -> list[str]:
+        """Restore /api/ps to the captured model set and verify exact set equality."""
+        wanted = {self._normalized_model_name(model) for model in snapshot if model}
+        current = set(self.resident_models())
+        for model in sorted(current - wanted):
+            self.ensure_unloaded(model, timeout=timeout)
+
+        current = set(self.resident_models())
+        for model in sorted(wanted - current):
+            self._request_model_load(model)
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            current = set(self.resident_models())
+            if current == wanted:
+                return sorted(current)
+            time.sleep(0.25)
+        raise BenchmarkError(
+            "model residency restoration mismatch: "
+            f"expected={sorted(wanted)!r} actual={sorted(current)!r}"
+        )
+
     def stop(self, model: str) -> bool:
         """Request model unload, falling back to the Ollama 0.34.0 HTTP path."""
         env = os.environ.copy()
@@ -918,10 +1086,9 @@ class OllamaClient:
 
     def model_loaded(self, model: str) -> bool:
         """Return whether /api/ps currently reports this exact model."""
-        normalized = model.removesuffix(":latest")
+        normalized = self._normalized_model_name(model)
         return any(
-            str(row.get("name") or row.get("model") or "").removesuffix(":latest")
-            == normalized
+            self._normalized_model_name(row.get("name") or row.get("model")) == normalized
             for row in self.ps()
         )
 
@@ -952,25 +1119,21 @@ class OllamaClient:
             raise BenchmarkError(f"model remained loaded after {timeout:.0f}s: {model}")
 
     def digest(self, model: str) -> str:
-        normalized = model.removesuffix(":latest")
+        normalized = self._normalized_model_name(model)
         for row in self.tags():
-            name = str(row.get("name") or row.get("model") or "").removesuffix(
-                ":latest"
-            )
+            name = self._normalized_model_name(row.get("name") or row.get("model"))
             if name == normalized:
                 return str(row.get("digest") or "")
         return ""
 
     def runtime_state(self, model: str) -> dict[str, Any]:
-        normalized = model.removesuffix(":latest")
+        normalized = self._normalized_model_name(model)
         try:
             rows = self.ps()
         except BenchmarkError:
             rows = []
         for row in rows:
-            name = str(row.get("name") or row.get("model") or "").removesuffix(
-                ":latest"
-            )
+            name = self._normalized_model_name(row.get("name") or row.get("model"))
             if name == normalized:
                 return {
                     "resident_size_bytes": row.get("size"),
@@ -1234,7 +1397,10 @@ class TelemetrySampler:
             "gpu_clock_max_mhz": max(clocks) if clocks else None,
             "vram_used_max_bytes": max(vrams) if vrams else None,
             "gtt_used_max_bytes": max(gtts) if gtts else None,
+            "mem_available_start_mib": mems[0] if mems else None,
             "mem_available_min_mib": min(mems) if mems else None,
+            "mem_available_end_mib": mems[-1] if mems else None,
+            "mem_available_end_delta_mib": (mems[-1] - mems[0]) if mems else None,
             "swap_used_start_mib": swaps[0] if swaps else None,
             "swap_used_max_mib": max(swaps) if swaps else None,
             "swap_used_end_mib": swaps[-1] if swaps else None,
@@ -1257,7 +1423,10 @@ def empty_telemetry() -> dict[str, Any]:
         "gpu_clock_max_mhz": None,
         "vram_used_max_bytes": None,
         "gtt_used_max_bytes": None,
+        "mem_available_start_mib": None,
         "mem_available_min_mib": None,
+        "mem_available_end_mib": None,
+        "mem_available_end_delta_mib": None,
         "swap_used_start_mib": None,
         "swap_used_max_mib": None,
         "swap_used_end_mib": None,

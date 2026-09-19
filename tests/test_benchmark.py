@@ -764,6 +764,122 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertTrue(category._acceptance_ok("Documents vendredi AB-42", case)[0])
         self.assertFalse(category._acceptance_ok("AB-42 Unterlagen bis Freitag", case)[0])
 
+    def test_acceptance_matching_uses_token_boundaries_for_dates_numbers_ids_and_currency(self) -> None:
+        cases = [
+            ("19 November 2026", {"forbidden": ["9 November"]}, True),
+            ("17 March 2028", {"forbidden": ["7 March 2028"]}, True),
+            ("19 units", {"forbidden": ["9"]}, True),
+            ("Use XAB-42Z", {"required": ["AB-42"]}, False),
+            ("Total CHF 319.50", {"forbidden": ["CHF 19.50"]}, True),
+            ("Due 31 August 2026", {"forbidden": ["1 August 2026"]}, True),
+        ]
+        for text, case, expected in cases:
+            with self.subTest(text=text, case=case):
+                self.assertEqual(category._acceptance_ok(text, case)[0], expected)
+
+    def test_acceptance_supports_explicit_alternatives_and_numeric_values(self) -> None:
+        case = {
+            "required_any_groups": [
+                ["five business days", "five working days"],
+                ["Sicherheitsprüfung", "Sicherheitsüberprüfung"],
+            ],
+            "numeric_values": ["9"],
+        }
+        self.assertTrue(
+            category._acceptance_ok(
+                "The result is 9 after five working days; Sicherheitsüberprüfung complete.",
+                case,
+            )[0]
+        )
+        ok, problems = category._acceptance_ok(
+            "The result is 19 after five working days; Sicherheitsüberprüfung complete.",
+            case,
+        )
+        self.assertFalse(ok)
+        self.assertIn("missing numeric value 9", problems)
+
+    def test_rag_language_status_handles_match_other_and_not_measurable(self) -> None:
+        self.assertEqual(
+            category.rag_language_status(
+                "OPS-17 represents Site Reliability Engineering [ops-17].", "en"
+            ),
+            "match",
+        )
+        self.assertEqual(
+            category.rag_language_status("Die Frist beträgt drei Monate.", "de"),
+            "match",
+        )
+        self.assertEqual(
+            category.rag_language_status("Le délai est de six mois.", "fr"),
+            "match",
+        )
+        self.assertEqual(category.rag_language_status("9 [source-9]", "en"), "not-measurable")
+        self.assertEqual(
+            category.rag_language_status("Die Frist beträgt drei Monate.", "en"),
+            "other",
+        )
+
+    def test_rag_case_evaluation_keeps_dimensions_independent(self) -> None:
+        case = {
+            "id": "multi",
+            "target": "doc-a",
+            "required_sources": ["doc-a", "doc-b"],
+            "required": ["42"],
+            "language": "en",
+        }
+        evaluation = category.rag_case_evaluation(
+            "The answer is 42 [doc-a].",
+            case,
+            ranked_ids=["doc-a", "doc-b", "doc-c"],
+            top_k=2,
+        )
+        self.assertTrue(evaluation["retrieval_ok"])
+        self.assertTrue(evaluation["target_retrieval_ok"])
+        self.assertTrue(evaluation["all_required_support_retrieval_ok"])
+        self.assertTrue(evaluation["fact_ok"])
+        self.assertTrue(evaluation["language_ok"])
+        self.assertFalse(evaluation["citation_ok"])
+        self.assertFalse(evaluation["overall_ok"])
+        self.assertIn("missing source [doc-b]", evaluation["problems"])
+
+    def test_rag_abstention_is_reported_separately_from_fact(self) -> None:
+        case = {
+            "id": "absent",
+            "target": "doc-a",
+            "required_any": ["not stated", "not available"],
+            "abstention": True,
+            "language": "en",
+        }
+        evaluation = category.rag_case_evaluation(
+            "The requested value is not stated [doc-a].",
+            case,
+            ranked_ids=["doc-a"],
+            top_k=1,
+        )
+        self.assertIsNone(evaluation["fact_ok"])
+        self.assertTrue(evaluation["abstention_ok"])
+        self.assertTrue(evaluation["overall_ok"])
+
+    def test_rag_true_abstention_can_omit_target_and_citation(self) -> None:
+        case = {
+            "id": "absent-no-target",
+            "required_any": ["not stated", "not available"],
+            "abstention": True,
+            "language": "en",
+        }
+        evaluation = category.rag_case_evaluation(
+            "The requested value is not stated.",
+            case,
+            ranked_ids=["doc-a", "doc-b"],
+            top_k=2,
+        )
+        self.assertIsNone(evaluation["target_retrieval_ok"])
+        self.assertIsNone(evaluation["all_required_support_retrieval_ok"])
+        self.assertIsNone(evaluation["retrieval_ok"])
+        self.assertIsNone(evaluation["citation_ok"])
+        self.assertTrue(evaluation["abstention_ok"])
+        self.assertTrue(evaluation["overall_ok"])
+
     def test_rag_public_cloud_accepts_equivalent_prohibition_not_permission(self) -> None:
         fixture = json.loads(
             (ROOT / "examples/benchmark/rag-quality-office.json").read_text(
@@ -1365,6 +1481,45 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             client.ensure_unloaded("model", timeout=0.01)
             stop.assert_not_called()
 
+    def test_residency_snapshot_and_restore_are_exact(self) -> None:
+        client = common.OllamaClient("http://127.0.0.1:11434")
+        states = iter([
+            [{"name": "keep:latest"}, {"name": "extra"}],
+            [{"name": "keep:latest"}],
+            [{"name": "keep:latest"}, {"name": "missing"}],
+        ])
+        with (
+            patch.object(client, "ps", side_effect=lambda: next(states)),
+            patch.object(client, "ensure_unloaded") as unload,
+            patch.object(client, "_request_model_load") as load,
+        ):
+            restored = client.restore_residency(("keep", "missing"), timeout=0.01)
+        unload.assert_called_once_with("extra", timeout=0.01)
+        load.assert_called_once_with("missing")
+        self.assertEqual(restored, ["keep", "missing"])
+
+    def test_model_load_uses_service_keep_alive_default_and_embedding_fallback(self) -> None:
+        client = common.OllamaClient("http://127.0.0.1:11437")
+        calls: list[tuple[str, dict[str, object]]] = []
+
+        def request(path: str, payload: dict[str, object]) -> dict[str, object]:
+            calls.append((path, payload))
+            if path == "/api/generate":
+                raise common.BenchmarkError("embedding-only")
+            return {"embeddings": [[0.0]]}
+
+        with patch.object(client, "json_request", side_effect=request):
+            client._request_model_load("embed-model")
+        self.assertEqual([path for path, _ in calls], ["/api/generate", "/api/embed"])
+        self.assertTrue(all("keep_alive" not in payload for _, payload in calls))
+
+    def test_model_load_allows_explicit_keep_alive_override(self) -> None:
+        client = common.OllamaClient("http://127.0.0.1:11434")
+        with patch.object(client, "json_request", return_value={}) as request:
+            client._request_model_load("model", keep_alive="5m")
+        payload = request.call_args.args[1]
+        self.assertEqual(payload["keep_alive"], "5m")
+
 
 class TelemetryTests(unittest.TestCase):
     def test_revalidation_context_diagnostic_is_concise_and_policy_explicit(self) -> None:
@@ -1372,6 +1527,25 @@ class TelemetryTests(unittest.TestCase):
         self.assertIn('"previous_prompt_eval_count": previous_prompt_eval_count', source)
         self.assertIn("context truncation observed:", source)
         self.assertIn("prompt tokens; policy=PASS (not severe)", source)
+
+    def test_revalidation_surfaces_tight_resource_headroom_without_weakening_floor(self) -> None:
+        source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("readonly EDGE_MIN_MEM_AVAILABLE_MIB=128", source)
+        self.assertIn("readonly EDGE_TIGHT_MEM_AVAILABLE_MIB=512", source)
+        self.assertIn('"kind": "resource-headroom"', source)
+        self.assertIn("resource headroom tight: MemAvailable minimum", source)
+        self.assertIn("hard floor ${hard} MiB); policy=PASS", source)
+
+    def test_revalidation_surfaces_passed_output_budget_diagnostics(self) -> None:
+        source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("record_quality_diagnostics()", source)
+        self.assertIn('index("output-budget")', source)
+        self.assertIn("output reached generation budget", source)
+        self.assertIn("acceptance=PASS", source)
+        self.assertIn(
+            'record_quality_diagnostics "$RAW/roles/production-usecase/results/results.jsonl" production-usecase',
+            source,
+        )
 
     def test_percentile_interpolates_and_empty_summary_is_safe(self) -> None:
         self.assertEqual(common.percentile([1.0], 95), 1.0)
@@ -1459,6 +1633,73 @@ class TelemetryTests(unittest.TestCase):
             paths.results_jsonl.write_text("{}\n", encoding="utf-8")
             with self.assertRaises(common.BenchmarkError):
                 common.prepare_result_dir("task", root)
+
+    def test_common_result_summary_reports_structural_completeness_independently(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            rows = [
+                common.result_record(
+                    category="rag-quality", model="m", case_id="a",
+                    result_type="qualification", outcome="pass",
+                ),
+                common.result_record(
+                    category="rag-quality", model="m", case_id="a",
+                    result_type="qualification", outcome="pass",
+                ),
+                common.result_record(
+                    category="rag-quality", model="m", case_id="extra",
+                    result_type="qualification", outcome="quality-fail",
+                    failure_kinds=["fact"],
+                ),
+            ]
+            path.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            summary_json, summary_txt = common.write_result_summary(
+                path, category="rag-quality", expected_case_ids=["a", "b"]
+            )
+            summary = json.loads(summary_json.read_text(encoding="utf-8"))
+            self.assertEqual(summary["structure"], "fail")
+            self.assertEqual(summary["quality"], "mixed")
+            self.assertEqual(summary["infrastructure"], "pass")
+            self.assertEqual(summary["completeness"]["missing_case_ids"], ["b"])
+            self.assertEqual(summary["completeness"]["unexpected_case_ids"], ["extra"])
+            self.assertEqual(summary["completeness"]["duplicate_case_ids"], ["a"])
+            text = summary_txt.read_text(encoding="utf-8")
+            self.assertIn("Structure      FAIL", text)
+            self.assertIn("missing              b", text)
+            self.assertIn("unexpected           extra", text)
+            self.assertIn("duplicate            a", text)
+
+    def test_infrastructure_finalizer_preserves_expected_case_completeness(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            paths = common.prepare_result_dir(
+                "rag-quality",
+                Path(temporary) / "results",
+                expected_case_ids=["a", "b"],
+            )
+            common.append_result(
+                paths.results_jsonl,
+                common.result_record(
+                    category="rag-quality", model="m", case_id="a",
+                    result_type="qualification", outcome="pass",
+                ),
+            )
+            self.assertTrue(
+                common.finalize_active_infrastructure_failure(
+                    common.BenchmarkError("forced failure")
+                )
+            )
+            summary = json.loads(paths.summary_json.read_text(encoding="utf-8"))
+            self.assertEqual(summary["structure"], "fail")
+            self.assertEqual(summary["infrastructure"], "fail")
+            self.assertEqual(summary["quality"], "pass")
+            self.assertEqual(summary["completeness"]["missing_case_ids"], ["b"])
+            self.assertEqual(
+                summary["completeness"]["unexpected_case_ids"],
+                ["benchmark-infrastructure-failure"],
+            )
 
     def test_common_result_summary_rejects_corrupt_canonical_records(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2208,6 +2449,45 @@ phase_roles
                 result = json.loads((t / f"{name}.out.json").read_text(encoding="utf-8"))
                 self.assertFalse(result["passed"], name)
 
+    def test_edge_tight_memory_headroom_is_diagnostic_not_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": 8192,
+                "prod-qwen35-9b-unsloth-q6-k": 32768,
+                "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
+            }
+            rows = []
+            for model, context in specs.items():
+                rows.append({
+                    "category": "generation", "model": model, "case_id": "short-1",
+                    "result_type": "measurement", "outcome": "pass", "diagnostics": [],
+                    "metrics": {
+                        "tokens_per_second": 100.0, "allocated_context": context,
+                        "resident_size_bytes": 1000, "resident_vram_bytes": 1000,
+                        "mem_available_min_mib": 193 if "gpt-oss" in model else 1024,
+                        "temp_max_c": 70, "prompt_eval_count": 5000,
+                    },
+                })
+            path = t / "tight-memory.jsonl"
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            script = (
+                f'source "{source}" help >/dev/null\n'
+                f'write_edge_policy "{t / "policy.json"}"\n'
+                f'check_edge_generation_sanity "{path}" "{t / "policy.json"}" "{t / "out.json"}"\n'
+            )
+            subprocess.run(["bash", "-c", script], check=True)
+            result = json.loads((t / "out.json").read_text(encoding="utf-8"))
+            self.assertTrue(result["passed"])
+            diagnostic = next(d for d in result["diagnostics"] if d["kind"] == "resource-headroom")
+            self.assertEqual(diagnostic["model"], "prod-gpt-oss20b-ggml-org-mxfp4")
+            self.assertEqual(diagnostic["mem_available_min_mib"], 193)
+            self.assertEqual(diagnostic["hard_floor_mib"], 128)
+            self.assertEqual(diagnostic["tight_threshold_mib"], 512)
+
     def test_revalidation_uses_full_snapshots_only_at_high_value_boundaries(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         self.assertIn("snapshot preflight/final", source)
@@ -2516,7 +2796,7 @@ status_raw
             source,
         )
         self.assertIn("sudo bc250-revalidate start --owui-token-file FILE", source)
-        self.assertIn("sudo bc250-revalidate start --skip-owui", source)
+        self.assertNotIn('echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"', source)
 
     def test_edge_policy_documents_conservative_threshold_rationale(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
@@ -2551,6 +2831,68 @@ status_raw
         self.assertIn("source-leakage", failures)
         self.assertIn("preservation", failures)
 
+    def test_owui_rag_model_resolution_prefers_exact_active_preset(self) -> None:
+        class Client:
+            def get(self, path: str) -> object:
+                self.path = path
+                return [
+                    {
+                        "id": "bc250-office-documents",
+                        "base_model_id": "prod-gemma:latest",
+                        "is_active": True,
+                    },
+                    {
+                        "id": "disabled-role",
+                        "base_model_id": "prod-gemma:latest",
+                        "is_active": False,
+                    },
+                ]
+
+        preset, base_model, mapping = openwebui_workflow.resolve_owui_model(
+            Client(), "bc250-office-documents"
+        )
+        self.assertEqual(preset, "bc250-office-documents")
+        self.assertEqual(base_model, "prod-gemma:latest")
+        self.assertEqual(mapping, {"bc250-office-documents": "prod-gemma:latest"})
+
+    def test_owui_rag_model_resolution_accepts_unambiguous_base_model(self) -> None:
+        class Client:
+            def get(self, _path: str) -> object:
+                return [
+                    {
+                        "id": "bc250-office-documents",
+                        "base_model_id": "prod-gemma:latest",
+                        "is_active": True,
+                    }
+                ]
+
+        preset, base_model, _mapping = openwebui_workflow.resolve_owui_model(
+            Client(), "prod-gemma"
+        )
+        self.assertEqual(preset, "bc250-office-documents")
+        self.assertEqual(base_model, "prod-gemma:latest")
+
+    def test_owui_rag_model_resolution_rejects_ambiguous_base_model(self) -> None:
+        class Client:
+            def get(self, _path: str) -> object:
+                return [
+                    {"id": "preset-a", "base_model_id": "prod-qwen", "is_active": True},
+                    {"id": "preset-b", "base_model_id": "prod-qwen:latest", "is_active": True},
+                ]
+
+        with self.assertRaisesRegex(openwebui_workflow.Failure, "ambiguous.*preset-a, preset-b"):
+            openwebui_workflow.resolve_owui_model(Client(), "prod-qwen")
+
+    def test_owui_rag_model_resolution_rejects_unknown_model(self) -> None:
+        class Client:
+            def get(self, _path: str) -> object:
+                return [
+                    {"id": "preset-a", "base_model_id": "prod-gemma", "is_active": True}
+                ]
+
+        with self.assertRaisesRegex(openwebui_workflow.Failure, "valid active preset IDs: preset-a"):
+            openwebui_workflow.resolve_owui_model(Client(), "missing-model")
+
     def test_owui_rag_cleanup_failure_is_classified_as_restoration(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)
@@ -2559,6 +2901,12 @@ status_raw
             with (
                 patch.object(openwebui_workflow, "prepare_result_dir", return_value=paths),
                 patch.object(openwebui_workflow, "owui_client", return_value=object()),
+                patch.object(openwebui_workflow, "wait_owui"),
+                patch.object(
+                    openwebui_workflow,
+                    "resolve_owui_model",
+                    return_value=("preset", "base:latest", {"preset": "base:latest"}),
+                ),
                 patch.object(openwebui_workflow, "simple_meta"),
                 patch.object(openwebui_workflow, "finish"),
                 patch.object(openwebui_workflow, "run_owui_rag_case", side_effect=openwebui_workflow.RestorationFailure("cleanup failed")),
@@ -2720,15 +3068,59 @@ status_raw
             self.assertAlmostEqual(model["prefill_tps"], 500.0)
             self.assertEqual(model["diagnostics"], {"context-truncation": 1})
 
+    def test_rag_quality_summary_exposes_resident_session_resources(self) -> None:
+        records = [
+            common.result_record(
+                category="rag-quality", model="answer", case_id="a",
+                result_type="qualification", outcome="pass",
+                metrics={
+                    "mem_available_start_mib": 4000,
+                    "mem_available_min_mib": 3000,
+                    "mem_available_end_mib": 3400,
+                    "swap_used_start_mib": 100,
+                    "swap_used_max_mib": 160,
+                    "swap_used_end_mib": 150,
+                    "temp_max_c": 70,
+                },
+            ),
+            common.result_record(
+                category="rag-quality", model="answer", case_id="b",
+                result_type="qualification", outcome="pass",
+                metrics={
+                    "mem_available_start_mib": 3400,
+                    "mem_available_min_mib": 2400,
+                    "mem_available_end_mib": 2800,
+                    "swap_used_start_mib": 150,
+                    "swap_used_max_mib": 220,
+                    "swap_used_end_mib": 180,
+                    "temp_max_c": 72,
+                },
+            ),
+        ]
+        aggregate = common.category_aggregates(records, "rag-quality")
+        session = aggregate["models"]["answer"]["resource_session"]
+        self.assertEqual(session["mem_available_start_mib"], 4000)
+        self.assertEqual(session["mem_available_min_mib"], 2400)
+        self.assertEqual(session["mem_available_end_mib"], 2800)
+        self.assertEqual(session["mem_available_end_delta_mib"], -1200)
+        self.assertEqual(session["swap_peak_delta_mib"], 120)
+        self.assertEqual(session["swap_used_end_mib"], 180)
+
     def test_chronological_resource_aggregate_uses_run_boundaries(self) -> None:
         rows = [
             {
+                "mem_available_start_mib": 4000,
+                "mem_available_min_mib": 3200,
+                "mem_available_end_mib": 3500,
                 "swap_used_start_mib": 100,
                 "swap_used_max_mib": 150,
                 "swap_used_end_mib": 140,
                 "temp_p95_c": 68,
             },
             {
+                "mem_available_start_mib": 3500,
+                "mem_available_min_mib": 2500,
+                "mem_available_end_mib": 3000,
                 "swap_used_start_mib": 140,
                 "swap_used_max_mib": 180,
                 "swap_used_end_mib": 120,
@@ -2736,6 +3128,10 @@ status_raw
             },
         ]
         aggregate = common.chronological_resource_aggregate(rows)
+        self.assertEqual(aggregate["mem_available_start_mib"], 4000)
+        self.assertEqual(aggregate["mem_available_min_mib"], 2500)
+        self.assertEqual(aggregate["mem_available_end_mib"], 3000)
+        self.assertEqual(aggregate["mem_available_end_delta_mib"], -1000)
         self.assertEqual(aggregate["swap_used_start_mib"], 100)
         self.assertEqual(aggregate["swap_used_max_mib"], 180)
         self.assertEqual(aggregate["swap_used_end_mib"], 120)
