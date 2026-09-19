@@ -483,3 +483,33 @@ setting and does not replace the separate whole-appliance revalidation policy.
 **Retest only if:** the BC-250 memory profile changes materially, Qwen/model/runtime memory behavior
 changes materially, or a future document-answer model provides a clear product benefit that justifies
 a new comparison. Do not reopen broad RAG answer-model tournaments without such a trigger.
+
+## DEC-020 — Keep new Qwen3.8 27B candidates bounded and role-specific
+
+**Status:** ACTIVE — same-release 0.11.3-1.4 pre-publication refinement.
+
+**Decision:** Add ISTA GSQ/RCO IQ3_XXS as an opt-in deployability/RAG-oriented text experiment and
+retune the already-packaged ISTA IQ3_S entry as the quality-first main-model experiment. IQ3_XXS
+starts at 16K context with the upstream Qwen3.8 non-thinking sampling profile and is intended to be
+called with `think=false`; IQ3_S starts at 8K with the upstream thinking profile and is intended for
+`think=true`. Neither changes the production Gemma E4B RAG role, Open WebUI desired state or current
+GPT-OSS/Qwen production roles. Vision projectors and MTP payloads are deliberately excluded from
+these Ollama experiments so first BC-250 evidence isolates text-model deployability/quality.
+
+Add `qwen3.8-27b-ymq-xs-ti-mtp` as a disabled/download-only native-MTP challenger to the existing
+HauhauCS Qwen3.8 27B IQ2_M control. Keep both at 8192 context and draft depth 2 for the first device
+comparison. Exact IDs remain the evidence contract; no convenience alias is added for the YMQ
+challenger.
+
+**Why:** ISTA currently publishes IQ3_XXS as a 10.1 GB strong all-round point and IQ3_S as an 11.8
+GB recommended/task-lossless point. The YMQ XS-TI file is about 10.2 GB, close to the 10.32 GB
+HauhauCS IQ2_M control, and provides a same-class architecture-aware mixed-precision MTP comparison.
+These are explicit product questions, not production promotions: can a dense Qwen3.8 27B provide
+useful quality/deployability on the 16 GiB appliance, and does the YMQ MTP quant improve the Qwen3.8
+27B speed/quality tradeoff under matched runtime settings?
+
+**Retest only if:** the candidates fail load/headroom, show no meaningful product-quality advantage,
+or upstream artifacts materially change. Do not promote either Ollama experiment or either MTP
+variant from upstream benchmark claims alone; real BC-250 load, semantic quality, memory/swap,
+stability and restoration evidence remain required.
+

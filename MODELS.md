@@ -322,6 +322,7 @@ exp-qwen35-4b-unsloth-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
 exp-qwen36-35b-a3b-unsloth-ud-iq3-s
 exp-qwen38-27b-ista-gsq-rco-iq3-s
+exp-qwen38-27b-ista-gsq-rco-iq3-xxs
 exp-qwen38-27b-unsloth-ud-iq3-s
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
@@ -356,7 +357,8 @@ cleanup decision from one comparable dataset. Notable additions are:
 | Model | Why it exists |
 |---|---|
 | `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | large MoE main-lane challenger; start at 16K context and fall back to UD-Q2_K_XL if BC-250 headroom is unsafe |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | dense 27B GSQ/RCO challenger; IQ3_S first, IQ3_XXS fallback if load/headroom fails |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | ISTA GSQ/RCO IQ3_S quality-first dense 27B experiment; 8K context, think=true, upstream thinking-mode sampling; 11.8 GB weights require strict BC-250 headroom qualification |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | ISTA GSQ/RCO IQ3_XXS deployability/RAG experiment; 16K context, think=false, upstream non-thinking sampling; no Open WebUI role/default changes until it proves safe and useful |
 | `exp-qwen38-27b-unsloth-ud-iq3-s` | dense 27B Unsloth dynamic-quant control; UD-IQ3_S first, UD-IQ3_XXS fallback |
 | `exp-gemma4-26b-a4b-mradermacher-i1-iq3-s` | Gemma 4 MoE main-lane challenger; i1-IQ3_S first, i1-IQ3_XS fallback; projector omitted for initial text comparison |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
@@ -378,7 +380,8 @@ runtime and the OS. Draft/MTP heads are not standalone Ollama role models and st
 workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from combined
 `apply all` / `refresh all` convergence regardless of their enabled flag; explicit
 `bc250-fetch-mtp` / `apply mtp` remains the preparation boundary. The first hardware funnel is `qwen3.5-9b-mtp`, retained
-`qwen3.6-27b-mtp` control, `qwen3.8-27b-hauhaucs-mtp`, then
+`qwen3.6-27b-mtp` retained cross-family control, then the Qwen3.8 27B pair
+`qwen3.8-27b-hauhaucs-mtp` (control) -> `qwen3.8-27b-ymq-xs-ti-mtp` (challenger), then
 `qwen3.6-35b-a3b-mtp`, one candidate at a time. `bc250-fetch-mtp [SELECTION]` is the
 explicit opt-in downloader/reconciler. Qualification should use `bc250-compare-mtp ID`,
 which compares the same GGUF/build/settings with MTP off versus on; `bc250-run-mtp ID`
