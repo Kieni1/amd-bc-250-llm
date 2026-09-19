@@ -304,7 +304,7 @@ JSON merely to make the current model pass.
 
 ## DEC-014 — Measure MTP against the same target/runtime and keep the external server unprivileged
 
-**Status:** ACTIVE — source contract; BC-250 runtime evidence pending.
+**Status:** ACTIVE — source contract; Phase-1 BC-250 runtime evidence recorded, Phase-2 optimization pending.
 
 **Decision:** The first MTP qualification campaign compares each selected target GGUF with
 the same llama.cpp build, context/cache/ubatch/request settings twice: speculative decoding
@@ -513,3 +513,37 @@ or upstream artifacts materially change. Do not promote either Ollama experiment
 variant from upstream benchmark claims alone; real BC-250 load, semantic quality, memory/swap,
 stability and restoration evidence remain required.
 
+
+
+## DEC-021 — Treat MTP Phase 2 as optimization, not requalification
+
+**Status:** ACTIVE — based on real BC-250 Phase-1 evidence from exact installed 0.11.3-0.4.
+
+**Decision:** Treat `qwen3.5-9b-mtp`, `qwen3.6-27b-mtp` and
+`qwen3.8-27b-hauhaucs-mtp` as Phase-1-qualified MTP configurations under the reviewed llama.cpp
+Vulkan contract. Retire `qwen3.6-35b-a3b-mtp` from the active MTP catalog: the stock
+8192-context / full-GPU configuration is a confirmed safety-fit failure before MTP inference, and
+there is no current product-driven retest hypothesis. Preserve its exact definition in the
+source-only MTP graveyard plus the historical model-run evidence. Phase 2 changes only the
+draft-depth parameter family and is optimization of already working configurations.
+
+Do not select a new draft-depth default from the first long Phase-2 sweep: that campaign accidentally
+repeated catalog defaults and therefore provides repeatability/noise-floor evidence only. Require
+approximately >=1.0% balanced improvement over the current catalog default before changing a depth,
+with quality, completeness, safety, restoration and both 256/1024-token speedups passing. Tiny
+sub-percent changes remain noise unless later evidence proves otherwise.
+
+The package comparison harness must record catalog/requested/effective draft depth and prove the
+requested MTP depth appears in the actual llama-server flags before inference evidence is accepted.
+The corrected hardware canary already proved an override can reach effective depth 1; that canary
+is plumbing evidence, not a depth-selection benchmark.
+
+**Why:** Three candidates already demonstrated useful speculative decoding with deterministic
+baseline/MTP parity. Re-running qualification would add little information. The remaining product
+question is whether any non-default draft depth materially improves the already-good defaults beyond
+the measured benchmark noise floor. The 35B stock failure is a baseline memory-fit limit rather than
+an MTP-performance result.
+
+**Retest only if:** a non-default depth clears the material-gain rule and needs confirmation, the
+model/quant/runtime changes materially, or a materially new product/hardware/runtime condition creates a justified 35B retest hypothesis.
+The new YMQ Qwen3.8 entry still requires its own matched control evidence.

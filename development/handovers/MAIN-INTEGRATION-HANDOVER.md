@@ -53,7 +53,7 @@ thresholds, GPU/device-error handling, runtime topology, GGUF provenance/SHA pol
 MTP settings and CU/governor policy are unchanged.
 
 Current source validation is **SOURCE PASS**: the full deterministic `make validate` gate completes
-with **402/402 tests PASS**, including 146 benchmark tests and the new lane-default keep-alive
+with **403/403 tests PASS**, including 146 benchmark tests and the new lane-default keep-alive
 restoration regression. Changed Python compiles, and packaged shell syntax is checked separately at
 release closure. GitHub RPM/SRPM build and exact-source BC-250 runtime qualification remain external;
 source validation must not be confused with hardware qualification.
@@ -891,69 +891,60 @@ Do not automatically execute arbitrary generated shell/Python as root.
 
 # 14. MTP / speculative decoding
 
-MTP is optional/experimental and separate from Ollama role models. Packaged MTP
-definitions remain disabled from generic convergence; `bc250-fetch-mtp ID` is the
-explicit opt-in source download/reconcile path and does not imply qualification.
+MTP remains optional/experimental and separate from Ollama role models. Packaged definitions stay
+disabled from generic convergence; `bc250-fetch-mtp ID` is the explicit preparation path.
 
-Current download-only catalog IDs:
+Current catalog IDs:
 
 ```text
 qwen3.5-9b-mtp
 qwen3.6-27b-mtp
 qwen3.8-27b-hauhaucs-mtp
 qwen3.8-27b-ymq-xs-ti-mtp
-qwen3.6-35b-a3b-mtp
 ```
 
-They are disabled by default and have no Ollama name/Modelfile. Files live under:
+Historical Phase-1 hardware evidence on exact installed `0.11.3-0.4` with llama.cpp b10964 /
+commit `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4` is now strong enough to separate
+qualification from optimization:
+
+- `qwen3.5-9b-mtp`: PASS; highest absolute speed and strongest short-generation MTP gains; benefit
+  diminishes on longer generations; deterministic exact quality parity.
+- `qwen3.6-27b-mtp`: PASS; strongest sustained long-generation speedup among tested passers, but
+  tightest successful memory margin (~1.18–1.26 GiB minimum MemAvailable under MTP).
+- `qwen3.8-27b-hauhaucs-mtp`: PASS; smaller long-form speedup than qwen3.6 27B but materially more
+  headroom (~2.63–2.71 GiB minimum MemAvailable under MTP) and excellent parity behavior.
+- retired `qwen3.6-35b-a3b-mtp`: stock 8K/full-GPU configuration DOES NOT FIT SAFELY. The first
+  baseline load reached ~120.4 MiB MemAvailable, crossed the 128 MiB hard floor and was terminated
+  before MTP inference. It is now source-graveyard-only and absent from routine MTP discovery.
+- `qwen3.8-27b-ymq-xs-ti-mtp`: new same-class challenger added after the historical Phase-1 batch;
+  still pending matched HauhauCS control evidence.
+
+The first long Phase-2 depth sweep did not actually vary draft depth because the wrapper override
+was reset before catalog resolution. It must not be used for depth selection. Keep it as stability
+and noise-floor evidence: repeated defaults showed roughly 0.01–0.19% throughput CV, so tiny
+sub-percent differences do not justify package-default changes. A corrected hardware canary forced
+Qwen3.5 to depth 1 and proved requested/run-info/effective depth all matched; its 64-token result is
+plumbing evidence only.
+
+Current Phase-2 task is bounded optimization on the three Phase-1 passers, one parameter family only:
 
 ```text
-/var/lib/bc250-llm-server/gguf/mtp/
+draft_n_max: 1, 2, 3, 4
+budgets: 256, 1024
+exploratory repeats: 1 performance / 1 quality
 ```
 
-Current preparation workflow:
+Every point must prove requested depth == effective emitted depth. A non-default depth must pass
+quality/safety/restoration/completeness, beat baseline at both budgets and provide approximately
+>=1.0% balanced improvement over the current catalog default before it is worth changing. If a
+non-default depth materially wins, confirm only that model/depth with higher repeats.
 
-```bash
-bc250-model list mtp --all
-sudo bc250-fetch-mtp qwen3.5-9b-mtp
-sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
-```
+The package harness now records catalog/requested/effective draft depth and checks the actual
+llama-server flags before accepting MTP evidence, preventing a repeat of the invalid first sweep.
+Do not expand the MTP framework further unless the corrected sweep exposes a concrete gap.
 
-The MTP catalog uses the same stable global display indexes as the combined model
-catalog. Prefer exact IDs in recorded evidence. Generic `apply all` still excludes disabled MTP entries.
-
-The RPM does not provide llama.cpp. The reviewed baseline is:
-
-```text
-llama.cpp release b10964
-commit b29c606e28a01b1bc8c1351026a0fa6e616bf6c4
-```
-
-A newer release can be tested if its CLI supports the required GPU-offload, context,
-flash-attention, cache and MTP/speculative options.
-
-The package runner binds `127.0.0.1:8090` by default and verifies required CLI flags
-before launch.
-
-`models/experiments/compare-mtp.sh` is now the controlled evidence harness: it launches
-the same target GGUF sequentially through the same llama.cpp build/settings with MTP off
-and on, records per-request throughput/acceptance, MemAvailable/swap, model/runtime
-identity, server logs and kernel/GPU faults, and fails closed on missing acceptance evidence
-or severe runtime faults. `bc250-run-mtp [--no-mtp] ID` remains the manual diagnosis path.
-Neither command is itself a production-promotion evaluator.
-
-Any useful MTP qualification must still record answer usefulness, accepted/proposed draft
-counts, throughput, memory/swap, context/draft settings, exact runtime/model identity and
-clean restoration. A tok/s speedup alone is not enough. After this 0.11.3-0.4 pre-flight
-polish, freeze the framework again until real BC-250 evidence exposes a concrete defect or
-measurement gap.
-
-The immediate next hardware work is MTP and support operations as separate bounded batches.
-Do not mix llama.cpp/resource experiments with WOL/power evidence in the same destructive
-sequence.
-
----
+Exact evidence and reasoning live in
+`development/model-runs/2026-09-19-mtp-phase1-and-phase2-state.md`.
 
 # 15. Maintenance, WOL and electricity saving
 

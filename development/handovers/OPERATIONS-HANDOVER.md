@@ -19,8 +19,10 @@ maintenance/Pi UX, post-configuration verification, tight-resource/output-budget
 deterministic RAG/Open WebUI qualification and safe MTP cleanup forward. RAG residency restoration
 now guarantees the starting model set while allowing each Ollama service to apply its normal
 keep-alive policy, and canonical RAG summaries use `swap_peak_delta_mib` rather than calling
-peak-minus-start swap cumulative growth. Model/runtime defaults and whole-appliance hard acceptance
-thresholds remain unchanged.
+peak-minus-start swap cumulative growth. Historical exact-0.11.3-0.4 MTP Phase 1 now provides real
+BC-250 pass evidence for qwen3.5-9b, qwen3.6-27b and HauhauCS qwen3.8-27b; the 35B-A3B stock
+8K/full-GPU configuration is a confirmed memory-fit failure, and Phase 2 remains optimization in
+progress. Model/runtime defaults and whole-appliance hard acceptance thresholds remain unchanged.
 
 Newest complete device evidence is exact refined
 `bc250-llm-server-0.11.3-0.4.fc44.x86_64`. Guided install completed with normal topology,
@@ -35,7 +37,7 @@ truncation; one accepted office-draft case reached its output budget. Exact evid
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
 runtime/hardware qualification. Current `0.11.3-1.4` completes the deterministic source gate with
-402/402 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
+403/403 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
 build and exact 0.11.3-1.4 BC-250 execution are also not yet claimed.
 
 ## Normal service topology
