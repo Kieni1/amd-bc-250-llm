@@ -2,12 +2,12 @@
 # Bootstrap a BC-250 appliance: install the RPM, then hand off.
 set -Eeuo pipefail
 
-RPM_PATH="${1:-$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")}" 
-[[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
 [[ "${1:-}" != -h && "${1:-}" != --help ]] || {
   echo "Usage: sudo ./install [RPM-FILE-OR-DIRECTORY]"
   exit 0
 }
+RPM_PATH="${1:-$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")}" 
+[[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
 
 find_rpm() {
   local target="$RPM_PATH" candidate

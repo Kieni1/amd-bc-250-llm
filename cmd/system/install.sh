@@ -17,6 +17,7 @@ INSTALL_MODE="full"
 OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
 OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
 HF_SESSION_FILE="/run/bc250-llm-server/install-hf-session"
+OWUI_SETUP_STATE="not-run"
 
 usage() {
   cat <<'USAGE'
@@ -365,9 +366,18 @@ step_7_models() {
     bc250-model apply all "$required_csv"
 
   echo
-  echo "Optional experiments, rollback/reference, agent and additional model selection:"
+  echo "Optional Ollama models:"
   bc250-model status all --compact
-  echo "MTP models are separate opt-in downloads; use: bc250-model list mtp --all"
+  echo
+  echo "MTP models are separate opt-in downloads."
+  echo "Standalone MTP models (llama.cpp; read-only inventory, not selectable here):"
+  if ! BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
+      bc250-model status mtp --include-disabled --compact \
+      | sed -E 's/^([[:space:]]*)[0-9]+\) /\1- /'; then
+    echo "  MTP inventory unavailable; inspect later with: bc250-model status mtp --include-disabled --compact"
+  fi
+  echo "  MTP is never fetched by installer convergence. Prepare one explicitly later with:"
+  echo "    sudo bc250-fetch-mtp MODEL_ID"
   local selection="${BC250_MODEL_SELECTION:-}"
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 ]]; then
     read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
@@ -493,8 +503,9 @@ wait_for_open_webui() {
 
 step_9_open_webui() {
   heading "9. CONFIGURE OPEN WEBUI"
+  OWUI_SETUP_STATE="retry-required"
   command -v bc250-openwebui-setup >/dev/null 2>&1 || {
-    echo "Open WebUI setup helper is unavailable; skipping application configuration."
+    echo "Open WebUI setup helper is unavailable; application configuration requires a retry."
     return 0
   }
   if ! wait_for_open_webui; then
@@ -511,6 +522,7 @@ step_9_open_webui() {
       echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
       return 0
     fi
+    OWUI_SETUP_STATE="applied"
     return 0
   fi
 
@@ -518,11 +530,14 @@ step_9_open_webui() {
     echo "Applying the package-owned Open WebUI baseline with OWUI_API_KEY from the environment."
     if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
+      return 0
     fi
+    OWUI_SETUP_STATE="applied"
     return 0
   fi
 
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]] || ! input_is_interactive; then
+    OWUI_SETUP_STATE="skipped"
     echo "Non-interactive install: Open WebUI administrator setup was not attempted."
     echo "Run later in an interactive terminal:"
     echo "  sudo bc250-openwebui-setup init"
@@ -543,10 +558,30 @@ step_9_open_webui() {
     if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup was not completed; the appliance remains usable." >&2
       echo "Retry later with: sudo bc250-openwebui-setup init" >&2
+      return 0
     fi
+    OWUI_SETUP_STATE="applied"
   else
+    OWUI_SETUP_STATE="skipped"
     echo "Skipped. Run later with: sudo bc250-openwebui-setup init"
   fi
+}
+
+print_openwebui_completion_status() {
+  case "$OWUI_SETUP_STATE" in
+    applied)
+      echo "Open WebUI baseline: APPLIED + VERIFIED"
+      ;;
+    skipped)
+      echo "Open WebUI baseline: SKIPPED (run sudo bc250-openwebui-setup init when ready)"
+      ;;
+    retry-required)
+      echo "Open WebUI baseline: RETRY REQUIRED (run sudo bc250-openwebui-setup init)"
+      ;;
+    *)
+      echo "Open WebUI baseline: NOT CHECKED"
+      ;;
+  esac
 }
 
 
@@ -739,7 +774,8 @@ run_models_only() {
   step_8_application_services
   step_9_open_webui
   echo
-  echo "Model and Open WebUI reconciliation completed."
+  echo "Model/runtime reconciliation completed."
+  print_openwebui_completion_status
   echo "Transcript: $LOG_FILE"
 }
 
@@ -768,7 +804,8 @@ main() {
   step_10_verify
   step_11_maintenance
   echo
-  echo "Installation and verification completed successfully."
+  echo "Core installation and verification completed successfully."
+  print_openwebui_completion_status
   echo "Transcript: $LOG_FILE"
   if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
     echo "Persistent 40-CU boot activation is configured."

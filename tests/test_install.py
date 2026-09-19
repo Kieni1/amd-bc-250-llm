@@ -76,6 +76,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("exec bc250-install", source)
         self.assertNotIn("bc250-memory-profile", source)
         self.assertLess(len(source.splitlines()), 50)
+        self.assertLess(source.index("--help"), source.index("EUID"))
 
     def test_packaged_installer_is_pre_v1_greenfield_and_uses_package_runtime_pins(self) -> None:
         source = INSTALLER.read_text()
@@ -160,7 +161,10 @@ step_3_install_ollama
         self.assertIn('bc250-model apply all "$selection"', source)
         self.assertNotIn('bc250-model apply all "$selection" --include-disabled', source)
         self.assertIn('BC250_MODELCTL_CURRENT_SUMMARY=1', source)
-        self.assertIn('MTP models are separate opt-in downloads', source)
+        self.assertIn('Standalone MTP models (llama.cpp; read-only inventory, not selectable here)', source)
+        self.assertIn('bc250-model status mtp --include-disabled --compact', source)
+        self.assertIn('sudo bc250-fetch-mtp MODEL_ID', source)
+        self.assertNotIn('bc250-model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
 
@@ -174,7 +178,7 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:status all --compact", result.stdout)
-        self.assertNotIn("--include-disabled", result.stdout)
+        self.assertIn("model:status mtp --include-disabled --compact", result.stdout)
         for model in (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
@@ -199,11 +203,32 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:apply all recommended,19-20", result.stdout)
-        self.assertNotIn("--include-disabled", result.stdout)
+        self.assertIn("model:status mtp --include-disabled --compact", result.stdout)
+        self.assertNotIn("model:apply mtp", result.stdout)
         self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl", result.stdout)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k", result.stdout)
         self.assertIn("embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
         self.assertEqual(result.stdout.count("model:apply"), 2)
+
+    def test_installer_mtp_inventory_is_visible_but_not_presented_as_selectable_indexes(self) -> None:
+        result = source_probe(r'''
+input_is_interactive() { return 1; }
+require_progress_terminal() { :; }
+prepare_hf_authentication() { :; }
+bc250-model() {
+  if [[ "$1 $2" == "status mtp" ]]; then
+    printf 'MTP models:\n  33) qwen3.5-9b-mtp [download-only, disabled, source verified, CURRENT]\n'
+  else
+    printf 'model:%s\n' "$*"
+  fi
+}
+step_7_models
+''')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Standalone MTP models", result.stdout)
+        self.assertIn("  - qwen3.5-9b-mtp", result.stdout)
+        self.assertNotIn("33) qwen3.5-9b-mtp", result.stdout)
+        self.assertIn("never fetched by installer convergence", result.stdout)
 
     def test_original_noninteractive_input_survives_transcript_pty(self) -> None:
         result = source_probe('''
@@ -532,6 +557,18 @@ step_8_application_services
         self.assertIn("/usr/share/doc/bc250-llm-server/", source)
         self.assertIn("docs/FILESTRUCTURE.md", source)
         self.assertIn("/var/lib/bc250-llm-server/revalidation/results/", source)
+
+    def test_installer_final_summary_reports_openwebui_completion_state(self) -> None:
+        source = INSTALLER.read_text()
+        self.assertIn('OWUI_SETUP_STATE="not-run"', source)
+        self.assertIn('OWUI_SETUP_STATE="applied"', source)
+        self.assertIn('OWUI_SETUP_STATE="skipped"', source)
+        self.assertIn('OWUI_SETUP_STATE="retry-required"', source)
+        self.assertIn("Open WebUI baseline: APPLIED + VERIFIED", source)
+        self.assertIn("Open WebUI baseline: SKIPPED", source)
+        self.assertIn("Open WebUI baseline: RETRY REQUIRED", source)
+        self.assertIn("Core installation and verification completed successfully.", source)
+        self.assertNotIn("Installation and verification completed successfully.", source)
 
     def test_optional_maintenance_top_gate_skips_all_changes_by_default(self) -> None:
         result = source_probe(r"""
