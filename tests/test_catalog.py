@@ -212,6 +212,8 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn('[[ "$done" != true ]]', helper)
         self.assertIn('[[ "$done_reason" == "length" ]]', helper)
         self.assertIn("reasoning markers", helper)
+        self.assertIn("outer_markdown_fence", helper)
+        self.assertIn("raw-output contract", helper)
         self.assertIn('mktemp --tmpdir="$out_dir" .bc250-code.XXXXXX', helper)
         self.assertIn('mv -f -- "$tmp_out" "$output"', helper)
         self.assertNotIn('"${OLLAMA_URL}/api/generate"', helper)
@@ -817,6 +819,41 @@ class StatusTests(unittest.TestCase):
         self.assertNotIn(">>> exp-remote-test", text)
         self.assertNotIn("already current; skipping", text)
         self.assertNotIn("Done: 1 model(s) processed.", text)
+
+    def test_hf_token_file_must_be_private_nonempty_regular_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "hf-token"
+            token_file.write_text("secret\n", encoding="utf-8")
+            token_file.chmod(0o600)
+            self.assertEqual(modelctl.status_token(token_file), "secret")
+            token_file.chmod(0o644)
+            with self.assertRaisesRegex(modelctl.ModelError, "group/world accessible"):
+                modelctl.status_token(token_file)
+            token_file.chmod(0o600)
+            token_file.write_text("\n", encoding="utf-8")
+            with self.assertRaisesRegex(modelctl.ModelError, "token file is empty"):
+                modelctl.status_token(token_file)
+
+    def test_coding_agent_outer_fence_detector_rejects_only_wrapped_output(self) -> None:
+        helper = (ROOT / "models/coding-agent/coding-agent.sh").read_text(encoding="utf-8")
+        start = helper.index("outer_markdown_fence() {")
+        end = helper.index('\ncase "$mode" in', start)
+        function = helper[start:end]
+        with tempfile.TemporaryDirectory() as tmp:
+            wrapped = Path(tmp) / "wrapped"
+            wrapped.write_text("```python\nprint('x')\n```\n", encoding="utf-8")
+            plain = Path(tmp) / "plain"
+            plain.write_text("print('``` is data')\n", encoding="utf-8")
+            rejected = subprocess.run(
+                ["bash", "-c", function + '\nouter_markdown_fence "$1"', "test", str(wrapped)],
+                check=False,
+            )
+            accepted = subprocess.run(
+                ["bash", "-c", function + '\nouter_markdown_fence "$1"', "test", str(plain)],
+                check=False,
+            )
+            self.assertEqual(rejected.returncode, 0)
+            self.assertNotEqual(accepted.returncode, 0)
 
     def test_verbose_status_explains_online_check_and_source_identity(self) -> None:
         model = {

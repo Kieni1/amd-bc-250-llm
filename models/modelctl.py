@@ -938,12 +938,31 @@ def remote_file_sha256(model: dict, token: str = "") -> str:
     raise ModelError("remote metadata did not expose a comparable SHA-256")
 
 
+def read_protected_token_file(token_file: Path) -> str:
+    """Read an explicitly supplied Hugging Face token only from a private file."""
+    try:
+        info = token_file.stat()
+    except OSError as error:
+        raise ModelError(f"cannot stat token file {token_file}: {error}") from error
+    if not stat.S_ISREG(info.st_mode):
+        raise ModelError(f"token file must be a regular file: {token_file}")
+    if info.st_mode & 0o077:
+        raise ModelError(
+            f"token file must not be group/world accessible: {token_file} "
+            f"(mode {stat.S_IMODE(info.st_mode):04o})"
+        )
+    try:
+        token = token_file.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise ModelError(f"cannot read token file {token_file}: {error}") from error
+    if not token:
+        raise ModelError(f"token file is empty: {token_file}")
+    return token
+
+
 def status_token(token_file: Path | None) -> str:
     if token_file:
-        try:
-            return token_file.read_text(encoding="utf-8").strip()
-        except OSError as error:
-            raise ModelError(f"cannot read token file {token_file}: {error}") from error
+        return read_protected_token_file(token_file)
     return os.environ.get("HF_TOKEN", "").strip()
 
 
@@ -1253,10 +1272,7 @@ def write_hf_session(token: str) -> None:
 
 def hf_token(hf_bin: str, hf_home: Path, token_file: Path | None) -> str:
     if token_file:
-        try:
-            token = token_file.read_text(encoding="utf-8").strip()
-        except OSError as error:
-            raise ModelError(f"cannot read token file {token_file}: {error}") from error
+        token = read_protected_token_file(token_file)
     else:
         token = os.environ.get("HF_TOKEN", "").strip()
         if not token:

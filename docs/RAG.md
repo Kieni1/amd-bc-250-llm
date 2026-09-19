@@ -316,6 +316,10 @@ sudo install -m 0600 -o root -g root /PATH/TO/KEY \
   /etc/bc250-llm-server/rag-api-key
 sudo bc250-rag-import sync /srv/bc250-documents \
   --token-file /etc/bc250-llm-server/rag-api-key
+
+The supplied token file is enforced as a non-empty regular file with no group/world access
+(normally mode `0600`). The importer refuses a permissive credential file rather than relying
+only on documentation to protect it.
 ```
 
 The sync uses Open WebUI v0.11.3's incremental knowledge API. The packaged

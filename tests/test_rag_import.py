@@ -202,6 +202,21 @@ class RagImportTests(unittest.TestCase):
         self.assertIn("ERROR: invalid sync diff response", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
+    def test_sync_token_file_must_be_private_nonempty_regular_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "owui-token"
+            token_file.write_text("secret\n", encoding="utf-8")
+            token_file.chmod(0o600)
+            args = type("Args", (), {"token_file": str(token_file)})()
+            self.assertEqual(rag.token_from(args), "secret")
+            token_file.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "group/world accessible"):
+                rag.token_from(args)
+            token_file.chmod(0o600)
+            token_file.write_text("\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "API key file is empty"):
+                rag.token_from(args)
+
     def test_plan_needs_no_api_key_and_sync_contract_is_incremental(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

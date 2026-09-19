@@ -9,6 +9,7 @@ import json
 import mimetypes
 import os
 import re
+import stat
 import sys
 import uuid
 from dataclasses import dataclass
@@ -480,11 +481,32 @@ class OpenWebUI:
             )
 
 
+def read_protected_token_file(path: Path) -> str:
+    """Read a credential file only when its filesystem permissions are private."""
+    try:
+        info = path.stat()
+    except OSError as exc:
+        raise ValueError(f"cannot stat Open WebUI API key file {path}: {exc}") from exc
+    if not stat.S_ISREG(info.st_mode):
+        raise ValueError(f"Open WebUI API key file must be a regular file: {path}")
+    if info.st_mode & 0o077:
+        raise ValueError(
+            f"Open WebUI API key file must not be group/world accessible: {path} "
+            f"(mode {stat.S_IMODE(info.st_mode):04o})"
+        )
+    try:
+        token = path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise ValueError(f"cannot read Open WebUI API key file {path}: {exc}") from exc
+    if not token:
+        raise ValueError(f"Open WebUI API key file is empty: {path}")
+    return token
+
+
 def token_from(args: argparse.Namespace) -> str:
     if args.token_file:
-        token = Path(args.token_file).read_text(encoding="utf-8").strip()
-    else:
-        token = os.environ.get("OPEN_WEBUI_API_KEY", "").strip()
+        return read_protected_token_file(Path(args.token_file))
+    token = os.environ.get("OPEN_WEBUI_API_KEY", "").strip()
     if not token:
         raise ValueError("provide --token-file or OPEN_WEBUI_API_KEY")
     return token
