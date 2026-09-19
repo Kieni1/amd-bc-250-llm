@@ -2,6 +2,9 @@
 
 ## 0.11.3-1.4 - 2026-09-19
 
+- Add two bounded Qwen3.8 27B ISTA GSQ/RCO experiments without changing production roles: IQ3_XXS is the deployability/RAG-oriented candidate at 16K with Qwen3.8 non-thinking sampling, while the existing IQ3_S entry becomes the quality-first main-model experiment at a safer 8K with Qwen3.8 thinking-mode sampling. Both are text-only and remain opt-in experiments.
+- Add disabled download-only `qwen3.8-27b-ymq-xs-ti-mtp` as a same-class Qwen3.8 MTP challenger to the existing HauhauCS IQ2_M control. Keep context/draft settings matched at 8192/2 so the first device comparison isolates model/quant differences; MTP remains explicit opt-in and hardware-unqualified.
+
 - Record the completed BC-250 RAG finalist campaign. `bc250-office-documents` / Gemma E4B remains the production document/RAG default on the current 16 GiB profile: both finalists passed short authenticated Open WebUI RAG, but Gemma completed 42/42 continuous-residency turns with about 2.7 GiB MemAvailable remaining while Qwen 9B reached the campaign's 512 MiB safety floor after only a few resident subruns. Qwen remains the separate higher-quality general-office option; this is a sustained-memory-margin decision, not a semantic-quality rejection.
 - Make RAG residency restoration preserve the starting model **set** while allowing each Ollama service's configured/default keep-alive policy to apply; stop forcing a synthetic 30-minute lifetime when reloading pre-existing models.
 - Rename the resident-session summary field from the inaccurate `cumulative_swap_growth_mib` to `swap_peak_delta_mib`, matching its actual definition: peak observed swap minus starting swap.

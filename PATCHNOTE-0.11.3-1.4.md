@@ -10,7 +10,14 @@ This release closes the current source-side RAG integration tranche and records 
 BC-250 RAG finalist decision while preserving the existing appliance architecture and resource
 policy.
 
+The Qwen3.8 candidate additions below are a pre-publication same-NVR source refinement. Any prior
+1.4 source hash/artifact must therefore be distinguished from these final bytes; no hardware evidence
+is silently transferred between same-NVR artifacts.
+
 ## Changes in 1.4
+
+- Same-release pre-publication refinement: add bounded Qwen3.8 27B experiments while keeping all production model roles unchanged. `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` is the 10.1 GB deployability/RAG-oriented text candidate at 16K with non-thinking sampling; the existing 11.8 GB IQ3_S entry is retuned as the quality-first main-model experiment at 8K with thinking-mode sampling.
+- Add disabled download-only `qwen3.8-27b-ymq-xs-ti-mtp` (10.2 GB published GGUF) as a Qwen3.8 27B MTP challenger against the existing HauhauCS IQ2_M control (~10.32 GB), with matched 8K context and draft depth 2. This is catalog inclusion only, not BC-250 MTP qualification.
 
 - Record the final RAG finalist evidence from exact installed `0.11.3-0.4`: both Gemma E4B and
   Qwen 9B were strong on broad direct retrieval and short authenticated Open WebUI RAG, but Gemma
@@ -48,13 +55,13 @@ revalidation policy remains unchanged.
 
 ## Deliberate non-changes
 
-- no new RAG answer-model tournament or additional candidate;
+- no change to the production RAG answer model; the new IQ3_XXS entry is an opt-in experiment and does not reopen the completed Gemma-vs-Qwen9B production decision;
 - no first-class long-residency benchmark framework in this release; the production selection
   question is already answered, so additional framework work would need a new concrete product need;
 - no change to the 128 MiB whole-appliance hard floor or the existing 512 MiB informational
   tight-headroom diagnostic;
-- no production model bytes, Modelfiles, Open WebUI desired-state IDs, lane topology or MTP tuning
-  changes;
+- no production model bytes, Open WebUI desired-state IDs or lane-topology changes; experimental
+  Modelfiles/catalog entries change only for the bounded Qwen3.8 candidates described above;
 - no attempt to reconstruct exact pre-benchmark model expiry timestamps that Ollama does not expose
   as a reliable restoration contract.
 
@@ -67,7 +74,7 @@ collection update/delete/re-import workflows remain a separate product-evidence 
 
 ## Source validation
 
-- `make validate`: **401/401 PASS**
+- `make validate`: **402/402 PASS**
 - Python `compileall` for `cmd`, `models` and `tests`: PASS
 - `bash -n` across packaged/source shell scripts: PASS
 - `models/modelctl.py`: source mode remains `0755`
