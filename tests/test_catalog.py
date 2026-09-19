@@ -278,6 +278,28 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         lfm = (MODELFILES / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
         self.assertIn("experimental rollback/control", lfm)
 
+    def test_qwen38_ista_profiles_match_intended_bc250_roles(self) -> None:
+        quality = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("PARAMETER num_ctx 8192", quality)
+        self.assertIn("PARAMETER num_predict 3072", quality)
+        self.assertIn("PARAMETER temperature 1.0", quality)
+        self.assertIn("PARAMETER top_p 0.95", quality)
+        self.assertIn("PARAMETER top_k 20", quality)
+        self.assertIn("PARAMETER min_p 0.0", quality)
+        self.assertIn("PARAMETER repeat_last_n 64", quality)
+        self.assertIn("think=true", quality)
+
+        deploy = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-xxs.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("PARAMETER num_ctx 16384", deploy)
+        self.assertIn("PARAMETER num_predict 1024", deploy)
+        self.assertIn("PARAMETER temperature 0.7", deploy)
+        self.assertIn("PARAMETER top_p 0.8", deploy)
+        self.assertIn("PARAMETER top_k 20", deploy)
+        self.assertIn("PARAMETER min_p 0.0", deploy)
+        self.assertIn("PARAMETER repeat_last_n 64", deploy)
+        self.assertIn("think=false", deploy)
+        self.assertNotRegex(deploy, r"(?m)^SYSTEM\s")
+
     def test_task_model_accepts_open_webui_integrated_task_prompts(self) -> None:
         source = MODELFILES / "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
         text = source.read_text(encoding="utf-8")
@@ -299,11 +321,17 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 "qwen3.5-9b-mtp",
                 "qwen3.6-27b-mtp",
                 "qwen3.8-27b-hauhaucs-mtp",
+                "qwen3.8-27b-ymq-xs-ti-mtp",
                 "qwen3.6-35b-a3b-mtp",
             ],
         )
         self.assertTrue(all(model["provider"] == "download-only" for model in models))
         self.assertTrue(all(model["enabled"] is False for model in models))
+        qwen38 = {model["id"]: model for model in models if model["id"].startswith("qwen3.8-27b-")}
+        self.assertEqual(qwen38["qwen3.8-27b-hauhaucs-mtp"]["context"], 8192)
+        self.assertEqual(qwen38["qwen3.8-27b-hauhaucs-mtp"]["draft"], 2)
+        self.assertEqual(qwen38["qwen3.8-27b-ymq-xs-ti-mtp"]["context"], 8192)
+        self.assertEqual(qwen38["qwen3.8-27b-ymq-xs-ti-mtp"]["draft"], 2)
 
     def test_mtp_filtered_view_preserves_global_catalog_indexes(self) -> None:
         _defaults, mtp_only = modelctl.load_models(
