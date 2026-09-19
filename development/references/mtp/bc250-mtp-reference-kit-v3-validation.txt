@@ -1,0 +1,48 @@
+PASS: required executable mode bits present
+PASS: shell syntax
+PASS: Python compile
+PASS: Phase-1 core preserves explicit CTX/DRAFT_N_MAX overrides
+PASS: Phase-2 verifies applied draft depth from emitted evidence
+PASS: no broad process cleanup construct
+PASS: no generated checksum/response-hash construct
+PASS: operator/Phase-2 wrappers contain no explicit shell exit
+PASS: Phase-1 funnel defaults to current 1.5 active catalog and excludes retired 35B stock-fit case
+PASS: package 1.5 MTP reference catalog contains YMQ and excludes retired 35B
+PASS: reviewed corrected Phase-2 and YMQ evidence summaries included
+PASS: embedded Python compile (2 blocks)
+PASS: static lifecycle/process/checksum/isolation/lock/RC checks
+PASS: synthetic scorer complete/pass -> RC 0
+PASS: synthetic scorer quality/parity miss -> RC 3
+PASS: synthetic scorer incomplete telemetry -> RC 4
+PASS: synthetic scorer exact-cardinality/run-ID check -> RC 4
+PASS: campaign lock release pattern
+PASS: active Ollama residency drain unit test
+PASS: direct/sourced caller behavior
+VALIDATION PASS
+INFO: ShellCheck unavailable; not claimed.
+PASS: Phase-1 v5 validator
+PASS: package executable mode bits present
+PASS: bundled Phase-1 core executable mode bits present
+PASS: shell syntax
+PASS: Python compile
+PASS: no broad process cleanup
+PASS: no generated checksum/response-hash logic
+PASS: runner contains no explicit shell exit
+PASS: runner defaults to bundled proven v5 core
+PASS: exact per-point root captured from core log
+PASS: resume path implemented
+PASS: synthetic scorer pass -> RC 0
+PASS: quality-bad point excluded while good point remains
+PASS: synthetic no-benefit -> RC 3
+PASS: synthetic incomplete evidence -> RC 4
+PASS: sourced runner returns without terminating caller
+VALIDATION PASS
+INFO: hardware preflight of CORE_DIR occurs at campaign start.
+PASS: Phase-2 v5 validator
+PASS: top-level operator entry returns to sourced caller
+PASS: Phase-1 funnel returns to sourced caller
+PASS: new operator wrappers return to sourced caller
+PASS: mock Phase-1 funnel + resume integration
+PASS: mock Phase-2 campaign + resume integration
+KIT VALIDATION PASS
+INFO: no BC-250 inference is performed by this validator.

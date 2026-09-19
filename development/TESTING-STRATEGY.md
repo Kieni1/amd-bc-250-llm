@@ -42,7 +42,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-1.5 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
+The current 0.11.3-1.6 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
 must be behind one default-No gate, local maintenance and Pi integration remain independent,
 and selected setup must be checked rather than assumed successful. Post-install guidance should
 point at a small set of next commands plus the installed documentation/config/state/evidence paths;
@@ -103,7 +103,7 @@ added after much of the older hardware evidence.
 
 Exact 0.11.3-0.4 has now completed the read-only/install/whole-appliance baseline: verifier
 54/0/0 and v4.2 infrastructure/restoration/full coverage PASS with quality 8/8. Preserve that
-artifact as historical evidence for exact 0.4. Current 0.11.3-1.5 has completed the deterministic
+artifact as historical evidence for exact 0.4. Current 0.11.3-1.6 has completed the deterministic
 source gate; do not relabel the 0.4 hardware evidence as current. After GitHub builds and the exact
 1.4 RPM is installed, run one exact-source verification/revalidation gate, then continue support
 operations with:
@@ -315,45 +315,42 @@ question open.
 
 ### Lane G — MTP / speculative decoding
 
-MTP basic qualification is now mostly complete; the active question is optimization. Historical
-real-device evidence from exact installed `0.11.3-0.4` with llama.cpp `b10964` / commit
-`b29c606e28a01b1bc8c1351026a0fa6e616bf6c4` passed the Qwen3.5 9B, Qwen3.6 27B and
-HauhauCS Qwen3.8 27B configurations with deterministic baseline/MTP quality parity. Qwen3.6 27B
-showed the strongest sustained long-generation gain but the tightest successful memory margin;
-HauhauCS Qwen3.8 retained more headroom; Qwen3.5 9B remained fastest in absolute terms and strongest
-for short generations.
+Broad MTP qualification is complete enough for the package. Under the reviewed external llama.cpp
+Vulkan runtime, Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B all have
+passing BC-250 same-target baseline/MTP evidence with deterministic quality parity and complete
+safety/restoration evidence. The stock Qwen3.6 35B-A3B 8192-context/full-GPU configuration is a
+confirmed fit failure before MTP inference and remains retired from the active catalog.
 
-The stock Qwen3.6 35B-A3B 8192-context/full-GPU baseline is a confirmed fit failure: MemAvailable
-crossed the 128 MiB hard floor during the first baseline load, before MTP inference. Do not rerun that
-exact configuration. The YMQ Qwen3.8 XS-TI entry was added after the historical Phase-1 batch and
-remains pending a matched HauhauCS-control comparison.
+Preserve the evidence distinction:
 
-The first long Phase-2 draft-depth sweep accidentally repeated the catalog defaults. Preserve it as
-repeatability evidence only: typical throughput CV was about 0.01–0.19%, so sub-percent changes are
-noise unless later evidence proves otherwise. The corrected override canary proved that an explicit
-`DRAFT_N_MAX=1` reaches the actual Qwen3.5 runtime configuration. The package comparison harness now
-records catalog/requested/effective draft depth and verifies the requested value appears in the
-actual llama-server flags before accepting inference evidence.
+- the first long Phase-2 sweep accidentally repeated catalog defaults and is repeatability/noise-floor
+  evidence only;
+- typical repeated-default throughput CV was about 0.01–0.19%; sub-percent differences should not
+  drive package defaults;
+- the corrected canary proved requested draft depth reaches the emitted llama-server configuration;
+- the corrected 1/2/3/4 sweep completed cleanly on all three original passers.
 
-Continue Phase 2 only on the three Phase-1 passers:
+Current package conclusions:
 
 ```text
-models: qwen3.5-9b-mtp, qwen3.6-27b-mtp, qwen3.8-27b-hauhaucs-mtp
-draft depths: 1, 2, 3, 4
-performance budgets: 256, 1024
-exploratory repeats: 1 performance / 1 quality
+qwen3.5-9b-mtp             keep packaged depth 3 for now; depth 2 is the strongest exploratory candidate
+qwen3.6-27b-mtp            keep depth 2
+qwen3.8-27b-hauhaucs-mtp   keep depth 2
+qwen3.8-27b-ymq-xs-ti-mtp  qualified at depth 2; further tuning is optional only if promotion is contemplated
 ```
 
-Selection rule: quality, completeness, safety and restoration must pass; both 256- and 1024-token
-speedups must remain above baseline; and a non-default depth should improve the balanced result by
-approximately >=1.0% over the catalog default before changing package settings. If one depth wins
-materially, confirm only that model/depth with 3 performance repeats and 2 quality repeats. Do not
-repeat a full four-depth confirmation sweep.
+Only run more MTP work to answer a concrete unresolved question:
 
-`bc250-compare-mtp` remains the same-target evidence harness; `bc250-run-mtp [--no-mtp] ID` remains
-the manual diagnostic path. MTP stays separate from support/WOL/power testing. Do not promote from
-tok/s alone: useful answer quality, accepted/proposed draft telemetry, memory/swap safety, GPU/kernel
-stability and cleanup/restoration all remain required.
+1. **Qwen3.5 depth-2 confirmation** — only if changing the package default matters. Use 256/1024
+   budgets, 3 performance repeats and 2 quality repeats, with only draft depth changed.
+2. **Current-package HauhauCS comparator** — only if rigorous YMQ-vs-HauhauCS memory/performance
+   comparison is needed.
+3. **YMQ depth optimization** — only if YMQ is intended to become a preferred package model.
+
+Do not reopen the full four-depth sweep. Do not add more MTP framework unless new hardware evidence
+shows a concrete measurement or lifecycle defect. `bc250-compare-mtp` remains the same-target evidence
+harness; `bc250-run-mtp [--no-mtp] ID` remains the manual diagnostic path. Performance and semantic
+quality remain separate lanes, and MTP stays separate from support/WOL/power testing.
 
 ## 7. Routine revalidation vs specialist campaigns
 
