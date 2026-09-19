@@ -145,6 +145,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertIn("qwen3.6-27b-mtp", result.stdout)
         self.assertIn("qwen3.5-9b-mtp", result.stdout)
         self.assertIn("qwen3.8-27b-hauhaucs-mtp", result.stdout)
+        self.assertIn("qwen3.8-27b-ymq-xs-ti-mtp", result.stdout)
         self.assertIn("qwen3.6-35b-a3b-mtp", result.stdout)
         self.assertNotIn("set LLAMACPP", result.stdout)
 

@@ -18,15 +18,18 @@ toward the heavier candidates:
 ```text
 qwen3.5-9b-mtp             Unsloth Qwen3.5 9B UD-Q4_K_XL       primary safe candidate
 qwen3.6-27b-mtp            Unsloth Qwen3.6 27B UD-Q2_K_XL      retained control
-qwen3.8-27b-hauhaucs-mtp   HauhauCS Qwen3.8 27B IQ2_M          27B challenger
+qwen3.8-27b-hauhaucs-mtp   HauhauCS Qwen3.8 27B IQ2_M          Qwen3.8 control (~10.32 GB)
+qwen3.8-27b-ymq-xs-ti-mtp  ZeroDigest Qwen3.8 27B YMQ XS-TI    Qwen3.8 challenger (~10.2 GB)
 qwen3.6-35b-a3b-mtp        Unsloth Qwen3.6 35B-A3B UD-IQ3_S    heavyweight challenger
 ```
 
 Test one candidate at a time. Do not preload the whole set merely because it is cataloged.
 The catalog `draft` values are conservative first-run settings for this 16 GiB BC-250,
-not claims about each upstream model's maximum useful speculative depth. The HauhauCS
-entry exercises the native/embedded NextN MTP head in the selected text GGUF; the separate
-FastMTP sidecar is intentionally outside this first package-owned hardware batch.
+not claims about each upstream model's maximum useful speculative depth. The HauhauCS and
+YMQ entries both exercise native/embedded MTP in their selected text GGUFs. HauhauCS is the
+Qwen3.8 27B control; YMQ XS-TI is the same-class architecture-aware mixed-precision challenger
+with a slightly smaller published file size. The separate HauhauCS FastMTP sidecar is intentionally
+outside this first package-owned hardware batch.
 
 ## Prepare one experiment
 
@@ -88,7 +91,8 @@ bc250-run-mtp --no-mtp qwen3.5-9b-mtp
 ```
 
 Exact IDs are preferred. Convenience aliases exist only for interactive use:
-`qwen35-9b`, `qwen36-27b`, `qwen38-27b`, `qwen36-35b`.
+`qwen35-9b`, `qwen36-27b`, `qwen38-27b`, `qwen36-35b`. The YMQ challenger intentionally
+has no convenience alias; use exact ID `qwen3.8-27b-ymq-xs-ti-mtp` in evidence.
 
 `PORT`, `CTX` and `DRAFT_N_MAX` override catalog values. `UBATCH=384` remains an explicit
 gfx1013 stability-control A/B only when the affected model/runtime path warrants it; an
