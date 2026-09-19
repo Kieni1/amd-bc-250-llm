@@ -485,20 +485,63 @@ step_8_application_services
         self.assertIn("bc250-verify --summary", block)
         self.assertNotIn("llm-run-diagnose --no-load", block)
 
-    def test_full_installer_offers_bounded_pi_maintenance_setup(self) -> None:
+    def test_full_installer_gates_optional_maintenance_before_local_or_pi_setup(self) -> None:
         source = INSTALLER.read_text()
         block = source[
             source.index("step_11_maintenance() {"):
             source.index("run_models_only() {")
         ]
-        self.assertIn("bc250-maintenance setup", block)
+        gate = 'yes_no "Configure optional maintenance or Raspberry Pi integration now?"'
+        self.assertIn(gate, block)
+        self.assertIn("bc250-maintenance setup", block[block.index(gate):])
+        self.assertIn("Review or change existing local BC-250 maintenance settings now?", block)
+        self.assertIn("Configure Raspberry Pi integration now?", block)
         self.assertIn("bc250-maintenance companion enable", block)
         self.assertIn("bc250-maintenance backup-export enable", block)
         self.assertIn("dnf install -y rsync-rrsync", block)
-        self.assertIn("HTTP :80", block)
+        self.assertIn("Optional setup verification", block)
+        self.assertIn("verify_local_maintenance_setup", source)
+        self.assertIn("verify_pi_companion_setup", source)
+        self.assertIn("verify_backup_export_setup", source)
         self.assertNotIn("11434", block)
         self.assertNotIn("11435", block)
         self.assertNotIn("11437", block)
+
+    def test_installer_completion_groups_commands_and_surfaces_installed_docs(self) -> None:
+        source = INSTALLER.read_text()
+        for heading in (
+            "Validation / benchmark",
+            "Models / runtime lanes",
+            "Further setup",
+            "Installed documentation",
+            "Important appliance paths",
+        ):
+            self.assertIn(heading, source)
+        for command in (
+            "sudo bc250-verify",
+            "bc250-benchmark --help",
+            "bc250-model list",
+            "sudo bc250-model status production",
+            "bc250-agent-mode status",
+            "sudo bc250-openwebui-setup init",
+            "sudo bc250-maintenance setup",
+            "sudo bc250-maintenance companion enable",
+        ):
+            self.assertIn(command, source)
+        self.assertIn("/usr/share/doc/bc250-llm-server/", source)
+        self.assertIn("docs/FILESTRUCTURE.md", source)
+        self.assertIn("/var/lib/bc250-llm-server/revalidation/results/", source)
+
+    def test_optional_maintenance_top_gate_skips_all_changes_by_default(self) -> None:
+        result = source_probe(r"""
+input_is_interactive() { return 0; }
+yes_no() { return 1; }
+bc250-maintenance() { printf 'UNEXPECTED:%s\n' "$*"; return 99; }
+step_11_maintenance
+""")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Optional maintenance setup skipped", result.stdout)
+        self.assertNotIn("UNEXPECTED:", result.stdout)
 
     def test_backup_export_prepares_ssh_even_when_pi_access_was_skipped(self) -> None:
         result = source_probe(r"""
@@ -524,6 +567,7 @@ dnf() {
   return 0
 }
 bc250-maintenance() { printf 'MAINT:%s\n' "$*"; }
+verify_backup_export_setup() { printf 'VERIFY:backup-export\n'; }
 step_11_maintenance
 """)
         self.assertEqual(result.returncode, 0, result.stdout)

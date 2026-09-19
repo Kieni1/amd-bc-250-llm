@@ -26,7 +26,7 @@ Before 1.0 this is a pre-1.0 greenfield appliance setup. Apply or resume the pac
 state, avoids completed work where practical, applies the TTM/swap baseline,
 prepares optional 40-CU support for the exact running kernel, offers one unified
 model selection, configures Open WebUI, verifies the core appliance result, then
-offers optional office-maintenance/Pi companion setup.
+offers a default-No optional maintenance/Pi gate after core verification.
 
 A normal update has one primary reboot after Fedora/kernel + memory setup. A
 second reboot is requested only when persistent 40-CU mode is already configured
@@ -478,7 +478,7 @@ show_plan() {
   printf '  models                ensure active role models + optional extras\n'
   printf '  Open WebUI            start after models, then apply/status\n'
   printf '  core verification     run before optional power/remote-maintenance setup\n'
-  printf '  maintenance / Pi      optional guided WOL, safe-shutdown and export setup\n'
+  printf '  maintenance / Pi      optional, default-No guided setup after core verification\n'
   printf '  primary reboot        %s\n' "$reboot"
 }
 
@@ -557,7 +557,7 @@ ensure_optional_ssh_server() {
   fi
   if ! yes_no_default_yes "Install Fedora openssh-server for $purpose?"; then
     echo "$purpose skipped; SSH server is unavailable."
-    return 1
+    return 2
   fi
   if ! dnf install -y openssh-server; then
     echo "ERROR: failed to install openssh-server for $purpose." >&2
@@ -569,8 +569,58 @@ ensure_optional_ssh_server() {
   fi
 }
 
+verify_local_maintenance_setup() {
+  local config=/etc/bc250-llm-server/maintenance.env unit mode owner dry_run
+  [[ -r "$config" ]] || { echo "ERROR: maintenance configuration is missing or unreadable: $config" >&2; return 1; }
+  owner="$(stat -c '%u' "$config" 2>/dev/null || true)"
+  mode="$(stat -c '%a' "$config" 2>/dev/null || true)"
+  [[ "$owner" == 0 && "$mode" == 600 ]] || {
+    echo "ERROR: maintenance configuration must be root-owned mode 0600 (found uid=${owner:-?} mode=${mode:-?})." >&2
+    return 1
+  }
+  bc250-maintenance status >/dev/null
+  for unit in owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer; do
+    if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
+      systemctl is-active --quiet "$unit" || {
+        echo "ERROR: enabled maintenance timer is not active: $unit" >&2
+        return 1
+      }
+    fi
+  done
+  if systemctl is-enabled --quiet owui-prune.timer 2>/dev/null; then
+    dry_run="$(sed -n 's/^DRY_RUN=//p' "$config" | tail -1 | tr -d '\"')"
+    [[ "$dry_run" == 1 ]] || {
+      echo "ERROR: newly configured upload pruning must remain DRY_RUN=1." >&2
+      return 1
+    }
+  fi
+}
+
+verify_pi_companion_setup() {
+  id bc250-power-control >/dev/null 2>&1 || { echo "ERROR: Pi power-control account is missing." >&2; return 1; }
+  systemctl is-active --quiet sshd.service || { echo "ERROR: sshd is not active after Pi companion setup." >&2; return 1; }
+  [[ -r /etc/sudoers.d/bc250-power-control ]] || { echo "ERROR: Pi power-control sudo rule is missing." >&2; return 1; }
+  [[ "$(stat -c '%a' /etc/sudoers.d/bc250-power-control 2>/dev/null || true)" == 440 ]] || {
+    echo "ERROR: Pi power-control sudo rule must be mode 0440." >&2
+    return 1
+  }
+  command -v visudo >/dev/null 2>&1 && visudo -cf /etc/sudoers.d/bc250-power-control >/dev/null
+  bc250-maintenance companion status >/dev/null
+}
+
+verify_backup_export_setup() {
+  [[ -x /usr/bin/rrsync ]] || { echo "ERROR: /usr/bin/rrsync is unavailable after backup-export setup." >&2; return 1; }
+  id bc250-backup-export >/dev/null 2>&1 || { echo "ERROR: backup-export account is missing." >&2; return 1; }
+  systemctl is-active --quiet sshd.service || { echo "ERROR: sshd is not active after backup-export setup." >&2; return 1; }
+  [[ -d /var/backups/bc250-llm-server/config && -d /var/backups/bc250-llm-server/users ]] || {
+    echo "ERROR: backup-export directories are missing." >&2
+    return 1
+  }
+  bc250-maintenance backup-export status >/dev/null
+}
+
 step_11_maintenance() {
-  heading "11. OFFICE MAINTENANCE / PI COMPANION"
+  heading "11. OPTIONAL MAINTENANCE / RASPBERRY PI"
   command -v bc250-maintenance >/dev/null 2>&1 || {
     echo "Maintenance helper unavailable; skipping optional setup."
     return 0
@@ -583,46 +633,84 @@ step_11_maintenance() {
     return 0
   fi
 
-  echo "First, configure maintenance performed locally by this BC-250."
-  echo "Raspberry Pi SSH access and optional off-device backup export are separate choices afterward."
-  if yes_no_default_yes "Configure local backups, optional pruning/warm-up, Wake-on-LAN and power saving now?"; then
-    bc250-maintenance setup
-  else
-    echo "Skipped local maintenance policy setup. Run later: sudo bc250-maintenance setup"
+  if ! yes_no "Configure optional maintenance or Raspberry Pi integration now?"; then
+    echo "Optional maintenance setup skipped. Existing configuration was not changed."
+    echo "Run later with: sudo bc250-maintenance setup"
+    return 0
   fi
 
+  local local_state=SKIPPED companion_state=SKIPPED export_state=SKIPPED
   echo
-  echo "Restricted Raspberry Pi maintenance access (optional)"
-  echo "  Prepares a forced-command power-control account and narrow sudo rule."
-  echo "  The Pi keeps its private key; Open WebUI/Ollama application ports are not exposed."
-  if yes_no_default_yes "Prepare the BC-250 side of restricted Raspberry Pi maintenance SSH?"; then
-    if ensure_optional_ssh_server "restricted Pi maintenance access"; then
-      bc250-maintenance companion enable
+  if [[ -f /etc/bc250-llm-server/maintenance.env ]]; then
+    if yes_no "Review or change existing local BC-250 maintenance settings now?"; then
+      bc250-maintenance setup
+      verify_local_maintenance_setup
+      local_state=PASS
+    else
+      echo "Existing local maintenance configuration left unchanged."
+      local_state=UNCHANGED
     fi
+  elif yes_no_default_yes "Configure local BC-250 maintenance now?"; then
+    bc250-maintenance setup
+    verify_local_maintenance_setup
+    local_state=PASS
   else
-    echo "Skipped Pi maintenance access. HTTP :80 remains the office endpoint; no Pi-only application port is opened."
+    echo "Local maintenance setup skipped. Run later: sudo bc250-maintenance setup"
   fi
 
   echo
-  echo "Read-only Raspberry Pi backup export (optional)"
-  echo "  Lets separate restricted Pi keys pull verified config/users backups only."
-  echo "  Local backups continue to work when this remains disabled."
-  if yes_no "Prepare optional read-only Raspberry Pi backup export too?"; then
-    if [[ ! -x /usr/bin/rrsync ]]; then
-      if yes_no_default_yes "Install Fedora rsync-rrsync for read-only backup export?"; then
-        dnf install -y rsync-rrsync
-      else
-        echo "Backup export skipped; /usr/bin/rrsync is unavailable."
-        return 0
+  if yes_no "Configure Raspberry Pi integration now?"; then
+    echo "Restricted Raspberry Pi maintenance access"
+    echo "  Prepares a forced-command power-control account and narrow sudo rule."
+    echo "  The Pi keeps its private key; Open WebUI/Ollama application ports are not exposed."
+    if yes_no_default_yes "Prepare restricted Raspberry Pi maintenance SSH?"; then
+      local ssh_rc=0
+      ensure_optional_ssh_server "restricted Pi maintenance access" || ssh_rc=$?
+      if ((ssh_rc == 0)); then
+        bc250-maintenance companion enable
+        verify_pi_companion_setup
+        companion_state=PASS
+      elif ((ssh_rc == 1)); then
+        companion_state=FAILED
       fi
     fi
-    if ensure_optional_ssh_server "read-only backup export"; then
-      bc250-maintenance backup-export enable
-    else
-      echo "Backup export skipped; restricted SSH is unavailable."
+
+    echo
+    echo "Read-only Raspberry Pi backup export"
+    echo "  Lets separate restricted Pi keys pull verified config/users backups only."
+    echo "  Local backups continue to work when this remains disabled."
+    if yes_no "Prepare read-only Raspberry Pi backup export too?"; then
+      if [[ ! -x /usr/bin/rrsync ]]; then
+        if yes_no_default_yes "Install Fedora rsync-rrsync for read-only backup export?"; then
+          dnf install -y rsync-rrsync
+        else
+          echo "Backup export skipped; /usr/bin/rrsync is unavailable."
+        fi
+      fi
+      if [[ -x /usr/bin/rrsync ]]; then
+        local export_ssh_rc=0
+        ensure_optional_ssh_server "read-only backup export" || export_ssh_rc=$?
+        if ((export_ssh_rc == 0)); then
+          bc250-maintenance backup-export enable
+          verify_backup_export_setup
+          export_state=PASS
+        elif ((export_ssh_rc == 1)); then
+          export_state=FAILED
+        fi
+      fi
     fi
   else
-    echo "Backup export remains disabled; local backups are unchanged."
+    echo "Raspberry Pi integration skipped. Existing Pi configuration was not changed."
+  fi
+
+  echo
+  echo "Optional setup verification"
+  printf '  Local maintenance: %-9s\n' "$local_state"
+  printf '  Pi maintenance:    %-9s\n' "$companion_state"
+  printf '  Backup export:     %-9s\n' "$export_state"
+  if [[ "$companion_state" == FAILED || "$export_state" == FAILED ]]; then
+    echo "ERROR: selected optional setup did not complete successfully." >&2
+    return 1
   fi
 }
 
@@ -688,26 +776,36 @@ main() {
     echo "Persistent 40-CU boot activation is not enabled; live CU routing remains separately managed."
   fi
   echo
-  echo "Useful commands:"
-  echo "  Appliance status:       sudo bc250-status"
   completion_owui_token="${OWUI_TOKEN_FILE:-${BC250_OWUI_TOKEN_FILE:-}}"
+  echo "Validation / benchmark"
+  echo "  sudo bc250-verify"
   if [[ -n "$completion_owui_token" && -f "$completion_owui_token" && -r "$completion_owui_token" ]]; then
-    echo "  Open WebUI status:      sudo bc250-openwebui-setup status --verbose --owui-token-file $completion_owui_token"
+    echo "  sudo bc250-revalidate start --owui-token-file $completion_owui_token"
   else
-    echo "  Open WebUI status:      bc250-openwebui-setup status"
+    echo "  sudo bc250-revalidate start --owui-token-file FILE"
   fi
-  echo "  Reconfigure Open WebUI: sudo bc250-openwebui-setup init"
-  echo "  40-CU status:           sudo bc250-40cu status"
-  if [[ -n "$completion_owui_token" && -f "$completion_owui_token" && -r "$completion_owui_token" ]]; then
-    echo "  Revalidation:           sudo bc250-revalidate start --owui-token-file $completion_owui_token"
-  else
-    echo "  Revalidation (full):    sudo bc250-revalidate start --owui-token-file FILE"
-    echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"
-  fi
-  echo "  Maintenance status:     sudo bc250-maintenance status"
-  echo "  Pi companion status:    sudo bc250-maintenance companion status"
-  echo "  Maintenance contract:   sudo bc250-maintenance contract"
-  echo "  Agent mode:             sudo bc250-agent-mode enter"
+  echo "  bc250-benchmark --help"
+  echo
+  echo "Models / runtime lanes"
+  echo "  bc250-model list"
+  echo "  sudo bc250-model status production"
+  echo "  bc250-agent-mode status"
+  echo
+  echo "Further setup"
+  echo "  sudo bc250-openwebui-setup init"
+  echo "  sudo bc250-maintenance setup"
+  echo "  sudo bc250-maintenance companion enable"
+  echo
+  echo "Installed documentation"
+  echo "  /usr/share/doc/bc250-llm-server/"
+  echo "  Start with: README.md, TLDR.md, docs/COMMANDS.md, MODELS.md"
+  echo "  File/path map: docs/FILESTRUCTURE.md"
+  echo
+  echo "Important appliance paths"
+  echo "  Configuration:          /etc/bc250-llm-server/"
+  echo "  Runtime/model state:    /var/lib/bc250-llm-server/"
+  echo "  Revalidation bundles:   /var/lib/bc250-llm-server/revalidation/results/"
+  echo "  Installer transcript:   $LOG_FILE"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then

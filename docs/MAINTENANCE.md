@@ -22,10 +22,12 @@ For those optional choices, use the guided setup:
 sudo bc250-maintenance setup
 ```
 
-A full interactive `sudo bc250-install` now offers this maintenance setup near
-the end of installation, followed by optional Raspberry Pi companion setup. The
-companion path deliberately uses only office HTTP :80 and restricted SSH :22;
-Wake-on-LAN itself does not require a host firewall port.
+A full interactive `sudo bc250-install` first asks whether **any** optional maintenance
+or Raspberry Pi integration should be configured; the default is No. If accepted, local
+BC-250 maintenance and Raspberry Pi integration are separate choices. Existing local
+maintenance can be left unchanged explicitly. Selected setup is verified before the
+installer finishes. The companion path deliberately uses only office HTTP :80 and
+restricted SSH :22; Wake-on-LAN itself does not require a host firewall port.
 
 Re-running setup updates the existing private configuration. Disable all
 maintenance and power timers without deleting data with:

@@ -84,6 +84,7 @@ readonly -a EDGE_GENERIC_MODELS=(
 # thermal warning/qualification ceiling.
 readonly EDGE_MIN_RESIDENCY_RATIO=0.90
 readonly EDGE_MIN_MEM_AVAILABLE_MIB=128
+readonly EDGE_TIGHT_MEM_AVAILABLE_MIB=512
 readonly EDGE_MAX_TEMP_C=85
 readonly EDGE_SEVERE_CONTEXT_TOKENS=4096
 
@@ -1056,6 +1057,7 @@ write_edge_policy() {
 {
   "min_residency_ratio": $EDGE_MIN_RESIDENCY_RATIO,
   "min_mem_available_mib": $EDGE_MIN_MEM_AVAILABLE_MIB,
+  "tight_mem_available_mib": $EDGE_TIGHT_MEM_AVAILABLE_MIB,
   "max_temp_c": $EDGE_MAX_TEMP_C,
   "severe_context_tokens": $EDGE_SEVERE_CONTEXT_TOKENS,
   "models": {
@@ -1179,6 +1181,15 @@ for model, limits in policy["models"].items():
     model_checks["mem_available_min_mib"] = mem_min
     if mem_min < float(policy["min_mem_available_mib"]):
         failures.append(f"{model}: MemAvailable floor {mem_min:.0f} MiB < {policy['min_mem_available_mib']} MiB")
+    elif mem_min < float(policy["tight_mem_available_mib"]):
+        diagnostics.append({
+            "model": model,
+            "case_id": "resource-headroom",
+            "kind": "resource-headroom",
+            "mem_available_min_mib": mem_min,
+            "hard_floor_mib": float(policy["min_mem_available_mib"]),
+            "tight_threshold_mib": float(policy["tight_mem_available_mib"]),
+        })
 
     temps = [
         float(r.get("metrics", {}).get("temp_max_c"))
@@ -1230,7 +1241,7 @@ PY_EDGE
 }
 
 record_edge_diagnostics() {
-  local sanity_json="$1" label="$2" model case_id previous prompt_eval
+  local sanity_json="$1" label="$2" model case_id previous prompt_eval mem hard tight
   [[ -r $sanity_json ]] || return 0
   while IFS=$'\t' read -r model case_id previous prompt_eval; do
     [[ -n $model ]] || continue
@@ -1239,7 +1250,20 @@ record_edge_diagnostics() {
     else
       record_event "$label" diagnostic info "$model $case_id: context truncation observed at $prompt_eval prompt tokens; policy=PASS (not severe)"
     fi
-  done < <(jq -r '.diagnostics[]? | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
+  done < <(jq -r '.diagnostics[]? | select(.kind == "context-truncation") | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
+  while IFS=$'\t' read -r model mem hard tight; do
+    [[ -n $model ]] || continue
+    record_event "$label" diagnostic info "$model: resource headroom tight: MemAvailable minimum ${mem} MiB (< ${tight} MiB diagnostic threshold; hard floor ${hard} MiB); policy=PASS"
+  done < <(jq -r '.diagnostics[]? | select(.kind == "resource-headroom") | [.model, (.mem_available_min_mib|floor|tostring), (.hard_floor_mib|floor|tostring), (.tight_threshold_mib|floor|tostring)] | @tsv' "$sanity_json")
+}
+
+record_quality_diagnostics() {
+  local jsonl="$1" label="$2" model case_id done_reason
+  [[ -r $jsonl ]] || return 0
+  while IFS=$'\t' read -r model case_id done_reason; do
+    [[ -n $model ]] || continue
+    record_event "$label" diagnostic info "$model $case_id: output reached generation budget (done_reason=${done_reason:-unknown}); acceptance=PASS"
+  done < <(jq -r 'select(.outcome == "pass" and ((.diagnostics // []) | index("output-budget"))) | [.model, .case_id, (.done_reason // "unknown")] | @tsv' "$jsonl")
 }
 
 diagnostic_report() {
@@ -1305,6 +1329,7 @@ phase_roles() {
   warm_embedding >/dev/null 2>&1 || true
   run_step roles rag-quality quality qualification_benchmark bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
   run_step roles usecase quality qualification_benchmark bc250-benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
+  record_quality_diagnostics "$RAW/roles/production-usecase/results/results.jsonl" production-usecase
   checkpoint roles/final
   write_phase_report production-role-results roles
 }
