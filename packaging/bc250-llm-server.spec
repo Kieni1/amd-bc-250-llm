@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        0.4%{?dist}
+Release:        1.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,34 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.4
+- Record final BC-250 RAG finalist evidence and keep Gemma E4B / bc250-office-documents as the production document/RAG default for the 16 GiB profile; Qwen 9B remains a separate heavier general-office option.
+- Restore benchmark residency sets with each Ollama lane's normal keep-alive policy instead of forcing 30m, and rename the resident-session swap metric to the precise swap_peak_delta_mib.
+- Reconcile current source-validation, main-lane wording and RAG evidence documentation without changing runtime topology, model bytes, hard resource policy or MTP behavior.
+
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.3
+- Restore the starting Ollama model residency set after direct RAG qualification and fail closed when set restoration cannot be verified.
+- Expose RAG resident-session MemAvailable start/min/end/delta plus swap start/peak/end/peak delta in canonical summaries.
+- Carry forward the 1.2 Ruff/executable-mode fix and all 1.1/WIP installer, RAG, Open WebUI and MTP changes unchanged.
+
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.2
+- Fix model-manager installer output helper closure binding so Ruff B023 passes without suppressions or behavior changes.
+- Preserve models/modelctl.py as an executable source file; the RPM install manifest continues to install the model controller as mode 0755.
+- Carry forward the 1.1 RAG/Open WebUI/MTP and unpublished 0.5 installer/maintenance refinements unchanged.
+
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.1
+- Carry forward the unpublished 0.5 installer/diagnostic refinements and strengthen direct RAG qualification without changing runtime topology or model defaults.
+- Make RAG acceptance boundary-aware for dates/numbers/IDs/currency, add explicit semantic-alternative and numeric-value fixture contracts, and report language-neutral answers without false language failures.
+- Separate RAG retrieval/fact/language/citation/abstention checks and add exact expected-case completeness reporting so partial result streams cannot appear complete.
+- Resolve Open WebUI RAG benchmarks through the live active preset/base-model mapping before creating temporary Knowledge state, and use bounded HTTP readiness rather than service state alone.
+- Harden MTP comparison cleanup so process-group signals require verified SID/PGID ownership; fall back to signaling only the launched child when ownership cannot be proven.
+
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.5
+- Gate optional maintenance/Pi setup behind one default-No installer question, separate local maintenance from Pi integration, and verify selected maintenance/SSH/export state after setup.
+- Group post-install guidance into concise validation, models/runtime-lanes and further-setup blocks; surface installed documentation and key configuration/state/evidence paths on the appliance.
+- Keep revalidation thresholds unchanged while surfacing tight (<512 MiB) MemAvailable headroom and accepted output-budget exhaustion as non-failing Diagnostics.
+- This 0.5 source line is still in progress; packaging/archive and external qualification remain pending.
+
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.4
 - Harden the experimental MTP lane before first BC-250 qualification: exact-ID candidates, protected-state verification, safe llama-server privilege drop, launch resource/port/stale-process preflight, and same-model no-MTP versus MTP comparison evidence.
 - Expand the disabled MTP catalog to Qwen3.5 9B, Qwen3.6 27B control, Qwen3.8 27B HauhauCS IQ2_M and Qwen3.6 35B-A3B while keeping MTP outside generic convergence and production roles.

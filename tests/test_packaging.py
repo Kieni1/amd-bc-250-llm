@@ -399,6 +399,20 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertNotIn("think:false", source)
 
+    def test_compare_mtp_proves_process_group_ownership_before_group_signal(self) -> None:
+        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("process_group_owned()", source)
+        self.assertIn('ps -o sid= -p "$pid"', source)
+        self.assertIn('ps -o pgid= -p "$pid"', source)
+        self.assertIn('"$sid" == "$pid" && "$pgid" == "$pid"', source)
+        self.assertIn('signal_server TERM "$pgid"', source)
+        self.assertIn('signal_server KILL "$pgid"', source)
+        self.assertIn("signaling only the direct child", source)
+        self.assertNotIn('kill -TERM -- "-$ACTIVE_PGID"', source)
+        self.assertNotIn('kill -KILL -- "-$ACTIVE_PGID"', source)
+
     def test_mtp_evidence_records_acceptance_and_opt_in_ubatch(self) -> None:
         runner = (ROOT / "models/mtp/run-mtp-llamacpp.sh").read_text(encoding="utf-8")
         self.assertIn('UBATCH="${UBATCH:-}"', runner)

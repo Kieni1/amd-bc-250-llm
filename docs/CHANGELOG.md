@@ -1,5 +1,48 @@
 # Changelog
 
+## 0.11.3-1.4 - 2026-09-19
+
+- Record the completed BC-250 RAG finalist campaign. `bc250-office-documents` / Gemma E4B remains the production document/RAG default on the current 16 GiB profile: both finalists passed short authenticated Open WebUI RAG, but Gemma completed 42/42 continuous-residency turns with about 2.7 GiB MemAvailable remaining while Qwen 9B reached the campaign's 512 MiB safety floor after only a few resident subruns. Qwen remains the separate higher-quality general-office option; this is a sustained-memory-margin decision, not a semantic-quality rejection.
+- Make RAG residency restoration preserve the starting model **set** while allowing each Ollama service's configured/default keep-alive policy to apply; stop forcing a synthetic 30-minute lifetime when reloading pre-existing models.
+- Rename the resident-session summary field from the inaccurate `cumulative_swap_growth_mib` to `swap_peak_delta_mib`, matching its actual definition: peak observed swap minus starting swap.
+- Reconcile current development memory with completed deterministic source validation and clarify that port 11434 is an interactive main/product-role lane. GPT-OSS remains the deep-reasoning and worst-case-memory production reference, not a permanently warm universal main model.
+- Keep whole-appliance resource thresholds, Open WebUI desired state, model bytes, runtime topology and MTP behavior unchanged. The final RAG hardware evidence was collected on exact installed 0.11.3-0.4 and is not relabelled as 1.4 qualification.
+
+## 0.11.3-1.3 - 2026-09-19
+
+- Make direct `rag-quality` state-preserving: snapshot the starting model residency on the main and embedding Ollama lanes, isolate the benchmark as before, then restore and verify the starting residency set on every exit path. Restoration failure is infrastructure failure rather than a warning.
+- Extend the existing telemetry contract instead of adding another sampler: RAG qualification now records per-request MemAvailable start/min/end/drift and swap start/peak/end, and canonical RAG summaries expose the chronological resident-session view including swap peak delta.
+- Reload restoration is model-type neutral: the shared Ollama client first tries the normal generation load path and falls back to `/api/embed` for embedding-only registrations.
+- Keep the current RAG quality thresholds, 128 MiB hard floor / 512 MiB informational headroom policy, model choices, Open WebUI configuration and long-residency experiment scope unchanged.
+- Release 1.3 remains pre-release source work until external RPM build and exact-source BC-250 qualification are completed.
+
+## 0.11.3-1.2 - 2026-09-19
+
+- Fix the model-manager install/convergence output helper so nested header rendering binds the current label/provider explicitly, resolving Ruff B023 without suppressions or behavioral compatibility code.
+- Keep `models/modelctl.py` executable in the source artifact (`0755`); the existing RPM install manifest continues to install it as executable mode `0755`.
+- Carry forward the 0.11.3-1.1 RAG/Open WebUI/MTP hardening and the unpublished 0.11.3-0.5 installer/maintenance changes unchanged. No model, runtime topology, benchmark policy, or qualification threshold changes are introduced by 1.2.
+- Release 1.2 remains pre-release source work until external RPM build and exact-source BC-250 qualification are completed.
+
+## 0.11.3-1.1 - 2026-09-19
+
+- Carry the unpublished 0.11.3-0.5 installer/maintenance and revalidation-diagnostic refinements forward into the next RPM release line; production models, service topology, MTP model/runtime settings and hard resource thresholds remain unchanged.
+- Fix deterministic RAG acceptance false negatives by using boundary-aware matching for phrases/dates/numbers/IDs/currency instead of naïve substring checks. Add explicit `required_any_groups` and case-scoped `numeric_values` fixture contracts rather than fuzzy or LLM-based grading.
+- Add deterministic RAG language evidence with `match`, `other` and `not-measurable` states. Language-neutral numeric/identifier answers can remain valid without being falsely claimed as a positive language match.
+- Keep direct RAG scoring dimensions independent: target retrieval, all-required-source retrieval, fact/abstention, language and citation are recorded separately, with compatibility answer/citation fields retained for existing evidence consumers.
+- Add exact expected-case completeness checks to canonical summaries used by `rag-quality`; missing, duplicate or unexpected case IDs are structural failures and remain separate from semantic quality and infrastructure status.
+- Make `owui-rag` resolve the real Open WebUI model surface before creating temporary benchmark state: exact active preset IDs are accepted directly, raw Ollama base IDs auto-resolve only when one active preset matches, and ambiguous/unknown selections fail with actionable preset IDs. Only the sanitized active preset-to-base mapping is retained in benchmark metadata.
+- Treat Open WebUI HTTP response, not merely service activation, as readiness for the product-path RAG benchmark; allow a bounded five-minute startup window for slow restarts.
+- Harden MTP comparison cleanup so process-group signals require proof that the launched llama-server PID is both the session leader and process-group leader; otherwise signal only the direct child.
+- Release 1.1 remains pre-release source work until final deterministic/package/archive closure, external RPM build and exact-source BC-250 qualification are complete.
+
+## 0.11.3-0.5 - 2026-09-19
+
+- Improve the guided installer maintenance UX: ask once whether any optional maintenance/Pi setup is wanted, default to no, then keep local BC-250 maintenance and Raspberry Pi integration as independent choices. Existing local policy can be left unchanged explicitly.
+- Verify selected optional setup instead of merely printing status: protected maintenance configuration, enabled timer activity, dry-run pruning safety, restricted Pi account/sudo/SSH state and read-only export prerequisites are checked after configuration.
+- Replace the long flat installer command tail with compact Validation/benchmark, Models/runtime lanes and Further setup blocks, followed by the installed documentation root and the important `/etc`, `/var/lib`, revalidation-results and installer-log paths.
+- Keep revalidation PASS/FAIL policy unchanged while making two non-failing conditions visible under `Diagnostics`: tight resource headroom below 512 MiB MemAvailable (hard failure remains 128 MiB) and accepted use cases that reach their generation output budget.
+- Release 0.5 is still an in-progress source iteration; packaging/archive closure and external/device qualification are intentionally pending.
+
 ## 0.11.3-0.4 - 2026-09-18
 
 - Harden the experimental MTP lane before its first BC-250 hardware campaign: `bc250-run-mtp` now verifies protected manager state/SHA, refuses an occupied port or stale llama-server, enforces a launch-memory floor, validates runtime flags/access, and launches the external server as the `ollama` service user rather than root.
