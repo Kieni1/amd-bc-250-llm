@@ -37,11 +37,11 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.3
-RPM Release   1.6%{?dist}
-NVR           bc250-llm-server-0.11.3-1.6
+RPM Release   1.7%{?dist}
+NVR           bc250-llm-server-0.11.3-1.7
 ```
 
-The current `0.11.3-1.6` source is a pre-v1.0 source-validated integration line on top of
+The current `0.11.3-1.7` source is a pre-v1.0 source-validated integration line on top of
 the release-closed 0.11.3-0.4 MTP/model-manager baseline. It carries forward the unpublished
 installer/maintenance and revalidation-diagnostic refinements, deterministic RAG/Open WebUI
 qualification, and the safe MTP cleanup contract. Release 1.5 carries that RAG decision forward and fixes the embedding-only residency reload probe
@@ -49,33 +49,33 @@ exposed by exact installed 1.4; pre-benchmark model **sets** are restored using 
 RAG/document role remains Gemma E4B / `bc250-office-documents` on the current 16 GiB profile;
 Qwen 9B remains a separate heavier higher-quality general-office option. Existing hard resource
 thresholds, GPU/device-error handling, runtime topology, GGUF provenance/SHA policy, model bytes,
-MTP settings and CU/governor policy are unchanged.
+MTP settings and CU/governor policy are unchanged. Release 1.7 is an operator-boundary cleanup,
+not an architecture/model release: `bc250-status` reuses the canonical topology classifier, RAG/HF
+explicit token files enforce private permissions, raw `bc250-code` modes reject outer Markdown
+fences, installer completion reports Open WebUI state separately, safe-power wording matches its
+conservative both-endpoint guard, and upload pruning no longer assumes a 50-item page size.
 
 Current source validation is **SOURCE PASS**: the full deterministic `make validate` gate completes
-with **403/403 tests PASS**, including 146 benchmark tests and the new lane-default keep-alive
-restoration regression. Changed Python compiles, and packaged shell syntax is checked separately at
+with **413/413 tests PASS**, including the current task-evaluator, MTP residency-lifecycle and
+installer MTP-inventory regressions. Changed Python compiles, and packaged shell syntax is checked separately at
 release closure. GitHub RPM/SRPM build and exact-source BC-250 runtime qualification remain external;
 source validation must not be confused with hardware qualification.
 
-Newest complete real-device appliance evidence is exact installed
-`bc250-llm-server-0.11.3-0.4.fc44.x86_64` from 2026-09-19. The refined guided installer
-completed with the expected concise model pass and `bc250-verify` reported 54 ok / 0 warn /
-0 fail. Revalidation v4.2 completed in 13:56 with infrastructure/restoration PASS, full
-coverage and quality **8 pass / 0 quality-fail / 0 skipped**. Task passed 6/6 including the
-previously failing `tags-de` case; direct translation 8/8, direct RAG 4/4, production use
-cases 5/5, agent 3/3, Open WebUI translation 8/8 and Open WebUI RAG 3/3 also passed.
-GPT-OSS/Jina remained within policy but reached only 193.36 MiB minimum MemAvailable and
-recorded non-severe 8662 -> 8320 context truncation. `office-draft-e2b` passed semantic
-acceptance with an `output-budget` diagnostic. Exact evidence and bundle SHA are recorded
-in `development/model-runs/2026-09-19-installed-0.11.3-0.4-revalidation.md`.
+Newest full current-line revalidation execution is exact installed
+`bc250-llm-server-0.11.3-1.6.fc44.x86_64` from 2026-09-19. Guided install/core verification passed
+54/0/0; v4.2 completed with infrastructure/restoration PASS and FULL coverage. RAG passed 4/4 and
+Jina residency restoration succeeded, closing the exact-1.4 empty-embed restoration defect. Quality
+was scored 7 pass / 1 fail only because `tags-en` returned `Document Analysis`, `Text Recognition`
+and `Multilingual Data` while the fixture did not recognize `Text Recognition` as an OCR synonym.
+Current source fixes that narrow evaluator vocabulary gap without lowering the two-group relevance
+threshold or changing the task model/prompt. GPT-OSS/Jina remained within policy at 79.293 tok/s,
+156.266 MiB minimum MemAvailable, 17.066 MiB swap peak delta and 72 C max temperature; 8662 -> 8320
+prompt truncation remained a non-severe diagnostic. Exact evidence is in
+`development/model-runs/2026-09-19-installed-0.11.3-1.6-revalidation.md`.
 
-Exact installed `0.11.3-1.4.fc44` now adds newer but incomplete current-line evidence. The guided
-upgrade/install completed successfully and the core verifier was 54/0/0. Revalidation reached
-RAG semantic acceptance 4/4, then correctly failed infrastructure because Jina embedding residency
-could not be restored: the embedding-only fallback used an empty `/api/embed` input rejected by
-Ollama 0.34. The same partial run reported task 5/6 with `tags-en: relevance`. Release 1.5 fixes only
-the restoration probe and installer no-op output; task quality policy is unchanged. Evidence is in
-`development/model-runs/2026-09-19-installed-0.11.3-1.4-partial-revalidation.md`.
+Exact 0.11.3-0.4 remains the newest all-green 8/8 quality run under its then-current fixtures and
+retains the broader historical role/quality evidence. Exact 1.4 remains useful failure evidence for
+the restoration defect but is superseded operationally by the successful 1.6 restoration run.
 
 A separate final RAG finalist campaign on the same exact installed 0.11.3-0.4 generation now
 settles the production document/RAG answer role for the current 16 GiB profile. Both Gemma E4B and
@@ -84,6 +84,11 @@ completed 42/42 continuous-residency product-path turns with roughly 2.7 GiB Mem
 while Qwen reached the campaign's configured 512 MiB safety floor after only a few resident subruns.
 This is a sustained-memory-margin decision, not a Qwen semantic-quality failure. Exact evidence is
 recorded in `development/model-runs/2026-09-19-rag-finalist-qualification.md`.
+
+MTP is now explicitly modeled as a standalone opt-in external llama.cpp runtime, not another Ollama
+service lane. Installer Stage 7 shows read-only/non-indexed MTP state but never fetches it. Direct
+`bc250-run-mtp` snapshots and drains reachable Ollama residency, then restores the exact pre-run set;
+`bc250-compare-mtp` uses drain-only isolation and intentionally leaves Ollama cold after evidence.
 
 The project remains **pre-v1.0**. Do not invent migration/backward-compatibility burdens
 that the current source does not impose.
@@ -444,7 +449,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.6` leaves it unchanged. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.7` leaves it unchanged. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -526,7 +531,7 @@ write native reasoning before a useful final answer and could also exhaust its 3
 budget before a complete answer. Those are product-path completion/integrity defects, not
 reasons to weaken the benchmark or retire Ornith.
 
-The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.6` carries that product route forward unchanged: separated thinking/final
+The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.7` carries that product route forward unchanged: separated thinking/final
 content, terminal-completion checks, explicit truncation refusal and reasoning-marker
 rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
 package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
@@ -1207,7 +1212,7 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-1.6 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.6 device qualification remain pending; exact installed 0.11.3-0.4 is still the newest complete whole-appliance evidence and must not be relabelled as 1.6; support/power hardware qualification remains pending;
+- current 0.11.3-1.7 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.7 device qualification remain pending; exact installed 1.6 is the newest full current-line revalidation execution, while exact 0.11.3-0.4 remains the newest all-green 8/8 run under its historical fixtures; neither may be relabelled as 1.7; support/power hardware qualification remains the next active device lane;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
@@ -1228,7 +1233,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-build the exact 0.11.3-1.6 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
+1. GitHub-build the exact 0.11.3-1.7 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
    plus RPM/source artifact SHA before making a current-release hardware claim.
 2. Run one bounded exact-source appliance verification/revalidation pass, including installer optional-
    setup behavior and the non-failing tight-resource/output-budget diagnostics.

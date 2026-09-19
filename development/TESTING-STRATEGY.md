@@ -42,7 +42,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-1.6 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
+The current 0.11.3-1.7 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
 must be behind one default-No gate, local maintenance and Pi integration remain independent,
 and selected setup must be checked rather than assumed successful. Post-install guidance should
 point at a small set of next commands plus the installed documentation/config/state/evidence paths;
@@ -103,7 +103,7 @@ added after much of the older hardware evidence.
 
 Exact 0.11.3-0.4 has now completed the read-only/install/whole-appliance baseline: verifier
 54/0/0 and v4.2 infrastructure/restoration/full coverage PASS with quality 8/8. Preserve that
-artifact as historical evidence for exact 0.4. Current 0.11.3-1.6 has completed the deterministic
+artifact as historical evidence for exact 0.4. Current 0.11.3-1.7 has completed the deterministic
 source gate; do not relabel the 0.4 hardware evidence as current. After GitHub builds and the exact
 1.4 RPM is installed, run one exact-source verification/revalidation gate, then continue support
 operations with:
@@ -349,8 +349,10 @@ Only run more MTP work to answer a concrete unresolved question:
 
 Do not reopen the full four-depth sweep. Do not add more MTP framework unless new hardware evidence
 shows a concrete measurement or lifecycle defect. `bc250-compare-mtp` remains the same-target evidence
-harness; `bc250-run-mtp [--no-mtp] ID` remains the manual diagnostic path. Performance and semantic
-quality remain separate lanes, and MTP stays separate from support/WOL/power testing.
+harness; `bc250-run-mtp [--no-mtp] ID` remains the manual diagnostic path. Both paths drain all
+reachable Ollama residency before llama.cpp starts. Direct operator runs restore the captured set on
+exit; qualification/comparison uses `drain-only` and deliberately leaves Ollama cold. Performance and
+semantic quality remain separate lanes, and MTP stays separate from support/WOL/power testing.
 
 ## 7. Routine revalidation vs specialist campaigns
 
@@ -383,3 +385,24 @@ no regression of another production role
 
 When a candidate is rejected, record **Retest only if** conditions so future work does
 not repeat a disproven experiment without a material reason.
+## 2026-09-19 operator-boundary hardening for 0.11.3-1.7
+
+The current release closes several source-review boundary defects without changing appliance
+topology or model defaults. Deterministic source coverage must preserve these contracts:
+
+- `bc250-status` obtains `normal|degraded|stopped|agent` from the existing agent-mode classifier;
+  agent inactivity alone must never imply a healthy normal topology.
+- Explicit Open WebUI/Hugging Face token files are private credential files: regular, non-empty and
+  not group/world accessible. Environment-provided tokens remain separate ephemeral inputs.
+- `bc250-code` file-producing/structured modes reject an outer Markdown fence rather than silently
+  stripping it or atomically writing fenced source.
+- Installer completion reports Open WebUI baseline state independently from core verification;
+  skipped/retry-required application setup remains nonfatal but visible.
+- Safe-power remains deliberately conservative about protected TCP activity on either endpoint;
+  wording/tests must not imply only inbound UI sessions are considered.
+- Upload pruning must not assume an Open WebUI page size. Continue until zero records, advertised
+  total completion, or no new IDs, while preserving uncertain metadata from deletion.
+
+These are source/unit boundaries. The upcoming support/maintenance device campaign still owns real
+S5 WOL, busy/defer, idle/allow, backup/export, timer and recovery qualification.
+

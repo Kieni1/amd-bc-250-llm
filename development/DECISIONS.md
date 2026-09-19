@@ -366,7 +366,7 @@ identity has changed.
 
 ## DEC-016 — Gate optional installer maintenance once and surface marginal PASS evidence
 
-**Status:** ACTIVE — carried forward in 0.11.3-1.5.
+**Status:** ACTIVE — carried forward in 0.11.3-1.7.
 
 **Decision:** The guided full installer must finish core appliance verification before any
 optional maintenance or Raspberry Pi work, then ask one top-level default-No question. If the
@@ -398,7 +398,7 @@ without new evidence and an explicit policy decision.
 
 ## DEC-017 — Keep RAG qualification deterministic and dimension-separated
 
-**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward in 0.11.3-1.5.
+**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward in 0.11.3-1.7.
 
 **Decision:** Direct `rag-quality` qualification must remain deterministic and reviewable.
 Acceptance terms use normalized token boundaries so shorter dates, numbers, identifiers or
@@ -567,3 +567,52 @@ is optional and only justified if preferred-role promotion is being considered.
 rigorous same-current-package YMQ/HauhauCS comparator is needed, YMQ is being promoted, the
 model/quant/runtime changes materially, or a materially new product/hardware/runtime condition creates
 a justified retest hypothesis. Do not rerun the retired 35B stock configuration unchanged.
+
+## DEC-022 — Protect explicit credential files consistently
+
+**Status:** ACTIVE — introduced in 0.11.3-1.7.
+
+**Decision:** Any explicit package credential-file argument used for Open WebUI or Hugging Face
+authentication must fail closed unless the target is a regular, non-empty file with no group/world
+permission bits (normally mode `0600`). The RAG importer and model manager enforce the same contract
+already used by Open WebUI setup/verification. Environment variables such as `OPEN_WEBUI_API_KEY`
+and `HF_TOKEN` remain separate ephemeral credential inputs and are not subjected to filesystem
+permission checks.
+
+Do not silently chmod an operator-supplied secret and do not accept a permissive file merely because
+the documentation recommends mode 0600. Report the path/mode problem without printing secret
+contents.
+
+**Why:** A source review found that Open WebUI setup/verification enforced private token files while
+`bc250-rag-import` and `bc250-model --token-file` simply read them. The inconsistent implementation
+made the package's credential-hygiene promise weaker at exactly the operator boundary where a leaked
+API/HF token matters.
+
+**Retest only if:** a supported credential provider requires a non-file secret transport, Fedora
+permission semantics materially change, or a specific integration needs an explicitly documented
+ACL-based alternative. Do not weaken the default private-file rule for convenience.
+
+
+## DEC-023 — Keep MTP standalone and isolate Ollama residency explicitly
+
+**Status:** ACTIVE — introduced in the final 0.11.3-1.7 source refinement.
+
+**Decision:** Keep MTP as a standalone opt-in external llama.cpp runtime, not another persistent
+Ollama/service lane. The model manager owns only catalog/provenance/source lifecycle for MTP. The
+installer may show read-only MTP operational state, but MTP remains non-selectable by normal model
+convergence and is never fetched implicitly.
+
+Before any MTP llama.cpp launch, snapshot every reachable package Ollama lane and drain all resident
+models so unified-memory headroom and performance are not contaminated. A direct operator
+`bc250-run-mtp` owns the temporary lifecycle and restores the exact pre-run residency set on exit,
+using each lane's configured/default keep-alive behavior. `bc250-compare-mtp` and specialist
+qualification use `drain-only` isolation and intentionally leave Ollama cold afterward. Neither path
+changes normal/agent service topology. Restoration failure on the direct path is a command failure.
+
+**Why:** MTP competes for the same ~16 GiB UMA as Ollama. Warm Ollama residency can invalidate both
+fit and throughput evidence. At the same time, turning MTP into another persistent service/mode would
+add lifecycle complexity without a product requirement. The split preserves clean experimental
+isolation while keeping normal operator use state-preserving.
+
+**Retest only if:** the external llama.cpp runtime or Ollama unload/load APIs change, MTP becomes a
+first-class product role, or real-device evidence shows restoration/isolation is unreliable.

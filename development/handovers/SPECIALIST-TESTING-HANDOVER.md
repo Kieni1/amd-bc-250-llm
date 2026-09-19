@@ -35,8 +35,13 @@ Suggested lane references:
 - RAG: `docs/RAG.md`, `config/openwebui/desired-state.json`; direct `rag-quality` must preserve starting Ollama residency set, use a non-empty embed probe for embedding-only reloads, and report resident-session MemAvailable/swap state;
 - translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
 - general/main: `MODELS.md`, generation/usecase benchmarks;
-- agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling;
-- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; broad BC-250 qualification is now complete enough for package use. Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B have passing same-target baseline/MTP evidence under the reviewed llama.cpp Vulkan runtime. The 35B-A3B stock 8K/full-GPU configuration is a retired fit failure. Corrected draft-depth testing keeps depth 2 for Qwen3.6/HauhauCS; Qwen3.5 depth 2 is the strongest exploratory candidate but packaged depth 3 remains until optional confirmation-grade evidence justifies a default change. YMQ passes at depth 2; further optimization is optional only if it is being promoted. Generic installer selection and combined `apply all` / `refresh all` never select MTP; preparation remains explicit. Do not reopen broad MTP campaigns without a concrete product question.
+- agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling; raw file-producing/commit
+  contracts reject outer Markdown fences rather than silently stripping them;
+- support/maintenance: `docs/MAINTENANCE.md`, `docs/MAINTENANCE-CONTRACT.md`,
+  `cmd/maintenance/maintenance.sh`, `safe-power.sh`, backup/restore/prune helpers. This is the next
+  active hardware lane: read-only inspection first, then real S5 WOL, busy/defer, idle/allow,
+  recovery/restoration, local backup/restore, and only then optional Pi/backup-export paths.
+- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; broad BC-250 qualification is now complete enough for package use. Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B have passing same-target baseline/MTP evidence under the reviewed llama.cpp Vulkan runtime. The 35B-A3B stock 8K/full-GPU configuration is a retired fit failure. Corrected draft-depth testing keeps depth 2 for Qwen3.6/HauhauCS; Qwen3.5 depth 2 is the strongest exploratory candidate but packaged depth 3 remains until optional confirmation-grade evidence justifies a default change. YMQ passes at depth 2; further optimization is optional only if it is being promoted. Generic installer selection and combined `apply all` / `refresh all` never select MTP; installer Stage 7 only shows a read-only non-indexed MTP inventory. `bc250-run-mtp` drains resident Ollama models and restores the pre-run set on direct use; `bc250-compare-mtp` uses drain-only isolation and intentionally leaves Ollama cold. Preparation remains explicit. Do not reopen broad MTP campaigns without a concrete product question.
 
 ## Required specialist handoff
 

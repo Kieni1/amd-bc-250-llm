@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source-validated 0.11.3-1.6
+# BC-250 support / operations handover — current source-validated 0.11.3-1.7
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,11 +10,11 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.3
-RPM Release:  1.6
+RPM Release:  1.7
 source base:  release-closed 0.11.3-0.4 + carried 0.5 installer/diagnostic work + bounded RAG integration/safety refinement
 ```
 
-Current 0.11.3-1.6 is source-validated but not yet RPM/device-qualified. It carries the optional
+Current 0.11.3-1.7 is source-validated but not yet RPM/device-qualified. It carries the optional
 maintenance/Pi UX, post-configuration verification, tight-resource/output-budget diagnostics,
 deterministic RAG/Open WebUI qualification and safe MTP cleanup forward. RAG residency restoration
 now guarantees the starting model set while allowing each Ollama service to apply its normal
@@ -38,12 +38,19 @@ RAG semantic acceptance was 4/4, and the worker then failed closed because the J
 residency reload used an empty `/api/embed` probe. Release 1.5 fixed that probe with non-empty input while retaining service-default keep-alive behavior; current 1.6 carries the fix forward unchanged. See
 `development/model-runs/2026-09-19-installed-0.11.3-1.4-partial-revalidation.md`.
 
+
+Exact installed `0.11.3-1.6.fc44` subsequently completed the full v4.2 revalidation: installer/core verify 54/0/0, infrastructure/restoration PASS and FULL coverage. RAG passed 4/4 and Jina residency restoration succeeded, closing the earlier empty-embed restoration defect. The only scored quality miss was task `tags-en` 5/6; its actual response used `Text Recognition`, which current source now accepts as an OCR synonym without lowering the two-group relevance threshold. GPT-OSS/Jina passed the edge policy at 79.293 tok/s with 156.266 MiB minimum MemAvailable, 17.066 MiB swap peak delta and 72 C max temperature. See `development/model-runs/2026-09-19-installed-0.11.3-1.6-revalidation.md`.
+
+MTP is operationally standalone from the Ollama lanes. Stage 7 shows read-only MTP state without
+selectable indexes or implicit fetch. Direct `bc250-run-mtp` drains all reachable Ollama residency and
+restores the captured set when llama.cpp exits; comparison/qualification selects drain-only isolation
+and deliberately leaves Ollama cold. Service topology itself is not switched for MTP.
+
 ## Validation ownership
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. Current `0.11.3-1.6` completes the deterministic source gate with
-403/403 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
-build and exact 0.11.3-1.6 BC-250 execution is not yet claimed; exact 1.4 has partial install/revalidation evidence only.
+runtime/hardware qualification. Current `0.11.3-1.7` source remains the active release line; deterministic counts must be taken from the final artifact closure after this refinement. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
+build and exact 0.11.3-1.7 BC-250 execution is not yet claimed; exact 1.4 has partial install/revalidation evidence only.
 
 ## Normal service topology
 
@@ -164,8 +171,8 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-Finish the current `0.11.3-1.6` source iteration first; do not spend hardware time on an
-intermediate package. Once 1.6 is frozen, GitHub-build/install the exact RPM, capture NEVRA plus
+Finish the current `0.11.3-1.7` source iteration first; do not spend hardware time on an
+intermediate package. Once 1.7 is frozen, GitHub-build/install the exact RPM, capture NEVRA plus
 RPM/source SHA, and run one bounded source-change check:
 
 ```text
