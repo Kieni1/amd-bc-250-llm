@@ -322,7 +322,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 "qwen3.6-27b-mtp",
                 "qwen3.8-27b-hauhaucs-mtp",
                 "qwen3.8-27b-ymq-xs-ti-mtp",
-                "qwen3.6-35b-a3b-mtp",
             ],
         )
         self.assertTrue(all(model["provider"] == "download-only" for model in models))
@@ -332,6 +331,14 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertEqual(qwen38["qwen3.8-27b-hauhaucs-mtp"]["draft"], 2)
         self.assertEqual(qwen38["qwen3.8-27b-ymq-xs-ti-mtp"]["context"], 8192)
         self.assertEqual(qwen38["qwen3.8-27b-ymq-xs-ti-mtp"]["draft"], 2)
+
+
+    def test_failed_mtp_35b_candidate_is_source_graveyard_only(self) -> None:
+        active = (ROOT / "models/mtp/models.toml").read_text(encoding="utf-8")
+        graveyard = (ROOT / "models/mtp/graveyard.toml").read_text(encoding="utf-8")
+        self.assertNotIn('id = "qwen3.6-35b-a3b-mtp"', active)
+        self.assertIn('id = "qwen3.6-35b-a3b-mtp"', graveyard)
+        self.assertIn("128 MiB MemAvailable hard floor", graveyard)
 
     def test_mtp_filtered_view_preserves_global_catalog_indexes(self) -> None:
         _defaults, mtp_only = modelctl.load_models(

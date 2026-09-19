@@ -1,0 +1,16 @@
+schema = 1
+
+# Source-only MTP graveyard. Entries here are deliberately excluded from the
+# installed active MTP catalog and therefore from normal list/fetch/run/compare
+# discovery. Preserve exact historical definitions and failure rationale here
+# when a candidate has no current retest path.
+[[models]]
+id = "qwen3.6-35b-a3b-mtp"
+provider = "download-only"
+repository = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
+revision = "latest"
+gguf = "Qwen3.6-35B-A3B-UD-IQ3_S.gguf"
+context = 8192
+draft = 2
+retired = "2026-09-19"
+reason = "Stock 8K/full-GPU baseline crossed the 128 MiB MemAvailable hard floor before MTP inference; no active retest hypothesis."

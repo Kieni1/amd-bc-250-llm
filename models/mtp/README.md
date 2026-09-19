@@ -10,26 +10,37 @@ the MTP category entirely, even when `--include-disabled` is supplied. `bc250-fe
 explicit opt-in workflow and deliberately exposes those disabled experiment definitions. MTP entries
 intentionally have no Ollama Modelfile.
 
-## Current first-campaign set
+## Current qualification / optimization state
 
-The first hardware funnel is deliberately small and ordered from the safest useful target
-toward the heavier candidates:
+Historical Phase-1 BC-250 evidence on exact installed `0.11.3-0.4` established:
 
 ```text
-qwen3.5-9b-mtp             Unsloth Qwen3.5 9B UD-Q4_K_XL       primary safe candidate
-qwen3.6-27b-mtp            Unsloth Qwen3.6 27B UD-Q2_K_XL      retained control
-qwen3.8-27b-hauhaucs-mtp   HauhauCS Qwen3.8 27B IQ2_M          Qwen3.8 control (~10.32 GB)
-qwen3.8-27b-ymq-xs-ti-mtp  ZeroDigest Qwen3.8 27B YMQ XS-TI    Qwen3.8 challenger (~10.2 GB)
-qwen3.6-35b-a3b-mtp        Unsloth Qwen3.6 35B-A3B UD-IQ3_S    heavyweight challenger
+qwen3.5-9b-mtp             PASS   highest absolute speed; strongest short-generation gains
+qwen3.6-27b-mtp            PASS   strongest sustained long-generation MTP gain; tightest passing memory margin
+qwen3.8-27b-hauhaucs-mtp   PASS   more memory headroom; excellent baseline/MTP parity
+qwen3.8-27b-ymq-xs-ti-mtp  PENDING matched Qwen3.8 challenger added after the historical Phase-1 batch
 ```
 
-Test one candidate at a time. Do not preload the whole set merely because it is cataloged.
-The catalog `draft` values are conservative first-run settings for this 16 GiB BC-250,
-not claims about each upstream model's maximum useful speculative depth. The HauhauCS and
-YMQ entries both exercise native/embedded MTP in their selected text GGUFs. HauhauCS is the
-Qwen3.8 27B control; YMQ XS-TI is the same-class architecture-aware mixed-precision challenger
-with a slightly smaller published file size. The separate HauhauCS FastMTP sidecar is intentionally
-outside this first package-owned hardware batch.
+The retired 35B-A3B result is a baseline/model-fit safety failure, not an MTP speed failure: the
+first baseline load crossed the 128 MiB hard floor before speculative inference began. Because no
+current retest hypothesis remains, its exact definition now lives only in `graveyard.toml` and is
+not installed or discovered by the active MTP workflow. Historical evidence remains under
+`development/model-runs/`.
+
+Phase 2 is now draft-depth optimization for the three Phase-1 passers. The first long depth sweep
+accidentally repeated the catalog defaults, so it is repeatability/noise-floor evidence only; do not
+use it to select a depth. Repeated defaults varied at roughly 0.01–0.19% throughput CV, so require
+approximately >=1.0% balanced improvement over the catalog default before changing a packaged depth.
+A corrected hardware canary proved `DRAFT_N_MAX=1` reaches the effective Qwen3.5 runtime path; the
+canary itself is not depth-selection evidence.
+
+Keep the corrected exploratory grid bounded to depths 1,2,3,4 on the three passing models, with
+256- and 1024-token budgets. Every point must prove the requested depth matches the effective
+server configuration. If one non-default depth materially wins, confirm only that model/depth with
+higher repeats.
+
+The packaged entries remain `enabled = false`; MTP stays explicit opt-in and separate from normal
+model convergence.
 
 ## Prepare one experiment
 
@@ -91,8 +102,9 @@ bc250-run-mtp --no-mtp qwen3.5-9b-mtp
 ```
 
 Exact IDs are preferred. Convenience aliases exist only for interactive use:
-`qwen35-9b`, `qwen36-27b`, `qwen38-27b`, `qwen36-35b`. The YMQ challenger intentionally
-has no convenience alias; use exact ID `qwen3.8-27b-ymq-xs-ti-mtp` in evidence.
+`qwen35-9b`, `qwen36-27b`, `qwen38-27b`. The YMQ challenger intentionally has no convenience
+alias; use exact ID `qwen3.8-27b-ymq-xs-ti-mtp` in evidence. Retired MTP entries have no alias and
+are not accepted by the active runner.
 
 `PORT`, `CTX` and `DRAFT_N_MAX` override catalog values. `UBATCH=384` remains an explicit
 gfx1013 stability-control A/B only when the affected model/runtime path warrants it; an
@@ -121,7 +133,10 @@ cache/KV, ubatch and request settings:
 The default comparison performs three identical requests per phase and writes one evidence
 directory plus a `.tar.gz`. The bundle contains package/runtime identity, verified model
 status/SHA, exact server logs/flags, per-request responses/timing, sampled MemAvailable and
-swap, accepted/proposed draft counts, speedup, kernel journal evidence and cleanup state.
+swap, accepted/proposed draft counts, speedup, kernel journal evidence and cleanup state. It also
+records catalog/requested/effective draft depth and refuses MTP evidence when the requested depth
+is not present in the actual llama-server flags. The baseline phase is likewise checked to ensure
+MTP was not accidentally enabled.
 
 The comparison fails closed when completion integrity is invalid, the server dies, severe
 GPU/kernel fault evidence is observed, or MTP draft-acceptance telemetry is absent. Missing

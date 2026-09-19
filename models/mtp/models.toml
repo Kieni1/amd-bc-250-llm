@@ -50,12 +50,3 @@ gguf = "Qwen3.8-27B-Uncensored-YMQ-XS-TI.gguf"
 context = 8192
 draft = 2
 
-[[models]]
-enabled = false
-provider = "download-only"
-id = "qwen3.6-35b-a3b-mtp"
-repository = "unsloth/Qwen3.6-35B-A3B-MTP-GGUF"
-revision = "latest"
-gguf = "Qwen3.6-35B-A3B-UD-IQ3_S.gguf"
-context = 8192
-draft = 2
