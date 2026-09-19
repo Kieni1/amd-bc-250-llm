@@ -379,14 +379,20 @@ from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cac
 runtime and the OS. Draft/MTP heads are not standalone Ollama role models and stay in the dedicated MTP
 workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from combined
 `apply all` / `refresh all` convergence regardless of their enabled flag; explicit
-`bc250-fetch-mtp` / `apply mtp` remains the preparation boundary. Historical Phase-1 BC-250
-evidence on exact installed 0.11.3-0.4 passed `qwen3.5-9b-mtp`, `qwen3.6-27b-mtp` and
-`qwen3.8-27b-hauhaucs-mtp` with deterministic baseline/MTP quality parity. The stock
-The retired `qwen3.6-35b-a3b-mtp` 8K/full-GPU configuration crossed the hard memory floor during
-baseline load before MTP inference. It has moved to the source-only MTP graveyard and is no longer
-part of routine list/fetch/run discovery. The new `qwen3.8-27b-ymq-xs-ti-mtp` remains an unqualified
-matched challenger to the HauhauCS Qwen3.8 control. `bc250-fetch-mtp [SELECTION]` is the explicit
-opt-in downloader/reconciler. Qualification/optimization should use `bc250-compare-mtp ID`, which
-compares the same GGUF/build/settings with MTP off versus on and now records/verifies the effective
-draft depth; `bc250-run-mtp ID` remains the manual runtime/debug path.
+`bc250-fetch-mtp` / `apply mtp` remains the preparation boundary.
+
+Current BC-250 MTP qualification is complete enough for package use under the reviewed external
+llama.cpp Vulkan runtime. Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B
+all have passing same-target baseline/MTP evidence with deterministic quality parity. The retired
+`qwen3.6-35b-a3b-mtp` stock 8K/full-GPU configuration crossed the hard memory floor during baseline
+load before MTP inference; it remains source-graveyard-only and absent from routine MTP discovery.
+
+Corrected draft-depth testing supports keeping depth 2 for Qwen3.6 27B and HauhauCS Qwen3.8 27B.
+YMQ is qualified at depth 2 and is a serious long-generation alternative, but it did not show a
+runtime-memory advantage over HauhauCS. Qwen3.5 depth 2 is the strongest exploratory optimization
+candidate, with a material advantage over the packaged depth-3 default, but confirmation-grade
+repeats are still preferred before changing that default. `bc250-fetch-mtp [SELECTION]` remains the
+explicit opt-in downloader/reconciler. Qualification/optimization uses `bc250-compare-mtp ID`, which
+compares the same GGUF/build/settings with MTP off versus on and records/verifies effective draft
+depth; `bc250-run-mtp ID` remains the manual runtime/debug path.
 

@@ -12,35 +12,60 @@ intentionally have no Ollama Modelfile.
 
 ## Current qualification / optimization state
 
-Historical Phase-1 BC-250 evidence on exact installed `0.11.3-0.4` established:
+MTP is qualified enough for current package use as an explicit opt-in experimental lane on the
+BC-250 with the reviewed external llama.cpp Vulkan runtime. It is **not** part of normal installer
+convergence and no active production role depends on it.
+
+Current evidence summary:
 
 ```text
-qwen3.5-9b-mtp             PASS   highest absolute speed; strongest short-generation gains
-qwen3.6-27b-mtp            PASS   strongest sustained long-generation MTP gain; tightest passing memory margin
-qwen3.8-27b-hauhaucs-mtp   PASS   more memory headroom; excellent baseline/MTP parity
-qwen3.8-27b-ymq-xs-ti-mtp  PENDING matched Qwen3.8 challenger added after the historical Phase-1 batch
+qwen3.5-9b-mtp             PASS   fastest absolute model; strongest short-generation gains
+qwen3.6-27b-mtp            PASS   strongest sustained gain of the original set; tightest passing memory margin
+qwen3.8-27b-hauhaucs-mtp   PASS   more memory headroom; excellent deterministic/parity behavior
+qwen3.8-27b-ymq-xs-ti-mtp  PASS   faster baseline decode and stronger long-form absolute MTP throughput than HauhauCS in the reviewed run
 ```
 
 The retired 35B-A3B result is a baseline/model-fit safety failure, not an MTP speed failure: the
-first baseline load crossed the 128 MiB hard floor before speculative inference began. Because no
-current retest hypothesis remains, its exact definition now lives only in `graveyard.toml` and is
-not installed or discovered by the active MTP workflow. Historical evidence remains under
-`development/model-runs/`.
+first baseline load crossed the 128 MiB hard floor before speculative inference began. Its exact
+definition remains in `graveyard.toml` for source history, but it is not installed or discovered by
+the active MTP workflow and should not be rerun unchanged.
 
-Phase 2 is now draft-depth optimization for the three Phase-1 passers. The first long depth sweep
-accidentally repeated the catalog defaults, so it is repeatability/noise-floor evidence only; do not
-use it to select a depth. Repeated defaults varied at roughly 0.01–0.19% throughput CV, so require
-approximately >=1.0% balanced improvement over the catalog default before changing a packaged depth.
-A corrected hardware canary proved `DRAFT_N_MAX=1` reaches the effective Qwen3.5 runtime path; the
-canary itself is not depth-selection evidence.
+The first long Phase-2 draft-depth campaign accidentally repeated catalog defaults and is **not**
+valid for depth selection. It is retained as repeatability/noise-floor evidence: typical throughput
+CV was approximately 0.01–0.19%, so sub-percent differences should not drive package defaults. The
+corrected hardware canary proved requested draft depth reaches the emitted llama-server flags, and
+the corrected sweep then applied depths 1, 2, 3 and 4 successfully to all three original passers.
 
-Keep the corrected exploratory grid bounded to depths 1,2,3,4 on the three passing models, with
-256- and 1024-token budgets. Every point must prove the requested depth matches the effective
-server configuration. If one non-default depth materially wins, confirm only that model/depth with
-higher repeats.
+Current draft-depth conclusions:
+
+```text
+qwen3.5-9b-mtp             packaged depth 3; depth 2 is the strongest exploratory candidate
+qwen3.6-27b-mtp            keep depth 2
+qwen3.8-27b-hauhaucs-mtp   keep depth 2
+qwen3.8-27b-ymq-xs-ti-mtp  qualified at depth 2; further depth tuning is optional only if preferred-role promotion is contemplated
+```
+
+Qwen3.5 depth 2 showed a material exploratory advantage (about +4% balanced versus depth 3 and a
+much larger long-generation gain than the default), well above the measured noise floor. Keep the
+packaged depth-3 default until confirmation-grade repeats are available if changing the default is
+important. Do not repeat the full sweep merely to reconfirm already-settled models.
+
+YMQ XS-TI qualified with deterministic baseline/MTP quality parity and clean safety/restoration.
+Compared with the earlier HauhauCS Qwen3.8 evidence, YMQ had roughly 4–5% faster baseline decode and
+better absolute MTP throughput at longer generations, but somewhat lower observed memory headroom.
+GGUF file size is therefore not a sufficient runtime-memory proxy.
+
+Further MTP work is optional and question-driven only:
+
+- confirm Qwen3.5 depth 2 with 3 performance repeats / 2 quality repeats at 256 and 1024 tokens only
+  if changing the package default matters;
+- run a same-current-package HauhauCS comparator only if a rigorous YMQ/HauhauCS memory comparison is
+  required;
+- explore YMQ depth 1 only if YMQ is being considered for a preferred package role.
 
 The packaged entries remain `enabled = false`; MTP stays explicit opt-in and separate from normal
-model convergence.
+model convergence. Broad MTP qualification should not be reopened without a materially new product,
+model, runtime or hardware question.
 
 ## Prepare one experiment
 

@@ -18,6 +18,7 @@ repository = "unsloth/Qwen3.5-9B-MTP-GGUF"
 revision = "latest"
 gguf = "Qwen3.5-9B-UD-Q4_K_XL.gguf"
 context = 16384
+# Depth 2 is the strongest exploratory result; keep 3 until confirmation-grade promotion evidence.
 draft = 3
 
 [[models]]
@@ -48,5 +49,6 @@ repository = "zerodigest/Qwen3.8-27B-Uncensored-YMQ-MTP-GGUF"
 revision = "latest"
 gguf = "Qwen3.8-27B-Uncensored-YMQ-XS-TI.gguf"
 context = 8192
+# Phase-1-qualified on BC-250; depth optimization is optional, not required for current package use.
 draft = 2
 
