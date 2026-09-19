@@ -330,7 +330,7 @@ Prerequisites:
   tested and must be recorded.
 
 Prepare and verify one MTP model at a time. The first funnel is 9B -> retained 27B
-control -> Qwen3.8 27B -> 35B-A3B; stop when a candidate no longer has a useful case:
+control -> Qwen3.8 27B HauhauCS control -> Qwen3.8 27B YMQ XS-TI challenger -> 35B-A3B; stop when a candidate no longer has a useful case:
 
 ```bash
 bc250-model list mtp --all

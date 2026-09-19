@@ -40,7 +40,7 @@ Older exact-release evidence remains historical rather than being rewritten as c
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — full deterministic `make validate` completed for the current source: 401/401 tests PASS; Python compileall and packaged shell syntax also pass | PENDING/EXTERNAL | N/A | source validation is complete; RPM/SRPM and exact-source device qualification remain separate external gates |
+| repository/unit validation | SOURCE PASS — full deterministic `make validate` completed for the current source: 402/402 tests PASS; Python compileall and packaged shell syntax also pass | PENDING/EXTERNAL | N/A | source validation is complete; RPM/SRPM and exact-source device qualification remain separate external gates |
 | RPM build/install | source metadata targets 0.11.3-1.4; no RPM/SRPM build is claimed from this environment | PENDING/EXTERNAL | HISTORICAL REAL DEVICE — exact refined 0.11.3-0.4.fc44 guided install completed with verifier 54/0/0 | build/install exact 1.4 externally before claiming current-release hardware qualification |
 | normal service topology | SOURCE PASS — unchanged by 1.4 | external | HISTORICAL REAL DEVICE — exact 0.11.3-0.4 v4.2 revalidation/restoration PASS | verify again only after exact 1.4 installation; 1.4 does not intentionally alter topology |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 Open WebUI reachable/drift none | power/support campaign remains separate |
@@ -67,7 +67,7 @@ Older exact-release evidence remains historical rather than being rewritten as c
 | agent mode restoration | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 restoration PASS | 1.4 does not alter lane topology; rerun in exact-source qualification |
 | OCR comparison | SOURCE PASS | external | HISTORICAL REAL DEVICE | GLM leads current small fidelity baseline; unchanged |
 | MTP lifecycle/runner/catalog | SOURCE PASS — 0.4 exact-ID/provenance/preflight/privilege and generic-exclusion contracts are unchanged; later source additionally requires SID+PGID ownership proof before negative-PID process-group cleanup | external llama.cpp | PENDING runtime qualification | RAG selection is closed; run the separate bounded MTP campaign one candidate at a time without additional framework work |
-| MTP speedup/acceptance | SOURCE PASS — comparison contract now uses the same GGUF/build/settings for baseline MTP-off versus MTP-on and captures acceptance/resource/journal evidence | N/A | PENDING | start with qwen3.5-9b-mtp, then retained qwen3.6-27b control, qwen3.8-27b challenger, then 35B-A3B only if prior evidence justifies it; speed alone is insufficient |
+| MTP speedup/acceptance | SOURCE PASS — comparison contract now uses the same GGUF/build/settings for baseline MTP-off versus MTP-on and captures acceptance/resource/journal evidence | N/A | PENDING | start with qwen3.5-9b-mtp, then retained qwen3.6-27b control; compare HauhauCS Qwen3.8 27B control against YMQ XS-TI challenger before 35B-A3B, one candidate at a time; speed alone is insufficient |
 
 ## How to update this matrix
 
