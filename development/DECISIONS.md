@@ -360,7 +360,7 @@ identity has changed.
 
 ## DEC-016 — Gate optional installer maintenance once and surface marginal PASS evidence
 
-**Status:** ACTIVE — carried forward in 0.11.3-1.4.
+**Status:** ACTIVE — carried forward in 0.11.3-1.5.
 
 **Decision:** The guided full installer must finish core appliance verification before any
 optional maintenance or Raspberry Pi work, then ask one top-level default-No question. If the
@@ -392,7 +392,7 @@ without new evidence and an explicit policy decision.
 
 ## DEC-017 — Keep RAG qualification deterministic and dimension-separated
 
-**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward in 0.11.3-1.4.
+**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward in 0.11.3-1.5.
 
 **Decision:** Direct `rag-quality` qualification must remain deterministic and reviewable.
 Acceptance terms use normalized token boundaries so shorter dates, numbers, identifiers or
@@ -447,8 +447,11 @@ improvements only; this contract does not introduce a new memory or swap failure
 **Why:** Current RAG testing showed that per-case swap deltas can hide cumulative pressure while a
 model remains resident, and external harnesses had to restore residency themselves after isolation.
 State restoration and chronological resource visibility are therefore benchmark-integrity concerns,
-not model-tuning features. Reusing the existing client and sampler keeps the pre-v1.0 implementation
-small and avoids a second lifecycle/telemetry framework.
+not model-tuning features. Exact installed 0.11.3-1.4 subsequently confirmed the fail-closed boundary:
+RAG quality passed 4/4, but Jina restoration failed because the embedding-only fallback supplied an
+empty `/api/embed` input that Ollama 0.34 rejects. Release 1.5 fixes the probe payload without changing
+the restoration contract or lane keep-alive policy. Reusing the existing client and sampler keeps the
+pre-v1.0 implementation small and avoids a second lifecycle/telemetry framework.
 
 **Retest only if:** Ollama changes its residency/load semantics, a benchmark legitimately needs to
 leave residency changed by explicit operator request, or repeated BC-250 evidence justifies a new

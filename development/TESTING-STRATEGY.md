@@ -42,7 +42,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-1.4 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
+The current 0.11.3-1.5 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
 must be behind one default-No gate, local maintenance and Pi integration remain independent,
 and selected setup must be checked rather than assumed successful. Post-install guidance should
 point at a small set of next commands plus the installed documentation/config/state/evidence paths;
@@ -103,7 +103,7 @@ added after much of the older hardware evidence.
 
 Exact 0.11.3-0.4 has now completed the read-only/install/whole-appliance baseline: verifier
 54/0/0 and v4.2 infrastructure/restoration/full coverage PASS with quality 8/8. Preserve that
-artifact as historical evidence for exact 0.4. Current 0.11.3-1.4 has completed the deterministic
+artifact as historical evidence for exact 0.4. Current 0.11.3-1.5 has completed the deterministic
 source gate; do not relabel the 0.4 hardware evidence as current. After GitHub builds and the exact
 1.4 RPM is installed, run one exact-source verification/revalidation gate, then continue support
 operations with:
@@ -211,7 +211,9 @@ Future RAG work should therefore proceed in layers without reopening the answer-
 
 Direct `rag-quality` isolation must also be state-preserving. Snapshot the main and embedding
 Ollama residency sets before unloading anything, restore and verify the starting residency sets on every
-exit path, and treat restoration failure as infrastructure failure. Resource evidence should show
+exit path, and treat restoration failure as infrastructure failure. Embedding-only restoration must use
+a real non-empty `/api/embed` probe; unit coverage must assert that payload directly so source tests do
+not accept a request Ollama rejects at runtime. Resource evidence should show
 resident-session MemAvailable start/min/end/delta and swap start/peak/end/`swap_peak_delta_mib` so
 sustained pressure is visible without falsely describing peak-minus-start swap as cumulative growth.
 These measurements are diagnostics/evidence; do not invent new thresholds from one campaign.
