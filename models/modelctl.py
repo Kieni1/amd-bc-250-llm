@@ -1413,10 +1413,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
         label = model.get("name", model["id"])
         header_printed = False
 
-        def show_header(
-            current_label: str = label,
-            current_provider: str = model["provider"],
-        ) -> None:
+        def show_header(current_label: str, current_provider: str) -> None:
             nonlocal header_printed
             if not header_printed:
                 print(f"\n>>> {current_label} [{current_provider}]")
@@ -1430,7 +1427,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 destination=args.destination or os.environ.get("DEST"),
             )
             if not summarize_current:
-                show_header()
+                show_header(label, model["provider"])
             if model["provider"] == "ollama-hf":
                 if args.revision is not None or args.sha256 is not None or args.destination:
                     raise ModelError(
@@ -1452,7 +1449,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                     else:
                         print("    already current; skipping")
                     continue
-                show_header()
+                show_header(label, model["provider"])
                 reason = reconciliation_reason(
                     inspection,
                     force_download=force_download,
@@ -1497,7 +1494,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 if not summarize_current:
                     print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
             else:
-                show_header()
+                show_header(label, model["provider"])
                 minimum = (
                     args.min_free_bytes
                     if args.min_free_bytes is not None
@@ -1556,7 +1553,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 print(f"    recorded SHA-256 {checksum}")
 
             if model["provider"] == "download-only":
-                show_header()
+                show_header(label, model["provider"])
                 print("    ready for llama.cpp")
                 continue
 
@@ -1577,12 +1574,12 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 if summarize_current and not source_metadata_changed:
                     current_skipped += 1
                     continue
-                show_header()
+                show_header(label, model["provider"])
                 if source_metadata_changed:
                     print("    refreshed source metadata/permissions")
                 print("    already current; skipping")
                 continue
-            show_header()
+            show_header(label, model["provider"])
             reason = reconciliation_reason(
                 inspection,
                 force_download=force_download,
@@ -1600,7 +1597,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 registrations.add(model["name"])
             print("    registered with Ollama")
         except (ModelError, OSError) as error:
-            show_header()
+            show_header(label, model["provider"])
             print(f"    ERROR: {error}", file=sys.stderr)
             failures.append(label)
 

@@ -53,7 +53,7 @@ for value in "$PORT" "$NUM_PREDICT" "$REPEATS" "$READY_TIMEOUT" "$INFER_TIMEOUT"
   [[ "$value" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: numeric comparison settings must be positive integers." >&2; exit 2; }
 done
 ((PORT <= 65535)) || { echo "ERROR: PORT must be <= 65535." >&2; exit 2; }
-for cmd in awk curl date grep jq journalctl kill pgrep rpm sed setsid sha256sum ss sudo tar; do
+for cmd in awk curl date grep jq journalctl kill pgrep ps rpm sed setsid sha256sum ss sudo tar tr; do
   command -v "$cmd" >/dev/null || { echo "ERROR: missing command: $cmd" >&2; exit 1; }
 done
 
@@ -82,19 +82,23 @@ rpm -q mesa-vulkan-drivers vulkan-loader > "$RESULT_DIR/graphics-packages.txt" 2
 sudo "$MANAGER" status mtp "$choice" --include-disabled --source "$SOURCE_FILE" --verbose \
   > "$RESULT_DIR/model-status.txt" 2>&1
 
-cleanup() {
-  if [[ -n "$SAMPLER_PID" ]] && kill -0 "$SAMPLER_PID" 2>/dev/null; then
-    kill "$SAMPLER_PID" 2>/dev/null || true
-    wait "$SAMPLER_PID" 2>/dev/null || true
-  fi
-  if [[ -n "$ACTIVE_PGID" ]] && kill -0 "$ACTIVE_PGID" 2>/dev/null; then
-    kill -TERM -- "-$ACTIVE_PGID" 2>/dev/null || true
-    sleep 1
-    kill -KILL -- "-$ACTIVE_PGID" 2>/dev/null || true
-    wait "$ACTIVE_PGID" 2>/dev/null || true
+process_group_owned() {
+  local pid="$1" sid pgid
+  sid="$(ps -o sid= -p "$pid" 2>/dev/null | tr -d '[:space:]')"
+  pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]')"
+  [[ -n "$sid" && -n "$pgid" && "$sid" == "$pid" && "$pgid" == "$pid" ]]
+}
+
+signal_server() {
+  local signal="$1" pid="$2"
+  kill -0 "$pid" 2>/dev/null || return 0
+  if process_group_owned "$pid"; then
+    kill "-$signal" -- "-$pid" 2>/dev/null || true
+  else
+    echo "WARNING: cannot prove SID/PGID ownership for llama-server PID $pid; signaling only the direct child." >&2
+    kill "-$signal" "$pid" 2>/dev/null || true
   fi
 }
-trap cleanup EXIT INT TERM
 
 resource_sampler() {
   local pgid="$1" output="$2"
@@ -129,13 +133,13 @@ has_reserved_token_run() {
 stop_server() {
   local pgid="$1"
   if kill -0 "$pgid" 2>/dev/null; then
-    kill -TERM -- "-$pgid" 2>/dev/null || true
+    signal_server TERM "$pgid"
     for _ in $(seq 1 20); do
       kill -0 "$pgid" 2>/dev/null || break
       sleep 0.25
     done
     if kill -0 "$pgid" 2>/dev/null; then
-      kill -KILL -- "-$pgid" 2>/dev/null || true
+      signal_server KILL "$pgid"
     fi
   fi
   local rc=0
@@ -143,6 +147,18 @@ stop_server() {
   ACTIVE_PGID=""
   return "$rc"
 }
+
+cleanup() {
+  if [[ -n "$SAMPLER_PID" ]] && kill -0 "$SAMPLER_PID" 2>/dev/null; then
+    kill "$SAMPLER_PID" 2>/dev/null || true
+    wait "$SAMPLER_PID" 2>/dev/null || true
+  fi
+  SAMPLER_PID=""
+  if [[ -n "$ACTIVE_PGID" ]] && kill -0 "$ACTIVE_PGID" 2>/dev/null; then
+    stop_server "$ACTIVE_PGID" || true
+  fi
+}
+trap cleanup EXIT INT TERM
 
 run_phase() {
   local phase="$1" mode_arg="$2"

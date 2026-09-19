@@ -392,9 +392,11 @@ before run state is created. The worker remains systemd-owned; Ctrl-C detaches a
 `--detach` returns immediately. The dashboard reports stage elapsed time, worker
 state and the age of the last real progress event rather than treating a periodic
 heartbeat as progress.
-Harness v4.2 also surfaces non-failing resource observations such as context truncation
-under a separate `Diagnostics` section. These diagnostics do not weaken or replace the
-existing infrastructure/quality gates. Intermediate successful phases use lighter
+Harness v4.2 also surfaces non-failing observations under a separate `Diagnostics`
+section. This includes non-severe context truncation, a MemAvailable minimum below the
+512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
+floor, and accepted use cases that reach their generation output budget. These diagnostics
+do not weaken or replace the existing infrastructure/quality gates. Intermediate successful phases use lighter
 checkpoints while high-value topology/restoration boundaries retain full snapshots.
 
 Revalidation tests only promoted package defaults. Configuration-decision work
@@ -470,6 +472,12 @@ package-owned setting, change only the named benchmark setting, use temporary
 knowledge/file state, and restore the original value. Restoration failure is an
 infrastructure failure. Routine revalidation does not run these A/B sweeps.
 
+For `owui-rag`, `MODEL` can be either an exact active Open WebUI preset ID or a raw Ollama
+base model that maps to exactly one active preset. Resolution happens through authenticated
+Open WebUI metadata before temporary benchmark knowledge/upload state is created. Ambiguous
+or unknown base-model selections fail early and report matching/valid preset IDs rather than
+falling through to a generic Open WebUI `Model not found` response.
+
 Generation and coexistence reporting emphasizes resident size, minimum
 `MemAvailable`, swap start/peak/end/delta, temperature and request outcomes. Generation
 also records completion-integrity state, effective local Ollama runtime/KV evidence when
@@ -528,7 +536,10 @@ sudo bc250-maintenance clean-cache
 sudo bc250-maintenance disable
 ```
 
-`setup --defaults` enables verified local backups only. Manual maintenance runs show
+The full installer asks one default-No question before entering optional maintenance/Pi
+setup. If accepted, local maintenance and Pi integration are separate choices; selected
+setup receives post-configuration checks. `setup --defaults` enables verified local
+backups only. Manual maintenance runs show
 only the current systemd invocation instead of a historical journal tail. Upload
 pruning preflights the protected Open WebUI credential before starting its unit; a
 missing/placeholder key fails with the active age/ceiling/dry-run policy and never
@@ -594,3 +605,17 @@ and verified CU changes after dedicated confirmation while preserving
 back Fedora upgrades or shrink filesystems. Ordinary
 `dnf remove bc250-llm-server.x86_64` retains persistent data. Read
 [`UNINSTALL.md`](UNINSTALL.md) first.
+
+## Installed documentation and important paths
+
+The RPM installs operator documentation under:
+
+```text
+/usr/share/doc/bc250-llm-server/
+```
+
+Start with `README.md`, `TLDR.md`, `docs/COMMANDS.md`, `MODELS.md` and
+`docs/FILESTRUCTURE.md`. Important live paths are `/etc/bc250-llm-server/` for package
+configuration, `/var/lib/bc250-llm-server/` for manager/runtime state,
+`/var/lib/bc250-llm-server/revalidation/results/` for final revalidation bundles, and
+`/var/log/bc250-llm-install.log` for the guided-installer transcript.
