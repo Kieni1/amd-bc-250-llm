@@ -11,13 +11,18 @@ BC-250 RAG finalist decision while preserving the existing appliance architectur
 policy.
 
 The Qwen3.8 candidate additions below are a pre-publication same-NVR source refinement. Any prior
-1.4 source hash/artifact must therefore be distinguished from these final bytes; no hardware evidence
+1.4 source hash/artifact must therefore be distinguished from the current bytes; no hardware evidence
 is silently transferred between same-NVR artifacts.
 
 ## Changes in 1.4
 
 - Same-release pre-publication refinement: add bounded Qwen3.8 27B experiments while keeping all production model roles unchanged. `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` is the 10.1 GB deployability/RAG-oriented text candidate at 16K with non-thinking sampling; the existing 11.8 GB IQ3_S entry is retuned as the quality-first main-model experiment at 8K with thinking-mode sampling.
 - Add disabled download-only `qwen3.8-27b-ymq-xs-ti-mtp` (10.2 GB published GGUF) as a Qwen3.8 27B MTP challenger against the existing HauhauCS IQ2_M control (~10.32 GB), with matched 8K context and draft depth 2. This is catalog inclusion only, not BC-250 MTP qualification.
+
+- Record the completed historical MTP Phase-1 evidence from exact installed `0.11.3-0.4`: Qwen3.5 9B, Qwen3.6 27B and HauhauCS Qwen3.8 27B all passed same-target baseline-vs-MTP performance/quality qualification; the Qwen3.6 35B-A3B stock 8K/full-GPU baseline crossed the 128 MiB memory floor before MTP inference and must not be rerun unchanged.
+- Retire the Qwen3.6 35B-A3B MTP definition from the active catalog after that confirmed stock-fit failure. Preserve its exact definition in the source-only `models/mtp/graveyard.toml` plus historical run evidence; it is no longer offered by routine MTP list/fetch/run/compare workflows.
+- Remove the flaky installer host-simulation regression that mocked `dnf` but depended on real absolute package files appearing. Keep only the deterministic source contract that backup-export setup invokes the SSH-preparation helper; production installer behavior is unchanged.
+- Treat MTP Phase 2 as optimization rather than requalification. The first long draft-depth sweep accidentally repeated catalog defaults and is retained only as low-variance/noise-floor evidence; a corrected hardware canary proved draft-depth overrides reach the runtime. `bc250-compare-mtp` now records catalog/requested/effective draft depth and refuses evidence when the requested depth is absent from the emitted llama-server flags. Packaged draft defaults remain unchanged until the corrected sweep shows approximately >=1% balanced improvement.
 
 - Record the final RAG finalist evidence from exact installed `0.11.3-0.4`: both Gemma E4B and
   Qwen 9B were strong on broad direct retrieval and short authenticated Open WebUI RAG, but Gemma
@@ -67,14 +72,16 @@ revalidation policy remains unchanged.
 
 ## Evidence boundary
 
-The RAG finalist campaign is real-device evidence for exact installed
-`bc250-llm-server-0.11.3-0.4.fc44.x86_64`. It justifies the current model-role decision, but it does
-not make 1.4 exact-source hardware-qualified. Real arbitrary office PDFs/Tika/OCR edge cases and
-collection update/delete/re-import workflows remain a separate product-evidence gate.
+The RAG finalist and MTP Phase-1 campaigns are real-device evidence for exact installed
+`bc250-llm-server-0.11.3-0.4.fc44.x86_64`. They justify the current RAG role decision and MTP
+qualification/optimization state, but they do not make 1.4 exact-source hardware-qualified. Real
+arbitrary office PDFs/Tika/OCR edge cases and collection update/delete/re-import workflows remain a
+separate RAG product-evidence gate; the corrected MTP Phase-2 depth sweep and new YMQ challenger
+comparison remain pending.
 
 ## Source validation
 
-- `make validate`: **402/402 PASS**
+- `make validate`: **403/403 PASS**
 - Python `compileall` for `cmd`, `models` and `tests`: PASS
 - `bash -n` across packaged/source shell scripts: PASS
 - `models/modelctl.py`: source mode remains `0755`
