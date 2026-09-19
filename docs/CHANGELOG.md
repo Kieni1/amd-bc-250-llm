@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.11.3-1.7 - 2026-09-19
+
+- Fix `bc250-status` mode derivation: the summary now reuses `bc250-agent-mode status` semantics and can report normal, degraded, stopped or exclusive agent mode instead of calling every agent-inactive state normal.
+- Enforce the package credential-file boundary consistently: RAG `--token-file` and Hugging Face model-manager `--token-file` inputs must be non-empty regular files with no group/world access. Environment-provided credentials remain separate ephemeral inputs.
+- Make `bc250-code` fail closed when `generate`, `refactor`, `test` or `commit` returns an outer Markdown code fence; `review` and `document` still allow Markdown. Atomic output replacement remains unchanged.
+- Make guided-installer completion distinguish core verification from package-owned Open WebUI state (`APPLIED + VERIFIED`, `SKIPPED`, `RETRY REQUIRED`) without turning recoverable Open WebUI setup problems into fatal install failures.
+- Preserve conservative safe-power behavior for protected TCP activity on either endpoint, but describe that policy accurately. Remove upload-pruning dependence on an assumed 50-item Open WebUI page size by using zero-record/advertised-total/no-new-ID termination.
+- Let top-level `./install --help` work without root, slim the README daily path, mark superseded model tables as historical, and explain intentionally unavailable agent registration state in normal mode.
+- Show standalone MTP state read-only in installer Stage 7 without making it selectable or implicitly fetched; direct MTP runs now drain Ollama residency and restore the captured set on exit, while comparison/qualification uses explicit drain-only isolation.
+- Fix the reproduced task `tags-en` evaluator gap by accepting `text recognition` / `optical character recognition` within the existing OCR semantic group; thresholds, prompt and model remain unchanged.
+- Record exact installed 1.6 full revalidation: 54/0/0 install verify, infrastructure/restoration PASS, FULL coverage, RAG 4/4, successful Jina restoration, and GPT-OSS/Jina policy PASS at 156.266 MiB minimum MemAvailable.
+- No production model, MTP default, runtime lane, hard resource threshold, maintenance power policy, RAG role or Open WebUI desired-state change is introduced by this release.
+
 ## 0.11.3-1.6 - 2026-09-19
 - Preserve the final MTP reference-kit validation/methodology source-only for reproducibility; no benchmark kit is added to the runtime RPM.
 

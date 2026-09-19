@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        1.6%{?dist}
+Release:        1.7%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,17 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.7
+- Correct operator topology reporting by deriving normal/degraded/stopped/agent from the existing agent-mode classifier instead of treating agent inactivity as proof of normal mode.
+- Enforce private non-empty regular-file permissions for explicit RAG/Open WebUI and Hugging Face token-file inputs.
+- Fail closed on outer Markdown fences in raw/structured bc250-code output contracts, while keeping review/document Markdown-capable.
+- Make installer completion distinguish core verification from Open WebUI applied/skipped/retry-required state; keep Open WebUI setup failures nonfatal.
+- Keep safe-power conservative on protected TCP activity while making the message truthful, and remove the upload-pruner dependency on an assumed 50-item Open WebUI page size.
+- Allow repository bootstrap help without root and simplify current-facing documentation.
+- Show standalone MTP state read-only in installer Stage 7; drain Ollama residency before MTP launch, restore it after direct operator runs, and keep comparison/qualification explicitly drain-only.
+- Correct the repeated task tags-en OCR-synonym evaluator gap without changing the model/prompt/threshold, and record exact installed 1.6 full revalidation including successful Jina restoration.
+- No production model, MTP draft default, service topology, hard resource threshold or power-policy default changes.
+
 * Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.6
 - Close the current MTP qualification lane in package/development state without changing runtime defaults: record YMQ Phase-1 qualification, corrected draft-depth sweep conclusions, measured noise floor, and optional confirmation-only follow-up.
 - Keep qwen3.5 draft depth 3 as the packaged default pending confirmation-grade depth-2 evidence; retain depth 2 for qwen3.6-27b, HauhauCS qwen3.8 and YMQ qwen3.8.
