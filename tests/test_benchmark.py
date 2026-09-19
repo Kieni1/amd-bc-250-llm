@@ -1511,6 +1511,7 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         with patch.object(client, "json_request", side_effect=request):
             client._request_model_load("embed-model")
         self.assertEqual([path for path, _ in calls], ["/api/generate", "/api/embed"])
+        self.assertEqual(calls[1][1]["input"], ["bc250 residency restore probe"])
         self.assertTrue(all("keep_alive" not in payload for _, payload in calls))
 
     def test_model_load_allows_explicit_keep_alive_override(self) -> None:

@@ -1017,7 +1017,7 @@ class OllamaClient:
         except BenchmarkError as generate_error:
             embed_payload: dict[str, Any] = {
                 "model": model,
-                "input": [""],
+                "input": ["bc250 residency restore probe"],
                 "truncate": False,
             }
             if keep_alive is not None:
