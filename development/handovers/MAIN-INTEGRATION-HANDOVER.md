@@ -37,16 +37,15 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.3
-RPM Release   1.4%{?dist}
-NVR           bc250-llm-server-0.11.3-1.4
+RPM Release   1.5%{?dist}
+NVR           bc250-llm-server-0.11.3-1.5
 ```
 
-The current `0.11.3-1.4` source is a pre-v1.0 source-validated integration line on top of
+The current `0.11.3-1.5` source is a pre-v1.0 source-validated integration line on top of
 the release-closed 0.11.3-0.4 MTP/model-manager baseline. It carries forward the unpublished
 installer/maintenance and revalidation-diagnostic refinements, deterministic RAG/Open WebUI
-qualification, and the safe MTP cleanup contract. Release 1.4 records the completed RAG finalist
-decision, restores pre-benchmark model **sets** using each Ollama lane's normal keep-alive policy,
-and names resident-session swap evidence precisely as `swap_peak_delta_mib`. The production
+qualification, and the safe MTP cleanup contract. Release 1.5 carries that RAG decision forward and fixes the embedding-only residency reload probe
+exposed by exact installed 1.4; pre-benchmark model **sets** are restored using each Ollama lane's normal keep-alive policy, and resident-session swap evidence remains `swap_peak_delta_mib`. The production
 RAG/document role remains Gemma E4B / `bc250-office-documents` on the current 16 GiB profile;
 Qwen 9B remains a separate heavier higher-quality general-office option. Existing hard resource
 thresholds, GPU/device-error handling, runtime topology, GGUF provenance/SHA policy, model bytes,
@@ -69,6 +68,14 @@ GPT-OSS/Jina remained within policy but reached only 193.36 MiB minimum MemAvail
 recorded non-severe 8662 -> 8320 context truncation. `office-draft-e2b` passed semantic
 acceptance with an `output-budget` diagnostic. Exact evidence and bundle SHA are recorded
 in `development/model-runs/2026-09-19-installed-0.11.3-0.4-revalidation.md`.
+
+Exact installed `0.11.3-1.4.fc44` now adds newer but incomplete current-line evidence. The guided
+upgrade/install completed successfully and the core verifier was 54/0/0. Revalidation reached
+RAG semantic acceptance 4/4, then correctly failed infrastructure because Jina embedding residency
+could not be restored: the embedding-only fallback used an empty `/api/embed` input rejected by
+Ollama 0.34. The same partial run reported task 5/6 with `tags-en: relevance`. Release 1.5 fixes only
+the restoration probe and installer no-op output; task quality policy is unchanged. Evidence is in
+`development/model-runs/2026-09-19-installed-0.11.3-1.4-partial-revalidation.md`.
 
 A separate final RAG finalist campaign on the same exact installed 0.11.3-0.4 generation now
 settles the production document/RAG answer role for the current 16 GiB profile. Both Gemma E4B and
@@ -437,7 +444,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.4` leaves it unchanged. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.5` leaves it unchanged. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -519,7 +526,7 @@ write native reasoning before a useful final answer and could also exhaust its 3
 budget before a complete answer. Those are product-path completion/integrity defects, not
 reasons to weaken the benchmark or retire Ornith.
 
-The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.4` carries that product route forward unchanged: separated thinking/final
+The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.5` carries that product route forward unchanged: separated thinking/final
 content, terminal-completion checks, explicit truncation refusal and reasoning-marker
 rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
 package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
@@ -1208,7 +1215,7 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-1.4 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.4 device qualification remain pending; exact installed 0.11.3-0.4 is still the newest complete whole-appliance evidence and must not be relabelled as 1.4; support/power hardware qualification remains pending;
+- current 0.11.3-1.5 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.5 device qualification remain pending; exact installed 0.11.3-0.4 is still the newest complete whole-appliance evidence and must not be relabelled as 1.5; support/power hardware qualification remains pending;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
@@ -1229,7 +1236,7 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-build the exact 0.11.3-1.4 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
+1. GitHub-build the exact 0.11.3-1.5 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
    plus RPM/source artifact SHA before making a current-release hardware claim.
 2. Run one bounded exact-source appliance verification/revalidation pass, including installer optional-
    setup behavior and the non-failing tight-resource/output-budget diagnostics.

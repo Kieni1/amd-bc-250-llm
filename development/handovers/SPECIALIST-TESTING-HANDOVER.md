@@ -32,7 +32,7 @@ retest conditions from existing decisions:
 Suggested lane references:
 
 - benchmark operations: `cmd/benchmark/README.md`, benchmark source/tests;
-- RAG: `docs/RAG.md`, `config/openwebui/desired-state.json`; direct `rag-quality` must preserve starting Ollama residency set and report resident-session MemAvailable/swap state;
+- RAG: `docs/RAG.md`, `config/openwebui/desired-state.json`; direct `rag-quality` must preserve starting Ollama residency set, use a non-empty embed probe for embedding-only reloads, and report resident-session MemAvailable/swap state;
 - translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
 - general/main: `MODELS.md`, generation/usecase benchmarks;
 - agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling;

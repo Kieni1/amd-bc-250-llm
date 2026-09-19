@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source-validated 0.11.3-1.4
+# BC-250 support / operations handover — current source-validated 0.11.3-1.5
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,11 +10,11 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.3
-RPM Release:  1.4
+RPM Release:  1.5
 source base:  release-closed 0.11.3-0.4 + carried 0.5 installer/diagnostic work + bounded RAG integration/safety refinement
 ```
 
-Current 0.11.3-1.4 is source-validated but not yet RPM/device-qualified. It carries the optional
+Current 0.11.3-1.5 is source-validated but not yet RPM/device-qualified. It carries the optional
 maintenance/Pi UX, post-configuration verification, tight-resource/output-budget diagnostics,
 deterministic RAG/Open WebUI qualification and safe MTP cleanup forward. RAG residency restoration
 now guarantees the starting model set while allowing each Ollama service to apply its normal
@@ -33,12 +33,19 @@ reached 193.36 MiB minimum MemAvailable and recorded non-severe 8662 -> 8320 con
 truncation; one accepted office-draft case reached its output budget. Exact evidence is in
 `development/model-runs/2026-09-19-installed-0.11.3-0.4-revalidation.md`.
 
+Exact installed `0.11.3-1.4.fc44` subsequently completed the guided upgrade/install with verifier
+54/0/0, but its revalidation is partial rather than qualified: task reported 5/6 (`tags-en` relevance),
+RAG semantic acceptance was 4/4, and the worker then failed closed because the Jina embedding-only
+residency reload used an empty `/api/embed` probe. Current 1.5 fixes that probe with non-empty input
+while retaining service-default keep-alive behavior. See
+`development/model-runs/2026-09-19-installed-0.11.3-1.4-partial-revalidation.md`.
+
 ## Validation ownership
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. Current `0.11.3-1.4` completes the deterministic source gate with
+runtime/hardware qualification. Current `0.11.3-1.5` completes the deterministic source gate with
 403/403 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
-build and exact 0.11.3-1.4 BC-250 execution are also not yet claimed.
+build and exact 0.11.3-1.5 BC-250 execution is not yet claimed; exact 1.4 has partial install/revalidation evidence only.
 
 ## Normal service topology
 
@@ -159,7 +166,7 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-Finish the current `0.11.3-1.4` source iteration first; do not spend hardware time on an
+Finish the current `0.11.3-1.5` source iteration first; do not spend hardware time on an
 intermediate package. Once 1.3 is frozen, GitHub-build/install the exact RPM, capture NEVRA plus
 RPM/source SHA, and run one bounded source-change check:
 
