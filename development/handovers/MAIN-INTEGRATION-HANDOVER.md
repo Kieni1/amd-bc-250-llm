@@ -53,7 +53,7 @@ thresholds, GPU/device-error handling, runtime topology, GGUF provenance/SHA pol
 MTP settings and CU/governor policy are unchanged.
 
 Current source validation is **SOURCE PASS**: the full deterministic `make validate` gate completes
-with **401/401 tests PASS**, including 146 benchmark tests and the new lane-default keep-alive
+with **402/402 tests PASS**, including 146 benchmark tests and the new lane-default keep-alive
 restoration regression. Changed Python compiles, and packaged shell syntax is checked separately at
 release closure. GitHub RPM/SRPM build and exact-source BC-250 runtime qualification remain external;
 source validation must not be confused with hardware qualification.
@@ -549,6 +549,7 @@ exp-qwen35-4b-unsloth-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
 exp-qwen36-35b-a3b-unsloth-ud-iq3-s
 exp-qwen38-27b-ista-gsq-rco-iq3-s
+exp-qwen38-27b-ista-gsq-rco-iq3-xxs
 exp-qwen38-27b-unsloth-ud-iq3-s
 exp-qwen38-4b-empero-q6-k
 exp-qwen38-9b-empero-q6-k
@@ -563,6 +564,7 @@ Large main-lane candidates needing proper resource/fit qualification include:
 ```text
 exp-qwen36-35b-a3b-unsloth-ud-iq3-s
 exp-qwen38-27b-ista-gsq-rco-iq3-s
+exp-qwen38-27b-ista-gsq-rco-iq3-xxs
 exp-qwen38-27b-unsloth-ud-iq3-s
 exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
 ```
@@ -570,6 +572,10 @@ exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
 The packaged matrix `quality-checks/main/10-main-model-candidate-matrix.sh` is a
 performance/resource-fit test against production GPT-OSS. It is **not semantic
 acceptance**.
+
+The ISTA Qwen3.8 pair is intentionally role-split: IQ3_XXS is the first deployability/RAG-oriented
+text experiment (16K, caller `think=false`), while IQ3_S is the quality-first main-model experiment
+(8K, caller `think=true`). Neither changes the production Gemma RAG role or main-lane defaults.
 
 Current main-candidate qualification policy is deliberately evidence-first. Require
 backend-aware completion integrity, exact runtime/build/flags, KV-type reporting and a
@@ -895,6 +901,7 @@ Current download-only catalog IDs:
 qwen3.5-9b-mtp
 qwen3.6-27b-mtp
 qwen3.8-27b-hauhaucs-mtp
+qwen3.8-27b-ymq-xs-ti-mtp
 qwen3.6-35b-a3b-mtp
 ```
 

@@ -35,7 +35,7 @@ truncation; one accepted office-draft case reached its output budget. Exact evid
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
 runtime/hardware qualification. Current `0.11.3-1.4` completes the deterministic source gate with
-401/401 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
+402/402 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
 build and exact 0.11.3-1.4 BC-250 execution are also not yet claimed.
 
 ## Normal service topology
