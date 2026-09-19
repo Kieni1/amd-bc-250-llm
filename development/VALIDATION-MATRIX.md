@@ -14,11 +14,12 @@ Status vocabulary:
 - **PENDING** — no sufficient evidence yet.
 - **N/A** — that validation class does not apply.
 
-Current source baseline while this file was refreshed: `0.11.3-1.5`.
+Current source baseline while this file was refreshed: `0.11.3-1.6`.
 This source carries forward the greenfield `bc250-model` lifecycle, v4.2 revalidation, refined
 installer/maintenance UX, deterministic RAG/Open WebUI qualification and hardened experimental MTP
-lane. Release 1.5 fixes the embedding-only residency reload boundary exposed by exact installed 1.4,
-keeps restoration fail-closed, and trims redundant all-current installer model output. The production
+lane. Release 1.6 closes the current MTP qualification/optimization evidence state without changing
+MTP runtime defaults, keeps the 1.5 embedding-residency fix, and moves active hardware focus to
+support/maintenance qualification. The production
 document/RAG role remains Gemma E4B / `bc250-office-documents` on the current 16 GiB profile; Qwen
 9B remains a separate heavier general-office role. Whole-appliance hard thresholds, runtime
 topology, model bytes, GGUF provenance/SHA policy, MTP model/runtime settings and CU/governor
@@ -49,7 +50,7 @@ is exact-1.4 installed evidence, not a complete revalidation pass. See
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
 | repository/unit validation | SOURCE PASS — full deterministic `make validate` completed for the current source: 403/403 tests PASS; Python compileall and packaged shell syntax also pass | PENDING/EXTERNAL | N/A | source validation is complete; RPM/SRPM and exact-source device qualification remain separate external gates |
-| RPM build/install | source metadata targets 0.11.3-1.5; no RPM/SRPM build is claimed from this environment | PENDING/EXTERNAL | PARTIAL CURRENT-LINE DEVICE EVIDENCE — exact 1.4 guided upgrade/install completed with verifier 54/0/0; full revalidation did not complete | build/install exact 1.5 externally before claiming current-release hardware qualification |
+| RPM build/install | source metadata targets 0.11.3-1.6; no RPM/SRPM build is claimed from this environment | PENDING/EXTERNAL | PARTIAL CURRENT-LINE DEVICE EVIDENCE — exact 1.4 guided upgrade/install completed with verifier 54/0/0; full revalidation did not complete | build/install exact 1.6 externally before claiming current-release hardware qualification |
 | normal service topology | SOURCE PASS — unchanged by 1.4 | external | HISTORICAL REAL DEVICE — exact 0.11.3-0.4 v4.2 revalidation/restoration PASS | verify again only after exact 1.4 installation; 1.4 does not intentionally alter topology |
 | office HTTP readiness | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 Open WebUI reachable/drift none | power/support campaign remains separate |
 | maintenance companion | SOURCE PASS | external | HISTORICAL/PARTIAL — companion intentionally unconfigured on 0.11.2-0.5 run | status/readiness first when power work resumes |
@@ -70,12 +71,12 @@ is exact-1.4 installed evidence, not a complete revalidation pass. See
 | standard/general office roles | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 production use-case 5/5; one accepted office draft reached output budget | diagnostics remain visible; no acceptance change in 1.4 |
 | large main-lane / deep-reasoning quality | SOURCE PASS for existing usecase/runtime machinery | external | EVIDENCE GAP — GPT-OSS is runtime-qualified but substantive semantic comparison against Qwen3.5 9B is still weak | run one bounded 12–16 case GPT-OSS vs Qwen9B office/deep-reasoning fixture before opening 27B/35B candidate work |
 | agent default Ornith static benchmark | SOURCE PASS — reasoning leakage remains an explicit format failure | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 canonical agent 3/3 | keep Ornith baseline; static success is not product-path completion proof |
-| `bc250-code` product route | SOURCE PASS — route/default/fail-closed/atomic-update contract asserted from source and shell syntax checked; no live helper execution | external | PENDING for current 0.11.3-1.5 | first bounded device check: final-content separation, terminal/length refusal, 3072 vs 6144 only on explicit truncation |
+| `bc250-code` product route | SOURCE PASS — route/default/fail-closed/atomic-update contract asserted from source and shell syntax checked; no live helper execution | external | PENDING for current 0.11.3-1.6 | first bounded device check: final-content separation, terminal/length refusal, 3072 vs 6144 only on explicit truncation |
 | new Qwen3.5 4B / Gemma E4B agent challengers | SOURCE PASS — Modelfiles discoverable/strict | external | PENDING | compare only after baseline product route is proven; no promotion claims yet |
 | agent mode restoration | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 restoration PASS | 1.4 does not alter lane topology; rerun in exact-source qualification |
 | OCR comparison | SOURCE PASS | external | HISTORICAL REAL DEVICE | GLM leads current small fidelity baseline; unchanged |
-| MTP lifecycle/runner/catalog | SOURCE PASS — exact-ID/provenance/preflight/privilege/generic-exclusion contracts retained; SID+PGID ownership is required for group cleanup; comparison evidence now records and verifies effective draft depth | external llama.cpp | HISTORICAL REAL DEVICE — exact 0.11.3-0.4 Phase 1 passed qwen3.5-9b, qwen3.6-27b and HauhauCS qwen3.8-27b; stock qwen3.6-35b-a3b 8K/full-GPU baseline crossed the hard memory floor before MTP inference; restoration passed | continue corrected Phase-2 depth optimization on the three passers only; YMQ challenger remains pending matched control evidence |
-| MTP speedup/acceptance | SOURCE PASS — same GGUF/build/settings baseline-off vs MTP-on contract plus acceptance/resource/journal evidence; requested draft depth must match emitted server flags | N/A | HISTORICAL REAL DEVICE — qwen3.5 9B showed strongest short-generation gain, qwen3.6 27B strongest sustained long-generation gain with tightest passing headroom, HauhauCS qwen3.8 27B more headroom and exact parity; first depth sweep repeated defaults and is noise-floor evidence only; corrected depth-1 canary proved override plumbing | require ~>=1.0% balanced improvement over catalog default before changing a depth; confirm only a materially winning model/depth |
+| MTP lifecycle/runner/catalog | SOURCE PASS — exact-ID/provenance/preflight/privilege/generic-exclusion contracts retained; SID+PGID ownership is required for group cleanup; comparison evidence records and verifies effective draft depth | external llama.cpp | REAL DEVICE EVIDENCE — Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B all have passing same-target baseline/MTP evidence under the reviewed Vulkan runtime; retired qwen3.6-35b-a3b stock 8K/full-GPU baseline remains a confirmed fit failure | broad MTP qualification closed; only targeted confirmation/optimization remains optional |
+| MTP speedup/acceptance | SOURCE PASS — same GGUF/build/settings baseline-off vs MTP-on contract plus acceptance/resource/journal evidence; requested draft depth must match emitted server flags | N/A | REAL DEVICE EVIDENCE — corrected 1/2/3/4 sweep supports keeping depth 2 for Qwen3.6 and HauhauCS; Qwen3.5 depth 2 is the strongest exploratory candidate with a material advantage over packaged depth 3; YMQ passes at depth 2 with stronger long-form absolute throughput than HauhauCS but lower observed memory headroom | keep current defaults; confirm only Qwen3.5 depth 2 if a package-default change is desired |
 
 ## How to update this matrix
 

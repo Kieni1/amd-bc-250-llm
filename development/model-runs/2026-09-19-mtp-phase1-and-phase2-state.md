@@ -1,3 +1,7 @@
+# SUPERSEDED CURRENT SUMMARY
+
+This record preserves the intermediate Phase-1 / early Phase-2 state. The current consolidated MTP evidence and conclusions are in `2026-09-19-mtp-final-qualification.md`. Keep this file historical; do not use its pending-work wording as current state.
+
 # MTP qualification and Phase-2 optimization state — 2026-09-19
 
 ## Evidence identity
