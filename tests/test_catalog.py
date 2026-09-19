@@ -813,9 +813,10 @@ class StatusTests(unittest.TestCase):
             rc = modelctl.apply_models(defaults, [model], args)
         self.assertEqual(rc, 0)
         text = output.getvalue()
-        self.assertIn("Experiments: 1/1 already current; no changes needed.", text)
+        self.assertIn("Experiments: 1/1 current", text)
         self.assertNotIn(">>> exp-remote-test", text)
         self.assertNotIn("already current; skipping", text)
+        self.assertNotIn("Done: 1 model(s) processed.", text)
 
     def test_verbose_status_explains_online_check_and_source_identity(self) -> None:
         model = {

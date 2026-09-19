@@ -1601,17 +1601,24 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
             print(f"    ERROR: {error}", file=sys.stderr)
             failures.append(label)
 
+    all_current = (
+        summarize_current
+        and current_skipped == len(models)
+        and not failures
+    )
     if summarize_current and current_skipped:
         category = str(defaults.get("category", "models"))
         title = "MTP" if category == "mtp" else category.title()
-        if current_skipped == len(models) and not failures:
-            print(f"{title}: {current_skipped}/{len(models)} already current; no changes needed.")
+        if all_current:
+            print(f"{title}: {current_skipped}/{len(models)} current")
         else:
             print(f"{title}: {current_skipped}/{len(models)} already current.")
 
     if failures:
         print(f"\nFailed: {' '.join(failures)}", file=sys.stderr)
         return 2
+    if all_current:
+        return 0
     print(f"\nDone: {len(models)} model(s) processed.")
     return 0
 
