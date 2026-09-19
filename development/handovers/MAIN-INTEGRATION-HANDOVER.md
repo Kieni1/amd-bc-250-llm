@@ -37,11 +37,11 @@ Current source baseline at this handover refresh:
 
 ```text
 VERSION       0.11.3
-RPM Release   1.5%{?dist}
-NVR           bc250-llm-server-0.11.3-1.5
+RPM Release   1.6%{?dist}
+NVR           bc250-llm-server-0.11.3-1.6
 ```
 
-The current `0.11.3-1.5` source is a pre-v1.0 source-validated integration line on top of
+The current `0.11.3-1.6` source is a pre-v1.0 source-validated integration line on top of
 the release-closed 0.11.3-0.4 MTP/model-manager baseline. It carries forward the unpublished
 installer/maintenance and revalidation-diagnostic refinements, deterministic RAG/Open WebUI
 qualification, and the safe MTP cleanup contract. Release 1.5 carries that RAG decision forward and fixes the embedding-only residency reload probe
@@ -444,7 +444,7 @@ upper bounds only because resident memory headroom fell to roughly 116-228 MiB.
 
 Stage-2E settled the model/configuration question by selecting Translate-Gemma E4B with
 exact explicit-direction v1, thinking omitted and `max_tokens=2048`; TIR is closed as the
-normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.5` leaves it unchanged. Do not reopen broad model discovery
+normal deployment choice. By maintainer decision, `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is now the package production translation base. Installed `0.11.2-0.3.fc44` first verified the live package-owned DE→FR and FR→DE roles through authenticated Open WebUI with correct direction, preserved identifiers/dates and no desired-state drift. Historical `0.11.2-0.4` testing exposed the installed fixture-path defect before translation quality evaluation. Installed `0.11.2-0.5.fc44` then completed v4.1 and passed the canonical `owui-translation` stage, confirming that resource fix on the RPM layout. `0.11.3-0.3` carried that translation model/evaluator contract forward, and current `0.11.3-1.6` leaves it unchanged. Do not reopen broad model discovery
 or preservation-prompt micro-tuning unless the integrated failure is proven model-level.
 
 ## Higher-quality office — Qwen3.5 9B
@@ -526,7 +526,7 @@ write native reasoning before a useful final answer and could also exhaust its 3
 budget before a complete answer. Those are product-path completion/integrity defects, not
 reasons to weaken the benchmark or retire Ornith.
 
-The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.5` carries that product route forward unchanged: separated thinking/final
+The `0.11.2-0.6` source moved `bc250-code` to `/api/chat` with separated thinking/final; current `0.11.3-1.6` carries that product route forward unchanged: separated thinking/final
 content, terminal-completion checks, explicit truncation refusal and reasoning-marker
 rejection. The 3072 default remains until a bounded real-device A/B justifies a larger
 package default. The active comparison funnel is Ornith baseline → Qwable 9B → Qwen3.5
@@ -901,7 +901,7 @@ Do not automatically execute arbitrary generated shell/Python as root.
 MTP remains optional/experimental and separate from Ollama role models. Packaged definitions stay
 disabled from generic convergence; `bc250-fetch-mtp ID` is the explicit preparation path.
 
-Current catalog IDs:
+Current active catalog IDs:
 
 ```text
 qwen3.5-9b-mtp
@@ -910,48 +910,40 @@ qwen3.8-27b-hauhaucs-mtp
 qwen3.8-27b-ymq-xs-ti-mtp
 ```
 
-Historical Phase-1 hardware evidence on exact installed `0.11.3-0.4` with llama.cpp b10964 /
-commit `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4` is now strong enough to separate
-qualification from optimization:
+Broad MTP qualification is now complete enough for current package use under the reviewed external
+llama.cpp Vulkan runtime (`b10964`, commit `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4`). Real BC-250
+evidence supports:
 
-- `qwen3.5-9b-mtp`: PASS; highest absolute speed and strongest short-generation MTP gains; benefit
-  diminishes on longer generations; deterministic exact quality parity.
-- `qwen3.6-27b-mtp`: PASS; strongest sustained long-generation speedup among tested passers, but
-  tightest successful memory margin (~1.18–1.26 GiB minimum MemAvailable under MTP).
-- `qwen3.8-27b-hauhaucs-mtp`: PASS; smaller long-form speedup than qwen3.6 27B but materially more
-  headroom (~2.63–2.71 GiB minimum MemAvailable under MTP) and excellent parity behavior.
-- retired `qwen3.6-35b-a3b-mtp`: stock 8K/full-GPU configuration DOES NOT FIT SAFELY. The first
-  baseline load reached ~120.4 MiB MemAvailable, crossed the 128 MiB hard floor and was terminated
-  before MTP inference. It is now source-graveyard-only and absent from routine MTP discovery.
-- `qwen3.8-27b-ymq-xs-ti-mtp`: new same-class challenger added after the historical Phase-1 batch;
-  still pending matched HauhauCS control evidence.
+- `qwen3.5-9b-mtp`: PASS; highest absolute speed and strongest short-generation gains; long-form gain
+  declines with acceptance but remains positive. Packaged depth stays 3; corrected Phase-2 depth 2 is
+  the strongest exploratory candidate and materially beats depth 3, but optional confirmation-grade
+  repeats are preferred before changing the default.
+- `qwen3.6-27b-mtp`: PASS; strongest sustained long-generation gain of the original set but tightest
+  successful memory margin. Corrected Phase 2 supports keeping depth 2.
+- `qwen3.8-27b-hauhaucs-mtp`: PASS; more memory headroom and excellent deterministic/parity behavior.
+  Corrected Phase 2 supports keeping depth 2; depth-1 balanced gain was only ~0.2% and is noise-scale.
+- `qwen3.8-27b-ymq-xs-ti-mtp`: PASS at depth 2; faster baseline decode and stronger absolute MTP
+  throughput at longer generations than the earlier HauhauCS evidence, but weaker short-token MTP
+  behavior and lower observed memory headroom. It is qualified, not preferred/promoted.
+- retired `qwen3.6-35b-a3b-mtp`: stock 8K/full-GPU baseline crossed the 128 MiB hard floor before MTP
+  inference. It is a memory-fit failure and remains source-graveyard-only.
 
-The first long Phase-2 depth sweep did not actually vary draft depth because the wrapper override
-was reset before catalog resolution. It must not be used for depth selection. Keep it as stability
-and noise-floor evidence: repeated defaults showed roughly 0.01–0.19% throughput CV, so tiny
-sub-percent differences do not justify package-default changes. A corrected hardware canary forced
-Qwen3.5 to depth 1 and proved requested/run-info/effective depth all matched; its 64-token result is
-plumbing evidence only.
+The first long Phase-2 depth sweep accidentally repeated defaults and is invalid for depth selection,
+but it established a useful low noise floor (~0.01–0.19% throughput CV). Require roughly >=1% balanced
+improvement before considering a package-default change. The corrected canary and corrected sweep
+proved requested draft depth reaches the emitted llama-server configuration.
 
-Current Phase-2 task is bounded optimization on the three Phase-1 passers, one parameter family only:
+Further MTP work is optional and decision-driven only:
 
-```text
-draft_n_max: 1, 2, 3, 4
-budgets: 256, 1024
-exploratory repeats: 1 performance / 1 quality
-```
+1. confirm Qwen3.5 depth 2 at 256/1024 with 3 performance / 2 quality repeats only if changing the
+   package default matters;
+2. run a same-current-package HauhauCS comparator only if rigorous YMQ/HauhauCS memory comparison is
+   required;
+3. optimize YMQ depth only if YMQ is being considered for preferred status.
 
-Every point must prove requested depth == effective emitted depth. A non-default depth must pass
-quality/safety/restoration/completeness, beat baseline at both budgets and provide approximately
->=1.0% balanced improvement over the current catalog default before it is worth changing. If a
-non-default depth materially wins, confirm only that model/depth with higher repeats.
-
-The package harness now records catalog/requested/effective draft depth and checks the actual
-llama-server flags before accepting MTP evidence, preventing a repeat of the invalid first sweep.
-Do not expand the MTP framework further unless the corrected sweep exposes a concrete gap.
-
-Exact evidence and reasoning live in
-`development/model-runs/2026-09-19-mtp-phase1-and-phase2-state.md`.
+Do not run another broad candidate/depth campaign and do not expand the MTP framework without a
+concrete new product question. Exact current evidence is consolidated in
+`development/model-runs/2026-09-19-mtp-final-qualification.md`; source-only specialist reproduction guidance is preserved in `development/references/mtp/BC250_MTP_EXECUTION_GUIDE_v3.md`.
 
 # 15. Maintenance, WOL and electricity saving
 
@@ -1127,11 +1119,11 @@ pairwise review only where deterministic checks cannot safely express quality. D
 
 Reconfirm exclusive-mode restoration and broaden actual documented `bc250-code` modes.
 
-## P1/P2 — MTP
+## P2/P3 — optional MTP follow-up
 
-Immediate next bounded hardware batch alongside support operations. Test one exact MTP
-candidate at a time with the 0.11.3-0.4 same-target comparison harness; stop framework
-work until real evidence identifies a blocker.
+Broad MTP qualification is closed. Do not spend hardware time on another sweep unless a release
+choice requires Qwen3.5 depth-2 confirmation, a rigorous current-package YMQ/HauhauCS comparator, or
+YMQ promotion-specific tuning. Support/maintenance is now the higher-priority hardware lane.
 
 ## P3 — optional backup export / dedupe performance
 
@@ -1215,13 +1207,13 @@ to-reverse decision becomes important.
 Keep these explicit until solved or superseded:
 
 - current source/Pi maintenance contract still needs real BC-250 power/WOL qualification;
-- current 0.11.3-1.5 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.5 device qualification remain pending; exact installed 0.11.3-0.4 is still the newest complete whole-appliance evidence and must not be relabelled as 1.5; support/power hardware qualification remains pending;
+- current 0.11.3-1.6 source passes the deterministic source gate, but GitHub RPM/SRPM build and exact installed 1.6 device qualification remain pending; exact installed 0.11.3-0.4 is still the newest complete whole-appliance evidence and must not be relabelled as 1.6; support/power hardware qualification remains pending;
 - large main-model candidate matrix is not yet full semantic/resource promotion evidence;
 - Translate-Gemma production direction roles passed a live authenticated 0.11.2-0.3 smoke and the canonical `owui-translation` stage passed on installed 0.11.2-0.5.fc44; the external Stage-2E hard corpus remains separate model-selection evidence;
 - exact Stage-2E hard-corpus payloads live in the recorded evidence archive, not the source tree; do not invent replacement cases if that archive is unavailable;
 - RAG finalist selection is complete for synthetic/direct and authenticated Open WebUI fixtures, but real office documents/Tika/OCR breadth still needs qualification across messy PDFs, tables, collection update/delete/re-import, multilingual synthesis and OCR-derived content;
 - Ornith passed canonical agent qualification 3/3 on installed 0.11.2-0.5.fc44, but the inherited `bc250-code` `/api/chat` product route and output budget still require bounded real-device qualification before stronger coding-helper claims;
-- MTP needs real llama.cpp runtime qualification and quality/resource-aware comparison;
+- broad MTP qualification is complete enough for the package; only optional targeted confirmation remains;
 - current batched XFS dedupe deserves a performance run when storage work becomes a
   priority;
 - arbitrary out-of-band same-name Ollama live-registration drift remains incompletely
@@ -1236,17 +1228,18 @@ Do not start six hardware campaigns simultaneously.
 
 The next real-device sequence should be:
 
-1. GitHub-build the exact 0.11.3-1.5 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
+1. GitHub-build the exact 0.11.3-1.6 RPM/SRPM, install it on the BC-250 and capture exact NEVRA
    plus RPM/source artifact SHA before making a current-release hardware claim.
 2. Run one bounded exact-source appliance verification/revalidation pass, including installer optional-
    setup behavior and the non-failing tight-resource/output-budget diagnostics.
 3. Run the final Gemma-only real-office-document RAG acceptance campaign: actual PDFs/Tika extraction,
    multilingual/multi-source/table cases, upload/delete/re-upload, one unload/reload cycle and one long
    resident session. This is production acceptance, not another answer-model tournament.
-4. Keep MTP as a separate bounded campaign starting with `qwen3.5-9b-mtp`; inspect same-target baseline
-   vs MTP quality, throughput, acceptance, memory/swap and GPU/kernel evidence before advancing.
-5. Restore/confirm normal appliance health, then run the support-operations batch separately: S5 WOL,
-   busy shutdown/defer, idle shutdown/allow + wake, then bounded recovery/lifecycle UX.
+4. Restore/confirm normal appliance health, then run the support/maintenance hardware batch: local
+   maintenance status/backups/timers, S5 WOL, busy shutdown/defer, idle shutdown/allow + wake, Pi
+   restricted access/export only where configured, then bounded recovery/lifecycle UX.
+5. Treat MTP as optional follow-up only if one of the remaining targeted decisions materially affects
+   a release; do not reopen broad qualification.
 
 That sequencing protects the product's current top priorities without losing the deeper
 quality program.
@@ -1263,6 +1256,6 @@ quality program.
 > hardware/software constraints in this handover. GitHub owns RPM builds, workstation
 > owns Ruff, BC-250 owns real runtime/hardware qualification. Use one bounded hardware
 > batch at a time. Main integration owns production promotion, cross-stream decisions and
-> release metadata. Current highest hardware priority is office availability/power/WOL;
-> then establish current benchmark-operation controls before continuing translation,
+> release metadata. Current highest hardware priority is support/maintenance and office availability/power/WOL;
+> after that, use product evidence to decide whether any remaining model/benchmark work is worth doing,
 > RAG, general quality, agentic and MTP specialist campaigns.

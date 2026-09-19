@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source-validated 0.11.3-1.5
+# BC-250 support / operations handover — current source-validated 0.11.3-1.6
 
 You own real-device health, service topology, model lifecycle operations, storage,
 maintenance/power, Open WebUI operational integration and bounded hardware regression.
@@ -10,19 +10,18 @@ Newest supplied source is authoritative over this handover. At the time of this 
 
 ```text
 VERSION:      0.11.3
-RPM Release:  1.5
+RPM Release:  1.6
 source base:  release-closed 0.11.3-0.4 + carried 0.5 installer/diagnostic work + bounded RAG integration/safety refinement
 ```
 
-Current 0.11.3-1.5 is source-validated but not yet RPM/device-qualified. It carries the optional
+Current 0.11.3-1.6 is source-validated but not yet RPM/device-qualified. It carries the optional
 maintenance/Pi UX, post-configuration verification, tight-resource/output-budget diagnostics,
 deterministic RAG/Open WebUI qualification and safe MTP cleanup forward. RAG residency restoration
 now guarantees the starting model set while allowing each Ollama service to apply its normal
 keep-alive policy, and canonical RAG summaries use `swap_peak_delta_mib` rather than calling
 peak-minus-start swap cumulative growth. Historical exact-0.11.3-0.4 MTP Phase 1 now provides real
 BC-250 pass evidence for qwen3.5-9b, qwen3.6-27b and HauhauCS qwen3.8-27b; the 35B-A3B stock
-8K/full-GPU configuration is a confirmed memory-fit failure, and Phase 2 remains optimization in
-progress. Model/runtime defaults and whole-appliance hard acceptance thresholds remain unchanged.
+8K/full-GPU configuration is a confirmed memory-fit failure, and corrected Phase-2 optimization is complete enough to close broad MTP testing; only optional targeted confirmation remains. Model/runtime defaults and whole-appliance hard acceptance thresholds remain unchanged.
 
 Newest complete device evidence is exact refined
 `bc250-llm-server-0.11.3-0.4.fc44.x86_64`. Guided install completed with normal topology,
@@ -36,16 +35,15 @@ truncation; one accepted office-draft case reached its output budget. Exact evid
 Exact installed `0.11.3-1.4.fc44` subsequently completed the guided upgrade/install with verifier
 54/0/0, but its revalidation is partial rather than qualified: task reported 5/6 (`tags-en` relevance),
 RAG semantic acceptance was 4/4, and the worker then failed closed because the Jina embedding-only
-residency reload used an empty `/api/embed` probe. Current 1.5 fixes that probe with non-empty input
-while retaining service-default keep-alive behavior. See
+residency reload used an empty `/api/embed` probe. Release 1.5 fixed that probe with non-empty input while retaining service-default keep-alive behavior; current 1.6 carries the fix forward unchanged. See
 `development/model-runs/2026-09-19-installed-0.11.3-1.4-partial-revalidation.md`.
 
 ## Validation ownership
 
 GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. Current `0.11.3-1.5` completes the deterministic source gate with
+runtime/hardware qualification. Current `0.11.3-1.6` completes the deterministic source gate with
 403/403 tests PASS. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
-build and exact 0.11.3-1.5 BC-250 execution is not yet claimed; exact 1.4 has partial install/revalidation evidence only.
+build and exact 0.11.3-1.6 BC-250 execution is not yet claimed; exact 1.4 has partial install/revalidation evidence only.
 
 ## Normal service topology
 
@@ -166,8 +164,8 @@ is relied upon.
 The next hardware campaign should no longer start with storage dedupe. Product priority
 is office availability and electricity saving.
 
-Finish the current `0.11.3-1.5` source iteration first; do not spend hardware time on an
-intermediate package. Once 1.3 is frozen, GitHub-build/install the exact RPM, capture NEVRA plus
+Finish the current `0.11.3-1.6` source iteration first; do not spend hardware time on an
+intermediate package. Once 1.6 is frozen, GitHub-build/install the exact RPM, capture NEVRA plus
 RPM/source SHA, and run one bounded source-change check:
 
 ```text
@@ -181,9 +179,10 @@ one full v4.2 revalidation
 
 The full revalidation should preserve all existing infrastructure/restoration semantics and
 hard thresholds while additionally surfacing tight MemAvailable and accepted output-budget
-observations under `Diagnostics`. After that exact-source gate, run MTP and support operations
-as separate bounded hardware batches: MTP starts with qwen3.5-9b-mtp; support starts with S5
-WOL, then busy defer and idle allow+wake.
+observations under `Diagnostics`. After that exact-source gate, support/maintenance is the next bounded hardware campaign: validate
+local maintenance and timer/backup behavior first, then S5 WOL, busy defer and idle allow+wake, and
+only exercise Pi restricted access/export when configured. MTP is now optional targeted follow-up,
+not a prerequisite for operations work.
 
 ## Other operations work after power qualification
 

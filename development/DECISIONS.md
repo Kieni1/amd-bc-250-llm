@@ -304,7 +304,7 @@ JSON merely to make the current model pass.
 
 ## DEC-014 — Measure MTP against the same target/runtime and keep the external server unprivileged
 
-**Status:** ACTIVE — source contract; Phase-1 BC-250 runtime evidence recorded, Phase-2 optimization pending.
+**Status:** ACTIVE — source contract; Phase-1 qualification and corrected Phase-2 optimization evidence recorded.
 
 **Decision:** The first MTP qualification campaign compares each selected target GGUF with
 the same llama.cpp build, context/cache/ubatch/request settings twice: speculative decoding
@@ -318,6 +318,12 @@ Missing draft-acceptance telemetry is an incomplete MTP qualification, not a sil
 The bounded first-campaign set is Qwen3.5 9B, retained Qwen3.6 27B control, HauhauCS
 Qwen3.8 27B IQ2_M and Qwen3.6 35B-A3B. All remain disabled/download-only and outside
 generic convergence.
+
+**Current evidence note:** That list describes the original campaign design. The 35B stock configuration
+subsequently failed baseline memory fit and is retired; YMQ XS-TI was added later and independently
+qualified. Corrected Phase-2 testing is complete enough to keep current package defaults unchanged,
+with only Qwen3.5 depth 2 remaining as an optional confirmation target. See DEC-021 and
+`development/model-runs/2026-09-19-mtp-final-qualification.md`.
 
 **Why:** The pre-hardware helper compared an MTP server to an unrelated Ollama baseline,
 which could not isolate speculative-decoding speedup, and it lacked one evidence bundle for
@@ -489,7 +495,7 @@ a new comparison. Do not reopen broad RAG answer-model tournaments without such 
 
 ## DEC-020 — Keep new Qwen3.8 27B candidates bounded and role-specific
 
-**Status:** ACTIVE — same-release 0.11.3-1.4 pre-publication refinement.
+**Status:** ACTIVE — candidates now have current BC-250 evidence; production roles remain unchanged.
 
 **Decision:** Add ISTA GSQ/RCO IQ3_XXS as an opt-in deployability/RAG-oriented text experiment and
 retune the already-packaged ISTA IQ3_S entry as the quality-first main-model experiment. IQ3_XXS
@@ -511,16 +517,21 @@ These are explicit product questions, not production promotions: can a dense Qwe
 useful quality/deployability on the 16 GiB appliance, and does the YMQ MTP quant improve the Qwen3.8
 27B speed/quality tradeoff under matched runtime settings?
 
-**Retest only if:** the candidates fail load/headroom, show no meaningful product-quality advantage,
-or upstream artifacts materially change. Do not promote either Ollama experiment or either MTP
-variant from upstream benchmark claims alone; real BC-250 load, semantic quality, memory/swap,
-stability and restoration evidence remain required.
+**Current evidence update:** YMQ XS-TI now passes BC-250 MTP Phase-1 qualification at 8K/depth 2
+with deterministic baseline/MTP parity and clean safety/restoration. It showed faster baseline decode
+and stronger absolute long-generation MTP throughput than the earlier HauhauCS evidence, but lower
+observed memory headroom; do not equate smaller GGUF size with lower runtime memory. The two ISTA
+Ollama experiments remain opt-in and still require their own role-specific product-quality/headroom
+qualification before any production promotion.
+
+**Retest only if:** an Ollama candidate is being considered for a production role, YMQ is being
+considered for preferred MTP status, or upstream artifacts/runtime materially change.
 
 
 
 ## DEC-021 — Treat MTP Phase 2 as optimization, not requalification
 
-**Status:** ACTIVE — based on real BC-250 Phase-1 evidence from exact installed 0.11.3-0.4.
+**Status:** ACTIVE — broad MTP qualification and corrected draft-depth sweep are complete enough for current package use.
 
 **Decision:** Treat `qwen3.5-9b-mtp`, `qwen3.6-27b-mtp` and
 `qwen3.8-27b-hauhaucs-mtp` as Phase-1-qualified MTP configurations under the reviewed llama.cpp
@@ -541,12 +552,18 @@ requested MTP depth appears in the actual llama-server flags before inference ev
 The corrected hardware canary already proved an override can reach effective depth 1; that canary
 is plumbing evidence, not a depth-selection benchmark.
 
-**Why:** Three candidates already demonstrated useful speculative decoding with deterministic
-baseline/MTP parity. Re-running qualification would add little information. The remaining product
-question is whether any non-default draft depth materially improves the already-good defaults beyond
-the measured benchmark noise floor. The 35B stock failure is a baseline memory-fit limit rather than
-an MTP-performance result.
+**Why:** The original three candidates and YMQ now demonstrate useful speculative decoding with
+deterministic baseline/MTP parity. The corrected sweep answered the broad draft-depth question for
+Qwen3.6 and HauhauCS and identified only one material unresolved default candidate: Qwen3.5 depth 2.
+The 35B stock failure remains a baseline memory-fit limit rather than an MTP-performance result.
 
-**Retest only if:** a non-default depth clears the material-gain rule and needs confirmation, the
-model/quant/runtime changes materially, or a materially new product/hardware/runtime condition creates a justified 35B retest hypothesis.
-The new YMQ Qwen3.8 entry still requires its own matched control evidence.
+Corrected Phase-2 testing now supports keeping depth 2 for Qwen3.6 27B and HauhauCS Qwen3.8 27B.
+Qwen3.5 depth 2 is the strongest exploratory candidate and exceeded the measured noise floor by a
+material margin, but keep packaged depth 3 until confirmation-grade repeats are available if a
+default change matters. YMQ XS-TI independently passes Phase-1 at depth 2; further YMQ depth tuning
+is optional and only justified if preferred-role promotion is being considered.
+
+**Retest only if:** changing Qwen3.5's package default requires confirmation-grade evidence, a
+rigorous same-current-package YMQ/HauhauCS comparator is needed, YMQ is being promoted, the
+model/quant/runtime changes materially, or a materially new product/hardware/runtime condition creates
+a justified retest hypothesis. Do not rerun the retired 35B stock configuration unchanged.
