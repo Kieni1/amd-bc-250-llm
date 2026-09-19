@@ -113,6 +113,10 @@ Model weights are never deleted automatically. Use `sudo bc250-model unregister`
 services to quiesce successfully and reports any restoration failure. It retains both a validated
 source GGUF and its Ollama blob while sharing identical XFS extents; `df` shows
 reclaimed physical capacity even if `du` counts both logical files. The separate
+Upload pruning enumerates Open WebUI pages until the API returns zero records, an advertised total
+is reached, or pagination stops discovering new file IDs. It does not assume a fixed Open WebUI
+page size; uncertain metadata remains preserved rather than selected for deletion.
+
 `bc250-storage prune-sources` command removes only hash-verified source copies
 after matching an Ollama blob, and requires explicit confirmation. `prune-40cu`
 removes build caches only for kernels no longer installed.
@@ -158,7 +162,11 @@ The stable remote request is:
 sudo bc250-maintenance request-shutdown
 ```
 
-That request runs the same package safe-power policy as the night timer. Active
+That request runs the same package safe-power policy as the night timer. The TCP guard is
+deliberately conservative: if either endpoint of an established connection matches a protected
+port (SSH/UI/Ollama plus configured web ports), automatic poweroff is deferred. This includes
+selected outbound activity such as HTTPS downloads; the log therefore reports **protected TCP
+activity**, not only inbound UI sessions. Active
 maintenance, SSH, UI or Ollama traffic can therefore defer shutdown. A Pi should
 never replace this with an unconditional remote `systemctl poweroff`.
 

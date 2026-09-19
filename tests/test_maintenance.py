@@ -341,7 +341,8 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("22 80 443 3000 11434 11435 11436 11437", source)
         self.assertIn("poweroff or suspend", source)
         self.assertIn("REQUIRE_WOL", source)
-        self.assertIn("active SSH, UI or Ollama TCP session", source)
+        self.assertIn("protected TCP activity", source)
+        self.assertIn("local or remote endpoint", source)
         self.assertNotIn(
             "safe-suspend.sh", (ROOT / "packaging/install-manifest.tsv").read_text()
         )
@@ -470,6 +471,47 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(
                 log.read_text(encoding="utf-8").splitlines(), ["1", "2", "3"]
             )
+
+    def test_pruning_without_total_does_not_assume_a_fixed_page_size(self) -> None:
+        script = ROOT / "cmd/maintenance/prune-uploads.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = Path(temporary) / "curl"
+            log = Path(temporary) / "pages.log"
+            fake.write_text(
+                textwrap.dedent(
+                    r"""\
+                    #!/usr/bin/env bash
+                    url="${@: -1}"
+                    page="${url##*page=}"
+                    printf '%s\n' "$page" >> "$CURL_LOG"
+                    case "$page" in
+                      1) printf '%s\n' '[{"id":"a","created_at":1700000001,"meta":{"size":1}}]' ;;
+                      2) printf '%s\n' '[{"id":"b","created_at":1700000002,"meta":{"size":1}}]' ;;
+                      3) printf '%s\n' '[{"id":"c","created_at":1700000003,"meta":{"size":1}}]' ;;
+                      *) printf '%s\n' '[]' ;;
+                    esac
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake.chmod(0o755)
+            env = os.environ | {
+                "PATH": f"{temporary}:{os.environ['PATH']}",
+                "CURL_LOG": str(log),
+                "OWUI_API_KEY": "test-key",
+                "MAX_AGE_DAYS": "0",
+                "MAX_TOTAL_GB": "1",
+                "DRY_RUN": "1",
+            }
+            result = subprocess.run(
+                [str(script)], env=env, text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, check=False
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Files=3", result.stdout)
+            self.assertEqual(log.read_text().splitlines(), ["1", "2", "3", "4"])
+        self.assertNotIn("page_count < 50", script.read_text(encoding="utf-8"))
+
 
 
 if __name__ == "__main__":

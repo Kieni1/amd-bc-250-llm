@@ -35,11 +35,13 @@ for unit in \
 done
 
 if command -v ss >/dev/null 2>&1; then
+  # Match either endpoint deliberately: inbound appliance sessions and selected
+  # outbound activity (for example HTTPS downloads) both defer automatic poweroff.
   connections="$(ss -Htn state established | awk -v re=":(${port_regex})$" '
     $4 ~ re || $5 ~ re {print}
   ')"
   if [[ -n "$connections" ]]; then
-    log "Deferring $NIGHT_POWER_ACTION: active SSH, UI or Ollama TCP session detected."
+    log "Deferring $NIGHT_POWER_ACTION: protected TCP activity detected on a configured local or remote endpoint."
     exit 0
   fi
 fi

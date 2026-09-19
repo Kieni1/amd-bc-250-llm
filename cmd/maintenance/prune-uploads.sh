@@ -28,13 +28,16 @@ trap 'rm -rf "$tmpdir"' EXIT
 rows_file="$tmpdir/files.tsv"
 
 page=1; fetched=0; expected_total=-1
+seen_ids_file="$tmpdir/seen-file-ids"
+: > "$seen_ids_file"
 while :; do
   json="$tmpdir/page-${page}.json"
   curl --fail --silent --show-error --retry 3 --retry-all-errors \
     --connect-timeout 10 --max-time 60 "${AUTH[@]}" \
     "${OWUI_URL}/api/v1/files/?content=false&page=${page}" > "$json"
-  summary="$(python3 - "$json" <<'PY_PAGE'
+  summary="$(python3 - "$json" "$seen_ids_file" <<'PY_PAGE'
 import json, sys
+from pathlib import Path
 with open(sys.argv[1], encoding="utf-8") as f:
     data = json.load(f)
 if isinstance(data, dict):
@@ -48,10 +51,24 @@ try:
     total = int(total)
 except (TypeError, ValueError):
     total = -1
-print(len(items), total)
+seen_path = Path(sys.argv[2])
+seen = set(seen_path.read_text(encoding="utf-8").splitlines())
+new_ids = []
+for item in items:
+    if not isinstance(item, dict) or not item.get("id"):
+        continue
+    file_id = str(item["id"])
+    if file_id not in seen:
+        seen.add(file_id)
+        new_ids.append(file_id)
+if new_ids:
+    with seen_path.open("a", encoding="utf-8") as handle:
+        for file_id in new_ids:
+            handle.write(file_id + "\n")
+print(len(items), total, len(new_ids))
 PY_PAGE
 )" || { log "ERROR: invalid Open WebUI file-list JSON; aborting without deletion."; exit 1; }
-  read -r page_count page_total <<< "$summary"
+  read -r page_count page_total new_count <<< "$summary"
   if (( page_total >= 0 )); then
     if (( expected_total < 0 )); then
       expected_total=$page_total
@@ -61,11 +78,11 @@ PY_PAGE
     fi
   fi
   ((page_count > 0)) || break
-  fetched=$((fetched + page_count))
+  fetched=$((fetched + new_count))
   ((expected_total >= 0 && fetched >= expected_total)) && break
-  if ((page_count < 50)); then
+  if ((new_count == 0)); then
     if ((expected_total >= 0 && fetched < expected_total)); then
-      log "ERROR: Open WebUI pagination ended before the advertised total; aborting without deletion."
+      log "ERROR: Open WebUI pagination stopped making progress before the advertised total; aborting without deletion."
       exit 1
     fi
     break
