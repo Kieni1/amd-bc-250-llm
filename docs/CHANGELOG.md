@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.3-1.6 - 2026-09-19
+- Preserve the final MTP reference-kit validation/methodology source-only for reproducibility; no benchmark kit is added to the runtime RPM.
+
+- Close the current broad MTP qualification lane in package/development state without changing MTP runtime defaults or normal appliance topology.
+- Record YMQ XS-TI Qwen3.8 27B as Phase-1-qualified at 8K/depth 2 with deterministic baseline/MTP quality parity, clean safety/restoration, faster baseline decode and stronger long-generation absolute MTP throughput than the earlier HauhauCS evidence, but lower observed memory headroom.
+- Record the corrected draft-depth sweep: keep depth 2 for Qwen3.6 27B and HauhauCS Qwen3.8 27B; keep Qwen3.5 packaged depth 3 while documenting depth 2 as the strongest exploratory candidate pending optional confirmation-grade repeats.
+- Preserve the invalid first Phase-2 sweep as repeatability/noise-floor evidence only (roughly 0.01–0.19% throughput CV); sub-percent differences do not justify package-default changes.
+- Keep the retired Qwen3.6 35B-A3B stock 8K/full-GPU MTP configuration in the source-only graveyard and do not rerun it unchanged.
+- Move active hardware focus to support/maintenance qualification. Additional MTP work is optional and limited to a concrete release decision; no new benchmark framework or broad candidate sweep is added.
+
 ## 0.11.3-1.5 - 2026-09-19
 
 - Fix embedding-only RAG residency restoration on Ollama 0.34 by using a non-empty `/api/embed` load probe while preserving each lane's normal/default keep-alive policy.

@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        1.5%{?dist}
+Release:        1.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.6
+- Close the current MTP qualification lane in package/development state without changing runtime defaults: record YMQ Phase-1 qualification, corrected draft-depth sweep conclusions, measured noise floor, and optional confirmation-only follow-up.
+- Keep qwen3.5 draft depth 3 as the packaged default pending confirmation-grade depth-2 evidence; retain depth 2 for qwen3.6-27b, HauhauCS qwen3.8 and YMQ qwen3.8.
+- Move the active hardware focus to support/maintenance qualification; no service topology, resource threshold, production-role or MTP runtime behavior changes.
+- Preserve the reviewed MTP execution methodology and reference-kit validation transcript as source-only development material; the benchmark kit remains outside the runtime RPM payload.
+
 * Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.5
 - Fix embedding-only RAG residency restoration by using a non-empty /api/embed probe while preserving each lane's normal keep-alive policy
 - Make all-current installer model reconciliation concise and remove redundant processed-count output
