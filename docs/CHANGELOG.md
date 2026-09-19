@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.3-1.5 - 2026-09-19
+
+- Fix embedding-only RAG residency restoration on Ollama 0.34 by using a non-empty `/api/embed` load probe while preserving each lane's normal/default keep-alive policy.
+- Keep restoration fail-closed: exact installed 1.4 proved RAG quality 4/4 but revalidation correctly failed infrastructure when Jina residency could not be restored.
+- Simplify all-current required-model installer output to one concise line per category and remove redundant `Done: N model(s) processed.` lines when nothing changed.
+- Rename the setup-plan status label to `reboot required` for clearer rerun UX; reboot behavior is unchanged.
+- Record exact installed 1.4 installer verification 54/0/0 and preserve the separate `tags-en` 5/6 task-quality miss for review rather than weakening its evaluator.
+
 ## 0.11.3-1.4 - 2026-09-19
 
 - Add two bounded Qwen3.8 27B ISTA GSQ/RCO experiments without changing production roles: IQ3_XXS is the deployability/RAG-oriented candidate at 16K with Qwen3.8 non-thinking sampling, while the existing IQ3_S entry becomes the quality-first main-model experiment at a safer 8K with Qwen3.8 thinking-mode sampling. Both are text-only and remain opt-in experiments.

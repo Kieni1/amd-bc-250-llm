@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        1.4%{?dist}
+Release:        1.5%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.5
+- Fix embedding-only RAG residency restoration by using a non-empty /api/embed probe while preserving each lane's normal keep-alive policy
+- Make all-current installer model reconciliation concise and remove redundant processed-count output
+- Clarify the installer setup-plan reboot status label
+- Record exact installed 1.4 installer success and the fail-closed revalidation restoration defect without relabelling partial evidence as qualification
+
 * Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.4
 - Record final BC-250 RAG finalist evidence and keep Gemma E4B / bc250-office-documents as the production document/RAG default for the 16 GiB profile; Qwen 9B remains a separate heavier general-office option.
 - Restore benchmark residency sets with each Ollama lane's normal keep-alive policy instead of forcing 30m, and rename the resident-session swap metric to the precise swap_peak_delta_mib.
