@@ -36,7 +36,6 @@ Convenience aliases (do not use them in recorded evidence):
   qwen35-9b   -> qwen3.5-9b-mtp
   qwen36-27b  -> qwen3.6-27b-mtp
   qwen38-27b  -> qwen3.8-27b-hauhaucs-mtp
-  qwen36-35b  -> qwen3.6-35b-a3b-mtp
 
 Available MTP entries:
 USAGE
@@ -66,7 +65,6 @@ case "$choice" in
   qwen35-9b)  choice=qwen3.5-9b-mtp ;;
   qwen36-27b) choice=qwen3.6-27b-mtp ;;
   qwen38-27b) choice=qwen3.8-27b-hauhaucs-mtp ;;
-  qwen36-35b) choice=qwen3.6-35b-a3b-mtp ;;
   "") show_usage 2; exit 2 ;;
 esac
 

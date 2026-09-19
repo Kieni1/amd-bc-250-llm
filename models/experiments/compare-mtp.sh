@@ -43,7 +43,6 @@ case "$choice" in
   qwen35-9b)  choice=qwen3.5-9b-mtp ;;
   qwen36-27b) choice=qwen3.6-27b-mtp ;;
   qwen38-27b) choice=qwen3.8-27b-hauhaucs-mtp ;;
-  qwen36-35b) choice=qwen3.6-35b-a3b-mtp ;;
   "") show_usage >&2; exit 2 ;;
 esac
 [[ $# -eq 1 ]] || { echo "ERROR: provide exactly one MTP catalog ID." >&2; exit 2; }
@@ -60,6 +59,13 @@ done
 # Resolve before asking for runtime credentials so invalid IDs fail cheaply.
 resolved="$("$MANAGER" path mtp "$choice" --source "$SOURCE_FILE")" || exit 1
 IFS=$'\t' read -r GGUF DEFAULT_CTX DEFAULT_DRAFT <<< "$resolved"
+EFFECTIVE_CTX="${CTX:-$DEFAULT_CTX}"
+EFFECTIVE_DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
+if [[ -n "${DRAFT_N_MAX:-}" ]]; then
+  DRAFT_N_SOURCE="override"
+else
+  DRAFT_N_SOURCE="catalog"
+fi
 [[ -s "$GGUF" ]] || {
   echo "ERROR: missing $GGUF." >&2
   echo "Fetch it first: sudo bc250-fetch-mtp $choice" >&2
@@ -72,8 +78,9 @@ RESULT_DIR="${RESULT_DIR:-$RESULT_BASE/bc250-mtp-${choice}-${STAMP}}"
 mkdir -p "$RESULT_DIR"
 RUN_START="$(date -Iseconds)"
 printf '%s\n' "$PROMPT" > "$RESULT_DIR/prompt.txt"
-printf 'id=%s\ngguf=%s\ncontext=%s\ndraft_n_max=%s\nubatch=%s\nrepeats=%s\nnum_predict=%s\nport=%s\nstarted=%s\n' \
-  "$choice" "$GGUF" "${CTX:-$DEFAULT_CTX}" "${DRAFT_N_MAX:-$DEFAULT_DRAFT}" "${UBATCH:-default}" "$REPEATS" "$NUM_PREDICT" "$PORT" "$RUN_START" \
+printf 'id=%s\ngguf=%s\ncontext=%s\ncatalog_draft_n_max=%s\nrequested_draft_n_max=%s\neffective_draft_n_max=%s\ndraft_n_source=%s\nubatch=%s\nrepeats=%s\nnum_predict=%s\nport=%s\nstarted=%s\n' \
+  "$choice" "$GGUF" "$EFFECTIVE_CTX" "$DEFAULT_DRAFT" "${DRAFT_N_MAX:-}" "$EFFECTIVE_DRAFT_N_MAX" "$DRAFT_N_SOURCE" \
+  "${UBATCH:-default}" "$REPEATS" "$NUM_PREDICT" "$PORT" "$RUN_START" \
   > "$RESULT_DIR/run-info.txt"
 rpm -q --qf '%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\n' bc250-llm-server > "$RESULT_DIR/package.txt" 2>&1 || true
 uname -a > "$RESULT_DIR/uname.txt"
@@ -187,6 +194,33 @@ run_phase() {
     wait "$SAMPLER_PID" 2>/dev/null || true
     SAMPLER_PID=""
     return 1
+  fi
+
+  # Prove wrapper/catalog draft-depth selection reached the actual llama-server
+  # command line before accepting any inference evidence. This guards the exact
+  # wrapper -> core boundary that invalidated the first Phase-2 depth sweep.
+  if [[ "$phase" == "mtp" ]]; then
+    if ! grep -Fq -- "--spec-draft-n-max $EFFECTIVE_DRAFT_N_MAX" "$phase_dir/server.log"; then
+      echo "ERROR: requested draft depth $EFFECTIVE_DRAFT_N_MAX was not present in the effective MTP server flags." >&2
+      stop_server "$pgid" || true
+      kill "$SAMPLER_PID" 2>/dev/null || true
+      wait "$SAMPLER_PID" 2>/dev/null || true
+      SAMPLER_PID=""
+      return 1
+    fi
+    printf 'mtp_enabled=true\neffective_draft_n_max=%s\nverification=PASS\n' \
+      "$EFFECTIVE_DRAFT_N_MAX" > "$phase_dir/runtime-config.txt"
+  else
+    if grep -Fq -- '--spec-type draft-mtp' "$phase_dir/server.log"; then
+      echo "ERROR: baseline server flags unexpectedly enabled MTP." >&2
+      stop_server "$pgid" || true
+      kill "$SAMPLER_PID" 2>/dev/null || true
+      wait "$SAMPLER_PID" 2>/dev/null || true
+      SAMPLER_PID=""
+      return 1
+    fi
+    printf 'mtp_enabled=false\neffective_draft_n_max=disabled\nverification=PASS\n' \
+      > "$phase_dir/runtime-config.txt"
   fi
 
   printf 'run\tfinish\tusable\treserved_run\ttps\taccepted\tproposed\n' > "$phase_dir/inference.tsv"
@@ -303,6 +337,7 @@ gpu_fault_lines="$(wc -l < "$RESULT_DIR/journal-gpu-faults.log")"
 cat > "$RESULT_DIR/README-FIRST.txt" <<SUMMARY
 BC-250 MTP same-model comparison
 ID: $choice
+Draft n max: $EFFECTIVE_DRAFT_N_MAX ($DRAFT_N_SOURCE; catalog default $DEFAULT_DRAFT)
 Baseline avg tok/s: ${baseline_tps:-unavailable}
 MTP avg tok/s: ${mtp_tps:-unavailable}
 Speedup: ${speedup:-unavailable}x

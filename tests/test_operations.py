@@ -146,7 +146,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertIn("qwen3.5-9b-mtp", result.stdout)
         self.assertIn("qwen3.8-27b-hauhaucs-mtp", result.stdout)
         self.assertIn("qwen3.8-27b-ymq-xs-ti-mtp", result.stdout)
-        self.assertIn("qwen3.6-35b-a3b-mtp", result.stdout)
+        self.assertNotIn("qwen3.6-35b-a3b-mtp", result.stdout)
         self.assertNotIn("set LLAMACPP", result.stdout)
 
     def test_mtp_runner_missing_source_points_to_exact_fetch_before_runtime(self) -> None:
@@ -170,6 +170,19 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertIn("cache_flags+=(--cache-ram 0)", source)
         self.assertIn("grep -Fq -- '--no-cache-idle-slots'", source)
         self.assertIn("cache_flags+=(--no-cache-idle-slots)", source)
+
+    def test_mtp_compare_records_and_verifies_effective_draft_depth(self) -> None:
+        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        for expected in (
+            "catalog_draft_n_max",
+            "requested_draft_n_max",
+            "effective_draft_n_max",
+            "draft_n_source",
+            'grep -Fq -- "--spec-draft-n-max $EFFECTIVE_DRAFT_N_MAX"',
+            "runtime-config.txt",
+            "baseline server flags unexpectedly enabled MTP",
+        ):
+            self.assertIn(expected, source)
 
     def test_cpu_sysfs_scan_ignores_an_unexpanded_glob(self) -> None:
         for relative in ("cmd/monitoring/status.sh", "cmd/monitoring/verify-server.sh"):
