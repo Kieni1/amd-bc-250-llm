@@ -182,4 +182,5 @@ summaries expose the chronological resident-session resource view (MemAvailable 
 end delta; swap start/peak/end plus `swap_peak_delta_mib`) so sustained pressure is visible without
 mislabeling peak-minus-start swap as cumulative growth or changing current acceptance thresholds.
 Residency restoration guarantees the starting model set and lets each Ollama lane apply its normal
-keep-alive policy; it does not claim to reconstruct the exact remaining expiry time.
+keep-alive policy. Embedding-only registrations are reloaded with a harmless non-empty `/api/embed`
+probe when generation is unsupported; exact remaining expiry time is not reconstructed.

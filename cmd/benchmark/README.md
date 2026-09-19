@@ -188,8 +188,9 @@ Canonical summaries also verify that every expected RAG case appears exactly onc
 partial result stream cannot be mistaken for a complete quality run. `rag-quality` snapshots the
 starting main/embedding Ollama residency set, restores and verifies that set on every exit path,
 and treats restoration failure as infrastructure failure. Reloads omit an explicit keep-alive so
-each Ollama service applies its normal configured/default lane policy; exact remaining expiry time
-is not reconstructed. Its canonical resource summary reports resident-session MemAvailable
+each Ollama service applies its normal configured/default lane policy; embedding-only registrations
+use a harmless non-empty `/api/embed` probe when `/api/generate` is unsupported. Exact remaining
+expiry time is not reconstructed. Its canonical resource summary reports resident-session MemAvailable
 start/min/end/delta plus swap start/peak/end and `swap_peak_delta_mib`,
 while keeping the existing qualification thresholds unchanged. The canonical
 thinking-policy A/B is `rag-quality --think true` versus
