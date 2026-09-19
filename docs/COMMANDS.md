@@ -85,8 +85,10 @@ roles, plus the task and embedding defaults, without printing the full catalog. 
 unchanged required models are summarized by category; downloads or repairs remain verbose.
 It then presents compact state for ordinary production/experiment/task/agent/embedding
 extras. Fully current rows collapse to `[CURRENT]`, and the intentionally inactive agent
-lane is shown as deferred without waiting on that stopped Ollama instance. MTP is not part
-of this generic picker; use `bc250-model list mtp --all` plus `bc250-fetch-mtp ID` explicitly.
+lane is shown as deferred without waiting on that stopped Ollama instance. Stage 7 also shows a
+**read-only, non-indexed MTP inventory** so fetched/current standalone llama.cpp artifacts are visible,
+but MTP is not part of the generic picker and is never fetched by installer convergence. Use
+`bc250-fetch-mtp ID` explicitly when preparing one.
 Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips
 optional extras only.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
@@ -94,7 +96,10 @@ across transcript PTY creation, so unattended runs never become interactive by
 accident. `BC250_HF_ANONYMOUS=1` forces anonymous Hugging Face downloads. The model manager
 asks for an optional Hugging Face token only when a download is actually needed;
 a no-op update with current model sources does not ask for one.
-`BC250_UPDATE_OLLAMA=1` explicitly refreshes official Ollama.
+`BC250_UPDATE_OLLAMA=1` explicitly refreshes official Ollama. The completion summary separates
+core installation/verification from package-owned Open WebUI state and reports the latter as
+`APPLIED + VERIFIED`, `SKIPPED`, or `RETRY REQUIRED`; a nonfatal Open WebUI setup problem is no
+longer hidden behind an unconditional whole-install success message.
 
 ## Models
 
@@ -140,6 +145,9 @@ bounded; the known-inactive agent lane is skipped during normal status-all inspe
 `--online` checks moving upstream revisions such as `latest` without downloading or modifying
 the local model.
 Pinned revisions are reported as pinned rather than mislabelled as needing an update.
+When normal mode is active, the agent API is intentionally stopped; full
+`status agentic MODEL` therefore may show registration as unavailable/UNKNOWN. Read-only status
+does not switch runtime modes merely to inspect it.
 
 `path` is the narrow machine-readable resolver used by package tooling. It prints the
 resolved source path and MTP context/draft metadata for one exact model; it replaces the
@@ -185,7 +193,7 @@ Common options for `apply` and `refresh`:
 - `--host HOST[:PORT]`: override the target Ollama API;
 - `--destination PATH`: override the manager-owned GGUF root;
 - `--min-free-bytes BYTES`: require free space before downloading;
-- `--token-file PATH`: read a Hugging Face token from a protected file;
+- `--token-file PATH`: read a Hugging Face token from a non-empty regular file that is not group/world accessible (normally mode `0600`);
 - `--include-disabled`: allow disabled MTP entries to be selected for an explicit `mtp` category operation; combined `apply all` / `refresh all` never include MTP;
 - `--modelfile-dir PATH`: add a Modelfile search directory;
 - `--source PATH`: use another MTP TOML catalog.
@@ -196,9 +204,10 @@ authentication is requested only when a manager download actually needs it.
 
 ### MTP lifecycle
 
-MTP entries are download-only llama.cpp experiments and are intentionally outside generic
-combined convergence. The installer picker excludes them, and `apply all` / `refresh all` never
-select MTP even when `--include-disabled` is supplied. Use the explicit `mtp` category or the
+MTP entries are download-only inputs for a standalone opt-in llama.cpp runtime and are intentionally
+outside generic combined convergence. The installer displays their read-only operational state but
+never exposes them as normal selectable indexes; `apply all` / `refresh all` never select MTP even
+when `--include-disabled` is supplied. Use the explicit `mtp` category or the
 opt-in helper to select one:
 
 ```bash
@@ -207,6 +216,10 @@ sudo bc250-fetch-mtp qwen3.5-9b-mtp
 sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
 LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
 ```
+
+`bc250-run-mtp` drains resident Ollama models before launching standalone llama.cpp. Direct operator
+runs restore the exact pre-run residency set when llama.cpp exits; `bc250-compare-mtp` uses the
+qualification `drain-only` policy and intentionally leaves Ollama cold after evidence capture.
 
 Running `sudo bc250-fetch-mtp` without a selection shows the disabled experiment entries
 and prompts for one. It maps to `bc250-model apply mtp --include-disabled`; the explicit
@@ -247,8 +260,9 @@ translation pairs are routed to `[SCOPE] COLLECTION — Français`. `plan` makes
 network request. `sync` uses Open WebUI's v0.11 incremental knowledge API,
 skips unchanged files and replaces changed files only after the new upload
 succeeds. Files removed locally remain in Open WebUI unless `--prune` is
-explicitly supplied. The API key is never packaged; read it from a protected
-file or `OPEN_WEBUI_API_KEY`.
+explicitly supplied. The API key is never packaged; `--token-file` requires a non-empty regular
+file with no group/world access (normally mode `0600`), or use `OPEN_WEBUI_API_KEY` for an
+ephemeral environment-provided credential.
 
 ## Experimental OCR
 
@@ -382,6 +396,10 @@ sudo bc250-revalidate status --raw
 sudo bc250-revalidate abort
 sudo bc250-revalidate cleanup
 ```
+
+`bc250-status` derives `normal`, `degraded`, `stopped` and exclusive `agent` topology from the same
+classifier used by `bc250-agent-mode status`; it does not call a machine "normal" merely because
+the agent unit is inactive.
 
 `bc250-revalidate` harness v4.2 is the root-only systemd-backed package
 qualification workflow. A full
@@ -565,6 +583,11 @@ LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-run-mtp MTP_ID
 ```
 
 `MODE` is `generate`, `refactor`, `review`, `document`, `test` or `commit`.
+For file-producing `generate`, `refactor` and `test` modes, and for the structured `commit` mode,
+`bc250-code` fails closed when the final answer is wrapped in an outer Markdown code fence. It does
+not silently strip the fence because that would hide a model output-contract failure. `review` and
+`document` continue to allow Markdown.
+
 `CODING_AGENT_MODEL` selects an installed agentic model; `OLLAMA_HOST`/`OLLAMA_URL`
 override its endpoint, and `CODING_AGENT_NUM_PREDICT` overrides the positive output
 token budget (default 3072). `bc250-code` uses `/api/chat` with `think:true` and writes

@@ -114,7 +114,8 @@ Experimental models are never silent replacements for the defaults above. During
 required role models are converged first; entries that are already fully current are summarized rather
 than printed model-by-model. The optional picker shows compact runtime state for ordinary Ollama
 catalog entries only. Download-only MTP candidates never participate in that generic picker or
-`apply all`; prepare them explicitly with `bc250-fetch-mtp`.
+`apply all`; discover them with `bc250-model list mtp --all` and prepare one explicitly with
+`bc250-fetch-mtp`.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
@@ -131,62 +132,24 @@ review every model's current license before use.
 ## Daily commands
 
 ```bash
-# Models
-bc250-model list production
-bc250-model list mtp --all          # experimental/download-only candidates
-sudo bc250-fetch-mtp qwen3.5-9b-mtp  # explicit opt-in; not generic convergence
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250-compare-mtp qwen3.5-9b-mtp
-sudo bc250-model status production
-sudo bc250-model status production MODEL --verbose
-sudo bc250-model apply production
-sudo bc250-model apply experiments
-sudo bc250-model apply embedding
-sudo bc250-model apply task
-sudo bc250-model apply agentic     # temporarily switches to agent mode, then restores normal
-sudo bc250-model unregister experiments MODEL  # keep verified source/state for later reuse
-sudo bc250-model remove experiments MODEL      # also remove manager-owned source/state
-bc250-ocr list
-sudo bc250-rag-import plan /srv/bc250-documents
-sudo bc250-openwebui-setup init
-sudo bc250-agent-mode enter         # use the registered coding model exclusively
-sudo bc250-agent-mode leave
-
-# Profiles and hardware
-bc250-memory-profile status
-bc250-swap-profile status
-bc250-ollama-profile status
-sudo bc250-40cu status
-
-# Optional maintenance / storage
 sudo bc250-status
-sudo bc250-maintenance setup --defaults
-sudo bc250-maintenance companion status
-sudo bc250-maintenance contract
-sudo bc250-maintenance run backup
-sudo bc250-maintenance run prune      # preflights the protected Open WebUI API key
-# Optional Pi setup: companion enable = safe shutdown over SSH; backup export is separate.
-# Check/apply package-owned Open WebUI state when needed:
-sudo bc250-openwebui-setup status --verbose --owui-token-file /root/owui-test.key
-sudo bc250-maintenance clean-cache
-sudo bc250-revalidate status          # opt-in appliance revalidation state
-# Destructive greenfield reset (operator documents are preserved):
-# sudo bc250-reset
+sudo bc250-verify
+sudo bc250-model status production
+sudo bc250-openwebui-setup status
+sudo bc250-maintenance status
+bc250-agent-mode status
 
-# Compare models and specialized model categories
-bc250-benchmark generation
-bc250-benchmark embeddings
-bc250-benchmark ocr
-bc250-benchmark task
-bc250-benchmark agent
-bc250-benchmark usecase
-bc250-benchmark rag-cycle
-bc250-benchmark translation
-bc250-benchmark rag-quality
+# Enter/leave the exclusive coding lane only when needed:
+sudo bc250-agent-mode enter
+sudo bc250-agent-mode leave
 ```
 
-The complete installed interface and its exact syntax are in
-[`docs/COMMANDS.md`](docs/COMMANDS.md). Raspberry Pi/WOL/safe-power integration
-uses the stable interface in [`docs/MAINTENANCE-CONTRACT.md`](docs/MAINTENANCE-CONTRACT.md).
+Keep experiments, MTP qualification, benchmark suites, destructive model lifecycle actions,
+reset and maintenance internals out of the normal daily path. Their complete syntax remains in
+[`docs/COMMANDS.md`](docs/COMMANDS.md); model policy and MTP opt-in details are in
+[`MODELS.md`](MODELS.md), and Raspberry Pi/WOL/safe-power operations are in
+[`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) and
+[`docs/MAINTENANCE-CONTRACT.md`](docs/MAINTENANCE-CONTRACT.md).
 
 ## Components
 

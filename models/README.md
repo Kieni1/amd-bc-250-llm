@@ -65,7 +65,10 @@ The public categories are `production`, `experiments`, `task`, `agentic`,
 is the only exception to Modelfile discovery: its download-only entries remain in
 a TOML runtime catalog because they have no Ollama model or Modelfile. Packaged MTP
 entries are excluded from combined mutation convergence regardless of enabled state; use
-`sudo bc250-fetch-mtp ID` when deliberately preparing one for a bounded llama.cpp experiment.
+`sudo bc250-fetch-mtp ID` when deliberately preparing one for a bounded standalone llama.cpp
+experiment. MTP shares catalog/provenance infrastructure only; it is not an Ollama runtime lane.
+`bc250-run-mtp` drains normal Ollama residency for memory isolation and restores the pre-run set on
+normal direct use, while `bc250-compare-mtp` intentionally leaves Ollama cold after qualification.
 
 ## Add or override a model
 

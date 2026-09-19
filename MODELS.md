@@ -16,7 +16,7 @@ way to override packaged model definitions.
 | `experiments` | `exp-` | `11434` | model/OCR comparisons |
 | `task` | `task-` | `11435` | Open WebUI background tasks |
 | `agentic` | `agentic-` | `11436` | coding/repository work |
-| `mtp` | n/a | llama.cpp helper | download-only MTP experiments |
+| `mtp` | n/a | standalone llama.cpp runtime | download-only MTP experiments |
 
 Main, task and embedding stores are deliberately separate. The main lane keeps its
 selected chat model warm for 20 minutes, the compact task lane unloads after each
@@ -24,6 +24,12 @@ request, and the embedding lane keeps the small retrieval model warm for 10 minu
 This preserves interactive chat latency while keeping background task residency small.
 Agent/coding is **exclusive**: `bc250-agent-mode enter` stops main/task/embedding and
 starts only 11436; `leave` restores normal mode.
+
+MTP is different from the agent lane: it shares catalog/provenance handling with `bc250-model`, but
+its runtime is a standalone opt-in external llama.cpp server rather than an Ollama service lane.
+Direct `bc250-run-mtp` operation snapshots and drains any resident Ollama models first, then restores
+the exact pre-run residency set when the standalone server exits. Qualification/comparison runs
+intentionally leave Ollama cold so residency cannot contaminate performance/resource evidence.
 
 The package owns all four Ollama service definitions statically. Normal mode requires main, task and embedding; model registration automatically switches into temporary agent mode when an agentic selection is included and restores normal mode afterwards.
 
@@ -62,6 +68,10 @@ sudo bc250-model purge-retired
 inspection command: it reports source/provenance validity, current-definition and
 runtime-Modelfile drift, registration state and a recommended reconciliation action.
 `--online` additionally checks moving upstream revisions without mutating local state.
+In normal mode the agent Ollama API is intentionally stopped, so full read-only
+`status agentic MODEL` may report registration as unavailable/UNKNOWN. That is not a reason
+to switch modes merely for inspection: apply/remove operations enter agent mode when needed,
+while read-only status leaves the appliance topology unchanged.
 
 `apply` converges a selected model to the current catalog definition and reuses an
 existing verified GGUF whenever possible. `refresh` deliberately fetches source bytes
@@ -125,6 +135,9 @@ For deployed role presets see [`docs/openwebui-settings.md`](docs/openwebui-sett
 and for exact command syntax see [`docs/COMMANDS.md`](docs/COMMANDS.md).
 
 ## 2026-08-31 benchmark status
+
+> **Historical decision evidence — superseded where later sections say otherwise.**
+> Keep the measured results, but use the current catalog/decision sections below for today's lifecycle state.
 
 The production map is now supported by repeatable BC-250 evidence rather than
 model size alone. The numbers below are same-board guidance from Ollama 0.33.2
