@@ -78,7 +78,7 @@ RESULT_DIR="${RESULT_DIR:-$RESULT_BASE/bc250-mtp-${choice}-${STAMP}}"
 mkdir -p "$RESULT_DIR"
 RUN_START="$(date -Iseconds)"
 printf '%s\n' "$PROMPT" > "$RESULT_DIR/prompt.txt"
-printf 'id=%s\ngguf=%s\ncontext=%s\ncatalog_draft_n_max=%s\nrequested_draft_n_max=%s\neffective_draft_n_max=%s\ndraft_n_source=%s\nubatch=%s\nrepeats=%s\nnum_predict=%s\nport=%s\nstarted=%s\n' \
+printf 'id=%s\ngguf=%s\ncontext=%s\ncatalog_draft_n_max=%s\nrequested_draft_n_max=%s\neffective_draft_n_max=%s\ndraft_n_source=%s\nollama_residency_policy=drain-only\nubatch=%s\nrepeats=%s\nnum_predict=%s\nport=%s\nstarted=%s\n' \
   "$choice" "$GGUF" "$EFFECTIVE_CTX" "$DEFAULT_DRAFT" "${DRAFT_N_MAX:-}" "$EFFECTIVE_DRAFT_N_MAX" "$DRAFT_N_SOURCE" \
   "${UBATCH:-default}" "$REPEATS" "$NUM_PREDICT" "$PORT" "$RUN_START" \
   > "$RESULT_DIR/run-info.txt"
@@ -180,6 +180,7 @@ run_phase() {
     LLAMACPP="$LLAMACPP" PORT="$PORT" \
     CTX="${CTX:-}" DRAFT_N_MAX="${DRAFT_N_MAX:-}" UBATCH="${UBATCH:-}" \
     MIN_MEM_AVAILABLE_MIB="${MIN_MEM_AVAILABLE_MIB:-2048}" \
+    BC250_MTP_RESIDENCY_POLICY=drain-only \
     "$RUNNER" "${runner_args[@]}" > "$phase_dir/server.log" 2>&1 &
   local pgid=$!
   ACTIVE_PGID="$pgid"

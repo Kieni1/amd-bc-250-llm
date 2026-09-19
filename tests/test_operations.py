@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -50,6 +52,36 @@ class StatusTests(unittest.TestCase):
             "CPU idle",
         ):
             self.assertIn(expected, source)
+
+
+    def test_status_uses_agent_mode_as_single_runtime_topology_classifier(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        start = source.index("runtime_mode() {")
+        end = source.index("\nollama_status() {", start)
+        function = source[start:end]
+        with tempfile.TemporaryDirectory() as tmp:
+            helper = Path(tmp) / "bc250-agent-mode"
+            helper.write_text(
+                "#!/usr/bin/env bash\nprintf 'ollama.service failed\nmode=%s\n' \"${TEST_MODE}\"\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            for expected in ("normal", "degraded", "stopped", "agent"):
+                env = os.environ | {
+                    "PATH": f"{tmp}:{os.environ.get('PATH', '')}",
+                    "TEST_MODE": expected,
+                }
+                result = subprocess.run(
+                    ["bash", "-c", function + "\nruntime_mode"],
+                    text=True,
+                    capture_output=True,
+                    env=env,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout, expected)
+        self.assertIn("degraded (partial normal topology)", source)
+        self.assertIn("stopped (normal and agent lanes inactive)", source)
 
 
 class VerifyTests(unittest.TestCase):
@@ -170,6 +202,28 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertIn("cache_flags+=(--cache-ram 0)", source)
         self.assertIn("grep -Fq -- '--no-cache-idle-slots'", source)
         self.assertIn("cache_flags+=(--no-cache-idle-slots)", source)
+
+    def test_mtp_runner_drains_ollama_and_restores_direct_operator_residency(self) -> None:
+        source = (ROOT / "models/mtp/run-mtp-llamacpp.sh").read_text(encoding="utf-8")
+        for expected in (
+            'RESIDENCY_POLICY="${BC250_MTP_RESIDENCY_POLICY:-restore}"',
+            'OLLAMA_PORTS=(11434 11435 11436 11437)',
+            "snapshot_ollama_residency()",
+            "drain_ollama_residency()",
+            "stop_ollama_model()",
+            "restore_ollama_residency()",
+            "bc250 MTP residency restore probe",
+            "ollama stop",
+            "configured default residency policy applies",
+        ):
+            self.assertIn(expected, source)
+        self.assertIn('if [[ "$RESIDENCY_POLICY" == drain-only ]]; then', source)
+        self.assertIn('trap restore_on_exit EXIT', source)
+
+    def test_mtp_compare_explicitly_keeps_ollama_cold_for_qualification(self) -> None:
+        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        self.assertIn("ollama_residency_policy=drain-only", source)
+        self.assertIn("BC250_MTP_RESIDENCY_POLICY=drain-only", source)
 
     def test_mtp_compare_records_and_verifies_effective_draft_depth(self) -> None:
         source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")

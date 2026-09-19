@@ -37,6 +37,24 @@ service_status() {
     "$(value_or_unknown "$state")" "$(value_or_unknown "$enabled")"
 }
 
+runtime_mode() {
+  # Reuse bc250-agent-mode as the single topology classifier rather than
+  # guessing from whether the agent unit alone happens to be active.
+  local helper="" output mode
+  if command -v bc250-agent-mode >/dev/null 2>&1; then
+    helper="$(command -v bc250-agent-mode)"
+  elif [[ -x /usr/libexec/bc250-llm-server/agent-mode.sh ]]; then
+    helper=/usr/libexec/bc250-llm-server/agent-mode.sh
+  fi
+  [[ -n "$helper" ]] || { printf 'unknown'; return; }
+  output="$("$helper" status 2>/dev/null || true)"
+  mode="$(awk -F= '$1 == "mode" {print $2; exit}' <<< "$output")"
+  case "$mode" in
+    normal|degraded|stopped|agent) printf '%s' "$mode" ;;
+    *) printf 'unknown' ;;
+  esac
+}
+
 ollama_status() {
   local label="$1" unit="$2" port="$3" state models response
   state="$(unit_state "$unit")"
@@ -158,11 +176,14 @@ if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
 else
   printf '  %-9s port %-5s %-8s %s\n' agent 11436 inactive '(expected in normal mode)'
 fi
-if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
-  echo "  Mode:      exclusive agent/coding"
-else
-  echo "  Mode:      normal production/task/embedding"
-fi
+mode="$(runtime_mode)"
+case "$mode" in
+  agent)    echo "  Mode:      exclusive agent/coding" ;;
+  normal)   echo "  Mode:      normal production/task/embedding" ;;
+  degraded) echo "  Mode:      degraded (partial normal topology)" ;;
+  stopped)  echo "  Mode:      stopped (normal and agent lanes inactive)" ;;
+  *)        echo "  Mode:      unknown (topology classifier unavailable)" ;;
+esac
 
 section "Web services"
 for unit in open-webui.service tika.service nginx.service; do

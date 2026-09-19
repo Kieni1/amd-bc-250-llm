@@ -12,7 +12,7 @@ intentionally have no Ollama Modelfile.
 
 ## Current qualification / optimization state
 
-MTP is qualified enough for current package use as an explicit opt-in experimental lane on the
+MTP is qualified enough for current package use as an explicit opt-in **standalone llama.cpp runtime** on the
 BC-250 with the reviewed external llama.cpp Vulkan runtime. It is **not** part of normal installer
 convergence and no active production role depends on it.
 
@@ -105,12 +105,20 @@ options. Every qualification run must capture the exact executable/build and fla
 `bc250-run-mtp` now performs a bounded fail-fast preflight before launch:
 
 - resolves the exact MTP catalog entry and refuses a missing source;
+- snapshots every reachable package Ollama lane (`11434`-`11437`) and drains all resident models
+  before measuring launch headroom or starting llama.cpp;
 - verifies protected manager state is `CURRENT` and records the source SHA-256;
 - rejects an occupied MTP port or another stale `llama-server` process;
 - enforces a configurable `MemAvailable` launch floor (default 2048 MiB);
 - validates required llama.cpp CLI options;
 - verifies the `ollama` service user can execute the external runtime and read the GGUF;
 - launches `llama-server` as `ollama`, never as root.
+
+A direct operator `bc250-run-mtp` owns this temporary lifecycle: after llama.cpp exits it restores the
+exact pre-run Ollama residency set and lets each lane's configured keep-alive policy apply. The
+comparison/qualification harness sets `BC250_MTP_RESIDENCY_POLICY=drain-only`; those isolated runs
+intentionally do **not** rewarm Ollama afterward. Neither path stops/reconfigures Ollama services or
+changes normal/agent topology.
 
 Manual launch remains useful for diagnosis:
 
@@ -154,6 +162,10 @@ cache/KV, ubatch and request settings:
 
 1. baseline: MTP disabled;
 2. candidate: `--spec-type draft-mtp` with the catalog draft limit.
+
+Before either comparison phase, the runner verifies Ollama residency is drained. Comparison evidence
+uses `drain-only` residency policy and leaves the appliance cold afterward by design; this is the
+specialist benchmark isolation contract, not the direct operator-run restoration contract.
 
 The default comparison performs three identical requests per phase and writes one evidence
 directory plus a `.tar.gz`. The bundle contains package/runtime identity, verified model

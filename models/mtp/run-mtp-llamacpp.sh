@@ -18,6 +18,11 @@ MIN_MEM_AVAILABLE_MIB="${MIN_MEM_AVAILABLE_MIB:-2048}"
 REVIEWED_LLAMACPP_RELEASE="b10964"
 MODE="mtp"
 choice=""
+RESIDENCY_POLICY="${BC250_MTP_RESIDENCY_POLICY:-restore}"
+OLLAMA_PORTS=(11434 11435 11436 11437)
+declare -A OLLAMA_RESIDENCY_SNAPSHOT=()
+RESIDENCY_CAPTURED=0
+SERVER_PID=""
 
 [[ -x "$MANAGER" ]] || { echo "ERROR: model manager is not executable: $MANAGER" >&2; exit 1; }
 
@@ -31,6 +36,10 @@ Usage: LLAMACPP=/path/to/llama-server $0 [--no-mtp] ID
 
 Run an exact package MTP catalog entry with llama.cpp. --no-mtp launches the
 same GGUF/settings without speculative decoding for a controlled baseline.
+
+Direct operator runs snapshot and drain resident Ollama models before launch, then
+restore the exact pre-run residency set on exit. Qualification/comparison harnesses
+set BC250_MTP_RESIDENCY_POLICY=drain-only and intentionally leave Ollama cold.
 
 Convenience aliases (do not use them in recorded evidence):
   qwen35-9b   -> qwen3.5-9b-mtp
@@ -84,13 +93,155 @@ DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
 [[ "$CTX" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: CTX must be a positive integer." >&2; exit 2; }
 [[ "$DRAFT_N_MAX" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: DRAFT_N_MAX must be a positive integer." >&2; exit 2; }
 [[ "$MIN_MEM_AVAILABLE_MIB" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: MIN_MEM_AVAILABLE_MIB must be a positive integer." >&2; exit 2; }
+case "$RESIDENCY_POLICY" in
+  restore|drain-only) ;;
+  *) echo "ERROR: BC250_MTP_RESIDENCY_POLICY must be restore or drain-only." >&2; exit 2 ;;
+esac
 if [[ -n "$UBATCH" ]]; then
   [[ "$UBATCH" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: UBATCH must be a positive integer." >&2; exit 2; }
 fi
 
-for cmd in awk grep pgrep rpm sed ss sudo; do
+for cmd in awk curl grep jq ollama pgrep rpm sed ss sudo timeout; do
   command -v "$cmd" >/dev/null || { echo "ERROR: missing command: $cmd" >&2; exit 1; }
 done
+
+ollama_api_ready() {
+  local port="$1"
+  curl -fsS --connect-timeout 1 --max-time 2 \
+    "http://127.0.0.1:$port/api/version" >/dev/null 2>&1
+}
+
+ollama_resident_names() {
+  local port="$1"
+  curl -fsS --connect-timeout 1 --max-time 3 \
+    "http://127.0.0.1:$port/api/ps" \
+    | jq -r '[.models[]? | (.name // .model // empty) | sub(":latest$"; "")] | unique | .[]'
+}
+
+snapshot_ollama_residency() {
+  local port
+  for port in "${OLLAMA_PORTS[@]}"; do
+    if ollama_api_ready "$port"; then
+      OLLAMA_RESIDENCY_SNAPSHOT[$port]="$(ollama_resident_names "$port")" || {
+        echo "ERROR: could not snapshot Ollama residency on :$port." >&2
+        return 1
+      }
+    else
+      OLLAMA_RESIDENCY_SNAPSHOT[$port]="__OFFLINE__"
+    fi
+  done
+  RESIDENCY_CAPTURED=1
+}
+
+stop_ollama_model() {
+  local port="$1" model="$2"
+  env OLLAMA_HOST="http://127.0.0.1:$port" timeout 30 ollama stop "$model" \
+    >/dev/null 2>&1
+}
+
+drain_ollama_residency() {
+  local port model remaining drained=0
+  for port in "${OLLAMA_PORTS[@]}"; do
+    [[ "${OLLAMA_RESIDENCY_SNAPSHOT[$port]}" != "__OFFLINE__" ]] || continue
+    while IFS= read -r model; do
+      [[ -n "$model" ]] || continue
+      echo "Draining Ollama :$port resident model: $model"
+      stop_ollama_model "$port" "$model" || {
+        echo "ERROR: could not unload Ollama model $model from :$port." >&2
+        return 1
+      }
+      ((drained += 1))
+    done <<< "${OLLAMA_RESIDENCY_SNAPSHOT[$port]}"
+  done
+
+  for port in "${OLLAMA_PORTS[@]}"; do
+    [[ "${OLLAMA_RESIDENCY_SNAPSHOT[$port]}" != "__OFFLINE__" ]] || continue
+    for _ in $(seq 1 120); do
+      remaining="$(ollama_resident_names "$port")" || return 1
+      [[ -z "$remaining" ]] && break
+      sleep 0.25
+    done
+    [[ -z "$remaining" ]] || {
+      echo "ERROR: Ollama :$port still has resident model(s) after drain: $remaining" >&2
+      return 1
+    }
+  done
+  echo "Ollama residency drained: $drained model(s); policy=$RESIDENCY_POLICY."
+}
+
+load_ollama_model() {
+  local port="$1" model="$2" payload
+  payload="$(jq -nc --arg model "$model" \
+    '{model:$model,prompt:"",stream:false,options:{num_predict:1}}')"
+  if curl -fsS --connect-timeout 2 --max-time 60 \
+      "http://127.0.0.1:$port/api/generate" \
+      -H 'Content-Type: application/json' --data-binary "$payload" >/dev/null 2>&1; then
+    return 0
+  fi
+  # Embedding-only models need a non-empty embed probe. keep_alive is omitted so
+  # the lane's configured default residency policy applies after restoration.
+  payload="$(jq -nc --arg model "$model" \
+    '{model:$model,input:["bc250 MTP residency restore probe"],truncate:false}')"
+  curl -fsS --connect-timeout 2 --max-time 60 \
+    "http://127.0.0.1:$port/api/embed" \
+    -H 'Content-Type: application/json' --data-binary "$payload" >/dev/null 2>&1
+}
+
+restore_ollama_residency() {
+  [[ "$RESIDENCY_CAPTURED" == 1 && "$RESIDENCY_POLICY" == restore ]] || return 0
+  local port model current expected failed=0
+  echo "Restoring pre-MTP Ollama residency set."
+  for port in "${OLLAMA_PORTS[@]}"; do
+    expected="${OLLAMA_RESIDENCY_SNAPSHOT[$port]}"
+    [[ "$expected" != "__OFFLINE__" ]] || continue
+    ollama_api_ready "$port" || {
+      echo "ERROR: Ollama :$port is unavailable during residency restoration." >&2
+      failed=1
+      continue
+    }
+
+    if ! current="$(ollama_resident_names "$port")"; then
+      echo "ERROR: could not inspect Ollama :$port during residency restoration." >&2
+      failed=1
+      continue
+    fi
+    while IFS= read -r model; do
+      [[ -n "$model" ]] || continue
+      grep -Fxq -- "$model" <<< "$expected" || stop_ollama_model "$port" "$model" || failed=1
+    done <<< "$current"
+
+    while IFS= read -r model; do
+      [[ -n "$model" ]] || continue
+      if ! current="$(ollama_resident_names "$port")"; then
+        failed=1
+        continue
+      fi
+      grep -Fxq -- "$model" <<< "$current" || load_ollama_model "$port" "$model" || failed=1
+    done <<< "$expected"
+
+    for _ in $(seq 1 120); do
+      current="$(ollama_resident_names "$port")" || current="__API_ERROR__"
+      [[ "$current" == "$expected" ]] && break
+      sleep 0.25
+    done
+    [[ "$current" == "$expected" ]] || {
+      echo "ERROR: Ollama :$port residency restoration mismatch: expected='${expected:-<empty>}' actual='${current:-<empty>}'" >&2
+      failed=1
+    }
+  done
+  ((failed == 0)) || return 1
+  echo "Ollama residency restoration: PASS"
+}
+
+restore_on_exit() {
+  local rc=$?
+  trap - EXIT
+  if ! restore_ollama_residency; then
+    echo "ERROR: MTP run ended but Ollama residency restoration failed." >&2
+    ((rc != 0)) || rc=74
+  fi
+  exit "$rc"
+}
 
 # Protected manager state is authoritative. Authenticate once, verify it, then
 # run llama-server as the dedicated ollama service account rather than root.
@@ -123,6 +274,12 @@ if [[ -n "$stale" ]]; then
   printf '%s\n' "$stale" >&2
   exit 1
 fi
+
+snapshot_ollama_residency || exit 1
+if [[ "$RESIDENCY_POLICY" == restore ]]; then
+  trap restore_on_exit EXIT
+fi
+drain_ollama_residency || exit 1
 
 mem_available_mib="$(awk '/^MemAvailable:/ { printf "%d", $2 / 1024 }' /proc/meminfo)"
 [[ "$mem_available_mib" =~ ^[0-9]+$ ]] || { echo "ERROR: could not read MemAvailable." >&2; exit 1; }
@@ -180,6 +337,7 @@ echo "MTP target ID: $choice"
 echo "Comparison mode: $MODE"
 echo "Package NEVRA: $package_nevra"
 echo "Source SHA-256: $source_sha"
+echo "Ollama residency policy: $RESIDENCY_POLICY"
 echo "MemAvailable at launch: ${mem_available_mib} MiB (floor ${MIN_MEM_AVAILABLE_MIB} MiB)"
 echo "Server: http://127.0.0.1:$PORT"
 echo "Compatible llama-server detected; reviewed release: $REVIEWED_LLAMACPP_RELEASE"
@@ -193,4 +351,27 @@ echo "KV cache: k=q8_0 v=q8_0"
 echo "ubatch: ${UBATCH:-default}"
 echo "runtime user: ollama"
 
-exec sudo -n -u ollama -- "$LLAMACPP" "${args[@]}"
+if [[ "$RESIDENCY_POLICY" == drain-only ]]; then
+  exec sudo -n -u ollama -- "$LLAMACPP" "${args[@]}"
+fi
+
+forward_server_signal() {
+  local signal="$1" code="$2"
+  if [[ -n "$SERVER_PID" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+    kill "-$signal" "$SERVER_PID" 2>/dev/null || true
+    wait "$SERVER_PID" 2>/dev/null || true
+    SERVER_PID=""
+  fi
+  exit "$code"
+}
+trap 'forward_server_signal INT 130' INT
+trap 'forward_server_signal TERM 143' TERM
+
+sudo -n -u ollama -- "$LLAMACPP" "${args[@]}" &
+SERVER_PID=$!
+set +e
+wait "$SERVER_PID"
+server_rc=$?
+set -e
+SERVER_PID=""
+exit "$server_rc"
