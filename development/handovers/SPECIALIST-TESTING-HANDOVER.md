@@ -36,7 +36,7 @@ Suggested lane references:
 - translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
 - general/main: `MODELS.md`, generation/usecase benchmarks;
 - agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling;
-- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; current 0.11.3-1.4 carries forward the 0.11.3-0.4 same-target baseline-vs-MTP evidence contract and exact IDs/settings unchanged, while hardening cleanup so process-group signaling requires SID+PGID ownership proof. Generic installer selection and combined `apply all` / `refresh all` never select MTP; preparation must remain explicit.
+- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; historical exact-0.11.3-0.4 Phase 1 now passes qwen3.5-9b, qwen3.6-27b and HauhauCS qwen3.8-27b, while the stock qwen3.6-35b-a3b 8K/full-GPU baseline is a confirmed fit failure. Phase 2 is draft-depth optimization only; the first sweep repeated catalog defaults and is noise-floor evidence, while the corrected canary proved overrides work. Current source additionally records/verifies effective draft depth and retains SID+PGID-safe cleanup. Generic installer selection and combined `apply all` / `refresh all` never select MTP; YMQ remains a pending matched challenger and preparation stays explicit.
 
 ## Required specialist handoff
 
