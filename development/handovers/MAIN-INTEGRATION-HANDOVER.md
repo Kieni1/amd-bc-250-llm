@@ -33,7 +33,7 @@ NVR           bc250-llm-server-0.11.3-2.3
 `0.11.3-2.3` is the current operations/UX source release. It carries the settled 2.2 RAG/MTP
 policy forward and makes only bounded operations changes: actionable operator-overlay recovery,
 separate local-maintenance/companion installer choices, clearer topology/status/verifier output,
-`bc250-agent-mode normal`, swap-directory mode consistency, and clearer DRY_RUN/timer output. Production Open WebUI roles,
+`bc250-agent-mode normal`, swap-directory mode consistency, clearer DRY_RUN/timer output, expected Tika-143 restart handling, and BC-250-compatible 40-CU reboot invocation. Production Open WebUI roles,
 service topology, hard memory floor, governor/CU policy, unattended-power defaults and GGUF
 provenance rules are unchanged. MTP remains standalone, disabled/download-only and opt-in.
 
@@ -67,7 +67,7 @@ Current 2.3 source closure evidence:
 
 ```text
 repository/RPM preflight   PASS
-deterministic tests        438/438 PASS (split modules; monolithic runner hit execution window)
+deterministic tests        439/439 PASS (split modules; monolithic runner hit execution window)
 bash -n                    64/64 PASS
 Python compileall          PASS
 Ruff / ShellCheck          unavailable; not claimed
@@ -90,6 +90,10 @@ automatic identity rollback        PASS
 production use-case suite          4/4 PASS
 task suite                         6/6 PASS
 bounded generation-edge infra      17/17 PASS
+individual/grouped service restart  PASS; failed units 0 after recovery
+external LAN isolation              PASS; internal app ports filtered externally
+reboot via sudo reboot              PASS; services/timers/firewall/40-CU reconstructed
+systemctl reboot path               DEVICE DEFECT; later boot became unusable after substantial startup
 final authenticated bc250-verify   54 ok / 0 warn / 0 fail
 ```
 
@@ -125,7 +129,9 @@ safe-power and 40-CU return-code defects fixed in 1.8. Exact 2.2 has since prove
 boundaries plus backup retention, configuration restore, identity rollback and bounded production/task
 runtime health. Real idle S5/WOL, Pi forced-command shutdown and live pruning remain conditional
 follow-up work. See `development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md`
-and `development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md`.
+and the exact-2.2 operations records:
+`development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md` and
+`development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md`.
 
 **Immediate evidence boundary:** exact 2.2 now has bounded operations evidence but not a full
 whole-appliance revalidation. Current 2.3 is source-validated but is not hardware-qualified until it is built and installed. Exact-1.7
@@ -589,8 +595,8 @@ and live-40-CU return-code boundaries. Current 2.3 still requires its own instal
 
 ## P0 — build/install 2.3 and run affected-boundary acceptance
 
-Exact 2.2 already proved the inherited SSH-safe-power and healthy-live-40-CU fixes. After the 2.3
-2.3 is built and installed, keep device acceptance focused on the behavior changed in 2.3:
+Exact 2.2 already proved the inherited SSH-safe-power and healthy-live-40-CU fixes. After 2.3
+is built and installed, keep device acceptance focused on the behavior changed in 2.3:
 
 ```text
 1. build/install exact 0.11.3-2.3; capture NEVRA + artifact SHA
@@ -601,6 +607,8 @@ Exact 2.2 already proved the inherited SSH-safe-power and healthy-live-40-CU fix
 6. verify unauthenticated --summary reports the skipped authenticated check explicitly
 7. repeat identity restore on the real DB with its known pre-existing FK baseline; no new violations may be introduced and unchanged baseline rows must not force rollback
 8. repeat active-SSH request-shutdown as a regression smoke; it must still defer without session loss
+9. restart Tika once; expected SIGTERM/143 must no longer create a false failed-unit event
+10. inspect package-controlled 40-CU reboot command selection and perform one supported `sudo reboot` recovery cycle; do not deliberately rerun the known-bad `sudo systemctl reboot` path
 ```
 
 If the Pi companion will be deployed, additionally prove companion-only control plus a deliberate

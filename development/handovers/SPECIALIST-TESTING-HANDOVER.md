@@ -37,8 +37,11 @@ retest conditions from existing decisions:
 - **support / maintenance / power:** read `docs/MAINTENANCE.md`,
   `docs/MAINTENANCE-CONTRACT.md`, `cmd/maintenance/maintenance.sh` and `safe-power.sh`. Current highest
   hardware priority is exact-2.3 operations acceptance after build/install: swap/RPM-mode
-  convergence, topology/status/verifier UX, and an active-SSH defer regression smoke. Exact 2.2
-  already proved interactive SSH defer and healthy live 40/40 rc=0 with persistent mode disabled. Add Pi forced-command/second-SSH and one idle S5→WOL→HTTP readiness cycle only when
+  convergence, topology/status/verifier UX, identity restore against the known FK baseline, one Tika
+  restart to verify expected-143 telemetry, and one supported `sudo reboot` recovery cycle. Exact 2.2
+  already proved interactive SSH defer, healthy live 40/40 rc=0 with persistent mode disabled,
+  service restart resilience and external LAN isolation. Do not deliberately rerun the device-proven
+  unreliable `sudo systemctl reboot` path. Add Pi forced-command/second-SSH and one idle S5→WOL→HTTP readiness cycle only when
   those optional power features are being enabled. No-download model lifecycle and backup restore are
   separate bounded support acceptance, not automatic release gates. Evaluate operator UX as well as
   functionality.

@@ -52,6 +52,10 @@ identity rollback on validation     PASS
 production use cases                4/4 PASS
 task suite                          6/6 PASS
 bounded generation-edge infra      17/17 PASS
+individual/grouped service restart  PASS; final failed units 0
+external LAN isolation              PASS; only SSH :22 and office HTTP :80 exposed as intended
+reboot persistence via sudo reboot  PASS; normal services/timers/firewall/40-CU restored
+systemctl reboot compatibility path DEVICE DEFECT; do not use for package-controlled reboot
 final authenticated bc250-verify   54 ok / 0 warn / 0 fail
 ```
 
@@ -68,10 +72,11 @@ Evidence files:
 development/model-runs/2026-09-20-installed-0.11.3-1.7-revalidation.md
 development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md
 development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md
+development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md
 ```
 
-The 2.2 Batch 04–06 record is operator-supplied summarized device evidence; its raw archive was not
-independently inspected in the main integration environment. Do not overstate its provenance.
+The 2.2 Batch 04–09 records are operator-supplied summarized device evidence; their raw archives were not
+independently inspected in the main integration environment. Do not overstate their provenance.
 
 ## Validation ownership
 
@@ -85,7 +90,7 @@ Current 2.3 implementation is recorded in `PATCHNOTE-0.11.3-2.3.md`. RPM/SRPM bu
 installed-2.3 execution remain pending. Exact 2.2 hardware observations above are the immediate
 regression baseline for the changed operations surfaces.
 
-Source closure for 2.3 is complete: repository/RPM preflight PASS, deterministic suite **438/438
+Source closure for 2.3 is complete: repository/RPM preflight PASS, deterministic suite **439/439
 PASS** in split modules, `bash -n` **64/64 PASS**, and Python compileall PASS. The monolithic
 validation invocation exceeded this environment's execution window while tests were still passing;
 the same suite was completed by module rather than weakening or dropping coverage. Ruff/ShellCheck
@@ -253,7 +258,9 @@ authenticated 54/0/0 verification. After exact 2.3 is installed, focus on change
 6. verify unauthenticated bc250-verify --summary reports skipped authenticated checks explicitly
 7. repeat identity restore against the known baseline FK violations; unchanged/subset baseline rows must not fail, and no new violation may appear
 8. active SSH request-shutdown -> DEFER regression smoke; no shutdown broadcast/session loss
-9. confirm live 40/40 rc=0 remains unchanged
+9. restart tika.service once; expected SIGTERM/143 must not leave a false failed-result event
+10. confirm package-controlled persistent 40-CU reboot paths use /usr/sbin/reboot, then perform one supported real reboot and confirm SSH, office HTTP, timers, firewalld, normal topology, live 40/40 and final verifier recovery
+11. confirm live 40/40 rc=0 remains unchanged
 ```
 
 Only add feature-specific checks when the feature is going into use: Pi companion requires
