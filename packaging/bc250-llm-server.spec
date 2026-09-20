@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        2.1%{?dist}
+Release:        2.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,14 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.2
+- Encode the completed MTP package selection in the existing catalog: Qwen3.5 9B 16K/draft-2 as primary fast, YMQ Qwen3.8 27B 8K/draft-1 as primary general 27B, and HauhauCS Qwen3.8 27B 8K/draft-2 as the specialist alternative.
+- Retire Qwen3.6 27B from active MTP discovery while preserving its positive historical definition/evidence in the source-only graveyard; keep the 35B-A3B stock-envelope failure retired.
+- Add only thin MTP role/recommendation metadata to the existing catalog and surface it in list output; keep every MTP entry disabled/download-only and outside installer/Open WebUI/Ollama convergence.
+- Remove ambiguous 27B convenience aliases instead of silently retargeting them after the preferred 27B changed; exact 27B IDs remain the evidence/operator contract.
+- Record the corrected final RAG conclusion: Gemma E4B remains the document/RAG default at 94/96 corrected overall versus Qwen 9B at 93/96, with no production-role change or reopened model tournament.
+- Speed repeated local package regeneration without weakening validation: preserve the normal source cache, default local Podman builds to pull=missing, and allow a complete prebuilt Fedora builder image to skip repeated dependency installation.
+
 * Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.1
 - Carry the 1.8 support/power safety fixes forward unchanged while moving the current source release to 2.1; no service-topology, production-model, power-policy, governor, CU, hard-memory-floor or MTP-default change.
 - Finish the RAG qualification integration: expose language measurability separately from language acceptance, document numeric/unit fixture composition, and clarify chronological session memory telemetry without adding another benchmark framework.

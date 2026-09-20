@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.11.3-2.2 - 2026-09-20
+
+- Turn the completed MTP campaign into a small package policy without another framework: the existing MTP TOML catalog now carries `role` and `recommendation` metadata, and normal list output shows the policy alongside the existing disabled/download-only state.
+- Set `qwen3.5-9b-mtp` to 16K/draft 2 as the primary fast model, `qwen3.8-27b-ymq-xs-ti-mtp` to 8K/draft 1 as the primary general 27B, and retain HauhauCS Qwen3.8 27B at 8K/draft 2 as the specialist alternative.
+- Retire `qwen3.6-27b-mtp` from active MTP discovery because the optimized Qwen3.8 choices now provide better package-facing throughput/headroom/completion efficiency; preserve its exact historical definition in the source-only graveyard. The 35B-A3B stock-envelope failure remains retired.
+- Remove ambiguous 27B convenience aliases from `bc250-run-mtp` instead of silently retargeting them after the preferred 27B changed. The unambiguous `qwen35-9b` alias remains for interactive use; recorded evidence should use exact IDs.
+- Record the corrected final RAG scoring: Gemma E4B 94/96 overall versus Qwen 9B 93/96 under the fixed retrieval campaign, with Gemma remaining `bc250-office-documents`. The 27B IQ3_XXS 5/5 result stays explicitly partial-before-resource-abort and does not reopen the production RAG decision.
+- Keep qualification machinery bounded: no recommendation engine, benchmark-result ingestion, second catalog, automatic promotion/retirement, new RAG residency harness or universal 512 MiB policy is introduced.
+- Make repeated local RPM regeneration cheaper without changing package semantics: `scripts/ci-local.sh` defaults to Podman `--pull=missing`, accepts `BC250_BUILD_IMAGE` / `BC250_BUILD_PULL_POLICY`, and skips `dnf install` when a prebuilt builder already contains the required packages. `make clean` remains the normal way to preserve verified upstream source caches.
+
 ## 0.11.3-2.1 - 2026-09-20
 
 - Carry the 1.8 support/power fixes forward unchanged into the new release line; no service-topology, production-model, unattended-power-policy, governor/CU, hard-memory-floor or MTP-default change is introduced.
