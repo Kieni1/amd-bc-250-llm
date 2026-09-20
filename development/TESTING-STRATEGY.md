@@ -113,19 +113,11 @@ the wrong fixed `ss` columns. It also exposed healthy live 40/40 status/verify r
 persistent boot activation was intentionally disabled. Release 1.8 fixed those source defects and added an exact forced-companion SSH exception rather
 than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
 
-After exact 2.2 is built/installed, run the two still-unqualified changed-boundary checks first:
+Exact 2.2 has now passed the inherited high-priority operations boundaries: active administrator SSH safely defers power actions, healthy live 40/40 returns success with persistent activation disabled, normal/agent/degraded recovery works, backup/restore and bounded production/task runtime checks are healthy, service restarts recover, and external LAN isolation matches policy. A real reboot through `sudo reboot` also reconstructs the appliance cleanly.
 
-```text
-interactive SSH safe-power defer (no broadcast/session loss)
-healthy live 40/40 status + verify return rc=0 with persistent mode disabled
-```
+The distinct `sudo systemctl reboot` invocation is device-proven unreliable on this BC-250: it enters a new boot and progresses substantially before the boot can become unusable/crash-recorded. Do not keep reproducing that failure. Package-controlled reboot paths should use the supported `reboot` compatibility invocation and receive one bounded installed-package retest. Tika routine restart also exposed expected exit 143 being logged as failure; source 2.3 normalizes only that expected SIGTERM status.
 
-Inspect that evidence before continuing. Companion forced-command, idle S5/WOL, backup restore and
-live upload deletion are separate acceptance work and become mandatory only when those optional
-features are about to be enabled or their boundary changed. Do not turn them into automatic gates
-for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the
-model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and
-avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
+Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
 The current harness v4.2 includes the actual package-owned production translation roles
 and remains the milestone whole-appliance gate.

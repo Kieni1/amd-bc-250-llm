@@ -698,3 +698,31 @@ materially, or a concrete product workload shows the selected fast/general/speci
 longer useful. A symmetric three-repeat YMQ depth-1 confirmation is optional evidence, not a release
 gate.
 
+
+
+## DEC-027 — Use the BC-250 reboot compatibility invocation for package-controlled reboot paths
+
+**Status:** ACTIVE — device evidence incorporated in 0.11.3-2.3.
+
+**Decision:** On BC-250 package paths that intentionally initiate a real reboot, do not invoke
+`systemctl reboot`. Preserve the existing command contract where it is still appropriate, but use
+`/usr/sbin/reboot` (operator-facing form: `sudo reboot`) because that invocation is repeatedly proven
+reliable on the target appliance. Do not create a generic reboot wrapper merely to encode this rule.
+
+Current source had exactly two executable package-owned `systemctl reboot` call sites, both in the
+persistent 40-CU enable/disable helper; 2.3 changes those calls to `/usr/sbin/reboot` without changing
+40-CU policy or the helper's automatic-reboot contract. Other reboot mentions were documentation,
+status/planning text, tests, or already used the compatible operator form.
+
+**Why:** Exact installed 2.2 testing repeatedly distinguished `COMMAND=/usr/sbin/systemctl reboot`
+from `COMMAND=/usr/sbin/reboot`. The former completed shutdown, started a new kernel and progressed
+through substantial early boot before the retained journal ended and boot history recorded a crash;
+the latter repeatedly reconstructed services, network, timers, firewalld, live 40/40 routing and a
+clean authenticated verifier. The evidence does not identify Tika, nginx, Ollama, networking, CU
+reconstruction, kernel restart or generic systemd shutdown as the root cause, so the package change
+must stay invocation-specific.
+
+**Retest only if:** a future systemd/Fedora/hardware change proves `systemctl reboot` equivalent and
+reliable on this appliance, or the package changes reboot ownership/contract. Installed 2.3 should
+receive one supported reboot-path acceptance test; do not deliberately rerun the known-bad invocation
+merely to reproduce the failure again.
