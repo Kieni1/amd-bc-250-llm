@@ -42,9 +42,9 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-2.2 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
-must be behind one default-No gate, local maintenance and Pi integration remain independent,
-and selected setup must be checked rather than assumed successful. Post-install guidance should
+The current 0.11.3-2.3 source release preserves the core-verification boundary while simplifying
+installer UX: local maintenance and Pi/companion integration are separate optional decisions,
+both choices remain optional/default-No, and selected setup must be checked rather than assumed successful. Post-install guidance should
 point at a small set of next commands plus the installed documentation/config/state/evidence paths;
 it must not become a second full command reference.
 

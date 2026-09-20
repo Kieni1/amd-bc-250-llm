@@ -58,7 +58,7 @@ fallback/control rather than reverting because of old baseline familiarity.
 **Retest only if:** current task quality regresses, Open WebUI changes the task contract,
 or a challenger first beats quality and then proves equal-or-better coexistence.
 
-## DEC-004 — Verify core install before optional maintenance/Pi setup
+## DEC-004 — Verify core install before optional maintenance and companion setup
 
 **Status:** ACTIVE  
 **Decision:** Full interactive installation runs core appliance verification before
@@ -364,14 +364,13 @@ normal setup, or the package deliberately changes MTP from an explicit experimen
 appliance convergence. Do not speed setup by skipping checksum validation when recorded file
 identity has changed.
 
-## DEC-016 — Gate optional installer maintenance once and surface marginal PASS evidence
+## DEC-016 — Keep installer maintenance and companion choices independent and surface marginal PASS evidence
 
 **Status:** ACTIVE — carried forward in 0.11.3-1.7.
 
 **Decision:** The guided full installer must finish core appliance verification before any
-optional maintenance or Raspberry Pi work, then ask one top-level default-No question. If the
-operator accepts, local BC-250 maintenance and Raspberry Pi integration are separate choices;
-existing local maintenance may be left unchanged explicitly. Selected optional setup is checked
+optional maintenance or Raspberry Pi work, then present local BC-250 maintenance and Pi/companion
+integration as separate choices. Local maintenance can be configured independently; both choices remain optional/default-No, and existing local maintenance may be left unchanged explicitly. Selected optional setup is checked
 for its relevant protected configuration/timer/SSH/account/export invariants before the installer
 reports success. The completion footer stays concise: one block each for validation/benchmark,
 models/runtime lanes and further setup, followed by the installed documentation root and the
