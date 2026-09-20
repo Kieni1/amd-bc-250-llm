@@ -205,14 +205,13 @@ The completed 2026-09-19 BC-250 campaign keeps **Office – Documents**
 document/RAG answer role for the current 16 GiB profile. This is primarily a sustained-residency
 resource decision, not an answer-quality rejection of Qwen 9B.
 
-| Evidence | Gemma E4B | Qwen 9B |
-|---|---:|---:|
-| Broad direct RAG effective overall | ~95/96 | ~93/96 |
-| Authenticated Open WebUI short-path turns | 36/36 pass | 36/36 pass |
-| Long-residency Open WebUI result | 42/42 pass | safety-aborted after a few subruns |
-| Long-residency minimum MemAvailable | ~2766 MiB | ~338 MiB |
-| End/near-abort MemAvailable | ~2770 MiB | ~426 MiB |
-| Max GPU temperature | 76 C | 76 C |
+| Evidence | Gemma E4B | Qwen 9B | Qwen3.8 27B IQ3_XXS (16K test) |
+|---|---:|---:|---:|
+| Broad/direct RAG quality | ~95/96 effective | ~93/96 effective | 5/5 before safety abort |
+| Authenticated Open WebUI short path | 36/36 pass | 36/36 pass | not qualified |
+| Long-residency result | 42/42 pass | safety-aborted after a few subruns | safety-aborted during sustained RAG |
+| Minimum / near-abort MemAvailable | ~2766 MiB | ~338 / ~426 MiB | ~280 MiB before abort |
+| Production status | document/RAG default | separate higher-quality office role | experimental only; 16K rejected |
 
 Gemma's continuous arm completed 14 subruns / 42 turns without unload, with roughly 15 MiB swap
 growth and no safety or residency failure. Qwen produced correct answers/citations before abort but
@@ -221,9 +220,16 @@ The Qwen preset remains useful for its separate higher-quality general-office ro
 silently replace Gemma as the long-lived document/RAG default on this memory profile.
 
 The long-residency campaign used a 512 MiB MemAvailable safety-abort threshold. That experiment
-threshold is not the same as the whole-appliance revalidation hard floor. Historical raw scorer
-counts from the broad campaign also contained known evaluator false negatives; the effective values
-above reflect manual adjudication and must not be hard-coded into fixtures as expected scores.
+threshold is not the same as the whole-appliance revalidation hard floor. The later Qwen3.8 27B
+IQ3_XXS 16K experiment answered its first five RAG cases correctly with citations, but MemAvailable
+progressively fell from roughly 3.17 GiB after early residency to ~0.67 GiB after case 5 and ~0.28
+GiB before the next request, where the safety harness aborted. Unloading recovered roughly 13.8 GiB.
+This is sufficient to reject the 16K configuration on the current 16 GiB profile, not to claim a
+broad quality result from five cases. The packaged model keeps the same verified GGUF/model identity
+and is now bounded to 8K for further explicit experimentation; it is not a production RAG candidate.
+Historical raw scorer counts from the broad finalist campaign contained known evaluator false
+negatives; the effective values above reflect manual adjudication and must not be hard-coded into
+fixtures as expected scores.
 
 ## 4. Authoritative document tree and language policy
 

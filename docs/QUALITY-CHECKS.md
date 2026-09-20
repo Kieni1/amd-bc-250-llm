@@ -175,12 +175,17 @@ Evidence tarballs from the current generic task/translation checks intentionally
 ## RAG result integrity
 
 Direct `rag-quality` evidence keeps retrieval, fact/abstention, language and citation
-independent and validates the exact expected case set. Missing, duplicate or unexpected
+independent and validates the exact expected case set. It records `language_ok` separately from
+`language_measurable`, so a short language-neutral answer can be accepted without being presented
+as a positive language match. `numeric_values` expresses numeric equivalence; require explicit
+unit/qualifier text only when the fixture actually needs it. Missing, duplicate or unexpected
 case IDs are structural failures, not semantic model-quality failures. The benchmark also
 snapshots and restores the starting model residency set on both Ollama lanes. Canonical RAG
-summaries expose the chronological resident-session resource view (MemAvailable start/min/end and
-end delta; swap start/peak/end plus `swap_peak_delta_mib`) so sustained pressure is visible without
+summaries expose the chronological session resource view (MemAvailable start/min/end and end
+delta; swap start/peak/end plus `swap_peak_delta_mib`) so sustained pressure is visible without
 mislabeling peak-minus-start swap as cumulative growth or changing current acceptance thresholds.
+The first start sample may precede initial model load; the end delta is therefore not labelled as
+workload-only memory drift.
 Residency restoration guarantees the starting model set and lets each Ollama lane apply its normal
 keep-alive policy. Embedding-only registrations are reloaded with a harmless non-empty `/api/embed`
 probe when generation is unsupported; exact remaining expiry time is not reconstructed.

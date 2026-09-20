@@ -181,9 +181,13 @@ bc250-benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
 `rag-cycle` checks that the answer model remains available while the dedicated
 embedding lane does work. `rag-quality` records target retrieval, all-required-source
 retrieval, fact/abstention acceptance, deterministic language evidence, citation behavior,
-thinking/output sizes and multi-cause failure information. Acceptance matching is
-boundary-aware for dates/numbers/IDs/currency and fixtures may declare explicit
-`required_any_groups` and case-scoped `numeric_values`; grading remains deterministic.
+thinking/output sizes and multi-cause failure information. Language evidence exposes both
+`language_ok` and `language_measurable`; short numeric/identifier answers can therefore pass
+without being misreported as a positive language match. Acceptance matching is boundary-aware
+for dates/numbers/IDs/currency and fixtures may declare explicit `required_any_groups` and
+case-scoped `numeric_values`; grading remains deterministic. Use `numeric_values` when the
+number itself is sufficient, and combine it with `required`/`required_any_groups` when a unit
+or qualifier is mandatory instead of adding a second unit-policy schema.
 Canonical summaries also verify that every expected RAG case appears exactly once, so a
 partial result stream cannot be mistaken for a complete quality run. `rag-quality` snapshots the
 starting main/embedding Ollama residency set, restores and verifies that set on every exit path,
@@ -212,6 +216,9 @@ bc250-benchmark owui-embedding-batch --token-file FILE
 bc250-benchmark owui-chunk-min MODEL --token-file FILE
 sudo bc250-benchmark owui-system-context MODEL --token-file FILE
 ```
+
+Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
+group/world access (normally mode `0600`), matching the package credential-file boundary.
 
 `concurrency` records both request outcomes, latency, minimum `MemAvailable`, swap
 start/peak/end/delta and device-facing telemetry.

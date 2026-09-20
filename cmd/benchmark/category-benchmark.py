@@ -1837,6 +1837,8 @@ def rag_case_evaluation(
         "fact_ok": fact_ok,
         "language_status": language_status,
         "language_ok": language_ok,
+        "language_measurable": language_status
+        not in {"not-measurable", "not-required"},
         "language_not_measurable": language_status == "not-measurable",
         "citation_ok": citation_ok,
         "abstention_ok": abstention_ok,
@@ -2668,7 +2670,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
             "timestamp", "case_id", "embed_model", "answer_model", "embedding_scheme",
             "target_rank", "retrieval_ok", "target_retrieval_ok",
             "all_required_support_retrieval_ok", "fact_ok", "answer_ok",
-            "language_status", "language_ok", "language_not_measurable",
+            "language_status", "language_ok", "language_measurable", "language_not_measurable",
             "citation_ok", "source_cited", "abstention_ok", "overall_ok", "passed",
             "failure_kinds", "num_predict", "think_policy", "answer_chars", "thinking_chars", "done_reason",
             "wall_s", "load_s", "temp_max_c",
@@ -2796,6 +2798,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                     "answer_ok": int(bool(answer_ok)),
                     "language_status": evaluation["language_status"],
                     "language_ok": int(language_ok),
+                    "language_measurable": int(evaluation["language_measurable"]),
                     "language_not_measurable": int(
                         evaluation["language_not_measurable"]
                     ),
@@ -2841,6 +2844,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                             ],
                             "fact": fact_ok,
                             "language": language_ok,
+                            "language_measurable": evaluation["language_measurable"],
                             "language_not_measurable": evaluation[
                                 "language_not_measurable"
                             ],

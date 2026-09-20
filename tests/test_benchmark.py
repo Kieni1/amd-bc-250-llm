@@ -814,6 +814,15 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             "match",
         )
         self.assertEqual(category.rag_language_status("9 [source-9]", "en"), "not-measurable")
+        neutral = category.rag_case_evaluation(
+            "9 [doc-a]",
+            {"id": "numeric", "target": "doc-a", "numeric_values": ["9"], "language": "en"},
+            ranked_ids=["doc-a"],
+            top_k=1,
+        )
+        self.assertTrue(neutral["language_ok"])
+        self.assertFalse(neutral["language_measurable"])
+        self.assertTrue(neutral["language_not_measurable"])
         self.assertEqual(
             category.rag_language_status("Die Frist beträgt drei Monate.", "en"),
             "other",
@@ -838,6 +847,7 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertTrue(evaluation["all_required_support_retrieval_ok"])
         self.assertTrue(evaluation["fact_ok"])
         self.assertTrue(evaluation["language_ok"])
+        self.assertTrue(evaluation["language_measurable"])
         self.assertFalse(evaluation["citation_ok"])
         self.assertFalse(evaluation["overall_ok"])
         self.assertIn("missing source [doc-b]", evaluation["problems"])
@@ -2515,6 +2525,26 @@ phase_roles
         self.assertNotIn("snapshot edge/final", source)
         self.assertNotIn("snapshot owui/final", source)
 
+    def test_openwebui_benchmark_token_file_must_be_private_nonempty_regular_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            token = root / "owui.key"
+            token.write_text("secret\n", encoding="utf-8")
+            token.chmod(0o600)
+            self.assertEqual(openwebui_workflow.token_from(str(token)), "secret")
+
+            token.chmod(0o640)
+            with self.assertRaisesRegex(openwebui_workflow.Failure, "group/world accessible"):
+                openwebui_workflow.token_from(str(token))
+
+            token.chmod(0o600)
+            token.write_text("\n", encoding="utf-8")
+            with self.assertRaisesRegex(openwebui_workflow.Failure, "is empty"):
+                openwebui_workflow.token_from(str(token))
+
+            with self.assertRaisesRegex(openwebui_workflow.Failure, "regular file"):
+                openwebui_workflow.token_from(str(root))
+
     def test_initialized_benchmark_failures_finalize_canonical_evidence(self) -> None:
         def assert_failed_run(root: Path, category_name: str) -> None:
             self.assertTrue((root / "results.jsonl").is_file())
@@ -2612,6 +2642,7 @@ phase_roles
             owui_dir = base / "owui"
             token = base / "token"
             token.write_text("secret\n", encoding="utf-8")
+            token.chmod(0o600)
             with (
                 patch.object(
                     sys,

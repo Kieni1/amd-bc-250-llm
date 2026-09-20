@@ -10,6 +10,7 @@ import mimetypes
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -161,9 +162,24 @@ class JsonClient:
 
 
 def token_from(path: str) -> str:
-    token = Path(path).read_text(encoding="utf-8").strip()
+    token_path = Path(path).expanduser()
+    try:
+        info = token_path.stat()
+    except OSError as exc:
+        raise Failure(f"cannot stat Open WebUI API key file {token_path}: {exc}") from exc
+    if not stat.S_ISREG(info.st_mode):
+        raise Failure(f"Open WebUI API key file must be a regular file: {token_path}")
+    if info.st_mode & 0o077:
+        raise Failure(
+            f"Open WebUI API key file must not be group/world accessible: {token_path} "
+            f"(mode {stat.S_IMODE(info.st_mode):04o})"
+        )
+    try:
+        token = token_path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise Failure(f"cannot read Open WebUI API key file {token_path}: {exc}") from exc
     if not token:
-        raise Failure("Open WebUI API key file is empty")
+        raise Failure(f"Open WebUI API key file is empty: {token_path}")
     return token
 
 
