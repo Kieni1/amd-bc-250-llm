@@ -36,6 +36,7 @@ RETIRED_CATALOG = INSTALLED_SHARE / "retired-models.json"
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
+MTP_RECOMMENDATIONS = {"primary", "alternative"}
 RECOMMENDED_MODELS = {
     "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
     "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
@@ -417,6 +418,13 @@ def load_mtp_catalog(path: Path) -> tuple[dict, list[dict]]:
         for key in ("context", "draft"):
             if type(model.get(key)) is not int or model[key] <= 0:
                 raise ModelError(f"{context}: {key} must be a positive integer")
+        role = require_string(model, "role", context)
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*", role) is None:
+            raise ModelError(f"{context}: role must be a lowercase token")
+        recommendation = require_string(model, "recommendation", context)
+        if recommendation not in MTP_RECOMMENDATIONS:
+            allowed = ", ".join(sorted(MTP_RECOMMENDATIONS))
+            raise ModelError(f"{context}: recommendation must be one of: {allowed}")
         checksum = model.get("sha256", "")
         if not isinstance(checksum, str) or (
             checksum and re.fullmatch(r"[0-9a-f]{64}", checksum) is None
@@ -2080,6 +2088,8 @@ def print_catalog_models(models: list[dict]) -> None:
         index = model.get("index", offset)
         label = model.get("name", model["id"])
         details = [model["provider"], definition_origin(model)]
+        if model.get("category") == "mtp":
+            details.append(f"{model['recommendation']} / {model['role']}")
         print(f"  {index:2d}) {label:<56} [{', '.join(details)}]")
 
 

@@ -63,10 +63,12 @@ misplaced.
 The public categories are `production`, `experiments`, `task`, `agentic`,
 `embedding`, `mtp` and `all`; legacy aliases are intentionally not accepted. MTP
 is the only exception to Modelfile discovery: its download-only entries remain in
-a TOML runtime catalog because they have no Ollama model or Modelfile. Packaged MTP
-entries are excluded from combined mutation convergence regardless of enabled state; use
-`sudo bc250-fetch-mtp ID` when deliberately preparing one for a bounded standalone llama.cpp
-experiment. MTP shares catalog/provenance infrastructure only; it is not an Ollama runtime lane.
+a TOML runtime catalog because they have no Ollama model or Modelfile. The active MTP
+catalog also owns its small package-facing `role` and `recommendation` metadata so list output,
+runtime context/draft defaults and operator documentation do not need separate selection tables.
+This metadata never enables a model or promotes it into normal convergence. Packaged MTP entries
+remain excluded from combined mutation convergence regardless of enabled state; use
+`sudo bc250-fetch-mtp ID` when deliberately preparing one for standalone llama.cpp use.
 `bc250-run-mtp` drains normal Ollama residency for memory isolation and restores the pre-run set on
 normal direct use, while `bc250-compare-mtp` intentionally leaves Ollama cold after qualification.
 

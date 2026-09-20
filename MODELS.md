@@ -401,18 +401,23 @@ workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from c
 `apply all` / `refresh all` convergence regardless of their enabled flag; explicit
 `bc250-fetch-mtp` / `apply mtp` remains the preparation boundary.
 
-Current BC-250 MTP qualification is complete enough for package use under the reviewed external
-llama.cpp Vulkan runtime. Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B
-all have passing same-target baseline/MTP evidence with deterministic quality parity. The retired
-`qwen3.6-35b-a3b-mtp` stock 8K/full-GPU configuration crossed the hard memory floor during baseline
-load before MTP inference; it remains source-graveyard-only and absent from routine MTP discovery.
+The completed MTP campaign now has a small package-facing policy in the existing MTP catalog:
 
-Corrected draft-depth testing supports keeping depth 2 for Qwen3.6 27B and HauhauCS Qwen3.8 27B.
-YMQ is qualified at depth 2 and is a serious long-generation alternative, but it did not show a
-runtime-memory advantage over HauhauCS. Qwen3.5 depth 2 is the strongest exploratory optimization
-candidate, with a material advantage over the packaged depth-3 default, but confirmation-grade
-repeats are still preferred before changing that default. `bc250-fetch-mtp [SELECTION]` remains the
-explicit opt-in downloader/reconciler. Qualification/optimization uses `bc250-compare-mtp ID`, which
-compares the same GGUF/build/settings with MTP off versus on and records/verifies effective draft
-depth; `bc250-run-mtp ID` remains the manual runtime/debug path.
+| Active MTP ID | Package policy | Context | Draft |
+|---|---|---:|---:|
+| `qwen3.5-9b-mtp` | primary fast model | 16384 | 2 |
+| `qwen3.8-27b-ymq-xs-ti-mtp` | primary general 27B | 8192 | 1 |
+| `qwen3.8-27b-hauhaucs-mtp` | specialist alternative | 8192 | 2 |
+
+`qwen3.6-27b-mtp` is retired from the active/recommended lane because the optimized Qwen3.8
+choices provide better absolute throughput, memory headroom and practical completion efficiency.
+Its historical passing result is preserved in the source-only MTP graveyard. The stock
+`qwen3.6-35b-a3b-mtp` 8K/full-GPU configuration remains retired for memory fit.
+
+The MTP `role` / `recommendation` fields are presentation/policy metadata only: all active entries
+remain disabled/download-only and excluded from installer or `apply all` convergence.
+`bc250-fetch-mtp [SELECTION]` remains the explicit preparation boundary. `bc250-compare-mtp ID`
+remains the same-target qualification path and `bc250-run-mtp ID` the manual runtime/debug path.
+Use exact IDs for 27B models; the ambiguous 27B convenience aliases were removed rather than
+silently retargeted after the package preference changed.
 

@@ -97,6 +97,20 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         }
         self.assertTrue(required <= {model["name"] for model in load("production")[1]})
 
+    def test_openwebui_has_one_active_document_rag_role(self) -> None:
+        document = json.loads((ROOT / "config/openwebui/models.json").read_text(encoding="utf-8"))
+        rag_models = []
+        for model in document["models"]:
+            tags = {str(item.get("name", "")) for item in model.get("meta", {}).get("tags", [])}
+            if model.get("is_active") and "RAG" in tags:
+                rag_models.append(model)
+        self.assertEqual(len(rag_models), 1)
+        self.assertEqual(rag_models[0]["id"], "bc250-office-documents")
+        self.assertEqual(
+            rag_models[0]["base_model_id"],
+            "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+        )
+
     def test_runtime_modelfiles_do_not_embed_campaign_measurement_notes(self) -> None:
         for path in MODELFILES.glob("*.Modelfile"):
             with self.subTest(path=path.name):
@@ -330,33 +344,53 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         source_dir = ROOT / "models/sources"
         self.assertFalse(source_dir.exists() and any(source_dir.glob("*.toml")))
 
-    def test_mtp_keeps_its_download_only_runtime_catalog(self) -> None:
+    def test_mtp_keeps_a_small_explicit_package_policy(self) -> None:
         defaults, models = modelctl.load_mtp_catalog(ROOT / "models/mtp/models.toml")
         self.assertEqual(defaults["category"], "mtp")
         self.assertEqual(
             [model["id"] for model in models],
             [
                 "qwen3.5-9b-mtp",
-                "qwen3.6-27b-mtp",
                 "qwen3.8-27b-hauhaucs-mtp",
                 "qwen3.8-27b-ymq-xs-ti-mtp",
             ],
         )
         self.assertTrue(all(model["provider"] == "download-only" for model in models))
         self.assertTrue(all(model["enabled"] is False for model in models))
-        qwen38 = {model["id"]: model for model in models if model["id"].startswith("qwen3.8-27b-")}
-        self.assertEqual(qwen38["qwen3.8-27b-hauhaucs-mtp"]["context"], 8192)
-        self.assertEqual(qwen38["qwen3.8-27b-hauhaucs-mtp"]["draft"], 2)
-        self.assertEqual(qwen38["qwen3.8-27b-ymq-xs-ti-mtp"]["context"], 8192)
-        self.assertEqual(qwen38["qwen3.8-27b-ymq-xs-ti-mtp"]["draft"], 2)
+        policy = {
+            model["id"]: (model["context"], model["draft"], model["recommendation"], model["role"])
+            for model in models
+        }
+        self.assertEqual(policy["qwen3.5-9b-mtp"], (16384, 2, "primary", "fast"))
+        self.assertEqual(
+            policy["qwen3.8-27b-ymq-xs-ti-mtp"],
+            (8192, 1, "primary", "general-27b"),
+        )
+        self.assertEqual(
+            policy["qwen3.8-27b-hauhaucs-mtp"],
+            (8192, 2, "alternative", "specialist"),
+        )
 
+        normalized_defaults, normalized = modelctl.load_models(
+            "mtp", directories=[MODELFILES], source=ROOT / "models/mtp/models.toml"
+        )
+        self.assertEqual(normalized_defaults["category"], "mtp")
+        output = StringIO()
+        with redirect_stdout(output):
+            modelctl.print_catalog_models(normalized)
+        text = output.getvalue()
+        self.assertIn("primary / fast", text)
+        self.assertIn("primary / general-27b", text)
+        self.assertIn("alternative / specialist", text)
 
-    def test_failed_mtp_35b_candidate_is_source_graveyard_only(self) -> None:
+    def test_retired_mtp_candidates_are_source_graveyard_only(self) -> None:
         active = (ROOT / "models/mtp/models.toml").read_text(encoding="utf-8")
         graveyard = (ROOT / "models/mtp/graveyard.toml").read_text(encoding="utf-8")
-        self.assertNotIn('id = "qwen3.6-35b-a3b-mtp"', active)
-        self.assertIn('id = "qwen3.6-35b-a3b-mtp"', graveyard)
+        for model_id in ("qwen3.6-27b-mtp", "qwen3.6-35b-a3b-mtp"):
+            self.assertNotIn(f'id = "{model_id}"', active)
+            self.assertIn(f'id = "{model_id}"', graveyard)
         self.assertIn("128 MiB MemAvailable hard floor", graveyard)
+        self.assertIn("Superseded in the recommended MTP lane", graveyard)
 
     def test_mtp_filtered_view_preserves_global_catalog_indexes(self) -> None:
         _defaults, mtp_only = modelctl.load_models(

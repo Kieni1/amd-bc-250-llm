@@ -14,3 +14,15 @@ context = 8192
 draft = 2
 retired = "2026-09-19"
 reason = "Stock 8K/full-GPU baseline crossed the 128 MiB MemAvailable hard floor before MTP inference; no active retest hypothesis."
+
+[[models]]
+id = "qwen3.6-27b-mtp"
+provider = "download-only"
+repository = "unsloth/Qwen3.6-27B-MTP-GGUF"
+revision = "latest"
+gguf = "Qwen3.6-27B-UD-Q2_K_XL.gguf"
+context = 8192
+draft = 2
+retired = "2026-09-20"
+reason = "Superseded in the recommended MTP lane by optimized Qwen3.8 27B choices with better absolute throughput, memory headroom and practical completion efficiency; historical qualification remains valid."
+

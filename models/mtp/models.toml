@@ -18,18 +18,10 @@ repository = "unsloth/Qwen3.5-9B-MTP-GGUF"
 revision = "latest"
 gguf = "Qwen3.5-9B-UD-Q4_K_XL.gguf"
 context = 16384
-# Depth 2 is the strongest exploratory result; keep 3 until confirmation-grade promotion evidence.
-draft = 3
-
-[[models]]
-enabled = false
-provider = "download-only"
-id = "qwen3.6-27b-mtp"
-repository = "unsloth/Qwen3.6-27B-MTP-GGUF"
-revision = "latest"
-gguf = "Qwen3.6-27B-UD-Q2_K_XL.gguf"
-context = 8192
 draft = 2
+role = "fast"
+recommendation = "primary"
+
 
 [[models]]
 enabled = false
@@ -40,6 +32,8 @@ revision = "latest"
 gguf = "Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-IQ2_M.gguf"
 context = 8192
 draft = 2
+role = "specialist"
+recommendation = "alternative"
 
 [[models]]
 enabled = false
@@ -49,6 +43,7 @@ repository = "zerodigest/Qwen3.8-27B-Uncensored-YMQ-MTP-GGUF"
 revision = "latest"
 gguf = "Qwen3.8-27B-Uncensored-YMQ-XS-TI.gguf"
 context = 8192
-# Phase-1-qualified on BC-250; depth optimization is optional, not required for current package use.
-draft = 2
+draft = 1
+role = "general-27b"
+recommendation = "primary"
 

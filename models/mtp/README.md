@@ -1,8 +1,9 @@
 # MTP models
 
-MTP entries are optional **download-only** llama.cpp experiments. They are not Ollama
-role models and remain excluded from normal `apply all` / installer convergence until
-real BC-250 qualification justifies a stronger integration decision.
+MTP entries are optional **download-only** standalone llama.cpp models. They are not Ollama
+role models and remain deliberately excluded from normal `apply all` / installer convergence.
+BC-250 qualification now defines their package-facing roles and defaults without turning MTP into a
+persistent production lane.
 
 The packaged entries are intentionally `enabled = false`. Ordinary `bc250-model list mtp` and
 `apply mtp` therefore do not select them accidentally. Combined `apply all` / `refresh all` excludes
@@ -10,61 +11,43 @@ the MTP category entirely, even when `--include-disabled` is supplied. `bc250-fe
 explicit opt-in workflow and deliberately exposes those disabled experiment definitions. MTP entries
 intentionally have no Ollama Modelfile.
 
-## Current qualification / optimization state
+## Current package policy
 
-MTP is qualified enough for current package use as an explicit opt-in **standalone llama.cpp runtime** on the
-BC-250 with the reviewed external llama.cpp Vulkan runtime. It is **not** part of normal installer
-convergence and no active production role depends on it.
-
-Current evidence summary:
+Broad MTP qualification is closed for the current BC-250/runtime combination. The active catalog
+contains only the choices that still have a clear operator role:
 
 ```text
-qwen3.5-9b-mtp             PASS   fastest absolute model; strongest short-generation gains
-qwen3.6-27b-mtp            PASS   strongest sustained gain of the original set; tightest passing memory margin
-qwen3.8-27b-hauhaucs-mtp   PASS   more memory headroom; excellent deterministic/parity behavior
-qwen3.8-27b-ymq-xs-ti-mtp  PASS   faster baseline decode and stronger long-form absolute MTP throughput than HauhauCS in the reviewed run
+qwen3.5-9b-mtp             primary / fast         ctx 16384  draft 2
+qwen3.8-27b-ymq-xs-ti-mtp  primary / general-27b  ctx 8192   draft 1
+qwen3.8-27b-hauhaucs-mtp   alternative / specialist ctx 8192 draft 2
 ```
 
-The retired 35B-A3B result is a baseline/model-fit safety failure, not an MTP speed failure: the
-first baseline load crossed the 128 MiB hard floor before speculative inference began. Its exact
-definition remains in `graveyard.toml` for source history, but it is not installed or discovered by
-the active MTP workflow and should not be rerun unchanged.
+`role` and `recommendation` are package-policy metadata in the existing MTP catalog. They are
+displayed by `bc250-model list mtp --all`; they do not make an entry enabled, production-resident,
+or part of generic convergence. Context and draft defaults remain runtime metadata consumed by the
+existing `bc250-model path` / `bc250-run-mtp` path. No separate recommendation database or automatic
+promotion mechanism exists.
 
-The first long Phase-2 draft-depth campaign accidentally repeated catalog defaults and is **not**
-valid for depth selection. It is retained as repeatability/noise-floor evidence: typical throughput
-CV was approximately 0.01–0.19%, so sub-percent differences should not drive package defaults. The
-corrected hardware canary proved requested draft depth reaches the emitted llama-server flags, and
-the corrected sweep then applied depths 1, 2, 3 and 4 successfully to all three original passers.
+Qwen3.5 depth 2 is the final package default: confirmation-grade 1.7 testing kept short-output
+throughput effectively equal to depth 3 while improving 1024-token MTP throughput by about 9%, with
+higher acceptance, slightly better memory headroom and clean parity-quality evidence.
 
-Current draft-depth conclusions:
+YMQ XS-TI is the preferred general 27B choice at depth 1. The reviewed depth-1 point improved both
+short and long MTP throughput over depth 2, retained about 2.8--3.0 GiB free-memory class, and passed
+the parity-quality screen. A symmetric three-repeat depth-1 confirmation is optional evidence, not a
+package-release gate.
 
-```text
-qwen3.5-9b-mtp             packaged depth 3; depth 2 is the strongest exploratory candidate
-qwen3.6-27b-mtp            keep depth 2
-qwen3.8-27b-hauhaucs-mtp   keep depth 2
-qwen3.8-27b-ymq-xs-ti-mtp  qualified at depth 2; further depth tuning is optional only if preferred-role promotion is contemplated
-```
+HauhauCS remains a defensible specialist alternative at depth 2 because it has the strongest tested
+short-output 27B point and unusually strong exact baseline/MTP output parity.
 
-Qwen3.5 depth 2 showed a material exploratory advantage (about +4% balanced versus depth 3 and a
-much larger long-generation gain than the default), well above the measured noise floor. Keep the
-packaged depth-3 default until confirmation-grade repeats are available if changing the default is
-important. Do not repeat the full sweep merely to reconfirm already-settled models.
+`qwen3.6-27b-mtp` is retired from the active/recommended lane because optimized Qwen3.8 choices now
+provide better absolute throughput, memory headroom and completion efficiency. Its historical passing
+qualification remains valid and its exact definition is preserved in source-only `graveyard.toml`.
+`qwen3.6-35b-a3b-mtp` also remains in the graveyard: stock 8K/full-GPU loading crossed the 128 MiB
+whole-appliance hard floor before MTP inference, so that configuration should not be rerun unchanged.
 
-YMQ XS-TI qualified with deterministic baseline/MTP quality parity and clean safety/restoration.
-Compared with the earlier HauhauCS Qwen3.8 evidence, YMQ had roughly 4–5% faster baseline decode and
-better absolute MTP throughput at longer generations, but somewhat lower observed memory headroom.
-GGUF file size is therefore not a sufficient runtime-memory proxy.
-
-Further MTP work is optional and question-driven only:
-
-- confirm Qwen3.5 depth 2 with 3 performance repeats / 2 quality repeats at 256 and 1024 tokens only
-  if changing the package default matters;
-- run a same-current-package HauhauCS comparator only if a rigorous YMQ/HauhauCS memory comparison is
-  required;
-- explore YMQ depth 1 only if YMQ is being considered for a preferred package role.
-
-The packaged entries remain `enabled = false`; MTP stays explicit opt-in and separate from normal
-model convergence. Broad MTP qualification should not be reopened without a materially new product,
+The packaged active entries remain `enabled = false`; MTP stays explicit opt-in and separate from
+normal model convergence. Do not reopen broad MTP qualification without a materially new product,
 model, runtime or hardware question.
 
 ## Prepare one experiment
@@ -134,10 +117,9 @@ LLAMACPP=/opt/llama.cpp/build/bin/llama-server \
 bc250-run-mtp --no-mtp qwen3.5-9b-mtp
 ```
 
-Exact IDs are preferred. Convenience aliases exist only for interactive use:
-`qwen35-9b`, `qwen36-27b`, `qwen38-27b`. The YMQ challenger intentionally has no convenience
-alias; use exact ID `qwen3.8-27b-ymq-xs-ti-mtp` in evidence. Retired MTP entries have no alias and
-are not accepted by the active runner.
+Exact IDs are preferred. Only the unambiguous `qwen35-9b` convenience alias remains for interactive
+use. Use exact IDs for 27B models so a future package-policy change cannot silently retarget an
+alias. Retired MTP entries have no alias and are not accepted by the active runner.
 
 `PORT`, `CTX` and `DRAFT_N_MAX` override catalog values. `UBATCH=384` remains an explicit
 gfx1013 stability-control A/B only when the affected model/runtime path warrants it; an
