@@ -702,27 +702,92 @@ gate.
 
 ## DEC-027 — Use the BC-250 reboot compatibility invocation for package-controlled reboot paths
 
-**Status:** ACTIVE — device evidence incorporated in 0.11.3-2.3.
+**Status:** ACTIVE — exact-2.3 device evidence accepted; remaining pinned-upstream call patched in 0.11.3-2.4.
 
 **Decision:** On BC-250 package paths that intentionally initiate a real reboot, do not invoke
 `systemctl reboot`. Preserve the existing command contract where it is still appropriate, but use
 `/usr/sbin/reboot` (operator-facing form: `sudo reboot`) because that invocation is repeatedly proven
 reliable on the target appliance. Do not create a generic reboot wrapper merely to encode this rule.
 
-Current source had exactly two executable package-owned `systemctl reboot` call sites, both in the
-persistent 40-CU enable/disable helper; 2.3 changes those calls to `/usr/sbin/reboot` without changing
-40-CU policy or the helper's automatic-reboot contract. Other reboot mentions were documentation,
-status/planning text, tests, or already used the compatible operator form.
+The 2.3 repository-native source review found and changed the two persistent 40-CU enable/disable
+`systemctl reboot` calls. Exact-2.3 installed-package acceptance then found a third reachable call
+inside the pinned upstream CU live manager: its interactive CPU-core-unlock reboot prompt. That
+upstream source is materialized only during RPM prep, so 2.4 corrects it through the existing
+`patches/cu-live-manager-rpm-paths.patch`, replacing only that command with `/usr/sbin/reboot`. The
+interactive prompt remains intact and upstream `--yes` remains non-rebooting.
 
 **Why:** Exact installed 2.2 testing repeatedly distinguished `COMMAND=/usr/sbin/systemctl reboot`
 from `COMMAND=/usr/sbin/reboot`. The former completed shutdown, started a new kernel and progressed
 through substantial early boot before the retained journal ended and boot history recorded a crash;
 the latter repeatedly reconstructed services, network, timers, firewalld, live 40/40 routing and a
-clean authenticated verifier. The evidence does not identify Tika, nginx, Ollama, networking, CU
-reconstruction, kernel restart or generic systemd shutdown as the root cause, so the package change
-must stay invocation-specific.
+clean authenticated verifier. Exact installed 2.3 again passed the supported `sudo reboot` path.
+The evidence does not identify Tika, nginx, Ollama, networking, CU reconstruction, kernel restart or
+generic systemd shutdown as the root cause, so the package change remains invocation-specific.
 
 **Retest only if:** a future systemd/Fedora/hardware change proves `systemctl reboot` equivalent and
-reliable on this appliance, or the package changes reboot ownership/contract. Installed 2.3 should
-receive one supported reboot-path acceptance test; do not deliberately rerun the known-bad invocation
-merely to reproduce the failure again.
+reliable on this appliance, or the package changes reboot ownership/contract. Exact 2.4 needs only a
+bounded package/source-path check for the patched live-manager CPU-unlock workflow; do not
+deliberately rerun the known-bad invocation merely to reproduce the failure again.
+
+## DEC-028 — Make the Open WebUI product surface role-oriented and persist package policy
+
+**Status:** ACTIVE — exact-2.3 Open WebUI investigation; implemented in 0.11.3-2.4.
+
+**Decision:** Use the existing authenticated Open WebUI desired-state helper as the single package
+authority for the persisted application values that define the BC-250 local-office contract. Keep
+Arena disabled. Persist the existing local/offline defaults for external OpenAI, direct connections,
+code execution/interpreter, memories and community sharing, and converge the upload size/count/
+extension policy rather than relying only on fresh-database environment bootstrap values.
+
+Keep the five production base models plus the dedicated task model active because package presets and
+background tasks depend on them, but add package-owned workspace model overrides with
+`meta.hidden=true` so the ordinary model selector presents curated office roles instead of
+implementation details. Provider allowlisting remains a backend-availability mechanism; it is not
+used as a substitute for UI hiding.
+
+**Boundary:** This is an extension of the existing additive desired-state contract, not a second Open
+WebUI configuration system. Unrelated operator models/users/prompts/knowledge remain untouched. Do
+not add a custom Arena pool, model-order/default/pinning policy, CORS redesign, another provider/
+service, direct DB edits or a generic configuration framework without a concrete product requirement.
+`ui.enable_signup=false` remains the existing single-user bootstrap outcome rather than gaining a
+second signup-control mechanism solely for this decision. Allowed-extension comparisons are
+order-insensitive.
+
+**Why:** Exact installed 2.3 product-path testing found the appliance functionally healthy but exposed
+three ownership gaps: upstream-default Arena remained visible, raw production/task models were visible
+alongside curated roles, and persisted upload/local-offline values could drift after database-side
+administration without package status noticing. The supported Open WebUI APIs already expose all
+three boundaries, so a small extension of current convergence is simpler and more honest than new
+architecture.
+
+**Retest only if:** Open WebUI changes its persisted config/model-override API semantics or the package
+intentionally changes its role-based product surface. Exact 2.4 needs one bounded authenticated
+apply/status/UI check plus harmless drift/reconvergence; it does not require another model campaign.
+
+## DEC-029 — Keep pinned Open WebUI OpenAI-style adapter outside the external appliance contract
+
+**Status:** ACTIVE — exact-2.3 attribution evidence; documented in 0.11.3-2.4.
+
+**Decision:** Do not vendor-patch the pinned Open WebUI v0.11.3 container solely to make its
+`/api/chat/completions` Ollama adapter a general external OpenAI-compatible BC-250 API. The package
+uses that endpoint for bounded product-path testing, but does not advertise it as an external
+integration contract. Package-owned callers that need a hard generation cap use Ollama-native nested
+`options.num_predict`; keep the separately device-tested Open WebUI preset `params.max_tokens` path
+unchanged.
+
+Document the v0.11.3 limitations: root OpenAI-style `max_tokens` is not reliably propagated to Ollama,
+`reasoning_tokens=0` can coexist with generated reasoning content, and Ollama length termination can
+be surfaced as `finish_reason=stop`. Do not infer resource bounds or truncation/reasoning semantics
+from those affected fields.
+
+**Why:** Exact-device A/B attribution isolated these behaviors to the Open WebUI v0.11.3 adapter;
+Ollama and the same models obeyed native `num_predict`. Carrying three container-code patches would
+turn the appliance into an Open WebUI fork for a surface the package does not currently promise.
+The safer pre-v1.0 boundary is explicit documentation plus native options in package-owned bounded
+clients.
+
+**Retest only if:** the appliance intentionally advertises Open WebUI's OpenAI-style endpoint as an
+external contract, a newer pinned Open WebUI version is evaluated, or a package-owned caller starts
+depending on root `max_tokens` / reasoning-token / finish-reason semantics. In that case qualify all
+three adapter semantics together rather than fixing one field in isolation.
+

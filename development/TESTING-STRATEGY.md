@@ -42,11 +42,13 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-2.3 source release preserves the core-verification boundary while simplifying
-installer UX: local maintenance and Pi/companion integration are separate optional decisions,
-both choices remain optional/default-No, and selected setup must be checked rather than assumed successful. Post-install guidance should
-point at a small set of next commands plus the installed documentation/config/state/evidence paths;
-it must not become a second full command reference.
+The current 0.11.3-2.4 source release preserves the core-verification boundary while simplifying
+installer UX: local maintenance and Pi/companion integration are separate optional decisions, both
+choices remain optional/default-No, and selected setup must be checked rather than assumed successful.
+It also extends the existing Open WebUI desired-state authority rather than adding another subsystem:
+Arena is off, implementation models stay active but hidden, and persisted local/offline/upload policy
+is checked and converged. Post-install guidance should point at a small set of next commands plus the
+installed documentation/config/state/evidence paths; it must not become a second full command reference.
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
 MemAvailable hard floor unchanged; below 512 MiB may be surfaced as tight headroom. Likewise, an
@@ -113,9 +115,11 @@ the wrong fixed `ss` columns. It also exposed healthy live 40/40 status/verify r
 persistent boot activation was intentionally disabled. Release 1.8 fixed those source defects and added an exact forced-companion SSH exception rather
 than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
 
-Exact 2.2 has now passed the inherited high-priority operations boundaries: active administrator SSH safely defers power actions, healthy live 40/40 returns success with persistent activation disabled, normal/agent/degraded recovery works, backup/restore and bounded production/task runtime checks are healthy, service restarts recover, and external LAN isolation matches policy. A real reboot through `sudo reboot` also reconstructs the appliance cleanly.
+Exact 2.3 has now passed the targeted operations acceptance introduced by the 2.3 release: clean `rpm -V`, swap 0750 convergence, topology-aware status/verifier UX, `bc250-agent-mode normal`, degraded recovery, DRY_RUN/timer output, Tika restart semantics, baseline-aware identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. Preserve this as exact-2.3 evidence.
 
-The distinct `sudo systemctl reboot` invocation is device-proven unreliable on this BC-250: it enters a new boot and progresses substantially before the boot can become unusable/crash-recorded. Do not keep reproducing that failure. Package-controlled reboot paths should use the supported `reboot` compatibility invocation and receive one bounded installed-package retest. Tika routine restart also exposed expected exit 143 being logged as failure; source 2.3 normalizes only that expected SIGTERM status.
+A separate exact-2.3 authenticated Open WebUI investigation found the application path healthy: HTTP readiness, task routing, Standard/Higher Quality/Deep Reasoning roles, translation 8/8 and bounded RAG 3/3 all passed. It also found three product-state ownership gaps now addressed in 2.4 source: Arena must be persisted off, the five production bases plus task model should remain active but hidden from the ordinary selector, and persisted local/offline/upload policy must participate in apply/status rather than relying only on fresh-database environment defaults. The next 2.4 OWUI check is one bounded authenticated apply/status/UI/drift-reconvergence batch, not another model campaign.
+
+The distinct `sudo systemctl reboot` invocation is device-proven unreliable on this BC-250: it enters a new boot and progresses substantially before the boot can become unusable/crash-recorded. Do not keep reproducing that failure. Exact-2.3 acceptance found one remaining reachable occurrence in the pinned CU live manager's interactive CPU-core-unlock reboot prompt. Source 2.4 patches that upstream path to `/usr/sbin/reboot` through the existing package patch while preserving its interactive/no-reboot-under-`--yes` contract.
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
