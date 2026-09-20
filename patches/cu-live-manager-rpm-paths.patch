@@ -1,8 +1,7 @@
 diff --git a/bc250-cu-live-manager.sh b/bc250-cu-live-manager.sh
-index 1d4c38e..f58fd04 100755
 --- a/bc250-cu-live-manager.sh
 +++ b/bc250-cu-live-manager.sh
-@@ -18,7 +18,7 @@ REG_SPI="mmSPI_PG_ENABLE_STATIC_WGP_MASK"
+@@ -16,7 +16,7 @@
  REG_RLC="mmRLC_PG_ALWAYS_ON_WGP_MASK"
  SERVICE_NAME="bc250-cu-live-manager.service"
  SERVICE_PATH="/etc/systemd/system/$SERVICE_NAME"
@@ -10,8 +9,17 @@ index 1d4c38e..f58fd04 100755
 +SERVICE_BIN="/usr/bin/bc250-cu-live-manager"
  SERVICE_CONF="/etc/bc250-cu-live-manager.conf"
  OLD_UDEV_RULE="/etc/udev/rules.d/99-bc250-cu-live-manager.rules"
- LAST_REG_PATH=""
-@@ -559,16 +559,7 @@ install_service() {
+ # CPU core unlock: SMN index/data window at PCI config 0xB8/0xBC on the GNB.
+@@ -714,7 +714,7 @@
+ 		case "$ans" in
+ 			y|Y|yes|YES)
+ 				info "rebooting..."
+-				systemctl reboot
++				/usr/sbin/reboot
+ 				return 0
+ 				;;
+ 			n|N|no|NO)
+@@ -762,16 +762,7 @@
  	need_root
  	need_umr
  	confirm_service_install || return 0
@@ -29,7 +37,7 @@ index 1d4c38e..f58fd04 100755
  	cat > "$SERVICE_PATH" <<EOF
  [Unit]
  Description=BC-250 CU saved enumeration and dispatch
-@@ -622,7 +613,8 @@ uninstall_service() {
+@@ -821,7 +812,8 @@
  uninstall_service() {
  	need_root
  	systemctl disable --now "$SERVICE_NAME" >/dev/null 2>&1 || true
@@ -39,12 +47,3 @@ index 1d4c38e..f58fd04 100755
  	systemctl daemon-reload
  	info "removed $SERVICE_NAME"
  }
-@@ -704,7 +695,7 @@ offer_cpu_unlock_reboot() {
- 		case "$ans" in
- 			y|Y|yes|YES)
- 				info "rebooting..."
--				systemctl reboot
-+				/usr/sbin/reboot
- 				return 0
- 				;;
- 			n|N|no|NO)
