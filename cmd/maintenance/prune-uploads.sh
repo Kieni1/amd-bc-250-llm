@@ -160,6 +160,9 @@ done
 age_label="${MAX_AGE_DAYS}d"; ceiling_label="${MAX_TOTAL_GB}GiB"
 ((MAX_AGE_DAYS > 0)) || age_label=disabled
 ((MAX_TOTAL_GB > 0)) || ceiling_label=disabled
+if [[ "$DRY_RUN" == 1 ]]; then
+  log "DRY RUN — no files will be deleted"
+fi
 log "Files=${#rows[@]} known_total=$(human_bytes "$total") ceiling=${ceiling_label} age=${age_label} dry_run=${DRY_RUN}"
 if ((unknown_age > 0 || unknown_size > 0)); then
   log "WARNING: preserving uncertain metadata from automatic pruning (unknown_age=${unknown_age} unknown_size=${unknown_size})."
@@ -208,5 +211,9 @@ if ((MAX_TOTAL_GB > 0)); then
   fi
 fi
 
-log "Done. deleted/planned=$deleted freed/planned=$(human_bytes "$freed") remaining/simulated=$(human_bytes "$total") failures=$failures"
+if [[ "$DRY_RUN" == 1 ]]; then
+  log "Done. actual_deleted=0 planned_candidates=$deleted actual_freed=0B planned_freed=$(human_bytes "$freed") remaining_simulated=$(human_bytes "$total") failures=$failures"
+else
+  log "Done. deleted=$deleted freed=$(human_bytes "$freed") remaining=$(human_bytes "$total") failures=$failures"
+fi
 (( failures == 0 ))

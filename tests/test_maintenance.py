@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import os
 import subprocess
 import tempfile
@@ -345,8 +346,8 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("22 80 443 3000 11434 11435 11436 11437", source)
         self.assertIn("poweroff or suspend", source)
         self.assertIn("REQUIRE_WOL", source)
-        self.assertIn("protected TCP activity", source)
-        self.assertIn("local or remote endpoint", source)
+        self.assertIn("active protected", source)
+        self.assertIn("configured remote endpoint", source)
         self.assertIn('local_endpoint="${fields[${#fields[@]}-2]}"', source)
         self.assertIn('systemctl --no-block "$NIGHT_POWER_ACTION"', source)
         self.assertNotIn(
@@ -417,7 +418,7 @@ class MaintenanceTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("Deferring poweroff: protected TCP activity", result.stdout)
+            self.assertIn("Deferring poweroff: active protected SSH connection detected on local port 22.", result.stdout)
             self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
 
     def test_safe_power_keeps_conservative_remote_https_deferral(self) -> None:
@@ -452,7 +453,7 @@ class MaintenanceTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("Deferring poweroff: protected TCP activity", result.stdout)
+            self.assertIn("Deferring poweroff: protected TCP activity detected on a configured remote endpoint.", result.stdout)
             self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
 
     def test_safe_power_exempts_only_companion_control_ssh(self) -> None:
@@ -527,7 +528,7 @@ class MaintenanceTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn("Deferring poweroff: protected TCP activity", result.stdout)
+            self.assertIn("Deferring poweroff: active protected SSH connection detected on local port 22.", result.stdout)
             self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
 
     def test_safe_power_refuses_missing_companion_connection(self) -> None:
@@ -628,6 +629,7 @@ class MaintenanceTests(unittest.TestCase):
         source = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
         self.assertIn("Warm-up:            disabled (configured model=", source)
         self.assertIn("Night power:        disabled (configured action=", source)
+        self.assertIn("last_scheduled=%s", source)
 
     def test_pruning_reports_small_files_without_rounding_to_zero_mib(self) -> None:
         script = ROOT / "cmd/maintenance/prune-uploads.sh"
@@ -659,7 +661,9 @@ class MaintenanceTests(unittest.TestCase):
             )
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertIn("known_total=512B", result.stdout)
+            self.assertIn("DRY RUN — no files will be deleted", result.stdout)
             self.assertIn("id=tiny-old size=512B", result.stdout)
+            self.assertIn("actual_deleted=0 planned_candidates=1", result.stdout)
             self.assertNotIn("size=0MiB", result.stdout)
 
     def test_pruning_disables_zero_rules_and_preserves_uncertain_metadata(self) -> None:
@@ -786,6 +790,147 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(
                 log.read_text(encoding="utf-8").splitlines(), ["1", "2", "3"]
             )
+
+    def test_identity_restore_compares_new_fk_violations_against_baseline(self) -> None:
+        script = ROOT / "cmd/maintenance/restore-users.sh"
+        baseline = "knowledge_file\t1\tfile\t0\nknowledge_file\t2\tfile\t0\n"
+        cases = (
+            ("unchanged", baseline, baseline, "ok", 0, False),
+            (
+                "new-violation",
+                baseline,
+                baseline + "user\t7\tgroup\t1\n",
+                "ok",
+                1,
+                True,
+            ),
+            (
+                "same-count-different-member",
+                baseline,
+                "knowledge_file\t1\tfile\t0\nuser\t7\tgroup\t1\n",
+                "ok",
+                1,
+                True,
+            ),
+            (
+                "baseline-violation-disappears",
+                baseline,
+                "knowledge_file\t1\tfile\t0\n",
+                "ok",
+                0,
+                False,
+            ),
+            ("integrity-failure", baseline, baseline, "corrupt", 1, True),
+        )
+        for name, before, after, post_integrity, expected_rc, expect_rollback in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as temporary:
+                tmp = Path(temporary)
+                fake_bin = tmp / "bin"
+                fake_bin.mkdir()
+                db = tmp / "webui.db"
+                db.write_text("db\n", encoding="utf-8")
+                backup = tmp / "users.sql.gz"
+                with gzip.open(backup, "wt", encoding="utf-8") as handle:
+                    handle.write("-- OWUI_SCHEMA_REVISION=rev-test\nBEGIN;\nCOMMIT;\n")
+                before_path = tmp / "before.tsv"
+                after_path = tmp / "after.tsv"
+                before_path.write_text(before, encoding="utf-8")
+                after_path.write_text(after, encoding="utf-8")
+                restored = tmp / "restored"
+                rollback = tmp / "rollback"
+                rollback_dir = tmp / "rollback-dir"
+
+                sqlite3 = fake_bin / "sqlite3"
+                sqlite3.write_text(
+                    textwrap.dedent(
+                        r'''\
+                        #!/usr/bin/env bash
+                        set -e
+                        joined="$*"
+                        if [[ "$joined" == *"SELECT version_num FROM alembic_version"* ]]; then
+                          echo rev-test
+                          exit 0
+                        fi
+                        if [[ "$joined" == *"PRAGMA wal_checkpoint(TRUNCATE);"* ]]; then
+                          exit 0
+                        fi
+                        if [[ "$joined" == *".backup '"* ]]; then
+                          src="$1"
+                          dest="${@: -1}"
+                          dest="$(printf '%s\n' "$dest" | sed -n "s/^\.backup '\(.*\)'$/\1/p")"
+                          cp -- "$src" "$dest"
+                          if [[ "$src" == *"webui.db.pre-users-restore-"* ]]; then
+                            rm -f -- "$RESTORED_MARKER"
+                            : > "$ROLLBACK_MARKER"
+                          fi
+                          exit 0
+                        fi
+                        if [[ "$joined" == *"PRAGMA integrity_check;"* ]]; then
+                          if [[ "$joined" == *"$TEST_DB"* && -e "$RESTORED_MARKER" && "$POST_INTEGRITY" != ok ]]; then
+                            echo "$POST_INTEGRITY"
+                          else
+                            echo ok
+                          fi
+                          exit 0
+                        fi
+                        if [[ "$joined" == *"PRAGMA foreign_key_check;"* ]]; then
+                          if [[ "$joined" == *"webui.db.pre-users-restore-"* ]]; then
+                            cat "$FK_BEFORE"
+                          else
+                            cat "$FK_AFTER"
+                          fi
+                          exit 0
+                        fi
+                        if [[ $# -eq 1 && "$1" == "$TEST_DB" ]]; then
+                          cat >/dev/null
+                          : > "$RESTORED_MARKER"
+                          exit 0
+                        fi
+                        exit 0
+                        '''
+                    ),
+                    encoding="utf-8",
+                )
+                systemctl = fake_bin / "systemctl"
+                systemctl.write_text("#!/usr/bin/env bash\nexit 3\n", encoding="utf-8")
+                sqlite3.chmod(0o755)
+                systemctl.chmod(0o755)
+
+                env = os.environ | {
+                    "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                    "OWUI_DB": str(db),
+                    "USERS_ROLLBACK_DIR": str(rollback_dir),
+                    "ALLOW_UNVERIFIED_BACKUP": "1",
+                    "CONFIRM_RESTORE": "YES",
+                    "FK_BEFORE": str(before_path),
+                    "FK_AFTER": str(after_path),
+                    "TEST_DB": str(db),
+                    "RESTORED_MARKER": str(restored),
+                    "ROLLBACK_MARKER": str(rollback),
+                    "POST_INTEGRITY": post_integrity,
+                }
+                result = subprocess.run(
+                    [str(script), str(backup)],
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, expected_rc, result.stdout)
+                self.assertEqual(rollback.exists(), expect_rollback, result.stdout)
+                if name in {"new-violation", "same-count-different-member"}:
+                    self.assertIn("introduced 1 new foreign-key violation", result.stdout)
+                    self.assertIn("user\t7\tgroup\t1", result.stdout)
+                    self.assertIn("Automatic rollback: successful", result.stdout)
+                elif name == "integrity-failure":
+                    self.assertIn("failed integrity_check", result.stdout)
+                    self.assertIn("Automatic rollback: successful", result.stdout)
+                else:
+                    self.assertIn("Integrity: OK", result.stdout)
+                    self.assertIn("Baseline FK violations: 2", result.stdout)
+                    self.assertIn("New FK violations: 0", result.stdout)
+                    self.assertIn("Restore: successful", result.stdout)
 
     def test_pruning_without_total_does_not_assume_a_fixed_page_size(self) -> None:
         script = ROOT / "cmd/maintenance/prune-uploads.sh"

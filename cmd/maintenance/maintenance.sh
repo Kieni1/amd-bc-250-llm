@@ -421,7 +421,7 @@ timer_line() {
   active="$(systemctl is-active "$unit" 2>/dev/null || true)"
   next="$(systemctl show "$unit" -p NextElapseUSecRealtime --value 2>/dev/null || true)"
   last="$(systemctl show "$unit" -p LastTriggerUSec --value 2>/dev/null || true)"
-  printf '  %-36s %-8s %-8s next=%s last=%s\n' "$unit" \
+  printf '  %-36s %-8s %-8s next=%s last_scheduled=%s\n' "$unit" \
     "${enabled:-unknown}" "${active:-unknown}" "${next:-n/a}" "${last:-n/a}"
 }
 

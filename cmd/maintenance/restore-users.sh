@@ -9,7 +9,7 @@ FORCE_SCHEMA_MISMATCH="${FORCE_SCHEMA_MISMATCH:-0}"
 
 [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
 [[ -f "$DB" && -r "$SRC" ]] || { echo "ERROR: DB or backup missing." >&2; exit 1; }
-for cmd in sqlite3 gzip zcat python3 sha256sum; do
+for cmd in sqlite3 gzip zcat python3 sha256sum sort comm awk; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing command: $cmd" >&2; exit 1; }
 done
 gzip -t "$SRC"
@@ -75,10 +75,34 @@ rollback_db(){
   fi
   chown --reference="$pre" "$DB"
   chmod --reference="$pre" "$DB"
-  [[ "$(sqlite3 "$DB" 'PRAGMA integrity_check;')" == ok ]]
+  if [[ "$(sqlite3 "$DB" 'PRAGMA integrity_check;')" != ok ]]; then
+    echo "CRITICAL: automatic database rollback restored a database that failed integrity_check. Keep Open WebUI stopped." >&2
+    return 1
+  fi
+  echo "Automatic rollback: successful." >&2
 }
-tmp="$(mktemp)"
-trap 'rm -f "$tmp"' EXIT
+
+capture_fk_set(){
+  local database="$1" output="$2" raw="${2}.raw"
+  if ! sqlite3 -batch -noheader -separator $'\t' "$database" 'PRAGMA foreign_key_check;' > "$raw"; then
+    rm -f -- "$raw"
+    return 1
+  fi
+  LC_ALL=C sort -u "$raw" > "$output"
+  rm -f -- "$raw"
+}
+
+tmpdir="$(mktemp -d)"
+trap 'rm -rf -- "$tmpdir"' EXIT
+tmp="$tmpdir/restore.sql"
+fk_before="$tmpdir/fk-before.tsv"
+fk_after="$tmpdir/fk-after.tsv"
+fk_new="$tmpdir/fk-new.tsv"
+if ! capture_fk_set "$pre" "$fk_before"; then
+  echo "ERROR: could not record pre-restore foreign-key state; refusing to modify identity rows." >&2
+  exit 1
+fi
+baseline_fk_count="$(awk 'END { print NR + 0 }' "$fk_before")"
 zcat "$SRC" > "$tmp"
 if ! sqlite3 "$DB" < "$tmp"; then
   echo "ERROR: restore failed; restoring pre-restore snapshot." >&2
@@ -90,13 +114,26 @@ fi
   rollback_db || true
   exit 1
 }
-fk_issues="$(sqlite3 "$DB" 'PRAGMA foreign_key_check;' 2>/dev/null || true)"
-[[ -z "$fk_issues" ]] || {
-  echo "ERROR: restored DB failed foreign_key_check." >&2
-  printf '%s\n' "$fk_issues" >&2
+if ! capture_fk_set "$DB" "$fk_after"; then
+  echo "ERROR: restored DB foreign-key validation could not be completed." >&2
   rollback_db || true
   exit 1
-}
+fi
+LC_ALL=C comm -13 "$fk_before" "$fk_after" > "$fk_new"
+new_fk_count="$(awk 'END { print NR + 0 }' "$fk_new")"
+if (( new_fk_count > 0 )); then
+  echo "ERROR: identity restore introduced ${new_fk_count} new foreign-key violation(s)." >&2
+  awk 'NR <= 20 { print "  " $0 }' "$fk_new" >&2
+  if (( new_fk_count > 20 )); then
+    echo "  ... additional new violations omitted from normal output." >&2
+  fi
+  rollback_db || true
+  exit 1
+fi
 sqlite3 "$DB" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1 || true
-echo "Identity rows restored. Pre-restore DB: $pre"
+echo "Integrity: OK"
+echo "Baseline FK violations: $baseline_fk_count"
+echo "New FK violations: 0"
+echo "Restore: successful"
+echo "Pre-restore DB: $pre"
 echo "Start Open WebUI and test an administrator login."

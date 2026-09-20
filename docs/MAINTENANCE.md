@@ -22,10 +22,10 @@ For those optional choices, use the guided setup:
 sudo bc250-maintenance setup
 ```
 
-A full interactive `sudo bc250-install` first asks whether **any** optional maintenance
-or Raspberry Pi integration should be configured; the default is No. If accepted, local
-BC-250 maintenance and Raspberry Pi integration are separate choices. Existing local
-maintenance can be left unchanged explicitly. Selected setup is verified before the
+A full interactive `sudo bc250-install` presents local BC-250 maintenance and Raspberry
+Pi/companion integration as separate optional decisions after core verification. Local
+maintenance can be configured independently; Both top-level choices remain optional/default-No, and Pi/companion setup remains separate. Existing
+local maintenance can be left unchanged explicitly. Selected setup is verified before the
 installer finishes. The companion path deliberately uses only office HTTP :80 and
 restricted SSH :22; Wake-on-LAN itself does not require a host firewall port.
 
@@ -74,7 +74,16 @@ sudo systemctl start open-webui.service
 ```
 
 Restore helpers require confirmation, verify checksum sidecars and create
-rollback data before replacement.
+rollback data before replacement. Configuration restore remains strict about the
+restored database integrity. Identity restore also requires `PRAGMA integrity_check`
+to succeed, but compares the post-restore `foreign_key_check` set with the captured
+pre-restore baseline: unrelated pre-existing violations do not block the identity
+subset restore, while any newly introduced foreign-key violation fails closed and
+triggers the existing automatic rollback.
+Successful identity restore output reports the strict integrity result, the captured baseline
+foreign-key violation count and `New FK violations: 0`. A failed validation reports only newly
+introduced violations needed for diagnosis and explicitly confirms successful automatic rollback;
+it does not dump the unrelated baseline set.
 
 ## Open WebUI package baseline
 
@@ -100,6 +109,9 @@ sudo bc250-maintenance clean-cache
 sudo bc250-maintenance run prune
 sudo journalctl -u owui-maintenance@prune-uploads.service -n 100 --no-pager
 ```
+
+With `DRY_RUN=1`, prune output starts by stating that no files will be deleted and
+separates actual deletion/freed counters from planned candidate/simulated values.
 
 `bc250-status` is the shared storage view for GGUFs, the main/task/embedding/agent Ollama stores,
 Hugging Face cache, Open WebUI, Podman and journal usage. `clean-cache` requires
