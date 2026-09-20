@@ -218,6 +218,8 @@ fi
 - Align runtime swap-directory creation with the packaged/tmpfiles 0750 root:root contract so normal convergence does not intentionally create RPM mode drift.
 - Clarify maintenance timer history and DRY_RUN pruning output while preserving current-invocation journaling, backup privacy, and non-destructive defaults.
 - Make selective identity restore compare baseline/new FK sets while keeping integrity_check strict, and report concise integrity/FK/rollback outcomes to the operator.
+- Treat Tika exit status 143 as successful only for the expected SIGTERM/container-stop path so routine restarts do not leave misleading failed-unit telemetry.
+- Replace package-controlled persistent 40-CU `systemctl reboot` calls with the BC-250 compatibility invocation `/usr/sbin/reboot`, preserving the existing automatic-reboot contract while avoiding the invocation path shown unreliable on target hardware.
 - Source validation closes this release; RPM/SRPM build and exact installed 2.3 device acceptance remain separate external gates.
 
 * Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.2
