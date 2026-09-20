@@ -496,7 +496,7 @@ active_cus() {
 }
 
 show_load_failure_hint() {
-  [[ -f "$CONF40" ]] || return
+  [[ -f "$CONF40" ]] || return 0
   [[ -d /sys/module/amdgpu ]] && \
     [[ -r /sys/module/amdgpu/parameters/bc250_cc_write_mode ]] && return
   echo

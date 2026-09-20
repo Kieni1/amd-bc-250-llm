@@ -47,6 +47,8 @@ if [[ -r "$prepared_file" ]]; then
   [[ "$prepared_kernel" == "$running_kernel" ]] && prepared_state="ready for running kernel" || \
     prepared_state="stale: prepared for ${prepared_kernel:-unknown}; rerun sudo bc250-40cu prepare"
   echo "  Prepared module state   : $prepared_state"
+elif ((EUID != 0)) && [[ -d /var/lib/bc250-llm-server ]] && [[ ! -x /var/lib/bc250-llm-server ]]; then
+  echo "  Prepared module state   : protected; run with sudo for package state"
 else
   echo "  Prepared module state   : not recorded"
 fi

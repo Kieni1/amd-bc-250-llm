@@ -54,6 +54,51 @@ class StatusTests(unittest.TestCase):
             self.assertIn(expected, source)
 
 
+    def test_status_reports_protected_storage_instead_of_zero_size(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        start = source.index("directory_usage() {")
+        end = source.index("\nollama_version_line() {", start)
+        function = source[start:end]
+        command = (
+            function
+            + "\ndu() { echo 'du: cannot read directory: Permission denied'; return 1; }; "
+            + "directory_usage 'Open WebUI' /protected"
+        )
+        result = subprocess.run(
+            ["bash", "-c", command],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("protected (use sudo)", result.stdout)
+        self.assertNotRegex(result.stdout, r"Open WebUI\s+0\s")
+
+    def test_status_queries_ollama_version_from_an_active_lane(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        start = source.index("ollama_version_line() {")
+        end = source.index('\nif [[ "${1:-}" == -h', start)
+        function = source[start:end]
+        command = function + """
+systemctl() {
+  [[ $1 == is-active && $3 == ollama-agent.service ]]
+}
+ollama() {
+  [[ ${OLLAMA_HOST-} == http://127.0.0.1:11436 ]] || return 9
+  echo 'ollama version is 0.34.0'
+}
+ollama_version_line
+"""
+        result = subprocess.run(
+            ["bash", "-c", command],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "ollama version is 0.34.0")
+        self.assertNotIn("Warning", result.stdout)
+
     def test_status_uses_agent_mode_as_single_runtime_topology_classifier(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         start = source.index("runtime_mode() {")
@@ -82,6 +127,27 @@ class StatusTests(unittest.TestCase):
                 self.assertEqual(result.stdout, expected)
         self.assertIn("degraded (partial normal topology)", source)
         self.assertIn("stopped (normal and agent lanes inactive)", source)
+
+
+class CuHelperTests(unittest.TestCase):
+    def test_40cu_status_hint_returns_success_when_persistent_mode_is_disabled(self) -> None:
+        source = (ROOT / "cmd/system/40cu-module.sh").read_text(encoding="utf-8")
+        start = source.index("show_load_failure_hint() {")
+        end = source.index("\ndo_status() {", start)
+        function = source[start:end]
+        result = subprocess.run(
+            ["bash", "-c", function + "\nCONF40=/definitely/not/present; show_load_failure_hint"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, "")
+
+    def test_normal_mode_message_describes_agent_as_intentionally_inactive(self) -> None:
+        source = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
+        self.assertIn("agent lane is intentionally inactive", source)
+        self.assertNotIn("agent is stopped by unit conflicts", source)
 
 
 class VerifyTests(unittest.TestCase):

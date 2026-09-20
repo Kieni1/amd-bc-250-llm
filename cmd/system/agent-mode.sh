@@ -78,7 +78,7 @@ enter_agent() {
 leave_agent() {
   require_units
   start_normal
-  echo "Normal mode active: main/task/embedding are ready; agent is stopped by unit conflicts."
+  echo "Normal mode active: main/task/embedding are ready; agent lane is intentionally inactive."
 }
 
 status_agent() {

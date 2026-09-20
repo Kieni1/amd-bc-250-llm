@@ -71,10 +71,42 @@ ollama_status() {
 }
 
 directory_usage() {
-  local label="$1" path="$2" usage
-  [[ -e "$path" ]] || return 0
-  usage="$(du -sh -- "$path" 2>/dev/null | awk '{print $1}' || true)"
+  local label="$1" path="$2" output usage rc=0
+  output="$(LC_ALL=C du -sh -- "$path" 2>&1)" || rc=$?
+  if ((rc != 0)); then
+    if grep -Eqi 'permission denied|operation not permitted' <<< "$output"; then
+      printf '  %-22s %-20s %s\n' "$label" 'protected (use sudo)' "$path"
+    fi
+    return 0
+  fi
+  usage="$(awk 'NR==1 {print $1}' <<< "$output")"
   printf '  %-22s %8s  %s\n' "$label" "$(value_or_unknown "$usage")" "$path"
+}
+
+ollama_version_line() {
+  local port='' output version unit candidate
+  for candidate in \
+    'ollama.service:11434' \
+    'ollama-task.service:11435' \
+    'ollama-embedding.service:11437' \
+    'ollama-agent.service:11436'; do
+    unit="${candidate%%:*}"
+    if systemctl is-active --quiet "$unit" 2>/dev/null; then
+      port="${candidate##*:}"
+      break
+    fi
+  done
+  if [[ -z "$port" ]]; then
+    echo '  Ollama client installed; server version unavailable while all lanes are stopped'
+    return 0
+  fi
+  output="$(OLLAMA_HOST="http://127.0.0.1:${port}" ollama --version 2>&1 || true)"
+  version="$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' <<< "$output" | tail -1 || true)"
+  if [[ -n "$version" ]]; then
+    printf '  ollama version is %s\n' "$version"
+  else
+    echo '  Ollama command available; version unavailable'
+  fi
 }
 
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
@@ -164,7 +196,7 @@ service_status cyan-skillfish-governor-smu.service
 
 section "Ollama instances"
 if command -v ollama >/dev/null 2>&1; then
-  ollama --version 2>/dev/null | sed 's/^/  /' || true
+  ollama_version_line
 else
   echo "  Ollama command is not installed"
 fi
@@ -174,7 +206,7 @@ ollama_status embedding ollama-embedding.service 11437
 if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
   ollama_status agent ollama-agent.service 11436
 else
-  printf '  %-9s port %-5s %-8s %s\n' agent 11436 inactive '(expected in normal mode)'
+  printf '  %-9s port %-5s %-8s %s\n' agent 11436 inactive '(intentionally inactive outside agent mode)'
 fi
 mode="$(runtime_mode)"
 case "$mode" in
