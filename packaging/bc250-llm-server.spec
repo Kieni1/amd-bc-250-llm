@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        2.2%{?dist}
+Release:        2.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,16 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.3
+- Improve operations UX without changing appliance architecture: actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, topology-aware status summary, clearer agent transitions and an idempotent `bc250-agent-mode normal` convergence alias.
+- Keep safe-power behavior unchanged while identifying protected local SSH/service ports in defer messages without exposing peer addresses.
+- Make verifier degradation output root-cause-aware by marking lane-dependent checks unavailable/skipped; expose skipped authenticated Open WebUI checks explicitly without counting them as pass/fail.
+- Make degraded status directly actionable with the normal convergence command, include skipped checks in verifier headline totals, and keep agent-mode transition guidance aligned with that public recovery path.
+- Align runtime swap-directory creation with the packaged/tmpfiles 0750 root:root contract so normal convergence does not intentionally create RPM mode drift.
+- Clarify maintenance timer history and DRY_RUN pruning output while preserving current-invocation journaling, backup privacy, and non-destructive defaults.
+- Make selective identity restore compare baseline/new FK sets while keeping integrity_check strict, and report concise integrity/FK/rollback outcomes to the operator.
+- Source validation closes this release; RPM/SRPM build and exact installed 2.3 device acceptance remain separate external gates.
+
 * Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.2
 - Encode the completed MTP package selection in the existing catalog: Qwen3.5 9B 16K/draft-2 as primary fast, YMQ Qwen3.8 27B 8K/draft-1 as primary general 27B, and HauhauCS Qwen3.8 27B 8K/draft-2 as the specialist alternative.
 - Retire Qwen3.6 27B from active MTP discovery while preserving its positive historical definition/evidence in the source-only graveyard; keep the 35B-A3B stock-envelope failure retired.

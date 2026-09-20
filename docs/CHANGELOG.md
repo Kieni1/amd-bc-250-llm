@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.3-2.3 - 2026-09-20
+
+- Improve operations UX with actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, clearer agent transitions, an idempotent `bc250-agent-mode normal` convergence alias, and a topology-aware `bc250-status` summary.
+- Preserve safe-power decision semantics while making local protected-port defer messages useful without exposing peer addresses.
+- Make verifier degradation reporting distinguish root service failures from dependent unavailable checks; report skipped authenticated Open WebUI verification explicitly without turning optional credentials into failures.
+- Make degraded status directly actionable with `sudo bc250-agent-mode normal`, include skipped checks in verifier headline totals, and use the same normal-convergence command in agent-mode guidance.
+- Align swap runtime directory creation with the existing package/tmpfiles `0750 root:root` contract to remove intentional RPM verification drift after convergence.
+- Clarify scheduled timer history and DRY_RUN prune counters while retaining current-invocation maintenance logs, private backups and fail-safe behavior.
+- Make selective identity restore summarize strict integrity, baseline/new foreign-key state and rollback outcome without dumping unrelated pre-existing violations.
+- No MTP, RAG, translation, Pi/companion architecture, 40-CU policy, or production-model change is introduced. RPM/SRPM build and exact installed-device acceptance remain separate external gates.
+
 ## 0.11.3-2.2 - 2026-09-20
 
 - Turn the completed MTP campaign into a small package policy without another framework: the existing MTP TOML catalog now carries `role` and `recommendation` metadata, and normal list output shows the policy alongside the existing disabled/download-only state.
