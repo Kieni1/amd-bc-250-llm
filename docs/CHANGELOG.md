@@ -9,7 +9,10 @@
 - Align swap runtime directory creation with the existing package/tmpfiles `0750 root:root` contract to remove intentional RPM verification drift after convergence.
 - Clarify scheduled timer history and DRY_RUN prune counters while retaining current-invocation maintenance logs, private backups and fail-safe behavior.
 - Make selective identity restore summarize strict integrity, baseline/new foreign-key state and rollback outcome without dumping unrelated pre-existing violations.
-- No MTP, RAG, translation, Pi/companion architecture, 40-CU policy, or production-model change is introduced. RPM/SRPM build and exact installed-device acceptance remain separate external gates.
+- Treat Tika exit status 143 as successful only for its expected SIGTERM/container-stop path so routine restarts do not create a false failed-unit event; unrelated abnormal exits remain failures.
+- Avoid the BC-250 device-proven unreliable `systemctl reboot` invocation in package-controlled 40-CU enable/disable paths; retain the existing automatic-reboot contract but invoke `/usr/sbin/reboot`, matching the compatibility path proven reliable on hardware.
+- Record exact-2.2 service-restart recovery, externally verified LAN isolation and successful reboot persistence through the supported `reboot` path; do not infer a root cause for the separate `systemctl reboot` crash path beyond the invocation-specific evidence.
+- No MTP, RAG, translation, Pi/companion architecture, 40-CU routing policy, or production-model change is introduced. RPM/SRPM build and exact installed-2.3 acceptance remain separate external gates.
 
 ## 0.11.3-2.2 - 2026-09-20
 
