@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source 0.11.3-2.1
+# BC-250 support / operations handover — current source 0.11.3-2.2
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,11 +10,11 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.11.3
-RPM Release:  2.1
-NVR:          bc250-llm-server-0.11.3-2.1
+RPM Release:  2.2
+NVR:          bc250-llm-server-0.11.3-2.2
 ```
 
-2.1 carries forward the focused 1.8 support/model-manager safety release derived from exact-1.7 operator testing, while adding only RAG evidence/schema and documentation cleanup. The inherited safety fixes are:
+2.2 carries forward the focused 1.8 support/model-manager safety release and 2.1 RAG/evidence cleanup, while adding only the completed MTP catalog policy and developer build-regeneration refinements. The inherited safety fixes are:
 
 - safe-power local/peer endpoint parsing;
 - a narrow forced-command Pi self-SSH exemption while preserving second-SSH/UI/Ollama deferral;
@@ -37,8 +37,8 @@ coverage             FULL
 
 The exact-1.7 support campaign separately proved normal↔agent restoration, degraded-mode
 recovery, fresh verified config/users backups and prune dry-run, then stopped after finding the
-safe-power and 40-CU return-code defects now fixed in 1.8 and carried into 2.1. Real idle S5/WOL, Pi forced-command
-shutdown, backup restore and live prune are therefore **pending exact-2.1 tests**, not accepted
+safe-power and 40-CU return-code defects now fixed in 1.8 and carried into 2.2. Real idle S5/WOL, Pi forced-command
+shutdown, backup restore and live prune are therefore **pending exact-2.2 tests**, not accepted
 historical behavior.
 
 Evidence files:
@@ -48,7 +48,7 @@ development/model-runs/2026-09-20-installed-0.11.3-1.7-revalidation.md
 development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md
 ```
 
-Do not relabel those results as 2.1 qualification.
+Do not relabel those results as 2.2 qualification.
 
 ## Validation ownership
 
@@ -58,7 +58,7 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 2.1 source validation is recorded in `PATCHNOTE-0.11.3-2.1.md`. Exact installed-2.1 execution is the outstanding hardware gate; RPM/SRPM build evidence remains external.
+Current 2.2 source validation is recorded in `PATCHNOTE-0.11.3-2.2.md`. Exact installed-2.2 execution is the outstanding hardware gate; RPM/SRPM build evidence remains external.
 
 ## Service topology
 
@@ -207,12 +207,12 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate exact-2.1 changed-boundary checks
+## Immediate exact-2.2 changed-boundary checks
 
 Run one bounded batch at a time. The minimum current-release device evidence is:
 
 ```text
-1. install exact 0.11.3-2.1; record NEVRA + artifact SHA
+1. install exact 0.11.3-2.2; record NEVRA + artifact SHA
 2. sudo bc250-verify --owui-token-file FILE
 3. interactive SSH request-shutdown -> DEFER, no shutdown broadcast/session loss
 4. bc250-40cu status + verify -> healthy 40/40 and rc=0 with persistent mode disabled

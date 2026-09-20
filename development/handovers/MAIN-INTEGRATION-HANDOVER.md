@@ -26,14 +26,14 @@ Current source release:
 
 ```text
 VERSION       0.11.3
-RPM Release   2.1%{?dist}
-NVR           bc250-llm-server-0.11.3-2.1
+RPM Release   2.2%{?dist}
+NVR           bc250-llm-server-0.11.3-2.2
 ```
 
-`0.11.3-2.1` carries the 1.8 support/model-manager safety fixes forward and closes the remaining
-RAG-evidence/documentation integration without redesigning the appliance. It does not change
-production model roles, service topology, MTP draft defaults, hard memory floor, governor policy,
-CU policy, unattended-power defaults or GGUF provenance rules.
+`0.11.3-2.2` carries the 1.8 support/model-manager safety fixes and 2.1 RAG integration forward,
+then encodes the completed MTP selection in the existing catalog. Production Open WebUI roles,
+service topology, hard memory floor, governor/CU policy, unattended-power defaults and GGUF
+provenance rules are unchanged. MTP remains standalone, disabled/download-only and opt-in.
 
 The release incorporates defects found during exact installed `0.11.3-1.7` support testing:
 
@@ -57,15 +57,15 @@ The release incorporates defects found during exact installed `0.11.3-1.7` suppo
   reached the low-memory boundary. It keeps the same model identity and verified GGUF, so applying
   the new definition does not require a source re-download.
 
-Current source validation for 2.1 is recorded in `PATCHNOTE-0.11.3-2.1.md`; device qualification remains separate:
+Current source validation for 2.2 is recorded in `PATCHNOTE-0.11.3-2.2.md`; device qualification remains separate:
 
 ```text
 repository/source preflight        PASS
-deterministic source suite         432/432 PASS
+deterministic source suite         433/433 PASS
 Python compileall                  PASS
 bash -n                            64/64 shell/bootstrap entrypoints PASS
 RPM/SRPM build                     external gate; not claimed here
-exact installed 2.1 hardware       not yet qualified
+exact installed 2.2 hardware       not yet qualified
 ```
 
 Newest full whole-appliance hardware evidence is exact installed
@@ -87,11 +87,11 @@ tight-headroom diagnostic but above the unchanged 128 MiB hard floor. A prompt d
 
 Exact-1.7 support/maintenance evidence additionally proved normal↔agent restoration, degraded-mode
 detection/recovery, verified local config/users backups and upload-prune dry-run. It exposed the
-safe-power and 40-CU return-code defects fixed in 1.8 and carried into 2.1 and therefore deliberately stopped before real
+safe-power and 40-CU return-code defects fixed in 1.8 and carried into 2.2 and therefore deliberately stopped before real
 idle S5/WOL, Pi forced-command shutdown, backup restore or live pruning. See
 `development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md`.
 
-**Immediate evidence boundary:** 2.1 is source-validated only until an exact 2.1 RPM is built, installed
+**Immediate evidence boundary:** 2.2 is source-validated only until an exact 2.2 RPM is built, installed
 and retested. Exact-1.7 evidence remains labelled exact-1.7; the intermediate 1.8 source line must not
 be treated as installed qualification unless separate evidence is supplied.
 
@@ -340,17 +340,17 @@ new handovers.
 MTP is a **standalone opt-in external llama.cpp runtime**, not another always-on Ollama lane.
 It shares catalog/provenance management but not normal appliance convergence.
 
-Current qualified active MTP entries:
+Current active MTP package policy:
 
 ```text
-qwen3.5-9b-mtp                 ctx 16384, packaged draft depth 3
-qwen3.6-27b-mtp                ctx 8192,  draft depth 2
-qwen3.8-27b-hauhaucs-mtp       ctx 8192,  draft depth 2
-qwen3.8-27b-ymq-xs-ti-mtp      ctx 8192,  draft depth 2
+qwen3.5-9b-mtp                 primary fast,        ctx 16384 / draft 2
+qwen3.8-27b-ymq-xs-ti-mtp      primary general 27B, ctx 8192  / draft 1
+qwen3.8-27b-hauhaucs-mtp       specialist alternative, ctx 8192 / draft 2
 ```
 
-`qwen3.6-35b-a3b-mtp` is retired: stock 8K/full-GPU baseline crossed the hard memory floor before a
-useful MTP run. Do not rerun the same configuration.
+`qwen3.6-27b-mtp` is retired from active discovery as superseded but retains positive historical
+qualification in source-only `graveyard.toml`. `qwen3.6-35b-a3b-mtp` remains retired for the stock
+8K/full-GPU memory-fit failure. Use exact IDs for 27B MTP models; ambiguous 27B aliases are removed.
 
 Current workflow:
 
@@ -370,9 +370,9 @@ Residency policy:
   restore the captured set; restoration failure must influence final success;
 - `bc250-compare-mtp`: drain-only specialist isolation and intentionally leave Ollama cold afterward.
 
-Broad MTP qualification is closed. Only run targeted follow-up if a concrete release decision
-requires Qwen3.5 depth-2 confirmation, a same-package HauhauCS/YMQ comparison, or YMQ-specific
-promotion tuning.
+Broad MTP qualification is closed. The symmetric three-repeat YMQ depth-1 confirmation remains
+optional evidence only; do not reopen the campaign without a materially new product/runtime/hardware
+question.
 
 ---
 
@@ -519,8 +519,9 @@ Safe-power in 1.8:
 - missing/failed TCP inspection fails safe by deferring;
 - final system power action is requested non-blocking only after all guards pass.
 
-Do not enable unattended automatic poweroff until exact-2.1 tests prove interactive defer, Pi
-forced-command behavior, idle allow, real S5 WOL and post-wake readiness/restoration.
+For exact 2.2, first prove interactive SSH defer and the corrected 40-CU return-code boundary.
+Before unattended automatic poweroff is actually enabled, additionally prove the configured companion
+path if used, idle allow, real S5/WOL and post-wake readiness/restoration.
 
 ---
 
@@ -541,20 +542,20 @@ Evidence rules:
 - historical startup AMDGPU/HPD warnings are not automatically new campaign faults; compare against
   the campaign's bounded kernel/device-error window.
 
-Current exact-1.7 full revalidation is the newest whole-appliance qualification. 2.1 requires its own
+Current exact-1.7 full revalidation is the newest whole-appliance qualification. 2.2 requires its own
 installed-device evidence.
 
 ---
 
 # 13. Current open gaps and priority order
 
-## P0 — exact-2.1 changed-boundary hardware checks
+## P0 — exact-2.2 changed-boundary hardware checks
 
 The source release carries 1.8 power/40-CU fixes that have not yet been proven on installed package
 bytes. Keep the first device pass narrow:
 
 ```text
-1. build/install exact 0.11.3-2.1; capture NEVRA + artifact SHA
+1. build/install exact 0.11.3-2.2; capture NEVRA + artifact SHA
 2. run the normal verifier
 3. interactive SSH request-shutdown -> DEFER, with no shutdown broadcast/session loss
 4. bc250-40cu status + verify -> healthy live 40/40 and rc=0 with persistent mode disabled
@@ -563,7 +564,7 @@ bytes. Keep the first device pass narrow:
 If the Pi companion will be deployed, additionally prove companion-only control plus a deliberate
 second-admin-SSH defer. If unattended S5/WOL will be enabled, prove one idle S5 -> WOL -> HTTP :80
 readiness cycle first. Model lifecycle, backup restore and destructive pruning are useful product/support
-acceptance work, but they are not automatic 2.1 release gates.
+acceptance work, but they are not automatic 2.2 release gates.
 
 ## P1 — real-office RAG acceptance
 
@@ -581,7 +582,8 @@ Exercise documented `bc250-code` modes and verify exclusive-mode restoration.
 
 ## P2/P3 — optional MTP follow-up
 
-Only targeted confirmation tied to an actual default/promotion decision.
+No broad campaign. Run only a targeted check if a future runtime/model/hardware change creates a
+new package decision; YMQ depth-1 repeat symmetry is optional, not a current gate.
 
 ## P3 — secondary operations
 
@@ -669,10 +671,10 @@ Main integration owns final promotion, release metadata and cross-stream policy.
 > evidence as authoritative over handovers. Read `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
 > `development/VALIDATION-MATRIX.md`, `development/TESTING-STRATEGY.md`,
 > `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source is
-> `0.11.3-2.1`; exact installed `0.11.3-1.7` is the newest fully revalidated device baseline, so do not
-> relabel it as 2.1. GitHub owns RPM builds, workstation owns Ruff/developer linting, and BC-250 owns
+> `0.11.3-2.2`; exact installed `0.11.3-1.7` is the newest fully revalidated device baseline, so do not
+> relabel it as 2.2. GitHub owns RPM builds, workstation owns Ruff/developer linting, and BC-250 owns
 > hardware/runtime qualification. Preserve verified GGUFs, keep destructive operations explicit,
-> fail closed on ambiguous state, and use one bounded hardware batch at a time. The immediate device
-> priority is exact-2.1 support/power qualification: SSH defer, healthy 40-CU rc=0, no-download model
-> lifecycle smoke, restricted Pi control with second-SSH blocking, backup restore, then idle S5/WOL and
-> final restoration. Only after that return to real-office RAG and other product-quality work.
+> fail closed on ambiguous state, and use one bounded hardware batch at a time. First prove only the
+> still-unqualified inherited safety boundaries: interactive SSH shutdown defer and healthy 40-CU
+> rc=0. Pi/S5/WOL, restore, live pruning and model lifecycle are separate acceptance work when those
+> features are actually being enabled or changed. Then return to real-office RAG and other product work.

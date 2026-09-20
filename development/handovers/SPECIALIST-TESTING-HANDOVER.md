@@ -36,7 +36,7 @@ retest conditions from existing decisions:
 
 - **support / maintenance / power:** read `docs/MAINTENANCE.md`,
   `docs/MAINTENANCE-CONTRACT.md`, `cmd/maintenance/maintenance.sh` and `safe-power.sh`. Current highest
-  hardware priority is a narrow exact-2.1 changed-boundary pass: interactive SSH defer and healthy
+  hardware priority is a narrow exact-2.2 changed-boundary pass: interactive SSH defer and healthy
   40-CU rc=0. Add Pi forced-command/second-SSH and one idle S5→WOL→HTTP readiness cycle only when
   those optional power features are being enabled. No-download model lifecycle and backup restore are
   separate bounded support acceptance, not automatic release gates. Evaluate operator UX as well as
@@ -60,10 +60,11 @@ retest conditions from existing decisions:
   final content and reasoning contamination. Product-path evidence must exercise actual documented
   `bc250-code` modes, not only the canonical benchmark.
 - **MTP:** use `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp` and
-  `bc250-compare-mtp`. Broad qualification is closed. Active qualified entries are Qwen3.5 9B,
-  Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B; 35B-A3B is a retired memory-fit failure.
-  Direct runs drain and restore Ollama residency; comparison uses drain-only isolation. Only reopen
-  targeted work for an actual depth/default/promotion decision.
+  `bc250-compare-mtp`. Broad qualification is closed. Active policy is Qwen3.5 9B 16K/d2 as primary
+  fast, YMQ Qwen3.8 27B 8K/d1 as primary general 27B, and HauhauCS Qwen3.8 27B 8K/d2 as specialist
+  alternative. Qwen3.6 27B is retired as superseded; 35B-A3B is retired for memory fit. Direct runs
+  drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
+  new runtime/model/hardware or product question.
 
 ## Required specialist handoff
 
