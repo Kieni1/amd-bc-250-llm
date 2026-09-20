@@ -42,7 +42,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-2.1 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
+The current 0.11.3-2.2 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
 must be behind one default-No gate, local maintenance and Pi integration remain independent,
 and selected setup must be checked rather than assumed successful. Post-install guidance should
 point at a small set of next commands plus the installed documentation/config/state/evidence paths;
@@ -104,7 +104,7 @@ added after much of the older hardware evidence.
 Exact installed 0.11.3-1.7 is now the newest whole-appliance baseline: guided install/core
 verification 54/0/0, Open WebUI baseline APPLIED + VERIFIED, and v4.2
 infrastructure/restoration PASS, FULL coverage and quality 8/8. Preserve that evidence as exact 1.7;
-do not relabel it as current 2.1.
+do not relabel it as current 2.2.
 
 The following exact-1.7 support campaign passed read-only health, normal<->agent transitions,
 deliberate degraded detection/recovery, verified local backups and pruning dry-run, then exposed a
@@ -113,22 +113,19 @@ the wrong fixed `ss` columns. It also exposed healthy live 40/40 status/verify r
 persistent boot activation was intentionally disabled. Release 1.8 fixed those source defects and added an exact forced-companion SSH exception rather
 than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
 
-After exact 2.1 is built/installed, use this bounded order:
+After exact 2.2 is built/installed, run the two still-unqualified changed-boundary checks first:
 
 ```text
 interactive SSH safe-power defer (no broadcast/session loss)
 healthy live 40/40 status + verify return rc=0 with persistent mode disabled
-companion forced-command: own SSH may be ignored; deliberate second SSH must defer
-fresh backup restore/rollback boundary
-idle safe-power allow
-real powered-off/S5 WOL -> HTTP readiness -> final verifier/restoration
-live upload deletion only as a separately reviewed operation
 ```
 
-Do not enable unattended night poweroff until that sequence is clean. The model unregister/re-apply
-support blocks should use privileged file existence/stat checks below protected `/var/lib` and must
-continue to avoid `refresh` or `remove` when the purpose is lifecycle testing without re-downloading
-GGUFs.
+Inspect that evidence before continuing. Companion forced-command, idle S5/WOL, backup restore and
+live upload deletion are separate acceptance work and become mandatory only when those optional
+features are about to be enabled or their boundary changed. Do not turn them into automatic gates
+for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the
+model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and
+avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
 The current harness v4.2 includes the actual package-owned production translation roles
 and remains the milestone whole-appliance gate.
@@ -333,44 +330,25 @@ question open.
 
 ### Lane G — MTP / speculative decoding
 
-Broad MTP qualification is complete enough for the package. Under the reviewed external llama.cpp
-Vulkan runtime, Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B all have
-passing BC-250 same-target baseline/MTP evidence with deterministic quality parity and complete
-safety/restoration evidence. The stock Qwen3.6 35B-A3B 8192-context/full-GPU configuration is a
-confirmed fit failure before MTP inference and remains retired from the active catalog.
-
-Preserve the evidence distinction:
-
-- the first long Phase-2 sweep accidentally repeated catalog defaults and is repeatability/noise-floor
-  evidence only;
-- typical repeated-default throughput CV was about 0.01–0.19%; sub-percent differences should not
-  drive package defaults;
-- the corrected canary proved requested draft depth reaches the emitted llama-server configuration;
-- the corrected 1/2/3/4 sweep completed cleanly on all three original passers.
-
-Current package conclusions:
+Broad MTP qualification is closed for the current BC-250/runtime combination. The package now
+encodes the final selection directly in the existing disabled/download-only MTP catalog:
 
 ```text
-qwen3.5-9b-mtp             keep packaged depth 3 for now; depth 2 is the strongest exploratory candidate
-qwen3.6-27b-mtp            keep depth 2
-qwen3.8-27b-hauhaucs-mtp   keep depth 2
-qwen3.8-27b-ymq-xs-ti-mtp  qualified at depth 2; further tuning is optional only if promotion is contemplated
+qwen3.5-9b-mtp             primary fast,        ctx 16384 / draft 2
+qwen3.8-27b-ymq-xs-ti-mtp  primary general 27B, ctx 8192  / draft 1
+qwen3.8-27b-hauhaucs-mtp   specialist alternative, ctx 8192 / draft 2
 ```
 
-Only run more MTP work to answer a concrete unresolved question:
+`qwen3.6-27b-mtp` is retired from active discovery because optimized Qwen3.8 choices now provide
+better absolute throughput, memory margin and completion efficiency; its positive historical
+qualification remains preserved in the source-only graveyard. The stock Qwen3.6 35B-A3B fit
+failure remains retired unchanged.
 
-1. **Qwen3.5 depth-2 confirmation** — only if changing the package default matters. Use 256/1024
-   budgets, 3 performance repeats and 2 quality repeats, with only draft depth changed.
-2. **Current-package HauhauCS comparator** — only if rigorous YMQ-vs-HauhauCS memory/performance
-   comparison is needed.
-3. **YMQ depth optimization** — only if YMQ is intended to become a preferred package model.
-
-Do not reopen the full four-depth sweep. Do not add more MTP framework unless new hardware evidence
-shows a concrete measurement or lifecycle defect. `bc250-compare-mtp` remains the same-target evidence
-harness; `bc250-run-mtp [--no-mtp] ID` remains the manual diagnostic path. Both paths drain all
-reachable Ollama residency before llama.cpp starts. Direct operator runs restore the captured set on
-exit; qualification/comparison uses `drain-only` and deliberately leaves Ollama cold. Performance and
-semantic quality remain separate lanes, and MTP stays separate from support/WOL/power testing.
+Do not run another broad MTP campaign for this release. A three-repeat YMQ depth-1 confirmation is
+optional only if future policy demands symmetric confirmation for every default promotion.
+`bc250-compare-mtp` remains the same-target evidence harness and `bc250-run-mtp [--no-mtp] ID` the
+manual diagnostic path. Direct runs restore captured Ollama residency; comparison uses drain-only
+isolation. Add framework only if new hardware evidence exposes a concrete lifecycle/measurement gap.
 
 ## 7. Routine revalidation vs specialist campaigns
 
@@ -445,6 +423,7 @@ Deterministic source coverage must preserve these newly observed contracts:
 - Category `all` and selection `all` stay distinct. Destructive omission never means all.
 - Prune arithmetic remains byte-precise; B/KiB/MiB/GiB is display-only operator UX.
 
-The current 2.1 source owns the next hardware qualification; 1.8 remains the source release where these fixes were introduced. Do not accept real idle shutdown or enable an
-unattended timer until public SSH defer, companion-only exemption, second-SSH defer and restore
-boundaries are proven on-device.
+The current 2.2 source owns the next hardware qualification; 1.8 remains the source release where
+these fixes were introduced. First prove public SSH defer and healthy 40-CU return-code behavior.
+Companion-only exemption, second-SSH defer and real idle S5/WOL are conditional acceptance gates
+before unattended power behavior is enabled, not automatic gates for every RPM.

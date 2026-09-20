@@ -185,6 +185,12 @@ produces binary and source RPM artifacts. Maintainers can still use `make rpm`
 in a matching Fedora build environment. Third-party governor and CU sources are
 pinned in `packaging/upstreams.toml`.
 
+For repeated local builds, `make clean` keeps the verified `sources/` cache; use
+`make clean-sources` only when an upstream refresh is actually wanted. `scripts/ci-local.sh`
+defaults to Podman `--pull=missing` and accepts `BC250_BUILD_IMAGE` /
+`BC250_BUILD_PULL_POLICY` overrides, so a maintainer can use a prebuilt Fedora builder image
+without changing appliance/runtime code. Source integrity checks still run during the normal build.
+
 Repository groups:
 
 - `cmd/`: host commands, services and timers;
