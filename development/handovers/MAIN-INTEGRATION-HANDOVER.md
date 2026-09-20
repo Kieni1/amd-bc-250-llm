@@ -26,16 +26,28 @@ Current source release:
 
 ```text
 VERSION       0.11.3
-RPM Release   2.3%{?dist}
-NVR           bc250-llm-server-0.11.3-2.3
+RPM Release   2.4%{?dist}
+NVR           bc250-llm-server-0.11.3-2.4
 ```
 
-`0.11.3-2.3` is the current operations/UX source release. It carries the settled 2.2 RAG/MTP
-policy forward and makes only bounded operations changes: actionable operator-overlay recovery,
-separate local-maintenance/companion installer choices, clearer topology/status/verifier output,
-`bc250-agent-mode normal`, swap-directory mode consistency, clearer DRY_RUN/timer output, expected Tika-143 restart handling, and BC-250-compatible 40-CU reboot invocation. Production Open WebUI roles,
-service topology, hard memory floor, governor/CU policy, unattended-power defaults and GGUF
-provenance rules are unchanged. MTP remains standalone, disabled/download-only and opt-in.
+`0.11.3-2.4` is the current source release. Exact installed 2.3 has now device-confirmed the
+targeted operations fixes from the previous release: clean RPM verification, topology/status/verifier
+UX, idempotent normal convergence, baseline-aware identity restore, Tika restart semantics, the
+supported reboot path, healthy live 40/40 and final authenticated 54/0/0. A separate authenticated
+Open WebUI investigation found HTTP/task/curated-role/translation/RAG behavior healthy but exposed
+three product-state ownership gaps. 2.4 therefore contains two bounded follow-ups: patch the pinned CU
+live manager's interactive CPU-core-unlock reboot prompt to `/usr/sbin/reboot`, and extend the existing
+Open WebUI desired-state path so Arena is off, implementation models remain active but hidden, and
+persisted local/offline/upload policy is converged and drift-checked. Production model choices,
+service topology, hard memory floor, governor/CU policy, unattended-power defaults and GGUF provenance
+rules are unchanged. MTP remains standalone, disabled/download-only and opt-in.
+
+The consolidated exact-2.3 Open WebUI investigation also isolated three pinned-v0.11.3
+OpenAI-style adapter limitations: root `max_tokens` is not a reliable Ollama cap, reasoning-token
+usage can report zero despite reasoning content, and length termination can surface as
+`finish_reason=stop`. 2.4 documents that boundary and keeps package-owned hard caps on nested
+`options.num_predict`; it does not vendor-patch Open WebUI for an external API contract the appliance
+does not currently advertise.
 
 The release incorporates defects found during exact installed `0.11.3-1.7` support testing:
 
@@ -59,21 +71,42 @@ The release incorporates defects found during exact installed `0.11.3-1.7` suppo
   reached the low-memory boundary. It keeps the same model identity and verified GGUF, so applying
   the new definition does not require a source re-download.
 
-Current 2.3 source is closed and source-validated. Final deterministic results are recorded in
-`PATCHNOTE-0.11.3-2.3.md`; RPM/SRPM build and installed-2.3 acceptance remain separate external
-gates. Do not inherit 2.2 hardware evidence as 2.3 qualification.
+Exact 2.3 is now device-qualified for the targeted operations surfaces recorded in
+`development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md`. Do not rewrite
+those observations as 2.4 qualification. Current 2.4 is source-validated and frozen, but has not yet been RPM-built or installed.
 
-Current 2.3 source closure evidence:
+Current 2.4 source evidence:
 
 ```text
-repository/RPM preflight   PASS
-deterministic tests        439/439 PASS (split modules; monolithic runner hit execution window)
-bash -n                    64/64 PASS
-Python compileall          PASS
-Ruff / ShellCheck          unavailable; not claimed
-RPM/SRPM build             NOT RUN
-exact-2.3 device evidence  PENDING
+release metadata              0.11.3-2.4
+repository/RPM preflight      PASS
+deterministic tests           447 / 447 PASS (split modules)
+bash -n                       64 / 64 PASS
+Python compileall             PASS
+RPM/SRPM build                NOT RUN
+exact-2.4 device evidence     NOT RUN
 ```
+
+Exact installed `0.11.3-2.3.fc44.x86_64` targeted operations acceptance has now demonstrated:
+
+```text
+rpm -V after convergence           PASS / clean
+swap runtime directory             root:root 0750
+status/verifier/recovery UX        PASS
+bc250-agent-mode normal            PASS / idempotent
+DRY_RUN/timer presentation         PASS
+Tika routine restart               PASS / no false failed result
+identity restore                   PASS with baseline FK=142, new FK=0
+supported sudo reboot              PASS / appliance reconstructed
+live CU routing                    40/40 healthy
+failed units                       0
+final authenticated bc250-verify   54 ok / 0 warn / 0 fail
+```
+
+One remaining installed-package source issue was found: the pinned upstream CU live manager still
+had a reachable interactive CPU-core-unlock branch that called `systemctl reboot`. 2.4 patches only
+that upstream call through the existing RPM-prep patch. The known-bad invocation should not be
+deliberately reproduced.
 
 Exact installed `0.11.3-2.2.fc44.x86_64` operations testing has now demonstrated:
 
@@ -131,11 +164,13 @@ runtime health. Real idle S5/WOL, Pi forced-command shutdown and live pruning re
 follow-up work. See `development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md`
 and the exact-2.2 operations records:
 `development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md` and
-`development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md`.
+`development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md`, plus exact-2.3 targeted acceptance in
+`development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md` and
+`development/model-runs/2026-09-20-installed-0.11.3-2.3-openwebui-investigation.md`.
 
-**Immediate evidence boundary:** exact 2.2 now has bounded operations evidence but not a full
-whole-appliance revalidation. Current 2.3 is source-validated but is not hardware-qualified until it is built and installed. Exact-1.7
-remains the newest full revalidation baseline; do not transfer either older evidence class to 2.3.
+**Immediate evidence boundary:** exact 2.3 now has targeted operations acceptance but not a full
+whole-appliance revalidation. Exact 1.7 remains the newest full revalidation baseline. Current 2.4
+is WIP/source-only; do not transfer either older evidence class to 2.4.
 
 ---
 
@@ -295,8 +330,12 @@ Tika         4.0.0-full
 ```
 
 Open WebUI desired state is package-owned. A meaningful authenticated status compares providers,
-task/embedding/RAG settings, package Function source/metadata/activation, model-role mappings and
-filter attachments. `Desired-state drift: none` is intended to be substantive, not cosmetic.
+task/embedding/RAG settings, persisted local/offline application policy, upload limits/extensions,
+package Function source/metadata/activation, model-role mappings/filter attachments and package-owned
+hidden metadata for implementation models. Arena is package-owned OFF. The five production bases and
+dedicated task model remain active internally but hidden from the ordinary selector so the normal
+product surface is the curated office roles. `Desired-state drift: none` is intended to be substantive,
+not cosmetic; unrelated operator-owned models/users/prompts/knowledge remain additive and untouched.
 
 ---
 
@@ -585,37 +624,46 @@ Evidence rules:
 - historical startup AMDGPU/HPD warnings are not automatically new campaign faults; compare against
   the campaign's bounded kernel/device-error window.
 
-Current exact-1.7 full revalidation remains the newest full whole-appliance qualification. Exact 2.2
-now has successful bounded operations evidence, including the previously unqualified SSH-safe-power
-and live-40-CU return-code boundaries. Current 2.3 still requires its own installed-device evidence.
+Exact installed 1.7 remains the newest full whole-appliance revalidation. Exact installed 2.3 now has
+strong targeted operations acceptance covering the fixes introduced through 2.3: clean RPM
+verification, swap mode consistency, topology/status/verifier UX, normal convergence, baseline-aware
+identity restore, Tika restart semantics, supported reboot reconstruction, healthy live 40/40 and a
+final authenticated 54/0/0 verifier. This is not a full 2.3 whole-appliance revalidation and must not
+be described as one.
 
----
+Current 2.4 is a source-validated release for the pinned live-manager reboot call plus the Open WebUI
+desired-state/product-surface ownership fixes and documented pinned-v0.11.3 OpenAI-style adapter
+boundary. It has no installed-device qualification yet.
 
 # 13. Current open gaps and priority order
 
-## P0 — build/install 2.3 and run affected-boundary acceptance
+## P0 — bounded exact-2.4 package/device acceptance
 
-Exact 2.2 already proved the inherited SSH-safe-power and healthy-live-40-CU fixes. After 2.3
-is built and installed, keep device acceptance focused on the behavior changed in 2.3:
+Exact 2.3 has closed its targeted operations acceptance. Do not replay that campaign for 2.4. The source release contains two narrow implementation changes plus one documented compatibility boundary:
 
 ```text
-1. build/install exact 0.11.3-2.3; capture NEVRA + artifact SHA
-2. rerun bc250-install and sudo rpm -V; package-owned swap directory must not drift
-3. inspect bc250-status overall/runtime-mode output in normal, agent and deliberate degraded states
-4. verify agent-mode normal/leave convergence and concise transition messages
-5. verify degraded bc250-verify reports root failure plus dependent unavailable/skipped checks
-6. verify unauthenticated --summary reports the skipped authenticated check explicitly
-7. repeat identity restore on the real DB with its known pre-existing FK baseline; no new violations may be introduced and unchanged baseline rows must not force rollback
-8. repeat active-SSH request-shutdown as a regression smoke; it must still defer without session loss
-9. restart Tika once; expected SIGTERM/143 must no longer create a false failed-unit event
-10. inspect package-controlled 40-CU reboot command selection and perform one supported `sudo reboot` recovery cycle; do not deliberately rerun the known-bad `sudo systemctl reboot` path
+1. keep the pinned live-manager source/revision unchanged and patch only its interactive CPU-unlock
+   reboot branch from systemctl reboot to /usr/sbin/reboot;
+2. preserve the interactive prompt and upstream --yes non-rebooting behavior;
+3. use the existing authenticated Open WebUI desired-state APIs to persist Arena=off, local/offline
+   policy and upload limits/extensions;
+4. keep the five production bases plus task model active but hidden via package-owned model metadata;
+5. document the pinned Open WebUI v0.11.3 root-max_tokens/reasoning-token/finish-reason adapter limits
+   rather than vendor-patching an unsupported external API contract;
+6. source validation is complete; do not invent browser/hardware source tests;
+7. when 2.4 is built, inspect the installed live-manager path and run one bounded authenticated OWUI
+   apply/status/UI/drift-reconvergence acceptance batch;
+8. do not deliberately invoke the known-bad systemctl reboot path.
 ```
 
-If the Pi companion will be deployed, additionally prove companion-only control plus a deliberate
-second-admin-SSH defer. If unattended S5/WOL will be enabled, prove one idle S5 -> WOL -> HTTP :80
-readiness cycle first. Model lifecycle and destructive pruning remain useful product/support acceptance work rather than
-automatic release gates. Configuration restore has now passed on exact 2.2; identity restore requires
-one exact-2.3 retest because its baseline-aware FK validation changed in 2.3.
+The exact-2.3 OWUI investigation already proved HTTP readiness, task routing, curated role smokes,
+translation 8/8 and bounded RAG 3/3. The 2.4 acceptance question is therefore product-state ownership,
+not another model/RAG campaign: Arena absent, implementation models active-but-hidden, package-owned
+persisted policy clean, one harmless drift detected/reconverged, and final status/verifier clean.
+
+Backup restore is already accepted for configuration on exact 2.2 and identity on exact 2.3. Live
+pruning, Pi forced-command shutdown, idle S5/WOL and full whole-appliance revalidation remain
+conditional rather than automatic release gates.
 
 ## P1 — real-office RAG acceptance
 
@@ -639,8 +687,6 @@ new package decision; YMQ depth-1 repeat symmetry is optional, not a current gat
 ## P3 — secondary operations
 
 Backup export, dedupe performance and other convenience work after power/availability is qualified.
-
----
 
 # 14. Durable anti-repeat guardrails
 
@@ -672,22 +718,20 @@ Canonical detailed rationale belongs in `development/DECISIONS.md`.
 
 # 15. Known gaps that are still current
 
-- exact installed 2.3 operations acceptance is pending; exact 2.2 already proved active-SSH defer,
-  healthy live 40/40 with persistent activation disabled, topology transitions/degraded recovery and
-  final authenticated 54/0/0 verification;
-- identity restore needs exact-2.3 acceptance with the known pre-existing FK baseline; configuration
-  restore and automatic rollback have already been demonstrated on exact 2.2;
-- Pi forced-command shutdown, idle S5/WOL and live prune have not yet been accepted on current source;
+- exact 2.4 is WIP/source-only and has not been RPM-built or installed;
+- the pinned CU live-manager CPU-core-unlock reboot patch still needs package-build applicability and
+  installed-path confirmation before it can be called exact-2.4 device-qualified;
+- Pi forced-command shutdown, idle S5/WOL and live prune remain conditional acceptance work;
 - no-download unregister/re-apply support smoke still needs a corrected privileged file-existence
-  wrapper after the exact-1.7 test harness skipped it;
-- real-office RAG acceptance across messy PDFs/tables/multilingual/OCR-derived content remains open;
+  wrapper if that lifecycle boundary becomes relevant again;
+- real-office RAG acceptance across messy PDFs/tables/multilingual/OCR-derived content remains open,
+  but RAG model selection itself is closed;
 - actual `bc250-code` product workflows need broader bounded device evidence;
 - arbitrary same-name out-of-band Ollama registration drift is not fully detected/proven;
-- current XFS dedupe implementation still deserves a performance run when storage optimization is a
-  real priority;
-- broader daily-use/human acceptance is still required before v1.0.
-
----
+- current XFS dedupe implementation still deserves a performance run only when storage optimization
+  becomes a real product priority;
+- exact 1.7 remains the newest full whole-appliance revalidation baseline; exact 2.3 provides strong
+  targeted operations acceptance, not a full revalidation replacement.
 
 # 16. Specialist-chat organization
 

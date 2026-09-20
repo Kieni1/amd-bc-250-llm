@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.11.3-2.3
+# BC-250 support / operations handover — current source release 0.11.3-2.4
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,12 +10,15 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.11.3
-RPM Release:  2.3
-NVR:          bc250-llm-server-0.11.3-2.3
+RPM Release:  2.4
+NVR:          bc250-llm-server-0.11.3-2.4
 ```
 
-2.3 is the current operations/UX source release on top of the settled 2.2 model policy. It does not change
-RAG, MTP, translation, Pi architecture, production models, or 40-CU policy. The inherited safety fixes are:
+2.4 is the current source-validated release after exact installed 2.3 targeted acceptance. It does not
+change RAG/MTP/translation/Pi architecture, production model choices, or 40-CU routing policy. Its two
+new product-facing changes are the pinned live-manager CPU-core-unlock reboot-path correction and an
+extension of the existing Open WebUI desired-state contract: Arena off, implementation models
+active-but-hidden, and persisted local/offline/upload policy owned by apply/status. The inherited safety fixes are:
 
 - safe-power local/peer endpoint parsing;
 - a narrow forced-command Pi self-SSH exemption while preserving second-SSH/UI/Ollama deferral;
@@ -35,6 +38,25 @@ quality              8/8 PASS
 restoration          PASS
 coverage             FULL
 ```
+
+Exact installed `0.11.3-2.3.fc44.x86_64` has passed the targeted 2.3 operations acceptance:
+
+```text
+rpm -V / swap 0750                 PASS
+status/verifier/degraded recovery   PASS
+agent-mode normal                   PASS / idempotent
+maintenance DRY_RUN/timer UX        PASS
+Tika routine restart                PASS / Result=success
+identity restore                    PASS; baseline FK=142, new FK=0
+supported sudo reboot               PASS; appliance reconstructed
+live 40-CU routing                  40/40 healthy
+failed units                        0
+final authenticated verifier        54 / 0 / 0
+```
+
+Installed-package inspection found one remaining reachable `systemctl reboot` inside the pinned CU
+live manager's interactive CPU-core-unlock prompt. Current 2.4 patches that upstream path through
+the existing RPM-prep patch to `/usr/sbin/reboot`. Do not rerun the known-bad invocation to prove it.
 
 Exact installed `0.11.3-2.2.fc44.x86_64` has now closed the two highest-priority inherited
 operations boundaries and accumulated further bounded support evidence:
@@ -59,12 +81,12 @@ systemctl reboot compatibility path DEVICE DEFECT; do not use for package-contro
 final authenticated bc250-verify   54 ok / 0 warn / 0 fail
 ```
 
-The identity restore itself exposed one real validation defect: the live Open WebUI DB already had
-142 unrelated `foreign_key_check` rows while still passing `integrity_check`; the selective identity
-restore rejected those unchanged baseline rows and rolled back. Current 2.3 fixes the validator
-to compare canonical pre/post FK sets and reject only newly introduced violations while keeping
-`integrity_check` strict. Real idle S5/WOL, Pi forced-command shutdown and live prune remain
-conditional acceptance work.
+The exact-2.2 identity restore attempt exposed one real validation defect: the live Open WebUI DB
+already had 142 unrelated `foreign_key_check` rows while still passing `integrity_check`; the old
+validator rejected those unchanged baseline rows and rolled back. Exact installed 2.3 proves the
+corrected canonical pre/post FK-set comparison in real use: baseline=142, new=0, strict integrity OK,
+restore RC=0 and final appliance health clean. Real idle S5/WOL, Pi forced-command shutdown and live
+prune remain conditional acceptance work.
 
 Evidence files:
 
@@ -73,10 +95,13 @@ development/model-runs/2026-09-20-installed-0.11.3-1.7-revalidation.md
 development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md
 development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md
 development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md
+development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md
+development/model-runs/2026-09-20-installed-0.11.3-2.3-openwebui-investigation.md
 ```
 
-The 2.2 Batch 04–09 records are operator-supplied summarized device evidence; their raw archives were not
-independently inspected in the main integration environment. Do not overstate their provenance.
+The 2.2 Batch 04–09 records, exact-2.3 targeted acceptance and exact-2.3 Open WebUI investigation are
+operator-supplied summarized device evidence; their raw archives were not independently inspected in
+the main integration environment. Do not overstate their provenance.
 
 ## Validation ownership
 
@@ -86,11 +111,13 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 2.3 implementation is recorded in `PATCHNOTE-0.11.3-2.3.md`. RPM/SRPM build and exact
-installed-2.3 execution remain pending. Exact 2.2 hardware observations above are the immediate
-regression baseline for the changed operations surfaces.
+Current 2.4 implementation is recorded in `PATCHNOTE-0.11.3-2.4.md`. Source closure is complete: RPM
+preflight PASS, deterministic tests 447/447 PASS in split modules, bash -n 64/64 and Python compileall
+PASS. RPM/SRPM build and exact-installed-2.4 execution remain pending. Exact 2.3 targeted acceptance is the immediate regression
+baseline for the changed operations surfaces; exact 2.2 remains useful historical evidence for
+service restarts, external LAN isolation and earlier backup/config-restore work.
 
-Source closure for 2.3 is complete: repository/RPM preflight PASS, deterministic suite **439/439
+Source closure for 2.4 is complete: repository/RPM preflight PASS, deterministic suite **447/447
 PASS** in split modules, `bash -n` **64/64 PASS**, and Python compileall PASS. The monolithic
 validation invocation exceeded this environment's execution window while tests were still passing;
 the same suite was completed by module rather than weakening or dropping coverage. Ruff/ShellCheck
@@ -243,32 +270,37 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate exact-2.3 acceptance after build/install
+## Immediate 2.4 source/device follow-up
 
-Run one bounded batch at a time. Exact 2.2 already proved active-SSH defer, healthy live 40/40
-with persistent activation disabled, normal↔agent recovery, degraded detection/recovery and final
-authenticated 54/0/0 verification. After exact 2.3 is installed, focus on changed surfaces:
+Do not replay the closed 2.3 targeted campaign. Exact 2.3 already proved clean package verification,
+status/verifier/degraded recovery UX, normal convergence, maintenance presentation, Tika restart,
+identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. It also
+proved the Open WebUI application path healthy while identifying three desired-state/product-surface
+gaps now addressed in 2.4 source.
+
+For current 2.4:
 
 ```text
-1. build/install exact 0.11.3-2.3; record NEVRA + artifact SHA
-2. rerun sudo bc250-install, then sudo rpm -V bc250-llm-server; swap-directory mode must stay clean
-3. review bc250-status Overall/Runtime mode in normal, agent and deliberate degraded states
-4. exercise bc250-agent-mode normal from normal and degraded states; convergence must be idempotent
-5. verify degraded bc250-verify shows the lane root failure and dependent SKIP/unavailable checks
-6. verify unauthenticated bc250-verify --summary reports skipped authenticated checks explicitly
-7. repeat identity restore against the known baseline FK violations; unchanged/subset baseline rows must not fail, and no new violation may appear
-8. active SSH request-shutdown -> DEFER regression smoke; no shutdown broadcast/session loss
-9. restart tika.service once; expected SIGTERM/143 must not leave a false failed-result event
-10. confirm package-controlled persistent 40-CU reboot paths use /usr/sbin/reboot, then perform one supported real reboot and confirm SSH, office HTTP, timers, firewalld, normal topology, live 40/40 and final verifier recovery
-11. confirm live 40/40 rc=0 remains unchanged
+1. confirm the existing live-manager RPM-prep patch replaces only the interactive CPU-unlock
+   `systemctl reboot` with `/usr/sbin/reboot`;
+2. preserve the upstream interactive prompt and `--yes` non-rebooting behavior;
+3. converge Open WebUI Arena=off, active-but-hidden production/task implementation models, persisted
+   local/offline policy and upload limits/extensions through the existing supported APIs;
+4. run focused deterministic Open WebUI + packaging/patch tests;
+5. when a 2.4 RPM is built, inspect installed `/usr/bin/bc250-cu-live-manager` and do not deliberately
+   invoke the known-bad reboot path;
+6. run one bounded authenticated OWUI acceptance: HTTP health, verbose desired-state clean, Arena
+   absent, six implementation models active-but-hidden, curated roles/task routing intact, one harmless
+   persisted drift detected then reconverged, final status/verifier clean and no credential leakage.
 ```
 
-Only add feature-specific checks when the feature is going into use: Pi companion requires
-companion-only allow plus second-admin-SSH defer; unattended power requires one idle S5 -> WOL ->
-HTTP :80 readiness cycle. Backup restore, unregister/apply lifecycle and destructive pruning remain
-bounded support/product acceptance tasks rather than mandatory checks after every release.
+Do not turn step 6 into another model tournament. Exact 2.3 already passed Standard/Higher Quality/
+Deep Reasoning smokes, translation 8/8 and bounded RAG 3/3. CORS and model-order/default preferences
+remain optional observations unless a concrete product defect appears.
 
-Do not enable unattended night shutdown before the applicable SSH/companion/S5 guards are proven.
+Feature-specific destructive checks stay conditional: Pi companion requires companion-only allow plus
+second-admin-SSH defer before deployment; unattended power requires one idle S5 -> WOL -> HTTP :80
+readiness cycle; live pruning remains unnecessary while DRY_RUN is the operational policy.
 
 ## UX acceptance during support tests
 
