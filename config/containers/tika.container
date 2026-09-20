@@ -16,6 +16,9 @@ NoNewPrivileges=true
 DropCapability=all
 
 [Service]
+# Podman/Tika exits 143 on the expected SIGTERM stop path used by systemd restart.
+# Treat only that expected termination status as successful; other failures remain failures.
+SuccessExitStatus=143
 Restart=always
 RestartSec=5
 

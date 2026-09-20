@@ -620,6 +620,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn(values["BC250_OPEN_WEBUI_IMAGE_DIGEST"], quadlet)
         self.assertIn(values["BC250_TIKA_VERSION"], tika)
         self.assertIn(values["BC250_TIKA_IMAGE_DIGEST"], tika)
+        self.assertIn("SuccessExitStatus=143", tika)
+        self.assertNotIn("SuccessExitStatus=0 143", tika)
         upstreams = (ROOT / "packaging/upstreams.toml").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         live_manager_commit = "a929085d791f126ce76a60eb609610820fb08066"
