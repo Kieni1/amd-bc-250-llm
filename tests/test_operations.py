@@ -153,6 +153,11 @@ class CuHelperTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, "")
 
+    def test_40cu_reboot_paths_use_bc250_compatible_reboot_invocation(self) -> None:
+        source = (ROOT / "cmd/system/40cu-module.sh").read_text(encoding="utf-8")
+        self.assertNotIn("systemctl reboot", source)
+        self.assertEqual(source.count("/usr/sbin/reboot"), 2)
+
     def test_normal_mode_message_describes_agent_as_intentionally_inactive(self) -> None:
         source = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
         self.assertIn("Agent:     intentionally inactive", source)

@@ -463,7 +463,7 @@ EOF_CONF
   verify_initramfs "$target"
   info "40-CU mode is configured. Rebooting to load the prepared module..."
   sleep 2
-  systemctl reboot
+  /usr/sbin/reboot
 }
 
 do_disable() {
@@ -472,7 +472,7 @@ do_disable() {
   refresh_initramfs
   info "40-CU mode is disabled. Rebooting with patched module mode 0..."
   sleep 2
-  systemctl reboot
+  /usr/sbin/reboot
 }
 
 do_restore() {
