@@ -8,7 +8,8 @@ The package uses two layers deliberately:
 1. the Quadlet supplies safe bootstrap/offline defaults so a new database starts
    locally and conservatively;
 2. `/usr/share/bc250-llm-server/openwebui/desired-state.json` is the single
-   package authority for persisted providers/task/embedding/RAG settings;
+   package authority for persisted providers/task/embedding/RAG settings and the
+   small local/offline application-policy subset owned by the appliance;
    `bc250-openwebui-setup` applies it through supported administrator APIs.
 
 The package never edits `webui.db` directly and does not store the administrator
@@ -59,8 +60,14 @@ environment variables:
 - normal Open WebUI Ollama providers: main `11434` and task `11435`;
 - the local task model and conservative task-generation toggles;
 - the RAG/Tika baseline and dedicated embedding endpoint `11437`;
+- persisted upload limits/extension allowlist;
+- local/offline application policy: Arena off, cloud OpenAI/direct connections,
+  code execution/interpreter, memories and community sharing off;
 - package-owned BC-250 workspace model presets from the versioned
-  `config/openwebui/models.json` payload.
+  `config/openwebui/models.json` payload;
+- active-but-hidden workspace overrides for the five production implementation
+  models and the dedicated task model, so normal users choose curated office
+  roles while presets/tasks retain access to their base models.
 
 The operator owns users, credentials, custom prompts, unrelated workspace models,
 knowledge bases, UI preferences, permissions and any intentional settings that
@@ -79,8 +86,10 @@ sync and therefore does not remove operator-created models.
 | Tika | `http://tika:9998` | private document extraction |
 
 The task connection must be enabled because Open WebUI resolves its local task
-model from the active provider model map. Its model allowlist prevents task
-models from becoming the ordinary user-facing production fleet.
+model from the active provider model map. Provider allowlisting limits what each
+lane exposes; a package-owned hidden model override separately suppresses the
+task implementation model from the normal selector while leaving it active for
+title/tag work.
 
 Agent/coding mode is exclusive. Use:
 
@@ -90,8 +99,28 @@ sudo bc250-agent-mode enter
 sudo bc250-agent-mode leave
 ```
 
-Entering agent mode stops main/task/embedding; leaving restores normal mode.
+Entering agent mode stops main/task/embedding; leaving restores normal mode. Open WebUI itself
+remains reachable, and its persisted catalogue may continue to list normal office roles while those
+backends are intentionally unavailable. Return with `sudo bc250-agent-mode normal`; do not dynamically
+rewrite Open WebUI provider/model state merely to mirror the temporary exclusive topology.
 This is intentional on the BC-250 unified-memory pool.
+
+## OpenAI-style API compatibility boundary
+
+Open WebUI's `/api/chat/completions` endpoint is used internally by package product-path tests, but
+the pinned Open WebUI v0.11.3 OpenAI-style adapter is **not** an advertised external BC-250 API
+contract. Exact-device attribution found three upstream adapter limitations for Ollama-backed models:
+
+- a root OpenAI-style `max_tokens=N` is not reliably propagated as an Ollama generation cap;
+- `completion_tokens_details.reasoning_tokens` can be `0` even when `reasoning_content` is present;
+- an Ollama `done_reason=length` can be surfaced as OpenAI-style `finish_reason=stop`.
+
+Package-owned callers that require a hard Ollama generation cap use the native nested
+`options.num_predict` path. Package preset `params.max_tokens` is a separate Open WebUI model-parameter
+path and remains part of the device-tested translation contract. Do not infer absence of reasoning or
+absence of truncation from the two affected OpenAI-style metadata fields on v0.11.3. If a future
+release wants to advertise this endpoint as an external compatibility surface, first qualify a newer
+Open WebUI version or carry a deliberately reviewed adapter patch with dedicated device tests.
 
 ## Package model presets
 
@@ -180,9 +209,15 @@ values and does not choose among candidates.
 
 ## Local/offline application baseline
 
-The Quadlet keeps authentication enabled and disables cloud OpenAI access,
-community sharing, direct browser connections, code execution/interpreter,
-memories and frontmatter-driven pip installation. It also sets:
+The Quadlet keeps authentication enabled and supplies conservative bootstrap
+defaults. `bc250-openwebui-setup` also owns the persisted values for Arena,
+cloud OpenAI access, community sharing, direct browser connections, code
+execution/interpreter and memories so a later database-side admin change is
+visible as drift and is reconverged on apply. Arena is disabled rather than
+maintaining a separate Arena model pool because the product surface is the
+curated office-role set.
+
+The Quadlet additionally sets:
 
 ```text
 OFFLINE_MODE=true

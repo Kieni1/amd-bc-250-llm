@@ -37,8 +37,9 @@ Environment=ENABLE_MEMORIES=false
 Environment=ENABLE_DIRECT_CONNECTIONS=false
 Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
 
-# Runtime-only upload/residency controls that are not part of the persisted
-# Open WebUI application desired-state API contract.
+# Bootstrap defaults for upload/residency controls. Upload limits/extensions are
+# also converged as persisted Open WebUI desired state; the environment values
+# keep a fresh database conservative before the authenticated setup pass.
 Environment=RAG_FILE_MAX_SIZE=128
 Environment=RAG_FILE_MAX_COUNT=20
 Environment="RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub"

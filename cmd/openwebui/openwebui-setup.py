@@ -38,7 +38,10 @@ def load_desired_state() -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"cannot read Open WebUI desired state {path}: {exc}") from exc
-    if not isinstance(data, dict) or any(not isinstance(data.get(k), dict) for k in ("ollama", "task", "embedding", "rag")):
+    if not isinstance(data, dict) or any(
+        not isinstance(data.get(k), dict)
+        for k in ("ollama", "task", "embedding", "rag", "application")
+    ):
         raise RuntimeError(f"invalid Open WebUI desired state: {path}")
     return data
 
@@ -192,6 +195,10 @@ def desired_rag() -> dict[str, Any]:
     return dict(DESIRED["rag"])
 
 
+def desired_application() -> dict[str, Any]:
+    return dict(DESIRED["application"])
+
+
 def authenticate(client: Client, action: str) -> str:
     if action == "create":
         print("Create the first Open WebUI administrator. Credentials are sent only to local Open WebUI and are not stored by this package.")
@@ -252,6 +259,8 @@ def apply_functions(client: Client) -> None:
 def apply(client: Client) -> None:
     client.post("/ollama/config/update", desired_ollama())
 
+    client.post("/api/v1/configs/import", {"config": desired_application()})
+
     task = client.get("/api/v1/tasks/config")
     if not isinstance(task, dict):
         raise ApiError("task config response was not an object")
@@ -265,6 +274,12 @@ def apply(client: Client) -> None:
 
 def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def values_match(key: str, current: Any, expected: Any) -> bool:
+    if key == "ALLOWED_FILE_EXTENSIONS" and isinstance(current, list) and isinstance(expected, list):
+        return sorted(str(value) for value in current) == sorted(str(value) for value in expected)
+    return canonical(current) == canonical(expected)
 
 
 def require_object(value: Any, label: str) -> dict[str, Any]:
@@ -282,6 +297,7 @@ def require_list(value: Any, label: str) -> list[Any]:
 def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str, Any]]) -> None:
     print()
     print("Package-owned Open WebUI roles")
+    hidden_models: list[str] = []
     for model in models:
         if not bool(model.get("is_active")):
             continue
@@ -289,6 +305,9 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
         base = str(model.get("base_model_id") or "unknown")
         params = model.get("params") if isinstance(model.get("params"), dict) else {}
         meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
+        if bool(meta.get("hidden")):
+            hidden_models.append(model_id)
+            continue
         filters = meta.get("filterIds") if isinstance(meta.get("filterIds"), list) else []
         extras: list[str] = []
         if "max_tokens" in params:
@@ -301,6 +320,12 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
             extras.append("filters=" + ",".join(str(value) for value in filters))
         suffix = f"  ({'; '.join(extras)})" if extras else ""
         print(f"  {model_id:<36} -> {base}{suffix}")
+
+    if hidden_models:
+        print()
+        print("Hidden implementation models")
+        for model_id in hidden_models:
+            print(f"  {model_id}")
 
     print()
     print("Task and RAG")
@@ -336,6 +361,13 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
         return 0
 
     problems: list[str] = []
+    application = require_object(
+        client.get("/api/v1/configs/export"), "application config"
+    )
+    for key, value in desired_application().items():
+        if not values_match(key, application.get(key), value):
+            problems.append(f"Application config differs: {key}")
+
     ollama = require_object(client.get("/ollama/config"), "Ollama config")
     desired = desired_ollama()
     for key in ("ENABLE_OLLAMA_API", "OLLAMA_BASE_URLS", "OLLAMA_API_CONFIGS"):
@@ -365,7 +397,7 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
 
     rag = require_object(client.get("/api/v1/retrieval/config"), "RAG config")
     for key, value in desired_rag().items():
-        if canonical(rag.get(key)) != canonical(value):
+        if not values_match(key, rag.get(key), value):
             problems.append(f"RAG config differs: {key}")
 
     exported_functions = require_list(
@@ -405,7 +437,7 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
                 problems.append(f"Package model preset differs: {model_id}.{key}")
         desired_meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
         live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
-        for key in ("description", "tags", "filterIds", "defaultFilterIds"):
+        for key in ("description", "tags", "filterIds", "defaultFilterIds", "hidden"):
             if key in desired_meta and canonical(live_meta.get(key)) != canonical(desired_meta[key]):
                 problems.append(f"Package model preset differs: {model_id}.meta.{key}")
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import importlib.util
 import io
@@ -23,6 +24,7 @@ SPEC.loader.exec_module(OPENWEBUI)
 class FakeClient:
     def __init__(self, overrides: dict[str, Any] | None = None):
         self.responses = {
+            "/api/v1/configs/export": OPENWEBUI.desired_application(),
             "/ollama/config": OPENWEBUI.desired_ollama(),
             "/api/v1/tasks/config": OPENWEBUI.desired_task(),
             "/api/v1/retrieval/embedding": OPENWEBUI.desired_embedding(),
@@ -69,7 +71,118 @@ class FakeFunctionApplyClient:
         raise AssertionError(f"unexpected POST {path}")
 
 
+class FakeApplyClient:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, Any | None]] = []
+
+    def get(self, path: str) -> Any:
+        self.calls.append(("GET", path, None))
+        if path == "/api/v1/tasks/config":
+            return {"unrelated": "preserved"}
+        if path == "/api/v1/functions/list":
+            return OPENWEBUI.load_functions()
+        raise AssertionError(f"unexpected GET {path}")
+
+    def post(self, path: str, payload: Any) -> Any:
+        self.calls.append(("POST", path, payload))
+        if path.startswith("/api/v1/functions/id/") and path.endswith("/update"):
+            desired = OPENWEBUI.load_functions()[0]
+            return {
+                "id": desired["id"],
+                "name": desired["name"],
+                "is_active": desired["is_active"],
+                "is_global": desired["is_global"],
+            }
+        return {}
+
+
 class OpenWebUIStatusTests(unittest.TestCase):
+
+    def test_apply_owns_persisted_application_policy_and_hidden_models(self) -> None:
+        client = FakeApplyClient()
+        OPENWEBUI.apply(client)
+        posts = [(path, payload) for method, path, payload in client.calls if method == "POST"]
+        app_payload = next(payload for path, payload in posts if path == "/api/v1/configs/import")
+        self.assertEqual(app_payload, {"config": OPENWEBUI.desired_application()})
+        self.assertFalse(app_payload["config"]["evaluation.arena.enable"])
+
+        model_payload = next(payload for path, payload in posts if path == "/api/v1/models/import")
+        hidden = {
+            model["id"]: model
+            for model in model_payload["models"]
+            if (model.get("meta") or {}).get("hidden") is True
+        }
+        self.assertEqual(
+            set(hidden),
+            {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
+                "prod-qwen35-9b-unsloth-q6-k:latest",
+                "prod-gpt-oss20b-ggml-org-mxfp4:latest",
+                "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
+            },
+        )
+        self.assertTrue(all(model["is_active"] for model in hidden.values()))
+        self.assertTrue(all(model["base_model_id"] is None for model in hidden.values()))
+
+    def test_persisted_application_policy_matches_local_offline_contract(self) -> None:
+        self.assertEqual(
+            OPENWEBUI.desired_application(),
+            {
+                "evaluation.arena.enable": False,
+                "openai.enable": False,
+                "direct.enable": False,
+                "code_execution.enable": False,
+                "code_interpreter.enable": False,
+                "memories.enable": False,
+                "ui.enable_community_sharing": False,
+            },
+        )
+
+    def test_rag_owns_persisted_upload_policy(self) -> None:
+        rag = OPENWEBUI.desired_rag()
+        self.assertEqual(rag["FILE_MAX_SIZE"], 128)
+        self.assertEqual(rag["FILE_MAX_COUNT"], 20)
+        self.assertIn("pdf", rag["ALLOWED_FILE_EXTENSIONS"])
+        self.assertIn("docx", rag["ALLOWED_FILE_EXTENSIONS"])
+
+    def test_status_detects_arena_drift(self) -> None:
+        current = OPENWEBUI.desired_application()
+        current["evaluation.arena.enable"] = True
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(
+                OPENWEBUI.status(FakeClient({"/api/v1/configs/export": current}), True),
+                2,
+            )
+        self.assertIn(
+            "Application config differs: evaluation.arena.enable", output.getvalue()
+        )
+
+    def test_status_detects_hidden_model_drift(self) -> None:
+        models = copy.deepcopy(OPENWEBUI.load_models()["models"])
+        target = next(
+            model
+            for model in models
+            if model["id"] == "task-lfm25-1.2b-instruct-liquidai-q6-k:latest"
+        )
+        target["meta"]["hidden"] = False
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(
+                OPENWEBUI.status(FakeClient({"/api/v1/models/export": models}), True),
+                2,
+            )
+        self.assertIn(".meta.hidden", output.getvalue())
+
+    def test_allowed_extension_order_does_not_create_false_drift(self) -> None:
+        rag = OPENWEBUI.desired_rag()
+        rag["ALLOWED_FILE_EXTENSIONS"] = list(reversed(rag["ALLOWED_FILE_EXTENSIONS"]))
+        self.assertEqual(
+            OPENWEBUI.status(FakeClient({"/api/v1/retrieval/config": rag}), True),
+            0,
+        )
 
     def test_apply_functions_creates_and_activates_package_filter(self) -> None:
         client = FakeFunctionApplyClient()
@@ -101,6 +214,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertIn("filters=bc250_translation_direction", text)
         self.assertIn("Task and RAG", text)
         self.assertIn("Package-owned functions", text)
+        self.assertIn("Hidden implementation models", text)
+        self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k:latest", text)
 
     def test_status_rejects_non_object_config_responses(self) -> None:
         endpoints = (
