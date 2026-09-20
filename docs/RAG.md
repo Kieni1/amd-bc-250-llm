@@ -194,7 +194,7 @@ mapping in its metadata and waits for real Open WebUI HTTP readiness before begi
 as separate checks. The evaluator uses boundary-aware deterministic matching rather than
 naïve substrings or an LLM judge; fixtures can enumerate semantic alternatives and numeric
 equivalence explicitly. Short numeric/identifier answers may be recorded as
-`language_not_measurable` without becoming a language failure. Its canonical summary also
+`language_measurable=false` / `language_not_measurable=true` without becoming a language failure. Its canonical summary also
 checks the exact expected case set so missing, duplicate or unexpected rows are structural
 failures rather than misleading quality results.
 
@@ -205,11 +205,12 @@ The completed 2026-09-19 BC-250 campaign keeps **Office – Documents**
 document/RAG answer role for the current 16 GiB profile. This is primarily a sustained-residency
 resource decision, not an answer-quality rejection of Qwen 9B.
 
-| Evidence | Gemma E4B | Qwen 9B | Qwen3.8 27B IQ3_XXS (16K test) |
+| Evidence | Gemma E4B | Qwen 9B | Qwen3.8 27B IQ3_XXS (16K partial) |
 |---|---:|---:|---:|
-| Broad/direct RAG quality | ~95/96 effective | ~93/96 effective | 5/5 before safety abort |
+| Broad/direct RAG overall | 94/96 | 93/96 | 5/5 before resource abort; not comparable to full corpus |
+| Fact / citation | 95/96 / 95/96 | 95/96 / 94/96 | 5/5 cited cases only |
 | Authenticated Open WebUI short path | 36/36 pass | 36/36 pass | not qualified |
-| Long-residency result | 42/42 pass | safety-aborted after a few subruns | safety-aborted during sustained RAG |
+| Long-residency result | 42/42 pass | safety-aborted during third subrun | safety-aborted during sustained RAG |
 | Minimum / near-abort MemAvailable | ~2766 MiB | ~338 / ~426 MiB | ~280 MiB before abort |
 | Production status | document/RAG default | separate higher-quality office role | experimental only; 16K rejected |
 
@@ -219,17 +220,13 @@ reproduced the earlier sustained-memory-pressure behavior on the actual Open Web
 The Qwen preset remains useful for its separate higher-quality general-office role; it should not
 silently replace Gemma as the long-lived document/RAG default on this memory profile.
 
-The long-residency campaign used a 512 MiB MemAvailable safety-abort threshold. That experiment
-threshold is not the same as the whole-appliance revalidation hard floor. The later Qwen3.8 27B
-IQ3_XXS 16K experiment answered its first five RAG cases correctly with citations, but MemAvailable
-progressively fell from roughly 3.17 GiB after early residency to ~0.67 GiB after case 5 and ~0.28
-GiB before the next request, where the safety harness aborted. Unloading recovered roughly 13.8 GiB.
-This is sufficient to reject the 16K configuration on the current 16 GiB profile, not to claim a
-broad quality result from five cases. The packaged model keeps the same verified GGUF/model identity
-and is now bounded to 8K for further explicit experimentation; it is not a production RAG candidate.
-Historical raw scorer counts from the broad finalist campaign contained known evaluator false
-negatives; the effective values above reflect manual adjudication and must not be hard-coded into
-fixtures as expected scores.
+The long-residency campaign used a 512 MiB MemAvailable safety-abort threshold; that campaign margin
+is not the whole-appliance hard floor. The later Qwen3.8 27B IQ3_XXS 16K experiment passed its first
+five cited RAG cases but then hit the sustained-memory safety gate, so 16K is rejected on this 16 GiB
+profile. The same verified model/GGUF identity is bounded to 8K for explicit experimentation only and
+is not a production RAG candidate. The corrected deterministic rescoring above supersedes the earlier
+approximate/manual-adjudication summary; full measurements and provenance remain in
+`development/model-runs/2026-09-20-rag-qualification-conclusion.md`.
 
 ## 4. Authoritative document tree and language policy
 
