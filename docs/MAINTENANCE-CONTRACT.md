@@ -80,8 +80,14 @@ sudo bc250-maintenance companion status
 ```
 
 The package prints the exact forced-command `authorized_keys` template. The
-power-control key is scoped to
-`restrict,command="/usr/bin/sudo /usr/bin/bc250-maintenance request-shutdown"`.
+power-control key is scoped to the package-internal
+`restrict,command="/usr/bin/sudo /usr/bin/bc250-maintenance request-shutdown-companion"`
+path. That path preserves the OpenSSH `SSH_CONNECTION` tuple and exempts only that
+one authenticated control connection from the protected-TCP test; the tuple must be found exactly
+once or the request fails closed. The companion path still uses the configured safe-power ports,
+power action and WOL requirement, and any second SSH session still defers shutdown. Operators continue to use the public
+`sudo bc250-maintenance request-shutdown` command. Do not use the internal companion
+command as a general bypass.
 
 Private keys remain on the external companion. If the Pi has a stable address,
 the operator may additionally add an OpenSSH `from="PI_IP"` restriction. Pi-side

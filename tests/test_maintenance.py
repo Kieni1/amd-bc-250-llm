@@ -44,6 +44,10 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("HTTP http://<BC250_HOST>/", contract)
         self.assertIn("3000", contract)
         self.assertIn("not part of the companion readiness contract", contract)
+        self.assertIn('request-shutdown-companion', companion)
+        self.assertIn('env_keep += "SSH_CONNECTION"', companion)
+        self.assertIn('request-shutdown-companion', contract)
+        self.assertIn('exempts only that', contract)
         self.assertNotIn('command="/usr/bin/sudo /usr/bin/systemctl poweroff"', companion)
 
     def test_backup_export_is_optional_read_only_and_publishes_group_rights(self) -> None:
@@ -343,9 +347,320 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("REQUIRE_WOL", source)
         self.assertIn("protected TCP activity", source)
         self.assertIn("local or remote endpoint", source)
+        self.assertIn('local_endpoint="${fields[${#fields[@]}-2]}"', source)
+        self.assertIn('systemctl --no-block "$NIGHT_POWER_ACTION"', source)
         self.assertNotIn(
             "safe-suspend.sh", (ROOT / "packaging/install-manifest.tsv").read_text()
         )
+
+    def test_safe_power_defers_when_tcp_inspection_fails(self) -> None:
+        script = ROOT / "cmd/maintenance/safe-power.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            calls = tmp / "systemctl.calls"
+            (tmp / "ss").write_text("#!/usr/bin/env bash\nexit 2\n", encoding="utf-8")
+            (tmp / "logger").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' \"$*\" >> \"$SYSTEMCTL_CALLS\"\n"
+                "[[ ${1-} == is-active ]] && exit 1\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            for helper in tmp.iterdir():
+                helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "SYSTEMCTL_CALLS": str(calls),
+                    "REQUIRE_WOL": "0",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("TCP activity inspection failed", result.stdout)
+            self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
+
+    def test_safe_power_detects_local_ssh_endpoint_and_defers(self) -> None:
+        script = ROOT / "cmd/maintenance/safe-power.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            calls = tmp / "systemctl.calls"
+            (tmp / "ss").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\n' '0 36 192.168.1.191:22 192.168.1.118:39396'\n",
+                encoding="utf-8",
+            )
+            (tmp / "logger").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' \"$*\" >> \"$SYSTEMCTL_CALLS\"\n"
+                "[[ ${1-} == is-active ]] && exit 1\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            for helper in tmp.iterdir():
+                helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "SYSTEMCTL_CALLS": str(calls),
+                    "REQUIRE_WOL": "0",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Deferring poweroff: protected TCP activity", result.stdout)
+            self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
+
+    def test_safe_power_keeps_conservative_remote_https_deferral(self) -> None:
+        script = ROOT / "cmd/maintenance/safe-power.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            calls = tmp / "systemctl.calls"
+            (tmp / "ss").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\n' '0 0 192.168.1.191:45000 203.0.113.10:443'\n",
+                encoding="utf-8",
+            )
+            (tmp / "logger").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' \"$*\" >> \"$SYSTEMCTL_CALLS\"\n"
+                "[[ ${1-} == is-active ]] && exit 1\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            for helper in tmp.iterdir():
+                helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "SYSTEMCTL_CALLS": str(calls),
+                    "REQUIRE_WOL": "0",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Deferring poweroff: protected TCP activity", result.stdout)
+            self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
+
+    def test_safe_power_exempts_only_companion_control_ssh(self) -> None:
+        script = ROOT / "cmd/maintenance/safe-power.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            calls = tmp / "systemctl.calls"
+            (tmp / "ss").write_text(
+                "#!/usr/bin/env bash\nprintf '%s\n' '0 36 192.168.1.191:22 192.168.1.118:39396'\n",
+                encoding="utf-8",
+            )
+            (tmp / "logger").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' \"$*\" >> \"$SYSTEMCTL_CALLS\"\n"
+                "[[ ${1-} == is-active ]] && exit 1\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            for helper in tmp.iterdir():
+                helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "SYSTEMCTL_CALLS": str(calls),
+                    "REQUIRE_WOL": "0",
+                    "BC250_SAFE_POWER_EXEMPT_SSH": "192.168.1.118 39396 192.168.1.191 22",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Ignoring only the authenticated companion control SSH", result.stdout)
+            self.assertIn("requesting poweroff", result.stdout)
+            self.assertIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
+
+    def test_safe_power_companion_exemption_does_not_hide_second_ssh_session(self) -> None:
+        script = ROOT / "cmd/maintenance/safe-power.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            calls = tmp / "systemctl.calls"
+            (tmp / "ss").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' '0 0 192.168.1.191:22 192.168.1.118:39396'\n"
+                "printf '%s\n' '0 0 192.168.1.191:22 192.168.1.120:40100'\n",
+                encoding="utf-8",
+            )
+            (tmp / "logger").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' \"$*\" >> \"$SYSTEMCTL_CALLS\"\n"
+                "[[ ${1-} == is-active ]] && exit 1\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            for helper in tmp.iterdir():
+                helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "SYSTEMCTL_CALLS": str(calls),
+                    "REQUIRE_WOL": "0",
+                    "BC250_SAFE_POWER_EXEMPT_SSH": "192.168.1.118 39396 192.168.1.191 22",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("Deferring poweroff: protected TCP activity", result.stdout)
+            self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
+
+    def test_safe_power_refuses_missing_companion_connection(self) -> None:
+        script = ROOT / "cmd/maintenance/safe-power.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            calls = tmp / "systemctl.calls"
+            (tmp / "ss").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "logger").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            (tmp / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' \"$*\" >> \"$SYSTEMCTL_CALLS\"\n"
+                "[[ ${1-} == is-active ]] && exit 1\n"
+                "exit 0\n",
+                encoding="utf-8",
+            )
+            for helper in tmp.iterdir():
+                helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{tmp}:{os.environ['PATH']}",
+                    "SYSTEMCTL_CALLS": str(calls),
+                    "REQUIRE_WOL": "0",
+                    "BC250_SAFE_POWER_EXEMPT_SSH": "192.168.1.118 39396 192.168.1.191 22",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("was not found exactly once", result.stdout)
+            self.assertNotIn("--no-block poweroff", calls.read_text(encoding="utf-8"))
+
+    def test_companion_shutdown_keeps_configured_safe_power_policy(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            config = tmp / "maintenance.env"
+            helper = tmp / "safe-power"
+            config.write_text(
+                'SAFE_POWER_PORTS="22 8443"\n'
+                "NIGHT_POWER_ACTION=suspend\n"
+                "REQUIRE_WOL=1\n"
+                "OWUI_API_KEY=must-not-be-forwarded\n",
+                encoding="utf-8",
+            )
+            helper.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf 'ports=%s\naction=%s\nrequire_wol=%s\nssh=%s\napi_key=%s\n' \"${SAFE_POWER_PORTS-}\" \"${NIGHT_POWER_ACTION-}\" \"${REQUIRE_WOL-}\" \"${BC250_SAFE_POWER_EXEMPT_SSH-}\" \"${OWUI_API_KEY-}\"\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script), "request-shutdown-companion"],
+                env=os.environ | {
+                    "BC250_MAINTENANCE_CONFIG": str(config),
+                    "BC250_SAFE_POWER_HELPER": str(helper),
+                    "SUDO_USER": "bc250-power-control",
+                    "SSH_CONNECTION": "192.168.1.118 39396 192.168.1.191 22",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("ports=22 8443", result.stdout)
+            self.assertIn("action=suspend", result.stdout)
+            self.assertIn("require_wol=1", result.stdout)
+            self.assertIn("ssh=192.168.1.118 39396 192.168.1.191 22", result.stdout)
+            self.assertIn("api_key=", result.stdout)
+            self.assertNotIn("must-not-be-forwarded", result.stdout)
+
+    def test_companion_shutdown_rejects_non_companion_sudo_user(self) -> None:
+        script = ROOT / "cmd/maintenance/maintenance.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            helper = Path(temporary) / "safe-power"
+            helper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            helper.chmod(0o755)
+            result = subprocess.run(
+                [str(script), "request-shutdown-companion"],
+                env=os.environ | {
+                    "BC250_SAFE_POWER_HELPER": str(helper),
+                    "SUDO_USER": "llm_admin",
+                    "SSH_CONNECTION": "192.168.1.118 39396 192.168.1.191 22",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("restricted to the forced SSH power-control identity", result.stdout)
+
+    def test_maintenance_status_labels_disabled_configured_policies(self) -> None:
+        source = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
+        self.assertIn("Warm-up:            disabled (configured model=", source)
+        self.assertIn("Night power:        disabled (configured action=", source)
+
+    def test_pruning_reports_small_files_without_rounding_to_zero_mib(self) -> None:
+        script = ROOT / "cmd/maintenance/prune-uploads.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            fake = Path(temporary) / "curl"
+            fake.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env bash
+                    printf '%s\n' '[{"id":"tiny-old","created_at":"2026-01-01T00:00:00Z","meta":{"size":512}}]'
+                    """
+                ),
+                encoding="utf-8",
+            )
+            fake.chmod(0o755)
+            result = subprocess.run(
+                [str(script)],
+                env=os.environ | {
+                    "PATH": f"{temporary}:{os.environ['PATH']}",
+                    "OWUI_API_KEY": "test-key",
+                    "MAX_AGE_DAYS": "1",
+                    "MAX_TOTAL_GB": "0",
+                    "DRY_RUN": "1",
+                },
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertIn("known_total=512B", result.stdout)
+            self.assertIn("id=tiny-old size=512B", result.stdout)
+            self.assertNotIn("size=0MiB", result.stdout)
 
     def test_pruning_disables_zero_rules_and_preserves_uncertain_metadata(self) -> None:
         script = ROOT / "cmd/maintenance/prune-uploads.sh"

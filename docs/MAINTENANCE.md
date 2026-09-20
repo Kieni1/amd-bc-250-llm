@@ -156,13 +156,21 @@ sudo bc250-maintenance contract
 printed by the helper. It does **not** open `3000` or Ollama ports
 `11434`-`11437`.
 
-The stable remote request is:
+The stable operator request is:
 
 ```bash
 sudo bc250-maintenance request-shutdown
 ```
 
-That request runs the same package safe-power policy as the night timer. The TCP guard is
+When invoked interactively over SSH, that SSH session is protected activity and the request
+should defer. The restricted Pi key printed by `companion enable` instead uses the package
+internal forced-command path, which exempts **only that authenticated control SSH connection**
+from the same safe-power decision. The internal path still applies the configured protected ports,
+power action and Wake-on-LAN requirement from `maintenance.env`; it does not use a weaker default
+policy. If the authenticated tuple cannot be found exactly once in the live TCP table, the power
+request fails closed. Any second SSH session still blocks shutdown.
+
+The request runs the same package safe-power policy as the night timer. The TCP guard is
 deliberately conservative: if either endpoint of an established connection matches a protected
 port (SSH/UI/Ollama plus configured web ports), automatic poweroff is deferred. This includes
 selected outbound activity such as HTTPS downloads; the log therefore reports **protected TCP

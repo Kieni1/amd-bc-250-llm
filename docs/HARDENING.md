@@ -38,8 +38,11 @@ forced-command `authorized_keys` scope rather than a general Pi shell key. If th
 Pi address is stable, adding `from="PI_IP"` to that key is an additional useful
 restriction.
 
-The Pi should request `sudo bc250-maintenance request-shutdown`; do not grant it
-raw `systemctl poweroff`, because that bypasses the package's active-session and
+The Pi should use the package-generated forced-command key, which invokes the
+internal `request-shutdown-companion` path and exempts only that authenticated
+control SSH connection. Human operators use `sudo bc250-maintenance request-shutdown`,
+and their SSH session remains protected activity. Do not grant the Pi raw
+`systemctl poweroff`, because that bypasses the package's active-session and
 maintenance checks. See [`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
 
 ## Check Ollama exposure

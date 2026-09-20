@@ -23,6 +23,24 @@ for port in $SAFE_POWER_PORTS; do
 done
 port_regex="$(tr ' ' '|' <<<"$SAFE_POWER_PORTS")"
 
+# Internal companion requests may exempt exactly the SSH connection that carries
+# the forced command. Any other protected connection must still defer poweroff.
+companion_ssh="${BC250_SAFE_POWER_EXEMPT_SSH:-}"
+companion_client=''
+companion_server=''
+if [[ -n "$companion_ssh" ]]; then
+  read -r companion_client_ip companion_client_port companion_server_ip companion_server_port extra <<< "$companion_ssh"
+  [[ -z "${extra:-}" && -n "${companion_client_ip:-}" && -n "${companion_server_ip:-}" && \
+     "${companion_client_port:-}" =~ ^[0-9]{1,5}$ && "${companion_server_port:-}" =~ ^[0-9]{1,5}$ && \
+     "$companion_client_port" -ge 1 && "$companion_client_port" -le 65535 && \
+     "$companion_server_port" -eq 22 ]] || {
+    log "Refusing power action: invalid companion SSH exemption."
+    exit 1
+  }
+  companion_client="${companion_client_ip}:${companion_client_port}"
+  companion_server="${companion_server_ip}:${companion_server_port}"
+fi
+
 for unit in \
   owui-maintenance@backup-config.service \
   owui-maintenance@backup-users.service \
@@ -34,16 +52,54 @@ for unit in \
   fi
 done
 
-if command -v ss >/dev/null 2>&1; then
-  # Match either endpoint deliberately: inbound appliance sessions and selected
-  # outbound activity (for example HTTPS downloads) both defer automatic poweroff.
-  connections="$(ss -Htn state established | awk -v re=":(${port_regex})$" '
-    $4 ~ re || $5 ~ re {print}
-  ')"
-  if [[ -n "$connections" ]]; then
-    log "Deferring $NIGHT_POWER_ACTION: protected TCP activity detected on a configured local or remote endpoint."
-    exit 0
+if ! command -v ss >/dev/null 2>&1; then
+  log "Deferring $NIGHT_POWER_ACTION: TCP activity inspection is unavailable."
+  exit 0
+fi
+
+if ! ss_output="$(ss -Htn state established)"; then
+  log "Deferring $NIGHT_POWER_ACTION: TCP activity inspection failed."
+  exit 0
+fi
+
+# `ss -Htn` prefixes the endpoints with Recv-Q/Send-Q, so inspect the final
+# two fields instead of assuming fixed endpoint columns. Match both endpoints
+# deliberately: inbound appliance sessions and selected outbound activity both
+# defer safe power.
+connections=''
+companion_matches=0
+while IFS= read -r line; do
+  [[ -n "$line" ]] || continue
+  read -ra fields <<< "$line"
+  ((${#fields[@]} >= 2)) || continue
+  local_endpoint="${fields[${#fields[@]}-2]}"
+  peer_endpoint="${fields[${#fields[@]}-1]}"
+  local_endpoint="${local_endpoint//\[/}"
+  local_endpoint="${local_endpoint//\]/}"
+  peer_endpoint="${peer_endpoint//\[/}"
+  peer_endpoint="${peer_endpoint//\]/}"
+
+  if [[ -n "$companion_ssh" ]] && \
+     { [[ "$local_endpoint" == "$companion_server" && "$peer_endpoint" == "$companion_client" ]] ||
+       [[ "$local_endpoint" == "$companion_client" && "$peer_endpoint" == "$companion_server" ]]; }; then
+    ((companion_matches+=1))
+    continue
   fi
+  if [[ "$local_endpoint" =~ :(${port_regex})$ || "$peer_endpoint" =~ :(${port_regex})$ ]]; then
+    connections+="${line}"$'\n'
+  fi
+done <<< "$ss_output"
+
+if [[ -n "$companion_ssh" ]]; then
+  if ((companion_matches != 1)); then
+    log "Refusing power action: authenticated companion SSH connection was not found exactly once."
+    exit 1
+  fi
+  log "Ignoring only the authenticated companion control SSH connection for this request."
+fi
+if [[ -n "$connections" ]]; then
+  log "Deferring $NIGHT_POWER_ACTION: protected TCP activity detected on a configured local or remote endpoint."
+  exit 0
 fi
 
 if [[ -r /etc/default/bc250-wol && -x /usr/libexec/bc250-llm-server/enable-wol.sh ]]; then
@@ -60,4 +116,7 @@ elif [[ "$REQUIRE_WOL" == 1 ]]; then
 fi
 
 log "No active requests or maintenance jobs; requesting $NIGHT_POWER_ACTION."
-exec systemctl "$NIGHT_POWER_ACTION"
+# Do not block this oneshot service on the system power transaction it starts.
+# Blocking here can let shutdown tear down the caller before systemd completes
+# the decision unit, producing a canceled service despite a valid request.
+systemctl --no-block "$NIGHT_POWER_ACTION"

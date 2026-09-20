@@ -9,6 +9,8 @@ POWER_DROPIN_DIR="${BC250_POWER_DROPIN_DIR:-/etc/systemd/system/bc250-night-shut
 POWER_DROPIN="$POWER_DROPIN_DIR/schedule.conf"
 CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/docs/MAINTENANCE-CONTRACT.md}"
 ACCESS_HELPER="${BC250_MAINTENANCE_ACCESS_HELPER:-/usr/libexec/bc250-llm-server/maintenance-companion.sh}"
+SAFE_POWER_HELPER="${BC250_SAFE_POWER_HELPER:-/usr/libexec/bc250-llm-server/safe-power.sh}"
+POWER_CONTROL_USER="${BC250_POWER_CONTROL_USER:-bc250-power-control}"
 
 BACKUP_TIMERS=(owui-backup-config.timer owui-backup-users.timer)
 OPTIONAL_TIMERS=(owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer)
@@ -434,7 +436,7 @@ backup_summary() {
 }
 
 show_status() {
-  local api_state='not configured'
+  local api_state='not configured' warmup_state='disabled' power_state='disabled'
   if [[ -e "$CONFIG" && ! -r "$CONFIG" ]]; then
     echo "ERROR: maintenance configuration is private; run status with sudo." >&2
     return 1
@@ -444,6 +446,8 @@ show_status() {
     return 0
   }
   [[ "$(get_setting OWUI_API_KEY '')" != REPLACE_WITH_ADMIN_API_KEY && -n "$(get_setting OWUI_API_KEY '')" ]] && api_state=configured
+  if systemctl is-enabled --quiet owui-warmup.timer 2>/dev/null; then warmup_state=enabled; fi
+  if systemctl is-enabled --quiet bc250-night-shutdown.timer 2>/dev/null; then power_state=enabled; fi
 
   echo "BC-250 maintenance status"
   echo
@@ -455,10 +459,20 @@ show_status() {
   printf '  Upload pruning:     age=%sd ceiling=%sGiB dry_run=%s API_key=%s\n' \
     "$(get_setting MAX_AGE_DAYS 90)" "$(get_setting MAX_TOTAL_GB 20)" \
     "$(get_setting DRY_RUN 1)" "$api_state"
-  printf '  Warm-up:            model=%s keep_alive=%s\n' \
-    "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)" \
-    "$(get_setting WARMUP_KEEP_ALIVE 15m)"
-  printf '  Night power action: %s\n' "$(get_setting NIGHT_POWER_ACTION poweroff)"
+  if [[ "$warmup_state" == enabled ]]; then
+    printf '  Warm-up:            enabled model=%s keep_alive=%s\n' \
+      "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)" \
+      "$(get_setting WARMUP_KEEP_ALIVE 15m)"
+  else
+    printf '  Warm-up:            disabled (configured model=%s keep_alive=%s)\n' \
+      "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)" \
+      "$(get_setting WARMUP_KEEP_ALIVE 15m)"
+  fi
+  if [[ "$power_state" == enabled ]]; then
+    printf '  Night power:        enabled action=%s\n' "$(get_setting NIGHT_POWER_ACTION poweroff)"
+  else
+    printf '  Night power:        disabled (configured action=%s)\n' "$(get_setting NIGHT_POWER_ACTION poweroff)"
+  fi
 
   echo
   echo "Storage overview: sudo bc250-status"
@@ -538,6 +552,35 @@ request_shutdown() {
   run_unit "safe shutdown request" bc250-night-shutdown.service
 }
 
+request_companion_shutdown() {
+  local safe_power_ports night_power_action require_wol
+  require_root
+  [[ "${SUDO_USER:-}" == "$POWER_CONTROL_USER" && -n "${SSH_CONNECTION:-}" ]] || {
+    echo "ERROR: companion shutdown is restricted to the forced SSH power-control identity." >&2
+    return 1
+  }
+  [[ -x "$SAFE_POWER_HELPER" ]] || {
+    echo "ERROR: safe-power helper is missing: $SAFE_POWER_HELPER" >&2
+    return 1
+  }
+
+  # The systemd timer loads these values from maintenance.env. The companion
+  # path calls the same helper directly so it can carry one exact SSH exemption;
+  # copy only the safe-power settings instead of sourcing the private config as
+  # shell code or leaking unrelated values such as the Open WebUI API key.
+  safe_power_ports="$(get_setting SAFE_POWER_PORTS '22 80 443 3000 11434 11435 11436 11437')"
+  night_power_action="$(get_setting NIGHT_POWER_ACTION poweroff)"
+  require_wol="$(get_setting REQUIRE_WOL 0)"
+
+  # Exempt only the authenticated forced-command SSH connection carrying this
+  # request. All other protected TCP activity remains a shutdown deferral.
+  BC250_SAFE_POWER_EXEMPT_SSH="$SSH_CONNECTION" \
+    SAFE_POWER_PORTS="$safe_power_ports" \
+    NIGHT_POWER_ACTION="$night_power_action" \
+    REQUIRE_WOL="$require_wol" \
+    "$SAFE_POWER_HELPER"
+}
+
 clean_cache() {
   local cache
   require_root
@@ -578,6 +621,7 @@ main() {
       case "$2" in status) run_access backup-status ;; enable) run_access backup-enable ;; *) usage >&2; exit 2 ;; esac
       ;;
     request-shutdown) (($# == 1)) || { usage >&2; exit 2; }; request_shutdown ;;
+    request-shutdown-companion) (($# == 1)) || { usage >&2; exit 2; }; request_companion_shutdown ;;
     run) (($# == 2)) || { usage >&2; exit 2; }; run_selected "$2" ;;
     clean-cache) (($# == 1)) || { usage >&2; exit 2; }; clean_cache ;;
     disable) (($# == 1)) || { usage >&2; exit 2; }; disable_all ;;

@@ -22,6 +22,18 @@ now="$(date +%s)"
 max_total_bytes=$(( MAX_TOTAL_GB * 1024 * 1024 * 1024 ))
 cutoff=$(( now - MAX_AGE_DAYS * 86400 ))
 log(){ printf '%s %s\n' "$(date '+%F %T')" "$*"; }
+human_bytes() {
+  local bytes="$1"
+  if ((bytes < 1024)); then
+    printf '%dB' "$bytes"
+  elif ((bytes < 1024 * 1024)); then
+    printf '%dKiB' "$(((bytes + 1023) / 1024))"
+  elif ((bytes < 1024 * 1024 * 1024)); then
+    printf '%dMiB' "$(((bytes + 1024 * 1024 - 1) / 1024 / 1024))"
+  else
+    printf '%dGiB' "$(((bytes + 1024 * 1024 * 1024 - 1) / 1024 / 1024 / 1024))"
+  fi
+}
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -148,7 +160,7 @@ done
 age_label="${MAX_AGE_DAYS}d"; ceiling_label="${MAX_TOTAL_GB}GiB"
 ((MAX_AGE_DAYS > 0)) || age_label=disabled
 ((MAX_TOTAL_GB > 0)) || ceiling_label=disabled
-log "Files=${#rows[@]} known_total=$((total/1024/1024))MiB ceiling=${ceiling_label} age=${age_label} dry_run=${DRY_RUN}"
+log "Files=${#rows[@]} known_total=$(human_bytes "$total") ceiling=${ceiling_label} age=${age_label} dry_run=${DRY_RUN}"
 if ((unknown_age > 0 || unknown_size > 0)); then
   log "WARNING: preserving uncertain metadata from automatic pruning (unknown_age=${unknown_age} unknown_size=${unknown_size})."
 fi
@@ -157,7 +169,7 @@ deleted=0; freed=0; failures=0
 delete_one(){
   local ts="$1" size="$2" id="$3" reason="$4" age_label="unknown" size_label="unknown"
   ((ts > 0)) && age_label="$(((now-ts)/86400))d"
-  ((size >= 0)) && size_label="$((size/1024/1024))MiB"
+  ((size >= 0)) && size_label="$(human_bytes "$size")"
   if [[ "$DRY_RUN" == 1 ]]; then
     log "WOULD delete [$reason] id=$id size=$size_label age=$age_label"
   elif ! curl --fail --silent --show-error --retry 2 --retry-all-errors \
@@ -196,5 +208,5 @@ if ((MAX_TOTAL_GB > 0)); then
   fi
 fi
 
-log "Done. deleted/planned=$deleted freed/planned=$((freed/1024/1024))MiB remaining/simulated=$((total/1024/1024))MiB failures=$failures"
+log "Done. deleted/planned=$deleted freed/planned=$(human_bytes "$freed") remaining/simulated=$(human_bytes "$total") failures=$failures"
 (( failures == 0 ))
