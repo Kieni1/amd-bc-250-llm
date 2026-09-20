@@ -240,16 +240,18 @@ class RuntimeConvenienceTests(unittest.TestCase):
             env={"PATH": "/usr/bin:/bin"},
         )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("qwen3.6-27b-mtp", result.stdout)
         self.assertIn("qwen3.5-9b-mtp", result.stdout)
         self.assertIn("qwen3.8-27b-hauhaucs-mtp", result.stdout)
         self.assertIn("qwen3.8-27b-ymq-xs-ti-mtp", result.stdout)
+        self.assertNotIn("qwen3.6-27b-mtp", result.stdout)
         self.assertNotIn("qwen3.6-35b-a3b-mtp", result.stdout)
+        self.assertNotIn("qwen36-27b", result.stdout)
+        self.assertNotIn("qwen38-27b", result.stdout)
         self.assertNotIn("set LLAMACPP", result.stdout)
 
     def test_mtp_runner_missing_source_points_to_exact_fetch_before_runtime(self) -> None:
         result = subprocess.run(
-            [str(ROOT / "models/mtp/run-mtp-llamacpp.sh"), "qwen3.6-27b-mtp"],
+            [str(ROOT / "models/mtp/run-mtp-llamacpp.sh"), "qwen3.8-27b-ymq-xs-ti-mtp"],
             text=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -258,7 +260,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "sudo bc250-fetch-mtp qwen3.6-27b-mtp", result.stdout
+            "sudo bc250-fetch-mtp qwen3.8-27b-ymq-xs-ti-mtp", result.stdout
         )
         self.assertNotIn("set LLAMACPP", result.stdout)
 

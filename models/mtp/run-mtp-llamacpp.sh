@@ -41,10 +41,10 @@ Direct operator runs snapshot and drain resident Ollama models before launch, th
 restore the exact pre-run residency set on exit. Qualification/comparison harnesses
 set BC250_MTP_RESIDENCY_POLICY=drain-only and intentionally leave Ollama cold.
 
-Convenience aliases (do not use them in recorded evidence):
+Convenience alias (do not use it in recorded evidence):
   qwen35-9b   -> qwen3.5-9b-mtp
-  qwen36-27b  -> qwen3.6-27b-mtp
-  qwen38-27b  -> qwen3.8-27b-hauhaucs-mtp
+
+Use exact IDs for 27B models so package-policy changes cannot silently retarget an alias.
 
 Available MTP entries:
 USAGE
@@ -71,9 +71,7 @@ if (($#)); then
 fi
 
 case "$choice" in
-  qwen35-9b)  choice=qwen3.5-9b-mtp ;;
-  qwen36-27b) choice=qwen3.6-27b-mtp ;;
-  qwen38-27b) choice=qwen3.8-27b-hauhaucs-mtp ;;
+  qwen35-9b) choice=qwen3.5-9b-mtp ;;
   "") show_usage 2; exit 2 ;;
 esac
 
