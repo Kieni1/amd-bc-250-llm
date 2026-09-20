@@ -42,7 +42,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-1.7 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
+The current 0.11.3-2.1 line carries forward the installer UX boundary introduced in the 0.5/1.1 development work: optional maintenance/Pi work
 must be behind one default-No gate, local maintenance and Pi integration remain independent,
 and selected setup must be checked rather than assumed successful. Post-install guidance should
 point at a small set of next commands plus the installed documentation/config/state/evidence paths;
@@ -101,25 +101,43 @@ state changes. Restore state before moving to another lane.
 This is currently the highest product priority because the Pi/maintenance contract was
 added after much of the older hardware evidence.
 
-Exact 0.11.3-0.4 has now completed the read-only/install/whole-appliance baseline: verifier
-54/0/0 and v4.2 infrastructure/restoration/full coverage PASS with quality 8/8. Preserve that
-artifact as historical evidence for exact 0.4. Current 0.11.3-1.7 has completed the deterministic
-source gate; do not relabel the 0.4 hardware evidence as current. After GitHub builds and the exact
-1.4 RPM is installed, run one exact-source verification/revalidation gate, then continue support
-operations with:
+Exact installed 0.11.3-1.7 is now the newest whole-appliance baseline: guided install/core
+verification 54/0/0, Open WebUI baseline APPLIED + VERIFIED, and v4.2
+infrastructure/restoration PASS, FULL coverage and quality 8/8. Preserve that evidence as exact 1.7;
+do not relabel it as current 2.1.
+
+The following exact-1.7 support campaign passed read-only health, normal<->agent transitions,
+deliberate degraded detection/recovery, verified local backups and pruning dry-run, then exposed a
+P1 safe-power failure: an active interactive SSH session was not detected because the parser checked
+the wrong fixed `ss` columns. It also exposed healthy live 40/40 status/verify returning rc=1 when
+persistent boot activation was intentionally disabled. Release 1.8 fixed those source defects and added an exact forced-companion SSH exception rather
+than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
+
+After exact 2.1 is built/installed, use this bounded order:
 
 ```text
-maintenance contract/status
-companion status
-WOL NIC state
-firewall/listener state
-real powered-off/S5 WOL
-busy safe-shutdown defer
-idle safe-shutdown allow + wake
+interactive SSH safe-power defer (no broadcast/session loss)
+healthy live 40/40 status + verify return rc=0 with persistent mode disabled
+companion forced-command: own SSH may be ignored; deliberate second SSH must defer
+fresh backup restore/rollback boundary
+idle safe-power allow
+real powered-off/S5 WOL -> HTTP readiness -> final verifier/restoration
+live upload deletion only as a separately reviewed operation
 ```
+
+Do not enable unattended night poweroff until that sequence is clean. The model unregister/re-apply
+support blocks should use privileged file existence/stat checks below protected `/var/lib` and must
+continue to avoid `refresh` or `remove` when the purpose is lifecycle testing without re-downloading
+GGUFs.
 
 The current harness v4.2 includes the actual package-owned production translation roles
 and remains the milestone whole-appliance gate.
+
+For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
+acceptance should be one bounded real-office corpus pass (real PDFs/Tika/OCR, tables, multilingual
+and multisource questions, upload/delete/re-upload, one unload/reload and a long resident session),
+not another model zoo or a new benchmark framework. Treat this as product acceptance, not an
+automatic RPM-release gate.
 
 To preserve evidence value while avoiding redundant runtime, v4.2 keeps direct and
 product-path semantic checks distinct, but removes the duplicate generic GPT-OSS edge
@@ -127,9 +145,9 @@ performance pass because the dedicated GPT-OSS/Jina coexistence stage is the str
 resource check. Successful intermediate phases use lightweight checkpoints; full
 snapshots remain at preflight, agent transitions, final restoration and failures.
 
-If clean, next batch is a real powered-off/S5 WOL test. Only after S5 wake succeeds
-should safe shutdown be exercised: first a deliberately busy/defer case, then an idle
-allow case. Backup export is separate and lower priority.
+Power ordering is now evidence-driven: prove the busy/defer guard and companion exception first,
+then allow a real idle poweroff and prove S5 WOL/recovery. Backup export remains separate and lower
+priority; backup restore/rollback is higher-value than export because it validates local recovery.
 
 ### Lane B — benchmark operations
 
@@ -406,3 +424,27 @@ topology or model defaults. Deterministic source coverage must preserve these co
 These are source/unit boundaries. The upcoming support/maintenance device campaign still owns real
 S5 WOL, busy/defer, idle/allow, backup/export, timer and recovery qualification.
 
+
+
+## 2026-09-20 support safety closure for 0.11.3-1.8
+
+Deterministic source coverage must preserve these newly observed contracts:
+
+- `ss -Htn state established` endpoint matching uses the final two fields, not fixed field numbers;
+  an interactive local `:22` connection must defer public `request-shutdown`.
+- The companion path may exempt only the validated OpenSSH `SSH_CONNECTION` tuple belonging to the
+  restricted `bc250-power-control` forced command. Any second SSH session still defers.
+- The final `poweroff`/`suspend` systemd request is non-blocking after guards pass, so the safe-power
+  decision unit can finish cleanly.
+- Live 40/40 routing with persistent boot activation intentionally disabled is healthy and must not
+  inherit rc=1 from an absent persistent-config hint.
+- Unprivileged status must label protected state as protected/unavailable rather than rendering it as
+  zero or absent.
+- Operator overlay files in `/etc/bc250-llm-server/models.d/` that are visible regular files but do
+  not end in `.Modelfile` are configuration errors, not silently ignored input.
+- Category `all` and selection `all` stay distinct. Destructive omission never means all.
+- Prune arithmetic remains byte-precise; B/KiB/MiB/GiB is display-only operator UX.
+
+The current 2.1 source owns the next hardware qualification; 1.8 remains the source release where these fixes were introduced. Do not accept real idle shutdown or enable an
+unattended timer until public SSH defer, companion-only exemption, second-SSH defer and restore
+boundaries are proven on-device.

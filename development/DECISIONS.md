@@ -398,7 +398,7 @@ without new evidence and an explicit policy decision.
 
 ## DEC-017 — Keep RAG qualification deterministic and dimension-separated
 
-**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward in 0.11.3-1.7.
+**Status:** ACTIVE — introduced in 0.11.3-1.1 source and carried forward.
 
 **Decision:** Direct `rag-quality` qualification must remain deterministic and reviewable.
 Acceptance terms use normalized token boundaries so shorter dates, numbers, identifiers or
@@ -499,8 +499,9 @@ a new comparison. Do not reopen broad RAG answer-model tournaments without such 
 
 **Decision:** Add ISTA GSQ/RCO IQ3_XXS as an opt-in deployability/RAG-oriented text experiment and
 retune the already-packaged ISTA IQ3_S entry as the quality-first main-model experiment. IQ3_XXS
-starts at 16K context with the upstream Qwen3.8 non-thinking sampling profile and is intended to be
-called with `think=false`; IQ3_S starts at 8K with the upstream thinking profile and is intended for
+was introduced at 16K with the upstream Qwen3.8 non-thinking sampling profile and is intended to be
+called with `think=false`; DEC-024 supersedes that initial context with the safer current 8K default.
+IQ3_S starts at 8K with the upstream thinking profile and is intended for
 `think=true`. Neither changes the production Gemma E4B RAG role, Open WebUI desired state or current
 GPT-OSS/Qwen production roles. Vision projectors and MTP payloads are deliberately excluded from
 these Ollama experiments so first BC-250 evidence isolates text-model deployability/quality.
@@ -520,9 +521,12 @@ useful quality/deployability on the 16 GiB appliance, and does the YMQ MTP quant
 **Current evidence update:** YMQ XS-TI now passes BC-250 MTP Phase-1 qualification at 8K/depth 2
 with deterministic baseline/MTP parity and clean safety/restoration. It showed faster baseline decode
 and stronger absolute long-generation MTP throughput than the earlier HauhauCS evidence, but lower
-observed memory headroom; do not equate smaller GGUF size with lower runtime memory. The two ISTA
-Ollama experiments remain opt-in and still require their own role-specific product-quality/headroom
-qualification before any production promotion.
+observed memory headroom; do not equate smaller GGUF size with lower runtime memory. The IQ3_XXS 16K RAG follow-up then produced five correct cited answers before memory pressure
+progressively collapsed to roughly 0.28 GiB MemAvailable and the safety harness aborted; unloading
+recovered roughly 13.8 GiB. This rejects the 16K configuration on the current 16 GiB profile but is
+not enough evidence to promote the model on quality. The two ISTA Ollama experiments remain opt-in
+and still require role-specific product-quality/headroom qualification before any production
+promotion.
 
 **Retest only if:** an Ollama candidate is being considered for a production role, YMQ is being
 considered for preferred MTP status, or upstream artifacts/runtime materially change.
@@ -616,3 +620,45 @@ isolation while keeping normal operator use state-preserving.
 
 **Retest only if:** the external llama.cpp runtime or Ollama unload/load APIs change, MTP becomes a
 first-class product role, or real-device evidence shows restoration/isolation is unreliable.
+
+## DEC-024 — Bound ISTA Qwen3.8 IQ3_XXS to 8K on the 16 GiB profile
+
+**Status:** ACTIVE.
+
+**Decision:** Change `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` from 16K to 8K context while
+keeping its model identity, verified GGUF, non-thinking sampling and opt-in experimental role
+unchanged. Do not create a parallel `-8k` catalog identity for the same source artifact.
+
+**Why:** Sustained RAG qualification on the BC-250 showed the 16K variant answering its first
+five RAG cases correctly with citations while MemAvailable fell from roughly 3.17 GiB after early
+residency to ~0.67 GiB after case 5 and ~0.28 GiB before the next request, where the safety harness
+aborted. Unloading recovered roughly 13.8 GiB. The operator subsequently attempted an 8K duplicate definition for
+the same GGUF; the cleaner green-field contract is one model identity with the safer current
+context default, which also lets `apply` reuse the existing verified source without a re-download.
+
+**Retest only if:** runtime/model memory behavior changes materially or a concrete product need
+requires larger context with measured headroom.
+
+
+## DEC-025 — Make companion shutdown self-exemption exact and keep public SSH protected
+
+**Status:** ACTIVE — introduced in 0.11.3-1.8.
+
+**Decision:** Treat either endpoint of an established connection on a protected port as activity,
+using the final two `ss` fields rather than fixed column numbers. The public
+`bc250-maintenance request-shutdown` path never exempts its caller: an interactive SSH session
+therefore defers shutdown. The dedicated `bc250-power-control` forced-command identity preserves
+OpenSSH's `SSH_CONNECTION` tuple through its exact sudo rule and invokes the package-internal
+`request-shutdown-companion` path. Safe-power may ignore only that validated tuple; every second
+SSH connection and all other protected activity still defer. After all guards pass, request the
+system power action with systemd's non-blocking mode so the decision service can finish cleanly.
+
+**Why:** Exact installed 1.7 device testing proved the fixed-field parser missed the local SSH
+endpoint and began a poweroff during an active administrator session. Correcting the parser without
+a companion-specific boundary would then make the Pi's own forced SSH session self-deferring. A
+general `--ignore-ssh` switch would be too broad; the exact authenticated tuple keeps human sessions
+protected while allowing the restricted control identity to request the same BC-250-owned policy.
+
+**Retest only if:** OpenSSH/sudo environment handling, `ss` output semantics, the companion identity,
+or the safe-power transport changes. Installed 1.8 must prove public SSH defer, companion-only allow,
+second-SSH defer, then real idle S5/WOL before unattended poweroff is enabled.
