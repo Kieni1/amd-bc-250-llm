@@ -105,7 +105,16 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch", spec)
         self.assertIn("-\t\t\t\tsystemctl reboot", patch)
         self.assertIn("+\t\t\t\t/usr/sbin/reboot", patch)
-        self.assertIn("offer_cpu_unlock_reboot()", patch)
+
+        # GNU patch applies hunks sequentially. Keep source hunks ordered by the
+        # original-file line number so a later RPM %prep does not fail merely
+        # because a newly added hunk targets an earlier section of the file.
+        old_starts = [
+            int(match.group(1))
+            for match in re.finditer(r"(?m)^@@ -(\d+)(?:,\d+)? \+", patch)
+        ]
+        self.assertGreaterEqual(len(old_starts), 4)
+        self.assertEqual(old_starts, sorted(old_starts))
 
     def test_source_tarball_excludes_python_and_ruff_caches(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
