@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source 0.11.3-2.2
+# BC-250 support / operations handover — current source release 0.11.3-2.3
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,11 +10,12 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.11.3
-RPM Release:  2.2
-NVR:          bc250-llm-server-0.11.3-2.2
+RPM Release:  2.3
+NVR:          bc250-llm-server-0.11.3-2.3
 ```
 
-2.2 carries forward the focused 1.8 support/model-manager safety release and 2.1 RAG/evidence cleanup, while adding only the completed MTP catalog policy and developer build-regeneration refinements. The inherited safety fixes are:
+2.3 is the current operations/UX source release on top of the settled 2.2 model policy. It does not change
+RAG, MTP, translation, Pi architecture, production models, or 40-CU policy. The inherited safety fixes are:
 
 - safe-power local/peer endpoint parsing;
 - a narrow forced-command Pi self-SSH exemption while preserving second-SSH/UI/Ollama deferral;
@@ -35,20 +36,42 @@ restoration          PASS
 coverage             FULL
 ```
 
-The exact-1.7 support campaign separately proved normal↔agent restoration, degraded-mode
-recovery, fresh verified config/users backups and prune dry-run, then stopped after finding the
-safe-power and 40-CU return-code defects now fixed in 1.8 and carried into 2.2. Real idle S5/WOL, Pi forced-command
-shutdown, backup restore and live prune are therefore **pending exact-2.2 tests**, not accepted
-historical behavior.
+Exact installed `0.11.3-2.2.fc44.x86_64` has now closed the two highest-priority inherited
+operations boundaries and accumulated further bounded support evidence:
+
+```text
+bc250-install convergence          PASS
+live 40-CU routing                 40/40 healthy
+persistent activation              intentionally disabled
+active admin SSH request-shutdown  DEFER PASS; no session loss
+normal -> agent -> normal           PASS
+deliberate degraded topology       detected and recovered
+config/users backup creation        PASS; checksums/privacy/retention verified
+config restore + rollback point     PASS; HTTP/topology/54-0-0 recovered
+identity rollback on validation     PASS
+production use cases                4/4 PASS
+task suite                          6/6 PASS
+bounded generation-edge infra      17/17 PASS
+final authenticated bc250-verify   54 ok / 0 warn / 0 fail
+```
+
+The identity restore itself exposed one real validation defect: the live Open WebUI DB already had
+142 unrelated `foreign_key_check` rows while still passing `integrity_check`; the selective identity
+restore rejected those unchanged baseline rows and rolled back. Current 2.3 fixes the validator
+to compare canonical pre/post FK sets and reject only newly introduced violations while keeping
+`integrity_check` strict. Real idle S5/WOL, Pi forced-command shutdown and live prune remain
+conditional acceptance work.
 
 Evidence files:
 
 ```text
 development/model-runs/2026-09-20-installed-0.11.3-1.7-revalidation.md
 development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md
+development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md
 ```
 
-Do not relabel those results as 2.2 qualification.
+The 2.2 Batch 04–06 record is operator-supplied summarized device evidence; its raw archive was not
+independently inspected in the main integration environment. Do not overstate its provenance.
 
 ## Validation ownership
 
@@ -58,7 +81,15 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 2.2 source validation is recorded in `PATCHNOTE-0.11.3-2.2.md`. Exact installed-2.2 execution is the outstanding hardware gate; RPM/SRPM build evidence remains external.
+Current 2.3 implementation is recorded in `PATCHNOTE-0.11.3-2.3.md`. RPM/SRPM build and exact
+installed-2.3 execution remain pending. Exact 2.2 hardware observations above are the immediate
+regression baseline for the changed operations surfaces.
+
+Source closure for 2.3 is complete: repository/RPM preflight PASS, deterministic suite **438/438
+PASS** in split modules, `bash -n` **64/64 PASS**, and Python compileall PASS. The monolithic
+validation invocation exceeded this environment's execution window while tests were still passing;
+the same suite was completed by module rather than weakening or dropping coverage. Ruff/ShellCheck
+were unavailable and are not claimed.
 
 ## Service topology
 
@@ -207,15 +238,22 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate exact-2.2 changed-boundary checks
+## Immediate exact-2.3 acceptance after build/install
 
-Run one bounded batch at a time. The minimum current-release device evidence is:
+Run one bounded batch at a time. Exact 2.2 already proved active-SSH defer, healthy live 40/40
+with persistent activation disabled, normal↔agent recovery, degraded detection/recovery and final
+authenticated 54/0/0 verification. After exact 2.3 is installed, focus on changed surfaces:
 
 ```text
-1. install exact 0.11.3-2.2; record NEVRA + artifact SHA
-2. sudo bc250-verify --owui-token-file FILE
-3. interactive SSH request-shutdown -> DEFER, no shutdown broadcast/session loss
-4. bc250-40cu status + verify -> healthy 40/40 and rc=0 with persistent mode disabled
+1. build/install exact 0.11.3-2.3; record NEVRA + artifact SHA
+2. rerun sudo bc250-install, then sudo rpm -V bc250-llm-server; swap-directory mode must stay clean
+3. review bc250-status Overall/Runtime mode in normal, agent and deliberate degraded states
+4. exercise bc250-agent-mode normal from normal and degraded states; convergence must be idempotent
+5. verify degraded bc250-verify shows the lane root failure and dependent SKIP/unavailable checks
+6. verify unauthenticated bc250-verify --summary reports skipped authenticated checks explicitly
+7. repeat identity restore against the known baseline FK violations; unchanged/subset baseline rows must not fail, and no new violation may appear
+8. active SSH request-shutdown -> DEFER regression smoke; no shutdown broadcast/session loss
+9. confirm live 40/40 rc=0 remains unchanged
 ```
 
 Only add feature-specific checks when the feature is going into use: Pi companion requires

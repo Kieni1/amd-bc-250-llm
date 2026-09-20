@@ -26,12 +26,14 @@ Current source release:
 
 ```text
 VERSION       0.11.3
-RPM Release   2.2%{?dist}
-NVR           bc250-llm-server-0.11.3-2.2
+RPM Release   2.3%{?dist}
+NVR           bc250-llm-server-0.11.3-2.3
 ```
 
-`0.11.3-2.2` carries the 1.8 support/model-manager safety fixes and 2.1 RAG integration forward,
-then encodes the completed MTP selection in the existing catalog. Production Open WebUI roles,
+`0.11.3-2.3` is the current operations/UX source release. It carries the settled 2.2 RAG/MTP
+policy forward and makes only bounded operations changes: actionable operator-overlay recovery,
+separate local-maintenance/companion installer choices, clearer topology/status/verifier output,
+`bc250-agent-mode normal`, swap-directory mode consistency, and clearer DRY_RUN/timer output. Production Open WebUI roles,
 service topology, hard memory floor, governor/CU policy, unattended-power defaults and GGUF
 provenance rules are unchanged. MTP remains standalone, disabled/download-only and opt-in.
 
@@ -57,16 +59,48 @@ The release incorporates defects found during exact installed `0.11.3-1.7` suppo
   reached the low-memory boundary. It keeps the same model identity and verified GGUF, so applying
   the new definition does not require a source re-download.
 
-Current source validation for 2.2 is recorded in `PATCHNOTE-0.11.3-2.2.md`; device qualification remains separate:
+Current 2.3 source is closed and source-validated. Final deterministic results are recorded in
+`PATCHNOTE-0.11.3-2.3.md`; RPM/SRPM build and installed-2.3 acceptance remain separate external
+gates. Do not inherit 2.2 hardware evidence as 2.3 qualification.
+
+Current 2.3 source closure evidence:
 
 ```text
-repository/source preflight        PASS
-deterministic source suite         433/433 PASS
-Python compileall                  PASS
-bash -n                            64/64 shell/bootstrap entrypoints PASS
-RPM/SRPM build                     external gate; not claimed here
-exact installed 2.2 hardware       not yet qualified
+repository/RPM preflight   PASS
+deterministic tests        438/438 PASS (split modules; monolithic runner hit execution window)
+bash -n                    64/64 PASS
+Python compileall          PASS
+Ruff / ShellCheck          unavailable; not claimed
+RPM/SRPM build             NOT RUN
+exact-2.3 device evidence  PENDING
 ```
+
+Exact installed `0.11.3-2.2.fc44.x86_64` operations testing has now demonstrated:
+
+```text
+bc250-install convergence          PASS
+live CU routing                    40/40 healthy
+persistent 40-CU boot activation   intentionally disabled
+active administrator SSH shutdown  DEFER PASS; session preserved
+normal -> agent -> normal           PASS
+deliberate degraded topology       detected; recovery PASS
+config/users backups + retention   PASS
+configuration restore              PASS
+automatic identity rollback        PASS
+production use-case suite          4/4 PASS
+task suite                         6/6 PASS
+bounded generation-edge infra      17/17 PASS
+final authenticated bc250-verify   54 ok / 0 warn / 0 fail
+```
+
+Identity restore itself exposed one validation defect rather than a rollback defect: the real DB
+already contained unrelated `foreign_key_check` rows while passing `integrity_check`, and the old
+validator rejected those unchanged baseline rows. The 2.3 release now compares canonical pre/post FK
+sets and fails only on newly introduced violations while keeping strict integrity checking. Its
+operator output now reports strict integrity, baseline/new FK counts and explicit rollback success
+without dumping unrelated baseline rows.
+
+This is strong operations evidence for 2.2, but it is not a full 2.2 whole-appliance revalidation.
 
 Newest full whole-appliance hardware evidence is exact installed
 `bc250-llm-server-0.11.3-1.7.fc44.x86_64`:
@@ -87,13 +121,15 @@ tight-headroom diagnostic but above the unchanged 128 MiB hard floor. A prompt d
 
 Exact-1.7 support/maintenance evidence additionally proved normal↔agent restoration, degraded-mode
 detection/recovery, verified local config/users backups and upload-prune dry-run. It exposed the
-safe-power and 40-CU return-code defects fixed in 1.8 and carried into 2.2 and therefore deliberately stopped before real
-idle S5/WOL, Pi forced-command shutdown, backup restore or live pruning. See
-`development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md`.
+safe-power and 40-CU return-code defects fixed in 1.8. Exact 2.2 has since proven those two
+boundaries plus backup retention, configuration restore, identity rollback and bounded production/task
+runtime health. Real idle S5/WOL, Pi forced-command shutdown and live pruning remain conditional
+follow-up work. See `development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md`
+and `development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md`.
 
-**Immediate evidence boundary:** 2.2 is source-validated only until an exact 2.2 RPM is built, installed
-and retested. Exact-1.7 evidence remains labelled exact-1.7; the intermediate 1.8 source line must not
-be treated as installed qualification unless separate evidence is supplied.
+**Immediate evidence boundary:** exact 2.2 now has bounded operations evidence but not a full
+whole-appliance revalidation. Current 2.3 is source-validated but is not hardware-qualified until it is built and installed. Exact-1.7
+remains the newest full revalidation baseline; do not transfer either older evidence class to 2.3.
 
 ---
 
@@ -519,9 +555,10 @@ Safe-power in 1.8:
 - missing/failed TCP inspection fails safe by deferring;
 - final system power action is requested non-blocking only after all guards pass.
 
-For exact 2.2, first prove interactive SSH defer and the corrected 40-CU return-code boundary.
-Before unattended automatic poweroff is actually enabled, additionally prove the configured companion
-path if used, idle allow, real S5/WOL and post-wake readiness/restoration.
+Exact 2.2 has proven interactive SSH defer and the corrected healthy-live-40-CU return-code boundary.
+For 2.3, repeat active-SSH defer only as a regression smoke after installing the release. Before unattended
+automatic poweroff is enabled, additionally prove the configured companion path if used, idle allow,
+real S5/WOL and post-wake readiness/restoration.
 
 ---
 
@@ -542,29 +579,35 @@ Evidence rules:
 - historical startup AMDGPU/HPD warnings are not automatically new campaign faults; compare against
   the campaign's bounded kernel/device-error window.
 
-Current exact-1.7 full revalidation is the newest whole-appliance qualification. 2.2 requires its own
-installed-device evidence.
+Current exact-1.7 full revalidation remains the newest full whole-appliance qualification. Exact 2.2
+now has successful bounded operations evidence, including the previously unqualified SSH-safe-power
+and live-40-CU return-code boundaries. Current 2.3 still requires its own installed-device evidence.
 
 ---
 
 # 13. Current open gaps and priority order
 
-## P0 — exact-2.2 changed-boundary hardware checks
+## P0 — build/install 2.3 and run affected-boundary acceptance
 
-The source release carries 1.8 power/40-CU fixes that have not yet been proven on installed package
-bytes. Keep the first device pass narrow:
+Exact 2.2 already proved the inherited SSH-safe-power and healthy-live-40-CU fixes. After the 2.3
+2.3 is built and installed, keep device acceptance focused on the behavior changed in 2.3:
 
 ```text
-1. build/install exact 0.11.3-2.2; capture NEVRA + artifact SHA
-2. run the normal verifier
-3. interactive SSH request-shutdown -> DEFER, with no shutdown broadcast/session loss
-4. bc250-40cu status + verify -> healthy live 40/40 and rc=0 with persistent mode disabled
+1. build/install exact 0.11.3-2.3; capture NEVRA + artifact SHA
+2. rerun bc250-install and sudo rpm -V; package-owned swap directory must not drift
+3. inspect bc250-status overall/runtime-mode output in normal, agent and deliberate degraded states
+4. verify agent-mode normal/leave convergence and concise transition messages
+5. verify degraded bc250-verify reports root failure plus dependent unavailable/skipped checks
+6. verify unauthenticated --summary reports the skipped authenticated check explicitly
+7. repeat identity restore on the real DB with its known pre-existing FK baseline; no new violations may be introduced and unchanged baseline rows must not force rollback
+8. repeat active-SSH request-shutdown as a regression smoke; it must still defer without session loss
 ```
 
 If the Pi companion will be deployed, additionally prove companion-only control plus a deliberate
 second-admin-SSH defer. If unattended S5/WOL will be enabled, prove one idle S5 -> WOL -> HTTP :80
-readiness cycle first. Model lifecycle, backup restore and destructive pruning are useful product/support
-acceptance work, but they are not automatic 2.2 release gates.
+readiness cycle first. Model lifecycle and destructive pruning remain useful product/support acceptance work rather than
+automatic release gates. Configuration restore has now passed on exact 2.2; identity restore requires
+one exact-2.3 retest because its baseline-aware FK validation changed in 2.3.
 
 ## P1 — real-office RAG acceptance
 
@@ -621,9 +664,12 @@ Canonical detailed rationale belongs in `development/DECISIONS.md`.
 
 # 15. Known gaps that are still current
 
-- exact installed 1.8 hardware/support/power qualification is pending;
-- Pi forced-command shutdown, backup restore, idle S5/WOL and live prune have not yet been accepted on
-  current source;
+- exact installed 2.3 operations acceptance is pending; exact 2.2 already proved active-SSH defer,
+  healthy live 40/40 with persistent activation disabled, topology transitions/degraded recovery and
+  final authenticated 54/0/0 verification;
+- identity restore needs exact-2.3 acceptance with the known pre-existing FK baseline; configuration
+  restore and automatic rollback have already been demonstrated on exact 2.2;
+- Pi forced-command shutdown, idle S5/WOL and live prune have not yet been accepted on current source;
 - no-download unregister/re-apply support smoke still needs a corrected privileged file-existence
   wrapper after the exact-1.7 test harness skipped it;
 - real-office RAG acceptance across messy PDFs/tables/multilingual/OCR-derived content remains open;
@@ -671,8 +717,9 @@ Main integration owns final promotion, release metadata and cross-stream policy.
 > evidence as authoritative over handovers. Read `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
 > `development/VALIDATION-MATRIX.md`, `development/TESTING-STRATEGY.md`,
 > `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source is
-> `0.11.3-2.2`; exact installed `0.11.3-1.7` is the newest fully revalidated device baseline, so do not
-> relabel it as 2.2. GitHub owns RPM builds, workstation owns Ruff/developer linting, and BC-250 owns
+> source release `0.11.3-2.3`; exact installed `0.11.3-1.7` remains the newest full revalidation baseline, while
+> exact installed 2.2 has successful bounded operations evidence. Do not relabel either evidence class
+> as exact-2.3 qualification. GitHub owns RPM builds, workstation owns Ruff/developer linting, and BC-250 owns
 > hardware/runtime qualification. Preserve verified GGUFs, keep destructive operations explicit,
 > fail closed on ambiguous state, and use one bounded hardware batch at a time. First prove only the
 > still-unqualified inherited safety boundaries: interactive SSH shutdown defer and healthy 40-CU
