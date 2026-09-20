@@ -10,7 +10,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 |---|---|
 | `bc250` | Canonical multicall dispatcher |
 | `bc250-40cu` | Replacement-module and live CU controls |
-| `bc250-agent-mode` | Enter/leave/status exclusive coding-agent mode |
+| `bc250-agent-mode` | Enter/leave/normal/status exclusive coding-agent mode |
 | `bc250-benchmark` | Explicit model, quality, coexistence and tuning benchmarks |
 | `bc250-revalidate` | Opt-in whole-appliance revalidation harness |
 | `bc250-check-temp` | Continuously refreshed sensors (`--once` for one sample) |
@@ -201,7 +201,8 @@ Common options for `apply` and `refresh`:
 - `--include-disabled`: allow disabled MTP entries to be selected for an explicit `mtp` category operation; combined `apply all` / `refresh all` never include MTP;
 - `--modelfile-dir PATH`: add a Modelfile search directory; the installed operator overlay
   `/etc/bc250-llm-server/models.d/` rejects visible regular files without a `.Modelfile` suffix
-  so typos cannot disappear silently;
+  so typos cannot disappear silently; the error lists offending operator-owned files and tells
+  the operator to move/rename/remove them before rerunning `sudo bc250-install`;
 - `--source PATH`: use another MTP TOML catalog.
 
 Remote experimental `hf.co/...` definitions do not accept local-GGUF revision/checksum/
@@ -404,8 +405,12 @@ sudo bc250-revalidate cleanup
 ```
 
 `bc250-status` derives `normal`, `degraded`, `stopped` and exclusive `agent` topology from the same
-classifier used by `bc250-agent-mode status`; it does not call a machine "normal" merely because
-the agent unit is inactive.
+classifier used by `bc250-agent-mode status`; a concise `Overall` / `Runtime mode` summary appears
+near the top. It does not call a machine "normal" merely because the agent unit is inactive.
+Unexpected degraded normal topology also prints the supported convergence command
+`sudo bc250-agent-mode normal` so the status output is directly actionable.
+If the optional reboot diagnostic helper is absent, reboot state is reported as unknown rather
+than as an appliance fault.
 
 `bc250-revalidate` harness v4.2 is the root-only systemd-backed package
 qualification workflow. A full
@@ -448,6 +453,8 @@ for ordinary service stop/start management. `bc250-status` is a short overview i
 topology/power-state exposure, RAM, memory pressure, zram, disk swap, swappiness
 and appliance storage. `bc250-verify` is the detailed pass/fail check and accepts
 `--owui-token-file FILE` for the authenticated package-owned Open WebUI drift check.
+Verifier totals report `ok / warn / fail / skipped`; optional/unavailable checks are never counted
+as passes or failures, and their individual `[SKIP]` line explains why they did not run.
 The detailed verifier also checks that every active package-owned Open WebUI role has its
 base model registered on the main Ollama lane. `bc250-check-temp` refreshes every
 second by default; use `--once` only when a single sample is useful. Verification includes kernel/module alignment, CU state, Ollama version,
@@ -481,6 +488,8 @@ bc250-benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
 sudo bc250-agent-mode enter
 bc250-benchmark agent MODEL --ollama-url http://127.0.0.1:11436
 sudo bc250-agent-mode leave
+# explicit idempotent normal-topology convergence/recovery alias:
+sudo bc250-agent-mode normal
 
 bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
 bc250-benchmark num-batch MODEL [MODEL ...]
@@ -544,10 +553,12 @@ Agent mode is separate from Open WebUI:
 bc250-agent-mode status
 sudo bc250-agent-mode enter
 sudo bc250-agent-mode leave
+sudo bc250-agent-mode normal
 ```
 
 Entering agent mode stops main/task/embedding and starts only the 11436 coding
-backend; leaving restores normal mode.
+backend; `leave` restores normal mode. `normal` is an idempotent convergence alias for the
+same restoration path and is useful when repairing an unexpected partial-normal topology.
 
 ## Maintenance
 
@@ -565,15 +576,19 @@ sudo bc250-maintenance disable
 
 `request-shutdown` is the public operator command. When it is invoked over an
 interactive SSH session, that session is protected activity and the request should
-defer. `companion enable` prints a restricted key whose internal forced command
+defer; normal output identifies a local protected SSH connection without printing peer
+address details. `companion enable` prints a restricted key whose internal forced command
 exempts only its own authenticated SSH connection; the internal command is not a
 general operator interface.
 
-The full installer asks one default-No question before entering optional maintenance/Pi
-setup. If accepted, local maintenance and Pi integration are separate choices; selected
-setup receives post-configuration checks. `setup --defaults` enables verified local
+The full installer presents local maintenance and Raspberry Pi/companion integration as
+separate optional decisions after core verification. Local maintenance can be configured
+independently. Both top-level choices remain optional/default-No, and Pi/companion setup remains
+separate. Selected setup receives
+post-configuration checks. `setup --defaults` enables verified local
 backups only. Manual maintenance runs show
-only the current systemd invocation instead of a historical journal tail. Upload
+only the current systemd invocation instead of a historical journal tail. Timer status uses
+`last_scheduled=` so a successful manual run is not confused with timer history. Upload
 pruning preflights the protected Open WebUI credential before starting its unit; a
 missing/placeholder key fails with the active age/ceiling/dry-run policy and never
 prints the credential. `clean-cache` requires confirmation and removes only rebuildable

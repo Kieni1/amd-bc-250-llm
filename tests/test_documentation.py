@@ -233,13 +233,13 @@ class DocumentationTests(unittest.TestCase):
         commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
         quality = (ROOT / "docs/QUALITY-CHECKS.md").read_text(encoding="utf-8")
 
-        self.assertIn("optional maintenance", maintenance)
-        self.assertIn("Raspberry Pi integration", maintenance)
-        self.assertIn("default is No", maintenance)
-        self.assertIn("separate choices", maintenance)
+        self.assertIn("separate optional decisions", maintenance)
+        self.assertIn("Pi/companion integration", maintenance)
+        self.assertIn("default-No", maintenance)
+        self.assertIn("configured independently", maintenance)
         self.assertIn("Selected setup is verified", maintenance)
 
-        self.assertIn("default-No question", commands)
+        self.assertIn("Both top-level choices remain optional/default-No", commands)
         self.assertIn("512 MiB", commands)
         self.assertIn("128 MiB hard", commands)
         self.assertIn("generation output budget", commands)

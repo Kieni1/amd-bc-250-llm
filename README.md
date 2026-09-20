@@ -39,9 +39,9 @@ for the exact running kernel, establishes the static main/task/embedding normal
 mode, installs every model required by the active package-owned Open WebUI roles
 plus the task and Jina embedding defaults, then presents one global prompt only for
 experiments, rollback/reference, agent and other optional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
-desired state, then offers one default-No optional-setup gate after core appliance
-verification. Only when accepted does it separately offer local BC-250 maintenance and
-Raspberry Pi integration. Selected optional setup is verified before the installer
+desired state, then offers local BC-250 maintenance and Raspberry Pi/companion integration
+as two separate optional setup decisions after core appliance verification. Both top-level choices remain optional/default-No; Pi/companion setup
+remains separate. Selected optional setup is verified before the installer
 finishes. Pi integration keeps HTTP :80 as the office endpoint and uses only restricted
 SSH :22; it does not expose internal Open WebUI/Ollama ports. A second reboot is requested only if persistent 40-CU mode was already configured
 and its newly prepared replacement module is not yet loaded.
@@ -141,7 +141,7 @@ bc250-agent-mode status
 
 # Enter/leave the exclusive coding lane only when needed:
 sudo bc250-agent-mode enter
-sudo bc250-agent-mode leave
+sudo bc250-agent-mode leave   # or: sudo bc250-agent-mode normal
 ```
 
 Keep experiments, MTP qualification, benchmark suites, destructive model lifecycle actions,

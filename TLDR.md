@@ -24,10 +24,9 @@ infrastructure; the additional-model prompt accepts indexes/ranges/names or
 `recommended`, `production`, `all`, and Enter skips extras. Unattended selection uses
 `BC250_MODEL_SELECTION`.
 
-Full interactive installs verify the core appliance first, then ask one default-No
-question before any optional maintenance or Raspberry Pi work. If accepted, local
-maintenance and Pi integration are separate choices and selected setup is verified before
-completion. Models-only and noninteractive runs do not silently enable those features. Legacy
+Full interactive installs verify the core appliance first, then present local maintenance
+and Raspberry Pi/companion integration as separate optional choices. Pi/companion setup
+remains default-No, and selected setup is verified before completion. Models-only and noninteractive runs do not silently enable those features. Legacy
 full-unit task/embedding/agent overrides are rejected rather than mixed with the
 package-owned four-lane topology.
 
@@ -124,7 +123,7 @@ bc250-benchmark task
 sudo bc250-agent-mode enter
 bc250-benchmark agent
 bc250-code review path/to/file review.md
-sudo bc250-agent-mode leave
+sudo bc250-agent-mode leave   # `normal` is the explicit convergence alias
 
 bc250-check-temp --once
 sudo llm-run-diagnose --no-load
