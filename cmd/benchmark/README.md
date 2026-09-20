@@ -87,8 +87,10 @@ deep-context or sustained testing.
 The normal comparison summary emphasizes decode mean/CV, cold load, warm answer
 latency where available, prefill, resident size, minimum `MemAvailable`, swap
 start/peak/end/delta, maximum per-case temperature p95 plus run maximum, and
-context/output diagnostics. VRAM/GTT
-counters remain raw Vulkan diagnostics and are not additive memory pools on BC-250 UMA.
+context/output diagnostics. GPU-journal evidence remains a canonical runtime record,
+but aggregate summaries expose it as runtime diagnostics rather than a pseudo-model
+with empty performance metrics. VRAM/GTT counters remain raw Vulkan diagnostics and
+are not additive memory pools on BC-250 UMA.
 
 `--mode neutral` supplies the neutral benchmark system prompt. `--mode production`
 preserves the packaged model policy. `--think` can explicitly select a supported

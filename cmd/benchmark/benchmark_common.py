@@ -411,7 +411,14 @@ def category_aggregates(records: list[dict[str, Any]], category: str) -> dict[st
 
     if category == "generation":
         models: dict[str, Any] = {}
+        runtime_rows = [
+            row
+            for row in by_model.get("runtime", [])
+            if row.get("case_id") == "gpu-journal"
+        ]
         for model, rows in by_model.items():
+            if model == "runtime" and runtime_rows and len(runtime_rows) == len(rows):
+                continue
             ok = [row for row in rows if row.get("outcome") == "pass"]
             short = [row for row in ok if row.get("test") == "short"]
             short_tps = _metric_values(short, "tokens_per_second")
@@ -453,6 +460,13 @@ def category_aggregates(records: list[dict[str, Any]], category: str) -> dict[st
                 "diagnostics": dict(sorted(diagnostics.items())),
             }
         aggregates["models"] = models
+        if runtime_rows:
+            latest_runtime = runtime_rows[-1]
+            aggregates["runtime_diagnostics"] = {
+                "outcome": latest_runtime.get("outcome"),
+                "checks": latest_runtime.get("checks", {}),
+                "diagnostics": latest_runtime.get("diagnostics", []),
+            }
     elif category == "embeddings":
         models: dict[str, Any] = {}
         summary_keys = (

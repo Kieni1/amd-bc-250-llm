@@ -3102,12 +3102,22 @@ status_raw
                 result_type="measurement", outcome="pass",
                 metrics={"prompt_tokens_per_second": 500.0}, test="prefill", run=1,
             ))
+            common.append_result(path, common.result_record(
+                category="generation", model="runtime", case_id="gpu-journal",
+                result_type="measurement", outcome="pass",
+                checks={"journal_available": True, "gpu_error_count": 0},
+            ))
             summary_json, _summary_txt = common.write_result_summary(path, category="generation")
             summary = json.loads(summary_json.read_text(encoding="utf-8"))
             model = summary["aggregates"]["models"]["m"]
             self.assertAlmostEqual(model["decode_mean_tps"], 41.0)
             self.assertAlmostEqual(model["prefill_tps"], 500.0)
             self.assertEqual(model["diagnostics"], {"context-truncation": 1})
+            self.assertNotIn("runtime", summary["aggregates"]["models"])
+            self.assertEqual(
+                summary["aggregates"]["runtime_diagnostics"]["checks"],
+                {"journal_available": True, "gpu_error_count": 0},
+            )
 
     def test_rag_quality_summary_exposes_resident_session_resources(self) -> None:
         records = [
