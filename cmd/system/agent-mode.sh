@@ -70,6 +70,7 @@ enter_agent() {
     echo "Agent mode active."
     echo "Agent API: 127.0.0.1:11436"
     echo "Normal main/task/embedding lanes are temporarily stopped."
+    echo "Open WebUI remains reachable; normal office roles may stay listed but are unavailable in agent mode."
     echo "Return to normal mode with: sudo bc250-agent-mode normal"
     return 0
   fi

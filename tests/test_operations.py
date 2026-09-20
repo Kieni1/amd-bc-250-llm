@@ -162,6 +162,7 @@ class CuHelperTests(unittest.TestCase):
         source = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
         self.assertIn("Agent:     intentionally inactive", source)
         self.assertIn("Return to normal mode with: sudo bc250-agent-mode normal", source)
+        self.assertIn("normal office roles may stay listed but are unavailable in agent mode", source)
         self.assertNotIn("agent is stopped by unit conflicts", source)
 
 

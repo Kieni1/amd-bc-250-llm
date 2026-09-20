@@ -352,6 +352,19 @@ class DocumentationTests(unittest.TestCase):
             self.assertIn(name, names)
             self.assertIn(name, readme)
 
+    def test_openwebui_api_compatibility_boundary_is_explicit(self) -> None:
+        settings = (ROOT / "docs/openwebui-settings.md").read_text(encoding="utf-8")
+        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        benchmark = (ROOT / "cmd/benchmark/README.md").read_text(encoding="utf-8")
+        for text in (settings, commands):
+            self.assertIn("/api/chat/completions", text)
+            self.assertIn("options.num_predict", text)
+        self.assertIn("root `max_tokens`", benchmark)
+        self.assertIn("options.num_predict", benchmark)
+        self.assertIn("reasoning_tokens", settings)
+        self.assertIn("finish_reason=stop", settings)
+        self.assertIn("advertised external BC-250 API", settings)
+
 
 if __name__ == "__main__":
     unittest.main()

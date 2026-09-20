@@ -77,8 +77,10 @@ sudo bc250-storage prune-40cu      # removed-kernel build caches only
 
 Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
 create/sign in the administrator and apply the package-owned Open WebUI baseline.
-Persisted providers, task, embedding and RAG settings come from the single packaged
-`openwebui/desired-state.json` through supported APIs; use
+Persisted providers, task, embedding, RAG and local/offline application policy come
+from the single packaged `openwebui/desired-state.json` through supported APIs.
+The normal model selector is role-oriented: implementation/task models stay active
+underneath package presets but are hidden, and Arena is package-converged off; use
 `sudo bc250-openwebui-setup init` later if that step was skipped. The default endpoint is unencrypted HTTP; see
 [`docs/HARDENING.md`](docs/HARDENING.md) before using a less trusted network.
 
