@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.3-2.4 - 2026-09-20
+
+- Patch the pinned CU live manager CPU-core-unlock reboot prompt to use `/usr/sbin/reboot` rather than the BC-250 device-proven unreliable `systemctl reboot` invocation; keep the interactive prompt and non-rebooting `--yes` behavior unchanged.
+- Record exact installed 2.3 targeted operations acceptance: clean RPM verification, topology/status/verifier recovery UX, baseline-aware identity restore, Tika restart semantics, supported reboot reconstruction, live 40/40 routing and final authenticated 54/0/0 all passed.
+- Tighten the package-owned Open WebUI product surface through the existing desired-state path: persistently disable Arena, keep the five production base models plus task model active but hidden from the ordinary selector, and converge local/offline application policy rather than relying only on fresh-database environment defaults.
+- Bring persisted upload policy into authenticated apply/status ownership (`FILE_MAX_SIZE=128`, `FILE_MAX_COUNT=20`, package extension allowlist) and compare extension lists order-independently to avoid false drift.
+- Preserve the existing Open WebUI provider/preset/task/RAG/translation architecture; do not add an Arena allowlist, model-order/default layer, extra provider/service or general configuration framework.
+- Document pinned Open WebUI v0.11.3 OpenAI-style adapter limitations instead of carrying a BC-250-specific container fork: root `max_tokens` is not a reliable Ollama cap, reasoning-token accounting can be zero despite reasoning content, and length termination can surface as `finish_reason=stop`; package-owned hard caps use nested `options.num_predict`.
+- Clarify exclusive-agent UX: Open WebUI remains reachable and may still list normal office roles while their backends are intentionally unavailable; restore them with `sudo bc250-agent-mode normal`.
+- Close 2.4 as a source-validated release; exact installed 2.4 RPM/device acceptance remains a separate external gate.
+
 ## 0.11.3-2.3 - 2026-09-20
 
 - Improve operations UX with actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, clearer agent transitions, an idempotent `bc250-agent-mode normal` convergence alias, and a topology-aware `bc250-status` summary.

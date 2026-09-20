@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        2.3%{?dist}
+Release:        2.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,14 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.4
+- Patch the pinned CU live manager CPU-core-unlock reboot prompt to use `/usr/sbin/reboot` instead of the BC-250 device-proven unreliable `systemctl reboot` invocation; keep its existing interactive/no-reboot-under-`--yes` contract unchanged.
+- Record exact installed 0.11.3-2.3 targeted operations acceptance: clean RPM verification, topology/status/verifier UX, identity restore with the existing FK baseline, Tika restart semantics, supported reboot reconstruction and healthy live 40/40 all passed.
+- Extend package-owned Open WebUI convergence through existing supported APIs: Arena off, local/offline application policy persisted, upload limits/extensions owned, and production/task implementation models active but hidden behind curated office roles.
+- Make authenticated Open WebUI status detect drift in those persisted settings and hidden-model metadata while preserving unrelated operator-owned state and order-insensitive extension semantics.
+- Document pinned Open WebUI v0.11.3 OpenAI-style adapter limitations rather than carrying an appliance-specific container fork; package-owned hard generation caps use nested `options.num_predict`, and exclusive-agent output clarifies that normal OWUI roles may remain listed but unavailable.
+- Close 2.4 as a source-validated release; exact installed RPM/device acceptance remains a separate gate.
+
 * Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.3
 - Improve operations UX without changing appliance architecture: actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, topology-aware status summary, clearer agent transitions and an idempotent `bc250-agent-mode normal` convergence alias.
 - Keep safe-power behavior unchanged while identifying protected local SSH/service ports in defer messages without exposing peer addresses.
