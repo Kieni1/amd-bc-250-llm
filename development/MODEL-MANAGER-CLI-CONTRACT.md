@@ -1,6 +1,6 @@
 # BC-250 model-manager CLI contract
 
-Current implementation target: `0.11.3-1.7` (lifecycle semantics carried forward unchanged from the 0.11.3-0.4 baseline).
+Current contract for the active source tree. The explicit lifecycle semantics originate from the 0.11.3 model-manager redesign and are carried forward unless a documented defect requires change.
 
 This document records the current greenfield model-manager command surface after the
 repository-wide caller/document migration. It is the lifecycle contract that current

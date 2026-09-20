@@ -7,13 +7,15 @@
 # Role: deployability/RAG-oriented dense 27B experiment for the 16 GiB BC-250 profile.
 # Approx source GGUF size: 10.1 GB; ISTA describes IQ3_XXS as a strong all-round operating point.
 # RAG/product-path callers should request think=false and own grounding/citation instructions.
+# 8K is deliberate on the 16 GiB UMA profile: the earlier 16K configuration
+# reached the low-memory safety boundary during sustained RAG qualification.
 # Text-only first pass: no vision projector and no MTP payload.
 
 FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-27b-ista-gsq-rco-iq3-xxs/Qwen3.8-27B-GSQ-RCO-IQ3_XXS.gguf
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256
-PARAMETER num_ctx 16384
+PARAMETER num_ctx 8192
 PARAMETER num_predict 1024
 
 # Qwen3.8 non-thinking/instruct sampling recommendations supported by Ollama Modelfile.

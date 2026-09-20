@@ -47,7 +47,9 @@ and systemd-preset configuration in the standard Fedora directories.
 | `/etc/default/bc250-wol` | Optional Wake-on-LAN interface |
 
 RPM upgrades preserve `%config(noreplace)` files and do not touch operator
-Modelfiles. A same-name file in `models.d` overrides the packaged definition.
+Modelfiles. A same-name file in `models.d` overrides the packaged definition. The directory is
+intentionally empty on a stock install; packaged model definitions live under
+`/usr/share/bc250-llm-server/model-management/modelfiles/`.
 
 ## Generated state
 
@@ -75,6 +77,12 @@ Modelfiles. A same-name file in `models.d` overrides the packaged definition.
 | `/var/lib/open-webui/vector_db/` | Derived vector/RAG index data; confidential |
 | `/var/backups/bc250-llm-server/` | Maintenance backups; config/users directories reserve the dormant `bc250-backup-export` group for optional read-only Pi export, while rollback data stays private |
 | `/var/log/bc250-llm-install.log` | Guided-installer transcript |
+
+Most generated package/application state under `/var/lib/bc250-llm-server` and
+`/var/lib/open-webui` is intentionally root-managed. A normal operator shell may not be able to
+`cd` into those trees; use package status/path commands for routine inspection and `sudo` only
+for administrative diagnostics. An unprivileged status command should report protected state as
+protected/unavailable rather than as an actual zero or missing value.
 
 Ordinary DNF removal retains persistent state. `sudo bc250-reset` is the
 separately confirmed greenfield appliance reset; `bc250-uninstall` remains an alias. Read [`UNINSTALL.md`](UNINSTALL.md) first.

@@ -331,6 +331,23 @@ def load_modelfile(path: Path) -> dict:
     }
 
 
+def validate_operator_model_directory(directory: Path) -> None:
+    """Reject visible regular files that the operator overlay would ignore."""
+    if directory != OPERATOR_MODEL_DIR or not directory.is_dir():
+        return
+    invalid = [
+        path.name
+        for path in sorted(directory.iterdir())
+        if path.is_file() and not path.name.startswith(".") and path.suffix != ".Modelfile"
+    ]
+    if invalid:
+        names = ", ".join(invalid)
+        raise ModelError(
+            f"{directory}: unrecognized operator model file(s): {names}; "
+            "model definitions must end in .Modelfile"
+        )
+
+
 def discover_models(directories: list[Path]) -> list[dict]:
     # Later directories override a same-named packaged template. This gives
     # /etc/bc250-llm-server/models.d the usual operator-over-package precedence.
@@ -340,6 +357,7 @@ def discover_models(directories: list[Path]) -> list[dict]:
         if not directory.is_dir():
             continue
         found_directory = True
+        validate_operator_model_directory(directory)
         for path in sorted(directory.glob("*.Modelfile")):
             model = load_modelfile(path)
             previous = discovered.get(model["name"])
@@ -1781,6 +1799,7 @@ CLI_EPILOG = """Common workflows:
   bc250-model list
   sudo bc250-model status agentic
   sudo bc250-model apply agentic MODEL
+  sudo bc250-model apply all all
   sudo bc250-model refresh agentic MODEL
   sudo bc250-model unregister agentic MODEL
   sudo bc250-model remove agentic MODEL
@@ -1812,7 +1831,11 @@ def selection_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "selection",
         nargs="?",
-        help="model id/index/range or comma-separated selection; also recommended, production or all",
+        help=(
+            "model id/index/range or comma-separated selection; also recommended, "
+            "production or all. Category 'all' plus selection 'all' means every "
+            "eligible model: 'bc250-model apply all all'"
+        ),
     )
 
 
@@ -1964,11 +1987,44 @@ def legacy_cli_hint(argv: list[str]) -> str | None:
     if first == "--refresh":
         return "'--refresh' is now an explicit operation; use: sudo bc250-model refresh <category> [selection]"
     if first == "install":
-        if "--refresh" in argv[1:]:
-            cleaned = " ".join(item for item in argv[1:] if item != "--refresh")
-            return f"'install --refresh' was replaced by 'refresh'; use: sudo bc250-model refresh {cleaned}".rstrip()
-        rest = " ".join(argv[1:])
+        tail = argv[1:]
+        category = next((item for item in tail if item in CATEGORIES), None)
+        if "--refresh" in tail:
+            cleaned = [item for item in tail if item not in {"--refresh", "--all"}]
+            if "--all" in tail:
+                target = category or "all"
+                return (
+                    "'install --refresh --all' was replaced by explicit category/selection "
+                    f"syntax; use: sudo bc250-model refresh {target} all"
+                )
+            rest = " ".join(cleaned)
+            return f"'install --refresh' was replaced by 'refresh'; use: sudo bc250-model refresh {rest}".rstrip()
+        if "--all" in tail:
+            target = category or "all"
+            return (
+                "'install --all' was replaced by explicit category/selection syntax; "
+                f"use: sudo bc250-model apply {target} all"
+            )
+        rest = " ".join(tail)
         return f"'install' was replaced by 'apply'; use: sudo bc250-model apply {rest}".rstrip()
+    if first in {"apply", "refresh", "unregister", "remove"} and "--all" in argv[1:]:
+        category = next((item for item in argv[1:] if item in CATEGORIES), None)
+        if first in {"unregister", "remove"}:
+            if category:
+                return (
+                    "'--all' is not a mutation flag; 'all' is an explicit selection. "
+                    f"Use: sudo bc250-model {first} {category} all; confirmation still applies."
+                )
+            return (
+                "'--all' is not a mutation flag; destructive operations require an explicit "
+                "category and selection. Example: sudo bc250-model "
+                f"{first} experiments all; confirmation still applies."
+            )
+        target = category or "all"
+        return (
+            "'--all' is not a mutation flag; 'all' is an explicit selection. "
+            f"Use: sudo bc250-model {first} {target} all"
+        )
     if first == "cleanup":
         keep = "--keep-gguf" in argv[1:]
         rest = " ".join(item for item in argv[1:] if item != "--keep-gguf")
@@ -2072,6 +2128,14 @@ def recommended_status_action(inspection: ModelInspection) -> str | None:
 def compact_inspection_details(inspection: ModelInspection) -> list[str]:
     """Return concise state labels suitable for interactive model selection."""
     model = inspection.model
+    if model.get("category") == "mtp":
+        if inspection.source_status == "current":
+            return ["FETCHED", "VERIFIED"]
+        if inspection.source_status == "missing":
+            return ["NOT FETCHED"]
+        if inspection.source_status == "drift":
+            return ["SOURCE DRIFT"]
+        return ["SOURCE UNAVAILABLE"]
     if (
         model.get("category") == "agentic"
         and inspection.registration_status == "unavailable"
@@ -2488,6 +2552,21 @@ def main(argv: list[str] | None = None) -> int:
                 catalogs,
                 include_disabled_mtp=(args.command == "remove"),
             )
+            if args.selection is None:
+                print(
+                    "\nCategory 'all' means the combined catalog; it does not select "
+                    "every model by itself."
+                )
+                if args.command in {"remove", "unregister"}:
+                    print(
+                        "For destructive actions, enter an explicit model/range or type "
+                        "'all' at the prompt; confirmation still applies."
+                    )
+                else:
+                    print(
+                        f"To select every eligible model explicitly: "
+                        f"sudo bc250-model {args.command} all all"
+                    )
         selected = selected_models_for_catalog(
             available, args.selection, interactive=True
         )

@@ -60,6 +60,21 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
 
+    def test_operator_overlay_rejects_visible_files_without_modelfile_suffix(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            operator = Path(temporary) / "models.d"
+            operator.mkdir()
+            stray = operator / "exp-example"
+            stray.write_text("# incomplete operator definition\n", encoding="utf-8")
+            with (
+                patch.object(modelctl, "OPERATOR_MODEL_DIR", operator),
+                self.assertRaisesRegex(
+                    modelctl.ModelError,
+                    r"exp-example.*must end in \.Modelfile",
+                ),
+            ):
+                modelctl.discover_models([operator])
+
     def test_current_model_set_and_dedicated_instances_are_preserved(self) -> None:
         expected_hosts = {
             "production": "127.0.0.1:11434",
@@ -292,7 +307,8 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("think=true", quality)
 
         deploy = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-xxs.Modelfile").read_text(encoding="utf-8")
-        self.assertIn("PARAMETER num_ctx 16384", deploy)
+        self.assertIn("PARAMETER num_ctx 8192", deploy)
+        self.assertIn("earlier 16K configuration", deploy)
         self.assertIn("PARAMETER num_predict 1024", deploy)
         self.assertIn("PARAMETER temperature 0.7", deploy)
         self.assertIn("PARAMETER top_p 0.8", deploy)
@@ -362,6 +378,11 @@ class ModelfileDiscoveryTests(unittest.TestCase):
 
 
 class CategoryInterfaceTests(unittest.TestCase):
+    def test_operator_template_uses_canonical_experiments_category(self) -> None:
+        template = (MODELFILES / "MODEL-TEMPLATE.Modelfile.example").read_text(encoding="utf-8")
+        self.assertIn("Categories: production, experiments, task, agentic, embedding", template)
+        self.assertNotIn("Categories: production, experimental, task, agentic, embedding", template)
+
     def test_public_categories_are_canonical_and_include_all(self) -> None:
         self.assertEqual(
             modelctl.CATEGORIES,
@@ -385,6 +406,7 @@ class CategoryInterfaceTests(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("bc250-model status agentic", text)
         self.assertIn("bc250-model apply agentic MODEL", text)
+        self.assertIn("bc250-model apply all all", text)
         self.assertIn("bc250-model unregister agentic MODEL", text)
         self.assertIn("bc250-model remove agentic MODEL", text)
 
@@ -417,6 +439,14 @@ class CategoryInterfaceTests(unittest.TestCase):
             (["--install"], "bc250-model apply <category>"),
             (["--refresh"], "bc250-model refresh <category>"),
             (["install", "agentic"], "'install' was replaced by 'apply'"),
+            (["install", "--all"], "bc250-model apply all all"),
+            (["install", "experiments", "--all"], "bc250-model apply experiments all"),
+            (["install", "experiments", "--refresh", "--all"], "bc250-model refresh experiments all"),
+            (["apply", "--all"], "bc250-model apply all all"),
+            (["apply", "experiments", "--all"], "bc250-model apply experiments all"),
+            (["remove", "--all"], "destructive operations require an explicit"),
+            (["remove", "experiments", "--all"], "bc250-model remove experiments all"),
+            (["unregister", "--all"], "destructive operations require an explicit"),
             (
                 ["cleanup", "agentic", "x", "--keep-gguf"],
                 "'cleanup' was replaced by 'unregister'",
@@ -431,6 +461,24 @@ class CategoryInterfaceTests(unittest.TestCase):
             ):
                 modelctl.main(argv)
 
+
+    def test_destructive_combined_catalog_prompt_does_not_casually_print_all_command(self) -> None:
+        defaults = {"category": "production"}
+        model = {"category": "production", "id": "p", "name": "prod-p", "index": 0}
+        catalogs = [(defaults, [model])]
+        output = StringIO()
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "load_all_catalogs", return_value=catalogs),
+            patch.object(modelctl, "print_catalogs_basic"),
+            patch.object(modelctl, "selected_models_for_catalog", return_value=[]),
+            redirect_stdout(output),
+        ):
+            self.assertEqual(modelctl.main(["remove", "all"]), 0)
+        text = output.getvalue()
+        self.assertIn("Category 'all' means the combined catalog", text)
+        self.assertIn("destructive actions", text)
+        self.assertNotIn("sudo bc250-model remove all all", text)
 
     def test_active_package_callers_use_new_model_manager_lifecycle(self) -> None:
         callers = (
@@ -678,6 +726,35 @@ class StatusTests(unittest.TestCase):
         self.assertIn("[CURRENT]", text)
         self.assertNotIn("source verified", text)
         self.assertNotIn("Modelfile current", text)
+
+    def test_compact_mtp_status_uses_standalone_source_vocabulary(self) -> None:
+        model = {
+            "id": "qwen-test-mtp",
+            "name": "qwen-test-mtp",
+            "category": "mtp",
+            "provider": "download-only",
+            "origin": "packaged",
+            "index": 33,
+        }
+        current = modelctl.ModelInspection(
+            model=model,
+            source_path=Path("/tmp/model.gguf"),
+            state_path=Path("/tmp/model.gguf.bc250.json"),
+            source_status="current",
+            source_detail="verified",
+            source_checksum="d" * 64,
+            runtime_modelfile=None,
+            modelfile_status="current",
+            registration_status="current",
+            overall_status="CURRENT",
+        )
+        self.assertEqual(
+            modelctl.compact_inspection_details(current), ["FETCHED", "VERIFIED"]
+        )
+        missing = modelctl.ModelInspection(
+            **{**current.__dict__, "source_status": "missing", "overall_status": "MISSING"}
+        )
+        self.assertEqual(modelctl.compact_inspection_details(missing), ["NOT FETCHED"])
 
     def test_compact_agent_status_marks_inactive_lane_as_deferred(self) -> None:
         model = {

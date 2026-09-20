@@ -81,7 +81,9 @@ that manager-owned GGUF/state. `purge-retired` is restricted to the explicit pac
 retirement catalog.
 
 Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer names
-in scripts. A moving source revision such as `latest` or `main` is allowed on purpose:
+in scripts. The category `all` means the combined catalog; it does not itself select every
+model. Use `sudo bc250-model apply all all` only when you deliberately mean every eligible
+non-MTP model. A moving source revision such as `latest` or `main` is allowed on purpose:
 this package is a model-testing tool. The manager records source identity/digest so
 `status --online` can identify an upstream change and `refresh` is an explicit decision
 to fetch it.
@@ -97,10 +99,15 @@ sudo bc250-model status experiments exp-example-source-q4-k-m
 sudo bc250-model apply experiments exp-example-source-q4-k-m
 ```
 
-A same-name operator Modelfile overrides the packaged definition. Keep category prefix,
-source metadata, GGUF/FROM and BC-250 parameters consistent with the template; invalid
-definitions are rejected before download. `status` makes an override or Modelfile drift
-visible before an action is taken.
+A same-name operator Modelfile overrides the packaged definition. The operator directory is
+expected to be empty on a stock install; packaged definitions live under
+`/usr/share/bc250-llm-server/model-management/modelfiles/`. Keep category prefix, source
+metadata, GGUF/FROM and BC-250 parameters consistent with the template; invalid definitions are
+rejected before download. Operator definitions must retain the `.Modelfile` suffix; visible
+regular files in `models.d` with another suffix are rejected instead of being silently ignored.
+Use the canonical category metadata `experiments` for new experimental overrides; historical
+singular `experimental` metadata remains readable for compatibility. `status` makes an override
+or Modelfile drift visible before an action is taken.
 
 ## Source retention and reindexing
 
@@ -371,7 +378,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 |---|---|
 | `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | large MoE main-lane challenger; start at 16K context and fall back to UD-Q2_K_XL if BC-250 headroom is unsafe |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-s` | ISTA GSQ/RCO IQ3_S quality-first dense 27B experiment; 8K context, think=true, upstream thinking-mode sampling; 11.8 GB weights require strict BC-250 headroom qualification |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | ISTA GSQ/RCO IQ3_XXS deployability/RAG experiment; 16K context, think=false, upstream non-thinking sampling; no Open WebUI role/default changes until it proves safe and useful |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | ISTA GSQ/RCO IQ3_XXS deployability/RAG experiment; the 16K test answered 5/5 early RAG cases correctly but fell to ~0.28 GiB MemAvailable before safety abort, so the same verified model/GGUF is now bounded to 8K; think=false, upstream non-thinking sampling; no Open WebUI role/default changes |
 | `exp-qwen38-27b-unsloth-ud-iq3-s` | dense 27B Unsloth dynamic-quant control; UD-IQ3_S first, UD-IQ3_XXS fallback |
 | `exp-gemma4-26b-a4b-mradermacher-i1-iq3-s` | Gemma 4 MoE main-lane challenger; i1-IQ3_S first, i1-IQ3_XS fallback; projector omitted for initial text comparison |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |

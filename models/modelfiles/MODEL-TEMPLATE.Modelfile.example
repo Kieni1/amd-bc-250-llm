@@ -1,6 +1,6 @@
 # Copy this file to /etc/bc250-llm-server/models.d/NAME.Modelfile.
 # Replace every uppercase placeholder; the filename becomes the Ollama name.
-# Categories: production, experimental, task, agentic, embedding
+# Categories: production, experiments, task, agentic, embedding
 # Name prefixes: prod-, exp-, task-, agentic-, embed-
 # Storage names: production, experiments, task, agent, embedding
 # BC250 category: CATEGORY

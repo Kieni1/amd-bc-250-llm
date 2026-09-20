@@ -103,8 +103,13 @@ rejected outside `experiments`. Every template requires exactly one
 `PARAMETER num_keep 256`.
 
 Invalid metadata, names, prefixes, paths or duplicate required parameters fail
-before download. Operator files live in `/etc/bc250-llm-server/models.d/`; a
-same-name operator file overrides the packaged template and survives upgrades.
+before download. Operator files live in `/etc/bc250-llm-server/models.d/`; that directory is
+expected to be empty on a stock install because packaged definitions live under
+`/usr/share/bc250-llm-server/model-management/modelfiles/`. A same-name operator file overrides
+the packaged template and survives upgrades. Every visible regular definition there must end in
+`.Modelfile`; otherwise model discovery fails with the offending filename instead of silently
+ignoring it. Use canonical category `experiments` for new overrides; singular `experimental` is
+accepted only for older files.
 
 ## Download state and authentication
 
