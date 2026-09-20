@@ -540,12 +540,17 @@ OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 `init` can create the first administrator, sign in an existing administrator or
 use a protected administrator API-key file. The guided installer exposes the same
 choice and suggests `/root/owui-test.key` when it already exists with protected
-permissions. It applies the package-owned main/task provider, dedicated embedding,
-task/RAG, reviewed package-owned Open WebUI Functions and additive model-preset baseline.
-`status` also verifies the package Function source/state and package-owned preset fields
-needed by the selected production translation contract. Credentials/tokens are not
-persisted by the package. Unrelated
-operator models, users, prompts and knowledge are not synchronized away.
+permissions. It applies the package-owned main/task provider, dedicated embedding, task/RAG, reviewed
+package-owned Open WebUI Functions and additive model-preset baseline. The package also owns the
+persisted local/offline application policy that matters to the appliance contract: Arena is disabled,
+external OpenAI/direct/code-execution/interpreter/memory/community-sharing features remain disabled,
+and upload count/size/extension limits are converged through supported Open WebUI APIs. The raw five
+production base models plus the dedicated task model remain active for presets/background tasks but
+are marked hidden in the ordinary selector so the normal product surface is role-oriented.
+`status` verifies those persisted values, hidden-model metadata, package Function source/state and
+package-owned preset fields needed by the selected production translation contract. Credentials/tokens
+are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
+synchronized away.
 
 Agent mode is separate from Open WebUI:
 
@@ -557,8 +562,16 @@ sudo bc250-agent-mode normal
 ```
 
 Entering agent mode stops main/task/embedding and starts only the 11436 coding
-backend; `leave` restores normal mode. `normal` is an idempotent convergence alias for the
-same restoration path and is useful when repairing an unexpected partial-normal topology.
+backend; `leave` restores normal mode. Open WebUI remains reachable, but its persisted catalogue may
+still list normal office roles while their backends are intentionally unavailable. `normal` is an
+idempotent convergence alias for the same restoration path and is useful when repairing an unexpected
+partial-normal topology.
+
+The pinned Open WebUI v0.11.3 `/api/chat/completions` OpenAI-style adapter is not an advertised
+external BC-250 compatibility contract. Device attribution found that root `max_tokens` is not a
+reliable Ollama cap and that reasoning-token / length-finish metadata can be misleading. Package-owned
+callers use native nested `options.num_predict` when a hard generation cap is required; see
+[`openwebui-settings.md`](openwebui-settings.md) for the precise compatibility boundary.
 
 ## Maintenance
 

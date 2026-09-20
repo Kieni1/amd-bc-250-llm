@@ -99,6 +99,14 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("source must not be a symlink", result.stderr)
 
+    def test_live_manager_cpu_unlock_uses_bc250_compatible_reboot_patch(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        patch = (ROOT / "patches/cu-live-manager-rpm-paths.patch").read_text(encoding="utf-8")
+        self.assertIn("patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch", spec)
+        self.assertIn("-\t\t\t\tsystemctl reboot", patch)
+        self.assertIn("+\t\t\t\t/usr/sbin/reboot", patch)
+        self.assertIn("offer_cpu_unlock_reboot()", patch)
+
     def test_source_tarball_excludes_python_and_ruff_caches(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
@@ -284,6 +292,25 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("desired-state.json", helper)
         self.assertIn('"bc250-office-standard"', models)
         self.assertIn('"bc250-office-deep-reasoning"', models)
+        model_data = json.loads(models)["models"]
+        hidden_ids = {
+            item["id"]
+            for item in model_data
+            if item.get("is_active") is True
+            and isinstance(item.get("meta"), dict)
+            and item["meta"].get("hidden") is True
+        }
+        self.assertEqual(
+            hidden_ids,
+            {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
+                "prod-qwen35-9b-unsloth-q6-k:latest",
+                "prod-gpt-oss20b-ggml-org-mxfp4:latest",
+                "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
+            },
+        )
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")
@@ -322,6 +349,9 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
+        desired = json.loads(
+            (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
+        )
         for setting in (
             "ENABLE_COMMUNITY_SHARING=false",
             "ENABLE_CODE_EXECUTION=false",
@@ -329,6 +359,21 @@ class PackagingTests(unittest.TestCase):
             "ENABLE_MEMORIES=false",
         ):
             self.assertIn(f"Environment={setting}", quadlet)
+        self.assertEqual(
+            desired["application"],
+            {
+                "evaluation.arena.enable": False,
+                "openai.enable": False,
+                "direct.enable": False,
+                "code_execution.enable": False,
+                "code_interpreter.enable": False,
+                "memories.enable": False,
+                "ui.enable_community_sharing": False,
+            },
+        )
+        self.assertEqual(desired["rag"]["FILE_MAX_SIZE"], 128)
+        self.assertEqual(desired["rag"]["FILE_MAX_COUNT"], 20)
+        self.assertIn("pdf", desired["rag"]["ALLOWED_FILE_EXTENSIONS"])
 
     def test_open_webui_v0113_new_controls_stay_conservative(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
