@@ -15,6 +15,7 @@ SUMMARY=0
 PASS=0
 WARN=0
 FAIL=0
+SKIP=0
 CURRENT_SECTION=""
 SECTION_PASS=0
 SECTION_WARN=0
@@ -87,6 +88,7 @@ finish_section() {
 ok() { ((SUMMARY)) || printf '  [ OK ] %s\n' "$1"; PASS=$((PASS + 1)); }
 warn() { ((SUMMARY)) && printf '    [WARN] %s\n' "$1" || printf '  [WARN] %s\n' "$1"; WARN=$((WARN + 1)); }
 bad() { ((SUMMARY)) && printf '    [FAIL] %s\n' "$1" || printf '  [FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); }
+skipped() { ((SUMMARY)) && printf '    [SKIP] %s\n' "$1" || printf '  [SKIP] %s\n' "$1"; SKIP=$((SKIP + 1)); }
 info() { ((SUMMARY)) || printf '  [info] %s\n' "$1"; }
 section() {
   finish_section
@@ -419,6 +421,10 @@ fi
 section "Services"
 agent_active=0
 systemctl is-active --quiet ollama-agent.service 2>/dev/null && agent_active=1
+task_lane_active=0
+embedding_lane_active=0
+systemctl is-active --quiet ollama-task.service 2>/dev/null && task_lane_active=1
+systemctl is-active --quiet ollama-embedding.service 2>/dev/null && embedding_lane_active=1
 for unit in cyan-skillfish-governor-smu.service tika.service open-webui.service nginx.service; do
   if systemctl is-active --quiet "$unit" 2>/dev/null; then
     ok "$unit active"
@@ -453,13 +459,17 @@ else
   done
 fi
 if ((agent_active == 0)); then
-  task_tags="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null || true)"
-  if [[ -n "$task_tags" ]] && jq -e --arg model "task-lfm25-1.2b-instruct-liquidai-q6-k" \
-      'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
-      <<< "$task_tags" >/dev/null 2>&1; then
-    ok "default Open WebUI task model is registered on dedicated task Ollama"
+  if ((task_lane_active)); then
+    task_tags="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null || true)"
+    if [[ -n "$task_tags" ]] && jq -e --arg model "task-lfm25-1.2b-instruct-liquidai-q6-k" \
+        'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
+        <<< "$task_tags" >/dev/null 2>&1; then
+      ok "default Open WebUI task model is registered on dedicated task Ollama"
+    else
+      bad "default Open WebUI task model is not registered on dedicated task Ollama :11435"
+    fi
   else
-    bad "default Open WebUI task model is not registered on dedicated task Ollama :11435"
+    skipped "task model registration unavailable because ollama-task.service is inactive"
   fi
 fi
 
@@ -573,6 +583,8 @@ if [[ -n "$rag_embedding_model" ]]; then
   [[ -n "$rag_embedding_url" ]] && info "Package RAG embedding endpoint: $rag_embedding_url"
   if ((agent_active)); then
     info "embedding registration check deferred while exclusive agent mode stops :11437"
+  elif ((!embedding_lane_active)); then
+    skipped "RAG embedding registration unavailable because ollama-embedding.service is inactive"
   elif [[ -n "$embedding_tags" ]] && jq -e --arg model "$rag_embedding_model" \
       'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
       <<< "$embedding_tags" >/dev/null 2>&1; then
@@ -599,7 +611,7 @@ if command -v bc250-openwebui-setup >/dev/null 2>&1; then
       printf '%s\n' "$owui_drift" | sed 's/^/    /'
     fi
   else
-    info "authenticated Open WebUI desired-state drift check skipped; rerun with --owui-token-file FILE or set OWUI_API_KEY temporarily"
+    skipped "authenticated Open WebUI desired-state check (no API token supplied)"
   fi
 else
   warn "bc250-openwebui-setup is not installed; live Open WebUI drift was not checked"
@@ -642,6 +654,14 @@ if ((agent_active)); then
   fi
 else
   for port in 11434 11435 11437; do
+    if [[ "$port" == 11435 ]] && ((!task_lane_active)); then
+      skipped "Open WebUI task gateway check unavailable because ollama-task.service is inactive"
+      continue
+    fi
+    if [[ "$port" == 11437 ]] && ((!embedding_lane_active)); then
+      skipped "Open WebUI embedding gateway check unavailable because ollama-embedding.service is inactive"
+      continue
+    fi
     if container_http "http://host.containers.internal:${port}/api/tags"; then
       ok "Open WebUI container reaches Ollama host gateway :$port"
     else
@@ -739,9 +759,11 @@ fi
 
 finish_section
 if ((SUMMARY)); then
-  printf '\nVerification: %d ok / %d warn / %d fail\n' "$PASS" "$WARN" "$FAIL"
+  printf '\nVerification: %d ok / %d warn / %d fail / %d skipped\n' \
+    "$PASS" "$WARN" "$FAIL" "$SKIP"
 else
-  printf '\n================ %d ok / %d warn / %d fail ================\n' "$PASS" "$WARN" "$FAIL"
+  printf '\n================ %d ok / %d warn / %d fail / %d skipped ================\n' \
+    "$PASS" "$WARN" "$FAIL" "$SKIP"
 fi
 if ((FAIL == 0 && WARN == 0)); then
   echo "Server verification completed successfully."

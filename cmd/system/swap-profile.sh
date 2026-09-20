@@ -105,7 +105,7 @@ EOF_ZRAM
 }
 
 create_swapfile() {
-  install -d -m0755 "$SWAP_DIR"
+  install -d -m0750 "$SWAP_DIR"
   local fstype
   fstype="$(findmnt -no FSTYPE --target "$SWAP_DIR")"
   if [[ "$fstype" == btrfs ]]; then
@@ -142,7 +142,7 @@ ensure_swappiness() {
 ensure_profile() {
   require_root
   validate_settings
-  install -d -m0755 "$SWAP_DIR"
+  install -d -m0750 "$SWAP_DIR"
   local wanted_bytes actual_bytes=0
   wanted_bytes=$((SWAP_GIB * 1024 * 1024 * 1024))
   [[ -f "$SWAP_FILE" ]] && actual_bytes="$(stat -c '%s' "$SWAP_FILE" 2>/dev/null || echo 0)"

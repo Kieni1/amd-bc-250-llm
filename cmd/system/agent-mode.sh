@@ -7,10 +7,11 @@ AGENT_UNIT=ollama-agent.service
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-agent-mode enter|leave|status
+Usage: sudo bc250-agent-mode enter|leave|normal|status
 
 enter   Start exclusive agent mode; systemd conflicts stop normal lanes.
-leave   Start main + task + embedding; systemd conflicts stop the agent.
+leave   Leave exclusive agent mode and restore normal topology.
+normal  Converge to normal main/task/embedding topology (same action as leave).
 status  Show package lane states and the derived appliance mode.
 USAGE
 }
@@ -66,7 +67,10 @@ start_normal() {
 enter_agent() {
   require_units
   if systemctl start "$AGENT_UNIT" && wait_api 11436 && agent_units_exclusive; then
-    echo "Agent mode active: 11436 only."
+    echo "Agent mode active."
+    echo "Agent API: 127.0.0.1:11436"
+    echo "Normal main/task/embedding lanes are temporarily stopped."
+    echo "Return to normal mode with: sudo bc250-agent-mode normal"
     return 0
   fi
   systemctl status "$AGENT_UNIT" --no-pager -l || true
@@ -78,7 +82,11 @@ enter_agent() {
 leave_agent() {
   require_units
   start_normal
-  echo "Normal mode active: main/task/embedding are ready; agent lane is intentionally inactive."
+  echo "Normal runtime topology restored."
+  echo "Main:      :11434 active"
+  echo "Task:      :11435 active"
+  echo "Embedding: :11437 active"
+  echo "Agent:     intentionally inactive"
 }
 
 status_agent() {
@@ -100,7 +108,7 @@ status_agent() {
 
 case "${1:-}" in
   enter) need_root; enter_agent ;;
-  leave) need_root; leave_agent ;;
+  leave|normal) need_root; leave_agent ;;
   status) status_agent ;;
   help|-h|--help|'') usage ;;
   *) usage >&2; exit 2 ;;

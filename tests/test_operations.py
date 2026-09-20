@@ -54,6 +54,15 @@ class StatusTests(unittest.TestCase):
             self.assertIn(expected, source)
 
 
+    def test_status_surfaces_topology_aware_overall_state(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        self.assertIn('Overall: HEALTHY', source)
+        self.assertIn('Runtime mode: exclusive agent', source)
+        self.assertIn('Overall: DEGRADED', source)
+        self.assertIn('Recovery: sudo bc250-agent-mode normal', source)
+        self.assertIn('Overall: UNAVAILABLE', source)
+        self.assertIn('Reason: optional needs-restarting helper unavailable', source)
+
     def test_status_reports_protected_storage_instead_of_zero_size(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         start = source.index("directory_usage() {")
@@ -146,7 +155,8 @@ class CuHelperTests(unittest.TestCase):
 
     def test_normal_mode_message_describes_agent_as_intentionally_inactive(self) -> None:
         source = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
-        self.assertIn("agent lane is intentionally inactive", source)
+        self.assertIn("Agent:     intentionally inactive", source)
+        self.assertIn("Return to normal mode with: sudo bc250-agent-mode normal", source)
         self.assertNotIn("agent is stopped by unit conflicts", source)
 
 
@@ -172,6 +182,13 @@ class VerifyTests(unittest.TestCase):
             runtime_sources,
             r"\b[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.fc44(?:\.[A-Za-z0-9_]+)?\b",
         )
+
+    def test_verify_reports_dependent_lane_checks_as_skipped(self) -> None:
+        source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn('skipped "task model registration unavailable because ollama-task.service is inactive"', source)
+        self.assertIn('skipped "RAG embedding registration unavailable because ollama-embedding.service is inactive"', source)
+        self.assertIn('skipped "authenticated Open WebUI desired-state check (no API token supplied)"', source)
+        self.assertIn("Verification: %d ok / %d warn / %d fail / %d skipped", source)
 
     def test_verify_treats_static_agent_unit_as_not_boot_enabled(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
@@ -428,6 +445,15 @@ class CuStatusTests(unittest.TestCase):
 
 
 class SwapProfileTests(unittest.TestCase):
+    def test_swap_directory_mode_matches_package_contract(self) -> None:
+        source = (ROOT / "cmd/system/swap-profile.sh").read_text(encoding="utf-8")
+        tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn('install -d -m0750 "$SWAP_DIR"', source)
+        self.assertNotIn('install -d -m0755 "$SWAP_DIR"', source)
+        self.assertIn("d /var/lib/bc250-llm-server/swap 0750 root root -", tmpfiles)
+        self.assertIn("%attr(0750,root,root) /var/lib/bc250-llm-server/swap", spec)
+
     def test_swappiness_override_is_optional_and_reversible(self) -> None:
         source = (ROOT / "cmd/system/swap-profile.sh").read_text(encoding="utf-8")
         self.assertIn('SWAPPINESS="${SWAPPINESS:-}"', source)

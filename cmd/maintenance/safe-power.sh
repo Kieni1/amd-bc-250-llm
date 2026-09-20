@@ -67,6 +67,7 @@ fi
 # deliberately: inbound appliance sessions and selected outbound activity both
 # defer safe power.
 connections=''
+protected_local_port=''
 companion_matches=0
 while IFS= read -r line; do
   [[ -n "$line" ]] || continue
@@ -85,7 +86,10 @@ while IFS= read -r line; do
     ((companion_matches+=1))
     continue
   fi
-  if [[ "$local_endpoint" =~ :(${port_regex})$ || "$peer_endpoint" =~ :(${port_regex})$ ]]; then
+  if [[ "$local_endpoint" =~ :(${port_regex})$ ]]; then
+    [[ -n "$protected_local_port" ]] || protected_local_port="${BASH_REMATCH[1]}"
+    connections+="${line}"$'\n'
+  elif [[ "$peer_endpoint" =~ :(${port_regex})$ ]]; then
     connections+="${line}"$'\n'
   fi
 done <<< "$ss_output"
@@ -98,7 +102,22 @@ if [[ -n "$companion_ssh" ]]; then
   log "Ignoring only the authenticated companion control SSH connection for this request."
 fi
 if [[ -n "$connections" ]]; then
-  log "Deferring $NIGHT_POWER_ACTION: protected TCP activity detected on a configured local or remote endpoint."
+  if [[ -n "$protected_local_port" ]]; then
+    case "$protected_local_port" in
+      22) protected_label="SSH connection" ;;
+      80) protected_label="HTTP connection" ;;
+      443) protected_label="HTTPS connection" ;;
+      3000) protected_label="Open WebUI connection" ;;
+      11434) protected_label="main Ollama connection" ;;
+      11435) protected_label="task Ollama connection" ;;
+      11436) protected_label="agent Ollama connection" ;;
+      11437) protected_label="embedding Ollama connection" ;;
+      *) protected_label="TCP connection" ;;
+    esac
+    log "Deferring $NIGHT_POWER_ACTION: active protected $protected_label detected on local port $protected_local_port."
+  else
+    log "Deferring $NIGHT_POWER_ACTION: protected TCP activity detected on a configured remote endpoint."
+  fi
   exit 0
 fi
 

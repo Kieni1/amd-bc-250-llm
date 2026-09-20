@@ -55,6 +55,49 @@ runtime_mode() {
   esac
 }
 
+
+topology_summary() {
+  local mode="$1" unit label missing=()
+  case "$mode" in
+    normal)
+      echo "Overall: HEALTHY"
+      echo "Runtime mode: normal"
+      ;;
+    agent)
+      echo "Overall: HEALTHY"
+      echo "Runtime mode: exclusive agent"
+      ;;
+    degraded)
+      for unit in ollama.service ollama-task.service ollama-embedding.service; do
+        [[ "$(unit_state "$unit")" == active ]] && continue
+        case "$unit" in
+          ollama.service) label=main ;;
+          ollama-task.service) label=task ;;
+          ollama-embedding.service) label=embedding ;;
+        esac
+        missing+=("$label")
+      done
+      if ((${#missing[@]})); then
+        local joined
+        joined="$(IFS=,; echo "${missing[*]}")"
+        echo "Overall: DEGRADED — ${joined//,/ + } lane(s) inactive"
+      else
+        echo "Overall: DEGRADED — unexpected runtime topology"
+      fi
+      echo "Runtime mode: degraded"
+      echo "Recovery: sudo bc250-agent-mode normal"
+      ;;
+    stopped)
+      echo "Overall: UNAVAILABLE — normal runtime lanes are not operational"
+      echo "Runtime mode: stopped"
+      ;;
+    *)
+      echo "Overall: UNKNOWN — topology classifier unavailable"
+      echo "Runtime mode: unknown"
+      ;;
+  esac
+}
+
 ollama_status() {
   local label="$1" unit="$2" port="$3" state models response
   state="$(unit_state "$unit")"
@@ -123,6 +166,8 @@ elif (($#)); then
 fi
 
 echo "BC-250 appliance status"
+mode="$(runtime_mode)"
+topology_summary "$mode"
 
 section "Platform"
 printf '  Kernel:       %s\n' "$(uname -r)"
@@ -134,7 +179,8 @@ if command -v needs-restarting >/dev/null 2>&1; then
     echo "  Reboot:       recommended after package/kernel updates"
   fi
 else
-  echo "  Reboot:       not checked (needs-restarting helper unavailable)"
+  echo "  Reboot required: unknown"
+  echo "  Reason: optional needs-restarting helper unavailable"
 fi
 
 section "CPU power states"
@@ -208,7 +254,6 @@ if systemctl is-active --quiet ollama-agent.service 2>/dev/null; then
 else
   printf '  %-9s port %-5s %-8s %s\n' agent 11436 inactive '(intentionally inactive outside agent mode)'
 fi
-mode="$(runtime_mode)"
 case "$mode" in
   agent)    echo "  Mode:      exclusive agent/coding" ;;
   normal)   echo "  Mode:      normal production/task/embedding" ;;
