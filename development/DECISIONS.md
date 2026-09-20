@@ -475,14 +475,14 @@ role for the current 16 GiB BC-250 profile. Keep `bc250-office-advanced` /
 `prod-qwen35-9b-unsloth-q6-k` available for its separate higher-quality general-office role,
 but do not present or preload Qwen 9B as an equivalent long-residency RAG default.
 
-**Observed:** Both finalists were functionally strong: the broad fixed-retrieval campaign achieved
-96/96 target retrieval, 96/96 all-required-support retrieval, 8/8 abstention and no truncations
-for each model, and the authenticated Open WebUI product path passed 36/36 turns per model in
-short isolated arms. The deciding evidence was sustained residency. Gemma completed 42/42
-continuous-residency Open WebUI RAG turns with about 2.7 GiB MemAvailable remaining, roughly
-15 MiB swap growth and no safety/residency failure. Qwen remained semantically correct up to the
-abort but fell to roughly 338 MiB minimum MemAvailable and reached the campaign's configured
-512 MiB safety floor after only a few subruns.
+**Observed:** Corrected direct scoring gave Gemma 94/96 overall (95/96 fact, 96/96 language,
+95/96 citation, 96/96 retrieval) and Qwen 93/96 overall (95/96 fact, 96/96 language, 94/96
+citation, 96/96 retrieval); both also passed 8/8 abstention probes. The authenticated Open WebUI
+short path passed 36/36 turns per model. The deciding evidence was sustained residency. Gemma
+completed 42/42 continuous-residency turns with about 2.7 GiB MemAvailable remaining and no
+safety/residency failure. Qwen had no quality failure before abort, but fell to roughly 338 MiB
+minimum MemAvailable and reached the campaign's configured 512 MiB safety floor during the third
+subrun.
 
 **Interpretation:** This is a resource-safety/product-role decision, not a Qwen answer-quality
 rejection. Gemma provides substantially more sustained-residency margin on the present 16 GiB UMA
@@ -528,14 +528,14 @@ not enough evidence to promote the model on quality. The two ISTA Ollama experim
 and still require role-specific product-quality/headroom qualification before any production
 promotion.
 
-**Retest only if:** an Ollama candidate is being considered for a production role, YMQ is being
-considered for preferred MTP status, or upstream artifacts/runtime materially change.
+**Retest only if:** an Ollama candidate is being considered for a production role or upstream
+artifacts/runtime materially change. Final MTP package selection is recorded separately in DEC-026.
 
 
 
 ## DEC-021 — Treat MTP Phase 2 as optimization, not requalification
 
-**Status:** ACTIVE — broad MTP qualification and corrected draft-depth sweep are complete enough for current package use.
+**Status:** SUPERSEDED BY DEC-026 — preserve as the pre-final-selection optimization record.
 
 **Decision:** Treat `qwen3.5-9b-mtp`, `qwen3.6-27b-mtp` and
 `qwen3.8-27b-hauhaucs-mtp` as Phase-1-qualified MTP configurations under the reviewed llama.cpp
@@ -660,5 +660,42 @@ general `--ignore-ssh` switch would be too broad; the exact authenticated tuple 
 protected while allowing the restricted control identity to request the same BC-250-owned policy.
 
 **Retest only if:** OpenSSH/sudo environment handling, `ss` output semantics, the companion identity,
-or the safe-power transport changes. Installed 1.8 must prove public SSH defer, companion-only allow,
-second-SSH defer, then real idle S5/WOL before unattended poweroff is enabled.
+or the safe-power transport changes. The next exact installed current release must first prove public
+SSH defer and healthy 40-CU return-code behavior. Companion-only/second-SSH and real idle S5/WOL are
+required before unattended poweroff is enabled, not as automatic gates for unrelated releases.
+
+## DEC-026 — Encode the final MTP selection in the existing catalog
+
+**Status:** ACTIVE — final package-facing MTP policy from the completed BC-250 campaign.
+
+**Decision:** Keep MTP standalone, disabled/download-only and outside normal installer/Open WebUI/
+Ollama convergence. Use the existing MTP TOML catalog as the single runtime source for context,
+draft and a deliberately small package-policy pair: `role` plus `recommendation`. The active set is:
+
+```text
+qwen3.5-9b-mtp             primary / fast         ctx 16384  draft 2
+qwen3.8-27b-ymq-xs-ti-mtp  primary / general-27b  ctx 8192   draft 1
+qwen3.8-27b-hauhaucs-mtp   alternative / specialist ctx 8192 draft 2
+```
+
+Retire `qwen3.6-27b-mtp` from active discovery while preserving its exact source definition and
+positive historical qualification in the source-only graveyard. Keep `qwen3.6-35b-a3b-mtp` retired
+for the already-proven stock-envelope memory-fit failure. Do not silently retarget ambiguous 27B
+convenience aliases; remove them and require exact 27B IDs.
+
+**Why:** Confirmation-grade Qwen3.5 testing selected depth 2: 256-token throughput was effectively
+unchanged from depth 3 while 1024-token MTP throughput improved by about 9%, with higher acceptance
+and slightly more memory headroom. YMQ depth 1 materially outperformed depth 2 at both reviewed
+output sizes, kept about 2.8--3.0 GiB free-memory class and passed parity-quality checks. HauhauCS
+retains a distinct short-output/parity niche. Qwen3.6 27B no longer has a strong package-facing niche
+after the optimized Qwen3.8 results.
+
+**Boundary:** `role` / `recommendation` are operator-presentation policy only. They do not alter
+`enabled=false`, acquisition behavior, topology or automatic model selection. There is no benchmark
+result ingestion, recommendation engine or automatic promotion/retirement state machine.
+
+**Retest only if:** the external llama.cpp runtime/model artifacts/hardware envelope change
+materially, or a concrete product workload shows the selected fast/general/specialist split is no
+longer useful. A symmetric three-repeat YMQ depth-1 confirmation is optional evidence, not a release
+gate.
+
