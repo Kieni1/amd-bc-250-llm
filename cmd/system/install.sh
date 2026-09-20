@@ -27,7 +27,7 @@ Before 1.0 this is a pre-1.0 greenfield appliance setup. Apply or resume the pac
 state, avoids completed work where practical, applies the TTM/swap baseline,
 prepares optional 40-CU support for the exact running kernel, offers one unified
 model selection, configures Open WebUI, verifies the core appliance result, then
-offers a default-No optional maintenance/Pi gate after core verification.
+offers local-maintenance setup and, separately, default-No optional Pi/companion setup after core verification.
 
 A normal update has one primary reboot after Fedora/kernel + memory setup. A
 second reboot is requested only when persistent 40-CU mode is already configured
@@ -488,7 +488,8 @@ show_plan() {
   printf '  models                ensure active role models + optional extras\n'
   printf '  Open WebUI            start after models, then apply/status\n'
   printf '  core verification     run before optional power/remote-maintenance setup\n'
-  printf '  maintenance / Pi      optional, default-No guided setup after core verification\n'
+  printf '  local maintenance      optional guided setup after core verification\n'
+  printf '  Pi / companion         separate optional, default-No guided setup\n'
   printf '  reboot required       %s\n' "$reboot"
 }
 
@@ -655,27 +656,20 @@ verify_backup_export_setup() {
 }
 
 step_11_maintenance() {
-  heading "11. OPTIONAL MAINTENANCE / RASPBERRY PI"
+  heading "11. OPTIONAL LOCAL MAINTENANCE"
   command -v bc250-maintenance >/dev/null 2>&1 || {
     echo "Maintenance helper unavailable; skipping optional setup."
     return 0
   }
   if ! input_is_interactive || [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
-    echo "Non-interactive install: optional maintenance/Pi setup was not changed."
+    echo "Non-interactive install: optional local maintenance and Pi/companion setup were not changed."
     echo "Run later with: sudo bc250-maintenance setup"
     echo "                sudo bc250-maintenance companion enable"
     echo "                sudo bc250-maintenance backup-export enable"
     return 0
   fi
 
-  if ! yes_no "Configure optional maintenance or Raspberry Pi integration now?"; then
-    echo "Optional maintenance setup skipped. Existing configuration was not changed."
-    echo "Run later with: sudo bc250-maintenance setup"
-    return 0
-  fi
-
   local local_state=SKIPPED companion_state=SKIPPED export_state=SKIPPED
-  echo
   if [[ -f /etc/bc250-llm-server/maintenance.env ]]; then
     if yes_no "Review or change existing local BC-250 maintenance settings now?"; then
       bc250-maintenance setup
@@ -685,7 +679,7 @@ step_11_maintenance() {
       echo "Existing local maintenance configuration left unchanged."
       local_state=UNCHANGED
     fi
-  elif yes_no_default_yes "Configure local BC-250 maintenance now?"; then
+  elif yes_no "Configure local BC-250 maintenance now?"; then
     bc250-maintenance setup
     verify_local_maintenance_setup
     local_state=PASS
@@ -693,8 +687,8 @@ step_11_maintenance() {
     echo "Local maintenance setup skipped. Run later: sudo bc250-maintenance setup"
   fi
 
-  echo
-  if yes_no "Configure Raspberry Pi integration now?"; then
+  heading "12. OPTIONAL RASPBERRY PI / COMPANION INTEGRATION"
+  if yes_no "Configure Raspberry Pi / companion integration now?"; then
     echo "Restricted Raspberry Pi maintenance access"
     echo "  Prepares a forced-command power-control account and narrow sudo rule."
     echo "  The Pi keeps its private key; Open WebUI/Ollama application ports are not exposed."
@@ -735,7 +729,7 @@ step_11_maintenance() {
       fi
     fi
   else
-    echo "Raspberry Pi integration skipped. Existing Pi configuration was not changed."
+    echo "Raspberry Pi / companion integration skipped. Existing Pi configuration was not changed."
   fi
 
   echo
@@ -759,6 +753,8 @@ step_10_verify() {
   fi
   if ((verify_status != 0)); then
     echo "ERROR: installation verification reported failures; run sudo bc250-verify for the detailed report." >&2
+    echo "After correcting the reported issue, rerun:" >&2
+    printf '  ' >&2; rerun_command >&2
     return 1
   fi
   echo "Detailed diagnostics remain available with: sudo bc250-verify"

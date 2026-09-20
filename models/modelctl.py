@@ -344,8 +344,10 @@ def validate_operator_model_directory(directory: Path) -> None:
     if invalid:
         names = ", ".join(invalid)
         raise ModelError(
-            f"{directory}: unrecognized operator model file(s): {names}; "
-            "model definitions must end in .Modelfile"
+            f"invalid operator model definition(s) in {directory}: {names}\n"
+            "Files in models.d must end in .Modelfile.\n"
+            "Operator-owned files are not modified automatically. Move, rename, or "
+            "remove the listed file(s), then rerun: sudo bc250-install"
         )
 
 

@@ -70,7 +70,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 patch.object(modelctl, "OPERATOR_MODEL_DIR", operator),
                 self.assertRaisesRegex(
                     modelctl.ModelError,
-                    r"exp-example.*must end in \.Modelfile",
+                    r"(?s)exp-example.*must end in \.Modelfile.*not modified automatically.*sudo bc250-install",
                 ),
             ):
                 modelctl.discover_models([operator])

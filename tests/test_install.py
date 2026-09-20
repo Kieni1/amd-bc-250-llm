@@ -259,7 +259,7 @@ input_is_interactive && exit 9 || exit 0
         )]
         self.assertEqual(order, sorted(order))
         plan = source[source.index("show_plan() {"):source.index("wait_for_open_webui() {")]
-        self.assertLess(plan.index("core verification"), plan.index("maintenance / Pi"))
+        self.assertLess(plan.index("core verification"), plan.index("local maintenance"))
         help_text = subprocess.run(
             ["bash", str(INSTALLER), "--help"],
             text=True, stdout=subprocess.PIPE, check=False,
@@ -358,6 +358,13 @@ input_is_interactive && exit 9 || exit 0
             self.assertFalse((state / "ollama-agent.service").exists())
             for unit in ("ollama.service", "ollama-task.service", "ollama-embedding.service"):
                 self.assertTrue((state / unit).exists())
+
+    def test_agent_mode_normal_alias_reuses_leave_convergence(self) -> None:
+        source = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
+        self.assertIn("enter|leave|normal|status", source)
+        self.assertIn("leave|normal) need_root; leave_agent", source)
+        self.assertIn("Normal runtime topology restored.", source)
+        self.assertIn("Return to normal mode with: sudo bc250-agent-mode normal", source)
 
     def test_agent_mode_rejects_nonexclusive_service_state(self) -> None:
         script = ROOT / "cmd/system/agent-mode.sh"
@@ -510,19 +517,23 @@ step_8_application_services
         source = INSTALLER.read_text()
         block = source[source.index("step_10_verify() {"):source.index("run_models_only() {")]
         self.assertIn("bc250-verify --summary", block)
+        self.assertIn("After correcting the reported issue, rerun:", block)
+        self.assertIn("rerun_command", block)
         self.assertNotIn("llm-run-diagnose --no-load", block)
 
-    def test_full_installer_gates_optional_maintenance_before_local_or_pi_setup(self) -> None:
+    def test_full_installer_separates_local_maintenance_from_pi_setup(self) -> None:
         source = INSTALLER.read_text()
         block = source[
             source.index("step_11_maintenance() {"):
             source.index("run_models_only() {")
         ]
-        gate = 'yes_no "Configure optional maintenance or Raspberry Pi integration now?"'
-        self.assertIn(gate, block)
-        self.assertIn("bc250-maintenance setup", block[block.index(gate):])
+        self.assertIn('heading "11. OPTIONAL LOCAL MAINTENANCE"', block)
+        self.assertIn('heading "12. OPTIONAL RASPBERRY PI / COMPANION INTEGRATION"', block)
+        self.assertNotIn("Configure optional maintenance or Raspberry Pi integration now?", block)
+        self.assertIn("Configure local BC-250 maintenance now?", block)
         self.assertIn("Review or change existing local BC-250 maintenance settings now?", block)
-        self.assertIn("Configure Raspberry Pi integration now?", block)
+        self.assertIn("Configure Raspberry Pi / companion integration now?", block)
+        self.assertLess(block.index("bc250-maintenance setup"), block.index("Configure Raspberry Pi / companion integration now?"))
         self.assertIn("bc250-maintenance companion enable", block)
         self.assertIn("bc250-maintenance backup-export enable", block)
         self.assertIn('ensure_optional_ssh_server "read-only backup export"', block)
@@ -572,15 +583,17 @@ step_8_application_services
         self.assertIn("Core installation and verification completed successfully.", source)
         self.assertNotIn("Installation and verification completed successfully.", source)
 
-    def test_optional_maintenance_top_gate_skips_all_changes_by_default(self) -> None:
+    def test_optional_local_and_pi_setup_can_both_be_skipped(self) -> None:
         result = source_probe(r"""
 input_is_interactive() { return 0; }
 yes_no() { return 1; }
+yes_no_default_yes() { return 1; }
 bc250-maintenance() { printf 'UNEXPECTED:%s\n' "$*"; return 99; }
 step_11_maintenance
 """)
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("Optional maintenance setup skipped", result.stdout)
+        self.assertIn("Local maintenance setup skipped", result.stdout)
+        self.assertIn("Raspberry Pi / companion integration skipped", result.stdout)
         self.assertNotIn("UNEXPECTED:", result.stdout)
 
     def test_models_only_resume_is_public(self) -> None:
