@@ -1,79 +1,85 @@
-# BC-250 support / operations handover — current source-validated 0.11.3-1.7
+# BC-250 support / operations handover — current source 0.11.3-2.1
 
-You own real-device health, service topology, model lifecycle operations, storage,
-maintenance/power, Open WebUI operational integration and bounded hardware regression.
-Semantic model promotion belongs to the relevant quality lane/main integration.
+This handover is for the real-device support/operations lane: service topology, model lifecycle
+operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
+hardware regression. Semantic model promotion remains a main/quality decision.
 
-## Authority and current source
+## Authority and evidence boundary
 
-Newest supplied source is authoritative over this handover. At the time of this refresh:
+Use newest source/package first, then exact installed device evidence. Current source:
 
 ```text
 VERSION:      0.11.3
-RPM Release:  1.7
-source base:  release-closed 0.11.3-0.4 + carried 0.5 installer/diagnostic work + bounded RAG integration/safety refinement
+RPM Release:  2.1
+NVR:          bc250-llm-server-0.11.3-2.1
 ```
 
-Current 0.11.3-1.7 is source-validated but not yet RPM/device-qualified. It carries the optional
-maintenance/Pi UX, post-configuration verification, tight-resource/output-budget diagnostics,
-deterministic RAG/Open WebUI qualification and safe MTP cleanup forward. RAG residency restoration
-now guarantees the starting model set while allowing each Ollama service to apply its normal
-keep-alive policy, and canonical RAG summaries use `swap_peak_delta_mib` rather than calling
-peak-minus-start swap cumulative growth. Historical exact-0.11.3-0.4 MTP Phase 1 now provides real
-BC-250 pass evidence for qwen3.5-9b, qwen3.6-27b and HauhauCS qwen3.8-27b; the 35B-A3B stock
-8K/full-GPU configuration is a confirmed memory-fit failure, and corrected Phase-2 optimization is complete enough to close broad MTP testing; only optional targeted confirmation remains. Model/runtime defaults and whole-appliance hard acceptance thresholds remain unchanged.
+2.1 carries forward the focused 1.8 support/model-manager safety release derived from exact-1.7 operator testing, while adding only RAG evidence/schema and documentation cleanup. The inherited safety fixes are:
 
-Newest complete device evidence is exact refined
-`bc250-llm-server-0.11.3-0.4.fc44.x86_64`. Guided install completed with normal topology,
-concise model reconciliation and verifier 54/0/0. v4.2 revalidation then completed with
-infrastructure/restoration PASS, full coverage and quality 8/8. Task was 6/6, agent 3/3,
-direct/OWUI translation and RAG paths passed. GPT-OSS/Jina remained within policy but
-reached 193.36 MiB minimum MemAvailable and recorded non-severe 8662 -> 8320 context
-truncation; one accepted office-draft case reached its output budget. Exact evidence is in
-`development/model-runs/2026-09-19-installed-0.11.3-0.4-revalidation.md`.
+- safe-power local/peer endpoint parsing;
+- a narrow forced-command Pi self-SSH exemption while preserving second-SSH/UI/Ollama deferral;
+- non-blocking final power requests;
+- healthy live-40CU rc=0 when persistent activation is intentionally disabled;
+- model-manager `apply all all` guidance and malformed overlay visibility;
+- protected-state/status wording, maintenance enabled/disabled wording and small-file prune sizes;
+- Stage-7 MTP presentation;
+- the existing ISTA Qwen3.8 IQ3_XXS experiment's safer 8K context with the same verified GGUF.
 
-Exact installed `0.11.3-1.4.fc44` subsequently completed the guided upgrade/install with verifier
-54/0/0, but its revalidation is partial rather than qualified: task reported 5/6 (`tags-en` relevance),
-RAG semantic acceptance was 4/4, and the worker then failed closed because the Jina embedding-only
-residency reload used an empty `/api/embed` probe. Release 1.5 fixed that probe with non-empty input while retaining service-default keep-alive behavior; current 1.6 carries the fix forward unchanged. See
-`development/model-runs/2026-09-19-installed-0.11.3-1.4-partial-revalidation.md`.
+Newest full device qualification is exact installed `0.11.3-1.7.fc44.x86_64`:
 
+```text
+core verify          54 / 0 / 0
+infrastructure       PASS
+quality              8/8 PASS
+restoration          PASS
+coverage             FULL
+```
 
-Exact installed `0.11.3-1.6.fc44` subsequently completed the full v4.2 revalidation: installer/core verify 54/0/0, infrastructure/restoration PASS and FULL coverage. RAG passed 4/4 and Jina residency restoration succeeded, closing the earlier empty-embed restoration defect. The only scored quality miss was task `tags-en` 5/6; its actual response used `Text Recognition`, which current source now accepts as an OCR synonym without lowering the two-group relevance threshold. GPT-OSS/Jina passed the edge policy at 79.293 tok/s with 156.266 MiB minimum MemAvailable, 17.066 MiB swap peak delta and 72 C max temperature. See `development/model-runs/2026-09-19-installed-0.11.3-1.6-revalidation.md`.
+The exact-1.7 support campaign separately proved normal↔agent restoration, degraded-mode
+recovery, fresh verified config/users backups and prune dry-run, then stopped after finding the
+safe-power and 40-CU return-code defects now fixed in 1.8 and carried into 2.1. Real idle S5/WOL, Pi forced-command
+shutdown, backup restore and live prune are therefore **pending exact-2.1 tests**, not accepted
+historical behavior.
 
-MTP is operationally standalone from the Ollama lanes. Stage 7 shows read-only MTP state without
-selectable indexes or implicit fetch. Direct `bc250-run-mtp` drains all reachable Ollama residency and
-restores the captured set when llama.cpp exits; comparison/qualification selects drain-only isolation
-and deliberately leaves Ollama cold. Service topology itself is not switched for MTP.
+Evidence files:
+
+```text
+development/model-runs/2026-09-20-installed-0.11.3-1.7-revalidation.md
+development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md
+```
+
+Do not relabel those results as 2.1 qualification.
 
 ## Validation ownership
 
-GitHub owns RPM/package builds. Workstation owns Ruff/ShellCheck. BC-250 owns
-runtime/hardware qualification. Current `0.11.3-1.7` source remains the active release line; deterministic counts must be taken from the final artifact closure after this refinement. Ruff/ShellCheck are workstation-owned and are not claimed here; GitHub RPM/SRPM
-build and exact 0.11.3-1.7 BC-250 execution is not yet claimed; exact 1.4 has partial install/revalidation evidence only.
+```text
+GitHub       RPM/SRPM/package builds
+workstation  Ruff/developer linting
+BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
+```
 
-## Normal service topology
+Current 2.1 source validation is recorded in `PATCHNOTE-0.11.3-2.1.md`. Exact installed-2.1 execution is the outstanding hardware gate; RPM/SRPM build evidence remains external.
+
+## Service topology
 
 ```text
 ollama.service            main       11434
 ollama-task.service       task       11435
-ollama-agent.service      agent      11436; inactive in normal mode
+ollama-agent.service      agent      11436; exclusive and inactive in normal mode
 ollama-embedding.service  embedding  11437
-open-webui.service        active
-nginx.service             office-facing HTTP :80
+open-webui.service        application
+nginx.service             office-facing HTTP :80 / readiness path
 tika.service              private document extraction
 ```
 
-Normal lane policy remains one loaded model / one parallel request per Ollama lane.
-Main keepalive is 20m, task 0, embedding 10m and agent 5m. Agent mode is exclusive and
-must restore the full normal topology on leave.
+Normal mode: main/task/embedding active, agent inactive. Agent mode: 11436 active, normal Ollama
+lanes inactive. `bc250-agent-mode status` is the topology authority and must distinguish
+`normal / agent / degraded / stopped`.
 
-Internal 3000/11434-11437 ports are not Pi readiness endpoints. Office readiness is the
-nginx/Open WebUI path on HTTP :80; SSH :22 is administration/restricted maintenance.
+Internal 3000/11434-11437 are not Pi readiness endpoints. Use nginx/Open WebUI HTTP :80 for office
+readiness and SSH :22 only for administration/restricted maintenance.
 
-## Current runtime pins
-
-Read `config/runtime.env` as authority. Current source pins:
+Current runtime pins come from `config/runtime.env`:
 
 ```text
 Ollama       0.34.0
@@ -81,123 +87,155 @@ Open WebUI   0.11.3
 Tika         4.0.0-full
 ```
 
-Ollama installer commit:
-`d8ab4b4f0ca24b51d3a46b3bf4f462e58ce66b1f`.
-
-## Current promoted roles
+## Current production roles relevant to operations
 
 ```text
 standard office     prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 RAG answer          prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 translation         prod-translate-gemma4-sub-e4b-17s-q4-k-xl
-translation roles:
-  bc250-office-translation-de-fr -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
-  bc250-office-translation-fr-de -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 higher-quality      prod-qwen35-9b-unsloth-q6-k
-deep/warm main      prod-gpt-oss20b-ggml-org-mxfp4
+deep/memory edge    prod-gpt-oss20b-ggml-org-mxfp4
 embedding           embed-jina-v5-small-retrieval-q4-k-m
-task default        task-lfm25-1.2b-instruct-liquidai-q6-k
-task retired        task-gemma3-1b-unsloth-ud-q4-k-xl (graveyard)
-agent default       agentic-ornith15-9b-ornith-q5-k-m
+task                task-lfm25-1.2b-instruct-liquidai-q6-k
+agent baseline      agentic-ornith15-9b-ornith-q5-k-m
 ```
 
-Do not revive graveyard models merely because an old handover names them.
+MTP is not another Ollama lane. Installer Stage 7 shows MTP state read-only but never fetches it.
+Direct `bc250-run-mtp` drains Ollama residency and restores the captured set; comparison uses
+specialist drain-only isolation and leaves Ollama cold.
 
-## Hardware facts that affect operations
+## Hardware/resource facts for operations
 
-- 16 GB shared GDDR6 is one physical CPU/GPU pool; never add RAM/VRAM/GTT/Vulkan heaps.
-- Stock exposure is roughly 24 CUs / 12 WGPs; physical GPU has up to 40 CUs / 20 WGPs.
-- Live 40-CU routing is operator-controlled. Do not require a generic driver CU counter
-  to show 40 when the package live routing table proves dispatch state.
-- Package governor policy is 350–1850 MHz. Do not import >2 GHz community settings into
-  production without dedicated stability/thermal evidence.
-- Stock CPU operation exposes 6C/12T even though 8C/16T silicon exists; CPU unlock is
-  separate and not required for the appliance.
+- 16 GB GDDR6 is one shared CPU/GPU pool; do not add RAM/VRAM/GTT/Vulkan views.
+- Live routing can be healthy at 40/40 even when kernel/RADV numeric counters show 24.
+- Live 40-CU routing is operator-controlled; persistent 40-CU boot activation may intentionally be
+  disabled and must not make healthy live status fail.
+- Governor policy remains approximately 350–1850 MHz with 85 C throttle target.
+- Hard MemAvailable floor is 128 MiB; <512 MiB is tight-headroom diagnostic territory.
+- GPT-OSS + Jina is the credible memory edge; exact-1.7 passed with 167 MiB minimum MemAvailable.
 
-Newest **full** general appliance evidence is exact installed
-`bc250-llm-server-0.11.3-0.4.fc44.x86_64`: normal main/task/embedding/Open WebUI topology,
-installer verification 54 ok / 0 warn / 0 fail, and v4.2 revalidation with
-infrastructure/restoration/full coverage PASS and quality 8/8. Task passed 6/6, direct and
-Open WebUI translation/RAG paths passed, production use cases passed and agent passed 3/3.
-That evidence remains historical for exact 0.4 and does not qualify current 1.3 bytes.
+## Model lifecycle safety
 
-Older installed `0.11.2-0.5.fc44` remains useful **maintenance-specific** evidence: local
-config/users backups were enabled, pruning remained `DRY_RUN=1`, warm-up and automatic night
-shutdown were disabled, and Pi companion/export were skipped. Its transcript also confirmed
-the already-fixed `bc250-maintenance contract` documentation path. Current source retains the
-later retained-key validation, independent SSH preparation for backup export and fail-closed
-MTP comparison-integrity work. Power/WOL evidence remains older and still needs qualification.
+Use the current grammar:
+
+```text
+bc250-model list [CATEGORY]
+sudo bc250-model status [CATEGORY] [SELECTION] [--online]
+bc250-model path CATEGORY ID
+sudo bc250-model apply CATEGORY [SELECTION]
+sudo bc250-model refresh CATEGORY [SELECTION]
+sudo bc250-model unregister CATEGORY [SELECTION]
+sudo bc250-model remove CATEGORY [SELECTION]
+sudo bc250-model purge-retired
+```
+
+Category `all` does not itself select every model. Explicit all-model convergence is
+`sudo bc250-model apply all all`.
+
+For support testing, prefer `unregister -> apply` so the manager reuses the verified GGUF. Avoid
+`refresh`, `remove` and source pruning unless source destruction/redownload is the actual test goal.
+Manager-owned GGUF paths are protected; shell existence/stat probes from `llm_admin` must use sudo.
+
+`/etc/bc250-llm-server/models.d/` is an operator override directory. Packaged definitions are not
+expected to appear there. Visible operator definitions must have a `.Modelfile` suffix and matching
+model metadata/name.
 
 ## Storage lessons to preserve
 
-During four large-model imports, Ollama 0.34.0 temporarily created source-hash blobs in
-addition to retained package GGUFs and converted/live blobs. Four unreferenced import
-blobs totaling roughly 46.3 GiB were removed by a normal `ollama.service` restart with
-Ollama reporting exactly four unused blobs removed. Do not manually delete blobs merely
-because onboarding temporarily looks ~3x amplified.
+Ollama imports can temporarily amplify storage by keeping source GGUFs plus import/live blobs. Normal
+Ollama lifecycle may remove unreferenced blobs; do not manually delete them merely because onboarding
+looks temporarily large.
 
-For byte-identical retained GGUF/live Ollama blobs, XFS dedupe is preferred over deleting
-GGUFs. The current implementation keeps 16 MiB ranges but batches all ranges for a pair
-into one `xfs_io` invocation. Do not regress to process-per-range behavior. Preserve
-dedupe state across model reconciliation.
+For byte-identical retained GGUF/live Ollama blobs on XFS, prefer package dedupe over deleting GGUFs.
+Preserve verified source/state so registration can be rebuilt locally.
 
-Known model-reconciliation gap: arbitrary out-of-band same-name Ollama registration
-mutation may not be detected when source/template state is unchanged. Do not claim full
-live-manifest drift proof until explicitly implemented.
+Known gap: arbitrary out-of-band same-name Ollama registration mutation is not fully detected when
+source/template state is unchanged.
 
-## Maintenance / Pi contract
+## Local maintenance and backup contract
 
-The Pi is an availability/power companion first; backup is optional.
+Stable interfaces:
 
-Stable BC-250 interfaces include:
-
-```bash
-sudo bc250-maintenance contract
+```text
+sudo bc250-maintenance status
+sudo bc250-maintenance setup
+sudo bc250-maintenance run backup
+sudo bc250-maintenance run prune
+sudo bc250-maintenance request-shutdown
 sudo bc250-maintenance companion status
 sudo bc250-maintenance companion enable
-sudo bc250-maintenance request-shutdown
 sudo bc250-maintenance backup-export status
 sudo bc250-maintenance backup-export enable
 ```
 
-Safe shutdown delegates to BC-250 policy and may defer for active SSH/UI/Ollama or
-maintenance. Never replace it with Pi-side raw `systemctl poweroff`.
+Current design:
 
-WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff
-is relied upon.
+- config/users backups are local and independent of Pi;
+- backups are private and verified, not merely created;
+- restore requires Open WebUI stopped, validates archive/database state and preserves rollback
+  material;
+- pruning starts `DRY_RUN=1` and fails safe on uncertain metadata;
+- warm-up/night power are optional; status must distinguish disabled schedules from retained
+  configured values;
+- backup export is a separate read-only identity and optional;
+- active maintenance jobs defer power actions.
 
-## Immediate operations priority
+## Safe-power / Pi contract
 
-The next hardware campaign should no longer start with storage dedupe. Product priority
-is office availability and electricity saving.
+The BC-250 owns the shutdown decision. The Pi may request it but must not execute raw remote
+`systemctl poweroff` as the normal interface.
 
-Finish the current `0.11.3-1.7` source iteration first; do not spend hardware time on an
-intermediate package. Once 1.7 is frozen, GitHub-build/install the exact RPM, capture NEVRA plus
-RPM/source SHA, and run one bounded source-change check:
+Public operator path:
 
 ```text
-sudo bc250-verify --owui-token-file FILE
-optional maintenance/Pi top gate defaults to No and preserves existing state
-local maintenance and Pi integration are independent choices
-selected optional setup reports PASS/UNCHANGED/SKIPPED truthfully
-post-install footer shows concise command groups plus installed docs/important paths
-one full v4.2 revalidation
+sudo bc250-maintenance request-shutdown
 ```
 
-The full revalidation should preserve all existing infrastructure/restoration semantics and
-hard thresholds while additionally surfacing tight MemAvailable and accepted output-budget
-observations under `Diagnostics`. After that exact-source gate, support/maintenance is the next bounded hardware campaign: validate
-local maintenance and timer/backup behavior first, then S5 WOL, busy defer and idle allow+wake, and
-only exercise Pi restricted access/export when configured. MTP is now optional targeted follow-up,
-not a prerequisite for operations work.
+This must defer if the current interactive SSH connection, UI/Ollama protected TCP activity or a
+maintenance job is active.
 
-## Other operations work after power qualification
+Dedicated companion path:
 
-1. establish one current benchmark-operations control run before large quality campaigns;
-2. eventually qualify batched XFS dedupe performance while preserving all retained GGUFs;
-3. verify backup export only when off-device backup becomes operationally useful;
-4. run whole-appliance `bc250-revalidate` at milestones rather than after every source-
-   documentation/test-only patch.
+```text
+forced-command SSH identity
+  -> sudo bc250-maintenance request-shutdown-companion
+  -> safe-power helper with exact SSH_CONNECTION exemption
+```
+
+Only that authenticated control tuple may be ignored. Any additional SSH/protected connection must
+still block poweroff. Missing/failed TCP inspection must defer.
+
+WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
+
+## Immediate exact-2.1 changed-boundary checks
+
+Run one bounded batch at a time. The minimum current-release device evidence is:
+
+```text
+1. install exact 0.11.3-2.1; record NEVRA + artifact SHA
+2. sudo bc250-verify --owui-token-file FILE
+3. interactive SSH request-shutdown -> DEFER, no shutdown broadcast/session loss
+4. bc250-40cu status + verify -> healthy 40/40 and rc=0 with persistent mode disabled
+```
+
+Only add feature-specific checks when the feature is going into use: Pi companion requires
+companion-only allow plus second-admin-SSH defer; unattended power requires one idle S5 -> WOL ->
+HTTP :80 readiness cycle. Backup restore, unregister/apply lifecycle and destructive pruning remain
+bounded support/product acceptance tasks rather than mandatory checks after every release.
+
+Do not enable unattended night shutdown before the applicable SSH/companion/S5 guards are proven.
+
+## UX acceptance during support tests
+
+Do not judge only return codes. Record whether an operator can correctly understand the state:
+
+- protected data should say protected/unavailable, not `0` or absent;
+- normal inactive agent should read as intentional, not a scary conflict/failure;
+- disabled warm-up/night power should be visibly disabled even if configuration values remain;
+- small prune candidates should show meaningful B/KiB/MiB sizes;
+- intentional degraded tests should produce a clear degraded summary and recover to normal;
+- safe-power defer should return without broadcast/session loss;
+- successful power allow should log the guard decision before the connection disappears.
 
 ## Handoff to main integration
 
@@ -212,6 +250,7 @@ commands actually run:
 result / rc:
 verifier before/after:
 service topology before/after:
+operator UX observations:
 observed facts:
 interpretation:
 restoration/integrity:
@@ -221,4 +260,4 @@ evidence files + SHA-256:
 credentials/private data included: no/yes
 ```
 
-Keep observed facts, interpretation and proposed changes separate.
+Keep observed facts, UX observations, interpretation and proposed changes separate.

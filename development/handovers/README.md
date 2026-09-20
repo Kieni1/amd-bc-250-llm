@@ -24,10 +24,10 @@ Authority when information disagrees:
 5. these handovers;
 6. older chats/logs/patches.
 
-The main handover intentionally remains detailed about hardware, software topology,
-resource constraints, model roles and proven negative results. Historical release-by-
-release narration belongs in the changelog, `development/DECISIONS.md`, and
-`development/model-runs/` rather than being copied indefinitely into every prompt.
+The main handover intentionally remains detailed about current hardware/software contracts,
+resource constraints, model roles, current evidence boundaries and proven negative results.
+Superseded release-by-release narration belongs in the changelog, `development/DECISIONS.md`,
+and `development/model-runs/` rather than being copied indefinitely into every prompt.
 
 Dated specialist handovers are evidence/method snapshots, not automatically current
 workflow policy. When their procedural advice conflicts with `DEVELOPMENT-WORKFLOW.md`,

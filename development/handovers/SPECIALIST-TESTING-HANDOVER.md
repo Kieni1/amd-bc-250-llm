@@ -1,17 +1,18 @@
 # BC-250 specialist testing handover template
 
-Use this template for temporary RAG, translation, general-quality, agentic, benchmark-
-operations or MTP chats. Do not maintain a permanently duplicated full project state in
-each specialist file.
+Use this for temporary support, RAG, translation, general-quality, agentic, benchmark-operations or
+MTP chats. Do not maintain a second full project state here; the newest source and main handover are
+authoritative.
 
 ## First instruction
 
-> Read the newest supplied source as authority, then read
+> Read the newest supplied source first, then `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
 > `development/TESTING-STRATEGY.md`, `development/VALIDATION-MATRIX.md`,
-> `development/DECISIONS.md`, the relevant package docs and `MODELS.md`. Work only on the
-> assigned lane. Use one bounded BC-250 batch at a time. Do not change production defaults,
-> version metadata or unrelated package policy without returning evidence to main
-> integration first. Never weaken evaluators/restoration to make a candidate pass.
+> `development/DECISIONS.md`, `MODELS.md` and the lane-specific package docs. Work only on the assigned
+> lane. Use one bounded BC-250 batch at a time. Preserve verified GGUFs, restore state before changing
+> lanes, and never weaken quality/safety/restoration checks to make a run pass. Do not change
+> production defaults, release metadata or unrelated package policy without returning evidence to
+> main integration.
 
 ## Lane contract
 
@@ -19,29 +20,50 @@ Fill in at chat start:
 
 ```text
 lane:
-current production baseline:
+source release:
+installed NEVRA:
 question being answered:
-cheap/direct gate:
+starting topology/state:
+cheap/read-only gate:
 real integration gate:
 resource/coexistence gate:
-repeatability requirement:
+restoration requirement:
 stop rule:
 retest conditions from existing decisions:
 ```
 
-Suggested lane references:
+## Current lane guidance
 
-- benchmark operations: `cmd/benchmark/README.md`, benchmark source/tests;
-- RAG: `docs/RAG.md`, `config/openwebui/desired-state.json`; direct `rag-quality` must preserve starting Ollama residency set, use a non-empty embed probe for embedding-only reloads, and report resident-session MemAvailable/swap state;
-- translation: `docs/QUALITY-CHECKS.md`, `MODELS.md`, translation quality scripts;
-- general/main: `MODELS.md`, generation/usecase benchmarks;
-- agentic: `models/coding-agent/README.md`, exclusive agent-mode tooling; raw file-producing/commit
-  contracts reject outer Markdown fences rather than silently stripping them;
-- support/maintenance: `docs/MAINTENANCE.md`, `docs/MAINTENANCE-CONTRACT.md`,
-  `cmd/maintenance/maintenance.sh`, `safe-power.sh`, backup/restore/prune helpers. This is the next
-  active hardware lane: read-only inspection first, then real S5 WOL, busy/defer, idle/allow,
-  recovery/restoration, local backup/restore, and only then optional Pi/backup-export paths.
-- MTP: `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp`, `bc250-compare-mtp`; broad BC-250 qualification is now complete enough for package use. Qwen3.5 9B, Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B have passing same-target baseline/MTP evidence under the reviewed llama.cpp Vulkan runtime. The 35B-A3B stock 8K/full-GPU configuration is a retired fit failure. Corrected draft-depth testing keeps depth 2 for Qwen3.6/HauhauCS; Qwen3.5 depth 2 is the strongest exploratory candidate but packaged depth 3 remains until optional confirmation-grade evidence justifies a default change. YMQ passes at depth 2; further optimization is optional only if it is being promoted. Generic installer selection and combined `apply all` / `refresh all` never select MTP; installer Stage 7 only shows a read-only non-indexed MTP inventory. `bc250-run-mtp` drains resident Ollama models and restores the pre-run set on direct use; `bc250-compare-mtp` uses drain-only isolation and intentionally leaves Ollama cold. Preparation remains explicit. Do not reopen broad MTP campaigns without a concrete product question.
+- **support / maintenance / power:** read `docs/MAINTENANCE.md`,
+  `docs/MAINTENANCE-CONTRACT.md`, `cmd/maintenance/maintenance.sh` and `safe-power.sh`. Current highest
+  hardware priority is a narrow exact-2.1 changed-boundary pass: interactive SSH defer and healthy
+  40-CU rc=0. Add Pi forced-command/second-SSH and one idle S5→WOL→HTTP readiness cycle only when
+  those optional power features are being enabled. No-download model lifecycle and backup restore are
+  separate bounded support acceptance, not automatic release gates. Evaluate operator UX as well as
+  functionality.
+- **benchmark operations:** use `cmd/benchmark/README.md` and current benchmark source/tests. Prove
+  result completeness, resource telemetry and restoration on a known production control before a
+  large campaign.
+- **RAG / documents:** production answer role is Gemma E4B via `bc250-office-documents`; model
+  selection is closed for the current 16 GiB profile. The active question is real-office-document
+  acceptance: actual PDFs/Tika, messy tables, multilingual/multi-source questions, OCR-derived text,
+  update/delete/re-import behavior, long residency and one deliberate unload/reload. Direct RAG work
+  must preserve starting residency and use non-empty embedding probes for embedding reload.
+- **translation:** production is Translate-Gemma E4B through explicit DE→FR / FR→DE roles. Broad
+  discovery is closed; run only integrated requalification or investigate a proven product-level
+  failure.
+- **general/main:** use existing production contracts. The meaningful bounded comparison is GPT-OSS
+  20B versus Qwen3.5 9B for deep-office quality versus memory cost; do not reopen broad 27B/35B
+  discovery without a concrete reason.
+- **agentic/coding:** use `models/coding-agent/README.md`. Agent mode is exclusive; verify normal-mode
+  restoration. File-producing/commit contracts reject outer Markdown fences, truncation/incomplete
+  final content and reasoning contamination. Product-path evidence must exercise actual documented
+  `bc250-code` modes, not only the canonical benchmark.
+- **MTP:** use `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp` and
+  `bc250-compare-mtp`. Broad qualification is closed. Active qualified entries are Qwen3.5 9B,
+  Qwen3.6 27B, HauhauCS Qwen3.8 27B and YMQ XS-TI Qwen3.8 27B; 35B-A3B is a retired memory-fit failure.
+  Direct runs drain and restore Ollama residency; comparison uses drain-only isolation. Only reopen
+  targeted work for an actual depth/default/promotion decision.
 
 ## Required specialist handoff
 
@@ -54,6 +76,7 @@ commands actually run:
 quality/measurement result:
 resource result:
 real integration result:
+operator UX result:
 restoration result:
 observed facts:
 interpretation:
@@ -64,4 +87,4 @@ recommended next action:
 ```
 
 If a candidate loses the promotion case at an earlier gate, stop. Do not spend expensive
-coexistence/integration time merely to finish a matrix.
+coexistence/integration time merely to complete a matrix.
