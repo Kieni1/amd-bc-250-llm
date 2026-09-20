@@ -59,6 +59,11 @@ The replacement module and live WGP routing solve different parts of the
 workflow. A numerically full routing table alone does not prove that the patched
 module is loaded or that all routed CUs produce correct results.
 
+The packaged pinned live manager also exposes the optional CPU-core-unlock workflow. When its
+interactive flow offers an immediate reboot, the package patch uses `/usr/sbin/reboot`, matching
+the reboot invocation proven reliable on BC-250 hardware. With `--yes`, upstream behavior remains
+non-rebooting: reboot explicitly when ready.
+
 ## Kernel updates
 
 The package does not hard-code a Fedora kernel release. After any kernel update,

@@ -39,3 +39,12 @@ index 1d4c38e..f58fd04 100755
  	systemctl daemon-reload
  	info "removed $SERVICE_NAME"
  }
+@@ -704,7 +695,7 @@ offer_cpu_unlock_reboot() {
+ 		case "$ans" in
+ 			y|Y|yes|YES)
+ 				info "rebooting..."
+-				systemctl reboot
++				/usr/sbin/reboot
+ 				return 0
+ 				;;
+ 			n|N|no|NO)
