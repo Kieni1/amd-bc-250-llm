@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.11.3-2.1 - 2026-09-20
+
+- Carry the 1.8 support/power fixes forward unchanged into the new release line; no service-topology, production-model, unattended-power-policy, governor/CU, hard-memory-floor or MTP-default change is introduced.
+- Complete the RAG tooling integration without growing a second framework: direct RAG evidence now exposes `language_measurable` alongside `language_ok`, while retaining the existing compatibility state; documentation explains that `numeric_values` handles numeric equivalence and existing required/alternative terms express mandatory units or qualifiers.
+- Clarify RAG resource semantics: the chronological start/min/end delta is session evidence and may include initial model load, so it is not presented as workload-only resident-memory drift. Existing telemetry, residency snapshot/restore and thresholds remain unchanged.
+- Record the final Qwen3.8 27B IQ3_XXS 16K follow-up supplied from BC-250 testing: 5/5 early RAG cases were correct with citations, but MemAvailable progressively fell to about 0.28 GiB before the safety harness aborted; unloading recovered about 13.8 GiB. The same verified model/GGUF remains experimental and bounded to 8K; no duplicate `-8k` identity is added.
+- Keep `bc250-office-documents` / Gemma E4B as the production document/RAG default on the 16 GiB profile. Qwen 9B remains the separate higher-quality general-office role; five 27B cases are not treated as broad quality qualification.
+- Fix secondary model-manager drift: the installed operator Modelfile template now teaches canonical `experiments`, while historical `experimental` metadata remains readable; make the development CLI contract versionless so it does not become stale on every release.
+- Apply the existing private credential-file boundary to Open WebUI benchmark `--token-file` inputs as well: require a non-empty regular file with no group/world access, matching the importer/setup/verifier behavior.
+- Do not add the proposed dedicated long-residency benchmark/subrun accounting layer, a second watchdog/telemetry implementation, a new unit-policy schema or a global 512 MiB benchmark failure gate. The completed model-selection campaign and current shared primitives do not justify that maintenance cost.
+
+## 0.11.3-1.8 - 2026-09-20
+
+- Fix the real-device safe-power failure found on installed 1.7: `ss -Htn` endpoints are parsed from the last two fields so an active local SSH session now defers shutdown instead of letting poweroff begin. Power actions use non-blocking systemd requests so the oneshot decision service can finish cleanly.
+- Make Pi forced-command shutdown compatible with that SSH guard without weakening it: only the authenticated companion control connection is exempted, the tuple must be found exactly once, configured safe-power/WOL policy is preserved, and any second SSH session, UI/Ollama traffic, protected outbound traffic or active maintenance still defers.
+- Fix `bc250-40cu status` / `verify` returning failure solely because persistent 40-CU boot activation is intentionally disabled; live 40/40 routing remains the operational authority.
+- Improve model-manager UX discovered during operator use: correct the old `install --all` hint to `apply all all`, explain category `all` versus selection `all`, and reject visible regular files in `/etc/bc250-llm-server/models.d/` that lost their `.Modelfile` suffix instead of silently ignoring them.
+- Improve operator status UX: standalone MTP inventory no longer repeats its heading and uses `FETCHED, VERIFIED` / `NOT FETCHED`; protected storage is reported as protected rather than `0`; Ollama version probing follows an active lane; normal-mode agent wording no longer presents intended conflicts as an error.
+- Make maintenance status show whether warm-up/night-power are enabled or merely configured, and render sub-MiB prune sizes as B/KiB instead of misleading `0MiB`.
+- Change the existing `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` experiment from 16K to 8K context after sustained RAG evidence reached the low-memory safety boundary. The model ID, source GGUF/checksum, sampling and opt-in role are unchanged, so verified source bytes can be reused.
+- Record installed 1.7 support/maintenance evidence. Model unregister/re-apply blocks 6/7 were not product failures; their first harness used unprivileged `-f` checks below protected `/var/lib`. Real power/WOL testing remains pending this fixed release.
+
 ## 0.11.3-1.7 - 2026-09-19
 
 - Fix `bc250-status` mode derivation: the summary now reuses `bc250-agent-mode status` semantics and can report normal, degraded, stopped or exclusive agent mode instead of calling every agent-inactive state normal.

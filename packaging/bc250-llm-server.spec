@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.11.3
-Release:        1.7%{?dist}
+Release:        2.1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,24 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.1
+- Carry the 1.8 support/power safety fixes forward unchanged while moving the current source release to 2.1; no service-topology, production-model, power-policy, governor, CU, hard-memory-floor or MTP-default change.
+- Finish the RAG qualification integration: expose language measurability separately from language acceptance, document numeric/unit fixture composition, and clarify chronological session memory telemetry without adding another benchmark framework.
+- Record the final Qwen3.8 27B IQ3_XXS 16K RAG follow-up: five early cited answers were correct, but MemAvailable fell to about 0.28 GiB before safety abort; keep the same verified model identity at the safer 8K experimental default.
+- Keep Gemma E4B / bc250-office-documents as the 16 GiB production RAG default; Qwen 9B remains the separate higher-quality office role and no broad RAG model tournament is reopened.
+- Fix secondary model-manager documentation drift: the operator template now teaches canonical category experiments, and the durable CLI contract no longer carries a stale per-release target header.
+- Apply the existing private Open WebUI credential-file boundary to benchmark --token-file inputs instead of accepting permissive files.
+- Deliberately do not add a first-class long-residency benchmark, a second telemetry/watchdog stack, global 512 MiB failure semantics or a new unit-policy schema because the current shared helpers and deterministic fixture primitives already cover the maintained product needs.
+
+* Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.8
+- Fix safe-power established-connection parsing so active local SSH/UI/Ollama endpoints actually defer shutdown; request power actions non-blocking so the decision unit can complete cleanly.
+- Keep Pi shutdown fail-safe by exempting only its authenticated forced-command SSH connection while every other protected connection still defers poweroff.
+- Fix healthy live 40-CU status/verify returning rc=1 when persistent boot activation is intentionally disabled.
+- Harden operator model discovery and CLI guidance: reject visible non-.Modelfile overlay files, clarify combined-category versus all-selection syntax, and correct the legacy install --all hint.
+- Make installer MTP inventory use standalone source vocabulary without a duplicate heading; improve protected-state, agent-mode, maintenance-policy and prune-size operator UX.
+- Bound the existing ISTA Qwen3.8 IQ3_XXS experiment to 8K context after sustained 16K low-memory evidence; reuse the same verified GGUF/model identity rather than creating a duplicate 8K entry.
+- Record exact installed 1.7 support/maintenance findings and keep remaining destructive/power qualification blocked until this safety release is installed.
+
 * Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.7
 - Correct operator topology reporting by deriving normal/degraded/stopped/agent from the existing agent-mode classifier instead of treating agent inactivity as proof of normal mode.
 - Enforce private non-empty regular-file permissions for explicit RAG/Open WebUI and Hugging Face token-file inputs.
