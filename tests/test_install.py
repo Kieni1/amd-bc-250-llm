@@ -161,7 +161,7 @@ step_3_install_ollama
         self.assertIn('bc250-model apply all "$selection"', source)
         self.assertNotIn('bc250-model apply all "$selection" --include-disabled', source)
         self.assertIn('BC250_MODELCTL_CURRENT_SUMMARY=1', source)
-        self.assertIn('Standalone MTP models (llama.cpp; read-only inventory, not selectable here)', source)
+        self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
         self.assertIn('bc250-model status mtp --include-disabled --compact', source)
         self.assertIn('sudo bc250-fetch-mtp MODEL_ID', source)
         self.assertNotIn('bc250-model apply mtp', source)
@@ -217,7 +217,7 @@ require_progress_terminal() { :; }
 prepare_hf_authentication() { :; }
 bc250-model() {
   if [[ "$1 $2" == "status mtp" ]]; then
-    printf 'MTP models:\n  33) qwen3.5-9b-mtp [download-only, disabled, source verified, CURRENT]\n'
+    printf 'MTP models:\n  33) qwen3.5-9b-mtp [FETCHED, VERIFIED]\n'
   else
     printf 'model:%s\n' "$*"
   fi
@@ -227,6 +227,8 @@ step_7_models
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("Standalone MTP models", result.stdout)
         self.assertIn("  - qwen3.5-9b-mtp", result.stdout)
+        self.assertIn("[FETCHED, VERIFIED]", result.stdout)
+        self.assertNotIn("\nMTP models:\n", result.stdout)
         self.assertNotIn("33) qwen3.5-9b-mtp", result.stdout)
         self.assertIn("never fetched by installer convergence", result.stdout)
 

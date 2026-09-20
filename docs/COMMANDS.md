@@ -155,7 +155,11 @@ old technical `resolve` verb and is not a lifecycle action.
 
 ### Lifecycle operations
 
-`apply` means **make the selected model match the current catalog definition**. It reuses
+`apply` means **make the selected model match the current catalog definition**. `all` has
+two different positions by design: the category `all` means the combined catalog, and the
+selection `all` means every eligible entry. Therefore `sudo bc250-model apply all` displays
+the combined catalog and prompts, while `sudo bc250-model apply all all` explicitly selects
+every eligible non-MTP model. It reuses
 a verified existing GGUF when source identity and recorded state still match, repairs
 Modelfile/registration drift without an unnecessary download, and downloads only when the
 source is missing or invalid. Agentic selections temporarily enter exclusive agent mode
@@ -195,7 +199,9 @@ Common options for `apply` and `refresh`:
 - `--min-free-bytes BYTES`: require free space before downloading;
 - `--token-file PATH`: read a Hugging Face token from a non-empty regular file that is not group/world accessible (normally mode `0600`);
 - `--include-disabled`: allow disabled MTP entries to be selected for an explicit `mtp` category operation; combined `apply all` / `refresh all` never include MTP;
-- `--modelfile-dir PATH`: add a Modelfile search directory;
+- `--modelfile-dir PATH`: add a Modelfile search directory; the installed operator overlay
+  `/etc/bc250-llm-server/models.d/` rejects visible regular files without a `.Modelfile` suffix
+  so typos cannot disappear silently;
 - `--source PATH`: use another MTP TOML catalog.
 
 Remote experimental `hf.co/...` definitions do not accept local-GGUF revision/checksum/
@@ -485,6 +491,9 @@ bc250-benchmark owui-chunk-min MODEL --token-file FILE
 sudo bc250-benchmark owui-system-context MODEL --token-file FILE
 ```
 
+Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
+group/world access (normally mode `0600`), matching the package credential-file boundary.
+
 The Open WebUI tuning commands are explicit experiments: they save the observed
 package-owned setting, change only the named benchmark setting, use temporary
 knowledge/file state, and restore the original value. Restoration failure is an
@@ -553,6 +562,12 @@ sudo bc250-maintenance run {backup|prune|all}
 sudo bc250-maintenance clean-cache
 sudo bc250-maintenance disable
 ```
+
+`request-shutdown` is the public operator command. When it is invoked over an
+interactive SSH session, that session is protected activity and the request should
+defer. `companion enable` prints a restricted key whose internal forced command
+exempts only its own authenticated SSH connection; the internal command is not a
+general operator interface.
 
 The full installer asks one default-No question before entering optional maintenance/Pi
 setup. If accepted, local maintenance and Pi integration are separate choices; selected

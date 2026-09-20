@@ -370,10 +370,10 @@ step_7_models() {
   bc250-model status all --compact
   echo
   echo "MTP models are separate opt-in downloads."
-  echo "Standalone MTP models (llama.cpp; read-only inventory, not selectable here):"
+  echo "Standalone MTP models (llama.cpp; read-only, not selectable here):"
   if ! BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
       bc250-model status mtp --include-disabled --compact \
-      | sed -E 's/^([[:space:]]*)[0-9]+\) /\1- /'; then
+      | sed -E '/^MTP models:$/d; s/^([[:space:]]*)[0-9]+\) /\1- /'; then
     echo "  MTP inventory unavailable; inspect later with: bc250-model status mtp --include-disabled --compact"
   fi
   echo "  MTP is never fetched by installer convergence. Prepare one explicitly later with:"
