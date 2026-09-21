@@ -5,6 +5,7 @@
 - Fix `bc250-revalidate` on 0.12.1 packages: the harness now reads the installed package-owned `VERSION` file instead of retaining the obsolete hard-coded `0.11.3` target.
 - Install the package `VERSION` authority under `/usr/share/bc250-llm-server/VERSION` and reject missing or malformed version metadata before qualification starts.
 - Keep the 0.12.1 Open WebUI ACL, Deep Reasoning residency, verifier, provenance and runtime behavior unchanged from 0.12.1-0.1.
+- Keep Git-only `development/` memory outside deterministic release validation, move pre-v1 patch notes under `development/patchnotes/`, and remove duplicate documentation/version assertions that repeated existing release gates.
 
 ## 0.12.1-0.1 - 2026-09-21
 

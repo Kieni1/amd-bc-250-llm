@@ -27,6 +27,7 @@ EXCLUDED_TREES = {
     "unlock-src",
     "live-manager-src",
     "__pycache__",
+    "development",
 }
 EXTERNAL_BUILD_TREES = ("governor-src/", "unlock-src/", "live-manager-src/")
 FAILURES: list[str] = []

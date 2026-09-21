@@ -214,6 +214,7 @@ fi
 - Fix bc250-revalidate package-version gating so it reads the package-owned installed VERSION authority instead of hard-coding the obsolete 0.11.3 target.
 - Install VERSION under the package share and fail closed if the revalidation target version is missing or malformed.
 - Keep the 0.12.1 Open WebUI behavior unchanged; this release bump is limited to revalidation compatibility and its focused regression coverage.
+- Keep Git-only development memory outside release validation, move pre-v1 patch notes under development/patchnotes, and remove duplicate documentation/version checks already owned by existing validation gates.
 
 * Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.1
 - Grant authenticated users read access to the six production Open WebUI roles and their six hidden implementation/task records while preserving unrelated grants.

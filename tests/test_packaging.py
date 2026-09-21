@@ -13,17 +13,6 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class PackagingTests(unittest.TestCase):
-    def test_version_release_and_top_changelog_match(self) -> None:
-        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        self.assertRegex(spec, rf"(?m)^Version:\s+{re.escape(version)}$")
-        release = re.search(r"(?m)^Release:\s+([^%\s]+)", spec)
-        self.assertIsNotNone(release)
-        self.assertRegex(
-            spec,
-            rf"(?m)^%changelog\n\* .* - {re.escape(version)}-{re.escape(release.group(1))}$",
-        )
-
     def test_package_version_authority_is_installed_for_revalidation(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("file\t0644\tVERSION\t{share}/VERSION", manifest)

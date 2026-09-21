@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.12.1-0.1
+# BC-250 support / operations handover — current source release 0.12.1-0.2
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,18 +10,17 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.12.1
-RPM Release:  0.1
-NVR:          bc250-llm-server-0.12.1-0.1
+RPM Release:  0.2
+NVR:          bc250-llm-server-0.12.1-0.2
 ```
 
-0.12.1-0.1 is the current source release target. It carries the narrow Open WebUI ACL, Deep
+0.12.1-0.2 is the current source release target. It carries the narrow Open WebUI ACL, Deep
 Reasoning residency and verifier fixes plus release-provenance/patch-applicability hardening. It does
 not change the already-qualified non-OWUI topology, maintenance, CU, power, storage, backup/restore or
 supported-reboot behavior. Exact installed `0.11.3-2.4.fc44.x86_64` remains the latest broad
-operations acceptance baseline; do not transfer that hardware qualification to 0.12.1-0.1.
+operations acceptance baseline; do not transfer that hardware qualification to 0.12.1-0.2.
 
-The required post-build device work for 0.12.1-0.1 is the small Open WebUI regression pass documented
-in `PATCHNOTE-0.12.1-0.1.md`, unless later source changes touch additional operations boundaries.
+The required post-build device work for 0.12.1-0.2 is the small Open WebUI/revalidation regression pass documented in `development/patchnotes/PATCHNOTE-0.12.1-0.2.md`, unless later source changes touch additional operations boundaries.
 
 Newest full device qualification is exact installed `0.11.3-1.7.fc44.x86_64`:
 
@@ -108,16 +107,9 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 0.12.1-0.1 implementation is recorded in `PATCHNOTE-0.12.1-0.1.md`. Source validation in the
-main integration environment is complete for the deterministic gates: RPM preflight PASS,
-**466/466** tests PASS in split modules, `bash -n` **64/64 PASS**, and Python compileall PASS. The
-monolithic validation invocation exceeded the execution window while tests were still passing; the
-same complete suite was run in disjoint module groups, as required by project evidence rules.
+Current 0.12.1-0.2 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.1-0.2.md`. The 0.2 follow-up changes only the revalidation package-version authority plus release-coherence documentation relative to 0.1; focused source tests for that boundary pass. GitHub remains authoritative for the complete deterministic/build gate.
 
-RPM/SRPM construction still belongs to the authoritative Fedora 44/GitHub build path and is not
-claimed from the current non-Fedora source environment. Exact installed 2.4 is the immediate device
-regression baseline; exact 0.12.1-0.1 remains unqualified until built, installed and subjected to the
-bounded OWUI regression.
+Exact installed 2.4 remains the broad device regression baseline. Exact installed 0.12.1-0.1 reached package convergence and authenticated verification but exposed the stale revalidation version gate; exact 0.12.1-0.2 remains unqualified until built, installed and subjected to the bounded OWUI/revalidation regression.
 
 ## Service topology
 
@@ -266,12 +258,12 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 0.12.1-0.1 source/device follow-up
+## Immediate 0.12.1-0.2 source/device follow-up
 
 Do not replay the closed 2.4 broad operations campaign. The new package changes only Open WebUI
 model authorization/residency/status behavior plus build provenance validation.
 
-For current 0.12.1-0.1:
+For current 0.12.1-0.2:
 
 ```text
 1. build binary/source RPMs through the authoritative Fedora 44 path with exact pinned source caches;

@@ -140,8 +140,6 @@ class DocumentationTests(unittest.TestCase):
             "models/experiments/README.md",
             "models/mtp/README.md",
             "models/task-model/README.md",
-            "development/TESTING-STRATEGY.md",
-            "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
         )
         forbidden = (
             "bc250-model install",
@@ -180,29 +178,6 @@ class DocumentationTests(unittest.TestCase):
                 self.assertNotIn(command, text, f"{relative}: {command}")
 
 
-    def test_current_release_identity_matches_spec_and_handovers(self) -> None:
-        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        version_match = re.search(r"^Version:\s*(\S+)", spec, re.MULTILINE)
-        release_match = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
-        self.assertIsNotNone(version_match)
-        self.assertIsNotNone(release_match)
-        self.assertEqual(version_match.group(1), version)
-        release = release_match.group(1)
-        vr = f"{version}-{release}"
-        nvr = f"bc250-llm-server-{vr}"
-
-        main = (ROOT / "development/handovers/MAIN-INTEGRATION-HANDOVER.md").read_text(encoding="utf-8")
-        operations = (ROOT / "development/handovers/OPERATIONS-HANDOVER.md").read_text(encoding="utf-8")
-        patchnote = (ROOT / f"PATCHNOTE-{vr}.md").read_text(encoding="utf-8")
-
-        self.assertIn(f"VERSION       {version}", main)
-        self.assertIn(f"RPM Release   {release}%{{?dist}}", main)
-        self.assertIn(f"NVR           {nvr}", main)
-        self.assertIn(f"VERSION:      {version}", operations)
-        self.assertIn(f"RPM Release:  {release}", operations)
-        self.assertIn(f"Expected NVR: `{nvr}`", patchnote)
-
     def test_secondary_model_docs_expose_explicit_mtp_opt_in(self) -> None:
         for relative in ("README.md", "TLDR.md", "MODELS.md", "models/README.md", "models/mtp/README.md"):
             text = (ROOT / relative).read_text(encoding="utf-8")
@@ -218,13 +193,11 @@ class DocumentationTests(unittest.TestCase):
 
     def test_current_docs_keep_mtp_out_of_generic_installer_convergence(self) -> None:
         commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
-        contract = (ROOT / "development/MODEL-MANAGER-CLI-CONTRACT.md").read_text(encoding="utf-8")
         models = (ROOT / "models/README.md").read_text(encoding="utf-8")
-        for text in (commands, contract, models):
+        for text in (commands, models):
             self.assertIn("apply all", text)
             self.assertIn("MTP", text)
         self.assertIn("never include MTP", commands)
-        self.assertIn("never select the MTP category", contract)
         self.assertIn("MTP is deliberately absent from that picker", models)
         self.assertNotIn("optional model selection across production, experiments,\nagentic, embedding, task and MTP entries", models)
 
@@ -299,21 +272,6 @@ class DocumentationTests(unittest.TestCase):
                             (path.parent / local).exists(),
                             f"installed {path.relative_to(staged)}: {target}",
                         )
-
-    def test_internal_markdown_links_resolve(self) -> None:
-        for path in ROOT.rglob("*.md"):
-            relative = path.relative_to(ROOT)
-            if any(part in EXCLUDED_DOC_TREES for part in relative.parts):
-                continue
-            text = path.read_text(encoding="utf-8")
-            for target in re.findall(r"\[[^]]*\]\(([^)]+)\)", text):
-                if target.startswith(("http://", "https://", "mailto:", "#")):
-                    continue
-                local = target.split("#", 1)[0]
-                if local:
-                    self.assertTrue(
-                        (path.parent / local).exists(), f"{relative}: {target}"
-                    )
 
     def test_documented_model_sets_match_current_modelfiles(self) -> None:
         names = set()

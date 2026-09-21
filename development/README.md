@@ -15,6 +15,7 @@ use the appliance.
 - `DECISIONS.md` — durable easy-to-reverse engineering decisions; append/supersede
   rather than deleting rationale.
 - `model-runs/` — compact records for consequential model experiments/comparisons.
+- `patchnotes/` — historical pre-v1 release patch notes; development-only and outside the installed documentation contract.
 - `VALIDATION-MATRIX.md` — which evidence class exists for each subsystem and what is
   still pending.
 - `TESTING-STRATEGY.md` — shared promotion funnel and lane-specific qualification order.
