@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.11.3-2.4
+# BC-250 support / operations handover — current source release 0.12.1-0.1
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -9,25 +9,19 @@ hardware regression. Semantic model promotion remains a main/quality decision.
 Use newest source/package first, then exact installed device evidence. Current source:
 
 ```text
-VERSION:      0.11.3
-RPM Release:  2.4
-NVR:          bc250-llm-server-0.11.3-2.4
+VERSION:      0.12.1
+RPM Release:  0.1
+NVR:          bc250-llm-server-0.12.1-0.1
 ```
 
-2.4 is the current source-validated release after exact installed 2.3 targeted acceptance. It does not
-change RAG/MTP/translation/Pi architecture, production model choices, or 40-CU routing policy. Its two
-new product-facing changes are the pinned live-manager CPU-core-unlock reboot-path correction and an
-extension of the existing Open WebUI desired-state contract: Arena off, implementation models
-active-but-hidden, and persisted local/offline/upload policy owned by apply/status. The inherited safety fixes are:
+0.12.1-0.1 is the current source release target. It carries the narrow Open WebUI ACL, Deep
+Reasoning residency and verifier fixes plus release-provenance/patch-applicability hardening. It does
+not change the already-qualified non-OWUI topology, maintenance, CU, power, storage, backup/restore or
+supported-reboot behavior. Exact installed `0.11.3-2.4.fc44.x86_64` remains the latest broad
+operations acceptance baseline; do not transfer that hardware qualification to 0.12.1-0.1.
 
-- safe-power local/peer endpoint parsing;
-- a narrow forced-command Pi self-SSH exemption while preserving second-SSH/UI/Ollama deferral;
-- non-blocking final power requests;
-- healthy live-40CU rc=0 when persistent activation is intentionally disabled;
-- model-manager `apply all all` guidance and malformed overlay visibility;
-- protected-state/status wording, maintenance enabled/disabled wording and small-file prune sizes;
-- Stage-7 MTP presentation;
-- the existing ISTA Qwen3.8 IQ3_XXS experiment's safer 8K context with the same verified GGUF.
+The required post-build device work for 0.12.1-0.1 is the small Open WebUI regression pass documented
+in `PATCHNOTE-0.12.1-0.1.md`, unless later source changes touch additional operations boundaries.
 
 Newest full device qualification is exact installed `0.11.3-1.7.fc44.x86_64`:
 
@@ -54,9 +48,10 @@ failed units                        0
 final authenticated verifier        54 / 0 / 0
 ```
 
-Installed-package inspection found one remaining reachable `systemctl reboot` inside the pinned CU
-live manager's interactive CPU-core-unlock prompt. Current 2.4 patches that upstream path through
-the existing RPM-prep patch to `/usr/sbin/reboot`. Do not rerun the known-bad invocation to prove it.
+The 2.4 package corrected the package-owned live-manager interactive CPU-core-unlock reboot path to
+`/usr/sbin/reboot`, and exact-installed 2.4 subsequently passed complete reconstruction through the
+supported `sudo reboot` path. The separate `systemctl reboot` anomaly remains intentionally deferred;
+do not rerun the known-bad invocation merely to prove it.
 
 Exact installed `0.11.3-2.2.fc44.x86_64` has now closed the two highest-priority inherited
 operations boundaries and accumulated further bounded support evidence:
@@ -97,6 +92,8 @@ development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.
 development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md
 development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md
 development/model-runs/2026-09-20-installed-0.11.3-2.3-openwebui-investigation.md
+development/model-runs/2026-09-21-installed-0.11.3-2.4-operations-batches-19-20.md
+development/model-runs/2026-09-21-installed-0.11.3-2.4-openwebui-final.md
 ```
 
 The 2.2 Batch 04–09 records, exact-2.3 targeted acceptance and exact-2.3 Open WebUI investigation are
@@ -111,17 +108,16 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 2.4 implementation is recorded in `PATCHNOTE-0.11.3-2.4.md`. Source closure is complete: RPM
-preflight PASS, deterministic tests 447/447 PASS in split modules, bash -n 64/64 and Python compileall
-PASS. RPM/SRPM build and exact-installed-2.4 execution remain pending. Exact 2.3 targeted acceptance is the immediate regression
-baseline for the changed operations surfaces; exact 2.2 remains useful historical evidence for
-service restarts, external LAN isolation and earlier backup/config-restore work.
+Current 0.12.1-0.1 implementation is recorded in `PATCHNOTE-0.12.1-0.1.md`. Source validation in the
+main integration environment is complete for the deterministic gates: RPM preflight PASS,
+**466/466** tests PASS in split modules, `bash -n` **64/64 PASS**, and Python compileall PASS. The
+monolithic validation invocation exceeded the execution window while tests were still passing; the
+same complete suite was run in disjoint module groups, as required by project evidence rules.
 
-Source closure for 2.4 is complete: repository/RPM preflight PASS, deterministic suite **447/447
-PASS** in split modules, `bash -n` **64/64 PASS**, and Python compileall PASS. The monolithic
-validation invocation exceeded this environment's execution window while tests were still passing;
-the same suite was completed by module rather than weakening or dropping coverage. Ruff/ShellCheck
-were unavailable and are not claimed.
+RPM/SRPM construction still belongs to the authoritative Fedora 44/GitHub build path and is not
+claimed from the current non-Fedora source environment. Exact installed 2.4 is the immediate device
+regression baseline; exact 0.12.1-0.1 remains unqualified until built, installed and subjected to the
+bounded OWUI regression.
 
 ## Service topology
 
@@ -270,37 +266,30 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 2.4 source/device follow-up
+## Immediate 0.12.1-0.1 source/device follow-up
 
-Do not replay the closed 2.3 targeted campaign. Exact 2.3 already proved clean package verification,
-status/verifier/degraded recovery UX, normal convergence, maintenance presentation, Tika restart,
-identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. It also
-proved the Open WebUI application path healthy while identifying three desired-state/product-surface
-gaps now addressed in 2.4 source.
+Do not replay the closed 2.4 broad operations campaign. The new package changes only Open WebUI
+model authorization/residency/status behavior plus build provenance validation.
 
-For current 2.4:
+For current 0.12.1-0.1:
 
 ```text
-1. confirm the existing live-manager RPM-prep patch replaces only the interactive CPU-unlock
-   `systemctl reboot` with `/usr/sbin/reboot`;
-2. preserve the upstream interactive prompt and `--yes` non-rebooting behavior;
-3. converge Open WebUI Arena=off, active-but-hidden production/task implementation models, persisted
-   local/offline policy and upload limits/extensions through the existing supported APIs;
-4. run focused deterministic Open WebUI + packaging/patch tests;
-5. when a 2.4 RPM is built, inspect installed `/usr/bin/bc250-cu-live-manager` and do not deliberately
-   invoke the known-bad reboot path;
-6. run one bounded authenticated OWUI acceptance: HTTP health, verbose desired-state clean, Arena
-   absent, six implementation models active-but-hidden, curated roles/task routing intact, one harmless
-   persisted drift detected then reconverged, final status/verifier clean and no credential leakage.
+1. build binary/source RPMs through the authoritative Fedora 44 path with exact pinned source caches;
+2. install the exact new NEVRA and run normal package convergence;
+3. verify all six production office roles are visible/usable to an ordinary user while the five
+   production bases plus task model remain selector-hidden;
+4. verify the ACL policy is minimum-required/additive: required user:*:read grants exist, unrelated
+   grants are not destructively stripped, and the inactive legacy translation record is not promoted;
+5. run one ordinary-user Standard request and one Documents request;
+6. run Deep Reasoning immediately followed by title/tag generation, confirm GPT-OSS has unloaded before
+   task cold-load and observe no new OOM/kernel allocation/GPU failure signature;
+7. run verbose authenticated Open WebUI status and final bc250-verify, targeting 54/0/0/0;
+8. finish with healthy normal topology and Open WebUI readiness.
 ```
 
-Do not turn step 6 into another model tournament. Exact 2.3 already passed Standard/Higher Quality/
-Deep Reasoning smokes, translation 8/8 and bounded RAG 3/3. CORS and model-order/default preferences
-remain optional observations unless a concrete product defect appears.
-
-Feature-specific destructive checks stay conditional: Pi companion requires companion-only allow plus
-second-admin-SSH defer before deployment; unattended power requires one idle S5 -> WOL -> HTTP :80
-readiness cycle; live pruning remains unnecessary while DRY_RUN is the operational policy.
+The exact-2.4 operations evidence already covers supported reboot reconstruction, live 40/40,
+maintenance, storage hygiene, backup/restore, runtime soak, model switching and service topology.
+Repeat those areas only if a corresponding implementation changes.
 
 ## UX acceptance during support tests
 

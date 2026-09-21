@@ -25,22 +25,25 @@ Do not relabel evidence from one NVR as qualification of another NVR.
 Current source release:
 
 ```text
-VERSION       0.11.3
-RPM Release   2.4%{?dist}
-NVR           bc250-llm-server-0.11.3-2.4
+VERSION       0.12.1
+RPM Release   0.1%{?dist}
+NVR           bc250-llm-server-0.12.1-0.1
 ```
 
-`0.11.3-2.4` is the current source release. Exact installed 2.3 has now device-confirmed the
-targeted operations fixes from the previous release: clean RPM verification, topology/status/verifier
-UX, idempotent normal convergence, baseline-aware identity restore, Tika restart semantics, the
-supported reboot path, healthy live 40/40 and final authenticated 54/0/0. A separate authenticated
-Open WebUI investigation found HTTP/task/curated-role/translation/RAG behavior healthy but exposed
-three product-state ownership gaps. 2.4 therefore contains two bounded follow-ups: patch the pinned CU
-live manager's interactive CPU-core-unlock reboot prompt to `/usr/sbin/reboot`, and extend the existing
-Open WebUI desired-state path so Arena is off, implementation models remain active but hidden, and
-persisted local/offline/upload policy is converged and drift-checked. Production model choices,
-service topology, hard memory floor, governor/CU policy, unattended-power defaults and GGUF provenance
-rules are unchanged. MTP remains standalone, disabled/download-only and opt-in.
+`0.12.1-0.1` is the current source release target. It is a bounded corrective release derived from
+operator-supplied exact-installed `0.11.3-2.4` acceptance. The broad non-OWUI operations campaign on
+2.4 is closed through operational hygiene and a real supported reboot reconstruction. The final
+Open WebUI investigation identified three narrow package changes: authenticated-read access on the
+six production presets plus six hidden implementation/task records, `keep_alive=0` on Deep Reasoning
+to prevent the reproduced Deep→task global-OOM sequence, and correct two-view status inspection for
+presets versus base-model overrides. Release hardening also corrects live-manager provenance and
+requires the carried patch to apply against the exact pinned source. Production model choices,
+service topology, RAG/embedding/translation choices, Tika policy, governor/CU policy, maintenance
+policy and supported reboot behavior remain unchanged.
+
+Exact `0.12.1-0.1` has no hardware qualification until the newly built RPM is installed and passes
+the bounded device regression described in `PATCHNOTE-0.12.1-0.1.md`. Exact-installed 2.4 evidence
+remains historical evidence for 2.4 only.
 
 The consolidated exact-2.3 Open WebUI investigation also isolated three pinned-v0.11.3
 OpenAI-style adapter limitations: root `max_tokens` is not a reliable Ollama cap, reasoning-token
@@ -71,20 +74,23 @@ The release incorporates defects found during exact installed `0.11.3-1.7` suppo
   reached the low-memory boundary. It keeps the same model identity and verified GGUF, so applying
   the new definition does not require a source re-download.
 
-Exact 2.3 is now device-qualified for the targeted operations surfaces recorded in
-`development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md`. Do not rewrite
-those observations as 2.4 qualification. Current 2.4 is source-validated and frozen, but has not yet been RPM-built or installed.
+Exact installed `0.11.3-2.4.fc44.x86_64` is now the latest broad operations baseline. Operator-supplied
+acceptance through Batch 20 closed non-OWUI operations with clean package integrity, bounded storage/
+residue state, normal topology, live 40/40 routing and successful complete reconstruction after a
+supported `sudo reboot`. The separate final Open WebUI investigation also proved the ordinary-user
+ACL and Deep Reasoning memory defects and their narrow temporary mitigations on exact 2.4. Those
+results motivate 0.12.1-0.1 but do not qualify the new NVR.
 
-Current 2.4 source evidence:
+Current 0.12.1-0.1 source evidence:
 
 ```text
-release metadata              0.11.3-2.4
+release metadata              0.12.1-0.1
 repository/RPM preflight      PASS
-deterministic tests           447 / 447 PASS (split modules)
+deterministic tests           466 / 466 PASS (split modules)
 bash -n                       64 / 64 PASS
 Python compileall             PASS
-RPM/SRPM build                NOT RUN
-exact-2.4 device evidence     NOT RUN
+RPM/SRPM build                NOT RUN in this non-Fedora environment
+exact-0.12.1 device evidence  NOT RUN
 ```
 
 Exact installed `0.11.3-2.3.fc44.x86_64` targeted operations acceptance has now demonstrated:
@@ -166,11 +172,15 @@ and the exact-2.2 operations records:
 `development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md` and
 `development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md`, plus exact-2.3 targeted acceptance in
 `development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md` and
-`development/model-runs/2026-09-20-installed-0.11.3-2.3-openwebui-investigation.md`.
+`development/model-runs/2026-09-20-installed-0.11.3-2.3-openwebui-investigation.md`, plus final exact-2.4 operator-supplied acceptance in
+`development/model-runs/2026-09-21-installed-0.11.3-2.4-operations-batches-19-20.md` and
+`development/model-runs/2026-09-21-installed-0.11.3-2.4-openwebui-final.md`.
 
-**Immediate evidence boundary:** exact 2.3 now has targeted operations acceptance but not a full
-whole-appliance revalidation. Exact 1.7 remains the newest full revalidation baseline. Current 2.4
-is WIP/source-only; do not transfer either older evidence class to 2.4.
+**Immediate evidence boundary:** exact installed 2.4 is the latest broad non-OWUI operations
+acceptance baseline and the source of the final OWUI defect/mitigation evidence. Exact 1.7 remains
+the newest full whole-appliance revalidation campaign. Current 0.12.1-0.1 is source-only until its
+RPM is built, installed and passes the bounded regression; do not transfer either historical evidence
+class to the new NVR.
 
 ---
 
@@ -624,42 +634,40 @@ Evidence rules:
 - historical startup AMDGPU/HPD warnings are not automatically new campaign faults; compare against
   the campaign's bounded kernel/device-error window.
 
-Exact installed 1.7 remains the newest full whole-appliance revalidation. Exact installed 2.3 now has
-strong targeted operations acceptance covering the fixes introduced through 2.3: clean RPM
-verification, swap mode consistency, topology/status/verifier UX, normal convergence, baseline-aware
-identity restore, Tika restart semantics, supported reboot reconstruction, healthy live 40/40 and a
-final authenticated 54/0/0 verifier. This is not a full 2.3 whole-appliance revalidation and must not
-be described as one.
+Exact installed 1.7 remains the newest full whole-appliance revalidation campaign. Exact installed
+2.4 is the latest broad operations acceptance baseline: non-OWUI behavior is closed through Batch 20,
+including operational hygiene and supported reboot reconstruction. The final exact-2.4 OWUI
+investigation established two additional product defects (ordinary-user model authorization and
+Deep Reasoning residency pressure) plus the already-known two-view verifier defect, and proved the
+narrow mitigations before restoring temporary state.
 
-Current 2.4 is a source-validated release for the pinned live-manager reboot call plus the Open WebUI
-desired-state/product-surface ownership fixes and documented pinned-v0.11.3 OpenAI-style adapter
-boundary. It has no installed-device qualification yet.
+Current 0.12.1-0.1 implements only those three OWUI fixes plus provenance/patch-applicability release
+hardening. It has no installed-device qualification yet.
 
 # 13. Current open gaps and priority order
 
-## P0 — bounded exact-2.4 package/device acceptance
+## P0 — build and bounded exact-0.12.1-0.1 package/device acceptance
 
-Exact 2.3 has closed its targeted operations acceptance. Do not replay that campaign for 2.4. The source release contains two narrow implementation changes plus one documented compatibility boundary:
+Do not replay the broad 2.4 campaign. The current release changes only the following acceptance
+boundaries:
 
 ```text
-1. keep the pinned live-manager source/revision unchanged and patch only its interactive CPU-unlock
-   reboot branch from systemctl reboot to /usr/sbin/reboot;
-2. preserve the interactive prompt and upstream --yes non-rebooting behavior;
-3. use the existing authenticated Open WebUI desired-state APIs to persist Arena=off, local/offline
-   policy and upload limits/extensions;
-4. keep the five production bases plus task model active but hidden via package-owned model metadata;
-5. document the pinned Open WebUI v0.11.3 root-max_tokens/reasoning-token/finish-reason adapter limits
-   rather than vendor-patching an unsupported external API contract;
-6. source validation is complete; do not invent browser/hardware source tests;
-7. when 2.4 is built, inspect the installed live-manager path and run one bounded authenticated OWUI
-   apply/status/UI/drift-reconvergence acceptance batch;
-8. do not deliberately invoke the known-bad systemctl reboot path.
+1. require authenticated-read user:*:read on the exact 12 active production package model records;
+2. preserve unrelated ACL grants (minimum-required/additive policy) and keep inactive legacy rows
+   outside the production-role contract;
+3. keep the five production bases plus task model active and selector-hidden;
+4. set only bc250-office-deep-reasoning.params.keep_alive=0 so GPT-OSS unloads before task cold-load;
+5. inspect curated presets through /api/v1/models/export and base overrides through /api/v1/models/base,
+   failing as an API-shape inspection problem rather than false mass drift when the basic schema differs;
+6. keep the Open WebUI v0.11.3 adapter boundary documented rather than vendor-patching it;
+7. ensure the live-manager notice matches the pinned revision and the carried patch really applies to
+   the exact prepared upstream source before RPM preparation;
+8. build the RPM/SRPM in the authoritative Fedora 44 path, then run the bounded device regression in
+   PATCHNOTE-0.12.1-0.1.md.
 ```
 
-The exact-2.3 OWUI investigation already proved HTTP readiness, task routing, curated role smokes,
-translation 8/8 and bounded RAG 3/3. The 2.4 acceptance question is therefore product-state ownership,
-not another model/RAG campaign: Arena absent, implementation models active-but-hidden, package-owned
-persisted policy clean, one harmless drift detected/reconverged, and final status/verifier clean.
+The exact-2.4 evidence already covers broad topology, runtime, maintenance, storage, reboot, RAG,
+translation and Tika behavior. Repeat those campaigns only if a corresponding implementation changes.
 
 Backup restore is already accepted for configuration on exact 2.2 and identity on exact 2.3. Live
 pruning, Pi forced-command shutdown, idle S5/WOL and full whole-appliance revalidation remain
@@ -718,20 +726,22 @@ Canonical detailed rationale belongs in `development/DECISIONS.md`.
 
 # 15. Known gaps that are still current
 
-- exact 2.4 is WIP/source-only and has not been RPM-built or installed;
-- the pinned CU live-manager CPU-core-unlock reboot patch still needs package-build applicability and
-  installed-path confirmation before it can be called exact-2.4 device-qualified;
+- 0.12.1-0.1 still needs the authoritative Fedora 44 RPM/SRPM build and exact-installed bounded OWUI
+  regression before it can inherit any new hardware-qualified claims;
+- the new upstream patch/provenance gate still needs to run against the exact prepared source cache in
+  the authoritative build environment; the current source environment has no network-populated cache;
 - Pi forced-command shutdown, idle S5/WOL and live prune remain conditional acceptance work;
 - no-download unregister/re-apply support smoke still needs a corrected privileged file-existence
   wrapper if that lifecycle boundary becomes relevant again;
-- real-office RAG acceptance across messy PDFs/tables/multilingual/OCR-derived content remains open,
-  but RAG model selection itself is closed;
+- real-office RAG behavior is substantially accepted on exact 2.4 for the tested PDF/DOCX/XLSX/PPTX
+  and lifecycle cases; further work should be driven by real office files rather than another generic
+  benchmark campaign;
 - actual `bc250-code` product workflows need broader bounded device evidence;
 - arbitrary same-name out-of-band Ollama registration drift is not fully detected/proven;
 - current XFS dedupe implementation still deserves a performance run only when storage optimization
   becomes a real product priority;
-- exact 1.7 remains the newest full whole-appliance revalidation baseline; exact 2.3 provides strong
-  targeted operations acceptance, not a full revalidation replacement.
+- exact 1.7 remains the newest full whole-appliance revalidation campaign; exact 2.4 is the latest
+  broad operations baseline but is not relabelled as that full campaign.
 
 # 16. Specialist-chat organization
 
@@ -768,12 +778,11 @@ Main integration owns final promotion, release metadata and cross-stream policy.
 > Continue as the BC-250 main integration chat. Treat the newest source/package and exact installed
 > evidence as authoritative over handovers. Read `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
 > `development/VALIDATION-MATRIX.md`, `development/TESTING-STRATEGY.md`,
-> `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source is
-> source release `0.11.3-2.3`; exact installed `0.11.3-1.7` remains the newest full revalidation baseline, while
-> exact installed 2.2 has successful bounded operations evidence. Do not relabel either evidence class
-> as exact-2.3 qualification. GitHub owns RPM builds, workstation owns Ruff/developer linting, and BC-250 owns
-> hardware/runtime qualification. Preserve verified GGUFs, keep destructive operations explicit,
-> fail closed on ambiguous state, and use one bounded hardware batch at a time. First prove only the
-> still-unqualified inherited safety boundaries: interactive SSH shutdown defer and healthy 40-CU
-> rc=0. Pi/S5/WOL, restore, live pruning and model lifecycle are separate acceptance work when those
-> features are actually being enabled or changed. Then return to real-office RAG and other product work.
+> `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source target is
+> `0.12.1-0.1`; exact installed `0.11.3-2.4` is the latest broad operations and final OWUI defect/
+> mitigation evidence baseline, while exact installed `0.11.3-1.7` remains the newest full
+> whole-appliance revalidation campaign. Do not transfer either evidence class to 0.12.1-0.1 before
+> exact-package installation and regression. GitHub/Fedora owns RPM/SRPM builds, the developer source
+> environment owns deterministic/static validation, and BC-250 owns hardware/runtime qualification.
+> Preserve verified GGUFs, keep destructive operations explicit, fail closed on ambiguous state, and
+> use the bounded 0.12.1 OWUI regression rather than replaying closed broad campaigns.

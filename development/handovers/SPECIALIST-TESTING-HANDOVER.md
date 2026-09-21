@@ -36,18 +36,17 @@ retest conditions from existing decisions:
 
 - **support / maintenance / power / Open WebUI operations:** read `docs/MAINTENANCE.md`,
   `docs/MAINTENANCE-CONTRACT.md`, `docs/openwebui-settings.md`, `cmd/maintenance/maintenance.sh` and
-  `safe-power.sh`. Exact-2.3 targeted operations acceptance is complete: package verification, swap
-  mode, topology/status/verifier UX, identity restore, Tika restart, supported reboot reconstruction
-  and live 40/40 all passed. A separate exact-2.3 OWUI investigation also passed HTTP/task/curated
-  roles/translation/RAG and exposed only product-state ownership gaps. Current 2.4 source release patches the
-  remaining pinned live-manager CPU-core-unlock reboot path and extends existing OWUI desired state so
-  Arena is off, implementation models remain active but hidden, and persisted local/offline/upload
-  policy is converged. It also documents the pinned-v0.11.3 OpenAI-style adapter limitations rather
-  than treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately rerun the device-proven unreliable `sudo systemctl reboot`
-  path or reopen model selection. Add Pi forced-command/second-SSH
-  and one idle S5→WOL→HTTP readiness cycle only when those optional power features are being enabled.
-  No-download model lifecycle, live pruning and other destructive support checks remain conditional,
-  not automatic release gates. Evaluate operator UX as well as functionality.
+  `safe-power.sh`. Exact installed 2.4 is the latest broad operations baseline: package integrity,
+  topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
+  supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
+  ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
+  narrow temporary mitigations. Current source 0.12.1-0.1 implements only those OWUI fixes plus
+  provenance/patch-applicability hardening; do not transfer 2.4 hardware qualification to it before the
+  bounded new-package regression. Keep the pinned-v0.11.3 adapter limitations documented rather than
+  treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
+  rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
+  live pruning and other destructive support checks remain conditional, not automatic release gates.
+  Evaluate operator UX as well as functionality.
 - **benchmark operations:** use `cmd/benchmark/README.md` and current benchmark source/tests. Prove
   result completeness, resource telemetry and restoration on a known production control before a
   large campaign.
