@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.1-0.1 - 2026-09-21
+
+- Fix ordinary-user Open WebUI access by converging authenticated-read (`user:*:read`) grants on exactly the six active office presets plus their five hidden production base overrides and the hidden task-model override. ACL convergence is minimum-required/additive: unrelated existing grants are preserved, including grants on inactive legacy records.
+- Make `bc250-office-deep-reasoning` set `keep_alive=0`, implementing the exact-device mitigation that unloads GPT-OSS before background title/tag task-model cold loads and avoids the reproduced global-memory-pressure/OOM sequence. Standard and Advanced residency remain unchanged.
+- Fix desired-state status so curated presets (`base_model_id != null`) are inspected through `/api/v1/models/export` while hidden base-model overrides (`base_model_id == null`) are inspected through `/api/v1/models/base`; unsupported response shapes now report an inspection compatibility problem instead of false mass drift.
+- Distinguish model-preset and base-model-override diagnostics and add a compact healthy model summary without changing the working model import/apply semantics.
+- Correct the CU live-manager third-party notice to the actually pinned `a929085d791f126ce76a60eb609610820fb08066` revision and validate the carried patch against the exact prepared upstream archive before RPM preparation.
+- Move the durable 0.12.1 Open WebUI regression cases into the established `tests/test_openwebui.py` suite, including the exact 12 production IDs, active/hidden state drift, Deep keep-alive drift, additive ACL behavior, API-shape guarding and token-output hygiene.
+- Preserve the accepted RAG/embedding/translation choices, topology, Tika limit, CU policy, maintenance policy, supported reboot path and other exact-2.4-qualified non-OWUI behavior. Exact 0.12.1-0.1 device qualification remains a separate release gate.
+
 ## 0.11.3-2.4 - 2026-09-20
 
 - Patch the pinned CU live manager CPU-core-unlock reboot prompt to use `/usr/sbin/reboot` rather than the BC-250 device-proven unreliable `systemctl reboot` invocation; keep the interactive prompt and non-rebooting `--yes` behavior unchanged.

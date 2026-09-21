@@ -10,8 +10,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.11.3
-Release:        2.4%{?dist}
+Version:        0.12.1
+Release:        0.1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.1
+- Grant authenticated users read access to the six production Open WebUI roles and their six hidden implementation/task records while preserving unrelated grants.
+- Unload the Deep Reasoning GPT-OSS model after each response so title/tag task-model cold loads retain safe memory headroom on the 16 GiB UMA appliance.
+- Verify curated presets and hidden base-model overrides through their correct Open WebUI v0.11.3 API views, with narrow API-shape guarding and accurate diagnostics.
+- Correct the CU live-manager third-party revision notice and validate the carried RPM patch against the exact pinned source before RPM preparation.
+- Fold the durable Open WebUI regressions into the established test suite, including exact production IDs, active/hidden state, additive ACL semantics, Deep keep-alive drift and credential-output hygiene.
+
 * Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.4
 - Patch the pinned CU live manager CPU-core-unlock reboot prompt to use `/usr/sbin/reboot` instead of the BC-250 device-proven unreliable `systemctl reboot` invocation; keep its existing interactive/no-reboot-under-`--yes` contract unchanged.
 - Record exact installed 0.11.3-2.3 targeted operations acceptance: clean RPM verification, topology/status/verifier UX, identity restore with the existing FK baseline, Tika restart semantics, supported reboot reconstruction and healthy live 40/40 all passed.
