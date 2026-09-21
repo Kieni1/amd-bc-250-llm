@@ -67,13 +67,20 @@ environment variables:
   `config/openwebui/models.json` payload;
 - active-but-hidden workspace overrides for the five production implementation
   models and the dedicated task model, so normal users choose curated office
-  roles while presets/tasks retain access to their base models.
+  roles while presets/tasks retain access to their base models;
+- authenticated-read (`user:*:read`) grants on the six active production presets
+  and the six hidden implementation/task overrides required by those roles.
 
 The operator owns users, credentials, custom prompts, unrelated workspace models,
 knowledge bases, UI preferences, permissions and any intentional settings that
 are outside that baseline. Model presets are imported through the additive
 `/api/v1/models/import` endpoint; the package does **not** use destructive model
 sync and therefore does not remove operator-created models.
+Required model access is converged separately and additively: package desired state
+means that required grants must exist, not that the complete ACL must equal a package-owned
+set. Existing unrelated grants are retained, including historical grants on inactive records.
+Hidden raw models are selector-hidden, not API-forbidden; an authenticated client that already
+knows a canonical hidden model ID may still call it directly.
 
 ## Ollama lanes
 
@@ -163,8 +170,11 @@ The legacy LFM preset is intentionally inactive. Its base model now lives in the
 experiments catalog and is installed only for deliberate rollback/comparison work.
 
 The Qwen3.5 preset carries request-level `think=false`; the package keeps Ollama's
-native renderer/parser rather than replacing the model template. GPT-OSS remains the
-likely memory-edge production model when the dedicated embedding service is resident.
+native renderer/parser rather than replacing the model template. The Deep Reasoning
+preset sets `keep_alive=0` so GPT-OSS unloads after each response before the dedicated
+task model cold-loads for title/tag generation. Standard and Advanced keep their
+existing residency behavior. GPT-OSS remains the likely memory-edge production model
+when the dedicated embedding service is resident.
 
 ## Task baseline
 
@@ -243,7 +253,7 @@ The package now provides scheduled, verified config and identity/user backups th
 broader operator retention/migration policy explicit and separate.
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
-upload/extraction, embedding/retrieval, the five package presets and an
+upload/extraction, embedding/retrieval, the six active package presets and an
 authenticated `bc250-openwebui-setup status` before changing the pin.
 
 ## Deferred candidates

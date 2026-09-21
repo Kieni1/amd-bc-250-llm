@@ -22,6 +22,9 @@ SOURCE_DESIRED = Path(__file__).resolve().parents[2] / "config/openwebui/desired
 DEFAULT_FUNCTIONS = Path("/usr/share/bc250-llm-server/openwebui/functions.json")
 SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
+# The model-view/access contract below is qualified against the packaged Open WebUI pin.
+OPENWEBUI_MODEL_API_VERSION = "0.11.3"
+
 
 def desired_file() -> Path:
     override = os.environ.get("BC250_OWUI_DESIRED_STATE")
@@ -269,7 +272,15 @@ def apply(client: Client) -> None:
     client.post("/api/v1/retrieval/embedding/update", desired_embedding())
     client.post("/api/v1/retrieval/config/update", desired_rag())
     apply_functions(client)
-    client.post("/api/v1/models/import", load_models())
+    desired_models = load_models()
+    client.post("/api/v1/models/import", model_import_payload(desired_models))
+    try:
+        preset_models, base_models = load_live_model_views(client)
+    except ApiError as exc:
+        raise ApiError(
+            f"Open WebUI model inspection unavailable for this API shape: {exc}"
+        ) from exc
+    apply_model_access(client, desired_models["models"], preset_models, base_models)
 
 
 def canonical(value: Any) -> str:
@@ -294,6 +305,182 @@ def require_list(value: Any, label: str) -> list[Any]:
     return value
 
 
+def model_record_kind(model: dict[str, Any]) -> str:
+    if "base_model_id" not in model:
+        raise ApiError(f"model record lacks base_model_id: {model.get('id', 'unknown')}")
+    return "base_override" if model["base_model_id"] is None else "preset"
+
+
+def model_record_label(model: dict[str, Any]) -> str:
+    return "base-model override" if model_record_kind(model) == "base_override" else "model preset"
+
+
+def model_import_payload(document: dict[str, Any]) -> dict[str, Any]:
+    models = document.get("models")
+    if not isinstance(models, list):
+        raise ApiError("invalid model preset file: models is not a list")
+    payload = dict(document)
+    payload["models"] = [
+        {
+            key: value
+            for key, value in require_object(model, "model record").items()
+            if key != "access_grants"
+        }
+        for model in models
+    ]
+    return payload
+
+
+def access_grant_key(grant: Any, label: str) -> tuple[str, str, str]:
+    item = require_object(grant, label)
+    principal_type = item.get("principal_type")
+    principal_id = item.get("principal_id")
+    permission = item.get("permission")
+    if principal_type not in {"user", "group", "anyone"}:
+        raise ApiError(f"{label} has unsupported principal_type")
+    if not isinstance(principal_id, str) or not principal_id:
+        raise ApiError(f"{label} has invalid principal_id")
+    if permission not in {"read", "write"}:
+        raise ApiError(f"{label} has unsupported permission")
+    if principal_type == "anyone" and (principal_id != "*" or permission != "read"):
+        raise ApiError(f"{label} has unsupported anyone grant")
+    return principal_type, principal_id, permission
+
+
+def desired_access_grants(model: dict[str, Any]) -> list[dict[str, str]]:
+    raw = model.get("access_grants", [])
+    grants = require_list(raw, f"desired access grants for {model.get('id', 'unknown')}")
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, grant in enumerate(grants):
+        key = access_grant_key(grant, f"desired access grant {index}")
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(
+            {"principal_type": key[0], "principal_id": key[1], "permission": key[2]}
+        )
+    return result
+
+
+def access_grant_keys(value: Any, label: str) -> set[tuple[str, str, str]]:
+    grants = require_list(value, label)
+    return {
+        access_grant_key(grant, f"{label} item {index}")
+        for index, grant in enumerate(grants)
+    }
+
+
+def merge_access_grants(
+    live: Any, required: list[dict[str, str]], label: str
+) -> list[dict[str, str]]:
+    live_grants = require_list(live, label)
+    merged: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for index, grant in enumerate([*live_grants, *required]):
+        key = access_grant_key(grant, f"{label} item {index}")
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(
+            {"principal_type": key[0], "principal_id": key[1], "permission": key[2]}
+        )
+    return merged
+
+
+def model_view_map(
+    value: Any, label: str, *, base_model_id_is_none: bool
+) -> dict[str, dict[str, Any]]:
+    records: dict[str, dict[str, Any]] = {}
+    for index, raw in enumerate(require_list(value, label)):
+        item = require_object(raw, f"{label} item {index}")
+        model_id = item.get("id")
+        if not isinstance(model_id, str) or not model_id:
+            raise ApiError(f"{label} item {index} has invalid id")
+        if "base_model_id" not in item:
+            raise ApiError(f"{label} item {model_id} lacks base_model_id")
+        if (item.get("base_model_id") is None) != base_model_id_is_none:
+            raise ApiError(f"{label} item {model_id} has unexpected base_model_id shape")
+        if model_id in records:
+            raise ApiError(f"{label} contains duplicate model id: {model_id}")
+        if not isinstance(item.get("access_grants", []), list):
+            raise ApiError(f"{label} item {model_id} access_grants was not a list")
+        records[model_id] = item
+    return records
+
+
+def load_live_model_views(
+    client: Client,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    # Open WebUI v0.11.3 represents curated presets and raw-model overrides in
+    # separate API views. Keep this explicit so a future pin change fails as an
+    # inspection-compatibility issue instead of looking like mass desired-state drift.
+    presets = model_view_map(
+        client.get("/api/v1/models/export"),
+        "model export",
+        base_model_id_is_none=False,
+    )
+    base_overrides = model_view_map(
+        client.get("/api/v1/models/base"),
+        "base-model view",
+        base_model_id_is_none=True,
+    )
+    return presets, base_overrides
+
+
+def live_model_record(
+    desired: dict[str, Any],
+    presets: dict[str, dict[str, Any]],
+    base_overrides: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    source = base_overrides if model_record_kind(desired) == "base_override" else presets
+    return source.get(str(desired.get("id", "")))
+
+
+def apply_model_access(
+    client: Client,
+    models: list[dict[str, Any]],
+    presets: dict[str, dict[str, Any]],
+    base_overrides: dict[str, dict[str, Any]],
+) -> None:
+    for desired in models:
+        required = desired_access_grants(desired)
+        if not required:
+            continue
+        model_id = desired.get("id")
+        if not isinstance(model_id, str) or not model_id:
+            raise ApiError("package model record has invalid id")
+        live = live_model_record(desired, presets, base_overrides)
+        if not isinstance(live, dict):
+            raise ApiError(
+                f"package {model_record_label(desired)} missing after import: {model_id}"
+            )
+        live_keys = access_grant_keys(
+            live.get("access_grants", []), f"access grants for {model_id}"
+        )
+        required_keys = {
+            access_grant_key(grant, f"required grant for {model_id}")
+            for grant in required
+        }
+        if required_keys <= live_keys:
+            continue
+        merged = merge_access_grants(
+            live.get("access_grants", []), required, f"access grants for {model_id}"
+        )
+        updated = require_object(
+            client.post(
+                "/api/v1/models/model/access/update",
+                {"id": model_id, "name": desired.get("name") or model_id, "access_grants": merged},
+            ),
+            f"model access update {model_id}",
+        )
+        updated_keys = access_grant_keys(
+            updated.get("access_grants", []), f"updated access grants for {model_id}"
+        )
+        if not required_keys <= updated_keys:
+            raise ApiError(f"Open WebUI did not retain required access grants for {model_id}")
+
+
 def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str, Any]]) -> None:
     print()
     print("Package-owned Open WebUI roles")
@@ -312,6 +499,8 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
         extras: list[str] = []
         if "max_tokens" in params:
             extras.append(f"max_tokens={params['max_tokens']}")
+        if "keep_alive" in params:
+            extras.append(f"keep_alive={params['keep_alive']}")
         if "think" in params:
             extras.append(f"think={params['think']}")
         elif "translation" in model_id:
@@ -424,22 +613,58 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
         if bool(live.get("is_global")) != desired_function["is_global"]:
             problems.append(f"Package function global state differs: {function_id}")
 
-    exported = require_list(client.get("/api/v1/models/export"), "model export")
-    live_models = {item.get("id"): item for item in exported if isinstance(item, dict)}
-    for model in load_models()["models"]:
+    desired_models = load_models()["models"]
+    try:
+        preset_models, base_models = load_live_model_views(client)
+    except ApiError as exc:
+        print(f"Open WebUI model inspection unavailable for this API shape: {exc}")
+        return 1
+
+    active_presets = 0
+    active_base_overrides = 0
+    for model in desired_models:
         model_id = model["id"]
-        live = live_models.get(model_id)
+        kind = model_record_kind(model)
+        label = model_record_label(model)
+        if bool(model.get("is_active")):
+            if kind == "preset":
+                active_presets += 1
+            else:
+                active_base_overrides += 1
+        live = live_model_record(model, preset_models, base_models)
         if not isinstance(live, dict):
-            problems.append(f"Package model preset missing: {model_id}")
+            problems.append(f"Package {label} missing: {model_id}")
             continue
         for key in ("base_model_id", "name", "params", "is_active"):
             if canonical(live.get(key)) != canonical(model.get(key)):
-                problems.append(f"Package model preset differs: {model_id}.{key}")
+                problems.append(f"Package {label} differs: {model_id}.{key}")
         desired_meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
         live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
         for key in ("description", "tags", "filterIds", "defaultFilterIds", "hidden"):
-            if key in desired_meta and canonical(live_meta.get(key)) != canonical(desired_meta[key]):
-                problems.append(f"Package model preset differs: {model_id}.meta.{key}")
+            if key in desired_meta and canonical(live_meta.get(key)) != canonical(
+                desired_meta[key]
+            ):
+                problems.append(f"Package {label} differs: {model_id}.meta.{key}")
+        required_grants = desired_access_grants(model)
+        if required_grants:
+            try:
+                live_grants = access_grant_keys(
+                    live.get("access_grants", []), f"access grants for {model_id}"
+                )
+            except ApiError as exc:
+                print(f"Open WebUI model inspection unavailable for this API shape: {exc}")
+                return 1
+            missing_grants = [
+                grant
+                for grant in required_grants
+                if access_grant_key(grant, f"required grant for {model_id}") not in live_grants
+            ]
+            for grant in missing_grants:
+                problems.append(
+                    f"Package {label} access differs: {model_id} "
+                    "(missing "
+                    f"{grant['principal_type']}:{grant['principal_id']}:{grant['permission']})"
+                )
 
     if problems:
         print("Desired-state drift: detected")
@@ -447,8 +672,12 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
             print(f"  - {problem}")
         return 2
     print("Desired-state drift: none in package-owned settings")
+    print(
+        f"Open WebUI models: {active_presets} presets current, "
+        f"{active_base_overrides} base overrides current"
+    )
     if verbose:
-        print_verbose_summary(load_models()["models"], load_functions())
+        print_verbose_summary(desired_models, load_functions())
     return 0
 
 
