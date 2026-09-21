@@ -31,7 +31,7 @@ The RPM also contains or refers to separately licensed components:
 ## CU live manager
 
 The RPM includes `WinnieLV/bc250-cu-live-manager` at commit
-`8eb45f07810af738f3e4945ea0cc29d399e378a6`. At the time this package was
+`a929085d791f126ce76a60eb609610820fb08066`. At the time this package was
 prepared, that repository did not contain a license file or other explicit
 redistribution terms. No license is inferred or granted by this notice; the
 upstream copyright and all rights remain with their respective owner.

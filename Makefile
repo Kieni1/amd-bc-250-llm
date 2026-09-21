@@ -20,9 +20,11 @@ help:
 
 sources:
 	./scripts/prepare-sources.py
+	./scripts/check-upstream-patches.py
 
 sources-check:
 	./scripts/prepare-sources.py --check
+	./scripts/check-upstream-patches.py
 
 source-tar:
 	./scripts/make-source-tarball.sh

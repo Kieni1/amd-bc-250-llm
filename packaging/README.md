@@ -51,6 +51,12 @@ HTTPS fetch records a local `.sha256` sidecar; reuse and `make sources-check` ve
 current bytes before they are copied into the RPM build tree. RPM scriptlets never
 fetch third-party source.
 
+For the carried live-manager patch, `scripts/check-upstream-patches.py` is part of both
+`make sources` and `make sources-check`. It verifies that the notice revision matches
+the pinned source, dry-runs and applies the patch against that exact cached archive,
+and checks the resulting source semantics. This deliberately tests patch applicability
+rather than only searching the patch text for expected strings.
+
 Useful maintainer targets are:
 
 ```bash
@@ -68,7 +74,8 @@ make distclean      # remove both
 2. Change the full commit in `upstreams.toml`.
 3. Align the source macro in `bc250-llm-server.spec`.
 4. Update third-party notices and affected documentation.
-5. Refresh `sources/` and let the GitHub/Fedora build validate the package.
+5. Refresh `sources/`, run `make sources-check`, and require carried patches to apply
+   against the exact pinned input before the GitHub/Fedora build.
 6. Install the resulting binary RPM on the BC-250 and test the affected feature.
 
 The governor vendor archive is generated from its `Cargo.lock` with
