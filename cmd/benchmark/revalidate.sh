@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # BC-250 package revalidation harness v4.2
 #
-# Intended target: bc250-llm-server 0.11.3 on Fedora 44; release suffix is not hard-coded.
+# The target package version is read from the package-owned VERSION file; the RPM
+# release suffix is intentionally not hard-coded.
 # `start` launches one systemd-owned qualification worker. Routine revalidation
 # exercises packaged defaults only; tuning and hardware A/B decisions are explicit
 # benchmark/diagnostic work. Per-phase reports are retained and exclusive-agent state
@@ -10,7 +11,8 @@ set -Eeuo pipefail
 umask 0077
 
 HARNESS_VERSION=4.2
-TARGET_VERSION=0.11.3
+PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
+TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
 HARDWARE_PCI_ID=1002:13fe
 
@@ -307,6 +309,22 @@ model_registered() {
     jq -e --arg m "$model" 'any(.models[]?; (.name | sub(":latest$"; "")) == $m)' >/dev/null 2>&1
 }
 
+load_target_version() {
+  local value
+  [[ -n $TARGET_VERSION ]] && return 0
+  [[ -r $PACKAGE_VERSION_FILE ]] || {
+    echo "ERROR: package version file is missing or unreadable: $PACKAGE_VERSION_FILE" >&2
+    return 1
+  }
+  IFS= read -r value < "$PACKAGE_VERSION_FILE" || true
+  value="${value//$'\r'/}"
+  [[ $value =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo "ERROR: invalid package version in $PACKAGE_VERSION_FILE: ${value:-empty}" >&2
+    return 1
+  }
+  TARGET_VERSION="$value"
+}
+
 
 current_relevant_args() {
   sed -E 's/[[:space:]]+/\n/g' /proc/cmdline | grep -E "$PARAM_REGEX" | sort | paste -sd' ' - || true
@@ -315,7 +333,7 @@ current_relevant_args() {
 install_unit() {
   cat > "$UNIT_PATH" <<EOFUNIT
 [Unit]
-Description=BC-250 0.11.3 package qualification v${HARNESS_VERSION}
+Description=BC-250 ${TARGET_VERSION} package qualification v${HARNESS_VERSION}
 After=network-online.target cyan-skillfish-governor-smu.service ollama.service open-webui.service
 Wants=network-online.target
 
@@ -331,7 +349,7 @@ EOFUNIT
 }
 
 preflight() {
-  local cmd missing=0 pkg
+  local cmd missing=0 pkg pkg_version
   for cmd in curl jq python3 rpm systemctl journalctl podman sensors vulkaninfo timeout flock tar lspci bc250-status bc250-verify bc250-benchmark bc250-agent-mode bc250-openwebui-setup bc250-cu-status; do
     if ! command_exists "$cmd"; then
       echo "ERROR: missing required command: $cmd" >&2
@@ -344,7 +362,8 @@ preflight() {
     return 1
   }
   pkg="$(rpm -q bc250-llm-server 2>/dev/null || true)"
-  [[ $pkg == bc250-llm-server-${TARGET_VERSION}-* ]] || {
+  pkg_version="$(rpm -q --qf '%{VERSION}' bc250-llm-server 2>/dev/null || true)"
+  [[ $pkg_version == "$TARGET_VERSION" ]] || {
     echo "ERROR: expected bc250-llm-server ${TARGET_VERSION}; installed: ${pkg:-not installed}" >&2
     return 1
   }
@@ -827,7 +846,7 @@ write_phase_report() {
   stamp="$(date +%Y%m%dT%H%M%S)"
   file="$PHASE_REPORT_DIR/$(run_id)-${label}-${stamp}.txt"
   {
-    echo "# BC-250 0.11.3 revalidation v${HARNESS_VERSION} phase report"
+    echo "# BC-250 ${TARGET_VERSION} revalidation v${HARNESS_VERSION} phase report"
     echo "generated=$(now)"
     echo "run_id=$(run_id)"
     echo "phase=$(cat "$PHASE_FILE")"
@@ -1826,6 +1845,10 @@ cleanup_run() {
   rm -rf "$WORK" "$RUN_DIR"
   echo "Removed revalidation work state/unit. Result bundles under $REPORT_DIR were retained."
 }
+
+case "${1:-}" in
+  start|worker|status) load_target_version || exit 1 ;;
+esac
 
 case "${1:-}" in
   start) start_run "$@" ;;

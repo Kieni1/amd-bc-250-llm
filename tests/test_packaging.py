@@ -24,6 +24,10 @@ class PackagingTests(unittest.TestCase):
             rf"(?m)^%changelog\n\* .* - {re.escape(version)}-{re.escape(release.group(1))}$",
         )
 
+    def test_package_version_authority_is_installed_for_revalidation(self) -> None:
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertIn("file\t0644\tVERSION\t{share}/VERSION", manifest)
+
     def test_standalone_quality_checks_are_packaged_but_not_wired_into_revalidation(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         revalidate = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")

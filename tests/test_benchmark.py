@@ -1740,13 +1740,63 @@ class TelemetryTests(unittest.TestCase):
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         self.assertIn("HARNESS_VERSION=4.2", source)
-        self.assertIn("TARGET_VERSION=0.11.3", source)
+        self.assertIn(
+            "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
+            source,
+        )
+        self.assertIn("TARGET_VERSION=\n", source)
+        self.assertNotIn("TARGET_VERSION=0.11.3", source)
+        self.assertIn("Description=BC-250 ${TARGET_VERSION} package qualification", source)
+        self.assertIn("# BC-250 ${TARGET_VERSION} revalidation", source)
+        self.assertIn("rpm -q --qf '%{VERSION}' bc250-llm-server", source)
         start = source.index("run_qualification_sequence() {")
         sequence = source[start:source.index("\nworker() {", start)]
         for phase in ("phase_preflight", "phase_roles", "phase_edge", "phase_agent", "phase_owui", "phase_restore_report"):
             self.assertIn(phase, sequence)
         for obsolete in ("phase_num_batch", "phase_kernel", "phase_governor", "translation-implicit", "translation-explicit", "rag-quality-nonthinking"):
             self.assertNotIn(obsolete, sequence)
+
+    def test_revalidation_loads_target_version_from_package_owned_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            version_file = t / "VERSION"
+            version_file.write_text("0.12.1\n", encoding="utf-8")
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source \"{source}\" help >/dev/null
+PACKAGE_VERSION_FILE=\"{version_file}\"
+TARGET_VERSION=\"\"
+load_target_version
+printf 'target=%s\\n' \"$TARGET_VERSION\"
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script],
+                text=True,
+                capture_output=True,
+                check=True,
+            )
+            self.assertEqual(completed.stdout, "target=0.12.1\n")
+
+    def test_revalidation_rejects_invalid_package_version_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            version_file = t / "VERSION"
+            version_file.write_text("not-a-version\n", encoding="utf-8")
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f"""
+source \"{source}\" help >/dev/null
+PACKAGE_VERSION_FILE=\"{version_file}\"
+TARGET_VERSION=\"\"
+load_target_version
+"""
+            completed = subprocess.run(
+                ["bash", "-c", script],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 1)
+            self.assertIn("invalid package version", completed.stderr)
 
     def test_revalidation_run_step_separates_quality_from_infrastructure(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")

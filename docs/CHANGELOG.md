@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.1-0.2 - 2026-09-21
+
+- Fix `bc250-revalidate` on 0.12.1 packages: the harness now reads the installed package-owned `VERSION` file instead of retaining the obsolete hard-coded `0.11.3` target.
+- Install the package `VERSION` authority under `/usr/share/bc250-llm-server/VERSION` and reject missing or malformed version metadata before qualification starts.
+- Keep the 0.12.1 Open WebUI ACL, Deep Reasoning residency, verifier, provenance and runtime behavior unchanged from 0.12.1-0.1.
+
 ## 0.12.1-0.1 - 2026-09-21
 
 - Fix ordinary-user Open WebUI access by converging authenticated-read (`user:*:read`) grants on exactly the six active office presets plus their five hidden production base overrides and the hidden task-model override. ACL convergence is minimum-required/additive: unrelated existing grants are preserved, including grants on inactive legacy records.

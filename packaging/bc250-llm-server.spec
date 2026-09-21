@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.1
-Release:        0.1%{?dist}
+Release:        0.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -210,6 +210,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.2
+- Fix bc250-revalidate package-version gating so it reads the package-owned installed VERSION authority instead of hard-coding the obsolete 0.11.3 target.
+- Install VERSION under the package share and fail closed if the revalidation target version is missing or malformed.
+- Keep the 0.12.1 Open WebUI behavior unchanged; this release bump is limited to revalidation compatibility and its focused regression coverage.
+
 * Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.1
 - Grant authenticated users read access to the six production Open WebUI roles and their six hidden implementation/task records while preserving unrelated grants.
 - Unload the Deep Reasoning GPT-OSS model after each response so title/tag task-model cold loads retain safe memory headroom on the 16 GiB UMA appliance.
