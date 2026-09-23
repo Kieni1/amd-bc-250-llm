@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.3
+# BC-250 package revalidation harness v4.4
 #
 # The target package version is read from the package-owned VERSION file; the RPM
 # release suffix is intentionally not hard-coded.
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.3
+HARNESS_VERSION=4.4
 PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
 TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
@@ -52,7 +52,7 @@ SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.3 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.4 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250-benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -1847,7 +1847,7 @@ status_raw() {
 status_run() {
   need_root
   local raw=0 phase stage service rid run_version worker position label stage_started last_event
-  shift || true
+  [[ "${1:-}" == status ]] && shift
   while (($#)); do case "$1" in --raw) raw=1; shift ;; -h|--help) echo "Usage: sudo bc250-revalidate status [--raw]"; return 0 ;; *) echo "ERROR: unknown status option: $1" >&2; return 2 ;; esac; done
   ((raw == 0)) || { status_raw; return; }
   rid="$(run_id)"; phase="$(cat "$PHASE_FILE" 2>/dev/null || echo none)"; stage="$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
@@ -1925,7 +1925,7 @@ esac
 case "${1:-}" in
   start) start_run "$@" ;;
   worker) worker ;;
-  status) status_run ;;
+  status) status_run "${@:2}" ;;
   abort) abort_run ;;
   cleanup) cleanup_run ;;
   help|-h|--help|'') usage ;;

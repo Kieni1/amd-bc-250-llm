@@ -1740,7 +1740,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.3", source)
+        self.assertIn("HARNESS_VERSION=4.4", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -2867,7 +2867,7 @@ follow_run
 printf '%s\n' '---STATUS---'
 status_run status
 printf '%s\n' '---RAW---'
-status_raw
+status_run --raw
 '''
             completed = subprocess.run(
                 ["bash", "-c", script], text=True, capture_output=True, check=True
@@ -2877,6 +2877,8 @@ status_raw
             self.assertIn("coverage:       partial", output)
             self.assertIn("coverage       : partial", output)
             self.assertIn("coverage=partial", output)
+            source_text = source.read_text(encoding="utf-8")
+            self.assertIn('status) status_run "${@:2}" ;;', source_text)
 
     def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
