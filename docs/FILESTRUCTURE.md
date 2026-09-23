@@ -69,8 +69,11 @@ intentionally empty on a stock install; packaged model definitions live under
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |
 | `/var/cache/bc250-llm-server/40cu/` | Kernel-specific build cache |
 | `/srv/bc250-documents/` | Operator-owned authoritative document tree, `root:root` mode `0750` |
-| `/srv/bc250-documents/{public,confidential}/COLLECTION/sources/` | Original PDFs; never automatically uploaded by `bc250-rag-import` |
-| `/srv/bc250-documents/{public,confidential}/COLLECTION/active/` | Canonical Markdown eligible for metadata-aware RAG sync |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/inbox/{german,french,bilingual}/` | Batch-preparation input lanes; files remain here when OCR/manual review is required |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/sources/` | Immutable authoritative source files; never automatically indexed |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/working/` | Local agent/editor drafts; never indexed |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/active/` | Human-reviewed canonical Markdown eligible for RAG sync |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/superseded/` | Previous source/Markdown revisions retained for audit |
 | `/var/lib/open-webui/` | Open WebUI application data; treat as confidential |
 | `/var/lib/open-webui/webui.db` | Accounts, chats, settings and knowledge metadata; confidential |
 | `/var/lib/open-webui/uploads/` | Uploaded source documents; confidential |

@@ -76,6 +76,7 @@ class DocumentationTests(unittest.TestCase):
             r"bc250-storage(?:\s|$)",
             r"bc250-revalidate(?:\s|$)",
             r"bc250-rag-import(?:\s|$)",
+            r"bc250-rag\s+(?:init|prepare-batch|review|activate|supersede|ingest)(?:\s|$)",
             r"bc250-ocr\s+install(?:\s|$)",
             r"bc250-fetch-mtp(?:\s|$)",
             r"bc250-agent-mode\s+(?:enter|leave)(?:\s|$)",

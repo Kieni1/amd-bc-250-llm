@@ -125,6 +125,7 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("models/sources", manifest)
         self.assertIn("uninstall.sh\t{libexec}/uninstall.sh", manifest)
         self.assertIn("cmd/monitoring/status.sh\t{libexec}/status.sh", manifest)
+        self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
         result = subprocess.run(
             [str(ROOT / "packaging/bc250"), "--list-aliases"],
@@ -135,6 +136,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("model", result.stdout.splitlines())
         self.assertIn("uninstall", result.stdout.splitlines())
         self.assertIn("status", result.stdout.splitlines())
+        self.assertIn("support-bundle", result.stdout.splitlines())
         self.assertNotIn("fetch-embeddings", result.stdout.splitlines())
         self.assertIn("fetch-mtp", result.stdout.splitlines())
         self.assertIn("ocr", result.stdout.splitlines())
@@ -225,15 +227,15 @@ class PackagingTests(unittest.TestCase):
         for forbidden in ("firewall-cmd", "setsebool", "dnf ", "bc250-model", "systemctl enable --now"):
             self.assertNotIn(forbidden, post)
 
-    def test_package_standard_ollama_is_0340(self) -> None:
+    def test_package_standard_ollama_is_0342(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn('VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', helper)
         self.assertIn('source "$runtime_env"', installer)
         self.assertNotIn('BC250_OLLAMA_VERSION="0.34.0"', installer)
-        self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', installer)
-        self.assertIn("BC250_OLLAMA_VERSION=0.34.0", (ROOT / "config/runtime.env").read_text())
+        self.assertIn('requested="$BC250_OLLAMA_VERSION"', installer)
+        self.assertIn("BC250_OLLAMA_VERSION=0.34.2", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
@@ -647,14 +649,14 @@ class PackagingTests(unittest.TestCase):
                 values[key] = value
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.34.0")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.34.2")
         self.assertEqual(
-            values["BC250_OLLAMA_INSTALLER_COMMIT"],
-            "d8ab4b4f0ca24b51d3a46b3bf4f462e58ce66b1f",
+            values["BC250_OLLAMA_PAYLOAD_URL"],
+            "https://github.com/ollama/ollama/releases/download/v0.34.2/ollama-linux-amd64.tar.zst",
         )
         self.assertEqual(
-            values["BC250_OLLAMA_INSTALLER_SHA256"],
-            "25f64b810b947145095956533e1bdf56eacea2673c55a7e586be4515fc882c9f",
+            values["BC250_OLLAMA_PAYLOAD_SHA256"],
+            "e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b",
         )
         self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.3")
         self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.3")

@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.1
-Release:        0.2%{?dist}
+Release:        0.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -61,6 +61,7 @@ Requires:       mesa-vulkan-drivers
 Requires:       nginx
 Requires:       pciutils
 Requires:       podman
+Requires:       poppler-utils
 Requires:       policycoreutils
 Requires:       procps-ng
 Requires:       python3
@@ -210,6 +211,18 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Wed Sep 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.4
+- Promote device-qualified Ollama 0.34.2 with exact release-payload URL/SHA verification while preserving package-owned service topology.
+- Add the local bc250-rag DE/FR/bilingual preparation, human-review, activation and ingestion lifecycle while retaining the legacy rag-import compatibility route.
+- Remove obsolete historical kernel-version warnings, qualify IOMMU as outside the supported baseline rather than hardware-broken, and improve live TTM conflict diagnostics.
+- Normalize Markdown-escaped deterministic RAG markers and keep established Open WebUI/model/40-CU runtime policy otherwise unchanged.
+
+* Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.3
+- Improve converged installer UX by hiding the long optional-model catalogue until an operator explicitly chooses to review additional models.
+- Add a small redacted bc250-support-bundle command that reuses existing appliance authorities and emits manifest/checksum evidence without collecting user content or credentials.
+- Advance package revalidation to harness v4.3 with manifest/checksum bundle integrity, explicit expected inactive-agent raw evidence, clearer policy-aware diagnostics, and diagnostic counts in completion/status summaries.
+- Make bc250-status distinguish Open WebUI unit activity from HTTP readiness and query the active Ollama server version through its API; clarify successful verifier output when optional authenticated checks are skipped.
+
 * Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.2
 - Fix bc250-revalidate package-version gating so it reads the package-owned installed VERSION authority instead of hard-coding the obsolete 0.11.3 target.
 - Install VERSION under the package share and fail closed if the revalidation target version is missing or malformed.
