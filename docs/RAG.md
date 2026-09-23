@@ -289,6 +289,7 @@ sudo bc250-rag activate public municipal-regulations --all-ready
 
 `prepare-batch` uses local `pdfinfo`/`pdftotext` and the exclusive local agent lane on `127.0.0.1:11436`.
 If the agent lane is inactive it enters agent mode for the batch and restores normal topology afterwards.
+The agent call uses Ollama `/api/chat` with native thinking kept separate from final `message.content`; truncated, empty, fenced or literal reasoning-contaminated final output is rejected before a draft is written. Fidelity checks run only against that validated final Markdown.
 No external OCR, conversion, translation or hosted document API is used. Automation writes **only** to
 `working/`; it never promotes generated text directly into `active/`.
 
@@ -299,15 +300,10 @@ Inbox semantics:
 - `bilingual/`: produce separate DE and FR drafts sharing the source; do not index mixed-language output.
 
 The local transformation prompt preserves complete substantive wording, original legal numbering, dates,
-amounts and identifiers while removing extraction/layout noise. It is intentionally conservative: scanned
-PDFs with little selectable text are left in the inbox for the local OCR workflow, and unusually large
-documents above the safe single-pass limit are left for a genuine chapter/document split. This avoids
-growing `bc250-rag` into a fragile OCR/chunking engine.
+amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. This avoids growing `bc250-rag` into a fragile OCR/chunking engine.
 
 The review step is where the operator confirms titles, stable `document_family`, effective date or edition,
-authority role, and DE/FR counterpart. For legal, financial or technical sources, visually compare
-representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an
-authoritative transformation until reviewed.
+authority role, and DE/FR counterpart. Review numbering covers only drafts that still need review, and the prompts make the effective-date-or-edition requirement explicit. For legal, financial or technical sources, visually compare representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an authoritative transformation until reviewed.
 
 Activation is explicit and atomic at the collection level: a reviewed replacement supersedes the previous
 active revision for the same `document_family` and language, retaining old evidence.

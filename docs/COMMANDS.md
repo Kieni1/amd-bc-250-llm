@@ -262,11 +262,9 @@ sudo bc250-rag ingest --token-file FILE [--prune]
 
 The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
 `inbox/bilingual`, `sources`, `working`, `active` and `superseded`. Agent-assisted batch preparation is
-local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Scanned
-PDFs and documents above the safe single-pass limit are intentionally deferred to OCR/manual chapter-split
-review rather than guessed.
+local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Native agent thinking is separated from final Markdown through Ollama `/api/chat`; truncated, empty, fenced or reasoning-contaminated final content is rejected. Scanned PDFs and documents above the safe single-pass limit are intentionally reported as deferred OCR/manual chapter-split work rather than generic failures or guessed.
 
-`validate` checks provenance, review state, document identity and active revision conflicts. `ingest` sends
+`validate` checks provenance, review state, document identity, active revision conflicts and obvious native-reasoning marker contamination. `ingest` sends
 only `active/*.md` through the existing incremental Open WebUI knowledge API. The API key is never packaged;
 `--token-file` must be a non-empty private regular file. Use `--prune` only when stale remote documents should
 be removed. `bc250-rag-import plan|sync` remains a compatibility route for older corpora.
@@ -400,7 +398,7 @@ bc250-benchmark generation
 sudo bc250-revalidate start --owui-token-file /root/owui-test.key
 sudo bc250-revalidate start --skip-owui
 sudo bc250-revalidate status
-sudo bc250-revalidate status --raw
+sudo bc250-revalidate status --raw  # machine-readable key=value state
 sudo bc250-revalidate abort
 sudo bc250-revalidate cleanup
 ```
@@ -422,7 +420,7 @@ maintenance, topology and CU commands, adds bounded resource/failure evidence, a
 chat content, uploaded document contents, database rows, identity SQL and backup contents.
 Use `--output-dir DIR` when the archive should be written elsewhere.
 
-`bc250-revalidate` harness v4.3 is the root-only systemd-backed package
+`bc250-revalidate` harness v4.4 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
@@ -431,7 +429,7 @@ before run state is created. The worker remains systemd-owned; Ctrl-C detaches a
 `--detach` returns immediately. The dashboard reports stage elapsed time, worker
 state and the age of the last real progress event rather than treating a periodic
 heartbeat as progress.
-Harness v4.3 also surfaces non-failing observations under a separate `Diagnostics`
+Harness v4.4 also surfaces non-failing observations under a separate `Diagnostics`
 section. This includes non-severe context truncation, a MemAvailable minimum below the
 512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
 floor, and accepted use cases that reach their generation output budget. These diagnostics
@@ -556,11 +554,12 @@ permissions. It applies the package-owned main/task provider, dedicated embeddin
 package-owned Open WebUI Functions and additive model-preset baseline. The package also owns the
 persisted local/offline application policy that matters to the appliance contract: Arena is disabled,
 external OpenAI/direct/code-execution/interpreter/memory/community-sharing features remain disabled,
-and upload count/size/extension limits are converged through supported Open WebUI APIs. The raw five
-production base models plus the dedicated task model remain active for presets/background tasks but
-are marked hidden in the ordinary selector so the normal product surface is role-oriented.
-`status` verifies those persisted values, hidden-model metadata, package Function source/state and
-package-owned preset fields needed by the selected production translation contract. Credentials/tokens
+and upload count/size/extension limits are converged through supported Open WebUI APIs. During the
+pre-v1 testing phase both normal Ollama providers are unrestricted and the raw production/task model
+overrides are visible, so installed main/task models can be selected directly for comparison. Curated
+Office roles remain the supported product paths. `status` verifies those persisted values, testing
+visibility/tool-policy metadata, package Function source/state and package-owned preset fields needed
+by the selected production translation contract. Credentials/tokens
 are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
 synchronized away.
 

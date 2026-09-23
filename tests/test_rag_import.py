@@ -8,7 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -21,6 +21,13 @@ assert spec and spec.loader
 rag = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = rag
 spec.loader.exec_module(rag)
+
+sys.modules["rag_import"] = rag
+lifecycle_spec = importlib.util.spec_from_file_location("bc250_rag_lifecycle", LIFECYCLE)
+assert lifecycle_spec and lifecycle_spec.loader
+lifecycle = importlib.util.module_from_spec(lifecycle_spec)
+sys.modules[lifecycle_spec.name] = lifecycle
+lifecycle_spec.loader.exec_module(lifecycle)
 
 
 class RagImportTests(unittest.TestCase):
@@ -258,6 +265,14 @@ class RagImportTests(unittest.TestCase):
                 text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("RAG collection ready", result.stdout)
+            self.assertIn("(created)", result.stdout)
+            again = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "public", "COLLECTION"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(again.returncode, 0, again.stderr)
+            self.assertIn("already present / converged", again.stdout)
             base = root / "public" / "COLLECTION"
             for name in ("sources", "working", "active", "superseded"):
                 self.assertTrue((base / name).is_dir())
@@ -279,6 +294,18 @@ class RagImportTests(unittest.TestCase):
             )
             self.assertEqual(remote.returncode, 2)
             self.assertIn("loopback-only agent URL", remote.stderr)
+            missing = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "status", "public", "MISSING"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(missing.returncode, 0, missing.stderr)
+            self.assertIn("RAG collection not found: public/MISSING", missing.stdout)
+            invalid = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "public", "bad/name"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn("'bad/name'", invalid.stderr)
             private = subprocess.run(
                 [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "confidential", "PRIVATE"],
                 text=True, capture_output=True, check=False,
@@ -309,6 +336,98 @@ class RagImportTests(unittest.TestCase):
             self.assertFalse(old.exists())
             self.assertTrue(any((base / "superseded").glob("family_de-CH_2025-01-01*.md")))
             self.assertTrue(source.exists())
+            pending = base / "working" / "pending.md"
+            pending.write_text(
+                template.format(document_id="pending", title="Pending", date="2027-01-01", digest=digest).replace(
+                    "review_required: false", "review_required: true"
+                ),
+                encoding="utf-8",
+            )
+            status = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "status", "public", "COLLECTION"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(status.returncode, 0, status.stderr)
+            self.assertIn("working awaiting review: 1", status.stdout)
+
+    def test_lifecycle_agent_output_integrity_and_deferral_taxonomy(self) -> None:
+        lifecycle_source = LIFECYCLE.read_text(encoding="utf-8")
+        self.assertIn('url + "/api/chat"', lifecycle_source)
+        self.assertIn('"think": True', lifecycle_source)
+        self.assertNotIn('url + "/api/generate"', lifecycle_source)
+        prompt = lifecycle.normalize_prompt("FR-MARKER-8520", "fr-CH", False)
+        self.assertIn("Do not remove unique codes, identifiers", prompt)
+        clean = {
+            "done": True,
+            "done_reason": "stop",
+            "message": {
+                "thinking": "FR-MARKER-8520 appears in the source but I might omit it",
+                "content": "# Titre\n\nTexte final sans le code.\n",
+            },
+        }
+        final = lifecycle.final_agent_content(clean)
+        self.assertEqual(final, "# Titre\n\nTexte final sans le code.\n")
+        self.assertIn("REVIEW", lifecycle.fidelity_note("FR-MARKER-8520", final, False))
+        kept = lifecycle.final_agent_content(
+            {
+                "done": True,
+                "done_reason": "stop",
+                "message": {"thinking": "private reasoning", "content": "# Titre\n\nFR-MARKER-8520\n"},
+            }
+        )
+        self.assertIn("PASS", lifecycle.fidelity_note("FR-MARKER-8520", kept, False))
+        for response in (
+            {"done": True, "done_reason": "stop", "message": {"content": "# T\n</think>\nBody"}},
+            {"done": True, "done_reason": "length", "message": {"content": "# T\nBody"}},
+            {"done": True, "done_reason": "stop", "message": {"content": ""}},
+            {"done": True, "done_reason": "stop", "message": {"content": "```markdown\n# T\n```"}},
+        ):
+            with self.assertRaises(ValueError):
+                lifecycle.final_agent_content(response)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "source.pdf"
+            source.write_bytes(b"source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            contaminated = base / "working" / "bad.md"
+            contaminated.write_text(
+                "---\n"
+                'document_id: "bad"\n'
+                'document_family: "bad"\n'
+                'title: "Bad"\n'
+                'language: "de-CH"\n'
+                'authority_role: "authoritative"\n'
+                'review_required: true\n'
+                'source_file: "source.pdf"\n'
+                f'source_sha256: "{digest}"\n'
+                "---\n\n# Bad\n\n<think>leaked</think>\n",
+                encoding="utf-8",
+            )
+            validation_output = io.StringIO()
+            with redirect_stdout(validation_output):
+                errors, _warnings = lifecycle.validate_collection(base, include_working=True)
+            self.assertEqual(errors, 1)
+            self.assertIn("native reasoning markers", validation_output.getvalue())
+
+            inbox = base / "inbox" / "german" / "scan.pdf"
+            inbox.write_bytes(b"scan")
+            args = type("Args", (), {
+                "root": root, "scope": "public", "collection": "COLLECTION",
+                "agent_url": "http://127.0.0.1:11436", "model": "agentic-ornith15-9b-ornith-q5-k-m",
+                "max_chars": 50000, "dry_run": False,
+            })()
+            out = io.StringIO()
+            err = io.StringIO()
+            with patch.object(lifecycle, "enter_agent_if_needed", return_value=False), \
+                 patch.object(lifecycle, "agent_models", return_value={"agentic-ornith15-9b-ornith-q5-k-m"}), \
+                 patch.object(lifecycle, "prepare_one", side_effect=lifecycle.DeferredPreparation("OCR required", "little/no selectable text")), \
+                 redirect_stdout(out), redirect_stderr(err):
+                lifecycle.cmd_prepare(args)
+            self.assertIn("DEFERRED — OCR required: scan.pdf", err.getvalue())
+            self.assertIn("deferred/manual:  1", out.getvalue())
+            self.assertIn("failed:           0", out.getvalue())
 
     def test_importer_is_packaged_and_document_root_is_operator_owned(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")

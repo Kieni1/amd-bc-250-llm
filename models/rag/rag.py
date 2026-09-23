@@ -31,6 +31,15 @@ DEFAULT_MAX_CHARS = int(os.environ.get("BC250_RAG_MAX_CHARS", "50000"))
 INBOX_LANES = ("german", "french", "bilingual")
 COLLECTION_DIRS = ("sources", "working", "active", "superseded")
 PDF_EXTENSIONS = {".pdf"}
+REASONING_MARKER_RE = re.compile(r"</?think(?:\s|>)|<\|/?think\|>", re.IGNORECASE)
+
+
+class DeferredPreparation(RuntimeError):
+    """Expected manual deferral, not an automated processing failure."""
+
+    def __init__(self, kind: str, message: str) -> None:
+        super().__init__(message)
+        self.kind = kind
 
 
 def die(message: str) -> None:
@@ -41,7 +50,9 @@ def collection_path(root: Path, scope: str, collection: str) -> Path:
     if scope not in importer.SCOPES:
         die(f"scope must be one of: {', '.join(importer.SCOPES)}")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", collection):
-        die("collection must contain only letters, numbers, dot, underscore or hyphen")
+        die(
+            f"invalid collection identifier {collection!r}; use only letters, numbers, dot, underscore or hyphen"
+        )
     return root / scope / collection
 
 
@@ -217,7 +228,8 @@ Rules:
 - Preserve original legal/article numbering exactly. Never replace source identifiers with editorial numbering.
 - Use ##/### only for real document sections. Use bold labels for clauses/articles where helpful.
 - Preserve dates, amounts, percentages, currency, names, identifiers and legal references exactly.
-- Remove repeated decorative page headers/footers and layout-only noise.
+- Do not remove unique codes, identifiers, article references, markers, numbers or alphanumeric labels as layout noise.
+- Remove repeated decorative page headers/footers only when their repeated/decorative nature is clear. When uncertain, preserve the source text.
 - Join words broken only by PDF line wrapping. Preserve genuine compound hyphens.
 - Repair only obvious extraction artifacts. Do not silently correct source grammar or legal wording.
 - Keep tables readable in Markdown when practical.
@@ -231,17 +243,43 @@ SOURCE EXTRACTION END
 """
 
 
+def final_agent_content(data: object) -> str:
+    if not isinstance(data, dict):
+        die("agent returned an invalid response object")
+    if data.get("done") is not True:
+        die("agent response did not report terminal completion")
+    if str(data.get("done_reason", "")).lower() in {"length", "max_tokens"}:
+        die("agent output hit its generation limit; leave this document for manual/chapter-split processing")
+    message = data.get("message")
+    if not isinstance(message, dict):
+        die("agent response did not contain a chat message")
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        die("agent returned no normalized Markdown final content")
+    output = content.strip()
+    if REASONING_MARKER_RE.search(output):
+        die("agent final content contains native reasoning markers; refusing contaminated RAG draft")
+    lines = [line for line in output.splitlines() if line.strip()]
+    if lines and re.match(r"^\s*(```|~~~)", lines[0]):
+        die(
+            "agent final content is wrapped in a Markdown fence; "
+            "refusing output that violates the raw-Markdown contract"
+        )
+    return output + "\n"
+
+
 def call_agent(url: str, model: str, prompt: str) -> str:
     payload = json.dumps(
         {
             "model": model,
-            "prompt": prompt,
+            "messages": [{"role": "user", "content": prompt}],
             "stream": False,
+            "think": True,
             "keep_alive": "10m",
             "options": {"temperature": 0, "num_ctx": 32768, "num_predict": 16384},
         }
     ).encode("utf-8")
-    request = Request(url + "/api/generate", data=payload, method="POST", headers={"Content-Type": "application/json"})
+    request = Request(url + "/api/chat", data=payload, method="POST", headers={"Content-Type": "application/json"})
     try:
         with urlopen(request, timeout=1800) as response:
             data = json.loads(response.read() or b"{}")
@@ -250,15 +288,7 @@ def call_agent(url: str, model: str, prompt: str) -> str:
         die(f"agent generation failed: HTTP {exc.code}: {detail}")
     except (OSError, URLError, json.JSONDecodeError) as exc:
         die(f"agent generation failed: {exc}")
-    if not isinstance(data, dict) or not str(data.get("response", "")).strip():
-        die("agent returned no normalized Markdown")
-    if data.get("done_reason") in {"length", "max_tokens"}:
-        die("agent output hit its generation limit; leave this document for manual/chapter-split processing")
-    output = str(data["response"]).strip()
-    if output.startswith("```"):
-        output = re.sub(r"^```(?:markdown)?\s*", "", output, flags=re.IGNORECASE)
-        output = re.sub(r"\s*```$", "", output)
-    return output.strip() + "\n"
+    return final_agent_content(data)
 
 
 def title_from_body(body: str, fallback: str) -> str:
@@ -268,14 +298,15 @@ def title_from_body(body: str, fallback: str) -> str:
 
 def critical_tokens(text: str) -> set[str]:
     patterns = (
-        r"\b\d{1,4}(?:[.'’ ]\d{3})*(?:[.,]\d+)?\s*%?\b",
-        r"\b(?:CHF|EUR|USD)\s*\d[\d'’., ]*\b",
-        r"\b(?:Art\.|Artikel|article|al\.|Abs\.)\s*\d+[A-Za-z.-]*\b",
-        r"\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b",
+        (r"\b\d{1,4}(?:[.'’ ]\d{3})*(?:[.,]\d+)?\s*%?\b", re.IGNORECASE),
+        (r"\b(?:CHF|EUR|USD)\s*\d[\d'’., ]*\b", re.IGNORECASE),
+        (r"\b(?:Art\.|Artikel|article|al\.|Abs\.)\s*\d+[A-Za-z.-]*\b", re.IGNORECASE),
+        (r"\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b", 0),
+        (r"\b(?=[A-Z0-9-]*[A-Z])(?=[A-Z0-9-]*\d)[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b", 0),
     )
     found: set[str] = set()
-    for pattern in patterns:
-        found.update(match.group(0).strip() for match in re.finditer(pattern, text, flags=re.IGNORECASE))
+    for pattern, flags in patterns:
+        found.update(match.group(0).strip() for match in re.finditer(pattern, text, flags=flags))
     return found
 
 
@@ -349,9 +380,15 @@ def prepare_one(base: Path, source: Path, lane: str, url: str, model: str, max_c
     print(f"  pages:      {pages or 'unknown'}")
     print(f"  characters: {len(text):,}")
     if len(compact) < 300:
-        die("little/no selectable text detected; leave in inbox and use the local OCR workflow before activation")
+        raise DeferredPreparation(
+            "OCR required",
+            "little/no selectable text detected; leave in inbox and use the local OCR workflow before activation",
+        )
     if len(text) > max_chars:
-        die(f"extraction is {len(text):,} characters, above the safe single-pass limit {max_chars:,}; split at a genuine document/chapter boundary and retry")
+        raise DeferredPreparation(
+            "source split required",
+            f"extraction is {len(text):,} characters, above the safe single-pass limit {max_chars:,}; split at a genuine document/chapter boundary and retry",
+        )
     digest = sha256(source)
     outputs: list[tuple[str, str, str]] = []
     if lane == "german":
@@ -378,8 +415,12 @@ def prepare_one(base: Path, source: Path, lane: str, url: str, model: str, max_c
 
 
 def cmd_init(args: argparse.Namespace) -> None:
-    base = ensure_collection(args.root.resolve(), args.scope, args.collection)
-    print(f"Initialized RAG collection: {base}")
+    root = args.root.resolve()
+    requested = collection_path(root, args.scope, args.collection)
+    existed = requested.is_dir()
+    base = ensure_collection(root, args.scope, args.collection)
+    state = "already present / converged" if existed else "created"
+    print(f"RAG collection ready: {base} ({state})")
     print("Inbox lanes:")
     for lane in INBOX_LANES:
         print(f"  {base / 'inbox' / lane}")
@@ -406,18 +447,29 @@ def cmd_prepare(args: argparse.Namespace) -> None:
         available = agent_models(args.agent_url)
         if args.model.removesuffix(":latest") not in available:
             die(f"agent model is not registered on :11436: {args.model}; install it with sudo bc250-model apply agentic {args.model}")
-        prepared = 0
+        prepared_files = 0
+        drafts = 0
+        deferred = 0
         failed = 0
         for lane, path in pending:
             try:
-                prepared += len(prepare_one(base, path, lane, args.agent_url, args.model, args.max_chars))
+                created = prepare_one(base, path, lane, args.agent_url, args.model, args.max_chars)
+                prepared_files += 1
+                drafts += len(created)
+            except DeferredPreparation as exc:
+                deferred += 1
+                print(f"  DEFERRED — {exc.kind}: {path.name}", file=sys.stderr)
+                print(f"    {exc}", file=sys.stderr)
             except (OSError, UnicodeError, ValueError, RuntimeError) as exc:
                 failed += 1
-                print(f"  REVIEW/FAILED: {exc}", file=sys.stderr)
+                print(f"  ERROR — processing failed: {path.name}", file=sys.stderr)
+                print(f"    {exc}", file=sys.stderr)
         print("\nBatch summary")
         print(f"  input files:      {len(pending)}")
-        print(f"  Markdown drafts:  {prepared}")
-        print(f"  files needing manual/OCR/split review: {failed}")
+        print(f"  prepared:         {prepared_files}")
+        print(f"  Markdown drafts:  {drafts}")
+        print(f"  deferred/manual:  {deferred}")
+        print(f"  failed:           {failed}")
         print(f"  working folder:   {base / 'working'}")
         print("\nAutomation stops here by design. Review metadata/content before activation.")
         print(f"Next: sudo bc250-rag review {args.scope} {args.collection}")
@@ -461,11 +513,17 @@ def cmd_review(args: argparse.Namespace) -> None:
     if not docs:
         print("No working Markdown drafts to review.")
         return
-    for index, path in enumerate(docs, 1):
+    review_docs: list[Path] = []
+    for path in docs:
+        meta = importer.front_matter(path)
+        if args.all or bool_value(meta.get("review_required", True)):
+            review_docs.append(path)
+    if not review_docs:
+        print("No working Markdown drafts require review.")
+        return
+    for index, path in enumerate(review_docs, 1):
         meta, body = split_markdown(path)
-        if not bool_value(meta.get("review_required", True)) and not args.all:
-            continue
-        print(f"\n[{index}/{len(docs)}] {path.name}")
+        print(f"\n[{index}/{len(review_docs)}] {path.name}")
         print(f"  source:     {meta.get('source_file', '')}")
         print(f"  language:   {meta.get('language', '')}")
         print(f"  title:      {meta.get('title', '')}")
@@ -473,8 +531,14 @@ def cmd_review(args: argparse.Namespace) -> None:
         print(f"  authority:  {meta.get('authority_role', meta.get('authority', ''))}")
         title = ask("Title", str(meta.get("title", "")))
         family = ask("Document family", str(meta.get("document_family", "")))
-        effective = ask("Effective date (YYYY-MM-DD; blank if unknown)", str(meta.get("effective_from", "")))
-        edition = ask("Edition/version (optional)", str(meta.get("edition", "")))
+        effective = ask(
+            "Effective date (YYYY-MM-DD; or provide edition/version below)",
+            str(meta.get("effective_from", "")),
+        )
+        edition = ask(
+            "Edition/version (required when effective date is blank)",
+            str(meta.get("edition", "")),
+        )
         role = ask("Authority role (authoritative|translation)", str(meta.get("authority_role", meta.get("authority", ""))))
         if role == "original":
             role = "authoritative"
@@ -545,7 +609,9 @@ def validate_collection(base: Path, *, include_working: bool = False) -> tuple[i
     for folder in folders:
         for path in docs_in(folder):
             try:
-                meta = importer.front_matter(path)
+                meta, body = split_markdown(path)
+                if REASONING_MARKER_RE.search(body):
+                    die("document body contains native reasoning markers (<think>/thinking delimiters)")
                 source_file = str(meta.get("source_file", ""))
                 source_digest = str(meta.get("source_sha256", ""))
                 if not source_file or not importer.SHA256_RE.fullmatch(source_digest):
@@ -697,6 +763,11 @@ def cmd_supersede(args: argparse.Namespace) -> None:
 
 def cmd_status(args: argparse.Namespace) -> None:
     root = args.root.resolve()
+    if args.scope and args.collection:
+        requested = collection_path(root, args.scope, args.collection)
+        if not requested.is_dir():
+            print(f"RAG collection not found: {args.scope}/{args.collection}")
+            return
     scopes = [args.scope] if args.scope else list(importer.SCOPES)
     found = False
     for scope in scopes:
@@ -731,7 +802,7 @@ def cmd_status(args: argparse.Namespace) -> None:
                     continue
                 families.setdefault(str(meta.get("document_family", "")), set()).add(str(meta.get("language", "")))
             paired = sum(1 for langs in families.values() if any(v.startswith("de") for v in langs) and any(v.startswith("fr") for v in langs))
-            print(f"  review required: {review}")
+            print(f"  working awaiting review: {review}")
             print(f"  active DE/FR paired families: {paired}")
     if not found:
         print(f"No RAG collections found below {root}.")
