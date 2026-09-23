@@ -298,7 +298,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertIn("filters=bc250_translation_direction", text)
         self.assertIn("Task and RAG", text)
         self.assertIn("Package-owned functions", text)
-        self.assertIn("Hidden implementation models", text)
+        self.assertIn("Implementation/task models", text)
+        self.assertIn("visible for testing", text)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k:latest", text)
 
     def test_status_rejects_non_object_config_responses(self) -> None:
