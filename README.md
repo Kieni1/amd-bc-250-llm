@@ -27,10 +27,10 @@ sudo bc250-install --models-only   # model/Open WebUI reconciliation
 ```
 
 Because the 0.x line is greenfield, the RPM owns all four Ollama lane units.
-`bc250-install-ollama` rejects a custom `/etc/systemd/system/ollama.service` before
-invoking the pinned upstream installer; the upstream installer supplies the binary
-only. Reruns reconcile observable appliance state rather than an installer-history
-database.
+`bc250-install-ollama` rejects a custom `/etc/systemd/system/ollama.service`, downloads
+the exact package-qualified upstream Linux payload, verifies its SHA-256, and leaves all
+service topology under RPM ownership. Reruns reconcile observable appliance state rather
+than an installer-history database.
 
 The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
 the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
@@ -62,6 +62,7 @@ The reviewed fresh-machine memory profile uses only
 ```bash
 sudo bc250-status
 sudo bc250-verify
+sudo bc250-support-bundle   # redacted support evidence archive
 bc250-verify-lan SERVER_IP
 ```
 
@@ -158,19 +159,18 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.34.0 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Ollama v0.34.2 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
 | Open WebUI v0.11.3 and Tika v4.0.0 | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
-| RAG import | Metadata-aware sync of operator-owned Markdown into Open WebUI Knowledge |
+| RAG lifecycle | Local DE/FR/bilingual batch preparation, human review, provenance validation and Open WebUI sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 
-Ollama 0.34.0 is the package runtime baseline. It keeps the same llama.cpp
-revision as 0.33.3; its headline changes are outside the BC-250 Vulkan path,
-including desktop integration plus OpenAI-compatible tool-search and response-
-compaction work. Re-run the normal BC-250 Vulkan/UMA smoke and revalidation after
-the runtime refresh.
+Ollama 0.34.2 is the package runtime baseline because that exact payload passed the
+BC-250 clean-boot generation, UMA-memory, embedding, Deep-to-task and Documents/RAG
+qualification. Runtime updates remain deliberately gated: package the last BC-250-
+qualified payload rather than automatically following the newest upstream release.
 See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.

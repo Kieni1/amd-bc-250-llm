@@ -35,6 +35,7 @@ package-owned four-lane topology.
 ```bash
 sudo bc250-status
 sudo bc250-verify
+sudo bc250-support-bundle   # redacted support evidence archive
 bc250-verify-lan SERVER_IP
 sudo bc250-storage status
 sudo bc250-storage dedupe
@@ -48,10 +49,12 @@ reflects reclaimed capacity even when `du` counts both names. Open
 sudo bc250-openwebui-setup init
 ```
 
-For RAG, keep operator documents under `/srv/bc250-documents` and plan before sync:
+For RAG, keep operator documents under `/srv/bc250-documents`; batch preparation stops at a human review gate:
 
 ```bash
-sudo bc250-rag-import plan /srv/bc250-documents
+sudo bc250-rag status
+sudo bc250-rag validate public COLLECTION
+sudo bc250-rag plan /srv/bc250-documents
 ```
 
 See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use

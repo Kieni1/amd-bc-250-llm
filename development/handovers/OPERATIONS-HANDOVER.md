@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.12.1-0.2
+# BC-250 support / operations handover — current source release 0.12.1-0.4
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,19 +10,15 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.12.1
-RPM Release:  0.2
-NVR:          bc250-llm-server-0.12.1-0.2
+RPM Release:  0.4
+NVR:          bc250-llm-server-0.12.1-0.4
 ```
 
-0.12.1-0.2 is the current source release target. It carries the narrow Open WebUI ACL, Deep
-Reasoning residency and verifier fixes plus release-provenance/patch-applicability hardening. It does
-not change the already-qualified non-OWUI topology, maintenance, CU, power, storage, backup/restore or
-supported-reboot behavior. Exact installed `0.11.3-2.4.fc44.x86_64` remains the latest broad
-operations acceptance baseline; do not transfer that hardware qualification to 0.12.1-0.2.
+0.12.1-0.4 is the current source release target. It preserves the narrow Open WebUI ACL, Deep-residency, verifier and 0.3 operator/evidence UX fixes, packages the separately exact-device-qualified Ollama 0.34.2 runtime, and adds the bounded `bc250-rag` corpus lifecycle plus IOMMU/TTM/kernel diagnostic cleanup. Exact installed `0.11.3-2.4.fc44.x86_64` remains the latest broad operations acceptance baseline; do not transfer that historical hardware qualification to 0.12.1-0.4.
 
-The required post-build device work for 0.12.1-0.2 is the small Open WebUI/revalidation regression pass documented in `development/patchnotes/PATCHNOTE-0.12.1-0.2.md`, unless later source changes touch additional operations boundaries.
+The previous 0.12.1-0.3 source candidate passed the testing-specialist deterministic/source gate but did not receive exact-installed device acceptance. The required post-build device work for 0.12.1-0.4 is split between `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.4.md` and `development/handovers/RAG-TESTING-HANDOVER-0.12.1-0.4.md`; do not replay unrelated broad campaigns unless a changed boundary fails.
 
-Newest full device qualification is exact installed `0.11.3-1.7.fc44.x86_64`:
+The earlier full whole-appliance revalidation campaign on exact installed `0.11.3-1.7.fc44.x86_64` remains useful historical evidence:
 
 ```text
 core verify          54 / 0 / 0
@@ -107,9 +103,9 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 0.12.1-0.2 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.1-0.2.md`. The 0.2 follow-up changes only the revalidation package-version authority plus release-coherence documentation relative to 0.1; focused source tests for that boundary pass. GitHub remains authoritative for the complete deterministic/build gate.
+Current 0.12.1-0.4 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.1-0.4.md`. It retains the 0.3 operator/evidence improvements, promotes the separately qualified Ollama 0.34.2 payload into package ownership, and adds the local `bc250-rag` lifecycle plus current hardware diagnostic wording. The prior 0.3 source candidate passed the testing-specialist deterministic/source gate; GitHub remains authoritative for the complete 0.4 deterministic/build gate.
 
-Exact installed 2.4 remains the broad device regression baseline. Exact installed 0.12.1-0.1 reached package convergence and authenticated verification but exposed the stale revalidation version gate; exact 0.12.1-0.2 remains unqualified until built, installed and subjected to the bounded OWUI/revalidation regression.
+Exact installed 2.4 remains the broad device regression baseline. Exact installed 0.12.1-0.1 reached package convergence and authenticated verification but exposed the stale revalidation version gate. The standalone 0.34.2 runtime comparison passed on exact installed 0.12.1-0.2, but exact 0.12.1-0.4 remains unqualified until built, installed and subjected to the bounded release and RAG acceptance.
 
 ## Service topology
 
@@ -133,7 +129,7 @@ readiness and SSH :22 only for administration/restricted maintenance.
 Current runtime pins come from `config/runtime.env`:
 
 ```text
-Ollama       0.34.0
+Ollama       0.34.2
 Open WebUI   0.11.3
 Tika         4.0.0-full
 ```
@@ -258,27 +254,11 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 0.12.1-0.2 source/device follow-up
+## Immediate 0.12.1-0.4 source/device follow-up
 
-Do not replay the closed 2.4 broad operations campaign. The new package changes only Open WebUI
-model authorization/residency/status behavior plus build provenance validation.
+Do not replay the closed 2.4 broad operations campaign. Follow the dedicated release and RAG testing handovers. The compact release/device round must verify exact package convergence, package-owned Ollama 0.34.2 on 11434/11435/11437, normal topology, Standard→Deep→task transition, one Jina probe, one Documents/RAG smoke, current Fedora-kernel diagnostics without historical blacklist warnings, corrected IOMMU severity, reviewed TTM 4194304/4194304, unchanged 40-CU behavior, and final healthy authenticated verification.
 
-For current 0.12.1-0.2:
-
-```text
-1. build binary/source RPMs through the authoritative Fedora 44 path with exact pinned source caches;
-2. install the exact new NEVRA and run normal package convergence;
-3. verify all six production office roles are visible/usable to an ordinary user while the five
-   production bases plus task model remain selector-hidden;
-4. verify the ACL policy is minimum-required/additive: required user:*:read grants exist, unrelated
-   grants are not destructively stripped, and the inactive legacy translation record is not promoted;
-5. run one ordinary-user Standard request and one Documents request;
-6. run Deep Reasoning immediately followed by title/tag generation, confirm GPT-OSS has unloaded before
-   task cold-load and observe no new OOM/kernel allocation/GPU failure signature;
-7. run verbose authenticated Open WebUI status and final bc250-verify, targeting 54/0/0/0;
-8. finish with healthy normal topology and Open WebUI readiness.
-```
-
+The RAG specialist must separately exercise `bc250-rag` inbox→working→review→active→ingest behavior with German, French and bilingual fixtures, refusal of scans/oversized single-pass inputs, loopback-only agent transformation, source SHA validation, supersession, idempotent Open WebUI sync, privacy and operator UX.
 The exact-2.4 operations evidence already covers supported reboot reconstruction, live 40/40,
 maintenance, storage hygiene, backup/restore, runtime soak, model switching and service topology.
 Repeat those areas only if a corresponding implementation changes.

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.12.1-0.4 - 2026-09-23
+
+- Promote exact-device-qualified Ollama 0.34.2 to the package runtime baseline using the exact Linux payload URL and SHA-256 instead of executing upstream install logic; preserve package-owned main/task/embedding/agent systemd topology and verify the three normal lanes report 0.34.2 after installation.
+- Add the `bc250-rag` lifecycle command for local German/French/bilingual corpus bootstrap: three inbox lanes, local agent-assisted text-native PDF normalization into `working/`, interactive metadata review, provenance validation, explicit activation/supersession, status and safe incremental Open WebUI ingestion. Automation never promotes generated drafts directly to `active/`; scanned and over-limit documents are deliberately deferred to OCR/manual split review.
+- Expand RAG metadata with document-family, authority-role, review and translation linkage while retaining the existing `bc250-rag-import plan|sync` compatibility interface. Normalize simple Markdown-escaped synthetic RAG markers so presentation escapes do not create false retrieval failures.
+- Remove historical kernel-version warning ranges and follow Fedora's current supported kernel. Correct IOMMU diagnostics from a categorical hardware-failure claim to an outside-qualified-baseline notice, and add focused hints for conflicting tmpfiles/modprobe settings when live TTM limits differ from the required 4194304/4194304 profile.
+- Keep production Open WebUI 0.11.3, Jina embedding, Deep `keep_alive=0`, current model policy and the proven 40-CU path unchanged; stock-AMDGPU/live-manager-only 40-CU remains a separate device experiment.
+
+## 0.12.1-0.3 - 2026-09-21
+
+- Keep the proven 0.12.1 model/runtime policy unchanged while improving operator-facing diagnostics and evidence collection.
+- Hide the large optional-model catalogue on a converged installer run until the operator explicitly chooses to review/install additional models; noninteractive explicit selections remain supported.
+- Add `bc250-support-bundle`, a root-only read-only redacted support archive with package/status/verifier/topology/CU/maintenance/resource evidence, `manifest.json`, and `SHA256SUMS.txt`; it intentionally excludes OWUI credentials, prompts/chats, uploaded document contents, database rows, identity SQL and backup contents.
+- Advance `bc250-revalidate` to harness v4.3: final bundles include manifest/checksum evidence, raw combined systemd snapshots explain the expected inactive agent lane in normal mode, accepted context truncation uses policy-aware wording, and completed runs surface diagnostic counts alongside PASS state.
+- Improve `bc250-status` by querying `/api/version` on the active Ollama lane and reporting Open WebUI HTTP readiness separately from unit activity.
+- Clarify verifier completion when optional/authenticated checks are skipped instead of ending with an unqualified success sentence.
+- Defer multi-model/compare policy changes, backup redesign, generic memory admission, RAG lifecycle tooling and broader security hardening until separate evidence justifies them.
+
 ## 0.12.1-0.2 - 2026-09-21
 
 - Fix `bc250-revalidate` on 0.12.1 packages: the harness now reads the installed package-owned `VERSION` file instead of retaining the obsolete hard-coded `0.11.3` target.
