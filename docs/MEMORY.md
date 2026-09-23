@@ -48,24 +48,19 @@ preserving an obsolete duplicate override. The explicit full power-feature mask 
 fresh-install requirement; operator overclock/experimental power-control work
 remains outside the appliance baseline.
 
-### Fedora 44 kernel note
+### Kernel policy
 
-The current appliance testing has progressed beyond the kernel used for the original
-TTM A/B measurements. Keep those measurements attributed to `7.1.10-200.fc44`;
-later application validation on the current Fedora kernel does not retroactively turn
-that earlier run into a kernel-profile comparison. No subsequent observation has
-provided evidence for changing TTM sizing, `ppfeaturemask`, the governor or Mesa.
-The installer always uses the exact running kernel dynamically when preparing
-optional 40-CU support.
+The appliance follows the current Fedora-supported kernel rather than maintaining historical
+release-number warning ranges. Hardware-sensitive checks remain state-based: the installer uses the
+exact running kernel dynamically when preparing optional 40-CU module support, and verification checks
+the running AMDGPU/module/build-tree relationship rather than comparing the kernel release to a stale list.
+No newer BC-250 evidence justifies changing TTM sizing, `ppfeaturemask`, the governor or Mesa defaults.
 
 The two TTM values describe a 16-GiB ceiling at 4-KiB pages. They do **not**
 reserve 16 GiB at boot and do not mean a 16-GiB GGUF will fit: the OS, Ollama,
 KV/cache and other services share the same physical memory.
 
-Do not enable `amd_iommu=on` on this board. `nomodeset` is only for installation
-recovery and must not remain on the normal LLM boot. The installer/verify tooling
-checks both hazards. The package also does not automatically add
-`mitigations=off`.
+IOMMU is not required by the qualified appliance baseline. Do not force `amd_iommu=on` on an unqualified BIOS configuration; BIOS-enabled SVM/IOMMU operation is a separate device-qualification choice. `nomodeset` is only for installation recovery and must not remain on the normal LLM boot. The package does not automatically add `mitigations=off`.
 
 The separate `bc250-swap-profile` remains a pressure safety net; it is not a way
 to make an oversized model GPU-resident. Watch `MemAvailable`, swap growth and
@@ -76,5 +71,5 @@ to make an oversized model GPU-resident. Watch `MemAvailable`, swap growth and
 Community guidance remains useful, but kernel-specific recipes age quickly. The
 package was cross-checked against the ElektricM kernel/quick-reference material
 and current Linux AMDGPU parameter documentation. The package values above are
-based on the Fedora 44 revalidation rather than copying an older kernel command
-line verbatim.
+based on BC-250 device evidence rather than copying kernel-version-specific recipes
+verbatim.

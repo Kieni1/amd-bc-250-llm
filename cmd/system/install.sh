@@ -264,14 +264,14 @@ ollama_version() {
 }
 
 step_3_install_ollama() {
-  heading "3. INSTALL OFFICIAL OLLAMA"
+  heading "3. INSTALL PACKAGE-QUALIFIED OLLAMA"
   local requested
-  requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"
+  requested="$BC250_OLLAMA_VERSION"
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
   remove_fedora_ollama
-  echo "Reconciling official Ollama ${requested} with the package-owned main service."
-  BC250_ASSUME_YES=1 OLLAMA_VERSION="$requested" OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" bc250-install-ollama
+  echo "Reconciling package-qualified Ollama ${requested} with the package-owned service topology."
+  BC250_ASSUME_YES=1 OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" bc250-install-ollama
   hash -r
 }
 
@@ -366,21 +366,31 @@ step_7_models() {
     bc250-model apply all "$required_csv"
 
   echo
-  echo "Optional Ollama models:"
-  bc250-model status all --compact
-  echo
-  echo "MTP models are separate opt-in downloads."
-  echo "Standalone MTP models (llama.cpp; read-only, not selectable here):"
-  if ! BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
-      bc250-model status mtp --include-disabled --compact \
-      | sed -E '/^MTP models:$/d; s/^([[:space:]]*)[0-9]+\) /\1- /'; then
-    echo "  MTP inventory unavailable; inspect later with: bc250-model status mtp --include-disabled --compact"
-  fi
-  echo "  MTP is never fetched by installer convergence. Prepare one explicitly later with:"
-  echo "    sudo bc250-fetch-mtp MODEL_ID"
-  local selection="${BC250_MODEL_SELECTION:-}"
-  if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 ]]; then
-    read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
+  echo "Required role models are current."
+  echo "Additional Ollama models are optional and are not listed on a converged install."
+  echo "MTP remains a separate opt-in workflow: sudo bc250-fetch-mtp MODEL_ID"
+  local selection="${BC250_MODEL_SELECTION:-}" review=""
+  if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
+    read -r -p "Review or install additional Ollama models now? [y/N]: " review
+    case "${review,,}" in
+      y|yes)
+        echo
+        echo "Optional Ollama models:"
+        bc250-model status all --compact
+        echo
+        echo "Standalone MTP models (llama.cpp; read-only, not selectable here):"
+        if ! BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
+            bc250-model status mtp --include-disabled --compact \
+            | sed -E '/^MTP models:$/d; s/^([[:space:]]*)[0-9]+\) /\1- /'; then
+          echo "  MTP inventory unavailable; inspect later with: bc250-model status mtp --include-disabled --compact"
+        fi
+        read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
+        ;;
+      *)
+        echo "Skipping additional-model review; required Open WebUI role models are installed."
+        return 0
+        ;;
+    esac
   elif [[ -z "$selection" ]]; then
     echo "BC250_MODEL_SELECTION is unset; no additional models selected in non-interactive mode."
     echo "All models required by active package-owned Open WebUI roles are installed."

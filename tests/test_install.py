@@ -91,23 +91,26 @@ class InstallerTests(unittest.TestCase):
         source = INSTALLER.read_text()
         self.assertIn("rpm -e --test ollama", source)
         self.assertIn("Refusing to install a second Ollama copy", source)
-        self.assertIn('requested="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"', source)
+        self.assertIn('requested="$BC250_OLLAMA_VERSION"', source)
 
-    def test_official_ollama_installer_is_commit_and_hash_pinned(self) -> None:
+    def test_ollama_payload_is_exact_version_and_hash_pinned(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text()
         runtime = (ROOT / "config/runtime.env").read_text()
-        self.assertIn("BC250_OLLAMA_INSTALLER_COMMIT=", runtime)
-        self.assertIn("BC250_OLLAMA_INSTALLER_SHA256=", runtime)
-        self.assertIn("raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT", helper)
-        self.assertIn("Ollama installer SHA-256 mismatch", helper)
+        self.assertIn("BC250_OLLAMA_PAYLOAD_URL=", runtime)
+        self.assertIn("BC250_OLLAMA_PAYLOAD_SHA256=", runtime)
+        self.assertIn("ollama-linux-amd64.tar.zst", runtime)
+        self.assertIn("Ollama payload SHA-256 mismatch", helper)
+        self.assertIn("tar --zstd -xf", helper)
+        self.assertIn("systemctl stop ollama-agent.service", helper)
+        self.assertIn("systemctl restart ollama.service ollama-task.service ollama-embedding.service", helper)
         self.assertIn("package-owned Ollama service is missing", helper)
-        self.assertIn("refusing to run the upstream Ollama installer while a custom service override exists", helper)
-        self.assertNotIn('URL="https://ollama.com/install.sh"', helper)
+        self.assertIn("refusing to overwrite a custom Ollama service override", helper)
+        self.assertNotIn("ollama.com/install.sh", helper)
 
     def test_ollama_unit_recognizer_rejects_upstream_like_customization(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text()
         start = helper.index("is_upstream_generated_unit() {")
-        end = helper.index("\netc_unit=", start)
+        end = helper.index("\n}", start) + 2
         function = helper[start:end]
         upstream = """[Unit]\nDescription=Ollama Service\nAfter=network-online.target\n[Service]\nExecStart=/usr/local/bin/ollama serve\nUser=ollama\nGroup=ollama\nRestart=always\nRestartSec=3\nEnvironment=\"PATH=/usr/local/bin:/usr/bin\"\n[Install]\nWantedBy=default.target\n"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -118,7 +121,7 @@ class InstallerTests(unittest.TestCase):
             unit.write_text(upstream.replace("[Install]", 'Environment=\"OLLAMA_DEBUG=1\"\n[Install]'))
             rejected = subprocess.run(["bash", "-c", function + '\nis_upstream_generated_unit "$1"', "unit-test", str(unit)], check=False)
             self.assertNotEqual(rejected.returncode, 0)
-        self.assertLess(helper.index('if [[ -e "$etc_unit"'), helper.index("if ((run_installer))"))
+        self.assertLess(helper.index('if [[ -e "$etc_unit"'), helper.index("if ((run_install))"))
         self.assertIn('rm -f -- "$etc_unit"', helper)
 
     def test_installer_update_ollama_flag_reaches_pinned_helper(self) -> None:
@@ -164,6 +167,7 @@ step_3_install_ollama
         self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
         self.assertIn('bc250-model status mtp --include-disabled --compact', source)
         self.assertIn('sudo bc250-fetch-mtp MODEL_ID', source)
+        self.assertIn('Review or install additional Ollama models now? [y/N]:', source)
         self.assertNotIn('bc250-model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -177,8 +181,8 @@ bc250-model() { printf 'model:%s\n' "$*"; }
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("model:status all --compact", result.stdout)
-        self.assertIn("model:status mtp --include-disabled --compact", result.stdout)
+        self.assertNotIn("model:status all --compact", result.stdout)
+        self.assertNotIn("model:status mtp --include-disabled --compact", result.stdout)
         for model in (
             "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
             "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
@@ -203,18 +207,28 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("model:apply all recommended,19-20", result.stdout)
-        self.assertIn("model:status mtp --include-disabled --compact", result.stdout)
+        self.assertNotIn("model:status mtp --include-disabled --compact", result.stdout)
         self.assertNotIn("model:apply mtp", result.stdout)
         self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl", result.stdout)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k", result.stdout)
         self.assertIn("embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
         self.assertEqual(result.stdout.count("model:apply"), 2)
 
-    def test_installer_mtp_inventory_is_visible_but_not_presented_as_selectable_indexes(self) -> None:
+    def test_installer_mtp_inventory_is_visible_only_after_optional_review(self) -> None:
         result = source_probe(r'''
-input_is_interactive() { return 1; }
+input_is_interactive() { return 0; }
 require_progress_terminal() { :; }
 prepare_hf_authentication() { :; }
+read_count=0
+read() {
+  read_count=$((read_count + 1))
+  local target="${@: -1}"
+  if ((read_count == 1)); then
+    printf -v "$target" '%s' y
+  else
+    printf -v "$target" '%s' ''
+  fi
+}
 bc250-model() {
   if [[ "$1 $2" == "status mtp" ]]; then
     printf 'MTP models:\n  33) qwen3.5-9b-mtp [FETCHED, VERIFIED]\n'
@@ -225,12 +239,13 @@ bc250-model() {
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Optional Ollama models", result.stdout)
         self.assertIn("Standalone MTP models", result.stdout)
         self.assertIn("  - qwen3.5-9b-mtp", result.stdout)
         self.assertIn("[FETCHED, VERIFIED]", result.stdout)
         self.assertNotIn("\nMTP models:\n", result.stdout)
         self.assertNotIn("33) qwen3.5-9b-mtp", result.stdout)
-        self.assertIn("never fetched by installer convergence", result.stdout)
+        self.assertIn("separate opt-in workflow", result.stdout)
 
     def test_original_noninteractive_input_survives_transcript_pty(self) -> None:
         result = source_probe('''

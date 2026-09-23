@@ -11,18 +11,16 @@ for every installed kernel and never reboots automatically. The installer applie
 this profile on green-field systems and pauses for the required reboot.
 
 The package deliberately no longer adds `amdgpu.gttsize=14750` or
-`amdgpu.ppfeaturemask=0xffffffff`. On Fedora 44 kernel 7.1.10, a controlled
-revalidation showed the TTM-only profile preserved the intended large GTT
-aperture and the tested Ollama/Vulkan performance. `amdgpu.gttsize` is also
-deprecated upstream. Applying the package profile removes those older overrides
-so upgrades converge on one reviewed state.
+`amdgpu.ppfeaturemask=0xffffffff`. Controlled BC-250 evidence showed the TTM-only
+profile preserved the intended large GTT aperture and tested Ollama/Vulkan behavior.
+`amdgpu.gttsize` is also deprecated upstream. Applying the package profile removes
+those older overrides so upgrades converge on one reviewed state.
 
 BC-250 safety checks:
 
-- keep BIOS IOMMU disabled and do **not** add `amd_iommu=on`;
+- IOMMU is not required by the qualified LLM baseline. Do not force `amd_iommu=on` on an unqualified BIOS configuration; a BIOS-enabled SVM/IOMMU setup must be qualified separately;
 - `nomodeset` is installation-only and must be removed once Mesa/AMDGPU is ready;
-- avoid the community-documented kernel regression ranges 6.15.0-6.15.6 and
-  6.17.8-6.17.10;
+- follow the current supported Fedora kernel; the package no longer carries historical kernel-version warning ranges;
 - the community recommends a 512 MiB dynamic UMA framebuffer; this package does
   not rewrite BIOS settings;
 - the gaming-oriented `mitigations=off` suggestion is intentionally not applied

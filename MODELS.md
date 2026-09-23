@@ -84,9 +84,10 @@ Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer
 in scripts. The category `all` means the combined catalog; it does not itself select every
 model. Use `sudo bc250-model apply all all` only when you deliberately mean every eligible
 non-MTP model. A moving source revision such as `latest` or `main` is allowed on purpose:
-this package is a model-testing tool. The manager records source identity/digest so
-`status --online` can identify an upstream change and `refresh` is an explicit decision
-to fetch it.
+this package is a model-testing tool. The recorded digest identifies the exact artifact currently
+installed; it is not a permanent product pin for moving `latest`/`main` sources. `status --online` can
+identify an upstream change and `refresh` is the explicit decision to resolve/download the newer artifact,
+after which the manager records its new digest/provenance.
 
 To add or override a model, copy the installed template to the operator directory:
 

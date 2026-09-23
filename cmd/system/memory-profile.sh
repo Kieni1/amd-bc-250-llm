@@ -64,7 +64,7 @@ status() {
     echo; echo "WARNING: the reviewed BC-250 TTM profile is not active or legacy overrides remain."
     echo "Expected: $FULL_MEMORY_ARGS"
   fi
-  has_cmdline amd_iommu=on && echo "WARNING: amd_iommu=on is unsafe on BC-250 community configurations."
+  has_cmdline amd_iommu=on && echo "INFO: amd_iommu=on is active; IOMMU is outside the qualified LLM baseline and requires matching BIOS/device qualification."
   has_cmdline nomodeset && echo "WARNING: nomodeset disables normal GPU acceleration after installation."
   return "$bad"
 }
@@ -92,9 +92,10 @@ Reviewed BC-250 LLM profile:
   sudo grubby --update-kernel=ALL --args="$FULL_MEMORY_ARGS"
   sudo reboot
 
-Fedora 44/kernel 7.1 BC-250 revalidation kept the TTM-only profile; deprecated
-amdgpu.gttsize and explicit amdgpu.ppfeaturemask overrides are not defaults.
-Do not add amd_iommu=on. Remove nomodeset after installation.
+Current Fedora BC-250 operation keeps the TTM-only profile; deprecated amdgpu.gttsize
+and explicit amdgpu.ppfeaturemask overrides are not defaults. The package follows
+Fedora's supported kernel instead of carrying historical release-number warning lists.
+IOMMU is not required by the qualified LLM baseline; do not force it without matching BIOS/device qualification. Remove nomodeset after installation.
 EOF_REC
 }
 

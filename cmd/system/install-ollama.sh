@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# Install the pinned official Ollama binary and restore the package-owned main service.
+# Install the exact package-qualified Ollama Linux payload without upstream service changes.
 set -Eeuo pipefail
 umask 0022
 
-[[ ${EUID} -eq 0 ]] || {
-  echo "ERROR: run with sudo." >&2
-  exit 1
-}
+[[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
 
 runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
 if [[ ! -r "$runtime_env" ]]; then
@@ -17,51 +14,48 @@ fi
 # shellcheck disable=SC1090
 source "$runtime_env"
 VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"
-INSTALLER_COMMIT="${BC250_OLLAMA_INSTALLER_COMMIT:-}"
-INSTALLER_SHA256="${BC250_OLLAMA_INSTALLER_SHA256:-}"
-[[ "$INSTALLER_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
-  echo "ERROR: BC250_OLLAMA_INSTALLER_COMMIT must be a full lowercase Git commit." >&2
-  exit 1
-}
-[[ "$INSTALLER_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
-  echo "ERROR: BC250_OLLAMA_INSTALLER_SHA256 must be a lowercase SHA-256." >&2
-  exit 1
-}
-URL="https://raw.githubusercontent.com/ollama/ollama/$INSTALLER_COMMIT/scripts/install.sh"
+PAYLOAD_URL="${OLLAMA_PAYLOAD_URL:-${BC250_OLLAMA_PAYLOAD_URL:-}}"
+PAYLOAD_SHA256="${OLLAMA_PAYLOAD_SHA256:-${BC250_OLLAMA_PAYLOAD_SHA256:-}}"
 
-is_upstream_generated_unit() {
-  local unit="$1"
-  [[ -f "$unit" && ! -L "$unit" ]] || return 1
-  awk '
-    /^[[:space:]]*$/ || /^[[:space:]]*[#;]/ {next}
-    $0 == "[Unit]" ||
-    $0 == "Description=Ollama Service" ||
-    $0 == "After=network-online.target" ||
-    $0 == "[Service]" ||
-    $0 == "ExecStart=/usr/local/bin/ollama serve" ||
-    $0 == "ExecStart=/usr/bin/ollama serve" ||
-    $0 == "User=ollama" ||
-    $0 == "Group=ollama" ||
-    $0 == "Restart=always" ||
-    $0 == "RestartSec=3" ||
-    $0 ~ /^Environment="PATH=[^"]*"$/ ||
-    $0 == "[Install]" ||
-    $0 == "WantedBy=default.target" ||
-    $0 == "WantedBy=multi-user.target" {next}
-    {bad=1}
-    END {exit bad}
-  ' "$unit" || return 1
-  grep -Fxq 'Description=Ollama Service' "$unit" &&
-    grep -Eq '^ExecStart=/(usr/local|usr)/bin/ollama serve$' "$unit" &&
-    grep -Fxq 'User=ollama' "$unit" &&
-    grep -Fxq 'Group=ollama' "$unit"
-}
+if [[ "$VERSION" != "$BC250_OLLAMA_VERSION" ]]; then
+  [[ -n "${OLLAMA_PAYLOAD_URL:-}" && -n "${OLLAMA_PAYLOAD_SHA256:-}" ]] || {
+    echo "ERROR: a non-package Ollama version requires explicit OLLAMA_PAYLOAD_URL and OLLAMA_PAYLOAD_SHA256." >&2
+    exit 1
+  }
+fi
+[[ "$PAYLOAD_URL" =~ ^https:// ]] || { echo "ERROR: Ollama payload URL must use HTTPS." >&2; exit 1; }
+[[ "$PAYLOAD_SHA256" =~ ^[0-9a-f]{64}$ ]] || { echo "ERROR: Ollama payload SHA-256 must be 64 lowercase hexadecimal characters." >&2; exit 1; }
 
 etc_unit=/etc/systemd/system/ollama.service
 package_unit=/usr/lib/systemd/system/ollama.service
+install_root=/usr/local
+
+is_upstream_generated_unit() {
+  local unit="$1" line
+  [[ -f "$unit" && ! -L "$unit" ]] || return 1
+  grep -Fxq 'Description=Ollama Service' "$unit" || return 1
+  grep -Eq '^ExecStart=/(usr/local|usr)/bin/ollama serve$' "$unit" || return 1
+  grep -Fxq 'User=ollama' "$unit" || return 1
+  grep -Fxq 'Group=ollama' "$unit" || return 1
+
+  # Remove only the small service shape emitted by Ollama's installer.  Any
+  # additional service policy is operator-owned and must be preserved/refused.
+  while IFS= read -r line; do
+    [[ -z "$line" || "$line" == \#* || "$line" =~ ^\[[A-Za-z]+\]$ ]] && continue
+    case "$line" in
+      'Description=Ollama Service'|'After=network-online.target'|'User=ollama'|'Group=ollama'|'Restart=always'|'WantedBy=default.target') ;;
+      ExecStart=/usr/local/bin/ollama\ serve|ExecStart=/usr/bin/ollama\ serve) ;;
+      RestartSec=[0-9]*) ;;
+      'Environment="PATH='*) ;;
+      *) return 1 ;;
+    esac
+  done < "$unit"
+}
+
+[[ -r "$package_unit" ]] || { echo "ERROR: package-owned Ollama service is missing: $package_unit" >&2; exit 1; }
 if [[ -e "$etc_unit" || -L "$etc_unit" ]]; then
   is_upstream_generated_unit "$etc_unit" || {
-    echo "ERROR: refusing to run the upstream Ollama installer while a custom service override exists: $etc_unit" >&2
+    echo "ERROR: refusing to overwrite a custom Ollama service override: $etc_unit" >&2
     exit 1
   }
 fi
@@ -74,133 +68,91 @@ confirm_install() {
     return 1
   }
   read -r -p "$action Ollama ${VERSION}? [y/N]: " answer
-  case "${answer,,}" in
-    y|yes) return 0 ;;
-    *) return 1 ;;
-  esac
+  case "${answer,,}" in y|yes) return 0 ;; *) return 1 ;; esac
 }
 
-run_installer=0
+installed_version=""
 if command -v ollama >/dev/null 2>&1; then
-  installed_version="$(ollama --version 2>/dev/null | awk '{print $NF}' || true)"
-  installed_version="${installed_version#v}"
-  if [[ "$VERSION" != latest && "$installed_version" == "${VERSION#v}" && \
-        "${OLLAMA_REINSTALL:-0}" != 1 ]]; then
-    echo "Requested Ollama version is already installed: $installed_version"
-  elif confirm_install "Install or update to"; then
-    run_installer=1
-  else
-    echo "Keeping installed Ollama: ${installed_version:-unknown version}"
-  fi
-elif confirm_install "Install"; then
-  run_installer=1
+  installed_version="$(ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+fi
+run_install=0
+if [[ "$installed_version" == "$VERSION" && "${OLLAMA_REINSTALL:-0}" != 1 ]]; then
+  echo "Requested Ollama version is already installed: $installed_version"
+elif confirm_install "Install or update to"; then
+  run_install=1
 else
-  echo "Cancelled."
-  exit 0
+  echo "Keeping installed Ollama: ${installed_version:-unknown version}"
 fi
 
-if ((run_installer)); then
-  printf 'Downloading the commit-pinned official Ollama installer from %s\n' "$URL"
-  tmp="$(mktemp)"
+if ((run_install)); then
+  echo "Downloading exact Ollama ${VERSION} Linux payload:"
+  echo "  $PAYLOAD_URL"
+  tmp="$(mktemp --suffix=.tar.zst)"
   trap 'rm -f "$tmp"' EXIT
-  curl --fail --silent --show-error --location --retry 3 "$URL" -o "$tmp"
+  curl --fail --silent --show-error --location --retry 3 "$PAYLOAD_URL" -o "$tmp"
   actual_sha256="$(sha256sum "$tmp" | awk '{print $1}')"
-  if [[ "$actual_sha256" != "$INSTALLER_SHA256" ]]; then
-    echo "ERROR: Ollama installer SHA-256 mismatch." >&2
-    echo "  expected: $INSTALLER_SHA256" >&2
+  if [[ "$actual_sha256" != "$PAYLOAD_SHA256" ]]; then
+    echo "ERROR: Ollama payload SHA-256 mismatch." >&2
+    echo "  expected: $PAYLOAD_SHA256" >&2
     echo "  actual:   $actual_sha256" >&2
     exit 1
   fi
-  echo "Verified Ollama installer SHA-256: $actual_sha256"
-  chmod 0700 "$tmp"
+  echo "Verified Ollama payload SHA-256: $actual_sha256"
 
-  if [[ "$VERSION" == "latest" ]]; then
-    # Upstream treats every non-empty OLLAMA_VERSION as a URL query. Passing
-    # the literal value "latest" therefore requests a nonexistent asset.
-    env -u OLLAMA_VERSION sh "$tmp"
-  else
-    OLLAMA_VERSION="$VERSION" sh "$tmp"
-  fi
+  # The upstream manual-upgrade contract requires replacing old libraries before
+  # extraction. The archive contains binary/library payload only; package systemd
+  # units remain authoritative and are never generated by this helper.
+  systemctl stop ollama-agent.service ollama-embedding.service ollama-task.service ollama.service
+  rm -rf "$install_root/lib/ollama"
+  install -d -m 0755 "$install_root/bin" "$install_root/lib"
+  tar --zstd -xf "$tmp" -C "$install_root"
 fi
 
-command -v ollama >/dev/null 2>&1 || {
-  echo "ERROR: no ollama command was found." >&2
+[[ -x /usr/local/bin/ollama ]] || { echo "ERROR: expected Ollama binary is missing: /usr/local/bin/ollama" >&2; exit 1; }
+actual_version="$(/usr/local/bin/ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+[[ "$actual_version" == "$VERSION" ]] || {
+  echo "ERROR: installed Ollama reports ${actual_version:-unknown}, expected $VERSION." >&2
   exit 1
 }
+
 getent group ollama >/dev/null || groupadd -r ollama
-id ollama >/dev/null 2>&1 || \
-  useradd -r -g ollama -d /var/lib/ollama -s /usr/sbin/nologin -M ollama
-
-for group in render video; do
-  getent group "$group" >/dev/null && usermod -a -G "$group" ollama
-done
-
-install -d -o root -g ollama -m 0750 \
-  /var/lib/bc250-llm-server /var/cache/bc250-llm-server
+id ollama >/dev/null 2>&1 || useradd -r -g ollama -d /var/lib/ollama -s /usr/sbin/nologin -M ollama
+for group in render video; do getent group "$group" >/dev/null && usermod -a -G "$group" ollama; done
+install -d -o root -g ollama -m 0750 /var/lib/bc250-llm-server /var/cache/bc250-llm-server
 install -d -o ollama -g ollama -m 0750 \
   /var/lib/ollama \
   /var/lib/bc250-llm-server/ollama/{main,task,embedding,agent} \
   /var/lib/bc250-llm-server/gguf/{production,experiments,task,embedding,agent} \
   /var/cache/bc250-llm-server/huggingface
-restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server \
-  /var/cache/bc250-llm-server 2>/dev/null || true
+restorecon -RF /var/lib/ollama /var/lib/bc250-llm-server /var/cache/bc250-llm-server 2>/dev/null || true
 
-# The upstream installer owns binary installation only. Normalize the service
-# back to the RPM-owned unit and refuse any unexpected /etc override.
-service_reload_needed="$(systemctl show -p NeedDaemonReload --value ollama.service 2>/dev/null || true)"
-override_removed=0
-[[ -r "$package_unit" ]] || {
-  echo "ERROR: package-owned Ollama service is missing: $package_unit" >&2
-  exit 1
-}
 if [[ -e "$etc_unit" || -L "$etc_unit" ]]; then
-  is_upstream_generated_unit "$etc_unit" || {
-    echo "ERROR: upstream Ollama installation left an unexpected service override: $etc_unit" >&2
-    exit 1
-  }
+  is_upstream_generated_unit "$etc_unit" || { echo "ERROR: unexpected Ollama service override remains: $etc_unit" >&2; exit 1; }
   rm -f -- "$etc_unit"
-  override_removed=1
 fi
-
 systemctl daemon-reload
 fragment="$(systemctl show -p FragmentPath --value ollama.service 2>/dev/null || true)"
 [[ "$fragment" == "$package_unit" ]] || {
   echo "ERROR: ollama.service is not using the package-owned unit: ${fragment:-unknown}" >&2
   exit 1
 }
-enable_state="$(systemctl is-enabled ollama.service 2>/dev/null || true)"
-if [[ "$enable_state" != enabled && "$enable_state" != enabled-runtime ]]; then
-  systemctl enable ollama.service >/dev/null 2>&1
-fi
 
-package_newer_than_service=0
-package_install_epoch="$(rpm -q --qf '%{INSTALLTIME}' bc250-llm-server 2>/dev/null || true)"
-service_started="$(systemctl show -p ActiveEnterTimestamp --value ollama.service 2>/dev/null || true)"
-service_start_epoch="$(date -d "$service_started" +%s 2>/dev/null || true)"
-if [[ "$package_install_epoch" =~ ^[0-9]+$ && "$service_start_epoch" =~ ^[0-9]+$ ]] &&
-   ((package_install_epoch > service_start_epoch)); then
-  package_newer_than_service=1
-fi
-
-if ((run_installer || override_removed || package_newer_than_service)) ||
-   [[ "$service_reload_needed" == yes ]] ||
-   ! systemctl is-active --quiet ollama.service 2>/dev/null; then
-  systemctl restart ollama.service
-else
-  echo "Ollama service topology is already current; restart not required."
-fi
-
-for _ in {1..30}; do
-  if curl --fail --silent \
-      --connect-timeout 2 http://127.0.0.1:11434/api/tags >/dev/null; then
-    ollama --version
-    echo "Ollama API is ready at http://127.0.0.1:11434."
-    exit 0
-  fi
-  sleep 1
+# This helper is an explicit runtime-management action. End in the package's
+# normal topology even when the requested payload was already installed. A
+# restart also guarantees a removed upstream override is not merely reloaded
+# while an old process continues under its former service policy.
+systemctl stop ollama-agent.service
+systemctl restart ollama.service ollama-task.service ollama-embedding.service
+for port in 11434 11435 11437; do
+  ready=0
+  for _ in {1..30}; do
+    if curl --fail --silent --connect-timeout 2 "http://127.0.0.1:${port}/api/version" >/dev/null; then ready=1; break; fi
+    sleep 1
+  done
+  ((ready)) || { echo "ERROR: Ollama lane :${port} did not become ready." >&2; exit 1; }
+  lane_version="$(curl -fsS "http://127.0.0.1:${port}/api/version" | jq -r '.version // empty' 2>/dev/null || true)"
+  [[ "$lane_version" == "$VERSION" ]] || { echo "ERROR: Ollama lane :${port} reports ${lane_version:-unknown}, expected $VERSION." >&2; exit 1; }
 done
 
-systemctl status ollama.service --no-pager -l || true
-journalctl -u ollama.service -b --no-pager -n 80 || true
-echo "ERROR: Ollama did not become reachable on 127.0.0.1:11434." >&2
-exit 1
+echo "Ollama ${VERSION} is installed from the verified payload."
+echo "Package-owned normal topology is ready on :11434/:11435/:11437; agent mode remains operator-entered."
