@@ -65,11 +65,11 @@ environment variables:
   code execution/interpreter, memories and community sharing off;
 - package-owned BC-250 workspace model presets from the versioned
   `config/openwebui/models.json` payload;
-- active-but-hidden workspace overrides for the five production implementation
-  models and the dedicated task model, so normal users choose curated office
-  roles while presets/tasks retain access to their base models;
+- active workspace overrides for the five production implementation models and
+  the dedicated task model. During pre-v1 testing these records are deliberately
+  visible so operators can compare curated roles with raw implementations;
 - authenticated-read (`user:*:read`) grants on the six active production presets
-  and the six hidden implementation/task overrides required by those roles.
+  and the six implementation/task overrides required by those roles.
 
 The operator owns users, credentials, custom prompts, unrelated workspace models,
 knowledge bases, UI preferences, permissions and any intentional settings that
@@ -79,24 +79,26 @@ sync and therefore does not remove operator-created models.
 Required model access is converged separately and additively: package desired state
 means that required grants must exist, not that the complete ACL must equal a package-owned
 set. Existing unrelated grants are retained, including historical grants on inactive records.
-Hidden raw models are selector-hidden, not API-forbidden; an authenticated client that already
-knows a canonical hidden model ID may still call it directly.
+The current pre-v1 testing policy deliberately keeps raw production/task implementations visible.
+The main and task providers are unrestricted, so experimental models that are actually installed on
+those normal lanes are visible too. This is a testing surface, not a promise that every raw model will
+remain user-facing for v1.
 
 ## Ollama lanes
 
 | Purpose | Endpoint | Open WebUI use |
 |---|---|---|
-| Production/chat | `http://host.containers.internal:11434` | enabled provider, production models only |
-| Task | `http://host.containers.internal:11435` | enabled provider, task models only |
+| Main/chat | `http://host.containers.internal:11434` | enabled, unrestricted during testing: installed production + experimental models |
+| Task | `http://host.containers.internal:11435` | enabled, unrestricted during testing: installed task-lane models |
 | Embedding | `http://host.containers.internal:11437` | retrieval API only, not a chat provider |
 | Agent/coding | host `11436` | intentionally absent from Open WebUI |
 | Tika | `http://tika:9998` | private document extraction |
 
-The task connection must be enabled because Open WebUI resolves its local task
-model from the active provider model map. Provider allowlisting limits what each
-lane exposes; a package-owned hidden model override separately suppresses the
-task implementation model from the normal selector while leaving it active for
-title/tag work.
+The task connection must be enabled because Open WebUI resolves its local task model from the
+active provider model map. During pre-v1 testing both normal providers intentionally use an empty
+`model_ids` allowlist, which Open WebUI treats as unrestricted discovery. The task implementation
+model therefore remains selectable as a raw test target even though its supported purpose is title/tag
+work.
 
 Agent/coding mode is exclusive. Use:
 
@@ -111,6 +113,25 @@ remains reachable, and its persisted catalogue may continue to list normal offic
 backends are intentionally unavailable. Return with `sudo bc250-agent-mode normal`; do not dynamically
 rewrite Open WebUI provider/model state merely to mirror the temporary exclusive topology.
 This is intentional on the BC-250 unified-memory pool.
+
+### Curated role tool policy
+
+Open WebUI 0.11.x injects built-in knowledge/chat tools into native-tool-capable models unless model
+metadata disables them. The package therefore makes the role boundary explicit:
+
+- `Office - Standard`, `Office - General / Higher Quality`, `Office - Deep Reasoning` and both
+  translation roles disable built-in tools. They answer ordinary questions from model knowledge and
+  still accept pre-injected/attached file context.
+- `Office - Documents / RAG` keeps built-in retrieval enabled, but disables unrelated chat-history,
+  notes, web, automation and similar tool categories. Knowledge retrieval is therefore concentrated in
+  the dedicated document role instead of being silently attempted by general chat roles.
+- raw/experimental models are exposed for comparison testing and may retain their own native/default
+  behavior unless a package-owned base override says otherwise.
+
+The system prompts in the production Modelfiles remain authoritative for Standard, Documents,
+Advanced and Deep. Their Open WebUI presets intentionally do not add a second system prompt. The
+translation base Modelfile intentionally has no `SYSTEM`; its exact product contract is owned by the
+Open WebUI translation preset plus direction filter.
 
 ## OpenAI-style API compatibility boundary
 
@@ -173,7 +194,7 @@ The Qwen3.5 preset carries request-level `think=false`; the package keeps Ollama
 native renderer/parser rather than replacing the model template. The Deep Reasoning
 preset sets `keep_alive=0` so GPT-OSS unloads after each response before the dedicated
 task model cold-loads for title/tag generation. Standard and Advanced keep their
-existing residency behavior. GPT-OSS remains the likely memory-edge production model
+existing residency behavior. The GPT-OSS Modelfile also carries an accuracy-first factual fallback: when reliable recall is insufficient, it should return fewer items and state uncertainty instead of filling a requested list with plausible names or placeholders. Sampling/context/residency are unchanged. GPT-OSS remains the likely memory-edge production model
 when the dedicated embedding service is resident.
 
 ## Task baseline

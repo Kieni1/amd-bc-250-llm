@@ -131,6 +131,9 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                         ),
                         1,
                     )
+                if path.name == "prod-gpt-oss20b-ggml-org-mxfp4.Modelfile":
+                    self.assertIn("accuracy is more important than satisfying a requested count", text)
+                    self.assertIn("provide fewer items when necessary", text)
 
     def test_experimental_ocr_models_use_ollama_managed_hf_sources(self) -> None:
         expected = {
@@ -300,14 +303,21 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         )
         self.assertNotIn("experimental general assistant", qwen)
         self.assertIn("German-, French-, and English-speaking users", qwen)
+        self.assertIn("absence of a document store or knowledge base", qwen)
         self.assertIn("PARAMETER temperature 0.7", qwen)
         self.assertIn("PARAMETER top_p 0.8", qwen)
+        standard = (MODELFILES / "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("answer from your model knowledge", standard)
+        deep = (MODELFILES / "prod-gpt-oss20b-ggml-org-mxfp4.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("provide fewer items when necessary", deep)
+        self.assertIn("document store, knowledge base, or external search", deep)
         translator = (MODELFILES / "prod-translate-gemma4-sub-e4b-17s-q4-k-xl.Modelfile").read_text(encoding="utf-8")
         self.assertIn("production German/French translation base", translator)
         self.assertIn("PARAMETER num_predict 2048", translator)
         self.assertNotRegex(translator, r"(?m)^SYSTEM\s")
         lfm = (MODELFILES / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
         self.assertIn("experimental rollback/control", lfm)
+        self.assertIn("Preserve legal and contractual modality exactly", lfm)
 
     def test_qwen38_ista_profiles_match_intended_bc250_roles(self) -> None:
         quality = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile").read_text(encoding="utf-8")

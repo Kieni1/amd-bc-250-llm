@@ -8,25 +8,19 @@
     "OLLAMA_API_CONFIGS": {
       "0": {
         "enable": true,
-        "model_ids": [
-          "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
-          "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
-          "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
-          "prod-gpt-oss20b-ggml-org-mxfp4:latest",
-          "prod-qwen35-9b-unsloth-q6-k:latest"
-        ],
+        "model_ids": [],
         "tags": [
-          "production"
+          "main",
+          "testing"
         ],
         "connection_type": "local"
       },
       "1": {
         "enable": true,
-        "model_ids": [
-          "task-lfm25-1.2b-instruct-liquidai-q6-k:latest"
-        ],
+        "model_ids": [],
         "tags": [
-          "task"
+          "task",
+          "testing"
         ],
         "connection_type": "local"
       }

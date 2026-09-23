@@ -6,12 +6,16 @@ FR_DE_MODEL = "bc250-office-translation-fr-de"
 WRAPPERS = {
     DE_FR_MODEL: (
         "Translate from German to French. Translate every ordinary-language source word "
-        "and preserve the document structure. Return only the translation.\n\n"
+        "and preserve the document structure. Preserve legal/contractual modality without "
+        "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+        "Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
     FR_DE_MODEL: (
         "Translate from French to German. Translate every ordinary-language source word "
-        "and preserve the document structure. Return only the translation.\n\n"
+        "and preserve the document structure. Preserve legal/contractual modality without "
+        "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+        "Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
 }

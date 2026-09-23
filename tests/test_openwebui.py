@@ -40,14 +40,7 @@ PRODUCTION_MODEL_IDS = {
     "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
 }
 
-HIDDEN_MODEL_IDS = {
-    "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
-    "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
-    "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
-    "prod-qwen35-9b-unsloth-q6-k:latest",
-    "prod-gpt-oss20b-ggml-org-mxfp4:latest",
-    "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
-}
+HIDDEN_MODEL_IDS: set[str] = set()
 
 
 def desired_models() -> list[dict[str, Any]]:
@@ -177,7 +170,7 @@ class FakeApplyClient:
 
 class OpenWebUIStatusTests(unittest.TestCase):
 
-    def test_apply_owns_persisted_application_policy_and_hidden_models(self) -> None:
+    def test_apply_owns_persisted_application_policy_and_testing_visibility(self) -> None:
         client = FakeApplyClient()
         OPENWEBUI.apply(client)
         posts = [(path, payload) for method, path, payload in client.calls if method == "POST"]
@@ -186,13 +179,13 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertFalse(app_payload["config"]["evaluation.arena.enable"])
 
         model_payload = next(payload for path, payload in posts if path == "/api/v1/models/import")
-        hidden = {
+        base_overrides = {
             model["id"]: model
             for model in model_payload["models"]
-            if (model.get("meta") or {}).get("hidden") is True
+            if model.get("base_model_id") is None
         }
         self.assertEqual(
-            set(hidden),
+            set(base_overrides),
             {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
@@ -202,8 +195,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
             },
         )
-        self.assertTrue(all(model["is_active"] for model in hidden.values()))
-        self.assertTrue(all(model["base_model_id"] is None for model in hidden.values()))
+        self.assertTrue(all(model["is_active"] for model in base_overrides.values()))
+        self.assertTrue(all((model.get("meta") or {}).get("hidden") is False for model in base_overrides.values()))
 
     def test_persisted_application_policy_matches_local_offline_contract(self) -> None:
         self.assertEqual(
@@ -239,14 +232,14 @@ class OpenWebUIStatusTests(unittest.TestCase):
             "Application config differs: evaluation.arena.enable", output.getvalue()
         )
 
-    def test_status_detects_hidden_model_drift(self) -> None:
+    def test_status_detects_testing_visibility_drift(self) -> None:
         bases = status_responses()["/api/v1/models/base"]
         target = next(
             model
             for model in bases
             if model["id"] == "task-lfm25-1.2b-instruct-liquidai-q6-k:latest"
         )
-        target["meta"]["hidden"] = False
+        target["meta"]["hidden"] = True
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(
@@ -255,6 +248,17 @@ class OpenWebUIStatusTests(unittest.TestCase):
             )
         self.assertIn("Package base-model override differs", output.getvalue())
         self.assertIn(".meta.hidden", output.getvalue())
+
+        presets = status_responses()["/api/v1/models/export"]
+        standard = next(model for model in presets if model["id"] == "bc250-office-standard")
+        standard["meta"]["capabilities"]["builtin_tools"] = True
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(
+                OPENWEBUI.status(FakeClient({"/api/v1/models/export": presets}), True),
+                2,
+            )
+        self.assertIn(".meta.capabilities", output.getvalue())
 
     def test_allowed_extension_order_does_not_create_false_drift(self) -> None:
         rag = OPENWEBUI.desired_rag()
@@ -341,7 +345,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertFalse(legacy["is_active"])
         self.assertEqual(OPENWEBUI.desired_access_grants(legacy), [])
 
-    def test_hidden_contract_and_deep_reasoning_keep_alive(self) -> None:
+    def test_testing_visibility_tool_policy_and_deep_reasoning_keep_alive(self) -> None:
         models = {model["id"]: model for model in desired_models()}
         hidden = {
             model_id
@@ -349,10 +353,45 @@ class OpenWebUIStatusTests(unittest.TestCase):
             if (model.get("meta") or {}).get("hidden") is True
         }
         self.assertEqual(hidden, HIDDEN_MODEL_IDS)
-        self.assertTrue(all(models[model_id]["base_model_id"] is None for model_id in hidden))
+        base_overrides = {
+            model_id
+            for model_id, model in models.items()
+            if model.get("base_model_id") is None and model.get("is_active")
+        }
+        self.assertEqual(
+            base_overrides,
+            {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
+                "prod-qwen35-9b-unsloth-q6-k:latest",
+                "prod-gpt-oss20b-ggml-org-mxfp4:latest",
+                "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
+            },
+        )
+        for model_id in (
+            "bc250-office-standard",
+            "bc250-office-translation-de-fr",
+            "bc250-office-translation-fr-de",
+            "bc250-office-advanced",
+            "bc250-office-deep-reasoning",
+        ):
+            self.assertFalse(models[model_id]["meta"]["capabilities"]["builtin_tools"])
+        documents = models["bc250-office-documents"]
+        self.assertTrue(documents["meta"]["capabilities"]["builtin_tools"])
+        self.assertTrue(documents["meta"]["builtinTools"]["knowledge"])
+        self.assertFalse(documents["meta"]["builtinTools"]["chats"])
         self.assertEqual(models["bc250-office-deep-reasoning"]["params"].get("keep_alive"), 0)
+        self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["params"].get("keep_alive"), 0)
         self.assertNotIn("keep_alive", models["bc250-office-standard"]["params"])
         self.assertNotIn("keep_alive", models["bc250-office-advanced"]["params"])
+        for model_id in (
+            "bc250-office-standard",
+            "bc250-office-documents",
+            "bc250-office-advanced",
+            "bc250-office-deep-reasoning",
+        ):
+            self.assertNotIn("system", models[model_id]["params"])
 
     def test_model_import_payload_does_not_replace_acl_state(self) -> None:
         payload = OPENWEBUI.model_import_payload(OPENWEBUI.load_models())
@@ -538,7 +577,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         prompt = prompt_path.read_text(encoding="utf-8")
         self.assertEqual(
             hashlib.sha256(prompt.encode()).hexdigest(),
-            "c12ccfb4694a444dff66400141c6ae8eaebb66195e98851ddc5b562cbbdb57db",
+            "93daa33b148423cfc7f909c2c4b1f1ba7567c9cfe21ffa599c79b0b6b1175a52",
         )
         models = {item["id"]: item for item in OPENWEBUI.load_models()["models"]}
         for model_id in (
@@ -547,6 +586,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         ):
             model = models[model_id]
             self.assertEqual(model["params"]["system"], prompt)
+            self.assertIn("Preserve legal and contractual modality exactly", model["params"]["system"])
             self.assertEqual(model["params"]["max_tokens"], 2048)
             self.assertNotIn("think", model["params"])
             self.assertEqual(
@@ -557,8 +597,10 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
             )
 
-        allowed = OPENWEBUI.desired_ollama()["OLLAMA_API_CONFIGS"]["0"]["model_ids"]
-        self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest", allowed)
+        main_models = OPENWEBUI.desired_ollama()["OLLAMA_API_CONFIGS"]["0"]["model_ids"]
+        task_models = OPENWEBUI.desired_ollama()["OLLAMA_API_CONFIGS"]["1"]["model_ids"]
+        self.assertEqual(main_models, [])
+        self.assertEqual(task_models, [])
         legacy = models["bc250-office-translation"]
         self.assertEqual(legacy["base_model_id"], "exp-lfm25-8b-a1b-liquidai-q6-k:latest")
         self.assertFalse(legacy["is_active"])
@@ -574,13 +616,17 @@ class OpenWebUIStatusTests(unittest.TestCase):
         cases = {
             "bc250-office-translation-de-fr": (
                 "Translate from German to French. Translate every ordinary-language source word "
-                + "and preserve the document structure. Return only the translation.\n\n"
+                + "and preserve the document structure. Preserve legal/contractual modality without "
+                + "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+                + "Return only the translation.\n\n"
                 + "[CURRENT_SOURCE]\n",
                 "Guten Tag.\nZweite Zeile.",
             ),
             "bc250-office-translation-fr-de": (
                 "Translate from French to German. Translate every ordinary-language source word "
-                + "and preserve the document structure. Return only the translation.\n\n"
+                + "and preserve the document structure. Preserve legal/contractual modality without "
+                + "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+                + "Return only the translation.\n\n"
                 + "[CURRENT_SOURCE]\n",
                 "Bonjour.\nDeuxième ligne.",
             ),

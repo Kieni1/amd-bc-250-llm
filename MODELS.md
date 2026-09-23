@@ -25,6 +25,12 @@ This preserves interactive chat latency while keeping background task residency 
 Agent/coding is **exclusive**: `bc250-agent-mode enter` stops main/task/embedding and
 starts only 11436; `leave` restores normal mode.
 
+During pre-v1 comparison testing Open WebUI exposes every model actually installed on the normal
+main (`11434`) and task (`11435`) providers. Curated `bc250-office-*` roles remain the product
+contracts; raw production, experimental and task identities are visible so behavior can be compared
+without editing provider allowlists. The embedding and exclusive agent lanes remain outside the normal
+chat selector.
+
 MTP is different from the agent lane: it shares catalog/provenance handling with `bc250-model`, but
 its runtime is a standalone opt-in external llama.cpp server rather than an Ollama service lane.
 Direct `bc250-run-mtp` operation snapshots and drains any resident Ollama models first, then restores

@@ -484,17 +484,18 @@ def apply_model_access(
 def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str, Any]]) -> None:
     print()
     print("Package-owned Open WebUI roles")
-    hidden_models: list[str] = []
+    implementation_models: list[tuple[str, bool]] = []
     for model in models:
         if not bool(model.get("is_active")):
             continue
         model_id = str(model.get("id") or "unknown")
-        base = str(model.get("base_model_id") or "unknown")
+        base_value = model.get("base_model_id")
         params = model.get("params") if isinstance(model.get("params"), dict) else {}
         meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
-        if bool(meta.get("hidden")):
-            hidden_models.append(model_id)
+        if base_value is None:
+            implementation_models.append((model_id, bool(meta.get("hidden"))))
             continue
+        base = str(base_value)
         filters = meta.get("filterIds") if isinstance(meta.get("filterIds"), list) else []
         extras: list[str] = []
         if "max_tokens" in params:
@@ -510,11 +511,12 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
         suffix = f"  ({'; '.join(extras)})" if extras else ""
         print(f"  {model_id:<36} -> {base}{suffix}")
 
-    if hidden_models:
+    if implementation_models:
         print()
-        print("Hidden implementation models")
-        for model_id in hidden_models:
-            print(f"  {model_id}")
+        print("Implementation/task models")
+        for model_id, hidden in implementation_models:
+            visibility = "hidden" if hidden else "visible for testing"
+            print(f"  {model_id:<52} {visibility}")
 
     print()
     print("Task and RAG")
@@ -640,7 +642,7 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
                 problems.append(f"Package {label} differs: {model_id}.{key}")
         desired_meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
         live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
-        for key in ("description", "tags", "filterIds", "defaultFilterIds", "hidden"):
+        for key in ("description", "tags", "filterIds", "defaultFilterIds", "hidden", "capabilities", "builtinTools"):
             if key in desired_meta and canonical(live_meta.get(key)) != canonical(
                 desired_meta[key]
             ):
