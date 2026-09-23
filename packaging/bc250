@@ -26,12 +26,14 @@ ROUTES=(
   "memory-profile|$LIBEXEC/memory-profile.sh"
   "model|$LIBEXEC/modelctl"
   "ocr|$LIBEXEC/ocr.sh"
-  "rag-import|$LIBEXEC/rag-import"
+  "rag|$LIBEXEC/rag"
+  "rag-import|$LIBEXEC/rag"
   "reset|$LIBEXEC/uninstall.sh"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "openwebui-setup|$LIBEXEC/openwebui-setup.py"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "status|$LIBEXEC/status.sh"
+  "support-bundle|$LIBEXEC/support-bundle.sh"
   "storage|$LIBEXEC/storage.py"
   "swap-profile|$LIBEXEC/swap-profile.sh"
   "uninstall|$LIBEXEC/uninstall.sh"
@@ -59,10 +61,10 @@ usage() {
 Usage: bc250 COMMAND [ARGUMENTS...]
 
 Models:
-  model, ocr, rag-import, fetch-mtp
+  model, ocr, rag, rag-import, fetch-mtp
 
 Operation:
-  status, verify, verify-lan, benchmark, revalidate, check-temp
+  status, verify, verify-lan, support-bundle, benchmark, revalidate, check-temp
   install, install-ollama, maintenance, ollama-profile, openwebui-setup, storage
   memory-profile, swap-profile, agent-mode, 40cu, cu-status, reset
 

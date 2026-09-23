@@ -228,32 +228,39 @@ is not a production RAG candidate. The corrected deterministic rescoring above s
 approximate/manual-adjudication summary; full measurements and provenance remain in
 `development/model-runs/2026-09-20-rag-qualification-conclusion.md`.
 
-## 4. Authoritative document tree and language policy
+## 4. Authoritative corpus lifecycle and language policy
 
-Keep the operator library outside Open WebUI under the package-created root:
+The package owns a simple filesystem lifecycle below `/srv/bc250-documents`; Open WebUI remains a
+derived index, not the source of truth:
 
 ```text
 /srv/bc250-documents/
-├── confidential/
+├── public/
 │   └── COLLECTION/
+│       ├── inbox/{german,french,bilingual}/
+│       ├── sources/
+│       ├── working/
 │       ├── active/
-│       └── sources/
-└── public/
+│       └── superseded/
+└── confidential/
     └── COLLECTION/
+        ├── inbox/{german,french,bilingual}/
+        ├── sources/
+        ├── working/
         ├── active/
-        └── sources/
+        └── superseded/
 ```
 
-The root is `root:root` mode `0750`. `sources/` holds the authoritative PDFs;
-`active/` holds the canonical Markdown used for RAG. Do not index both copies:
-that wastes Top-K slots and can return duplicate passages. PDFs without a ready
-Markdown derivative can still be tested manually in Open WebUI, but the bulk
-importer intentionally uploads only `active/*.md`.
+`bc250-rag init` creates the collection. Public-source collections default to mode `0750`;
+confidential collections default to root-private mode `0700`. `sources/` contains immutable
+authoritative inputs, `working/` contains drafts needing review, `active/` contains the only Markdown
+eligible for ingestion, and `superseded/` retains previous revisions for audit. Never index both a
+source PDF and its normalized Markdown.
 
-For this library the German document is the authoritative original. The French
-document is a translation and should be searched for French queries only. The
-importer therefore creates separate knowledge bases per collection and security
-boundary:
+For this appliance the supplied German document is treated as the authoritative/main version and a
+French counterpart as its translation unless the source itself establishes different legal authority.
+The importer creates separate knowledge bases so parallel DE/FR chunks do not consume the same Top-K
+slots:
 
 ```text
 [PUBLIC] COLLECTION — Originals
@@ -262,85 +269,101 @@ boundary:
 [CONFIDENTIAL] COLLECTION — Français
 ```
 
-There is deliberately no automatic query-language router. Attach/select **Originals** for German and English queries and **Français** for French queries. If a translation and original conflict, verify and cite the German
-Originals collection. This separation also prevents parallel DE/FR chunks from
-consuming two of the same Top-K retrieval slots.
+There is deliberately no automatic query-language router. Attach/select **Originals** for German and
+English queries and **Français** for French queries. If source and translation conflict, verify against
+the authoritative German source.
 
-## 5. Markdown metadata and provenance
+## 5. Batch preparation with a mandatory human gate
 
-Use YAML front matter like the installed template at
-`/usr/share/bc250-llm-server/examples/rag/document-template.md`:
+The supported first-pass workflow is one local command, not a separate conversion framework:
+
+```bash
+sudo bc250-rag init public municipal-regulations
+# copy PDFs into the appropriate inbox lane
+sudo bc250-rag prepare-batch public municipal-regulations --dry-run
+sudo bc250-rag prepare-batch public municipal-regulations
+sudo bc250-rag review public municipal-regulations
+sudo bc250-rag validate public municipal-regulations --include-working
+sudo bc250-rag activate public municipal-regulations --all-ready
+```
+
+`prepare-batch` uses local `pdfinfo`/`pdftotext` and the exclusive local agent lane on `127.0.0.1:11436`.
+If the agent lane is inactive it enters agent mode for the batch and restores normal topology afterwards.
+No external OCR, conversion, translation or hosted document API is used. Automation writes **only** to
+`working/`; it never promotes generated text directly into `active/`.
+
+Inbox semantics:
+
+- `german/`: produce a `de-CH` authoritative draft.
+- `french/`: produce a `fr-CH` translation draft and pair it during review.
+- `bilingual/`: produce separate DE and FR drafts sharing the source; do not index mixed-language output.
+
+The local transformation prompt preserves complete substantive wording, original legal numbering, dates,
+amounts and identifiers while removing extraction/layout noise. It is intentionally conservative: scanned
+PDFs with little selectable text are left in the inbox for the local OCR workflow, and unusually large
+documents above the safe single-pass limit are left for a genuine chapter/document split. This avoids
+growing `bc250-rag` into a fragile OCR/chunking engine.
+
+The review step is where the operator confirms titles, stable `document_family`, effective date or edition,
+authority role, and DE/FR counterpart. For legal, financial or technical sources, visually compare
+representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an
+authoritative transformation until reviewed.
+
+Activation is explicit and atomic at the collection level: a reviewed replacement supersedes the previous
+active revision for the same `document_family` and language, retaining old evidence.
+
+## 6. Markdown metadata, validation and ingestion
+
+Use compact front matter like the packaged template:
 
 ```yaml
 ---
-document_id: "[DOCUMENT_ID]"
-title: "[DOCUMENT_TITLE]"
+document_id: "biel_ortspolizeireglement_de-CH_2023-01-01"
+document_family: "biel_ortspolizeireglement"
+title: "Ortspolizeireglement der Stadt Biel (OPolR)"
+organisation: "Stadt Biel"
 language: "de-CH"
+authority_role: "authoritative"
+document_type: "Ortspolizeireglement"
+edition: "Stand 1. Januar 2023"
+effective_from: "2023-01-01"
 status: "currentness-not-verified"
-authority: "original"
-source_file: "[SOURCE_PDF_FILENAME]"
-source_sha256: "[SOURCE_PDF_SHA256]"
-relation:
-  type: "translation-pair"
-  counterpart: "[FRENCH_COUNTERPART.md]"
-  source_language: "de-CH"
+review_required: false
+source_file: "130101_Ortspolizeireglement_der_Stadt_Biel.pdf"
+source_sha256: "[64-HEX-SHA256]"
+normalization: "Mechanical/local-agent extraction cleanup; source wording preserved"
 ---
 ```
 
-The importer intentionally supports only this small YAML subset: scalar
-`document_id`, `title`, `language`, `status`, `authority`, `source_file`,
-`source_sha256`, plus the three scalar `relation` keys shown above. Use two-space
-indentation under `relation`; duplicate/unknown keys and other YAML constructs are
-rejected. `source_file` must be a basename inside the collection's `sources/`
-directory. Symlinked collection/active/source paths are rejected so provenance
-cannot escape the operator-owned collection tree.
+For a French translation, use `authority_role: "translation"` and `translation_of` naming the reviewed
+German Markdown counterpart. Preserve source article/paragraph identifiers exactly; never invent replacement
+legal numbering merely to make retrieval IDs unique. Extra package metadata may use `bc250_*` keys so the
+schema can evolve without accepting arbitrary YAML.
 
-`authority` is recommended but not required for the existing DE/FR set:
-`bc250-rag-import` infers `de-*` as `original`, and infers a `fr-*`
-`translation-pair` whose `source_language` is German as `translation`. Other
-languages must state authority explicitly. The importer verifies the declared
-source SHA-256 before any network request. If `source_file` has been renamed but
-exactly one PDF in `sources/` matches the SHA-256, it reports the mismatch and
-continues; a missing or incorrect source checksum is an error.
+`bc250-rag validate` verifies source-file confinement, SHA-256 provenance, review state, unique document IDs,
+and one active revision per document-family/language. `currentness-not-verified` is deliberately a warning,
+not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
 
-## 6. Validate and bulk-sync active Markdown
-
-First inspect routing and provenance. This does not contact Open WebUI:
+Inspect the complete ingestion plan without contacting Open WebUI:
 
 ```bash
-sudo bc250-rag-import plan /srv/bc250-documents
+sudo bc250-rag plan /srv/bc250-documents
 ```
 
-For API sync, enable Open WebUI API keys deliberately, generate a key for the
-account that should own the knowledge bases, and store it outside the repository:
+Then sync only reviewed `active/*.md` files:
 
 ```bash
-sudo install -m 0600 -o root -g root /PATH/TO/KEY \
-  /etc/bc250-llm-server/rag-api-key
-sudo bc250-rag-import sync /srv/bc250-documents \
-  --token-file /etc/bc250-llm-server/rag-api-key
-
-The supplied token file is enforced as a non-empty regular file with no group/world access
-(normally mode `0600`). The importer refuses a permissive credential file rather than relying
-only on documentation to protect it.
+sudo install -m 0600 -o root -g root /PATH/TO/KEY /etc/bc250-llm-server/rag-api-key
+sudo bc250-rag ingest --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
-The sync uses Open WebUI v0.11.3's incremental knowledge API. The packaged
-baseline keeps `ENABLE_KNOWLEDGE_FILE_RETENTION=false`, so removal from a knowledge
-base remains disposable and `/srv/bc250-documents` stays authoritative. Treat these
-four generated knowledge-base name patterns as importer-managed: do not add unrelated
-files to them manually if you plan to use `--prune`. Unchanged files
-are skipped. A changed Markdown file is uploaded first and only then replaces
-the stale Open WebUI copy. Files removed locally are reported but retained
-remotely; remove them only with an explicit second run using `--prune`. `--prune`
-also handles a generated Originals/Français lane that has become completely
-empty, so the final stale remote file does not become stranded. The importer
-never uploads `sources/` PDFs and never stores the API key itself.
+`ingest` validates the new lifecycle schema before using the existing Open WebUI v0.11.3 incremental
+knowledge API. Unchanged files are skipped and changed Markdown is uploaded before the stale remote copy is
+removed. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
+credential must be a non-empty private regular file (normally `0600`); it is never stored in the corpus.
 
-New knowledge bases are private to the API-key account. After the first sync,
-review **Workspace → Knowledge** and assign public/restricted group permissions
-manually. In particular, do not infer Open WebUI access from the filesystem word
-`public`; it is only a local classification boundary.
+`bc250-rag-import plan|sync` remains as a compatibility interface for existing pre-0.4 corpora. New work
+should use `bc250-rag`.
 
 ### OCR workflow for scanned office documents
 

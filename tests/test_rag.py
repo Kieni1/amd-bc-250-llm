@@ -63,6 +63,7 @@ class RagBaselineTests(unittest.TestCase):
         for command in (
             "bc250-model",
             "bc250-ocr",
+            "bc250-rag",
             "bc250-rag-import",
             "bc250-status",
             "bc250-verify",

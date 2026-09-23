@@ -24,12 +24,22 @@ SCOPES = ("public", "confidential")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 TOP_LEVEL_KEYS = {
     "document_id",
+    "document_family",
     "title",
+    "organisation",
     "language",
+    "document_type",
+    "edition",
+    "approved_on",
+    "effective_from",
     "status",
+    "review_required",
     "authority",
+    "authority_role",
+    "translation_of",
     "source_file",
     "source_sha256",
+    "normalization",
     "relation",
 }
 RELATION_KEYS = {"type", "counterpart", "source_language"}
@@ -105,7 +115,7 @@ def front_matter(path: Path) -> dict[str, object]:
             raise ValueError(f"unsupported YAML syntax on line {line_number}")
         key, value = match.group(1), (match.group(2) or "")
         if indent == 0:
-            if key not in TOP_LEVEL_KEYS:
+            if key not in TOP_LEVEL_KEYS and not key.startswith("bc250_"):
                 raise ValueError(f"unsupported front-matter key: {key}")
             if key in data:
                 raise ValueError(f"duplicate front-matter key: {key}")
@@ -134,7 +144,7 @@ def front_matter(path: Path) -> dict[str, object]:
 
 def route(meta: dict[str, object]) -> tuple[str, str]:
     language = str(meta.get("language", "")).strip()
-    authority = str(meta.get("authority", "")).strip().lower()
+    authority = str(meta.get("authority_role", meta.get("authority", ""))).strip().lower()
     relation = meta.get("relation") if isinstance(meta.get("relation"), dict) else {}
     rel_type = (
         str(relation.get("type", "")).strip().lower()
@@ -150,7 +160,10 @@ def route(meta: dict[str, object]) -> tuple[str, str]:
 
     if authority:
         if authority not in {"original", "translation"}:
-            raise ValueError("authority must be original or translation")
+            if authority == "authoritative":
+                authority = "original"
+            else:
+                raise ValueError("authority_role must be authoritative/original or translation")
         lane = authority
     elif lang.startswith("de"):
         lane = "original"
@@ -245,6 +258,8 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
                         raise ValueError("active Markdown must not be a symlink")
                     meta = front_matter(path)
                     lane, language = route(meta)
+                    if str(meta.get("review_required", "false")).strip().lower() in {"1", "true", "yes", "on"}:
+                        raise ValueError("active Markdown must not have review_required=true")
                     source_file = str(meta.get("source_file", "")).strip()
                     source_sha256 = str(meta.get("source_sha256", "")).strip().lower()
                     if not source_file:

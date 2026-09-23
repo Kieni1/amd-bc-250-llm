@@ -69,7 +69,8 @@ ghost	0600	-	{config}/maintenance.env
 
 file	0755	models/modelctl.py	{libexec}/modelctl
 file	0755	models/ocr/bc250-ocr.sh	{libexec}/ocr.sh
-file	0755	models/rag/rag_import.py	{libexec}/rag-import
+file	0644	models/rag/rag_import.py	{libexec}/rag_import.py
+file	0755	models/rag/rag.py	{libexec}/rag
 file	0755	cmd/system/agent-mode.sh	{libexec}/agent-mode.sh
 file	0755	cmd/openwebui/openwebui-setup.py	{libexec}/openwebui-setup.py
 file	0755	models/experiments/compare-mtp.sh	{libexec}/compare-mtp.sh
@@ -99,6 +100,7 @@ file	0644	examples/benchmark/ocr/office-fr-scan.png	{share}/benchmark/ocr/office
 file	0755	cmd/monitoring/check-temp.sh	{libexec}/check-temp.sh
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
 file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
+file	0755	cmd/monitoring/support-bundle.sh	{libexec}/support-bundle.sh
 file	0755	cmd/system/40cu.sh	{libexec}/40cu.sh
 file	0755	cmd/system/install.sh	{libexec}/install.sh
 file	0755	cmd/system/install-ollama.sh	{libexec}/install-ollama.sh

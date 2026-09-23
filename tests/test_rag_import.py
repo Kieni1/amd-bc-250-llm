@@ -14,6 +14,7 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "models/rag/rag_import.py"
+LIFECYCLE = ROOT / "models/rag/rag.py"
 
 spec = importlib.util.spec_from_file_location("bc250_rag_import", SCRIPT)
 assert spec and spec.loader
@@ -248,14 +249,77 @@ class RagImportTests(unittest.TestCase):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("set(grouped) | (set(expected) if args.prune else set())", source)
 
+
+    def test_lifecycle_init_creates_three_inbox_lanes_and_dry_run_is_nonmutating(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "public", "COLLECTION"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            base = root / "public" / "COLLECTION"
+            for name in ("sources", "working", "active", "superseded"):
+                self.assertTrue((base / name).is_dir())
+            for lane in ("german", "french", "bilingual"):
+                self.assertTrue((base / "inbox" / lane).is_dir())
+            source = base / "inbox" / "german" / "example.pdf"
+            source.write_bytes(b"not parsed during dry run")
+            dry = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "prepare-batch", "public", "COLLECTION", "--dry-run"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(dry.returncode, 0, dry.stderr)
+            self.assertIn("german", dry.stdout)
+            self.assertIn("example.pdf", dry.stdout)
+            self.assertTrue(source.exists())
+            remote = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "prepare-batch", "public", "COLLECTION", "--agent-url", "https://example.invalid", "--dry-run"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(remote.returncode, 2)
+            self.assertIn("loopback-only agent URL", remote.stderr)
+            private = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "confidential", "PRIVATE"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(private.returncode, 0, private.stderr)
+            self.assertEqual((root / "confidential" / "PRIVATE").stat().st_mode & 0o777, 0o700)
+
+    def test_lifecycle_activation_requires_reviewed_metadata_and_supersedes_prior_revision(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = root / "public" / "COLLECTION"
+            for name in ("sources", "working", "active", "superseded"):
+                (base / name).mkdir(parents=True, exist_ok=True)
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"authoritative source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            template = """---\ndocument_id: \"{document_id}\"\ndocument_family: \"family\"\ntitle: \"{title}\"\nlanguage: \"de-CH\"\nauthority_role: \"authoritative\"\neffective_from: \"{date}\"\nstatus: \"active\"\nreview_required: false\nsource_file: \"reglement.pdf\"\nsource_sha256: \"{digest}\"\n---\n\n# {title}\n"""
+            old = base / "active" / "family_de-CH_2025-01-01.md"
+            old.write_text(template.format(document_id="family_de-CH_2025-01-01", title="Old", date="2025-01-01", digest=digest), encoding="utf-8")
+            new = base / "working" / "family_de-CH_2026-01-01.md"
+            new.write_text(template.format(document_id="family_de-CH_2026-01-01", title="New", date="2026-01-01", digest=digest), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(LIFECYCLE), "--root", str(root), "activate", "public", "COLLECTION", new.name, "--yes"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertTrue((base / "active" / new.name).is_file())
+            self.assertFalse(old.exists())
+            self.assertTrue(any((base / "superseded").glob("family_de-CH_2025-01-01*.md")))
+            self.assertTrue(source.exists())
+
     def test_importer_is_packaged_and_document_root_is_operator_owned(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
         tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(
             encoding="utf-8"
         )
-        self.assertIn("models/rag/rag_import.py\t{libexec}/rag-import", manifest)
-        self.assertIn('"rag-import|$LIBEXEC/rag-import"', dispatcher)
+        self.assertIn("models/rag/rag_import.py\t{libexec}/rag_import.py", manifest)
+        self.assertIn("models/rag/rag.py\t{libexec}/rag", manifest)
+        self.assertIn('"rag|$LIBEXEC/rag"', dispatcher)
+        self.assertIn('"rag-import|$LIBEXEC/rag"', dispatcher)
         self.assertIn("d /srv/bc250-documents 0750 root root -", tmpfiles)
 
 
