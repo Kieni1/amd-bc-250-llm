@@ -290,8 +290,8 @@ class PackagingTests(unittest.TestCase):
             ["http://host.containers.internal:11434", "http://host.containers.internal:11435"],
         )
         self.assertEqual(desired["embedding"]["ollama_config"]["url"], "http://host.containers.internal:11437")
-        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["0"]["tags"], ["production"])
-        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["1"]["tags"], ["task"])
+        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["0"]["tags"], ["main", "testing"])
+        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["1"]["tags"], ["task", "testing"])
         self.assertNotIn("http://host.containers.internal:11436", json.dumps(desired))
         self.assertIn("desired-state.json", helper)
         self.assertIn('"bc250-office-standard"', models)
@@ -304,17 +304,9 @@ class PackagingTests(unittest.TestCase):
             and isinstance(item.get("meta"), dict)
             and item["meta"].get("hidden") is True
         }
-        self.assertEqual(
-            hidden_ids,
-            {
-                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
-                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
-                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
-                "prod-qwen35-9b-unsloth-q6-k:latest",
-                "prod-gpt-oss20b-ggml-org-mxfp4:latest",
-                "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
-            },
-        )
+        self.assertEqual(hidden_ids, set())
+        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["0"]["model_ids"], [])
+        self.assertEqual(desired["ollama"]["OLLAMA_API_CONFIGS"]["1"]["model_ids"], [])
 
     def test_fresh_install_governor_maximum_is_1850_mhz(self) -> None:
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")

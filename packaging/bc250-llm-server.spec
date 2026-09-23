@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.1
-Release:        0.4%{?dist}
+Release:        0.5%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -211,6 +211,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Wed Sep 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.5
+- Fix local RAG preparation to use Ollama chat output with separated native thinking, fail closed on truncated/empty/fenced/reasoning-contaminated final content, and score source fidelity only against validated final Markdown.
+- Preserve unique source identifiers during normalization, reject reasoning markers during working/active validation, and distinguish expected OCR/oversize deferrals from real preparation errors with clearer review/status UX.
+- Fix bc250-revalidate status --raw argument forwarding and advance the harness to v4.4 without changing its qualified phases/bundle semantics.
+- Make healthy live 40-CU routing primary in installer/dashboard wording, clarify the optional persistent boot module, and make the initial kernel plan explicitly defer repository update evaluation to step 2.
+- Strengthen the GPT-OSS Deep system prompt to prefer fewer accurate facts over plausible list-filling without changing sampling, context, residency or model runtime policy.
+
 * Wed Sep 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.4
 - Promote device-qualified Ollama 0.34.2 with exact release-payload URL/SHA verification while preserving package-owned service topology.
 - Add the local bc250-rag DE/FR/bilingual preparation, human-review, activation and ingestion lifecycle while retaining the legacy rag-import compatibility route.

@@ -40,7 +40,7 @@ retest conditions from existing decisions:
   topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
   supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
   ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.1-0.4 preserves those OWUI fixes and 0.3 evidence/UX hardening, packages the separately qualified Ollama 0.34.2 runtime, and adds the local RAG lifecycle plus current hardware-diagnostic cleanup; do not transfer 2.4 or standalone-runtime qualification to the new package before bounded exact-installed acceptance. Keep the pinned-v0.11.3 adapter limitations documented rather than
+  narrow temporary mitigations. Current source 0.12.1-0.5 preserves the exact-0.4 runtime configuration and repairs the RAG reasoning/fidelity path, raw revalidation status contract and operator-state wording found during exact-0.4 testing. Exact 0.4 already provides broad runtime/model evidence; do not replay it unless the repair crosses that boundary. Keep the pinned-v0.11.3 adapter limitations documented rather than
   treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
   rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
   live pruning and other destructive support checks remain conditional, not automatic release gates.
@@ -70,16 +70,20 @@ retest conditions from existing decisions:
   drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
   new runtime/model/hardware or product question.
 
-## Current 0.12.1-0.4 testing priority
+## Current 0.12.1-0.5 testing priority
 
 Keep this round impact-based and use the dedicated handovers rather than replaying broad closed campaigns:
 
-- non-RAG release boundaries: `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.4.md`;
-- RAG lifecycle/product boundaries: `development/handovers/RAG-TESTING-HANDOVER-0.12.1-0.4.md`.
+- non-RAG release boundaries: `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.5.md`;
+- RAG lifecycle/product boundaries: `development/handovers/RAG-TESTING-HANDOVER-0.12.1-0.5.md`.
 
-The non-RAG round must prove exact Ollama 0.34.2 payload/service ownership and three-lane version reporting, compact Standard→Deep→task/Jina/Documents behavior, current Fedora-kernel diagnostics without historical release blacklists, corrected IOMMU severity, TTM conflict hints, and unchanged 40-CU production behavior. The RAG round must prove the three-inbox local batch workflow, loopback-only agent transformation, human review gate, source SHA/provenance validation, activation/supersession, safe Open WebUI ingestion, privacy, and operator UX.
+The non-RAG round must prove `bc250-revalidate status --raw`, installer/kernel-plan and live-40-CU state wording, bounded Standard/Advanced/Deep general-knowledge behavior without unwanted knowledge/chat-tool routing, Translation legal-modality preservation, visibility of installed main/task models in Open WebUI, package integrity/verifier and final normal topology. The RAG round must first prove chat-response reasoning separation, final-body-only fidelity, unique identifier retention, expected deferral taxonomy and reasoning-marker validation; only then continue review/activation/supersession/Open WebUI ingestion.
 
-The previous 0.3 source candidate already passed its deterministic/source qualification, but it was not exact-device qualified. Do not infer 0.4 package acceptance from either that result or the separate 0.34.2 runtime qualification. Run the ordinary-user multi-model/compare safety question only as a separate discovery round if still assigned; do not change package policy merely because the feature exists.
+Exact 0.12.1-0.4 already passed broad runtime/model/revalidation qualification before these narrow source defects were identified. Reuse that evidence rather than replaying the whole campaign. Run the ordinary-user multi-model/compare safety question only as a separate discovery round if still assigned; do not change package policy merely because the feature exists.
+
+## Acceptance-harness evidence policy
+
+Acceptance harnesses must record device truth rather than aborting the whole evidence run on an ordinary product mismatch. Keep execution/observation/classification separate; a failed assertion is evidence and independent checks continue. A destructive or resource-sensitive subtest may skip only itself when its safety prerequisite is not met. Reserve a nonzero overall harness exit for an unsafe final appliance state or a mechanical harness error that invalidates the evidence run. Also distinguish mechanical field/string presence from human UX judgment; do not call string presence alone `UX PASS`.
 
 ## Required specialist handoff
 

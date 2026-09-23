@@ -26,13 +26,13 @@ Current source release:
 
 ```text
 VERSION       0.12.1
-RPM Release   0.4%{?dist}
-NVR           bc250-llm-server-0.12.1-0.4
+RPM Release   0.5%{?dist}
+NVR           bc250-llm-server-0.12.1-0.5
 ```
 
-`0.12.1-0.4` is the current source release target. It preserves the closed 0.12.1 Open WebUI ACL/hidden-model/Deep-residency corrections and the 0.3 operator/evidence UX work, then adds a bounded new integration set: package-qualified Ollama 0.34.2 payload installation, the maintainable `bc250-rag` corpus lifecycle and local batch-preparation workflow, Markdown-escaped RAG marker normalization, corrected IOMMU baseline wording, useful live-TTM conflict hints, and removal of obsolete fixed kernel-release warning lists. Production Open WebUI 0.11.3, Jina embedding, task/translation choices, Deep `keep_alive=0`, TTM 4194304/4194304, governor policy and the proven 40-CU production path remain unchanged.
+`0.12.1-0.5` is the current source release target. It preserves the 0.4 runtime/hardware policy (Ollama 0.34.2, Open WebUI 0.11.3, Jina, Deep `keep_alive=0`, TTM 4194304/4194304 and the proven live 40-CU path) and repairs defects found only after exact-installed 0.4 testing: RAG native-reasoning contamination/fidelity handling, the broken `bc250-revalidate status --raw` dispatcher contract, and several installer/CU/RAG state-presentation issues. It also strengthens the GPT-OSS Deep system instruction against factual list-filling without changing sampling/context/residency.
 
-The previous `0.12.1-0.3` source bundle passed the testing-specialist deterministic/source gate (295 tests plus 22 subtests, repository preflight clean) but was not exact-device qualified. Separately, Ollama 0.34.2 completed a clean-boot exact-device runtime comparison on installed `0.12.1-0.2` with main/task/embedding, Standard/Deep, title/tag, Jina, Documents/RAG, context, memory and kernel/GPU/OOM checks passing. That qualifies the runtime choice but does not qualify the future exact `0.12.1-0.4` package. Exact `0.12.1-0.1` reached package convergence and authenticated verification on-device but exposed the stale revalidation version gate. Exact-installed 2.4 evidence remains historical evidence for 2.4 only.
+Exact installed `0.12.1-0.4.fc44.x86_64` reached package convergence, authenticated verifier 54/0, healthy normal topology, Ollama 0.34.2, current Fedora kernel operation, packaged revalidation infrastructure/quality/restoration PASS and the first bounded RAG filesystem/security gate. Device testing then found two source blockers: the RAG agent path consumed native reasoning as document text and could falsely satisfy fidelity checks, while `bc250-revalidate status --raw` discarded its option. Those findings block 0.4 release acceptance but do not invalidate its broad runtime/model evidence. 0.5 therefore needs focused RAG-preparation/CLI/UX acceptance rather than replaying the completed broad model campaign. Exact-installed 2.4 remains historical broad operations evidence only.
 
 The consolidated exact-2.3 Open WebUI investigation also isolated three pinned-v0.11.3
 OpenAI-style adapter limitations: root `max_tokens` is not a reliable Ollama cap, reasoning-token
@@ -70,15 +70,15 @@ supported `sudo reboot`. The separate final Open WebUI investigation also proved
 ACL and Deep Reasoning memory defects and their narrow temporary mitigations on exact 2.4. Those
 results motivate 0.12.1-0.1 but do not qualify the new NVR.
 
-Current 0.12.1-0.4 evidence boundary:
+Current 0.12.1-0.5 evidence boundary:
 
 ```text
-release metadata               0.12.1-0.4
-prior 0.3 source qualification PASS (295 tests + 22 subtests)
-0.34.2 runtime device evidence PASS on exact installed 0.12.1-0.2
-0.4 focused changed-source     PASS (29 selected tests + syntax/compile)
+release metadata               0.12.1-0.5
+exact-installed 0.4 runtime    PASS for broad model/revalidation/device health
+0.4 release acceptance         BLOCKED by RAG preparation + status --raw source defects
+0.5 focused source repair      PASS (10 targeted tests + syntax/compile)
 GitHub full source/build gate   pending
-exact-0.12.1-0.4 device gate   pending
+exact-0.12.1-0.5 focused gate  pending
 ```
 
 Exact installed `0.11.3-2.3.fc44.x86_64` targeted operations acceptance has now demonstrated:
@@ -164,9 +164,7 @@ and the exact-2.2 operations records:
 `development/model-runs/2026-09-21-installed-0.11.3-2.4-operations-batches-19-20.md` and
 `development/model-runs/2026-09-21-installed-0.11.3-2.4-openwebui-final.md`.
 
-**Immediate evidence boundary:** exact installed 2.4 is the latest broad non-OWUI operations
-acceptance baseline and the source of the final OWUI defect/mitigation evidence. Exact 1.7 remains
-the newest full whole-appliance revalidation campaign. Current 0.12.1-0.4 is source-only until its RPM is built, installed and passes the bounded release and RAG lifecycle regressions; do not transfer either historical evidence class or the standalone 0.34.2 runtime qualification to the new NVR.
+**Immediate evidence boundary:** exact installed 2.4 remains the historical broad non-OWUI operations baseline and source of the final OWUI defect/mitigation evidence; exact 1.7 remains the historical full whole-appliance revalidation campaign. Exact installed 0.12.1-0.4 now adds broad current-runtime evidence (Ollama 0.34.2, verifier-clean normal topology and packaged revalidation PASS) but is release-blocked by the RAG preparation and raw-status source defects. Current 0.12.1-0.5 must pass focused repair acceptance before promotion.
 
 ---
 
@@ -327,11 +325,13 @@ Tika         4.0.0-full
 
 Open WebUI desired state is package-owned. A meaningful authenticated status compares providers,
 task/embedding/RAG settings, persisted local/offline application policy, upload limits/extensions,
-package Function source/metadata/activation, model-role mappings/filter attachments and package-owned
-hidden metadata for implementation models. Arena is package-owned OFF. The five production bases and
-dedicated task model remain active internally but hidden from the ordinary selector so the normal
-product surface is the curated office roles. `Desired-state drift: none` is intended to be substantive,
-not cosmetic; unrelated operator-owned models/users/prompts/knowledge remain additive and untouched.
+package Function source/metadata/activation, model-role mappings/filter attachments, model visibility
+and built-in-tool/capability policy. Arena is package-owned OFF. During pre-v1 testing the main and task
+providers are intentionally unrestricted and all models actually installed on 11434/11435 are selectable;
+package-owned raw production/task overrides are visible and labelled for comparison. Curated
+`bc250-office-*` roles remain the product contracts. Embedding 11437 and exclusive agent 11436 remain
+outside the normal chat selector. `Desired-state drift: none` is intended to be substantive, not cosmetic;
+unrelated operator-owned models/users/prompts/knowledge remain additive and untouched.
 
 ---
 
@@ -356,6 +356,13 @@ Translation Open WebUI roles:
 bc250-office-translation-de-fr -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 bc250-office-translation-fr-de -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 ```
+
+Current tool/prompt ownership during testing:
+
+- Standard, Advanced and Deep use general model knowledge by default; package-owned metadata disables autonomous built-in Open WebUI knowledge/chat/search tools.
+- Documents is the dedicated retrieval role and keeps package-owned knowledge retrieval enabled while unrelated built-ins remain disabled.
+- Translation keeps built-in tools disabled; the OWUI direction wrapper owns translation direction and preserves legal/contractual modality.
+- Raw main/task models are visible for comparison, not promoted as stable product roles. Raw GPT-OSS keeps `keep_alive=0` for BC-250 memory safety.
 
 Do not revive graveyard models because old logs or handovers mention them.
 
@@ -627,32 +634,28 @@ investigation established two additional product defects (ordinary-user model au
 Deep Reasoning residency pressure) plus the already-known two-view verifier defect, and proved the
 narrow mitigations before restoring temporary state.
 
-Current 0.12.1-0.4 preserves those OWUI and 0.3 operator/evidence fixes, packages the separately device-qualified Ollama 0.34.2 payload, and adds the bounded `bc250-rag` corpus lifecycle plus kernel/IOMMU/TTM diagnostic corrections. It has no exact-installed package qualification yet.
+Current 0.12.1-0.5 preserves the exact-0.4 runtime configuration and repairs the RAG preparation, raw-status and operator-state defects found during 0.4 device acceptance. Exact 0.4 broad runtime/model evidence remains useful, but 0.5 still needs its own focused exact-installed repair gate.
 
 # 13. Current open gaps and priority order
 
-## P0 — build and bounded exact-0.12.1-0.4 package/device acceptance
+## P0 — build and focused exact-0.12.1-0.5 repair acceptance
 
-Do not replay the broad 2.4 campaign. The current release changes only the following acceptance
-boundaries:
+Do not replay the completed exact-0.4 broad model/revalidation campaign. The current release changes only the following acceptance boundaries:
 
 ```text
-1. require authenticated-read user:*:read on the exact 12 active production package model records;
-2. preserve unrelated ACL grants (minimum-required/additive policy) and keep inactive legacy rows
-   outside the production-role contract;
-3. keep the five production bases plus task model active and selector-hidden;
-4. set only bc250-office-deep-reasoning.params.keep_alive=0 so GPT-OSS unloads before task cold-load;
-5. inspect curated presets through /api/v1/models/export and base overrides through /api/v1/models/base,
-   failing as an API-shape inspection problem rather than false mass drift when the basic schema differs;
-6. keep the Open WebUI v0.11.3 adapter boundary documented rather than vendor-patching it;
-7. ensure the live-manager notice matches the pinned revision and the carried patch really applies to
-   the exact prepared upstream source before RPM preparation;
-8. build the RPM/SRPM in the authoritative Fedora 44 path, then run the bounded device regression in
-   development/patchnotes/PATCHNOTE-0.12.1-0.4.md.
+1. bc250-rag uses /api/chat with native thinking separated from final message.content;
+2. truncated, empty, fenced or literal reasoning-contaminated final content is rejected before draft creation;
+3. fidelity checks use only validated final body content and unique identifiers are preserved/scored;
+4. working/active validation rejects obvious native-reasoning delimiters;
+5. RAG UX distinguishes expected OCR/source-split deferral from genuine processing error and clarifies review/status/init states;
+6. bc250-revalidate status --raw returns the documented machine-readable key=value contract (harness v4.4);
+7. installer/CU output presents healthy live routing as primary and persistent boot-module state as optional;
+8. installer setup plan states that Fedora repository kernel evaluation occurs in step 2;
+9. GPT-OSS factual/list fallback prefers fewer reliable items and explicit uncertainty over plausible invention, without runtime-policy changes;
+10. build the RPM/SRPM in the authoritative Fedora 44 path, then run the two focused 0.5 testing handovers.
 ```
 
-The exact-2.4 evidence already covers broad topology, runtime, maintenance, storage, reboot, RAG,
-translation and Tika behavior. Repeat those campaigns only if a corresponding implementation changes.
+Exact-0.4 already covers broad topology, Ollama 0.34.2 runtime, packaged revalidation, model roles, Jina, RAG product smoke and resource/kernel health. Repeat those campaigns only if a repair unexpectedly changes a corresponding implementation boundary.
 
 Backup restore is already accepted for configuration on exact 2.2 and identity on exact 2.3. Live
 pruning, Pi forced-command shutdown, idle S5/WOL and full whole-appliance revalidation remain
@@ -711,7 +714,7 @@ Canonical detailed rationale belongs in `development/DECISIONS.md`.
 
 # 15. Known gaps that are still current
 
-- 0.12.1-0.4 still needs the authoritative Fedora 44 RPM/SRPM build plus exact-installed bounded release/RAG acceptance before it can inherit packaged hardware-qualified claims;
+- 0.12.1-0.5 needs the authoritative Fedora 44 RPM/SRPM build plus focused exact-installed RAG-preparation/raw-status/CU-UX acceptance before release; the broad exact-0.4 model/runtime campaign does not need replay unless a repair crosses that boundary;
 - the new upstream patch/provenance gate still needs to run against the exact prepared source cache in
   the authoritative build environment; the current source environment has no network-populated cache;
 - Pi forced-command shutdown, idle S5/WOL and live prune remain conditional acceptance work;
@@ -763,10 +766,10 @@ Main integration owns final promotion, release metadata and cross-stream policy.
 > evidence as authoritative over handovers. Read `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
 > `development/VALIDATION-MATRIX.md`, `development/TESTING-STRATEGY.md`,
 > `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source target is
-> `0.12.1-0.4`; exact installed `0.11.3-2.4` is the latest broad operations and final OWUI defect/
+> `0.12.1-0.5`; exact installed `0.11.3-2.4` is the latest broad operations and final OWUI defect/
 > mitigation evidence baseline, while exact installed `0.11.3-1.7` remains the newest full
-> whole-appliance revalidation campaign. Do not transfer either evidence class to 0.12.1-0.4 before
-> exact-package installation and regression. GitHub/Fedora owns RPM/SRPM builds, the developer source
+> whole-appliance revalidation campaign. Use exact-0.4 broad runtime evidence as historical support, but do not call 0.12.1-0.5 accepted before
+> its focused exact-package repair regression. GitHub/Fedora owns RPM/SRPM builds, the developer source
 > environment owns deterministic/static validation, and BC-250 owns hardware/runtime qualification.
 > Preserve verified GGUFs, keep destructive operations explicit, fail closed on ambiguous state, and
 > use the bounded 0.12.1 OWUI regression rather than replaying closed broad campaigns.

@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.12.1-0.4
+# BC-250 support / operations handover — current source release 0.12.1-0.5
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,13 +10,13 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.12.1
-RPM Release:  0.4
-NVR:          bc250-llm-server-0.12.1-0.4
+RPM Release:  0.5
+NVR:          bc250-llm-server-0.12.1-0.5
 ```
 
-0.12.1-0.4 is the current source release target. It preserves the narrow Open WebUI ACL, Deep-residency, verifier and 0.3 operator/evidence UX fixes, packages the separately exact-device-qualified Ollama 0.34.2 runtime, and adds the bounded `bc250-rag` corpus lifecycle plus IOMMU/TTM/kernel diagnostic cleanup. Exact installed `0.11.3-2.4.fc44.x86_64` remains the latest broad operations acceptance baseline; do not transfer that historical hardware qualification to 0.12.1-0.4.
+0.12.1-0.5 is the current source release target. It keeps the exact-installed 0.4 runtime configuration and fixes the two source blockers found during 0.4 device acceptance: RAG native-reasoning contamination/fidelity handling and broken `bc250-revalidate status --raw` forwarding. It also improves RAG/CU/kernel-plan wording, strengthens factual fallback, aligns Standard/Advanced/Deep/Translation Open WebUI tool policy with their intended roles, preserves legal translation modality, and deliberately exposes all models installed on the normal main/task providers for pre-v1 comparison testing without changing the embedding/agent topology.
 
-The previous 0.12.1-0.3 source candidate passed the testing-specialist deterministic/source gate but did not receive exact-installed device acceptance. The required post-build device work for 0.12.1-0.4 is split between `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.4.md` and `development/handovers/RAG-TESTING-HANDOVER-0.12.1-0.4.md`; do not replay unrelated broad campaigns unless a changed boundary fails.
+Exact installed `0.12.1-0.4.fc44.x86_64` was otherwise healthy: authenticated verifier 54/0, Ollama 0.34.2, normal topology, current Fedora kernel, packaged revalidation quality/restoration PASS and no fresh OOM/GPU/kernel regression. The required 0.5 device work is therefore split between `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.5.md` and `development/handovers/RAG-TESTING-HANDOVER-0.12.1-0.5.md`; do not replay unrelated broad campaigns unless a repair crosses that boundary.
 
 The earlier full whole-appliance revalidation campaign on exact installed `0.11.3-1.7.fc44.x86_64` remains useful historical evidence:
 
@@ -103,9 +103,9 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 0.12.1-0.4 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.1-0.4.md`. It retains the 0.3 operator/evidence improvements, promotes the separately qualified Ollama 0.34.2 payload into package ownership, and adds the local `bc250-rag` lifecycle plus current hardware diagnostic wording. The prior 0.3 source candidate passed the testing-specialist deterministic/source gate; GitHub remains authoritative for the complete 0.4 deterministic/build gate.
+Current 0.12.1-0.5 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.1-0.5.md`. It retains the 0.3 operator/evidence improvements, promotes the separately qualified Ollama 0.34.2 payload into package ownership, and adds the local `bc250-rag` lifecycle plus current hardware diagnostic wording. The repaired 0.4 source candidate passed its deterministic/source gate before exact-device testing exposed the RAG preparation and raw-status product defects. Current 0.5 has passed focused main-integration repair checks; GitHub remains authoritative for the complete 0.5 deterministic/build gate.
 
-Exact installed 2.4 remains the broad device regression baseline. Exact installed 0.12.1-0.1 reached package convergence and authenticated verification but exposed the stale revalidation version gate. The standalone 0.34.2 runtime comparison passed on exact installed 0.12.1-0.2, but exact 0.12.1-0.4 remains unqualified until built, installed and subjected to the bounded release and RAG acceptance.
+Exact installed 2.4 remains the broad device regression baseline. Exact installed 0.12.1-0.1 reached package convergence and authenticated verification but exposed the stale revalidation version gate. The standalone 0.34.2 runtime comparison passed on exact installed 0.12.1-0.2, and exact 0.12.1-0.4 subsequently proved broad runtime health but was release-blocked by the RAG preparation and raw-status source defects. Exact 0.12.1-0.5 needs focused repair acceptance.
 
 ## Service topology
 
@@ -254,11 +254,11 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 0.12.1-0.4 source/device follow-up
+## Immediate 0.12.1-0.5 source/device follow-up
 
-Do not replay the closed 2.4 broad operations campaign. Follow the dedicated release and RAG testing handovers. The compact release/device round must verify exact package convergence, package-owned Ollama 0.34.2 on 11434/11435/11437, normal topology, Standard→Deep→task transition, one Jina probe, one Documents/RAG smoke, current Fedora-kernel diagnostics without historical blacklist warnings, corrected IOMMU severity, reviewed TTM 4194304/4194304, unchanged 40-CU behavior, and final healthy authenticated verification.
+Do not replay the completed exact-0.4 broad model/revalidation campaign. Follow the dedicated 0.5 release and RAG testing handovers. The compact non-RAG round must verify the repaired `bc250-revalidate status --raw` key/value contract, installer kernel-plan wording, live-40-CU-primary/persistent-module-secondary state presentation, one bounded GPT-OSS factual fallback smoke, package integrity/authenticated verifier and final normal topology.
 
-The RAG specialist must separately exercise `bc250-rag` inbox→working→review→active→ingest behavior with German, French and bilingual fixtures, refusal of scans/oversized single-pass inputs, loopback-only agent transformation, source SHA validation, supersession, idempotent Open WebUI sync, privacy and operator UX.
+The RAG specialist must first re-prove `bc250-rag prepare-batch` with native thinking separated from final Markdown, final-body-only fidelity, unique identifier preservation, explicit OCR/source-split deferrals and reasoning-marker validation. Only after preparation passes should review→active→ingest, source SHA validation, supersession, idempotent Open WebUI sync, privacy and operator UX continue.
 The exact-2.4 operations evidence already covers supported reboot reconstruction, live 40/40,
 maintenance, storage hygiene, backup/restore, runtime soak, model switching and service topology.
 Repeat those areas only if a corresponding implementation changes.

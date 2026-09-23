@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.1-0.5 - 2026-09-23
+
+- Repair `bc250-rag prepare-batch` around native-reasoning models: use `/api/chat` with separated thinking, consume only terminal non-empty `message.content`, reject truncation/reasoning markers/outer fences, and run fidelity checks only on validated final Markdown. Preserve unique alphanumeric source identifiers and reject obvious reasoning contamination in `working/` or `active/` validation.
+- Improve RAG lifecycle UX without weakening the human gate: expected scan/oversize cases are `DEFERRED` rather than generic failures, summaries separate prepared/deferred/failed counts, review numbering covers pending drafts only, metadata prompts expose the date-or-edition requirement, idempotent init reports converged state, status names `working awaiting review`, and missing/invalid collection diagnostics are explicit.
+- Fix `bc250-revalidate status --raw` so the documented machine-readable key/value contract is actually forwarded; advance the command to harness v4.4 while leaving the already-qualified revalidation phases and evidence-bundle format unchanged.
+- Make live 40-CU health the primary installer/operator state and optional persistent boot-module state secondary; label `active_cu_number` as non-authoritative for live routing and make the initial kernel plan say repository update evaluation occurs in step 2.
+- Harden the GPT-OSS Deep system instruction against factual list-filling: when reliable recall is insufficient, return fewer items and state uncertainty instead of inventing plausible names. No sampling, context, residency, role or runtime-policy change is introduced.
+- Align Open WebUI role/tool policy and model visibility for pre-v1 testing: Standard, Advanced, Deep and Translation answer without autonomous built-in knowledge/chat tools; Documents keeps knowledge retrieval as its dedicated product path; all models installed on the normal main/task Ollama providers are selectable for comparison; raw GPT-OSS retains `keep_alive=0`; translation prompts preserve legal/contractual modality.
+- Record exact-installed 0.12.1-0.4 evidence as runtime-clean but release-blocked by the RAG preparation contamination and `status --raw` CLI defects; 0.5 requires focused preparation/CLI/UX retest rather than replaying the completed broad model qualification.
+
 ## 0.12.1-0.4 - 2026-09-23
 
 - Promote exact-device-qualified Ollama 0.34.2 to the package runtime baseline using the exact Linux payload URL and SHA-256 instead of executing upstream install logic; preserve package-owned main/task/embedding/agent systemd topology and verify the three normal lanes report 0.34.2 after installation.
