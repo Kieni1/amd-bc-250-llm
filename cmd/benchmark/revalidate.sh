@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.2
+# BC-250 package revalidation harness v4.3
 #
 # The target package version is read from the package-owned VERSION file; the RPM
 # release suffix is intentionally not hard-coded.
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.2
+HARNESS_VERSION=4.3
 PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
 TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
@@ -52,7 +52,7 @@ SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.2 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.3 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250-benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -806,6 +806,10 @@ snapshot() {
   fi
   capture_cmd "$dir/agent-mode.txt" bc250-agent-mode status
   capture_cmd "$dir/systemctl.txt" systemctl --no-pager --full status ollama.service ollama-task.service ollama-embedding.service ollama-agent.service open-webui.service tika.service nginx.service
+  if grep -Fxq 'mode=normal' "$dir/agent-mode.txt" 2>/dev/null \
+      && [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]; then
+    echo 'interpretation=EXPECTED: ollama-agent.service intentionally inactive in normal mode' >> "$dir/systemctl.txt"
+  fi
   for port in 11434 11435 11436 11437; do
     curl -fsS "http://127.0.0.1:$port/api/version" > "$dir/ollama-$port-version.json" 2>&1 || true
     curl -fsS "http://127.0.0.1:$port/api/tags" > "$dir/ollama-$port-tags.json" 2>&1 || true
@@ -1265,9 +1269,9 @@ record_edge_diagnostics() {
   while IFS=$'\t' read -r model case_id previous prompt_eval; do
     [[ -n $model ]] || continue
     if [[ $previous =~ ^[0-9]+$ ]]; then
-      record_event "$label" diagnostic info "$model $case_id: context truncation observed: $previous -> $prompt_eval prompt tokens; policy=PASS (not severe)"
+      record_event "$label" diagnostic info "$model $case_id: effective prompt evaluation capped at $prompt_eval tokens ($previous requested); accepted by current context-truncation policy"
     else
-      record_event "$label" diagnostic info "$model $case_id: context truncation observed at $prompt_eval prompt tokens; policy=PASS (not severe)"
+      record_event "$label" diagnostic info "$model $case_id: effective prompt evaluation capped at $prompt_eval tokens; accepted by current context-truncation policy"
     fi
   done < <(jq -r '.diagnostics[]? | select(.kind == "context-truncation") | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
   while IFS=$'\t' read -r model mem hard tight; do
@@ -1526,10 +1530,16 @@ else:
 PY_CAUSES
 }
 
+diagnostic_count() {
+  awk -F '\t' '$4=="diagnostic" && $5=="info" {count++} END {print count+0}' "$EVENTS" 2>/dev/null || echo 0
+}
+
 create_summary() {
-  local out="$WORK/revalidation-summary.txt" p q skipped quality coverage
+  local out="$WORK/revalidation-summary.txt" p q skipped quality coverage diagnostics run_state
   read -r p q skipped <<<"$(quality_counts)"; quality="$(quality_state)"
   coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
+  diagnostics="$(diagnostic_count)"
+  run_state="$(tr '[:lower:]' '[:upper:]' < "$RUN_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
   printf '%s\n' "$quality" > "$QUALITY_STATE_FILE"
   {
     echo "BC-250 revalidation complete"
@@ -1539,7 +1549,11 @@ create_summary() {
     printf 'Harness         %s\n' "$HARNESS_VERSION"
     printf 'Kernel          %s\n' "$(uname -r)"
     echo
-    printf 'Run state       %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RUN_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
+    if ((diagnostics > 0)); then
+      printf 'Run state       %s — %d diagnostic(s)\n' "$run_state" "$diagnostics"
+    else
+      printf 'Run state       %s\n' "$run_state"
+    fi
     printf 'Infrastructure  %s\n' "$(tr '[:lower:]' '[:upper:]' < "$INFRA_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
     printf 'Quality         %s       %s pass / %s quality-fail / %s skipped\n' "${quality^^}" "$p" "$q" "$skipped"
     printf 'Restoration     %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
@@ -1561,6 +1575,54 @@ create_summary() {
     echo "  The complete live SPI/WGP routing table is the CU authority; numeric kernel/RADV counters are diagnostic only."
     echo "  BC-250 resource headroom is interpreted through residency, MemAvailable and swap context; VRAM/GTT are not additive pools."
   } > "$out"
+}
+
+create_bundle_manifest() {
+  local path="$WORK/manifest.json" started ended diagnostics package result coverage
+  started="$(awk 'NR==1{print $1; exit}' "$EVENTS" 2>/dev/null || true)"
+  ended="$(awk 'END{print $1}' "$EVENTS" 2>/dev/null || true)"
+  diagnostics="$(diagnostic_count)"
+  package="$(rpm -q bc250-llm-server 2>/dev/null || echo unknown)"
+  result="$(effective_run_state)"
+  coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
+  python3 - "$path" "$(run_id)" "$HARNESS_VERSION" "$package" "$(uname -r)" "$started" "$ended" "$coverage" "$result" "$diagnostics" <<'PY_MANIFEST'
+import json
+import sys
+from pathlib import Path
+
+(path, run_id, harness, package, kernel, started, ended, coverage, result, diagnostics) = sys.argv[1:]
+data = {
+    "schema_version": 1,
+    "run_id": run_id,
+    "harness_version": harness,
+    "package": package,
+    "kernel": kernel,
+    "started_at": started or None,
+    "ended_at": ended or None,
+    "coverage": coverage,
+    "final_result": result,
+    "diagnostics": int(diagnostics),
+    "checksum_file": "SHA256SUMS.txt",
+}
+Path(path).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY_MANIFEST
+}
+
+create_bundle_checksums() {
+  local item path
+  : > "$WORK/SHA256SUMS.txt"
+  {
+    for item in "$@"; do
+      path="$WORK/$item"
+      if [[ -f $path ]]; then
+        printf '%s\0' "$path"
+      elif [[ -d $path ]]; then
+        find "$path" -type f -print0
+      fi
+    done
+  } | sort -z | while IFS= read -r -d '' path; do
+    (cd "$WORK" && sha256sum "${path#"$WORK/"}")
+  done > "$WORK/SHA256SUMS.txt"
 }
 
 create_final_bundle() {
@@ -1586,6 +1648,10 @@ create_final_bundle() {
   [[ ! -e $FAILURE_CONSOLE_FILE ]] || items+=(failure-console)
   [[ ! -e $ERROR_CONTEXT ]] || items+=(error-context.txt)
   [[ ! -e $SERVICE_JOURNAL ]] || items+=(revalidation-service-journal.txt)
+  create_bundle_manifest
+  items+=(manifest.json)
+  create_bundle_checksums "${items[@]}"
+  items+=(SHA256SUMS.txt)
   rm -f "$tmp"
   tar -C "$WORK" -czf "$tmp" "${items[@]}"
   chmod 0644 "$tmp"
@@ -1794,7 +1860,13 @@ status_run() {
   if [[ -z "$rid" ]]; then echo "Last run        : none"; return; fi
   echo "Run"
   printf '  ID             : %s\n' "$rid"; printf '  Harness        : %s\n' "$run_version"
-  printf '  State          : %s\n' "$(effective_run_state)"
+  local diagnostics
+  diagnostics="$(diagnostic_count)"
+  if ((diagnostics > 0)); then
+    printf '  State          : %s (%d diagnostic(s))\n' "$(effective_run_state)" "$diagnostics"
+  else
+    printf '  State          : %s\n' "$(effective_run_state)"
+  fi
   printf '  Infrastructure : %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
   printf '  Quality        : %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
   printf '  Restoration    : %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"

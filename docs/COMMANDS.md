@@ -22,12 +22,13 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-fetch-mtp` | Explicitly download/reconcile a selected MTP experiment, including disabled catalog entries |
 | `bc250-gitea-review` | Generate an optional Gitea pull-request review |
 | `bc250-install` | Apply/resume the packaged appliance setup |
-| `bc250-install-ollama` | Install or normalize official Ollama |
+| `bc250-install-ollama` | Install/normalize the exact package-qualified Ollama payload |
 | `bc250-maintenance` | Backups, safe power/WOL policy and optional Pi companion access |
 | `bc250-memory-profile` | Inspect or change TTM boot arguments |
 | `bc250-model` | Model catalog, state inspection and lifecycle reconciliation |
 | `bc250-ocr` | Experimental office OCR model list/install/test helper |
-| `bc250-rag-import` | Validate and incrementally sync the operator document tree |
+| `bc250-rag` | Prepare, review, validate, activate and ingest the local RAG corpus |
+| `bc250-rag-import` | Compatibility alias for legacy RAG plan/sync |
 | `bc250-ollama-profile` | Switch the main Ollama runtime profile |
 | `bc250-openwebui-setup` | Initialize/apply/check package-owned Open WebUI state |
 | `bc250-run-mtp` | Start a downloaded MTP model with llama.cpp |
@@ -35,6 +36,7 @@ has a `bc250-COMMAND` compatibility name, so `bc250 verify` and
 | `bc250-model apply embedding` | Reconcile embedding model(s) on the required dedicated lane |
 | `bc250-model apply task` | Reconcile task model(s) on the required dedicated lane |
 | `bc250-status` | Concise read-only appliance status |
+| `bc250-support-bundle` | Create a redacted read-only support evidence archive |
 | `bc250-storage` | Report/dedupe/prune package-owned storage |
 | `bc250-swap-profile` | Inspect or change zram/disk-swap policy |
 | `bc250-reset` | Reset the dedicated pre-1.0 appliance configuration |
@@ -96,7 +98,7 @@ across transcript PTY creation, so unattended runs never become interactive by
 accident. `BC250_HF_ANONYMOUS=1` forces anonymous Hugging Face downloads. The model manager
 asks for an optional Hugging Face token only when a download is actually needed;
 a no-op update with current model sources does not ask for one.
-`BC250_UPDATE_OLLAMA=1` explicitly refreshes official Ollama. The completion summary separates
+`BC250_UPDATE_OLLAMA=1` explicitly reinstalls the package-qualified Ollama payload. The completion summary separates
 core installation/verification from package-owned Open WebUI state and reports the latter as
 `APPLIED + VERIFIED`, `SKIPPED`, or `RETRY REQUIRED`; a nonfatal Open WebUI setup problem is no
 longer hidden behind an unconditional whole-install success message.
@@ -245,31 +247,29 @@ forces a full checksum before reuse. Source repository, revision and GGUF filena
 also match. This is what lets a Modelfile-only change re-register from retained bytes
 without silently accepting modified source data.
 
-## Documents / RAG import
+## Documents / RAG lifecycle
 
 ```bash
-sudo bc250-rag-import plan [ROOT]
-sudo bc250-rag-import sync [ROOT] --token-file FILE [--prune]
+sudo bc250-rag init public COLLECTION
+sudo bc250-rag prepare-batch public COLLECTION --dry-run
+sudo bc250-rag prepare-batch public COLLECTION
+sudo bc250-rag review public COLLECTION
+sudo bc250-rag validate public COLLECTION --include-working
+sudo bc250-rag activate public COLLECTION --all-ready
+sudo bc250-rag status
+sudo bc250-rag ingest --token-file FILE [--prune]
 ```
 
-The default root is `/srv/bc250-documents`. The supported layout is
-`public|confidential/COLLECTION/{active,sources}`. Only Markdown files directly
-inside `active/` are sent to Open WebUI; PDFs in `sources/` remain the local
-authoritative evidence and their SHA-256 is checked against each Markdown
-header before sync. `source_file` is a filename, not a path; the importer rejects
-`../`/absolute references and symlinked active/source files or directories that
-could leave the collection boundary. Front matter is a strict small YAML subset
-documented in `RAG.md`; malformed indentation, duplicate keys and unknown fields
-fail the plan before network access.
+The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
+`inbox/bilingual`, `sources`, `working`, `active` and `superseded`. Agent-assisted batch preparation is
+local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Scanned
+PDFs and documents above the safe single-pass limit are intentionally deferred to OCR/manual chapter-split
+review rather than guessed.
 
-German originals are routed to `[SCOPE] COLLECTION — Originals`; French
-translation pairs are routed to `[SCOPE] COLLECTION — Français`. `plan` makes no
-network request. `sync` uses Open WebUI's v0.11 incremental knowledge API,
-skips unchanged files and replaces changed files only after the new upload
-succeeds. Files removed locally remain in Open WebUI unless `--prune` is
-explicitly supplied. The API key is never packaged; `--token-file` requires a non-empty regular
-file with no group/world access (normally mode `0600`), or use `OPEN_WEBUI_API_KEY` for an
-ephemeral environment-provided credential.
+`validate` checks provenance, review state, document identity and active revision conflicts. `ingest` sends
+only `active/*.md` through the existing incremental Open WebUI knowledge API. The API key is never packaged;
+`--token-file` must be a non-empty private regular file. Use `--prune` only when stale remote documents should
+be removed. `bc250-rag-import plan|sync` remains a compatibility route for older corpora.
 
 ## Experimental OCR
 
@@ -386,6 +386,7 @@ pressure. See [`CU-UNLOCK.md`](CU-UNLOCK.md) before changing GPU routing.
 
 ```bash
 sudo bc250-status
+sudo bc250-support-bundle
 sudo bc250-verify
 sudo bc250-verify --summary
 sudo bc250-verify --owui-token-file /root/owui-test.key
@@ -410,9 +411,18 @@ near the top. It does not call a machine "normal" merely because the agent unit 
 Unexpected degraded normal topology also prints the supported convergence command
 `sudo bc250-agent-mode normal` so the status output is directly actionable.
 If the optional reboot diagnostic helper is absent, reboot state is reported as unknown rather
-than as an appliance fault.
+than as an appliance fault. `bc250-status` also distinguishes an active Open WebUI systemd unit
+from HTTP application readiness and queries the active Ollama lane's `/api/version` endpoint
+rather than inferring the server version from CLI output.
 
-`bc250-revalidate` harness v4.2 is the root-only systemd-backed package
+`sudo bc250-support-bundle` creates a mode-0600 timestamped archive under
+`/var/lib/bc250-llm-server/support/` by default. It reuses existing status, verifier,
+maintenance, topology and CU commands, adds bounded resource/failure evidence, and writes
+`manifest.json` plus `SHA256SUMS.txt`. It intentionally excludes OWUI credentials, prompts,
+chat content, uploaded document contents, database rows, identity SQL and backup contents.
+Use `--output-dir DIR` when the archive should be written elsewhere.
+
+`bc250-revalidate` harness v4.3 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
@@ -421,7 +431,7 @@ before run state is created. The worker remains systemd-owned; Ctrl-C detaches a
 `--detach` returns immediately. The dashboard reports stage elapsed time, worker
 state and the age of the last real progress event rather than treating a periodic
 heartbeat as progress.
-Harness v4.2 also surfaces non-failing observations under a separate `Diagnostics`
+Harness v4.3 also surfaces non-failing observations under a separate `Diagnostics`
 section. This includes non-severe context truncation, a MemAvailable minimum below the
 512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
 floor, and accepted use cases that reach their generation output budget. These diagnostics
@@ -441,8 +451,10 @@ path. Authenticated packaged Open WebUI qualification accepts
 and the packaged RAG path. The direct translation stage pins the promoted 2048-token
 budget; the Open WebUI stage sends source text through the real production role IDs rather
 than rebuilding the Filter contract in the harness. Final bundles remain under
-`/var/lib/bc250-llm-server/revalidation/results/`; completed work remains
-inspectable until `cleanup` or a later `start`.
+`/var/lib/bc250-llm-server/revalidation/results/`; each bundle now includes a small
+`manifest.json` and `SHA256SUMS.txt` covering its evidence files. Expected nonzero raw
+`systemctl status` results are annotated when the agent lane is intentionally inactive in
+normal mode. Completed work remains inspectable until `cleanup` or a later `start`.
 
 `bc250-revalidate status` is human-readable by default and separates the installed
 harness/worker state from the recorded last-run result; `--raw` preserves the
@@ -522,7 +534,7 @@ adds approximate 4K/16K targets with actual `prompt_eval_count` as the authority
 `--sustained-seconds` makes the thermal lane continue to a minimum elapsed time. VRAM/GTT
 remain diagnostic Vulkan counters and must not be interpreted as independent additive
 memory pools on the BC-250. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
-for result schema, category contracts and Ollama 0.34.0 request policy. The installed copy is
+for result schema, category contracts and Ollama 0.34.2 request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/cmd/benchmark/README.md`.
 
 ## Open WebUI setup

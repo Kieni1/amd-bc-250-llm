@@ -132,7 +132,7 @@ The production product path is the pair of package-owned roles
 exact Stage-2E system prompt, `max_tokens=2048`, thinking omitted, and the non-global
 `bc250_translation_direction` filter. Installed `0.11.2-0.3` subsequently passed an
 authenticated live DE→FR / FR→DE role smoke with correct direction, preserved identifiers
-and dates, and no desired-state drift. Revalidation harness v4.2 includes the canonical
+and dates, and no desired-state drift. Revalidation harness v4.3 includes the canonical
 eight-case `owui-translation` screen through those real role IDs so future release checks
 do not depend on an ad-hoc curl command. This remains distinct from the external Stage-2E
 hard corpus. The exact Stage-2E evidence archive remains
@@ -159,7 +159,7 @@ mistakes into passes. When a structural/parse failure makes downstream language 
 semantic checks meaningless, report the structural failure without cascading synthetic
 causes. Canonical mixed-quality summaries should identify the failed case and retain a
 path back to `results.jsonl`.
-Revalidation v4.2 additionally surfaces non-failing context-truncation/resource
+Revalidation v4.3 additionally surfaces non-failing context-truncation/resource
 observations as diagnostics. They remain informational unless the existing severe
 qualification threshold is crossed. The dedicated GPT-OSS/Jina coexistence step owns
 deep GPT-OSS resource qualification; the generic production edge sweep no longer repeats

@@ -248,7 +248,7 @@ valid matching preset IDs. Only the sanitized active `preset_id -> base_model` m
 in benchmark metadata. Open WebUI must answer HTTP readiness before the product-path benchmark
 starts; the readiness allowance is bounded to five minutes for slow application restarts.
 
-## Revalidation harness v4.2
+## Revalidation harness v4.3
 
 ```bash
 sudo bc250-revalidate start --owui-token-file /root/owui-test.key
@@ -277,7 +277,7 @@ quality and restoration separately. Worker liveness and the age of the last real
 progress event are also separate; a free-running pulse is never presented as proof
 of benchmark progress.
 
-Harness v4.2 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
+Harness v4.3 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
 deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
 snapshots remain at preflight, agent-mode transitions, final restoration and failures.

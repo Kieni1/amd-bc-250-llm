@@ -1867,6 +1867,10 @@ def acceptance_text(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).translate(
         str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
     )
+    # Open WebUI/model responses may Markdown-escape punctuation in deterministic
+    # synthetic identifiers (for example FOO\_BAR).  That is presentation, not a
+    # semantic retrieval failure, so normalize the simple escapes before matching.
+    text = re.sub(r"\\([_*\[\]()#.+!\-])", r"\1", text)
     text = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", text)
     return " ".join(text.casefold().split())
 
@@ -2980,7 +2984,7 @@ def add_common(parser: argparse.ArgumentParser, default_url: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="bc250-benchmark",
-        description="Category-specific BC-250 benchmark suites for Ollama 0.34.0.",
+        description="Category-specific BC-250 benchmark suites for Ollama 0.34.2.",
     )
     sub = parser.add_subparsers(dest="category", required=True)
     emb = sub.add_parser(

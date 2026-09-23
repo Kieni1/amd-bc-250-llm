@@ -86,16 +86,17 @@ class StatusTests(unittest.TestCase):
     def test_status_queries_ollama_version_from_an_active_lane(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         start = source.index("ollama_version_line() {")
-        end = source.index('\nif [[ "${1:-}" == -h', start)
+        end = source.index("\nopenwebui_readiness() {", start)
         function = source[start:end]
         command = function + """
 systemctl() {
   [[ $1 == is-active && $3 == ollama-agent.service ]]
 }
-ollama() {
-  [[ ${OLLAMA_HOST-} == http://127.0.0.1:11436 ]] || return 9
-  echo 'ollama version is 0.34.0'
+curl() {
+  [[ ${@: -1} == http://127.0.0.1:11436/api/version ]] || return 9
+  printf '{"version":"0.34.0"}\n'
 }
+jq() { printf '0.34.0\n'; }
 ollama_version_line
 """
         result = subprocess.run(
@@ -105,8 +106,42 @@ ollama_version_line
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "ollama version is 0.34.0")
+        self.assertEqual(result.stdout.strip(), "Ollama server version: 0.34.0")
         self.assertNotIn("Warning", result.stdout)
+
+    def test_status_reports_openwebui_application_readiness(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        self.assertIn("openwebui_readiness()", source)
+        self.assertIn("active-not-ready", source)
+        self.assertIn("Open WebUI application readiness", source)
+
+    def test_support_bundle_is_redacted_read_only_evidence(self) -> None:
+        path = ROOT / "cmd/monitoring/support-bundle.sh"
+        result = subprocess.run(
+            [str(path), "--help"],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        source = path.read_text(encoding="utf-8")
+        for expected in (
+            "manifest.json",
+            "SHA256SUMS.txt",
+            "bc250-status",
+            "bc250-verify --summary",
+            "bc250-maintenance status",
+            "pstore-presence.txt",
+            "memory.events",
+        ):
+            self.assertIn(expected, source)
+        for forbidden in (
+            "/var/lib/open-webui/webui.db",
+            "journalctl -u open-webui.service",
+            "cat /root/owui-test.key",
+        ):
+            self.assertNotIn(forbidden, source)
 
     def test_status_uses_agent_mode_as_single_runtime_topology_classifier(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -178,8 +213,12 @@ class VerifyTests(unittest.TestCase):
             "cyan-skillfish-governor-smu --version",
             "toml_table_value gpu-usage fix-freq",
             "toml_table_value gpu-usage method",
+            "IOMMU is outside the qualified LLM baseline",
+            "/etc/tmpfiles.d /usr/lib/tmpfiles.d /etc/modprobe.d",
         ):
             self.assertIn(expected, source)
+        self.assertNotIn("6.15.0", source)
+        self.assertNotIn("6.17.8", source)
         runtime_sources = source + (ROOT / "install").read_text(encoding="utf-8")
         runtime_sources += (ROOT / "cmd/system/40cu-module.sh").read_text(
             encoding="utf-8"
@@ -195,6 +234,7 @@ class VerifyTests(unittest.TestCase):
         self.assertIn('skipped "RAG embedding registration unavailable because ollama-embedding.service is inactive"', source)
         self.assertIn('skipped "authenticated Open WebUI desired-state check (no API token supplied)"', source)
         self.assertIn("Verification: %d ok / %d warn / %d fail / %d skipped", source)
+        self.assertIn("optional/authenticated check was skipped", source)
 
     def test_verify_treats_static_agent_unit_as_not_boot_enabled(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")

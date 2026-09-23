@@ -1260,6 +1260,7 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("CHF 319.50"), category.acceptance_text(actual))
         self.assertIn(category.acceptance_text("ZH-204"), category.acceptance_text(actual))
+        self.assertEqual(category.acceptance_text(r"BC250\_RAG\_MARKER"), category.acceptance_text("BC250_RAG_MARKER"))
 
     def test_translation_preservation_rejects_wrong_numeric_magnitude(self) -> None:
         cases = json.loads(
@@ -1545,8 +1546,8 @@ class TelemetryTests(unittest.TestCase):
     def test_revalidation_context_diagnostic_is_concise_and_policy_explicit(self) -> None:
         source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
         self.assertIn('"previous_prompt_eval_count": previous_prompt_eval_count', source)
-        self.assertIn("context truncation observed:", source)
-        self.assertIn("prompt tokens; policy=PASS (not severe)", source)
+        self.assertIn("effective prompt evaluation capped at", source)
+        self.assertIn("accepted by current context-truncation policy", source)
 
     def test_revalidation_surfaces_tight_resource_headroom_without_weakening_floor(self) -> None:
         source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
@@ -1739,7 +1740,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.2", source)
+        self.assertIn("HARNESS_VERSION=4.3", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -3044,6 +3045,13 @@ status_raw
         self.assertIn("Quality", summary)
         self.assertIn("Restoration", summary)
         self.assertNotIn("PASSED", summary)
+        self.assertIn("diagnostic(s)", summary)
+        bundle = source[source.index("create_bundle_manifest() {"):source.index("restore_all() {")]
+        self.assertIn('"checksum_file": "SHA256SUMS.txt"', bundle)
+        self.assertIn('"final_result": result', bundle)
+        self.assertIn('items+=(manifest.json)', bundle)
+        self.assertIn('items+=(SHA256SUMS.txt)', bundle)
+        self.assertIn('interpretation=EXPECTED: ollama-agent.service intentionally inactive in normal mode', source)
 
     def test_round2b_removes_private_revalidation_tuning_helper(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")

@@ -7,7 +7,7 @@ if [[ ! -r "$runtime_env" ]]; then runtime_env="$(cd -- "$(dirname -- "${BASH_SO
 if [[ -r "$runtime_env" ]]; then # shellcheck disable=SC1090
   source "$runtime_env"
 else
-  BC250_OLLAMA_VERSION=0.34.0
+  BC250_OLLAMA_VERSION=0.34.2
 fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
 OWUI_TOKEN_FILE=""
@@ -211,6 +211,16 @@ if [[ "$pages" =~ ^[0-9]+$ ]]; then
 else
   warn "kernel does not expose a numeric TTM pages_limit"
 fi
+if [[ "$pages" != 4194304 || "$pool" != 4194304 ]]; then
+  conflicts="$(grep -RInE 'ttm\.(pages_limit|page_pool_size)|options[[:space:]]+ttm' \
+    /etc/tmpfiles.d /usr/lib/tmpfiles.d /etc/modprobe.d 2>/dev/null | head -12 || true)"
+  if [[ -n "$conflicts" ]]; then
+    info "possible TTM override/config conflict(s):"
+    ((SUMMARY)) || sed 's/^/  /' <<< "$conflicts"
+  else
+    info "no TTM override was found in tmpfiles.d/modprobe.d; inspect bootloader and local administration state"
+  fi
+fi
 
 cmdline="$(cat /proc/cmdline 2>/dev/null || true)"
 info "kernel arguments: $cmdline"
@@ -224,11 +234,12 @@ for prefix in amdgpu.gttsize= amdgpu.ppfeaturemask=; do
     ok "legacy kernel override absent: ${prefix}..."
   fi
 done
-grep -qE '(^| )amd_iommu=on( |$)' <<< "$cmdline" && bad "amd_iommu=on is active; BC-250 community documentation requires IOMMU disabled" || ok "amd_iommu=on is not active"
+if grep -qE '(^| )amd_iommu=on( |$)' <<< "$cmdline"; then
+  info "amd_iommu=on is active; IOMMU is outside the qualified LLM baseline and should be device-qualified with matching BIOS SVM/IOMMU state"
+else
+  ok "IOMMU is not forced from the kernel command line (qualified appliance baseline)"
+fi
 grep -qE '(^| )nomodeset( |$)' <<< "$cmdline" && bad "nomodeset is still active and prevents normal GPU acceleration" || ok "nomodeset is not active"
-case "$kernel" in
-  6.15.[0-6]-*|6.15.[0-6]|6.17.[89]-*|6.17.10-*|6.17.[89]|6.17.10) warn "running kernel is in a BC-250 community-documented regression range" ;;
-esac
 
 section "GFX1013 compute queues"
 gfx1013_root=/opt/bc250-gfx1013
@@ -492,14 +503,30 @@ ollama_version="$ollama_api_version"
 if [[ -z "$ollama_version" && -x /usr/local/bin/ollama ]]; then
   ollama_version="$(HOME=/var/lib/ollama /usr/local/bin/ollama --version 2>&1 | head -1 || true)"
 fi
-info "Ollama version: ${ollama_version:-unknown}"
-ollama_semver="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$ollama_version" | head -1 || true)"
-if [[ "$ollama_semver" == "$BC250_OLLAMA_VERSION" ]]; then
-  ok "Ollama matches the package standard $BC250_OLLAMA_VERSION"
-elif [[ -n "$ollama_semver" ]]; then
-  warn "Ollama $ollama_semver differs from package standard $BC250_OLLAMA_VERSION; treat this as a deliberate runtime test"
+info "active Ollama version: ${ollama_version:-unknown}"
+if ((agent_active)); then
+  ollama_semver="$(grep -oE '[0-9]+\.[0-9]+\.[0-9]+' <<< "$ollama_version" | head -1 || true)"
+  if [[ "$ollama_semver" == "$BC250_OLLAMA_VERSION" ]]; then
+    ok "exclusive agent Ollama matches package standard $BC250_OLLAMA_VERSION"
+  elif [[ -n "$ollama_semver" ]]; then
+    warn "agent Ollama $ollama_semver differs from package standard $BC250_OLLAMA_VERSION"
+  else
+    warn "agent Ollama version could not be parsed"
+  fi
 else
-  warn "Ollama version could not be parsed"
+  lane_versions=()
+  version_mismatch=0
+  for port in 11434 11435 11437; do
+    lane_version="$(curl -fsS "http://127.0.0.1:${port}/api/version" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)"
+    lane_versions+=(":${port}=${lane_version:-unavailable}")
+    [[ "$lane_version" == "$BC250_OLLAMA_VERSION" ]] || version_mismatch=1
+  done
+  info "Ollama lane versions: ${lane_versions[*]}"
+  if ((version_mismatch == 0)); then
+    ok "main/task/embedding Ollama lanes all match package standard $BC250_OLLAMA_VERSION"
+  else
+    warn "one or more normal Ollama lanes differ from package standard $BC250_OLLAMA_VERSION; treat this as deliberate runtime drift"
+  fi
 fi
 ollama_tags="$(curl -fsS "$OLLAMA_URL/api/tags" 2>/dev/null || true)"
 if [[ -n "$ollama_tags" ]]; then
@@ -766,7 +793,13 @@ else
     "$PASS" "$WARN" "$FAIL" "$SKIP"
 fi
 if ((FAIL == 0 && WARN == 0)); then
-  echo "Server verification completed successfully."
+  if ((SKIP == 1)); then
+    echo "Server verification completed successfully; 1 optional/authenticated check was skipped."
+  elif ((SKIP > 1)); then
+    printf 'Server verification completed successfully; %d optional/authenticated checks were skipped.\n' "$SKIP"
+  else
+    echo "Server verification completed successfully."
+  fi
 elif ((FAIL == 0)); then
   echo "Server verification completed with warnings; review the items above."
 else

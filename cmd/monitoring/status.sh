@@ -127,7 +127,7 @@ directory_usage() {
 }
 
 ollama_version_line() {
-  local port='' output version unit candidate
+  local port='' response version unit candidate
   for candidate in \
     'ollama.service:11434' \
     'ollama-task.service:11435' \
@@ -140,15 +140,29 @@ ollama_version_line() {
     fi
   done
   if [[ -z "$port" ]]; then
-    echo '  Ollama client installed; server version unavailable while all lanes are stopped'
+    echo '  Ollama server version unavailable while all lanes are stopped'
     return 0
   fi
-  output="$(OLLAMA_HOST="http://127.0.0.1:${port}" ollama --version 2>&1 || true)"
-  version="$(grep -Eo '[0-9]+\.[0-9]+\.[0-9]+' <<< "$output" | tail -1 || true)"
+  response="$(curl --fail --silent --connect-timeout 1 --max-time 3 \
+    "http://127.0.0.1:${port}/api/version" 2>/dev/null || true)"
+  version="$(jq -r '.version // empty' <<< "$response" 2>/dev/null || true)"
   if [[ -n "$version" ]]; then
-    printf '  ollama version is %s\n' "$version"
+    printf '  Ollama server version: %s\n' "$version"
   else
-    echo '  Ollama command available; version unavailable'
+    echo '  Ollama server version unavailable from active lane'
+  fi
+}
+
+openwebui_readiness() {
+  local state
+  state="$(unit_state open-webui.service)"
+  if curl --fail --silent --output /dev/null --connect-timeout 1 --max-time 3 \
+      http://127.0.0.1:3000/ 2>/dev/null; then
+    printf 'ready'
+  elif [[ "$state" == active ]]; then
+    printf 'active-not-ready'
+  else
+    printf 'unavailable'
   fi
 }
 
@@ -266,6 +280,7 @@ section "Web services"
 for unit in open-webui.service tika.service nginx.service; do
   service_status "$unit"
 done
+printf '  %-38s %s\n' 'Open WebUI application readiness' "$(openwebui_readiness)"
 
 section "Memory and swap"
 free -h 2>/dev/null | sed 's/^/  /' || true
