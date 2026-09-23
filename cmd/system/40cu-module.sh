@@ -415,7 +415,8 @@ do_prepare() {
       if [[ -f "$CONF40" ]]; then
         info "Persistent 40-CU boot activation is configured."
       else
-        info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
+        info "Persistent boot activation: disabled (optional)."
+        info "Live CU routing is managed independently by bc250-cu-live-manager."
       fi
       return
     fi
@@ -437,8 +438,8 @@ do_prepare() {
   if [[ -f "$CONF40" ]]; then
     info "Persistent 40-CU boot activation is configured."
   else
-    info "Persistent 40-CU boot activation is not enabled; live CU routing is managed separately."
-    info "Enable persistent 40-CU boot activation when ready: sudo bc250-40cu enable"
+    info "Persistent boot activation: disabled (optional)."
+    info "Live CU routing is managed independently by bc250-cu-live-manager."
   fi
 }
 

@@ -490,7 +490,11 @@ show_plan() {
   printf '  Fedora update         check/apply\n'
   printf '  package               %s\n' "$(rpm -q bc250-llm-server.x86_64 2>/dev/null || echo missing)"
   printf '  Ollama                %s\n' "$ollama"
-  printf '  kernel                %s\n' "${kernel:+pending -> $kernel}${kernel:-current}"
+  if [[ -n "$kernel" ]]; then
+    printf '  kernel                running %s; installed pending -> %s; repository check/update in step 2\n' "$(uname -r)" "$kernel"
+  else
+    printf '  kernel                running %s; repository check/update in step 2\n' "$(uname -r)"
+  fi
   printf '  TTM profile           %s\n' "$memory"
   printf '  swap                  %s\n' "$swap"
   printf '  40-CU                 %s\n' "$cu"
@@ -785,6 +789,30 @@ run_models_only() {
   echo "Transcript: $LOG_FILE"
 }
 
+print_40cu_completion_status() {
+  local manager=bc250-cu-live-manager.service summary routed health enabled active
+  enabled="$(systemctl is-enabled "$manager" 2>/dev/null || true)"
+  active="$(systemctl is-active "$manager" 2>/dev/null || true)"
+  summary="$(bc250-cu-status --summary 2>/dev/null || true)"
+  routed="$(sed -n 's/^[[:space:]]*Live routed CUs[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
+  health="$(sed -n 's/^[[:space:]]*Live routing status[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
+  if [[ -n "$routed" ]]; then
+    if [[ "$routed" == "40/40" && "$health" == *healthy* ]]; then
+      echo "40-CU live routing: 40/40 healthy (live manager ${enabled:-unknown}; ${active:-unknown})"
+    else
+      echo "40-CU live routing: $routed${health:+; $health} (live manager ${enabled:-unknown}; ${active:-unknown})"
+    fi
+  else
+    echo "40-CU live routing: status unavailable (live manager ${enabled:-unknown}; ${active:-unknown})"
+  fi
+  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
+    echo "Persistent boot module: enabled/configured"
+  else
+    echo "Persistent boot module: disabled (optional; not required for healthy live routing)"
+  fi
+}
+
+
 main() {
   parse_arguments "$@"
   require_root
@@ -813,11 +841,7 @@ main() {
   echo "Core installation and verification completed successfully."
   print_openwebui_completion_status
   echo "Transcript: $LOG_FILE"
-  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-    echo "Persistent 40-CU boot activation is configured."
-  else
-    echo "Persistent 40-CU boot activation is not enabled; live CU routing remains separately managed."
-  fi
+  print_40cu_completion_status
   echo
   completion_owui_token="${OWUI_TOKEN_FILE:-${BC250_OWUI_TOKEN_FILE:-}}"
   echo "Validation / benchmark"

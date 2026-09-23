@@ -233,7 +233,7 @@ elif [[ -x /usr/libexec/bc250-llm-server/cu-status.sh ]]; then
 fi
 if [[ -n "$cu_helper" ]]; then
   cu_report="$("$cu_helper" --summary 2>&1 || true)"
-  cu_summary="$(grep -E 'Prepared module state|Live routed CUs|Live routing status|Kernel active_cu_number|RADV report' \
+  cu_summary="$(grep -E 'Prepared module state|Live routed CUs|Live routing status|Kernel diagnostic active_cu_number|RADV report' \
     <<< "$cu_report" || true)"
   [[ -n "$cu_summary" ]] && printf '%s\n' "$cu_summary" || echo "  CU status could not be summarized"
 else

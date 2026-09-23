@@ -52,7 +52,7 @@ elif ((EUID != 0)) && [[ -d /var/lib/bc250-llm-server ]] && [[ ! -x /var/lib/bc2
 else
   echo "  Prepared module state   : not recorded"
 fi
-echo "  Kernel active_cu_number : $(read_param /sys/module/amdgpu/parameters/active_cu_number) (diagnostic counter)"
+echo "  Kernel diagnostic active_cu_number : $(read_param /sys/module/amdgpu/parameters/active_cu_number) (not live-routing authority)"
 echo "  Kernel cc_write_mode    : $(read_param /sys/module/amdgpu/parameters/bc250_cc_write_mode)"
 if grep -qo 'amdgpu.bc250_cc_write_mode=[^ ]*' /proc/cmdline 2>/dev/null; then
   echo "  Boot parameter          : $(grep -o 'amdgpu.bc250_cc_write_mode=[^ ]*' /proc/cmdline | head -1)"

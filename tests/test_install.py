@@ -500,6 +500,8 @@ step_8_application_services
         block = source[source.index("show_plan() {"):source.index("wait_for_open_webui() {")]
         for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "storage headroom", "reboot required"):
             self.assertIn(label, block)
+        self.assertIn("repository check/update in step 2", block)
+        self.assertNotIn("${kernel:-current}", block)
 
     def test_primary_reboot_happens_after_update_ollama_and_memory(self) -> None:
         source = INSTALLER.read_text()
@@ -515,6 +517,10 @@ step_8_application_services
         self.assertIn("/etc/modprobe.d/bc250-40cu.conf", source)
         self.assertIn("/sys/module/amdgpu/parameters/bc250_cc_write_mode", source)
         self.assertNotIn("bc250-40cu enable", source)
+        self.assertIn("Persistent boot activation: disabled (optional).", (ROOT / "cmd/system/40cu-module.sh").read_text())
+        self.assertNotIn("Enable persistent 40-CU boot activation when ready", (ROOT / "cmd/system/40cu-module.sh").read_text())
+        self.assertIn("40-CU live routing: 40/40 healthy", source)
+        self.assertIn("Persistent boot module: disabled (optional; not required for healthy live routing)", source)
 
     def test_root_growth_skips_lvm_when_no_free_extents(self) -> None:
         source = INSTALLER.read_text()
