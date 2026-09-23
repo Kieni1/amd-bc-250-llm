@@ -256,7 +256,7 @@ def call_agent(url: str, model: str, prompt: str) -> str:
         die("agent output hit its generation limit; leave this document for manual/chapter-split processing")
     output = str(data["response"]).strip()
     if output.startswith("```"):
-        output = re.sub(r"^```(?:markdown)?\s*", "", output, flags=re.I)
+        output = re.sub(r"^```(?:markdown)?\s*", "", output, flags=re.IGNORECASE)
         output = re.sub(r"\s*```$", "", output)
     return output.strip() + "\n"
 
@@ -275,7 +275,7 @@ def critical_tokens(text: str) -> set[str]:
     )
     found: set[str] = set()
     for pattern in patterns:
-        found.update(match.group(0).strip() for match in re.finditer(pattern, text, flags=re.I))
+        found.update(match.group(0).strip() for match in re.finditer(pattern, text, flags=re.IGNORECASE))
     return found
 
 
