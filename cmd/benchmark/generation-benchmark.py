@@ -40,6 +40,7 @@ from benchmark_common import (
     finalize_benchmark_metadata,
     fixture_metadata,
     prepare_result_dir,
+    request_policy_for_model,
     result_record,
     write_benchmark_metadata,
     write_result_summary,
@@ -302,6 +303,15 @@ def resolve_think_policy(model: str, requested: str) -> str:
     """Return omit|true|false|low|medium|high|max for Ollama 0.34.2."""
     if requested != "auto":
         return requested
+    policy = request_policy_for_model(model)
+    if "think" in policy:
+        value = policy["think"]
+        if value is True:
+            return "true"
+        if value is False:
+            return "false"
+        if isinstance(value, str) and value in {"low", "medium", "high", "max"}:
+            return value
     lower = model.casefold()
     if "gpt-oss" in lower:
         return "medium"
@@ -328,10 +338,20 @@ def think_value(policy: str) -> bool | str | None:
     return policy
 
 
-def options_for(mode: str, num_predict: int) -> dict[str, Any]:
+def options_for(
+    mode: str, num_predict: int, request_policy: dict[str, Any] | None = None
+) -> dict[str, Any]:
     if mode == "neutral":
         return {"temperature": 0, "num_predict": num_predict}
-    return {"num_predict": num_predict}
+    options: dict[str, Any] = {"num_predict": num_predict}
+    policy = request_policy or {}
+    for key in (
+        "temperature", "top_p", "top_k", "min_p", "presence_penalty",
+        "repeat_penalty",
+    ):
+        if key in policy:
+            options[key] = policy[key]
+    return options
 
 
 def generate_payload(
@@ -347,7 +367,7 @@ def generate_payload(
         "prompt": prompt,
         "stream": False,
         "keep_alive": keep_alive,
-        "options": options_for(mode, num_predict),
+        "options": options_for(mode, num_predict, request_policy_for_model(model)),
     }
     if mode == "neutral":
         # Ollama 0.34.2 GenerateRequest.System explicitly overrides the
@@ -377,7 +397,7 @@ def chat_payload(
         "messages": messages,
         "stream": True,
         "keep_alive": keep_alive,
-        "options": options_for(mode, num_predict),
+        "options": options_for(mode, num_predict, request_policy_for_model(model)),
     }
     value = think_value(think_policy)
     if value is not None:
@@ -854,6 +874,7 @@ def main() -> int:
                 "quantization_level": details.get("quantization_level", ""),
                 "runtime_url": client.base_url,
                 "think_policy": resolve_think_policy(model, think_requested),
+                "package_request_policy": request_policy_for_model(model),
                 "kv_cache_type": runtime_evidence.get("kv_cache_type", "unknown"),
                 "latency_num_predict": latency_budget(
                     num_latency,

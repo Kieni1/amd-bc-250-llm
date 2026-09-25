@@ -114,6 +114,8 @@ ollama_version_line
         self.assertIn("openwebui_readiness()", source)
         self.assertIn("active-not-ready", source)
         self.assertIn("Open WebUI application readiness", source)
+        self.assertIn("resident:", source)
+        self.assertIn("Reboot recommendation: not checked", source)
 
     def test_support_bundle_is_redacted_read_only_evidence(self) -> None:
         path = ROOT / "cmd/monitoring/support-bundle.sh"
@@ -134,6 +136,10 @@ ollama_version_line
             "bc250-maintenance status",
             "pstore-presence.txt",
             "memory.events",
+            "BC250_SUPPORT_CAPTURE_TIMEOUT",
+            "interpretation=TIMEOUT",
+            "sha256sum -c SHA256SUMS.txt",
+            "Support bundle created and self-verified",
         ):
             self.assertIn(expected, source)
         for forbidden in (

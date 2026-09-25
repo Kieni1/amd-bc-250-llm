@@ -66,6 +66,32 @@ def resolve_package_resource(
     return DEFAULT_PACKAGE_SHARE / installed_relative
 
 
+
+
+def model_policy_path() -> Path:
+    return resolve_package_resource("config/openwebui/models.json", "openwebui/models.json")
+
+
+def request_policy_for_model(model: str) -> dict[str, Any]:
+    """Return package request policy from the existing Open WebUI model authority."""
+    try:
+        document = json.loads(model_policy_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    canonical = model if ":" in model else f"{model}:latest"
+    for item in document.get("models", []) if isinstance(document, dict) else []:
+        if not isinstance(item, dict) or item.get("id") not in {model, canonical}:
+            continue
+        params = item.get("params") if isinstance(item.get("params"), dict) else {}
+        custom = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
+        return dict(custom)
+    policies = document.get("testing_model_policies", {}) if isinstance(document, dict) else {}
+    policy = policies.get(canonical) or policies.get(model) if isinstance(policies, dict) else None
+    if isinstance(policy, dict) and isinstance(policy.get("custom_params"), dict):
+        return dict(policy["custom_params"])
+    return {}
+
+
 def benchmark_fixture_root() -> Path:
     """Return the canonical benchmark fixture directory for this execution layout."""
     return resolve_package_resource(

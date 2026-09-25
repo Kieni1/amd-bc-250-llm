@@ -384,6 +384,13 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertFalse(documents["meta"]["builtinTools"]["chats"])
         self.assertEqual(models["bc250-office-deep-reasoning"]["params"].get("keep_alive"), 0)
         self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["params"].get("keep_alive"), 0)
+        advanced_policy = models["bc250-office-advanced"]["params"]["custom_params"]
+        self.assertEqual(advanced_policy["think"], False)
+        self.assertEqual(advanced_policy["temperature"], 0.7)
+        self.assertEqual(advanced_policy["top_p"], 0.8)
+        self.assertEqual(advanced_policy["top_k"], 20)
+        self.assertEqual(advanced_policy["presence_penalty"], 0.0)
+        self.assertEqual(advanced_policy["repeat_penalty"], 1.0)
         self.assertNotIn("keep_alive", models["bc250-office-standard"]["params"])
         self.assertNotIn("keep_alive", models["bc250-office-advanced"]["params"])
         for model_id in (
@@ -394,6 +401,52 @@ class OpenWebUIStatusTests(unittest.TestCase):
         ):
             self.assertNotIn("system", models[model_id]["params"])
 
+    def test_testing_inventory_expands_normal_lanes_with_model_specific_policy(self) -> None:
+        document = OPENWEBUI.load_models()
+        effective = OPENWEBUI.effective_model_document(
+            document,
+            {
+                "main": [
+                    "prod-qwen35-9b-unsloth-q6-k:latest",
+                    "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest",
+                    "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest",
+                ],
+                "task": ["task-extra:latest"],
+            },
+        )
+        models = {model["id"]: model for model in effective["models"]}
+        q36 = models["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]
+        self.assertFalse(q36["meta"]["hidden"])
+        self.assertEqual(q36["meta"]["bc250_lane"], "main")
+        self.assertIn({"name": OPENWEBUI.AUTO_VISIBLE_TAG}, q36["meta"]["tags"])
+        self.assertEqual(q36["params"]["custom_params"]["think"], False)
+        self.assertEqual(q36["params"]["custom_params"]["temperature"], 0.7)
+        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [REQUIRED_READ])
+        xxs = models["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]
+        self.assertEqual(xxs["meta"]["bc250_qualification"]["quality_warning"], "arithmetic-probe-failed")
+        task = models["task-extra:latest"]
+        self.assertEqual(task["meta"]["bc250_lane"], "task")
+        self.assertFalse(task["meta"]["capabilities"]["builtin_tools"])
+
+        class DeleteClient:
+            def __init__(self) -> None:
+                self.deleted: list[str] = []
+
+            def post(self, path: str, payload: Any) -> Any:
+                self.assert_path = path
+                self.deleted.append(payload["id"])
+                return True
+
+        delete_client = DeleteClient()
+        stale = {
+            "old-main:latest": OPENWEBUI.auto_visible_model_record("old-main:latest", "main"),
+            "old-task:latest": OPENWEBUI.auto_visible_model_record("old-task:latest", "task"),
+        }
+        OPENWEBUI.remove_stale_auto_visible_models(
+            delete_client, set(), stale, {"main"}
+        )
+        self.assertEqual(delete_client.deleted, ["old-main:latest"])
+
     def test_model_import_payload_does_not_replace_acl_state(self) -> None:
         payload = OPENWEBUI.model_import_payload(OPENWEBUI.load_models())
         self.assertTrue(all("access_grants" not in model for model in payload["models"]))
@@ -401,6 +454,67 @@ class OpenWebUIStatusTests(unittest.TestCase):
             model for model in payload["models"] if model["id"] == "bc250-office-deep-reasoning"
         )
         self.assertEqual(deep["params"].get("keep_alive"), 0)
+        advanced = next(
+            model for model in payload["models"] if model["id"] == "bc250-office-advanced"
+        )
+        raw_qwen = next(
+            model
+            for model in payload["models"]
+            if model["id"] == "prod-qwen35-9b-unsloth-q6-k:latest"
+        )
+        for model in (advanced, raw_qwen):
+            self.assertEqual(
+                model["params"]["custom_params"],
+                {
+                    "think": False,
+                    "temperature": 0.7,
+                    "top_p": 0.8,
+                    "top_k": 20,
+                    "min_p": 0.0,
+                    "presence_penalty": 0.0,
+                    "repeat_penalty": 1.0,
+                },
+            )
+
+    def test_model_request_policy_shape_rejects_misplaced_sampler_params(self) -> None:
+        document = OPENWEBUI.load_models()
+        misplaced_model = copy.deepcopy(document)
+        advanced = next(
+            model
+            for model in misplaced_model["models"]
+            if model["id"] == "bc250-office-advanced"
+        )
+        advanced["params"]["temperature"] = advanced["params"]["custom_params"].pop(
+            "temperature"
+        )
+        with self.assertRaisesRegex(OPENWEBUI.ApiError, "params.custom_params"):
+            OPENWEBUI.validate_model_request_policy_shape(misplaced_model)
+
+        unknown_direct_param = copy.deepcopy(document)
+        advanced = next(
+            model
+            for model in unknown_direct_param["models"]
+            if model["id"] == "bc250-office-advanced"
+        )
+        advanced["params"]["seed"] = 42
+        with self.assertRaisesRegex(OPENWEBUI.ApiError, "unsupported direct params"):
+            OPENWEBUI.validate_model_request_policy_shape(unknown_direct_param)
+
+        misplaced_policy = copy.deepcopy(document)
+        q36 = misplaced_policy["testing_model_policies"][
+            "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+        ]
+        q36["think"] = q36["custom_params"].pop("think")
+        with self.assertRaisesRegex(OPENWEBUI.ApiError, "under custom_params"):
+            OPENWEBUI.validate_model_request_policy_shape(misplaced_policy)
+
+        unknown_policy_param = copy.deepcopy(document)
+        q36 = unknown_policy_param["testing_model_policies"][
+            "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+        ]
+        q36["num_ctx"] = 16_384
+        with self.assertRaisesRegex(OPENWEBUI.ApiError, "under custom_params"):
+            OPENWEBUI.validate_model_request_policy_shape(unknown_policy_param)
 
     def test_compatibility_assumption_matches_packaged_openwebui_pin(self) -> None:
         values: dict[str, str] = {}
@@ -635,8 +749,101 @@ class OpenWebUIStatusTests(unittest.TestCase):
         for model_id, (wrapper, source) in cases.items():
             with self.subTest(model_id=model_id):
                 body = {"model": model_id, "messages": [{"role": "user", "content": source}]}
-                result = asyncio.run(module.Filter().inlet(body))
+                filter_instance = module.Filter()
+                result = asyncio.run(filter_instance.inlet(body))
                 self.assertEqual(result["messages"][-1]["content"], wrapper + source)
+
+        wrapper = module.WRAPPERS["bc250-office-translation-de-fr"]
+        guarded = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Die Regeln sollten beachtet werden."},
+                {"role": "assistant", "content": "Les règles doivent être respectées."},
+            ],
+        }
+        guarded = asyncio.run(module.Filter().outlet(guarded))
+        self.assertIn("Translation withheld", guarded["messages"][-1]["content"])
+        clean = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Die Regeln sollten beachtet werden."},
+                {"role": "assistant", "content": "Les règles devraient être respectées."},
+            ],
+        }
+        clean = asyncio.run(module.Filter().outlet(clean))
+        self.assertEqual(clean["messages"][-1]["content"], "Les règles devraient être respectées.")
+
+        weakened = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Die Mieterin muss CHF 1'250.00 bis 2026-10-01 bezahlen."},
+                {"role": "assistant", "content": "La locataire devrait payer CHF 1'250.00 avant le 2026-10-01."},
+            ],
+        }
+        weakened = asyncio.run(module.Filter().outlet(weakened))
+        self.assertIn("Translation withheld", weakened["messages"][-1]["content"])
+
+        missing_identifier = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Referenz FR-MARKER-8520 gilt ab 2026-10-01."},
+                {"role": "assistant", "content": "La référence est valable dès le 2026-10-01."},
+            ],
+        }
+        missing_identifier = asyncio.run(module.Filter().outlet(missing_identifier))
+        self.assertIn("FR-MARKER-8520", missing_identifier["messages"][-1]["content"])
+
+        locale_currency = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": wrapper + "Der Gesamtbetrag beträgt CHF 10 450.00.",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Le montant total est de 10.450,00 CHF ;",
+                },
+            ],
+        }
+        locale_currency = asyncio.run(module.Filter().outlet(locale_currency))
+        self.assertEqual(
+            locale_currency["messages"][-1]["content"],
+            "Le montant total est de 10.450,00 CHF ;",
+        )
+
+        wrong_currency = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Der Gesamtbetrag beträgt CHF 319.50."},
+                {"role": "assistant", "content": "Le montant total est de 391,50 CHF."},
+            ],
+        }
+        wrong_currency = asyncio.run(module.Filter().outlet(wrong_currency))
+        self.assertIn("currency amount", wrong_currency["messages"][-1]["content"])
+
+        permission_strengthened = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Die Mieterin darf den Raum nutzen."},
+                {"role": "assistant", "content": "La locataire doit utiliser la pièce."},
+            ],
+        }
+        permission_strengthened = asyncio.run(
+            module.Filter().outlet(permission_strengthened)
+        )
+        self.assertIn("permission strengthened", permission_strengthened["messages"][-1]["content"])
+
+        fr_wrapper = module.WRAPPERS["bc250-office-translation-fr-de"]
+        obligation_weakened = {
+            "model": "bc250-office-translation-fr-de",
+            "messages": [
+                {"role": "user", "content": fr_wrapper + "La locataire doit payer le dépôt."},
+                {"role": "assistant", "content": "Die Mieterin darf die Kaution bezahlen."},
+            ],
+        }
+        obligation_weakened = asyncio.run(module.Filter().outlet(obligation_weakened))
+        self.assertIn("obligation weakened to permission", obligation_weakened["messages"][-1]["content"])
 
     def test_package_function_manifest_loads_non_global_active_filter(self) -> None:
         functions = OPENWEBUI.load_functions()

@@ -175,5 +175,72 @@
       "données RH"
     ],
     "min_words": 6
+  },
+  {
+    "id": "de-fr-recommendation-modality",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Die Belegungsvorschriften bei Neuvermietungen sollten beachtet werden.",
+    "required_any": [
+      "devraient être respectées",
+      "devraient être observées",
+      "il conviendrait de respecter"
+    ],
+    "forbidden": [
+      "doivent être respectées",
+      "doivent être observées"
+    ],
+    "preserve": [],
+    "min_words": 5
+  },
+  {
+    "id": "de-fr-obligation-modality",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Bei Neueinzug müssen die Genossenschaftsanteile einbezahlt sein.",
+    "required_any": [
+      "doivent être versées",
+      "doivent être payées",
+      "doivent avoir été versées"
+    ],
+    "forbidden": [
+      "devraient être versées",
+      "devraient être payées"
+    ],
+    "preserve": [],
+    "min_words": 5
+  },
+  {
+    "id": "fr-de-recommendation-modality",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Les règles d'occupation devraient être respectées lors d'une nouvelle location.",
+    "required_any": [
+      "sollten beachtet werden",
+      "sollten eingehalten werden"
+    ],
+    "forbidden": [
+      "müssen beachtet werden",
+      "müssen eingehalten werden"
+    ],
+    "preserve": [],
+    "min_words": 5
+  },
+  {
+    "id": "fr-de-obligation-modality",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Les parts sociales doivent être versées avant l'emménagement.",
+    "required_any": [
+      "müssen vor dem Einzug",
+      "müssen vor Einzug",
+      "sind vor dem Einzug"
+    ],
+    "forbidden": [
+      "sollten vor dem Einzug",
+      "sollten vor Einzug"
+    ],
+    "preserve": [],
+    "min_words": 5
   }
 ]

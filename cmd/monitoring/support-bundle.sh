@@ -3,9 +3,10 @@
 set -Eeuo pipefail
 umask 077
 
-BUNDLE_VERSION=1
+BUNDLE_VERSION=2
 DEFAULT_OUTPUT=/var/lib/bc250-llm-server/support
 OUTPUT_DIR="$DEFAULT_OUTPUT"
+CAPTURE_TIMEOUT=${BC250_SUPPORT_CAPTURE_TIMEOUT:-20}
 
 usage() {
   cat <<'USAGE'
@@ -32,6 +33,8 @@ done
 
 command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 is required." >&2; exit 1; }
 command -v sha256sum >/dev/null 2>&1 || { echo "ERROR: sha256sum is required." >&2; exit 1; }
+command -v timeout >/dev/null 2>&1 || { echo "ERROR: timeout is required." >&2; exit 1; }
+[[ "$CAPTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: BC250_SUPPORT_CAPTURE_TIMEOUT must be a positive integer." >&2; exit 2; }
 
 run_id="$(date +%Y%m%dT%H%M%S%z)-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 started="$(date --iso-8601=seconds)"
@@ -46,10 +49,11 @@ capture() {
   {
     printf '$'; printf ' %q' "$@"; echo
     set +e
-    "$@"
+    timeout --signal=TERM --kill-after=5s "${CAPTURE_TIMEOUT}s" "$@"
     rc=$?
     set -e
     echo "command_rc=$rc"
+    [[ $rc -ne 124 ]] || echo "interpretation=TIMEOUT after ${CAPTURE_TIMEOUT}s"
   } > "$evidence/$file" 2>&1
 }
 
@@ -58,10 +62,11 @@ capture_shell() {
   {
     printf '$ %s\n' "$command"
     set +e
-    bash -o pipefail -c "$command"
+    timeout --signal=TERM --kill-after=5s "${CAPTURE_TIMEOUT}s" bash -o pipefail -c "$command"
     rc=$?
     set -e
     echo "command_rc=$rc"
+    [[ $rc -ne 124 ]] || echo "interpretation=TIMEOUT after ${CAPTURE_TIMEOUT}s"
   } > "$evidence/$file" 2>&1
 }
 
@@ -153,10 +158,15 @@ PY
 (
   cd "$work"
   find manifest.json evidence -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+  sha256sum -c SHA256SUMS.txt >/dev/null
   tar -czf "$archive.tmp" manifest.json SHA256SUMS.txt evidence
 )
+verify_dir="$work/verify"
+install -d -m 0700 "$verify_dir"
+tar -xzf "$archive.tmp" -C "$verify_dir"
+(cd "$verify_dir" && sha256sum -c SHA256SUMS.txt >/dev/null)
 chmod 0600 "$archive.tmp"
 mv -f "$archive.tmp" "$archive"
 
-echo "Support bundle created: $archive"
+echo "Support bundle created and self-verified: $archive"
 echo "The archive is mode 0600 and excludes user content and credentials by design."

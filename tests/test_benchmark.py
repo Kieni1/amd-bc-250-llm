@@ -162,6 +162,28 @@ class GenerationPolicyTests(unittest.TestCase):
             ),
             "omit",
         )
+        self.assertEqual(
+            generation.resolve_think_policy("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", "auto"),
+            "false",
+        )
+        self.assertEqual(
+            generation.resolve_think_policy("exp-qwen38-27b-unsloth-ud-iq3-s", "auto"),
+            "medium",
+        )
+        qwen_payload = generation.generate_payload(
+            "prod-qwen35-9b-unsloth-q6-k:latest",
+            "test",
+            128,
+            "production",
+            "false",
+            "20m",
+        )
+        self.assertEqual(qwen_payload["options"]["temperature"], 0.7)
+        self.assertEqual(qwen_payload["options"]["top_p"], 0.8)
+        self.assertEqual(qwen_payload["options"]["top_k"], 20)
+        self.assertEqual(qwen_payload["options"]["min_p"], 0.0)
+        self.assertEqual(qwen_payload["options"]["presence_penalty"], 0.0)
+        self.assertEqual(qwen_payload["options"]["repeat_penalty"], 1.0)
 
     def test_early_stop_only_flags_short_done_reason_stop(self) -> None:
         self.assertIsNone(
@@ -1031,6 +1053,11 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         args = run.call_args.args[0]
         self.assertEqual(args.think, "false")
         self.assertEqual(args.models, ["prod-test"])
+        self.assertIn("Preserve legal and contractual modality exactly", category.TRANSLATE_GEMMA_EXPLICIT_DIRECTION_V1)
+        cases = json.loads((ROOT / "examples/benchmark/translation-office.json").read_text(encoding="utf-8"))
+        ids = {case["id"] for case in cases}
+        self.assertIn("de-fr-recommendation-modality", ids)
+        self.assertIn("fr-de-obligation-modality", ids)
 
     def test_translation_identifier_fragment_is_not_meaningful_translation(self) -> None:
         fragment = "AB-42 4 septembre 2026"
@@ -1740,7 +1767,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.4", source)
+        self.assertIn("HARNESS_VERSION=4.5", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -1750,6 +1777,8 @@ class TelemetryTests(unittest.TestCase):
         self.assertIn("Description=BC-250 ${TARGET_VERSION} package qualification", source)
         self.assertIn("# BC-250 ${TARGET_VERSION} revalidation", source)
         self.assertIn("rpm -q --qf '%{VERSION}' bc250-llm-server", source)
+        self.assertIn('installed_nevra=$(rpm -q bc250-llm-server', source)
+        self.assertIn("Installed NEVRA", source)
         start = source.index("run_qualification_sequence() {")
         sequence = source[start:source.index("\nworker() {", start)]
         for phase in ("phase_preflight", "phase_roles", "phase_edge", "phase_agent", "phase_owui", "phase_restore_report"):

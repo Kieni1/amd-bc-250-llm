@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.1
-Release:        0.5%{?dist}
+Release:        0.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -211,6 +211,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 
 %changelog
+* Fri Sep 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.6
+- Synchronize all models discovered on the normal main/task Ollama lanes into package-managed visible Open WebUI testing records with additive ordinary-user read access, while excluding embedding/agent lanes and failing safe on unavailable provider discovery.
+- Centralize qualified Qwen request policy in the existing Open WebUI model authority, expose effective nested parameters in diagnostics, and reuse those policies in production-mode generation benchmarks without repacking embedded chat templates.
+- Add bounded DE/FR translation integrity checks for high-confidence modality drift and preserved dates/amounts/identifiers; expand translation fixtures without changing the production translation model.
+- Improve operator evidence with current residency in bc250-status, exact installed NEVRA in revalidation v4.5, clearer reboot-not-checked wording, and timeout/self-verification hardening in bc250-support-bundle.
+- Keep proven topology, Deep keep_alive=0, TTM/40-CU policy, RAG architecture and Open WebUI 0.11.3 unchanged; defer model-only deployment and generic memory admission.
+
 * Wed Sep 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.5
 - Fix local RAG preparation to use Ollama chat output with separated native thinking, fail closed on truncated/empty/fenced/reasoning-contaminated final content, and score source fidelity only against validated final Markdown.
 - Preserve unique source identifiers during normalization, reject reasoning markers during working/active validation, and distinguish expected OCR/oversize deferrals from real preparation errors with clearer review/status UX.

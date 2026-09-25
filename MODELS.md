@@ -26,10 +26,11 @@ Agent/coding is **exclusive**: `bc250-agent-mode enter` stops main/task/embeddin
 starts only 11436; `leave` restores normal mode.
 
 During pre-v1 comparison testing Open WebUI exposes every model actually installed on the normal
-main (`11434`) and task (`11435`) providers. Curated `bc250-office-*` roles remain the product
-contracts; raw production, experimental and task identities are visible so behavior can be compared
-without editing provider allowlists. The embedding and exclusive agent lanes remain outside the normal
-chat selector.
+main (`11434`) and task (`11435`) providers. Setup discovers those inventories and maintains
+package-managed visible testing records with additive ordinary-user read access; it never uses an
+unavailable lane as evidence that all of that lane's models vanished. Curated `bc250-office-*` roles
+remain the product contracts; raw production, experimental and task identities are visible for direct
+comparison. The embedding and exclusive agent lanes remain outside the normal chat selector.
 
 MTP is different from the agent lane: it shares catalog/provenance handling with `bc250-model`, but
 its runtime is a standalone opt-in external llama.cpp server rather than an Ollama service lane.
@@ -376,6 +377,13 @@ status changes.
 
 ## Current comparison policy
 
+Qwen request policy is request-level, not a Modelfile `think` parameter. Corrected GPU-backed
+paired tests found no demonstrated product benefit from replacing the embedded Qwen3.6/Qwen3.8
+templates with froggeric v22.5: directly paired visible output/reasoning was byte-identical and timing
+differences were noise-level. Keep embedded templates unless a concrete history/tool-call defect is
+reproduced. Qualified request defaults and experimental qualification metadata live in the existing
+Open WebUI model-policy document and are also consumed by production-mode benchmark requests.
+
 Production roles stay stable until a measured replacement wins its real use case.
 The current operator comparison pool intentionally retains older Qwen/Gemma/GPT
 variants alongside newer candidates so the next full BC-250 run can make the
@@ -383,10 +391,10 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | large MoE main-lane challenger; start at 16K context and fall back to UD-Q2_K_XL if BC-250 headroom is unsafe |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | ISTA GSQ/RCO IQ3_S quality-first dense 27B experiment; 8K context, think=true, upstream thinking-mode sampling; 11.8 GB weights require strict BC-250 headroom qualification |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | ISTA GSQ/RCO IQ3_XXS deployability/RAG experiment; the 16K test answered 5/5 early RAG cases correctly but fell to ~0.28 GiB MemAvailable before safety abort, so the same verified model/GGUF is now bounded to 8K; think=false, upstream non-thinking sampling; no Open WebUI role/default changes |
-| `exp-qwen38-27b-unsloth-ud-iq3-s` | dense 27B Unsloth dynamic-quant control; UD-IQ3_S first, UD-IQ3_XXS fallback |
+| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | experimental memory-edge 35B; integrated OWUI/Tika repeatedly crosses the 512 MiB safety floor, while model-only 16K is viable with ~0.8-0.95 GiB residual headroom; prefer `think=false`; named reasoning effort is not exposed by the embedded template |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | experimental dense 27B; non-thinking is more predictable, while named reasoning effort is supported and the next bounded comparison is `low` versus `medium`; do not promote medium as solved |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | memory-efficient comparison only; despite comfortable fit it returned `56` for `7*9-17` under both tested non-thinking sampler configurations, so quality qualification failed and no production/RAG promotion is allowed |
+| `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental dense 27B control; native `think=medium` improved the office-list workload and is the preferred reasoning experiment, but open-ended tasks can still exhaust reasoning budget and prior memory evidence excludes production RAG |
 | `exp-gemma4-26b-a4b-mradermacher-i1-iq3-s` | Gemma 4 MoE main-lane challenger; i1-IQ3_S first, i1-IQ3_XS fallback; projector omitted for initial text comparison |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |

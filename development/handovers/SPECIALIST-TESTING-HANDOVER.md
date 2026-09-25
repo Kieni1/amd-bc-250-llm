@@ -40,7 +40,7 @@ retest conditions from existing decisions:
   topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
   supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
   ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.1-0.5 preserves the exact-0.4 runtime configuration and repairs the RAG reasoning/fidelity path, raw revalidation status contract and operator-state wording found during exact-0.4 testing. Exact 0.4 already provides broad runtime/model evidence; do not replay it unless the repair crosses that boundary. Keep the pinned-v0.11.3 adapter limitations documented rather than
+  narrow temporary mitigations. Current source 0.12.1-0.6 preserves the established runtime configuration and focuses on effective ordinary-user model visibility, translation integrity, centralized Qwen request policy and operator/evidence observability. Exact 0.4 already provides broad runtime/model evidence; do not replay it unless the repair crosses that boundary. Keep the pinned-v0.11.3 adapter limitations documented rather than
   treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
   rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
   live pruning and other destructive support checks remain conditional, not automatic release gates.
@@ -70,16 +70,11 @@ retest conditions from existing decisions:
   drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
   new runtime/model/hardware or product question.
 
-## Current 0.12.1-0.5 testing priority
+## Current 0.12.1-0.6 testing priority
 
-Keep this round impact-based and use the dedicated handovers rather than replaying broad closed campaigns:
+Keep this round impact-based and use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.6.md`. Do not replay broad closed campaigns. Prove the effective ordinary-user model selector against actual 11434/11435 inventory, embedding/agent exclusion, additive/non-destructive model reconciliation, DE↔FR modality/literal integrity behavior, Advanced effective nested request params, status residency/reboot wording, revalidation v4.5 identity/raw output, support-bundle timeout/self-verification, package integrity/verifier and final normal topology.
 
-- non-RAG release boundaries: `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.5.md`;
-- RAG lifecycle/product boundaries: `development/handovers/RAG-TESTING-HANDOVER-0.12.1-0.5.md`.
-
-The non-RAG round must prove `bc250-revalidate status --raw`, installer/kernel-plan and live-40-CU state wording, bounded Standard/Advanced/Deep general-knowledge behavior without unwanted knowledge/chat-tool routing, Translation legal-modality preservation, visibility of installed main/task models in Open WebUI, package integrity/verifier and final normal topology. The RAG round must first prove chat-response reasoning separation, final-body-only fidelity, unique identifier retention, expected deferral taxonomy and reasoning-marker validation; only then continue review/activation/supersession/Open WebUI ingestion.
-
-Exact 0.12.1-0.4 already passed broad runtime/model/revalidation qualification before these narrow source defects were identified. Reuse that evidence rather than replaying the whole campaign. Run the ordinary-user multi-model/compare safety question only as a separate discovery round if still assigned; do not change package policy merely because the feature exists.
+The already-repaired RAG lifecycle semantics from 0.5 remain in force; reopen them only if a 0.6 change demonstrably crosses that boundary. Qwen template replacement, generic memory admission and the model-only deployment profile are not part of this release.
 
 ## Acceptance-harness evidence policy
 

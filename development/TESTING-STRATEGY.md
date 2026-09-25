@@ -42,13 +42,15 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.11.3-2.4 source release preserves the core-verification boundary while simplifying
-installer UX: local maintenance and Pi/companion integration are separate optional decisions, both
-choices remain optional/default-No, and selected setup must be checked rather than assumed successful.
-It also extends the existing Open WebUI desired-state authority rather than adding another subsystem:
-Arena is off, implementation models stay active but hidden, and persisted local/offline/upload policy
-is checked and converged. Post-install guidance should point at a small set of next commands plus the
-installed documentation/config/state/evidence paths; it must not become a second full command reference.
+The current 0.12.1-0.6 source preserves the core-verification boundary while keeping installer UX
+concise. Open WebUI desired state remains one existing subsystem rather than gaining another policy
+framework. During pre-v1 testing, implementation and comparison models on the normal main/task lanes
+are intentionally visible: authenticated setup discovers the live 11434/11435 inventories, maintains
+only package-marked testing records and additive ordinary-user read grants, and never treats an
+unavailable lane as an empty lane. The older hidden-implementation policy belongs to historical 2.4
+evidence and must not be reused as a current assertion. Embedding/agent lanes remain excluded.
+Post-install guidance should point at a small set of next commands plus installed documentation/config/
+state/evidence paths; it must not become a second full command reference.
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
 MemAvailable hard floor unchanged; below 512 MiB may be surfaced as tight headroom. Likewise, an
@@ -117,13 +119,13 @@ than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
 
 Exact 2.3 has now passed the targeted operations acceptance introduced by the 2.3 release: clean `rpm -V`, swap 0750 convergence, topology-aware status/verifier UX, `bc250-agent-mode normal`, degraded recovery, DRY_RUN/timer output, Tika restart semantics, baseline-aware identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. Preserve this as exact-2.3 evidence.
 
-A separate exact-2.3 authenticated Open WebUI investigation found the application path healthy: HTTP readiness, task routing, Standard/Higher Quality/Deep Reasoning roles, translation 8/8 and bounded RAG 3/3 all passed. It also found three product-state ownership gaps now addressed in 2.4 source: Arena must be persisted off, the five production bases plus task model should remain active but hidden from the ordinary selector, and persisted local/offline/upload policy must participate in apply/status rather than relying only on fresh-database environment defaults. The next 2.4 OWUI check is one bounded authenticated apply/status/UI/drift-reconvergence batch, not another model campaign.
+A separate exact-2.3 authenticated Open WebUI investigation found the application path healthy: HTTP readiness, task routing, Standard/Higher Quality/Deep Reasoning roles, translation 8/8 and bounded RAG 3/3 all passed. It also found three product-state ownership gaps addressed in the historical 2.4 source: Arena persistence, explicit ownership of implementation-model visibility, and persisted local/offline/upload policy in apply/status. Release 0.6 intentionally supersedes the old hidden-implementation selector policy for pre-v1 testing: discovered normal main/task models are visible and synchronized, while agent/embed lanes remain excluded. The current 0.6 OWUI check is one bounded authenticated apply/status/UI/drift-reconvergence batch that also confirms nested request parameters survive import and reach the intended model requests; it is not another model campaign.
 
 The distinct `sudo systemctl reboot` invocation is device-proven unreliable on this BC-250: it enters a new boot and progresses substantially before the boot can become unusable/crash-recorded. Do not keep reproducing that failure. Exact-2.3 acceptance found one remaining reachable occurrence in the pinned CU live manager's interactive CPU-core-unlock reboot prompt. Source 2.4 patches that upstream path to `/usr/sbin/reboot` through the existing package patch while preserving its interactive/no-reboot-under-`--yes` contract.
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.2 includes the actual package-owned production translation roles
+The current harness v4.5 includes the actual package-owned production translation roles
 and remains the milestone whole-appliance gate.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
@@ -132,7 +134,7 @@ and multisource questions, upload/delete/re-upload, one unload/reload and a long
 not another model zoo or a new benchmark framework. Treat this as product acceptance, not an
 automatic RPM-release gate.
 
-To preserve evidence value while avoiding redundant runtime, v4.2 keeps direct and
+To preserve evidence value while avoiding redundant runtime, v4.5 keeps direct and
 product-path semantic checks distinct, but removes the duplicate generic GPT-OSS edge
 performance pass because the dedicated GPT-OSS/Jina coexistence stage is the stronger
 resource check. Successful intermediate phases use lightweight checkpoints; full

@@ -37,7 +37,7 @@
       "base_model_id": "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
       "name": "Office - Documents / RAG",
       "meta": {
-        "description": "Reviewed document and grounded-RAG answer model.",
+        "description": "Use for answers grounded in uploaded or indexed documents. Choose Standard for ordinary general questions.",
         "tags": [
           {
             "name": "BC250"
@@ -111,7 +111,7 @@
       "base_model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
       "name": "Office - Translation DE → FR",
       "meta": {
-        "description": "Production German-to-French translation role using the selected Stage-2E Translate-Gemma contract.",
+        "description": "Source-faithful German → French translation with legal/contractual modality protection.",
         "tags": [
           {
             "name": "BC250"
@@ -149,7 +149,7 @@
       "base_model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
       "name": "Office - Translation FR → DE",
       "meta": {
-        "description": "Production French-to-German translation role using the selected Stage-2E Translate-Gemma contract.",
+        "description": "Source-faithful French → German translation with legal/contractual modality protection.",
         "tags": [
           {
             "name": "BC250"
@@ -187,7 +187,7 @@
       "base_model_id": "prod-qwen35-9b-unsloth-q6-k:latest",
       "name": "Office - General / Higher Quality",
       "meta": {
-        "description": "Higher-quality general model; normal office preset requests non-thinking mode.",
+        "description": "Higher-quality general office model. Uses the qualified non-thinking Qwen3.5 policy for predictable direct answers.",
         "tags": [
           {
             "name": "BC250"
@@ -206,7 +206,13 @@
       },
       "params": {
         "custom_params": {
-          "think": false
+          "think": false,
+          "temperature": 0.7,
+          "top_p": 0.8,
+          "top_k": 20,
+          "min_p": 0.0,
+          "presence_penalty": 0.0,
+          "repeat_penalty": 1.0
         }
       },
       "is_active": true,
@@ -223,7 +229,7 @@
       "base_model_id": "prod-gpt-oss20b-ggml-org-mxfp4:latest",
       "name": "Office - Deep Reasoning",
       "meta": {
-        "description": "Large reasoning role. Re-test memory headroom together with the dedicated embedding lane on this 16 GiB UMA appliance.",
+        "description": "For complex analysis and reasoning. Slower to start and automatically unloads after each response to preserve BC-250 memory.",
         "tags": [
           {
             "name": "BC250"
@@ -371,7 +377,17 @@
           "file_context": true
         }
       },
-      "params": {},
+      "params": {
+        "custom_params": {
+          "think": false,
+          "temperature": 0.7,
+          "top_p": 0.8,
+          "top_k": 20,
+          "min_p": 0.0,
+          "presence_penalty": 0.0,
+          "repeat_penalty": 1.0
+        }
+      },
       "is_active": true,
       "access_grants": [
         {
@@ -449,5 +465,96 @@
         }
       ]
     }
-  ]
+  ],
+  "testing_model_policies": {
+    "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest": {
+      "description": "Experimental 35B Qwen3.6 memory-edge model. Integrated OWUI/Tika deployment is not production-qualified; model-only 16K use is experimentally viable.",
+      "tags": [
+        "qwen3.6",
+        "memory-edge",
+        "model-only-recommended"
+      ],
+      "custom_params": {
+        "think": false,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "qualification": {
+        "deployment": "model-only-recommended",
+        "supports_named_effort": false,
+        "production": "not-qualified"
+      }
+    },
+    "exp-qwen38-27b-ista-gsq-rco-iq3-s:latest": {
+      "description": "Experimental Qwen3.8 ISTA IQ3_S. Non-thinking is the predictable default; low versus medium reasoning remains a bounded experiment.",
+      "tags": [
+        "qwen3.8",
+        "reasoning-experiment",
+        "ista"
+      ],
+      "custom_params": {
+        "think": false,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "qualification": {
+        "preferred_reasoning_experiment": "low-vs-medium",
+        "supports_named_effort": true,
+        "production": "not-qualified"
+      }
+    },
+    "exp-qwen38-27b-unsloth-ud-iq3-s:latest": {
+      "description": "Experimental Qwen3.8 Unsloth IQ3_S. Medium is the preferred reasoning experiment; not qualified for production RAG on the 16 GiB integrated appliance.",
+      "tags": [
+        "qwen3.8",
+        "reasoning-experiment",
+        "unsloth",
+        "rag-not-qualified"
+      ],
+      "custom_params": {
+        "think": "medium",
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "qualification": {
+        "preferred_reasoning_experiment": "medium",
+        "supports_named_effort": true,
+        "production_rag": "not-qualified"
+      }
+    },
+    "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest": {
+      "description": "Experimental memory-efficient Qwen3.8 ISTA IQ3_XXS. Basic arithmetic qualification failed (7*9-17 returned 56); keep comparison-only.",
+      "tags": [
+        "qwen3.8",
+        "memory-efficient",
+        "quality-warning",
+        "comparison-only"
+      ],
+      "custom_params": {
+        "think": false,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "qualification": {
+        "quality_warning": "arithmetic-probe-failed",
+        "production": "not-qualified"
+      }
+    }
+  }
 }

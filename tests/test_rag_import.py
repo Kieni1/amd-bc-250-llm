@@ -22,12 +22,19 @@ rag = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = rag
 spec.loader.exec_module(rag)
 
-sys.modules["rag_import"] = rag
 lifecycle_spec = importlib.util.spec_from_file_location("bc250_rag_lifecycle", LIFECYCLE)
 assert lifecycle_spec and lifecycle_spec.loader
 lifecycle = importlib.util.module_from_spec(lifecycle_spec)
 sys.modules[lifecycle_spec.name] = lifecycle
-lifecycle_spec.loader.exec_module(lifecycle)
+_previous_rag_import = sys.modules.get("rag_import")
+sys.modules["rag_import"] = rag
+try:
+    lifecycle_spec.loader.exec_module(lifecycle)
+finally:
+    if _previous_rag_import is None:
+        sys.modules.pop("rag_import", None)
+    else:
+        sys.modules["rag_import"] = _previous_rag_import
 
 
 class RagImportTests(unittest.TestCase):

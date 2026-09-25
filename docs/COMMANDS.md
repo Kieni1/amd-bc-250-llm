@@ -408,19 +408,23 @@ classifier used by `bc250-agent-mode status`; a concise `Overall` / `Runtime mod
 near the top. It does not call a machine "normal" merely because the agent unit is inactive.
 Unexpected degraded normal topology also prints the supported convergence command
 `sudo bc250-agent-mode normal` so the status output is directly actionable.
-If the optional reboot diagnostic helper is absent, reboot state is reported as unknown rather
-than as an appliance fault. `bc250-status` also distinguishes an active Open WebUI systemd unit
-from HTTP application readiness and queries the active Ollama lane's `/api/version` endpoint
-rather than inferring the server version from CLI output.
+If the optional reboot diagnostic helper is absent, the reboot recommendation is reported as
+`not checked` rather than as uncertain appliance health. `bc250-status` also distinguishes an active
+Open WebUI systemd unit from HTTP application readiness, queries the active Ollama lane's
+`/api/version` endpoint rather than inferring the server version from CLI output, and reports current
+`/api/ps` residency per Ollama lane so memory-sensitive investigations can see what is actually loaded.
 
 `sudo bc250-support-bundle` creates a mode-0600 timestamped archive under
 `/var/lib/bc250-llm-server/support/` by default. It reuses existing status, verifier,
 maintenance, topology and CU commands, adds bounded resource/failure evidence, and writes
-`manifest.json` plus `SHA256SUMS.txt`. It intentionally excludes OWUI credentials, prompts,
-chat content, uploaded document contents, database rows, identity SQL and backup contents.
-Use `--output-dir DIR` when the archive should be written elsewhere.
+`manifest.json` plus `SHA256SUMS.txt`. Individual command captures are bounded by
+`BC250_SUPPORT_CAPTURE_TIMEOUT` (20 seconds by default) and record `TIMEOUT` distinctly. Before
+reporting success the command validates the checksum set, creates the archive, reopens it and validates
+the archived checksum set again. It intentionally excludes OWUI credentials, prompts, chat content,
+uploaded document contents, database rows, identity SQL and backup contents. Use `--output-dir DIR`
+when the archive should be written elsewhere.
 
-`bc250-revalidate` harness v4.4 is the root-only systemd-backed package
+`bc250-revalidate` harness v4.5 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
@@ -429,7 +433,7 @@ before run state is created. The worker remains systemd-owned; Ctrl-C detaches a
 `--detach` returns immediately. The dashboard reports stage elapsed time, worker
 state and the age of the last real progress event rather than treating a periodic
 heartbeat as progress.
-Harness v4.4 also surfaces non-failing observations under a separate `Diagnostics`
+Harness v4.5 also surfaces non-failing observations under a separate `Diagnostics`
 section. This includes non-severe context truncation, a MemAvailable minimum below the
 512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
 floor, and accepted use cases that reach their generation output budget. These diagnostics
@@ -454,7 +458,8 @@ than rebuilding the Filter contract in the harness. Final bundles remain under
 `systemctl status` results are annotated when the agent lane is intentionally inactive in
 normal mode. Completed work remains inspectable until `cleanup` or a later `start`.
 
-`bc250-revalidate status` is human-readable by default and separates the installed
+`bc250-revalidate status` is human-readable by default and reports the exact installed package NEVRA
+separately from the target source version and harness identity. It separates the installed
 harness/worker state from the recorded last-run result; `--raw` preserves the
 key/value form for scripts. `abort` requests termination of the current systemd-owned
 run through the harness recovery/finalization path; `cleanup` removes completed work

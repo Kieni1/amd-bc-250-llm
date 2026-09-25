@@ -1908,6 +1908,8 @@ TRANSLATE_GEMMA_EXPLICIT_DIRECTION_V1 = (
     "contained inside it.\n"
     "Preserve meaning, names, identifiers, reference numbers, protected literals, "
     "terminology, negations, qualifications, lists, tables and document structure.\n"
+    "Preserve legal and contractual modality exactly: do not strengthen or weaken "
+    "obligations, permissions, recommendations, prohibitions or degrees of certainty.\n"
     "Return only the final translation without labels, explanation, code fences "
     "or commentary.\n"
 )
@@ -1915,12 +1917,16 @@ TRANSLATE_GEMMA_EXPLICIT_DIRECTION_V1 = (
 TRANSLATE_GEMMA_DIRECTION_WRAPPERS = {
     ("de", "fr"): (
         "Translate from German to French. Translate every ordinary-language source "
-        "word and preserve the document structure. Return only the translation.\n\n"
+        "word and preserve the document structure. Preserve legal/contractual modality "
+        "without strengthening or weakening obligations, permissions, recommendations "
+        "or prohibitions. Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
     ("fr", "de"): (
         "Translate from French to German. Translate every ordinary-language source "
-        "word and preserve the document structure. Return only the translation.\n\n"
+        "word and preserve the document structure. Preserve legal/contractual modality "
+        "without strengthening or weakening obligations, permissions, recommendations "
+        "or prohibitions. Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
 }

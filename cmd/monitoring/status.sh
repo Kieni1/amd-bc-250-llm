@@ -99,7 +99,7 @@ topology_summary() {
 }
 
 ollama_status() {
-  local label="$1" unit="$2" port="$3" state models response
+  local label="$1" unit="$2" port="$3" state models response ps resident
   state="$(unit_state "$unit")"
   response="$(curl --fail --silent --connect-timeout 1 --max-time 3 \
     "http://127.0.0.1:${port}/api/tags" 2>/dev/null || true)"
@@ -107,6 +107,10 @@ ollama_status() {
     models="$(jq -r '.models | length' <<< "$response" 2>/dev/null || printf '?')"
     printf '  %-9s port %-5s %-8s API ready, %s model(s)\n' \
       "$label" "$port" "$(value_or_unknown "$state")" "$models"
+    ps="$(curl --fail --silent --connect-timeout 1 --max-time 3 \
+      "http://127.0.0.1:${port}/api/ps" 2>/dev/null || true)"
+    resident="$(jq -r '[.models[]? | (.name // .model // empty)] | map(select(. != null and . != "")) | if length == 0 then "empty" else join(", ") end' <<< "$ps" 2>/dev/null || true)"
+    printf '    resident: %s\n' "${resident:-unknown}"
   else
     printf '  %-9s port %-5s %-8s API unavailable\n' \
       "$label" "$port" "$(value_or_unknown "$state")"
@@ -193,7 +197,7 @@ if command -v needs-restarting >/dev/null 2>&1; then
     echo "  Reboot:       recommended after package/kernel updates"
   fi
 else
-  echo "  Reboot required: unknown"
+  echo "  Reboot recommendation: not checked"
   echo "  Reason: optional needs-restarting helper unavailable"
 fi
 

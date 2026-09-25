@@ -49,7 +49,9 @@ package-owned Function state. The helper does not persist credentials;
 the install orchestrator may hold the authenticated token briefly under `/run` so
 its final verification can reuse the same session, then removes it on exit.
 A reported difference may be an intentional operator override; `status` does not
-reset it.
+reset it. Verbose status also renders effective nested `params.custom_params` for model/request
+policy and, when the pinned API exports it, reports the administrator-owned multi-model-chat
+permission without converging that permission.
 
 ## Configuration ownership
 
@@ -68,8 +70,9 @@ environment variables:
 - active workspace overrides for the five production implementation models and
   the dedicated task model. During pre-v1 testing these records are deliberately
   visible so operators can compare curated roles with raw implementations;
-- authenticated-read (`user:*:read`) grants on the six active production presets
-  and the six implementation/task overrides required by those roles.
+- authenticated-read (`user:*:read`) grants on the six active production presets,
+  the six package implementation/task overrides, and package-managed testing records
+  dynamically discovered on the normal main/task lanes.
 
 The operator owns users, credentials, custom prompts, unrelated workspace models,
 knowledge bases, UI preferences, permissions and any intentional settings that
@@ -80,9 +83,13 @@ Required model access is converged separately and additively: package desired st
 means that required grants must exist, not that the complete ACL must equal a package-owned
 set. Existing unrelated grants are retained, including historical grants on inactive records.
 The current pre-v1 testing policy deliberately keeps raw production/task implementations visible.
-The main and task providers are unrestricted, so experimental models that are actually installed on
-those normal lanes are visible too. This is a testing surface, not a promise that every raw model will
-remain user-facing for v1.
+Provider allowlists alone are not treated as proof of the ordinary-user selector. On authenticated
+apply/status, `bc250-openwebui-setup` also discovers the actual `11434`/`11435` Ollama inventories and
+creates or updates lightweight package-managed testing records with additive `user:*:read` access.
+Only records marked `bc250_managed=testing-discovery` are eligible for stale cleanup, and cleanup is
+limited to provider lanes successfully inspected during that run. A temporarily unavailable lane is
+therefore never interpreted as an empty lane. Administrator-created records and unrelated grants are
+preserved. This is a testing surface, not a promise that every raw model remains user-facing for v1.
 
 ## Ollama lanes
 

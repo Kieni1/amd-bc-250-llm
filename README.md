@@ -80,11 +80,13 @@ Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
 create/sign in the administrator and apply the package-owned Open WebUI baseline.
 Persisted providers, task, embedding, RAG and local/offline application policy come
 from the single packaged `openwebui/desired-state.json` through supported APIs.
-During the pre-v1 testing phase the normal main/task Open WebUI providers are unrestricted,
-so every model actually installed on those two lanes is visible in the selector. Curated Office
-roles remain the recommended product paths, while raw production/experimental/task models are
-visible for comparison testing. Agent `11436` and embedding `11437` remain separate from the chat
-selector by topology. Arena is package-converged off; use `sudo bc250-openwebui-setup init` later
+During the pre-v1 testing phase the normal main/task Open WebUI providers are unrestricted and
+`bc250-openwebui-setup` synchronizes their discovered Ollama inventories into package-managed visible
+testing records with ordinary-user read access. Curated Office roles remain the recommended product
+paths, while raw production/experimental/task models are visible for comparison testing. Only
+package-managed discovery records are reconciled; administrator-created records/grants are preserved.
+Agent `11436` and embedding `11437` remain separate from the chat selector by topology. Arena is
+package-converged off; use `sudo bc250-openwebui-setup init` later
 if that step was skipped. The default endpoint is unencrypted HTTP; see
 [`docs/HARDENING.md`](docs/HARDENING.md) before using a less trusted network.
 

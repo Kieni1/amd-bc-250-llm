@@ -24,6 +24,25 @@ SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/funct
 
 # The model-view/access contract below is qualified against the packaged Open WebUI pin.
 OPENWEBUI_MODEL_API_VERSION = "0.11.3"
+AUTO_VISIBLE_TAG = "bc250-auto-visible"
+NORMAL_PROVIDER_LANES = {
+    "main": "http://127.0.0.1:11434",
+    "task": "http://127.0.0.1:11435",
+}
+REQUEST_CUSTOM_PARAM_KEYS = frozenset(
+    {
+        "think",
+        "temperature",
+        "top_p",
+        "top_k",
+        "min_p",
+        "presence_penalty",
+        "repeat_penalty",
+    }
+)
+NATIVE_MODEL_PARAM_KEYS = frozenset({"system", "max_tokens", "keep_alive", "custom_params"})
+TESTING_MODEL_POLICY_KEYS = frozenset({"description", "tags", "custom_params", "qualification"})
+_DISCOVERED_MODEL_CACHE: dict[str, list[str]] | None = None
 
 
 def desired_file() -> Path:
@@ -130,7 +149,198 @@ def load_models() -> dict[str, Any]:
         raise ApiError(f"cannot read model preset file {path}: {exc}") from exc
     if not isinstance(data, dict) or not isinstance(data.get("models"), list):
         raise ApiError(f"invalid model preset file: {path}")
+    policies = data.get("testing_model_policies", {})
+    if not isinstance(policies, dict):
+        raise ApiError(f"invalid testing_model_policies in {path}")
+    validate_model_request_policy_shape(data)
     return data
+
+
+def validate_model_request_policy_shape(document: dict[str, Any]) -> None:
+    """Fail closed when request-only sampler policy is stored outside custom_params."""
+    models = document.get("models", [])
+    if not isinstance(models, list):
+        raise ApiError("model preset file models is not a list")
+    for index, raw in enumerate(models):
+        if not isinstance(raw, dict):
+            raise ApiError(f"model record {index} is not an object")
+        model_id = str(raw.get("id") or f"index-{index}")
+        root_misplaced = sorted(REQUEST_CUSTOM_PARAM_KEYS.intersection(raw))
+        if root_misplaced:
+            raise ApiError(
+                f"model {model_id} request params must be under params.custom_params: "
+                + ", ".join(root_misplaced)
+            )
+        params = raw.get("params", {})
+        if not isinstance(params, dict):
+            raise ApiError(f"model {model_id} params is not an object")
+        params_misplaced = sorted(REQUEST_CUSTOM_PARAM_KEYS.intersection(params))
+        if params_misplaced:
+            raise ApiError(
+                f"model {model_id} request params must be under params.custom_params: "
+                + ", ".join(params_misplaced)
+            )
+        unexpected_params = sorted(set(params) - NATIVE_MODEL_PARAM_KEYS)
+        if unexpected_params:
+            raise ApiError(
+                f"model {model_id} has unsupported direct params; request-specific values "
+                "belong under params.custom_params: " + ", ".join(unexpected_params)
+            )
+        custom_params = params.get("custom_params")
+        if custom_params is not None and not isinstance(custom_params, dict):
+            raise ApiError(f"model {model_id} params.custom_params is not an object")
+
+    policies = document.get("testing_model_policies", {})
+    if not isinstance(policies, dict):
+        raise ApiError("testing_model_policies is not an object")
+    for model_id, raw in policies.items():
+        if not isinstance(raw, dict):
+            raise ApiError(f"testing model policy {model_id} is not an object")
+        unexpected_policy_keys = sorted(set(raw) - TESTING_MODEL_POLICY_KEYS)
+        if unexpected_policy_keys:
+            raise ApiError(
+                f"testing model policy {model_id} has unsupported keys; request-specific "
+                "values belong under custom_params: " + ", ".join(unexpected_policy_keys)
+            )
+        misplaced = sorted(REQUEST_CUSTOM_PARAM_KEYS.intersection(raw))
+        if misplaced:
+            raise ApiError(
+                f"testing model policy {model_id} request params must be under custom_params: "
+                + ", ".join(misplaced)
+            )
+        custom_params = raw.get("custom_params")
+        if custom_params is not None and not isinstance(custom_params, dict):
+            raise ApiError(
+                f"testing model policy {model_id} custom_params is not an object"
+            )
+
+
+def testing_model_policies(document: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw = document.get("testing_model_policies", {})
+    if not isinstance(raw, dict):
+        raise ApiError("testing_model_policies is not an object")
+    policies: dict[str, dict[str, Any]] = {}
+    for model_id, value in raw.items():
+        if not isinstance(model_id, str) or not model_id or not isinstance(value, dict):
+            raise ApiError("invalid testing model policy entry")
+        policies[model_id] = value
+    return policies
+
+
+def discover_normal_provider_models() -> dict[str, list[str]]:
+    global _DISCOVERED_MODEL_CACHE
+    if _DISCOVERED_MODEL_CACHE is not None:
+        return {lane: list(models) for lane, models in _DISCOVERED_MODEL_CACHE.items()}
+    if os.environ.get("BC250_OWUI_MODEL_DISCOVERY", "1").strip().lower() in {"0", "false", "no"}:
+        _DISCOVERED_MODEL_CACHE = {}
+        return {}
+    discovered: dict[str, list[str]] = {}
+    for lane, default_url in NORMAL_PROVIDER_LANES.items():
+        env_name = f"BC250_OLLAMA_{lane.upper()}_URL"
+        base_url = os.environ.get(env_name, default_url).rstrip("/")
+        request = urllib.request.Request(f"{base_url}/api/tags", headers={"Accept": "application/json"})
+        try:
+            with urllib.request.urlopen(request, timeout=1.0) as response:
+                payload = json.loads(response.read())
+        except (OSError, urllib.error.URLError, json.JSONDecodeError):
+            continue
+        rows = payload.get("models") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            continue
+        names = sorted({
+            str(row.get("name") or row.get("model") or "").strip()
+            for row in rows if isinstance(row, dict)
+        } - {""})
+        discovered[lane] = names
+    _DISCOVERED_MODEL_CACHE = discovered
+    return {lane: list(models) for lane, models in discovered.items()}
+
+
+def auto_visible_model_record(
+    model_id: str, lane: str, policy: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    policy = policy or {}
+    tags = [
+        {"name": "BC250"},
+        {"name": "testing"},
+        {"name": lane},
+        {"name": AUTO_VISIBLE_TAG},
+    ]
+    for tag in policy.get("tags", []):
+        if isinstance(tag, str) and tag and all(item["name"] != tag for item in tags):
+            tags.append({"name": tag})
+    custom_params = policy.get("custom_params", {})
+    params = {"custom_params": custom_params} if isinstance(custom_params, dict) and custom_params else {}
+    description = str(policy.get("description") or (
+        f"Installed {lane}-lane model exposed for pre-v1 comparison testing. "
+        "Use a curated Office role for normal product use."
+    ))
+    qualification = policy.get("qualification")
+    meta: dict[str, Any] = {
+        "hidden": False,
+        "description": description,
+        "tags": tags,
+        "capabilities": {"builtin_tools": False, "file_context": True},
+        "bc250_managed": "testing-discovery",
+        "bc250_lane": lane,
+    }
+    if isinstance(qualification, dict) and qualification:
+        meta["bc250_qualification"] = qualification
+    return {
+        "id": model_id,
+        "base_model_id": None,
+        "name": model_id,
+        "meta": meta,
+        "params": params,
+        "is_active": True,
+        "access_grants": [
+            {"principal_type": "user", "principal_id": "*", "permission": "read"}
+        ],
+    }
+
+
+def effective_model_document(
+    document: dict[str, Any], inventory: dict[str, list[str]] | None = None
+) -> dict[str, Any]:
+    models = [dict(model) for model in require_list(document.get("models"), "model records")]
+    known = {str(model.get("id")) for model in models}
+    policies = testing_model_policies(document)
+    lanes = discover_normal_provider_models() if inventory is None else inventory
+    for lane in ("main", "task"):
+        for model_id in lanes.get(lane, []):
+            if model_id in known:
+                continue
+            models.append(auto_visible_model_record(model_id, lane, policies.get(model_id)))
+            known.add(model_id)
+    return {"models": models}
+
+
+def is_auto_visible_model(model: dict[str, Any]) -> bool:
+    meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
+    return meta.get("bc250_managed") == "testing-discovery"
+
+
+def remove_stale_auto_visible_models(
+    client: Client,
+    desired_ids: set[str],
+    base_overrides: dict[str, dict[str, Any]],
+    discovered_lanes: set[str],
+) -> None:
+    """Remove stale auto-managed records only for provider lanes we actually inspected.
+
+    A transient /api/tags failure must never make an entire lane look empty and trigger
+    destructive cleanup. Static package-owned model records are never handled here.
+    """
+    for model_id, live in sorted(base_overrides.items()):
+        if model_id in desired_ids or not is_auto_visible_model(live):
+            continue
+        meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
+        lane = str(meta.get("bc250_lane") or "")
+        if lane not in discovered_lanes:
+            continue
+        result = client.post("/api/v1/models/model/delete", {"id": model_id})
+        if result is not True and not (isinstance(result, dict) and result.get("success") is True):
+            raise ApiError(f"Open WebUI did not delete stale package-managed testing model {model_id}")
 
 
 def functions_file() -> Path:
@@ -272,7 +482,9 @@ def apply(client: Client) -> None:
     client.post("/api/v1/retrieval/embedding/update", desired_embedding())
     client.post("/api/v1/retrieval/config/update", desired_rag())
     apply_functions(client)
-    desired_models = load_models()
+    source_models = load_models()
+    discovered_inventory = discover_normal_provider_models()
+    desired_models = effective_model_document(source_models, discovered_inventory)
     client.post("/api/v1/models/import", model_import_payload(desired_models))
     try:
         preset_models, base_models = load_live_model_views(client)
@@ -280,12 +492,31 @@ def apply(client: Client) -> None:
         raise ApiError(
             f"Open WebUI model inspection unavailable for this API shape: {exc}"
         ) from exc
+    desired_ids = {str(model.get("id")) for model in desired_models["models"]}
+    remove_stale_auto_visible_models(
+        client, desired_ids, base_models, set(discovered_inventory)
+    )
+    if any(model_id not in desired_ids and is_auto_visible_model(model) for model_id, model in base_models.items()):
+        preset_models, base_models = load_live_model_views(client)
     apply_model_access(client, desired_models["models"], preset_models, base_models)
 
 
 def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
+
+
+def multiple_models_state(application: dict[str, Any]) -> bool | None:
+    """Return effective admin-owned multi-model-chat permission when exposed by config export."""
+    direct = application.get("user.permissions.chat.multiple_models")
+    if isinstance(direct, bool):
+        return direct
+    permissions = application.get("user.permissions")
+    if isinstance(permissions, dict):
+        chat = permissions.get("chat")
+        if isinstance(chat, dict) and isinstance(chat.get("multiple_models"), bool):
+            return chat["multiple_models"]
+    return None
 
 def values_match(key: str, current: Any, expected: Any) -> bool:
     if key == "ALLOWED_FILE_EXTENSIONS" and isinstance(current, list) and isinstance(expected, list):
@@ -319,15 +550,14 @@ def model_import_payload(document: dict[str, Any]) -> dict[str, Any]:
     models = document.get("models")
     if not isinstance(models, list):
         raise ApiError("invalid model preset file: models is not a list")
-    payload = dict(document)
-    payload["models"] = [
+    payload = {"models": [
         {
             key: value
             for key, value in require_object(model, "model record").items()
             if key != "access_grants"
         }
         for model in models
-    ]
+    ]}
     return payload
 
 
@@ -484,7 +714,7 @@ def apply_model_access(
 def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str, Any]]) -> None:
     print()
     print("Package-owned Open WebUI roles")
-    implementation_models: list[tuple[str, bool]] = []
+    implementation_models: list[tuple[str, bool, dict[str, Any], str]] = []
     for model in models:
         if not bool(model.get("is_active")):
             continue
@@ -493,7 +723,8 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
         params = model.get("params") if isinstance(model.get("params"), dict) else {}
         meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
         if base_value is None:
-            implementation_models.append((model_id, bool(meta.get("hidden"))))
+            lane = str(meta.get("bc250_lane") or "package")
+            implementation_models.append((model_id, bool(meta.get("hidden")), params, lane))
             continue
         base = str(base_value)
         filters = meta.get("filterIds") if isinstance(meta.get("filterIds"), list) else []
@@ -502,7 +733,11 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
             extras.append(f"max_tokens={params['max_tokens']}")
         if "keep_alive" in params:
             extras.append(f"keep_alive={params['keep_alive']}")
-        if "think" in params:
+        custom_params = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
+        if custom_params:
+            effective = ",".join(f"{key}={custom_params[key]}" for key in sorted(custom_params))
+            extras.append(f"effective={effective}")
+        elif "think" in params:
             extras.append(f"think={params['think']}")
         elif "translation" in model_id:
             extras.append("think=omitted")
@@ -514,9 +749,14 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
     if implementation_models:
         print()
         print("Implementation/task models")
-        for model_id, hidden in implementation_models:
+        for model_id, hidden, params, lane in implementation_models:
             visibility = "hidden" if hidden else "visible for testing"
-            print(f"  {model_id:<52} {visibility}")
+            custom_params = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
+            effective = ""
+            if custom_params:
+                values = ",".join(f"{key}={custom_params[key]}" for key in sorted(custom_params))
+                effective = f"; effective={values}"
+            print(f"  {model_id:<52} {visibility}; lane={lane}{effective}")
 
     print()
     print("Task and RAG")
@@ -615,7 +855,9 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
         if bool(live.get("is_global")) != desired_function["is_global"]:
             problems.append(f"Package function global state differs: {function_id}")
 
-    desired_models = load_models()["models"]
+    discovered_inventory = discover_normal_provider_models()
+    desired_document = effective_model_document(load_models(), discovered_inventory)
+    desired_models = desired_document["models"]
     try:
         preset_models, base_models = load_live_model_views(client)
     except ApiError as exc:
@@ -642,7 +884,11 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
                 problems.append(f"Package {label} differs: {model_id}.{key}")
         desired_meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
         live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
-        for key in ("description", "tags", "filterIds", "defaultFilterIds", "hidden", "capabilities", "builtinTools"):
+        for key in (
+            "description", "tags", "filterIds", "defaultFilterIds", "hidden",
+            "capabilities", "builtinTools", "bc250_managed", "bc250_lane",
+            "bc250_qualification",
+        ):
             if key in desired_meta and canonical(live_meta.get(key)) != canonical(
                 desired_meta[key]
             ):
@@ -668,6 +914,14 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
                     f"{grant['principal_type']}:{grant['principal_id']}:{grant['permission']})"
                 )
 
+    desired_ids = {str(model.get("id")) for model in desired_models}
+    for model_id, live in base_models.items():
+        if model_id in desired_ids or not is_auto_visible_model(live):
+            continue
+        live_meta = live.get("meta") if isinstance(live.get("meta"), dict) else {}
+        if str(live_meta.get("bc250_lane") or "") in discovered_inventory:
+            problems.append(f"Stale package-managed testing model: {model_id}")
+
     if problems:
         print("Desired-state drift: detected")
         for problem in problems:
@@ -680,6 +934,13 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
     )
     if verbose:
         print_verbose_summary(desired_models, load_functions())
+        compare_state = multiple_models_state(application)
+        rendered_compare = (
+            "enabled" if compare_state is True else "disabled" if compare_state is False else "not reported"
+        )
+        print()
+        print("Administrator-owned feature state")
+        print(f"  multi-model chat: {rendered_compare} (reported only; not package-converged)")
     return 0
 
 
