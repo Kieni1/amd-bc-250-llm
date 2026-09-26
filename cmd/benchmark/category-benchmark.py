@@ -1873,7 +1873,7 @@ def acceptance_text(text: str) -> str:
     text = re.sub(r"\\([_*\[\]()#.+!\-])", r"\1", text)
     # Paired Markdown emphasis around semantic words is presentation only. Keep
     # underscores inside identifiers untouched by requiring non-word boundaries.
-    text = re.sub(r"(?<!\w)([*_]{1,3})(?=\S)(.+?)(?<=\S)\1(?!\w)", r"\2", text)
+    text = re.sub(r"(?<!\w)([*_]{1,3})(?=\w)(.+?)(?<=\w)\1(?!\w)", r"\2", text)
     text = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", text)
     return " ".join(text.casefold().split())
 
