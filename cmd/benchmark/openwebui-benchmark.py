@@ -493,6 +493,9 @@ def translation_acceptance_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).translate(
         str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
     )
+    normalized = re.sub(
+        r"(?<!\w)([*_]{1,3})(?=\S)(.+?)(?<=\S)\1(?!\w)", r"\2", normalized
+    )
     normalized = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", normalized)
     return " ".join(normalized.casefold().split())
 
@@ -539,15 +542,19 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
             translation_numeric_values(content)
         )
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
+    modality_case = "modality" in str(case.get("id") or "").casefold()
     failures: list[str] = []
     if not content.strip():
         failures.append("empty-output")
-    if not required_ok or not meaningful_ok:
+    if not required_ok:
+        failures.append("modality" if modality_case else "semantic")
+    elif not meaningful_ok:
         failures.append("semantic")
     if not forbidden_ok:
-        failures.append("source-leakage")
+        failures.append("modality" if modality_case else "source-leakage")
     if not preserved_ok:
         failures.append("preservation")
+    failures = list(dict.fromkeys(failures))
     return not failures, failures
 
 

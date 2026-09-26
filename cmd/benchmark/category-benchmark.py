@@ -378,7 +378,7 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
 # are consumed by both Open WebUI and this direct benchmark. This prevents a model
 # from qualifying against one prompt contract and then regressing on the live route.
 TASK_NUM_PREDICT = {
-    # Open WebUI v0.11.3 falls back to max_tokens=1000 for title generation
+    # Open WebUI v0.11.4 falls back to max_tokens=1000 for title generation
     # when TASK_MODEL_PARAMS is empty. The other packaged task paths inherit
     # the model's 128-token generation limit.
     "title": 1000,
@@ -1871,6 +1871,9 @@ def acceptance_text(text: str) -> str:
     # synthetic identifiers (for example FOO\_BAR).  That is presentation, not a
     # semantic retrieval failure, so normalize the simple escapes before matching.
     text = re.sub(r"\\([_*\[\]()#.+!\-])", r"\1", text)
+    # Paired Markdown emphasis around semantic words is presentation only. Keep
+    # underscores inside identifiers untouched by requiring non-word boundaries.
+    text = re.sub(r"(?<!\w)([*_]{1,3})(?=\S)(.+?)(?<=\S)\1(?!\w)", r"\2", text)
     text = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", text)
     return " ".join(text.casefold().split())
 
@@ -2990,7 +2993,7 @@ def add_common(parser: argparse.ArgumentParser, default_url: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="bc250-benchmark",
-        description="Category-specific BC-250 benchmark suites for Ollama 0.34.2.",
+        description="Category-specific BC-250 benchmark suites for the package-pinned Ollama runtime.",
     )
     sub = parser.add_subparsers(dest="category", required=True)
     emb = sub.add_parser(
@@ -3001,7 +3004,7 @@ def main() -> int:
         "--repeats", type=int, default=int(os.environ.get("EMBED_REPEATS", "2"))
     )
     task = sub.add_parser(
-        "task", help="Open WebUI 0.11.3-compatible title/tag/query tasks"
+        "task", help="package-pinned Open WebUI title/tag/query tasks"
     )
     add_common(task, "http://127.0.0.1:11435")
     agent = sub.add_parser(

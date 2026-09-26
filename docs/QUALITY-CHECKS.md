@@ -78,7 +78,7 @@ themselves make recovery impossible to prove. Set `WARM_MAIN=0` only for an expl
 read-only residency check.
 
 Task benchmark metadata records the actual request contract: task requests use
-`keep_alive=0`, titles mirror Open WebUI 0.11.3's 1000-token fallback, and the
+`keep_alive=0`, titles mirror the package-pinned Open WebUI task-token fallback, and the
 packaged tag/query paths retain the 128-token task budget. The tag prompt explicitly
 requires broad and specific tags in one array and exactly one raw JSON object; repeated
 objects remain a `format-contract` quality failure. The screen does not silently enlarge
@@ -104,22 +104,21 @@ work.
 
 The broad DE↔FR tournament is closed. `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` is the package production translation
 base and the two package-owned Open WebUI roles provide the selected Stage-2E direction
-contract. The former LFM production model is retained only as `exp-lfm25-8b-a1b-liquidai-q6-k` for explicit
-rollback/reference comparisons. Hunyuan and Ministral translation-only challengers are
-retired to the source graveyard; TIR remains experimental only for broader office/RAG work.
+contract. The former LFM production/comparison model is retired to the source graveyard after corrected
+long-run evidence reproduced recommendation→obligation strengthening. Hunyuan and Ministral
+translation-only challengers are also retired; TIR remains experimental only for broader
+office/RAG work.
 
 Current direct checks:
 
 ```bash
 /usr/share/bc250-llm-server/quality-checks/translation/13-translate-gemma-direct.sh
-/usr/share/bc250-llm-server/quality-checks/translation/14-lfm-direct-reference.sh
 ```
 
-Current restoring Open WebUI comparisons:
+Current restoring Open WebUI production check:
 
 ```bash
 /usr/share/bc250-llm-server/quality-checks/translation/22-translate-gemma-owui.sh
-/usr/share/bc250-llm-server/quality-checks/translation/23-lfm-owui-reference.sh
 ```
 
 The generic `10-direct-candidate-screen.sh` and `20-owui-candidate-screen.sh` remain
@@ -129,14 +128,16 @@ merely to repeat a closed tournament.
 
 The production product path is the pair of package-owned roles
 `bc250-office-translation-de-fr` and `bc250-office-translation-fr-de`. Both use the
-exact Stage-2E system prompt, `max_tokens=2048`, thinking omitted, and the non-global
-`bc250_translation_direction` filter. The filter also performs a bounded post-generation
-integrity check: high-confidence recommendation/obligation or permission/obligation drift, loss of
-an explicit prohibition, or loss of source-critical dates/currency/identifier tokens is withheld for
-review rather than silently returned. Currency/percentage checks compare normalized numeric values,
-so locale-equivalent separators and currency-code placement do not create false withholding. The
-package does not attempt to rewrite legal prose automatically. Focused source regressions cover the
-modality and literal-integrity guard. Revalidation harness v4.5 includes the canonical
+Stage-2E-derived production prompt with the 0.12.2 explicit recommendation/obligation hardening,
+`max_tokens=2048`, thinking omitted, and the non-global `bc250_translation_direction` filter. The
+filter also performs a bounded post-generation integrity check: high-confidence
+recommendation/obligation or permission/obligation drift, loss of an explicit prohibition, or loss
+of source-critical currency/percentage/identifier values is withheld for review rather than silently
+returned. Currency/percentage checks compare normalized numeric values, so locale-equivalent
+separators and currency-code placement do not create false withholding. Dates may be rendered in
+locale-equivalent target-language wording and are evaluated semantically rather than requiring a
+byte-identical source token. The package does not attempt to rewrite legal prose automatically. Focused source regressions cover the
+modality and literal-integrity guard. Revalidation harness v4.6 includes the canonical
 eight-case `owui-translation` screen through those real role IDs so future release checks
 do not depend on an ad-hoc curl command. This remains distinct from the external Stage-2E
 hard corpus. The exact Stage-2E evidence archive remains
@@ -163,7 +164,7 @@ mistakes into passes. When a structural/parse failure makes downstream language 
 semantic checks meaningless, report the structural failure without cascading synthetic
 causes. Canonical mixed-quality summaries should identify the failed case and retain a
 path back to `results.jsonl`.
-Revalidation v4.5 additionally surfaces non-failing context-truncation/resource
+Revalidation v4.6 additionally surfaces non-failing context-truncation/resource
 observations as diagnostics. They remain informational unless the existing severe
 qualification threshold is crossed. The dedicated GPT-OSS/Jina coexistence step owns
 deep GPT-OSS resource qualification; the generic production edge sweep no longer repeats

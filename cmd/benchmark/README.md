@@ -118,7 +118,9 @@ bc250-benchmark ocr [MODEL ...]
 ```
 
 Text fidelity is scored on canonicalized plain text so requested Markdown/HTML
-markup does not distort transcription quality. Structure reconstruction is measured
+markup does not distort transcription quality. Semantic literal matching likewise normalizes paired
+Markdown emphasis plus Unicode space/hyphen presentation before deciding that required content is
+missing. Structure reconstruction is measured
 separately. OCR remains a benchmark role until a production OCR model is promoted.
 
 ## Task
@@ -226,7 +228,7 @@ sudo bc250-benchmark owui-system-context MODEL --token-file FILE
 Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
 group/world access (normally mode `0600`), matching the package credential-file boundary.
 
-The pinned Open WebUI v0.11.3 OpenAI-style adapter is not an external BC-250 compatibility
+The pinned Open WebUI v0.11.4 OpenAI-style adapter is not an external BC-250 compatibility
 contract. In particular, a root `max_tokens` field is not a reliable hard cap for Ollama-backed
 requests in this pin. Benchmark/package callers that require a hard generation cap must use the
 native nested `options.num_predict` path. See `docs/openwebui-settings.md` for the related
@@ -252,7 +254,7 @@ valid matching preset IDs. Only the sanitized active `preset_id -> base_model` m
 in benchmark metadata. Open WebUI must answer HTTP readiness before the product-path benchmark
 starts; the readiness allowance is bounded to five minutes for slow application restarts.
 
-## Revalidation harness v4.5
+## Revalidation harness v4.6
 
 ```bash
 sudo bc250-revalidate start --owui-token-file /root/owui-test.key
@@ -281,7 +283,7 @@ quality and restoration separately. Worker liveness and the age of the last real
 progress event are also separate; a free-running pulse is never presented as proof
 of benchmark progress.
 
-Harness v4.5 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
+Harness v4.6 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
 deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
 snapshots remain at preflight, agent-mode transitions, final restoration and failures.

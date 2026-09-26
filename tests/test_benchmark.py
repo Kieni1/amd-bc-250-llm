@@ -148,7 +148,7 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             generation.resolve_think_policy("prod-qwen35-9b-unsloth-q6-k", "auto"),
-            "false",
+            "true",
         )
         self.assertEqual(
             generation.resolve_think_policy("prod-gemma4-e4b", "auto"), "omit"
@@ -339,7 +339,7 @@ class CategoryPolicyTests(unittest.TestCase):
         usecase = json.loads(
             (ROOT / "examples/benchmark/usecase-office.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(len(usecase), 5)
+        self.assertEqual(len(usecase), 6)
         self.assertEqual(
             {case["model"] for case in usecase},
             {
@@ -351,7 +351,11 @@ class CategoryPolicyTests(unittest.TestCase):
             },
         )
         qwen = next(case for case in usecase if "qwen35" in case["model"])
-        self.assertIs(qwen["think"], False)
+        self.assertIs(qwen["think"], True)
+        calibration = next(case for case in usecase if case["id"] == "finite-factual-calibration-e2b")
+        self.assertEqual(calibration["required"], ["Au", "Fe", "Na"])
+        self.assertEqual(calibration["forbidden"], ["Qz", "Xx"])
+        self.assertIn("omit it rather than guessing", calibration["prompt"])
         translator = next(case for case in usecase if "translate-gemma" in case["model"])
         self.assertIn("translate from german to french", translator["prompt"].casefold())
         translation = json.loads(
@@ -1282,6 +1286,13 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertNotIn('"keep_alive": KEEP_ALIVE', agent)
         self.assertIn("client.ensure_unloaded(model)", agent)
 
+    def test_acceptance_text_normalizes_markdown_emphasis_and_unicode_presentation(self) -> None:
+        text = "The memo must **not** use HX‑47‑BETA or CHF\u00a0184,750 externally."
+        normalized = category.acceptance_text(text)
+        self.assertIn("must not", normalized)
+        self.assertIn("hx-47-beta", normalized)
+        self.assertIn("chf184750", normalized.replace(" ", ""))
+
     def test_translation_acceptance_normalizes_hyphens_and_locale_numbers(self) -> None:
         actual = "Facture INV‑4821 : CHF 319,50; référence ZH‑204."
         self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
@@ -1767,7 +1778,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.5", source)
+        self.assertIn("HARNESS_VERSION=4.6", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -1790,7 +1801,7 @@ class TelemetryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)
             version_file = t / "VERSION"
-            version_file.write_text("0.12.1\n", encoding="utf-8")
+            version_file.write_text("0.12.2\n", encoding="utf-8")
             source = ROOT / "cmd/benchmark/revalidate.sh"
             script = f"""
 source \"{source}\" help >/dev/null
@@ -1805,7 +1816,7 @@ printf 'target=%s\\n' \"$TARGET_VERSION\"
                 capture_output=True,
                 check=True,
             )
-            self.assertEqual(completed.stdout, "target=0.12.1\n")
+            self.assertEqual(completed.stdout, "target=0.12.2\n")
 
     def test_revalidation_rejects_invalid_package_version_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -3646,6 +3657,31 @@ raise SystemExit(module.entrypoint())
         )
 
 
+
+    def test_revalidation_captures_ollama_show_thinking_metadata_as_diagnostic(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn('/api/show', source)
+        self.assertIn('thinking metadata', source)
+        self.assertIn('absence is', source)
+        self.assertIn('$QWEN_MODEL', source)
+        self.assertIn('$GPT_OSS_MODEL', source)
+
+    def test_owui_translation_modality_failure_is_not_source_leakage(self) -> None:
+        case = {
+            "id": "de-fr-recommendation-modality",
+            "required": [],
+            "required_any": ["devrait"],
+            "forbidden": ["doit"],
+            "preserve": [],
+            "numeric_values": [],
+            "min_words": 2,
+        }
+        ok, failures = openwebui_workflow.owui_translation_checks(
+            "Le prestataire doit examiner le dossier.", case
+        )
+        self.assertFalse(ok)
+        self.assertEqual(failures, ["modality"])
+        self.assertNotIn("source-leakage", failures)
 
 if __name__ == "__main__":
     unittest.main()

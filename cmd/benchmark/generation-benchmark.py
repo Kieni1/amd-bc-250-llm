@@ -8,7 +8,7 @@ The benchmark has two deliberate modes:
 * production: no SYSTEM/sampling override, so the registered Modelfile is
   exercised as deployed.
 
-Request shapes target Ollama 0.34.2.  The implementation is stdlib-only.
+Request shapes target the package-pinned Ollama runtime.  The implementation is stdlib-only.
 """
 
 from __future__ import annotations
@@ -300,7 +300,7 @@ def make_filler(sentences: int) -> str:
 
 
 def resolve_think_policy(model: str, requested: str) -> str:
-    """Return omit|true|false|low|medium|high|max for Ollama 0.34.2."""
+    """Return omit|true|false|low|medium|high|max for the package-pinned Ollama runtime."""
     if requested != "auto":
         return requested
     policy = request_policy_for_model(model)
@@ -315,11 +315,11 @@ def resolve_think_policy(model: str, requested: str) -> str:
     lower = model.casefold()
     if "gpt-oss" in lower:
         return "medium"
-    # The packaged stock Qwen3.5 profile uses upstream non-thinking sampling.
+    # The production Qwen3.5 Advanced candidate enables reasoning; package policy above wins when available.
     if "qwen35" in lower and not any(
         token in lower for token in ("defiant", "fable", "heretic")
     ):
-        return "false"
+        return "true"
     if "qwen3-4b" in lower:
         return "false"
     # Gemma4 mode is selected by its SYSTEM token; LFM/Ornith/other native families
@@ -370,7 +370,7 @@ def generate_payload(
         "options": options_for(mode, num_predict, request_policy_for_model(model)),
     }
     if mode == "neutral":
-        # Ollama 0.34.2 GenerateRequest.System explicitly overrides the
+        # the package-pinned Ollama runtime GenerateRequest.System explicitly overrides the
         # registered Modelfile SYSTEM. Do not use raw=true: model renderers and
         # templates remain part of the runtime being benchmarked.
         payload["system"] = NEUTRAL_SYSTEM
@@ -681,7 +681,7 @@ def fmt(value: Any, digits: int = 2) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(
         prog="bc250-benchmark generation",
-        description="BC-250 generation benchmark for Ollama 0.34.2.",
+        description="BC-250 generation benchmark for the package-pinned Ollama runtime.",
     )
     parser.add_argument(
         "models",

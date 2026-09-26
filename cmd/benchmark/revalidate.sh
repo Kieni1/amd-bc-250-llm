@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.5
+# BC-250 package revalidation harness v4.6
 #
 # The target package version is read from the package-owned VERSION file; the RPM
 # release suffix is intentionally not hard-coded.
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.5
+HARNESS_VERSION=4.6
 PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
 TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
@@ -52,7 +52,7 @@ SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.5 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.6 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250-benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -815,6 +815,25 @@ snapshot() {
     curl -fsS "http://127.0.0.1:$port/api/tags" > "$dir/ollama-$port-tags.json" 2>&1 || true
     curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
   done
+  # Ollama 0.34.4 exposes model thinking metadata through /api/show when the
+  # implementation provides it. Capture it as diagnostic evidence; absence is
+  # never interpreted here as a hard non-reasoning result.
+  local show_model show_port show_name
+  while IFS='|' read -r show_port show_model; do
+    show_name="${show_model//[^A-Za-z0-9._-]/_}"
+    curl -fsS -H 'Content-Type: application/json' \
+      -d "$(jq -cn --arg model "$show_model" '{model:$model}')" \
+      "http://127.0.0.1:${show_port}/api/show" \
+      > "$dir/ollama-${show_port}-show-${show_name}.json" 2>&1 || true
+  done <<EOF_SHOW
+11434|$E2B_MODEL
+11434|$E4B_MODEL
+11434|$TRANSLATION_ROLE_MODEL
+11434|$QWEN_MODEL
+11434|$GPT_OSS_MODEL
+11435|$TASK_MODEL
+11437|$EMBED_MODEL
+EOF_SHOW
   podman inspect open-webui --format '{{json .State}}' > "$dir/openwebui-container-state.json" 2>&1 || true
   podman inspect open-webui --format '{{.ImageName}}' > "$dir/openwebui-container-image.txt" 2>&1 || true
   capture_cmd "$dir/free.txt" free -h

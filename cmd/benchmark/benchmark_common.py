@@ -2,7 +2,7 @@
 """Shared helpers for BC-250 benchmarks.
 
 Stdlib-only by design: these helpers are installed with the RPM and must work on
-an otherwise minimal Fedora host. API shapes target Ollama 0.34.2.
+an otherwise minimal Fedora host. API shapes target the package-pinned Ollama runtime.
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ from pathlib import Path
 from typing import Any
 from urllib import error, request
 
-STANDARD_OLLAMA_VERSION = "0.34.2"
 DEFAULT_TIMEOUT = 900.0
 DEFAULT_TELEMETRY_INTERVAL = 0.5
 TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
@@ -37,6 +36,28 @@ PACKAGE_NAME = "bc250-llm-server"
 BENCHMARK_METADATA_VERSION = 1
 DEFAULT_PACKAGE_SHARE = Path("/usr/share/bc250-llm-server")
 SOURCE_ROOT = Path(__file__).resolve().parents[2]
+
+
+def runtime_metadata() -> dict[str, str]:
+    """Read simple package-owned KEY=value runtime metadata."""
+    override = os.environ.get("BC250_RUNTIME_ENV")
+    candidates = [Path(override)] if override else []
+    candidates.extend([SOURCE_ROOT / "config/runtime.env", DEFAULT_PACKAGE_SHARE / "runtime.env"])
+    for path in candidates:
+        if not path.is_file():
+            continue
+        values: dict[str, str] = {}
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip('"').strip("'")
+        return values
+    return {}
+
+
+STANDARD_OLLAMA_VERSION = runtime_metadata().get("BC250_OLLAMA_VERSION", "unknown")
 
 
 def resolve_package_resource(
@@ -1096,7 +1117,7 @@ class OllamaClient:
         )
 
     def stop(self, model: str) -> bool:
-        """Request model unload, falling back to the Ollama 0.34.2 HTTP path."""
+        """Request model unload, falling back to the package-pinned Ollama HTTP path."""
         env = os.environ.copy()
         env["OLLAMA_HOST"] = self.base_url
         try:
@@ -1113,7 +1134,7 @@ class OllamaClient:
         except (FileNotFoundError, subprocess.TimeoutExpired):
             pass
         # Ollama documents an empty /api/generate request with keep_alive=0 as
-        # the HTTP unload path. This remains valid in 0.34.2.
+        # the HTTP unload path. This remains valid for the pinned runtime.
         try:
             self.json_request(
                 "/api/generate", {"model": model, "keep_alive": 0, "stream": False}
