@@ -424,7 +424,7 @@ the archived checksum set again. It intentionally excludes OWUI credentials, pro
 uploaded document contents, database rows, identity SQL and backup contents. Use `--output-dir DIR`
 when the archive should be written elsewhere.
 
-`bc250-revalidate` harness v4.5 is the root-only systemd-backed package
+`bc250-revalidate` harness v4.6 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250-revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly incomplete Open WebUI coverage
@@ -433,7 +433,7 @@ before run state is created. The worker remains systemd-owned; Ctrl-C detaches a
 `--detach` returns immediately. The dashboard reports stage elapsed time, worker
 state and the age of the last real progress event rather than treating a periodic
 heartbeat as progress.
-Harness v4.5 also surfaces non-failing observations under a separate `Diagnostics`
+Harness v4.6 also surfaces non-failing observations under a separate `Diagnostics`
 section. This includes non-severe context truncation, a MemAvailable minimum below the
 512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
 floor, and accepted use cases that reach their generation output budget. These diagnostics
@@ -537,7 +537,7 @@ adds approximate 4K/16K targets with actual `prompt_eval_count` as the authority
 `--sustained-seconds` makes the thermal lane continue to a minimum elapsed time. VRAM/GTT
 remain diagnostic Vulkan counters and must not be interpreted as independent additive
 memory pools on the BC-250. See [`../cmd/benchmark/README.md`](../cmd/benchmark/README.md)
-for result schema, category contracts and Ollama 0.34.2 request policy. The installed copy is
+for result schema, category contracts and the package-pinned Ollama request policy. The installed copy is
 `/usr/share/doc/bc250-llm-server/cmd/benchmark/README.md`.
 
 ## Open WebUI setup
@@ -583,7 +583,7 @@ still list normal office roles while their backends are intentionally unavailabl
 idempotent convergence alias for the same restoration path and is useful when repairing an unexpected
 partial-normal topology.
 
-The pinned Open WebUI v0.11.3 `/api/chat/completions` OpenAI-style adapter is not an advertised
+The Open WebUI `/api/chat/completions` OpenAI-style adapter is not an advertised
 external BC-250 compatibility contract. Device attribution found that root `max_tokens` is not a
 reliable Ollama cap and that reasoning-token / length-finish metadata can be misleading. Package-owned
 callers use native nested `options.num_predict` when a hard generation cap is required; see

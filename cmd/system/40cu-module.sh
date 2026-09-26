@@ -553,7 +553,7 @@ do_status() {
 
 do_verify() {
   do_status
-  [[ -f "$CONF40" ]] || { info "Module preparation can be verified now; 40-CU activation is disabled."; return; }
+  [[ -f "$CONF40" ]] || { info "Live CU routing is evaluated independently; persistent 40-CU boot activation is disabled (optional)."; return; }
   [[ -r /sys/module/amdgpu/parameters/bc250_cc_write_mode ]] || \
     die "configured replacement module is not running"
   [[ "$(cat /sys/module/amdgpu/parameters/bc250_cc_write_mode)" == 3 ]] || \

@@ -2,7 +2,7 @@
 
 The Ollama binary is installed from the pinned upstream release by the guided helper, while the RPM owns all four systemd lane definitions. Use the commands below for an explicit binary reinstall or runtime change.
 
-Package standard: **Ollama v0.34.2**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden.
+Package candidate standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device acceptance of this new runtime belongs to the 0.12.2 release gate; v0.34.2 remains the immediate qualified comparison baseline.
 
 ## Install and verify
 
@@ -61,15 +61,17 @@ general comparison. GPT-OSS 20B with warm Jina remains the production memory-edg
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 
-## 0.34.2 runtime notes
+## 0.34.4 candidate runtime notes
 
-Ollama 0.34.2 is promoted because that exact runtime passed a clean-boot BC-250 comparison against 0.34.0.
+Ollama 0.34.4 is the package-pinned candidate for 0.12.2. Exact v0.34.2 remains the immediate qualified BC-250 comparison baseline because it passed a clean-boot comparison against 0.34.0.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
 transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
+The 0.12.2 device gate must re-run the focused Vulkan/UMA path because v0.34.4 changes the upstream runtime. It also records `/api/show` `thinking` metadata where available, but absence of that metadata is diagnostic rather than a hard non-reasoning result. Structured-output probes and a cheap large-library `/api/show` lookup regression are part of the candidate gate.
+
+The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
 checks therefore use the supported runtime version and stable model/digest provenance rather than old textual
 serialization.
@@ -111,10 +113,10 @@ a possible quality cost. Service profiles do not modify individual Modelfiles.
 
 ## Benchmark API baseline
 
-`bc250-benchmark` targets the Ollama **0.34.2** request schema. Neutral generation
+`bc250-benchmark` targets the package-pinned Ollama **0.34.4** candidate request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
-`low`/`medium`/`high`/`max` as supported by 0.34.2. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
+`low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
 lane; RAG-quality uses 11437 for vectors and 11434 for the answer model. Model
 allocation comes from `/api/ps`. The `bc250-benchmark agent` lane and `bc250-code`
 product helper use `/api/chat` on exclusive port 11436. `bc250-code` requests
@@ -137,7 +139,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.34.2** as the package-standard runtime. Before moving beyond it, review
+Treat **0.34.4** as the package-standard candidate runtime for this source. Exact-device promotion still requires the 0.12.2 release gate. Before moving beyond it, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;

@@ -25,6 +25,13 @@
 # ===========================================================================
 
 set -uo pipefail
+runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
+if [[ ! -r "$runtime_env" ]]; then runtime_env="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/runtime.env"; fi
+if [[ -r "$runtime_env" ]]; then # shellcheck disable=SC1090
+  source "$runtime_env"
+fi
+PACKAGE_OLLAMA_VERSION="${BC250_OLLAMA_VERSION:-unknown}"
+PACKAGE_GOVERNOR_VERSION="${BC250_GOVERNOR_VERSION:-unknown}"
 MODEL="${MODEL:-}"
 OLLAMA="${OLLAMA_URL:-http://localhost:11434}"
 LOAD_SECONDS="${LOAD_SECONDS:-60}"
@@ -136,14 +143,14 @@ else wn "dmesg unavailable (need sudo)"; fi
 
 # ---------------------------------------------------------------------------
 sec "6. VERSIONS  (compare these when investigating a performance delta)"
-exp "Mesa 26.1.4 | governor 0.4.12 | package-standard Ollama 0.34.2. Other Ollama versions are explicit comparison runs."
+exp "Mesa 26.1.4 reference | governor $PACKAGE_GOVERNOR_VERSION | package-standard Ollama $PACKAGE_OLLAMA_VERSION. Other Ollama versions are explicit comparison runs."
 k=$(uname -r); echo "  kernel: $k"
 ov=$(curl -fsS "$OLLAMA/api/version" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 if [[ -z "$ov" ]] && have ollama; then
   ov=$(HOME=${HOME:-/var/lib/ollama} ollama --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 fi
-if [[ "$ov" == "0.34.2" ]]; then ok "ollama=$ov (package standard)"
-elif [[ -n "$ov" ]]; then wn "ollama=$ov (package standard 0.34.2; compare results as a runtime override)"
+if [[ "$PACKAGE_OLLAMA_VERSION" != unknown && "$ov" == "$PACKAGE_OLLAMA_VERSION" ]]; then ok "ollama=$ov (package standard)"
+elif [[ -n "$ov" ]]; then wn "ollama=$ov (package standard $PACKAGE_OLLAMA_VERSION; compare results as a runtime override)"
 else wn "Ollama version unavailable"; fi
 if have vulkaninfo; then
   mv=$(vulkaninfo --summary 2>/dev/null | grep -m1 -i driverInfo | grep -oE 'Mesa [0-9.]+')
@@ -156,7 +163,7 @@ if have vulkaninfo; then
   fi
 fi
 gv=$(cyan-skillfish-governor-smu --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-[[ "$gv" == "0.4.12" ]] && ok "governor=$gv" || wn "governor=${gv:-?}  (packaged 0.4.12)"
+[[ "$PACKAGE_GOVERNOR_VERSION" != unknown && "$gv" == "$PACKAGE_GOVERNOR_VERSION" ]] && ok "governor=$gv" || wn "governor=${gv:-?}  (packaged $PACKAGE_GOVERNOR_VERSION)"
 
 # ---------------------------------------------------------------------------
 sec "7. OLLAMA SERVICE ENV"

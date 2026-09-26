@@ -7,7 +7,7 @@ if [[ ! -r "$runtime_env" ]]; then runtime_env="$(cd -- "$(dirname -- "${BASH_SO
 if [[ -r "$runtime_env" ]]; then # shellcheck disable=SC1090
   source "$runtime_env"
 else
-  BC250_OLLAMA_VERSION=0.34.2
+  BC250_OLLAMA_VERSION=unknown
 fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
 OWUI_TOKEN_FILE=""
@@ -384,7 +384,7 @@ if [[ -r "$config" ]]; then
   info "governor range: ${min:-unknown}-${max:-unknown} MHz"
   info "governor gpu usage: method=${usage_method:-unknown}; fix-freq=${fix_freq:-not set}"
   [[ -n "$fix_freq" ]] || \
-    warn "governor fix-freq is not explicit; v0.4.12 defaults it to false"
+    warn "governor fix-freq is not explicit; package policy expects false"
   [[ "$usage_method" != '"kernel"' ]] || \
     warn "governor kernel usage method requires a separately patched compatible kernel"
   active_sclk=""
