@@ -649,13 +649,26 @@ step_11_maintenance
         pre = spec.split("%pre\n", 1)[1].split("%post\n", 1)[0]
         post = spec.split("%post\n", 1)[1].split("%preun\n", 1)[0]
         self.assertIn("systemctl stop open-webui.service", pre)
-        self.assertIn("rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", pre)
+        self.assertNotIn("is-active --quiet open-webui.service", pre)
+        self.assertIn(
+            "systemctl show --property=ActiveState --value open-webui.service", pre
+        )
+        self.assertIn('[ "$owui_state" != "inactive" ]', pre)
+        self.assertIn(
+            "rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", pre
+        )
         self.assertIn("Open WebUI runtime and boot held for migration safety", pre)
         self.assertIn("%systemd_post", post)
         self.assertIn("systemctl daemon-reload", post)
-        self.assertLess(spec.index("systemctl stop open-webui.service"), spec.index("%systemd_post"))
-        self.assertLess(spec.index("systemctl stop open-webui.service"), spec.index("systemctl daemon-reload"))
-        self.assertNotIn("open-webui.service", spec.split("%global bc250_units", 1)[1].split("\n", 1)[0])
+        self.assertLess(
+            spec.index("systemctl stop open-webui.service"), spec.index("%systemd_post")
+        )
+        self.assertLess(
+            spec.index("systemctl stop open-webui.service"),
+            spec.index("systemctl daemon-reload"),
+        )
+        units = spec.split("%global bc250_units", 1)[1].split("\n", 1)[0]
+        self.assertNotIn("open-webui.service", units)
 
 if __name__ == "__main__":
     unittest.main()

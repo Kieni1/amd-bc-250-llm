@@ -26,7 +26,7 @@ sudo bc250-install
 sudo bc250-install --models-only   # model/Open WebUI reconciliation
 ```
 
-When an RPM upgrade changes the pinned Open WebUI image and an existing database is present, the RPM stops Open WebUI before the new Quadlet can become restart-eligible and holds boot enablement. Run `sudo bc250-install` to create/verify the rollback snapshot and perform the guided migration; see [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
+When an RPM upgrade changes the pinned Open WebUI image and an existing database is present, the RPM unconditionally stops Open WebUI, verifies it is inactive before the new Quadlet can become restart-eligible, and holds boot enablement. Run `sudo bc250-install` to create/verify the rollback snapshot and perform the guided migration; see [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
 
 Because the 0.x line is greenfield, the RPM owns all four Ollama lane units.
 `bc250-install-ollama` rejects a custom `/etc/systemd/system/ollama.service`, downloads

@@ -65,8 +65,8 @@ artifacts remain private `0600`; after enablement they are published `0640`.
 
 Before upgrading Open WebUI or moving the complete instance, take a stopped
 filesystem snapshot. On a package upgrade with an existing Open WebUI database, RPM `%pre`
-stops an active `open-webui.service` and removes its boot-enablement drop-in before the new
-Quadlet payload or a later daemon-reload can make the new image restart-eligible. The automatic
+issues `systemctl stop open-webui.service` unconditionally and verifies `ActiveState=inactive` before removing its boot-enablement drop-in. The new
+Quadlet payload or a later daemon-reload cannot make the new image restart-eligible until that stopped invariant has been established. The automatic
 RPM-migration snapshot uses the same ownership, ACL and xattr-preserving tar semantics before
 the new image is allowed to start:
 
