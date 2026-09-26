@@ -41,7 +41,7 @@ reduces Qwen3.6 35B and Qwen3.8 27B Unsloth to 8K, moves Ollama/Open WebUI/gover
 0.34.4/0.11.4/0.4.13, and makes the OWUI upgrade path rollback-snapshot gated. The four-lane topology,
 Mesa/Vulkan backend, Deep `keep_alive=0`, task/embed architecture, `OLLAMA_MAX_LOADED_MODELS=1` and
 administrator ownership of multi-model permission remain unchanged. 0.12.2-0.3 also closes the
-pre-device translation/rollback logic review: complete French modality forms, clause-local modality association, conservative ambiguous-three-decimal integrity, shared production translation authorities in direct/OWUI qualification, fail-closed
+pre-device translation/rollback logic review: complete French modality forms, ordered clause-local modality association with negation/no-obligation polarity, conservative ambiguous-three-decimal integrity, shared production translation authorities in direct/OWUI qualification, fail-closed
 visibility typing, and ACL/xattr-preserving OWUI rollback archives. Use
 `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.3.md` for the next device gate.
 
@@ -659,7 +659,7 @@ Exact installed 0.12.1-0.6 is now the immediate comparison baseline: its device 
 The current release requires the following acceptance boundaries:
 
 ```text
-1. RPM upgrade with existing OWUI state stops active OWUI in `%pre` and holds boot before the new Quadlet can become restart-eligible; a verified full stopped-state rollback snapshot then gates guided migration; migration/readiness/convergence then succeed on Open WebUI 0.11.4;
+1. RPM upgrade with existing OWUI state unconditionally stops OWUI in `%pre`, verifies `ActiveState=inactive`, and holds boot before the new Quadlet can become restart-eligible; a verified full stopped-state rollback snapshot then gates guided migration; migration/readiness/convergence then succeed on Open WebUI 0.11.4;
 2. Ollama 0.34.4 normal lanes and Mesa/Vulkan/UMA behavior remain clean; /api/show thinking metadata is captured as diagnostic evidence;
 3. every curated OWUI workspace/derived record matches package base_model_id, params/custom_params, meta, attachments and minimum ACL; unrelated grants survive;
 4. Advanced effective request proves root think=true plus 0.7/0.8/20/min_p=0/presence=0/repeat=1 options, then quality/resource probes decide whether the candidate stays;

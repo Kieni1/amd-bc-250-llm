@@ -142,11 +142,14 @@ python3 scripts/install-manifest.py \
 # subsequent daemon-reload.  Keep boot enablement held until bc250-install
 # creates and verifies the stopped-state rollback snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
-  if systemctl is-active --quiet open-webui.service 2>/dev/null; then
-    if ! systemctl stop open-webui.service >/dev/null 2>&1; then
-      echo "ERROR: could not stop Open WebUI before migration-safe package upgrade." >&2
-      exit 1
-    fi
+  if ! systemctl stop open-webui.service >/dev/null 2>&1; then
+    echo "ERROR: could not stop Open WebUI before migration-safe package upgrade." >&2
+    exit 1
+  fi
+  owui_state="$(systemctl show --property=ActiveState --value open-webui.service 2>/dev/null || :)"
+  if [ "$owui_state" != "inactive" ]; then
+    echo "ERROR: Open WebUI did not reach inactive state before package upgrade (state: ${owui_state:-unknown})." >&2
+    exit 1
   fi
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
   echo "Open WebUI runtime and boot held for migration safety. Run: sudo bc250-install"
@@ -236,8 +239,8 @@ fi
 
 %changelog
 * Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.3
-- Stop an existing Open WebUI service in the RPM pre-upgrade phase before the new Quadlet can become restart-eligible; keep boot/runtime held until the verified migration snapshot and guided convergence.
-- Make translation modality checks clause-local so recommendation/obligation/permission swaps cannot pass through document-global category matching.
+- Unconditionally stop Open WebUI and verify ActiveState=inactive in RPM %pre before the new Quadlet can become restart-eligible; keep boot/runtime held until the verified migration snapshot and guided convergence.
+- Make translation modality checks ordered and polarity-aware within each clause so negation/no-obligation loss and recommendation/obligation/permission swaps cannot pass category-set matching.
 - Treat single-separator three-decimal numeric forms as ambiguous and require the complete interpretation set to match, preventing 1000x corruption from being accepted.
 - Use neutral translation-integrity rejection wording for modality and literal/numeric failures and extend direct/OWUI qualification to the same runtime literal-integrity authority.
 

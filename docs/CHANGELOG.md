@@ -2,8 +2,8 @@
 
 ## 0.12.2-0.3 - 2026-09-26
 
-- Close the Open WebUI migration restart race by stopping an active OWUI service and removing its boot-enablement drop-in in RPM `%pre`, before the new Quadlet payload or any subsequent daemon-reload can make Open WebUI 0.11.4 restart-eligible. Guided `bc250-install` still creates/verifies the stopped-state rollback snapshot before re-enabling and starting OWUI.
-- Make translation modality integrity clause-local rather than document-global, so recommendation/obligation and permission/obligation swaps across adjacent clauses are withheld.
+- Close the Open WebUI migration restart race by unconditionally stopping Open WebUI when existing state is present, verifying `ActiveState=inactive`, and removing its boot-enablement drop-in in RPM `%pre`, before the new Quadlet payload or any subsequent daemon-reload can make Open WebUI 0.11.4 restart-eligible. Guided `bc250-install` still creates/verifies the stopped-state rollback snapshot before re-enabling and starting OWUI.
+- Make translation modality integrity clause-local and order-aware: protected modal events retain polarity, `muss nicht` is distinguished from obligation, and recommendation/obligation or permission/obligation swaps are withheld even when they occur inside one clause.
 - Treat single-separator three-decimal forms such as `1,234` / `1.234` as numerically ambiguous and require the complete interpretation set to survive translation; collapsing either form to `1234` now fails closed for percentages and currencies.
 - Use neutral translation-integrity withholding wording for modality and literal/numeric failures, and make both direct and Open WebUI translation qualification reuse the runtime literal-integrity authority.
 

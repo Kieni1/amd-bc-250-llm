@@ -22,7 +22,7 @@ Revalidation   v4.6
 Do not relabel 0.12.1-0.6 device evidence as 0.12.2 qualification. Use it as the comparison baseline.
 
 0.12.2-0.3 closes the remaining pre-device logic review: complete French modality conjugations,
-clause-local modality association, conservative handling of ambiguous single-separator three-decimal
+ordered clause-local modality association with negation/no-obligation polarity, conservative handling of ambiguous single-separator three-decimal
 numbers, one production translation prompt/wrapper/literal-integrity authority across direct and OWUI
 qualification, neutral integrity-withholding UX, fail-closed `ordinary_user_visible` typing, and an RPM
 `%pre` runtime/boot hold before the new OWUI Quadlet can become restart-eligible. ACL/xattr-preserving
@@ -67,7 +67,7 @@ Acceptance sequence:
 
 ```text
 install new RPM
--> RPM %pre stops any active OWUI service before the new Quadlet payload / daemon-reload can make it restart-eligible
+-> RPM %pre unconditionally stops OWUI when existing state is present and proves `ActiveState=inactive` before the new Quadlet payload / daemon-reload can make it restart-eligible
 -> existing OWUI boot enablement is removed and remains held
 -> bc250-install confirms the stopped state before migration
 -> SQLite integrity check passes
@@ -195,7 +195,7 @@ devrait -> sollte    (not muss)
 muss/doit remain obligations
 ```
 
-Correct locale-equivalent unambiguous CHF/date formatting is not a semantic failure. Explicitly verify that ambiguous `1,234` / `1.234` percentage and currency forms cannot collapse to `1234`, and that two adjacent modal clauses cannot swap recommendation/obligation or permission/obligation without being withheld. If the underlying model
+Correct locale-equivalent unambiguous CHF/date formatting is not a semantic failure. Explicitly verify that ambiguous `1,234` / `1.234` percentage and currency forms cannot collapse to `1234`; that negated recommendations retain polarity; that German `muss nicht` is not strengthened into an obligation; and that protected modalities cannot be swapped across adjacent clauses or within one multi-modal clause without being withheld. If the underlying model
 still strengthens modality, record a translation quality defect even if the package filter correctly
 withholds the bad output. Verify the benchmark reports this as `modality`, not `source-leakage`.
 
