@@ -49,8 +49,7 @@ reflects reclaimed capacity even when `du` counts both names. Open
 sudo bc250-openwebui-setup init
 ```
 
-When an RPM upgrade changes Open WebUI with existing persistent state, the guided installer
-creates a verified stopped-state rollback archive before allowing the new image to start. See
+When an RPM upgrade changes Open WebUI with existing persistent state, RPM `%pre` stops Open WebUI and holds boot enablement before the new Quadlet can restart. The guided installer then creates a verified stopped-state rollback archive before allowing the new image to start. See
 [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) for the supported restore procedure.
 
 For RAG, keep operator documents under `/srv/bc250-documents`; batch preparation stops at a human review gate:

@@ -643,11 +643,18 @@ step_11_maintenance
         self.assertIn("upgrade backup does not contain webui.db", source)
         self.assertIn('sha256sum -c "$out.sha256"', source)
 
-    def test_rpm_upgrade_holds_openwebui_boot_until_guided_migration_backup(self) -> None:
+    def test_rpm_upgrade_holds_openwebui_runtime_before_new_quadlet_reload(self) -> None:
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertIn('[ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]', spec)
-        self.assertIn("rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", spec)
-        self.assertIn("Open WebUI boot held for migration safety", spec)
+        pre = spec.split("%pre\n", 1)[1].split("%post\n", 1)[0]
+        post = spec.split("%post\n", 1)[1].split("%preun\n", 1)[0]
+        self.assertIn("systemctl stop open-webui.service", pre)
+        self.assertIn("rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", pre)
+        self.assertIn("Open WebUI runtime and boot held for migration safety", pre)
+        self.assertIn("%systemd_post", post)
+        self.assertIn("systemctl daemon-reload", post)
+        self.assertLess(spec.index("systemctl stop open-webui.service"), spec.index("%systemd_post"))
+        self.assertLess(spec.index("systemctl stop open-webui.service"), spec.index("systemctl daemon-reload"))
         self.assertNotIn("open-webui.service", spec.split("%global bc250_units", 1)[1].split("\n", 1)[0])
 
 if __name__ == "__main__":

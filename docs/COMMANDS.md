@@ -66,6 +66,8 @@ Packaged orchestrator:
 
 ```bash
 sudo bc250-install
+
+For an RPM upgrade with an existing Open WebUI database, the package stops OWUI in RPM `%pre` and holds its boot drop-in before the new Quadlet can restart. `bc250-install` is the supported continuation: it verifies the stopped-state rollback snapshot before re-enabling/starting the new image. See `MAINTENANCE.md` for restore steps.
 sudo bc250-install --models-only
 sudo bc250-install --owui-token-file /root/owui-test.key
 ```

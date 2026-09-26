@@ -285,8 +285,7 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250-maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database, RPM upgrade holds OWUI boot and the guided
-installer creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database, RPM `%pre` stops an active OWUI service and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and
