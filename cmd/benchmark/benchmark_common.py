@@ -8,6 +8,7 @@ an otherwise minimal Fedora host. API shapes target the package-pinned Ollama ru
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -87,6 +88,62 @@ def resolve_package_resource(
     return DEFAULT_PACKAGE_SHARE / installed_relative
 
 
+
+
+
+
+_TRANSLATION_CONTRACT_MODULE: Any | None = None
+
+
+def translation_contract_module() -> Any:
+    """Load the package-owned translation filter as shared benchmark authority."""
+    global _TRANSLATION_CONTRACT_MODULE
+    if _TRANSLATION_CONTRACT_MODULE is not None:
+        return _TRANSLATION_CONTRACT_MODULE
+    path = resolve_package_resource(
+        "config/openwebui/functions/bc250_translation_direction.py",
+        "openwebui/functions/bc250_translation_direction.py",
+    )
+    spec = importlib.util.spec_from_file_location("bc250_translation_contract", path)
+    if spec is None or spec.loader is None:
+        raise BenchmarkError(f"cannot load translation contract: {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _TRANSLATION_CONTRACT_MODULE = module
+    return module
+
+
+def translation_system_prompt() -> str:
+    path = resolve_package_resource(
+        "config/openwebui/prompts/translation-explicit-direction-v1.txt",
+        "openwebui/prompts/translation-explicit-direction-v1.txt",
+    )
+    try:
+        return path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise BenchmarkError(f"cannot read translation prompt authority: {path}") from exc
+
+
+def translation_direction_wrappers() -> dict[tuple[str, str], str]:
+    module = translation_contract_module()
+    wrappers = getattr(module, "WRAPPERS", None)
+    if not isinstance(wrappers, dict):
+        raise BenchmarkError("translation contract does not define WRAPPERS")
+    try:
+        return {
+            ("de", "fr"): str(wrappers[module.DE_FR_MODEL]),
+            ("fr", "de"): str(wrappers[module.FR_DE_MODEL]),
+        }
+    except (AttributeError, KeyError) as exc:
+        raise BenchmarkError("translation contract has incomplete direction wrappers") from exc
+
+
+def translation_numeric_values(text: str) -> set[Any]:
+    module = translation_contract_module()
+    normalizer = getattr(module, "numeric_values", None)
+    if not callable(normalizer):
+        raise BenchmarkError("translation contract does not define numeric_values")
+    return set(normalizer(text))
 
 
 def model_policy_path() -> Path:

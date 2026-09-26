@@ -19,7 +19,7 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -37,6 +37,7 @@ from benchmark_common import (
     normalize_words,
     prepare_result_dir,
     result_record,
+    translation_numeric_values,
     write_benchmark_metadata,
     write_result_summary,
 )
@@ -494,30 +495,15 @@ def translation_acceptance_text(text: str) -> str:
         str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
     )
     normalized = re.sub(
-        r"(?<!\w)([*_]{1,3})(?=\S)(.+?)(?<=\S)\1(?!\w)", r"\2", normalized
+        r"(?<!\w)([*_]{1,3})(?=\w)(.+?)(?<=\w)\1(?!\w)", r"\2", normalized
     )
     normalized = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", normalized)
     return " ".join(normalized.casefold().split())
 
 
-def translation_numeric_values(text: str) -> set[Decimal]:
-    values: set[Decimal] = set()
-    for raw in re.findall(r"(?<![\w-])\d(?:[\d\s.,'’]*\d)?(?![\w-])", text):
-        token = raw.strip().replace(" ", "").replace("'", "").replace("’", "")
-        if not token:
-            continue
-        decimal_pos = max(token.rfind("."), token.rfind(","))
-        fractional_digits = len(token) - decimal_pos - 1 if decimal_pos >= 0 else 0
-        if decimal_pos >= 0 and fractional_digits in {1, 2}:
-            whole = re.sub(r"[.,]", "", token[:decimal_pos]) or "0"
-            token = whole + "." + token[decimal_pos + 1 :]
-        else:
-            token = re.sub(r"[.,]", "", token)
-        try:
-            values.add(Decimal(token))
-        except InvalidOperation:
-            continue
-    return values
+def translation_numeric_values_for_checks(text: str) -> set[Decimal]:
+    """Use the package runtime translation numeric authority."""
+    return {Decimal(value) for value in translation_numeric_values(text)}
 
 
 def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -539,7 +525,7 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
     expected_numbers = {Decimal(str(value)) for value in case.get("numeric_values", [])}
     if expected_numbers:
         preserved_ok = preserved_ok and expected_numbers.issubset(
-            translation_numeric_values(content)
+            translation_numeric_values_for_checks(content)
         )
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     modality_case = "modality" in str(case.get("id") or "").casefold()

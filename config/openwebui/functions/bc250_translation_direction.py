@@ -50,14 +50,21 @@ def modality_mismatch(source: str, target: str, model_id: str) -> str | None:
         source_permission = bool(
             re.search(r"\b(?:darf|dürfen|darfst|dürft)\b", source_folded)
         ) and not source_prohibition
-        target_recommendation = bool(re.search(r"\bdevrai(?:t|ent|s|ez)\b", target_folded))
-        target_obligation = bool(re.search(r"\b(?:doit|doivent|devez|dois)\b", target_folded))
+        target_recommendation = bool(
+            re.search(r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", target_folded)
+        )
+        target_obligation = bool(
+            re.search(r"\b(?:dois|doit|devons|devez|doivent)\b", target_folded)
+        )
         target_prohibition = bool(
-            re.search(r"\bne\b[^.!?;]{0,50}\b(?:doit|doivent|peut|peuvent)\b[^.!?;]{0,30}\bpas\b", target_folded)
+            re.search(
+                r"\bne\b[^.!?;]{0,50}\b(?:dois|doit|devons|devez|doivent|peux|peut|pouvons|pouvez|peuvent)\b[^.!?;]{0,30}\bpas\b",
+                target_folded,
+            )
             or re.search(r"\binterdit(?:e|es|s)?\b", target_folded)
         )
         target_permission = (
-            bool(re.search(r"\b(?:peut|peuvent|pouvez|peux)\b", target_folded))
+            bool(re.search(r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", target_folded))
             or bool(re.search(r"\bautorisé(?:e|es|s)?\b", target_folded))
         ) and not target_prohibition
         if source_recommendation and not source_obligation and target_obligation and not target_recommendation:
@@ -71,14 +78,21 @@ def modality_mismatch(source: str, target: str, model_id: str) -> str | None:
         if source_prohibition and not target_prohibition:
             return "prohibition/negation may have been lost (darf nicht)"
     elif model_id == FR_DE_MODEL:
-        source_recommendation = bool(re.search(r"\bdevrai(?:t|ent|s|ez)\b", source_folded))
-        source_obligation = bool(re.search(r"\b(?:doit|doivent|devez|dois)\b", source_folded))
+        source_recommendation = bool(
+            re.search(r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", source_folded)
+        )
+        source_obligation = bool(
+            re.search(r"\b(?:dois|doit|devons|devez|doivent)\b", source_folded)
+        )
         source_prohibition = bool(
-            re.search(r"\bne\b[^.!?;]{0,50}\b(?:doit|doivent|peut|peuvent)\b[^.!?;]{0,30}\bpas\b", source_folded)
+            re.search(
+                r"\bne\b[^.!?;]{0,50}\b(?:dois|doit|devons|devez|doivent|peux|peut|pouvons|pouvez|peuvent)\b[^.!?;]{0,30}\bpas\b",
+                source_folded,
+            )
             or re.search(r"\binterdit(?:e|es|s)?\b", source_folded)
         )
         source_permission = (
-            bool(re.search(r"\b(?:peut|peuvent|pouvez|peux)\b", source_folded))
+            bool(re.search(r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", source_folded))
             or bool(re.search(r"\bautorisé(?:e|es|s)?\b", source_folded))
         ) and not source_prohibition
         target_recommendation = bool(re.search(r"\bsollt(?:e|en|est|et)\b", target_folded))
@@ -107,21 +121,66 @@ def modality_mismatch(source: str, target: str, model_id: str) -> str | None:
 _NUMBER_TOKEN = r"\d(?:[\d\s'’.,]*\d)?"
 
 
-def _decimal_value(raw: str) -> Decimal | None:
-    token = raw.strip().replace(" ", "").replace("'", "").replace("’", "")
-    if not token:
+def decimal_value(raw: str) -> Decimal | None:
+    """Normalize one locale-formatted numeric token without collapsing decimals."""
+    token = re.sub(r"\s+", "", raw.strip()).replace("'", "").replace("’", "")
+    if not token or not re.fullmatch(r"\d[\d.,]*", token):
         return None
-    decimal_pos = max(token.rfind("."), token.rfind(","))
-    fractional_digits = len(token) - decimal_pos - 1 if decimal_pos >= 0 else 0
-    if decimal_pos >= 0 and fractional_digits in {1, 2}:
-        whole = re.sub(r"[.,]", "", token[:decimal_pos]) or "0"
-        token = whole + "." + token[decimal_pos + 1 :]
+
+    if "." in token and "," in token:
+        decimal_sep = "." if token.rfind(".") > token.rfind(",") else ","
+        grouping_sep = "," if decimal_sep == "." else "."
+        whole_raw, fractional = token.rsplit(decimal_sep, 1)
+        whole_groups = whole_raw.split(grouping_sep)
+        if (
+            not fractional.isdigit()
+            or not whole_groups[0].isdigit()
+            or any(not part.isdigit() or len(part) != 3 for part in whole_groups[1:])
+        ):
+            return None
+        normalized = "".join(whole_groups) + "." + fractional
+    elif "." in token or "," in token:
+        separator = "." if "." in token else ","
+        parts = token.split(separator)
+        if any(not part.isdigit() for part in parts):
+            return None
+        if len(parts) > 2:
+            if all(len(part) == 3 for part in parts[1:]):
+                normalized = "".join(parts)
+            elif len(parts[-1]) in {1, 2} and all(
+                len(part) == 3 for part in parts[1:-1]
+            ):
+                normalized = "".join(parts[:-1]) + "." + parts[-1]
+            else:
+                return None
+        else:
+            whole, fractional = parts
+            if whole.lstrip("0") == "" and fractional:
+                # Leading-zero forms such as 0.125 and 0,125 are decimals, never 125.
+                normalized = whole + "." + fractional
+            elif len(fractional) in {1, 2}:
+                normalized = whole + "." + fractional
+            elif len(fractional) == 3:
+                normalized = whole + fractional
+            else:
+                normalized = whole + "." + fractional
     else:
-        token = re.sub(r"[.,]", "", token)
+        normalized = token
+
     try:
-        return Decimal(token)
+        return Decimal(normalized)
     except InvalidOperation:
         return None
+
+
+def numeric_values(text: str) -> set[Decimal]:
+    """Return normalized numeric values using the runtime translation contract."""
+    values: set[Decimal] = set()
+    for match in re.finditer(rf"(?<![\w-])(?P<amount>{_NUMBER_TOKEN})(?![\w-])", text):
+        value = decimal_value(match.group("amount"))
+        if value is not None:
+            values.add(value)
+    return values
 
 
 def _currency_values(text: str) -> set[tuple[str, Decimal]]:
@@ -132,7 +191,7 @@ def _currency_values(text: str) -> set[tuple[str, Decimal]]:
     )
     for pattern in patterns:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            value = _decimal_value(match.group("amount"))
+            value = decimal_value(match.group("amount"))
             if value is not None:
                 values.add((match.group("code").upper(), value))
     return values
@@ -141,7 +200,7 @@ def _currency_values(text: str) -> set[tuple[str, Decimal]]:
 def _percentage_values(text: str) -> set[Decimal]:
     values: set[Decimal] = set()
     for match in re.finditer(rf"(?P<amount>{_NUMBER_TOKEN})\s*%", text):
-        value = _decimal_value(match.group("amount"))
+        value = decimal_value(match.group("amount"))
         if value is not None:
             values.add(value)
     return values

@@ -134,9 +134,10 @@ filter also performs a bounded post-generation integrity check: high-confidence
 recommendation/obligation or permission/obligation drift, loss of an explicit prohibition, or loss
 of source-critical currency/percentage/identifier values is withheld for review rather than silently
 returned. Currency/percentage checks compare normalized numeric values, so locale-equivalent
-separators and currency-code placement do not create false withholding. Dates may be rendered in
-locale-equivalent target-language wording and are evaluated semantically rather than requiring a
-byte-identical source token. The package does not attempt to rewrite legal prose automatically. Focused source regressions cover the
+separators and currency-code placement do not create false withholding. The runtime filter does
+not semantically validate dates: locale-equivalent target-language date wording is deliberately
+allowed, and date preservation is covered by benchmark/qualification cases instead. The package
+does not attempt to rewrite legal prose automatically. Focused source regressions cover the
 modality and literal-integrity guard. Revalidation harness v4.6 includes the canonical
 eight-case `owui-translation` screen through those real role IDs so future release checks
 do not depend on an ad-hoc curl command. This remains distinct from the external Stage-2E

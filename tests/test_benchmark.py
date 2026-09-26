@@ -1332,6 +1332,12 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertEqual(category.numeric_values("CHF 1 250.00"), {category.Decimal("1250.00")})
         self.assertEqual(category.numeric_values("CHF 1 250,00"), {category.Decimal("1250.00")})
         self.assertEqual(category.numeric_values("1,250"), {category.Decimal("1250")})
+        self.assertEqual(category.numeric_values("0.125 %"), {category.Decimal("0.125")})
+        self.assertEqual(category.numeric_values("0,125 %"), {category.Decimal("0.125")})
+        self.assertEqual(
+            openwebui_workflow.translation_numeric_values_for_checks("CHF 0.125"),
+            {category.Decimal("0.125")},
+        )
 
     def test_translation_prompt_profiles_match_specialist_contracts(self) -> None:
         case = {
@@ -1356,6 +1362,26 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertEqual(
             gemma[1]["content"],
             category.TRANSLATE_GEMMA_DIRECTION_WRAPPERS[("de", "fr")] + case["input"],
+        )
+
+        prompt_authority = (
+            ROOT / "config/openwebui/prompts/translation-explicit-direction-v1.txt"
+        ).read_text(encoding="utf-8")
+        self.assertEqual(category.TRANSLATE_GEMMA_EXPLICIT_DIRECTION_V1, prompt_authority)
+        filter_path = ROOT / "config/openwebui/functions/bc250_translation_direction.py"
+        filter_spec = importlib.util.spec_from_file_location(
+            "bc250_translation_contract_test", filter_path
+        )
+        assert filter_spec is not None and filter_spec.loader is not None
+        filter_module = importlib.util.module_from_spec(filter_spec)
+        filter_spec.loader.exec_module(filter_module)
+        self.assertEqual(
+            category.TRANSLATE_GEMMA_DIRECTION_WRAPPERS[("de", "fr")],
+            filter_module.WRAPPERS[filter_module.DE_FR_MODEL],
+        )
+        self.assertEqual(
+            category.TRANSLATE_GEMMA_DIRECTION_WRAPPERS[("fr", "de")],
+            filter_module.WRAPPERS[filter_module.FR_DE_MODEL],
         )
 
     def test_translation_generic_prompt_does_not_contradict_localized_dates(self) -> None:
@@ -1494,6 +1520,23 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             preserved_ok=True,
         )
         self.assertEqual(failures, ["source-leakage"])
+
+    def test_direct_translation_modality_failure_is_not_source_leakage(self) -> None:
+        for case_id in (
+            "de-fr-recommendation-modality",
+            "fr-de-recommendation-modality",
+        ):
+            with self.subTest(case_id=case_id):
+                failures = category.translation_failure_kinds(
+                    "modality failure",
+                    language_ok=True,
+                    source_leakage_ok=False,
+                    semantic_ok=False,
+                    preserved_ok=True,
+                    modality_case=True,
+                )
+                self.assertEqual(failures, ["modality"])
+                self.assertNotIn("source-leakage", failures)
 
     def test_translation_direction_is_explicit_package_policy(self) -> None:
         case = {"source_language": "fr", "target_language": "de", "input": "Bonjour."}
