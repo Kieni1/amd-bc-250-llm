@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.12.2-0.2 - 2026-09-26
+
+- Complete the 0.12.2 translation-boundary repair: recognize full common French present/conditional forms used by recommendation, obligation, permission and prohibition checks, including `devrions`, `devriez`, `devons` and `pouvons`.
+- Fix numeric integrity so leading-zero decimals such as `0.125` / `0,125` cannot be normalized to `125`; direct and Open WebUI benchmark paths now consume the package runtime numeric authority instead of carrying independent parsers.
+- Make the direct Translate-Gemma benchmark consume the exact packaged system prompt and direction wrappers, and classify recommendation/obligation failures as `modality` instead of `source-leakage`.
+- Require `ordinary_user_visible` testing policy values to be real JSON booleans.
+- Align automatic Open WebUI migration snapshots with documented full-state semantics by preserving ACLs, xattrs and numeric ownership; document verified restoration and SELinux relabeling.
+- Clarify that the runtime translation filter validates identifiers, currency/percentages and bounded modality while date semantic preservation remains qualification coverage.
+
 ## 0.12.2-0.1 - 2026-09-26
 
 - Advance the next device candidate to Ollama 0.34.4, Open WebUI 0.11.4 and Cyan Skillfish governor 0.4.13 while retaining Tika 4.0.0-full, the standard Open WebUI image, Mesa/Vulkan, the four-lane topology and `OLLAMA_MAX_LOADED_MODELS=1`.

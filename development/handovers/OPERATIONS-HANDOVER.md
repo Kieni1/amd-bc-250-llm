@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.12.2-0.1
+# BC-250 support / operations handover — current source release 0.12.2-0.2
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,11 +10,11 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.12.2
-RPM Release:  0.1
-NVR:          bc250-llm-server-0.12.2-0.1
+RPM Release:  0.2
+NVR:          bc250-llm-server-0.12.2-0.2
 ```
 
-0.12.2-0.1 is the next operations/device candidate. It keeps the established four-lane topology, Deep
+0.12.2-0.2 is the next operations/device candidate. It keeps the established four-lane topology, Deep
 `keep_alive=0`, TTM/live-40-CU and serialized large-model safety policy, but moves Ollama/Open WebUI/governor
 to 0.34.4/0.11.4/0.4.13 and adds a migration-safe OWUI upgrade hold plus verified full rollback snapshot.
 Advanced becomes a reasoning-enabled test candidate, translation modality instructions are hardened, and two
@@ -107,7 +107,7 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 0.12.2-0.1 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.2-0.1.md`.
+Current 0.12.2-0.2 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.2-0.2.md`.
 GitHub remains authoritative for RPM/SRPM build closure; the BC-250 remains authoritative for the new runtime,
 migration, model-quality and resource gates. Exact installed 0.12.1-0.6 is the immediate comparison baseline:
 the finalized source also retires the failed Gemma4 26B/LFM 8B experiments and withholds the three pressure-heavy large comparison profiles from ordinary-user OWUI visibility while preserving admin/native test access.
@@ -260,9 +260,9 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 0.12.2-0.1 source/device follow-up
+## Immediate 0.12.2-0.2 source/device follow-up
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.1.md`. This candidate crosses OWUI/Ollama runtime, migration, Advanced reasoning policy, translation prompt and selected large-model context boundaries; qualify those explicitly while retaining the previous clean topology/restoration baseline as comparison evidence. Preserve package integrity, authenticated verifier cleanliness and final normal topology.
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.2.md`. This candidate crosses OWUI/Ollama runtime, migration, Advanced reasoning policy, translation prompt and selected large-model context boundaries; qualify those explicitly while retaining the previous clean topology/restoration baseline as comparison evidence. Preserve package integrity, authenticated verifier cleanliness and final normal topology.
 
 The exact-2.4/0.4 operations evidence already covers supported reboot reconstruction, live 40/40, maintenance, storage hygiene, backup/restore, runtime soak, model switching and service topology. Repeat those areas only if a corresponding implementation changes.
 

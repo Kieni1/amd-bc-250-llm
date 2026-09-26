@@ -795,7 +795,7 @@ three adapter semantics together rather than fixing one field in isolation.
 
 ## DEC-030 — Retire failed long-run candidates and make pressure-heavy OWUI experiments admin-only
 
-**Status:** ACCEPTED — 0.12.2-0.1 source policy; exact-device verification remains required.
+**Status:** ACCEPTED — 0.12.2-0.2 source policy; exact-device verification remains required.
 
 **Context:** Corrected long-run scoring removed prior harness noise and left repeatable model-level
 quality/resource signals. Experimental Gemma4 26B showed wrong/template-contaminated arithmetic and

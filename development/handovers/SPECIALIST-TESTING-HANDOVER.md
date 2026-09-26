@@ -40,7 +40,7 @@ retest conditions from existing decisions:
   topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
   supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
   ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.2-0.1 is a new runtime/model-policy candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, reasoning-enabled Advanced, hardened translation modality, and 8K pressure-profile retests. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
+  narrow temporary mitigations. Current source 0.12.2-0.2 is a new runtime/model-policy candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, reasoning-enabled Advanced, hardened translation modality, and 8K pressure-profile retests. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
   treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
   rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
   live pruning and other destructive support checks remain conditional, not automatic release gates.
@@ -70,9 +70,9 @@ retest conditions from existing decisions:
   drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
   new runtime/model/hardware or product question.
 
-## Current 0.12.2-0.1 testing priority
+## Current 0.12.2-0.2 testing priority
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.1.md`. This candidate deliberately crosses
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.2.md`. This candidate deliberately crosses
 OWUI/Ollama runtime, Advanced request policy, translation prompt, selected large-model context and upgrade
 migration boundaries, so test those surfaces directly. Preserve the previous clean topology/restoration
 evidence as comparison context, but do not relabel it as current qualification. Qwen template replacement,

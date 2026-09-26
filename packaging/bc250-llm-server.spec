@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.2
-Release:        0.1%{?dist}
+Release:        0.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -219,6 +219,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.2
+- Complete French recommendation/obligation/permission/prohibition conjugation coverage in the bounded translation guard and reject leading-zero decimal value changes such as 0.125 -> 125.
+- Make direct and Open WebUI translation qualification load the package runtime numeric authority, and make the direct production benchmark load the exact packaged translation prompt/wrappers with modality-specific failure classification.
+- Fail closed on non-boolean ordinary_user_visible policy values.
+- Preserve ACLs/xattrs/numeric ownership in automatic Open WebUI migration snapshots and document the verified restoration sequence.
+- Clarify that runtime translation filtering protects identifiers/currency/percentages/modality while date semantics remain benchmark qualification coverage.
+
 * Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.1
 - Retire the failed Gemma4 26B and LFM 8B comparison candidates, keep pressure-heavy large experiments admin/testing-only while retaining IQ3_XXS as the ordinary-user deployability comparison, and preserve unrelated administrator ACL grants.
 - Normalize Markdown emphasis and Unicode presentation variants in semantic benchmark matching so formatting-only differences do not inflate model-quality defects.
