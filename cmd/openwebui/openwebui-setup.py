@@ -213,6 +213,12 @@ def validate_model_request_policy_shape(document: dict[str, Any]) -> None:
             raise ApiError(
                 f"testing model policy {model_id} custom_params is not an object"
             )
+        if "ordinary_user_visible" in raw and not isinstance(
+            raw["ordinary_user_visible"], bool
+        ):
+            raise ApiError(
+                f"testing model policy {model_id} ordinary_user_visible must be a boolean"
+            )
 
 
 def testing_model_policies(document: dict[str, Any]) -> dict[str, dict[str, Any]]:

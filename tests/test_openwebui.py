@@ -517,6 +517,20 @@ class OpenWebUIStatusTests(unittest.TestCase):
         with self.assertRaisesRegex(OPENWEBUI.ApiError, "under custom_params"):
             OPENWEBUI.validate_model_request_policy_shape(unknown_policy_param)
 
+        for invalid_visibility in ("false", None, 0, 1):
+            malformed_visibility = copy.deepcopy(document)
+            q36 = malformed_visibility["testing_model_policies"][
+                "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+            ]
+            q36["ordinary_user_visible"] = invalid_visibility
+            with (
+                self.subTest(ordinary_user_visible=invalid_visibility),
+                self.assertRaisesRegex(
+                    OPENWEBUI.ApiError, "ordinary_user_visible must be a boolean"
+                ),
+            ):
+                OPENWEBUI.validate_model_request_policy_shape(malformed_visibility)
+
     def test_compatibility_assumption_matches_packaged_openwebui_pin(self) -> None:
         values: dict[str, str] = {}
         for line in (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines():
@@ -804,6 +818,40 @@ class OpenWebUIStatusTests(unittest.TestCase):
         clean = asyncio.run(module.Filter().outlet(clean))
         self.assertEqual(clean["messages"][-1]["content"], "Les règles devraient être respectées.")
 
+        plural_modality_cases = (
+            (
+                "bc250-office-translation-de-fr",
+                module.WRAPPERS["bc250-office-translation-de-fr"],
+                "Wir sollten unterschreiben.",
+                "Nous devons signer.",
+            ),
+            (
+                "bc250-office-translation-fr-de",
+                module.WRAPPERS["bc250-office-translation-fr-de"],
+                "Vous devriez signer.",
+                "Sie müssen unterschreiben.",
+            ),
+            (
+                "bc250-office-translation-fr-de",
+                module.WRAPPERS["bc250-office-translation-fr-de"],
+                "Nous devrions signer.",
+                "Wir müssen unterschreiben.",
+            ),
+        )
+        for model_id, case_wrapper, source, target in plural_modality_cases:
+            with self.subTest(source=source, target=target):
+                plural_case = {
+                    "model": model_id,
+                    "messages": [
+                        {"role": "user", "content": case_wrapper + source},
+                        {"role": "assistant", "content": target},
+                    ],
+                }
+                guarded_plural = asyncio.run(module.Filter().outlet(plural_case))
+                self.assertIn(
+                    "Translation withheld", guarded_plural["messages"][-1]["content"]
+                )
+
         weakened = {
             "model": "bc250-office-translation-de-fr",
             "messages": [
@@ -871,6 +919,34 @@ class OpenWebUIStatusTests(unittest.TestCase):
         }
         wrong_currency = asyncio.run(module.Filter().outlet(wrong_currency))
         self.assertIn("currency amount", wrong_currency["messages"][-1]["content"])
+
+        leading_zero_percentage = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Der Satz beträgt 0.125 %."},
+                {"role": "assistant", "content": "Le taux est de 125 %."},
+            ],
+        }
+        leading_zero_percentage = asyncio.run(
+            module.Filter().outlet(leading_zero_percentage)
+        )
+        self.assertIn(
+            "source percentage", leading_zero_percentage["messages"][-1]["content"]
+        )
+
+        leading_zero_currency = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {"role": "user", "content": wrapper + "Der Betrag beträgt CHF 0.125."},
+                {"role": "assistant", "content": "Le montant est de CHF 125."},
+            ],
+        }
+        leading_zero_currency = asyncio.run(
+            module.Filter().outlet(leading_zero_currency)
+        )
+        self.assertIn(
+            "currency amount", leading_zero_currency["messages"][-1]["content"]
+        )
 
         permission_strengthened = {
             "model": "bc250-office-translation-de-fr",
