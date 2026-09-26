@@ -144,7 +144,7 @@ and hybrid-without-reranker results have been measured.
 
 ### Measured tuning candidates, not fresh-install defaults
 
-Open WebUI 0.11.3 exposes three settings that are relevant to this appliance but
+Open WebUI 0.11.4 exposes settings that are relevant to this appliance but
 remain conservative in the packaged Quadlet:
 
 - `RAG_SYSTEM_CONTEXT=false`: enabling it moves retrieved context to a stable
@@ -353,7 +353,7 @@ sudo install -m 0600 -o root -g root /PATH/TO/KEY /etc/bc250-llm-server/rag-api-
 sudo bc250-rag ingest --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
-`ingest` validates the new lifecycle schema before using the existing Open WebUI v0.11.3 incremental
+`ingest` validates the lifecycle schema before using the package-pinned Open WebUI incremental
 knowledge API. Unchanged files are skipped and changed Markdown is uploaded before the stale remote copy is
 removed. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
 credential must be a non-empty private regular file (normally `0600`); it is never stored in the corpus.
@@ -402,7 +402,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: important Open WebUI v0.11.3 behavior
+## 7. Retrieval mode: Open WebUI 0.11.4 candidate behavior
 
 Use **Focused Retrieval** for the growing library. Use **Full Context** only for
 one short document that comfortably fits the model context.
@@ -417,10 +417,8 @@ For the most predictable baseline with the relatively small local Gemma model:
 5. **Attach the knowledge base in the chat**, choose Focused Retrieval, and ask
    the evaluation questions.
 
-This detail matters on Open WebUI v0.11.3: knowledge permanently attached to a
-model in Native function-calling mode is accessed through knowledge tools. 0.11.3 retains the knowledge-vector rebuild behavior so so a knowledge-base rebuild includes its files.
-If Builtin Tools are disabled at the same time, that model-bound knowledge is not
-retrieved. If you want a permanently model-bound knowledge base, keep Native
+The preceding v0.11.3 device baseline showed that knowledge permanently attached to a
+model in Native function-calling mode is accessed through knowledge tools, and that a knowledge-base rebuild includes its files. The v0.11.4 candidate must requalify this browser/product path rather than silently inheriting the old result. If model-bound knowledge still requires builtin knowledge tools, leaving Builtin Tools disabled will prevent that retrieval path. If you want a permanently model-bound knowledge base, keep Native
 mode and enable only the **Knowledge Base** builtin-tool category, then verify
 that the model reliably calls the knowledge tools. Do not switch the whole
 appliance to legacy tool calling merely to make RAG work.

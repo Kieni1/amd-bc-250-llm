@@ -18,6 +18,7 @@ OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
 OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
 HF_SESSION_FILE="/run/bc250-llm-server/install-hf-session"
 OWUI_SETUP_STATE="not-run"
+OWUI_UPGRADE_BACKUP=""
 
 usage() {
   cat <<'USAGE'
@@ -432,6 +433,45 @@ for url in (
 ' >/dev/null 2>&1
 }
 
+openwebui_upgrade_backup_helper() {
+  local installed=/usr/libexec/bc250-llm-server/backup-upgrade-state.sh
+  if [[ -x "$installed" ]]; then
+    printf '%s\n' "$installed"
+    return
+  fi
+  printf '%s\n' "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../maintenance/backup-upgrade-state.sh"
+}
+
+openwebui_running_version() {
+  curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/api/version 2>/dev/null |
+    jq -r '.version // empty' 2>/dev/null || true
+}
+
+prepare_openwebui_migration_backup() {
+  local data="${OWUI_DATA:-/var/lib/open-webui}" db current helper output
+  db="${OWUI_DB:-$data/webui.db}"
+  [[ -f "$db" ]] || return 0
+  current="$(openwebui_running_version)"
+  if [[ -n "$current" && "$current" == "$BC250_OPEN_WEBUI_VERSION" ]]; then
+    echo "Open WebUI data is already running on $current; migration rollback snapshot not required."
+    return 0
+  fi
+  helper="$(openwebui_upgrade_backup_helper)"
+  [[ -x "$helper" ]] || {
+    echo "ERROR: Open WebUI upgrade backup helper is unavailable: $helper" >&2
+    return 1
+  }
+  echo "Existing Open WebUI data requires a pre-migration rollback snapshot (${current:-unknown} -> $BC250_OPEN_WEBUI_VERSION)."
+  systemctl stop open-webui.service
+  output="$("$helper" "${current:-unknown}" "$BC250_OPEN_WEBUI_VERSION")" || return
+  printf '%s\n' "$output"
+  OWUI_UPGRADE_BACKUP="${output##*: }"
+  [[ -f "$OWUI_UPGRADE_BACKUP" && -f "$OWUI_UPGRADE_BACKUP.sha256" ]] || {
+    echo "ERROR: verified Open WebUI upgrade backup was not produced." >&2
+    return 1
+  }
+}
+
 step_8_application_services() {
   heading "8. START APPLICATION SERVICES"
   local firewall_changed=0 tika_was_active=0 owui_was_active=0 unit_refresh_needed=0
@@ -456,6 +496,9 @@ step_8_application_services() {
     fi
   fi
   command -v setsebool >/dev/null 2>&1 && setsebool -P httpd_can_network_connect 1 || true
+  # On upgrades the RPM intentionally removes the OWUI boot-enablement drop-in.
+  # Keep it held until a required stopped-state rollback snapshot has succeeded.
+  prepare_openwebui_migration_backup
   enable_open_webui_boot
   systemctl start tika.service open-webui.service
   # Recreate already-running containers only when package/firewall state changed

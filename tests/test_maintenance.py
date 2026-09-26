@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import json
 import os
 import subprocess
 import tempfile
@@ -241,12 +242,17 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("That looks like an IP address.", result.stdout)
         self.assertIn("NIC=enp0s16f0u1", result.stdout)
 
-    def test_open_webui_model_import_preserves_qwen_non_thinking(self) -> None:
+    def test_open_webui_model_import_preserves_package_request_policies(self) -> None:
         helper = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
-        models = (ROOT / "config/openwebui/models.json").read_text(encoding="utf-8")
+        models = json.loads((ROOT / "config/openwebui/models.json").read_text(encoding="utf-8"))
         maintenance = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        self.assertIn('"think": false', models)
+        by_id = {model["id"]: model for model in models["models"]}
+        self.assertIs(by_id["bc250-office-advanced"]["params"]["custom_params"]["think"], True)
+        self.assertIs(
+            models["testing_model_policies"]["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]["custom_params"]["think"],
+            False,
+        )
         self.assertIn('/api/v1/models/import', helper)
         self.assertIn('openwebui/models.json', manifest)
         self.assertNotIn('model-baseline', maintenance)

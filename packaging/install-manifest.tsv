@@ -147,6 +147,7 @@ file	0644	models/mtp/models.toml	{share}/model-management/mtp-models.toml
 file	0644	models/modelfiles/*.Modelfile	{share}/model-management/modelfiles/
 file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-management/MODEL-TEMPLATE.Modelfile.example
 file	0644	models/retired-models.json	{share}/model-management/retired-models.json
+file	0644	models/model-profiles.json	{share}/model-management/model-profiles.json
 file	0644	quality-checks/README.md	{share}/quality-checks/README.md
 file	0755	quality-checks/main/*.sh	{share}/quality-checks/main/
 file	0755	quality-checks/package/*.sh	{share}/quality-checks/package/

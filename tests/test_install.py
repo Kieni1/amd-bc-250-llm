@@ -624,5 +624,31 @@ step_11_maintenance
         self.assertIn("run_models_only", source)
 
 
+    def test_openwebui_upgrade_backup_precedes_boot_enable_and_start(self) -> None:
+        source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
+        block = source[source.index("step_8_application_services()"):]
+        backup = block.index("prepare_openwebui_migration_backup")
+        enable = block.index("enable_open_webui_boot", backup)
+        start = block.index("systemctl start tika.service open-webui.service", enable)
+        self.assertLess(backup, enable)
+        self.assertLess(enable, start)
+        self.assertIn("verified Open WebUI upgrade backup was not produced", source)
+
+    def test_openwebui_upgrade_backup_is_full_stopped_state_and_self_verified(self) -> None:
+        source = (ROOT / "cmd/maintenance/backup-upgrade-state.sh").read_text(encoding="utf-8")
+        self.assertIn("open-webui.service must be stopped", source)
+        self.assertIn("PRAGMA integrity_check", source)
+        self.assertIn("tar --one-file-system --numeric-owner", source)
+        self.assertIn("unsupported backup member", source)
+        self.assertIn("upgrade backup does not contain webui.db", source)
+        self.assertIn('sha256sum -c "$out.sha256"', source)
+
+    def test_rpm_upgrade_holds_openwebui_boot_until_guided_migration_backup(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn('[ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]', spec)
+        self.assertIn("rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", spec)
+        self.assertIn("Open WebUI boot held for migration safety", spec)
+        self.assertNotIn("open-webui.service", spec.split("%global bc250_units", 1)[1].split("\n", 1)[0])
+
 if __name__ == "__main__":
     unittest.main()

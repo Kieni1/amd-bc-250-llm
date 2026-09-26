@@ -7,8 +7,8 @@ Wants=network-online.target tika.service
 
 [Container]
 ContainerName=open-webui
-# v0.11.3, pinned OCI index digest.
-Image=ghcr.io/open-webui/open-webui@sha256:751b617714b91e4cfd0186a509c72480c858e012976103b09a30dad053c36175
+# v0.11.4, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:9591b13f13843c7721c2b8eaf7382846c81b3ffe126526d1888d1fed50c6a33f
 Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
@@ -43,6 +43,7 @@ Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
 Environment=RAG_FILE_MAX_SIZE=128
 Environment=RAG_FILE_MAX_COUNT=20
 Environment="RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub"
+Environment=TIKA_SERVER_VERSION=4
 Environment=RAG_SYSTEM_CONTEXT=false
 Environment="RAG_EMBEDDING_QUERY_PREFIX=Query: "
 Environment="RAG_EMBEDDING_CONTENT_PREFIX=Document: "
