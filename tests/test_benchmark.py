@@ -1326,12 +1326,32 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertTrue(category.translation_content_checks(locale_de, fr_de)[2])
         self.assertFalse(category.translation_content_checks(wrong_de, fr_de)[2])
 
+    def test_translation_preservation_rejects_ambiguous_three_decimal_collapse(self) -> None:
+        case = {
+            "input": "Der Satz beträgt 1,234 % und der Betrag CHF 1.234.",
+            "required": [],
+            "required_any": [],
+            "forbidden": [],
+            "preserve": [],
+            "numeric_values": [],
+            "min_words": 1,
+        }
+        collapsed = "Le taux est de 1234 % et le montant CHF 1234."
+        preserved = "Le taux est de 1,234 % et le montant CHF 1.234."
+        self.assertFalse(category.translation_content_checks(collapsed, case)[2])
+        self.assertTrue(category.translation_content_checks(preserved, case)[2])
+        self.assertFalse(openwebui_workflow.owui_translation_checks(collapsed, case)[0])
+        self.assertTrue(openwebui_workflow.owui_translation_checks(preserved, case)[0])
+
     def test_translation_numeric_values_accept_one_decimal_locale_forms(self) -> None:
         self.assertEqual(category.numeric_values("8.1 %"), {category.Decimal("8.1")})
         self.assertEqual(category.numeric_values("8,1 %"), {category.Decimal("8.1")})
         self.assertEqual(category.numeric_values("CHF 1 250.00"), {category.Decimal("1250.00")})
         self.assertEqual(category.numeric_values("CHF 1 250,00"), {category.Decimal("1250.00")})
-        self.assertEqual(category.numeric_values("1,250"), {category.Decimal("1250")})
+        self.assertEqual(
+            category.numeric_values("1,250"),
+            {category.Decimal("1.250"), category.Decimal("1250")},
+        )
         self.assertEqual(category.numeric_values("0.125 %"), {category.Decimal("0.125")})
         self.assertEqual(category.numeric_values("0,125 %"), {category.Decimal("0.125")})
         self.assertEqual(

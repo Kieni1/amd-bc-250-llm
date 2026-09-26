@@ -1,4 +1,4 @@
-"""Apply BC-250 translation direction and bounded legal-modality integrity checks."""
+"""Apply BC-250 translation direction and bounded translation integrity checks."""
 
 import re
 from decimal import Decimal, InvalidOperation
@@ -39,94 +39,145 @@ def _source_text(content: str, wrapper: str) -> str:
     return content.removeprefix(wrapper)
 
 
+def _split_clauses(text: str) -> list[str]:
+    """Split text into bounded sentence/clause units for local modality checks."""
+    return [part.strip() for part in re.split(r"(?:[.!?;]+|\n+)", text) if part.strip()]
+
+
+def _de_modalities(clause: str) -> frozenset[str]:
+    folded = clause.casefold()
+    prohibition = bool(
+        re.search(r"\b(?:darf|dürfen|darfst|dürft)\b[^.!?;]{0,40}\bnicht\b", folded)
+        or re.search(r"\b(?:nicht\s+erlaubt|verboten)\b", folded)
+    )
+    modes: set[str] = set()
+    if re.search(r"\bsollt(?:e|en|est|et)\b", folded):
+        modes.add("recommendation")
+    if re.search(r"\b(?:muss|müssen|musst|müsst)\b", folded):
+        modes.add("obligation")
+    if prohibition:
+        modes.add("prohibition")
+    elif re.search(r"\b(?:darf|dürfen|darfst|dürft)\b", folded) or re.search(
+        r"\berlaubt\b", folded
+    ):
+        modes.add("permission")
+    return frozenset(modes)
+
+
+def _fr_modalities(clause: str) -> frozenset[str]:
+    folded = clause.casefold()
+    modal_forms = (
+        r"(?:dois|doit|devons|devez|doivent|peux|peut|pouvons|pouvez|peuvent)"
+    )
+    prohibition = bool(
+        re.search(
+            rf"\bne\b[^.!?;]{{0,50}}\b{modal_forms}\b[^.!?;]{{0,30}}\b(?:pas|jamais|plus)\b",
+            folded,
+        )
+        or re.search(r"\binterdit(?:e|es|s)?\b", folded)
+        or re.search(r"\bpas\s+autorisé(?:e|es|s)?\b", folded)
+    )
+    modes: set[str] = set()
+    if re.search(r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", folded):
+        modes.add("recommendation")
+    if re.search(r"\b(?:dois|doit|devons|devez|doivent)\b", folded) and not prohibition:
+        modes.add("obligation")
+    if prohibition:
+        modes.add("prohibition")
+    elif (
+        re.search(r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", folded)
+        or re.search(r"\bautorisé(?:e|es|s)?\b", folded)
+    ):
+        modes.add("permission")
+    return frozenset(modes)
+
+
+def _modality_sequence(text: str, language: str) -> list[frozenset[str]]:
+    detector = _de_modalities if language == "de" else _fr_modalities
+    return [modes for clause in _split_clauses(text) if (modes := detector(clause))]
+
+
+def _modality_change_reason(
+    source_modes: frozenset[str], target_modes: frozenset[str], model_id: str
+) -> str:
+    if "recommendation" in source_modes and "obligation" in target_modes and "recommendation" not in target_modes:
+        return (
+            "recommendation strengthened to obligation (sollte -> doit)"
+            if model_id == DE_FR_MODEL
+            else "recommendation strengthened to obligation (devrait -> muss)"
+        )
+    if "obligation" in source_modes and "recommendation" in target_modes and "obligation" not in target_modes:
+        return (
+            "obligation weakened to recommendation (muss -> devrait)"
+            if model_id == DE_FR_MODEL
+            else "obligation weakened to recommendation (doit -> sollte)"
+        )
+    if "permission" in source_modes and "obligation" in target_modes and "permission" not in target_modes:
+        return (
+            "permission strengthened to obligation (darf -> doit)"
+            if model_id == DE_FR_MODEL
+            else "permission strengthened to obligation (peut -> muss)"
+        )
+    if "obligation" in source_modes and "permission" in target_modes and "obligation" not in target_modes:
+        return (
+            "obligation weakened to permission (muss -> peut)"
+            if model_id == DE_FR_MODEL
+            else "obligation weakened to permission (doit -> darf)"
+        )
+    if "prohibition" in source_modes and "prohibition" not in target_modes:
+        return (
+            "prohibition/negation may have been lost (darf nicht)"
+            if model_id == DE_FR_MODEL
+            else "prohibition/negation may have been lost (ne ... pas)"
+        )
+    source_label = ",".join(sorted(source_modes)) or "none"
+    target_label = ",".join(sorted(target_modes)) or "none"
+    return f"clause modality changed ({source_label} -> {target_label})"
+
+
 def modality_mismatch(source: str, target: str, model_id: str) -> str | None:
-    """Return only high-confidence modality mismatches; avoid semantic rewriting."""
-    source_folded = source.casefold()
-    target_folded = target.casefold()
+    """Return bounded clause-local modality mismatches; avoid semantic rewriting."""
     if model_id == DE_FR_MODEL:
-        source_recommendation = bool(re.search(r"\bsollt(?:e|en|est|et)\b", source_folded))
-        source_obligation = bool(re.search(r"\b(?:muss|müssen|musst|müsst)\b", source_folded))
-        source_prohibition = bool(re.search(r"\b(?:darf|dürfen|darfst|dürft)\b[^.!?;]{0,40}\bnicht\b", source_folded))
-        source_permission = bool(
-            re.search(r"\b(?:darf|dürfen|darfst|dürft)\b", source_folded)
-        ) and not source_prohibition
-        target_recommendation = bool(
-            re.search(r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", target_folded)
-        )
-        target_obligation = bool(
-            re.search(r"\b(?:dois|doit|devons|devez|doivent)\b", target_folded)
-        )
-        target_prohibition = bool(
-            re.search(
-                r"\bne\b[^.!?;]{0,50}\b(?:dois|doit|devons|devez|doivent|peux|peut|pouvons|pouvez|peuvent)\b[^.!?;]{0,30}\bpas\b",
-                target_folded,
-            )
-            or re.search(r"\binterdit(?:e|es|s)?\b", target_folded)
-        )
-        target_permission = (
-            bool(re.search(r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", target_folded))
-            or bool(re.search(r"\bautorisé(?:e|es|s)?\b", target_folded))
-        ) and not target_prohibition
-        if source_recommendation and not source_obligation and target_obligation and not target_recommendation:
-            return "recommendation strengthened to obligation (sollte -> doit)"
-        if source_obligation and target_recommendation and not target_obligation:
-            return "obligation weakened to recommendation (muss -> devrait)"
-        if source_permission and target_obligation and not target_permission:
-            return "permission strengthened to obligation (darf -> doit)"
-        if source_obligation and target_permission and not target_obligation:
-            return "obligation weakened to permission (muss -> peut)"
-        if source_prohibition and not target_prohibition:
-            return "prohibition/negation may have been lost (darf nicht)"
+        source_language, target_language = "de", "fr"
     elif model_id == FR_DE_MODEL:
-        source_recommendation = bool(
-            re.search(r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", source_folded)
+        source_language, target_language = "fr", "de"
+    else:
+        return None
+
+    source_sequence = _modality_sequence(source, source_language)
+    if not source_sequence:
+        return None
+    target_sequence = _modality_sequence(target, target_language)
+    if len(source_sequence) != len(target_sequence):
+        return (
+            "modality-bearing clause count changed "
+            f"({len(source_sequence)} -> {len(target_sequence)})"
         )
-        source_obligation = bool(
-            re.search(r"\b(?:dois|doit|devons|devez|doivent)\b", source_folded)
-        )
-        source_prohibition = bool(
-            re.search(
-                r"\bne\b[^.!?;]{0,50}\b(?:dois|doit|devons|devez|doivent|peux|peut|pouvons|pouvez|peuvent)\b[^.!?;]{0,30}\bpas\b",
-                source_folded,
-            )
-            or re.search(r"\binterdit(?:e|es|s)?\b", source_folded)
-        )
-        source_permission = (
-            bool(re.search(r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", source_folded))
-            or bool(re.search(r"\bautorisé(?:e|es|s)?\b", source_folded))
-        ) and not source_prohibition
-        target_recommendation = bool(re.search(r"\bsollt(?:e|en|est|et)\b", target_folded))
-        target_obligation = bool(re.search(r"\b(?:muss|müssen|musst|müsst)\b", target_folded))
-        target_prohibition = bool(
-            re.search(r"\b(?:darf|dürfen|darfst|dürft)\b[^.!?;]{0,40}\bnicht\b", target_folded)
-            or re.search(r"\bverboten\b", target_folded)
-        )
-        target_permission = (
-            bool(re.search(r"\b(?:darf|dürfen|darfst|dürft)\b", target_folded))
-            or bool(re.search(r"\berlaubt\b", target_folded))
-        ) and not target_prohibition
-        if source_recommendation and not source_obligation and target_obligation and not target_recommendation:
-            return "recommendation strengthened to obligation (devrait -> muss)"
-        if source_obligation and target_recommendation and not target_obligation:
-            return "obligation weakened to recommendation (doit -> sollte)"
-        if source_permission and target_obligation and not target_permission:
-            return "permission strengthened to obligation (peut -> muss)"
-        if source_obligation and target_permission and not target_obligation:
-            return "obligation weakened to permission (doit -> darf)"
-        if source_prohibition and not target_prohibition:
-            return "prohibition/negation may have been lost (ne ... pas)"
+    for index, (source_modes, target_modes) in enumerate(
+        zip(source_sequence, target_sequence, strict=True), start=1
+    ):
+        if source_modes != target_modes:
+            return f"clause {index}: {_modality_change_reason(source_modes, target_modes, model_id)}"
     return None
 
 
 _NUMBER_TOKEN = r"\d(?:[\d\s'’.,]*\d)?"
 
 
-def decimal_value(raw: str) -> Decimal | None:
-    """Normalize one locale-formatted numeric token without collapsing decimals."""
+def decimal_interpretations(raw: str) -> frozenset[Decimal]:
+    """Return every plausible value for one locale-formatted numeric token.
+
+    Single-separator forms with exactly three trailing digits are intentionally
+    ambiguous (for example ``1,234`` may mean 1.234 or 1234).  Integrity checks
+    compare the complete interpretation set, so translating an ambiguous source
+    token to only one of those values fails closed instead of silently accepting
+    a possible 1000x change.
+    """
     token = re.sub(r"\s+", "", raw.strip()).replace("'", "").replace("’", "")
     if not token or not re.fullmatch(r"\d[\d.,]*", token):
-        return None
+        return frozenset()
 
+    normalized_values: set[str] = set()
     if "." in token and "," in token:
         decimal_sep = "." if token.rfind(".") > token.rfind(",") else ","
         grouping_sep = "," if decimal_sep == "." else "."
@@ -137,73 +188,85 @@ def decimal_value(raw: str) -> Decimal | None:
             or not whole_groups[0].isdigit()
             or any(not part.isdigit() or len(part) != 3 for part in whole_groups[1:])
         ):
-            return None
-        normalized = "".join(whole_groups) + "." + fractional
+            return frozenset()
+        normalized_values.add("".join(whole_groups) + "." + fractional)
     elif "." in token or "," in token:
         separator = "." if "." in token else ","
         parts = token.split(separator)
         if any(not part.isdigit() for part in parts):
-            return None
+            return frozenset()
         if len(parts) > 2:
             if all(len(part) == 3 for part in parts[1:]):
-                normalized = "".join(parts)
+                normalized_values.add("".join(parts))
             elif len(parts[-1]) in {1, 2} and all(
                 len(part) == 3 for part in parts[1:-1]
             ):
-                normalized = "".join(parts[:-1]) + "." + parts[-1]
+                normalized_values.add("".join(parts[:-1]) + "." + parts[-1])
             else:
-                return None
+                return frozenset()
         else:
             whole, fractional = parts
-            if whole.lstrip("0") == "" and fractional:
-                # Leading-zero forms such as 0.125 and 0,125 are decimals, never 125.
-                normalized = whole + "." + fractional
-            elif len(fractional) in {1, 2}:
-                normalized = whole + "." + fractional
+            if (whole.lstrip("0") == "" and fractional) or len(fractional) in {1, 2}:
+                normalized_values.add(whole + "." + fractional)
             elif len(fractional) == 3:
-                normalized = whole + fractional
+                # Preserve both plausible meanings; callers must prove a safe match.
+                normalized_values.add(whole + "." + fractional)
+                normalized_values.add(whole + fractional)
             else:
-                normalized = whole + "." + fractional
+                normalized_values.add(whole + "." + fractional)
     else:
-        normalized = token
+        normalized_values.add(token)
 
-    try:
-        return Decimal(normalized)
-    except InvalidOperation:
+    values: set[Decimal] = set()
+    for normalized in normalized_values:
+        try:
+            values.add(Decimal(normalized))
+        except InvalidOperation:
+            return frozenset()
+    return frozenset(values)
+
+
+def decimal_value(raw: str) -> Decimal | None:
+    """Return an unambiguous value, or ``None`` when the token is ambiguous."""
+    values = decimal_interpretations(raw)
+    if len(values) != 1:
         return None
+    return next(iter(values))
 
 
 def numeric_values(text: str) -> set[Decimal]:
-    """Return normalized numeric values using the runtime translation contract."""
+    """Return every plausible value using the runtime translation numeric authority."""
     values: set[Decimal] = set()
     for match in re.finditer(rf"(?<![\w-])(?P<amount>{_NUMBER_TOKEN})(?![\w-])", text):
-        value = decimal_value(match.group("amount"))
-        if value is not None:
-            values.add(value)
+        values.update(decimal_interpretations(match.group("amount")))
     return values
 
 
-def _currency_values(text: str) -> set[tuple[str, Decimal]]:
-    values: set[tuple[str, Decimal]] = set()
+def _currency_signatures(text: str) -> set[tuple[str, frozenset[Decimal]]]:
+    values: set[tuple[str, frozenset[Decimal]]] = set()
     patterns = (
         rf"\b(?P<code>CHF|EUR|USD)\s*(?P<amount>{_NUMBER_TOKEN})",
         rf"(?P<amount>{_NUMBER_TOKEN})\s*(?P<code>CHF|EUR|USD)\b",
     )
     for pattern in patterns:
         for match in re.finditer(pattern, text, re.IGNORECASE):
-            value = decimal_value(match.group("amount"))
-            if value is not None:
-                values.add((match.group("code").upper(), value))
+            interpretations = decimal_interpretations(match.group("amount"))
+            if interpretations:
+                values.add((match.group("code").upper(), interpretations))
     return values
 
 
-def _percentage_values(text: str) -> set[Decimal]:
-    values: set[Decimal] = set()
+def _percentage_signatures(text: str) -> set[frozenset[Decimal]]:
+    values: set[frozenset[Decimal]] = set()
     for match in re.finditer(rf"(?P<amount>{_NUMBER_TOKEN})\s*%", text):
-        value = decimal_value(match.group("amount"))
-        if value is not None:
-            values.add(value)
+        interpretations = decimal_interpretations(match.group("amount"))
+        if interpretations:
+            values.add(interpretations)
     return values
+
+
+def _format_interpretations(values: frozenset[Decimal]) -> str:
+    return " / ".join(str(value) for value in sorted(values))
 
 
 def _integrity_tokens(text: str) -> set[str]:
@@ -227,13 +290,24 @@ def literal_integrity_mismatch(source: str, target: str) -> str | None:
         normalized = token.casefold().replace("’", "'")
         if normalized not in target_folded:
             return f"source token missing from translation ({token})"
-    missing_currency = sorted(_currency_values(source) - _currency_values(target))
+    missing_currency = _currency_signatures(source) - _currency_signatures(target)
     if missing_currency:
-        code, amount = missing_currency[0]
-        return f"source currency amount missing from translation ({code} {amount})"
-    missing_percentages = sorted(_percentage_values(source) - _percentage_values(target))
+        code, interpretations = min(
+            missing_currency, key=lambda item: (item[0], tuple(sorted(item[1])))
+        )
+        return (
+            "source currency amount missing from translation "
+            f"({code} {_format_interpretations(interpretations)})"
+        )
+    missing_percentages = _percentage_signatures(source) - _percentage_signatures(target)
     if missing_percentages:
-        return f"source percentage missing from translation ({missing_percentages[0]}%)"
+        interpretations = min(
+            missing_percentages, key=lambda item: tuple(sorted(item))
+        )
+        return (
+            "source percentage missing from translation "
+            f"({_format_interpretations(interpretations)}%)"
+        )
     return None
 
 
@@ -285,8 +359,8 @@ class Filter:
         for message in reversed(messages):
             if isinstance(message, dict) and message.get("role") == "assistant":
                 message["content"] = (
-                    "Translation withheld: BC-250 detected a possible legal/contractual "
-                    f"modality mismatch ({problem}). Please review or retry the translation."
+                    "Translation withheld: BC-250 detected a possible translation "
+                    f"integrity mismatch ({problem}). Please review or retry the translation."
                 )
                 return body
         raise ValueError("BC-250 translation integrity check could not find assistant output")

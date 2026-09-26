@@ -131,10 +131,9 @@ The production product path is the pair of package-owned roles
 Stage-2E-derived production prompt with the 0.12.2 explicit recommendation/obligation hardening,
 `max_tokens=2048`, thinking omitted, and the non-global `bc250_translation_direction` filter. The
 filter also performs a bounded post-generation integrity check: high-confidence
-recommendation/obligation or permission/obligation drift, loss of an explicit prohibition, or loss
+clause-local recommendation/obligation or permission/obligation drift, loss of an explicit prohibition, or loss
 of source-critical currency/percentage/identifier values is withheld for review rather than silently
-returned. Currency/percentage checks compare normalized numeric values, so locale-equivalent
-separators and currency-code placement do not create false withholding. The runtime filter does
+returned. Currency/percentage checks compare conservative numeric interpretation sets, so locale-equivalent unambiguous formatting and currency-code placement remain accepted while ambiguous single-separator three-decimal forms (`1,234` / `1.234`) cannot silently collapse to a 1000x-different value. The runtime filter does
 not semantically validate dates: locale-equivalent target-language date wording is deliberately
 allowed, and date preservation is covered by benchmark/qualification cases instead. The package
 does not attempt to rewrite legal prose automatically. Focused source regressions cover the

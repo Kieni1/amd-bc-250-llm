@@ -146,6 +146,15 @@ def translation_numeric_values(text: str) -> set[Any]:
     return set(normalizer(text))
 
 
+def translation_literal_integrity_mismatch(source: str, target: str) -> str | None:
+    module = translation_contract_module()
+    checker = getattr(module, "literal_integrity_mismatch", None)
+    if not callable(checker):
+        raise BenchmarkError("translation contract does not define literal_integrity_mismatch")
+    result = checker(source, target)
+    return str(result) if result is not None else None
+
+
 def model_policy_path() -> Path:
     return resolve_package_resource("config/openwebui/models.json", "openwebui/models.json")
 

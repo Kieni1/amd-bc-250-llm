@@ -41,6 +41,7 @@ from benchmark_common import (
     resolve_package_resource,
     result_record,
     translation_direction_wrappers,
+    translation_literal_integrity_mismatch,
     translation_numeric_values,
     translation_system_prompt,
     write_benchmark_metadata,
@@ -1982,6 +1983,9 @@ def translation_content_checks(
     expected_numbers = {Decimal(str(value)) for value in case.get("numeric_values", [])}
     if expected_numbers:
         preserved_ok = preserved_ok and expected_numbers.issubset(numeric_values(content))
+    preserved_ok = preserved_ok and translation_literal_integrity_mismatch(
+        str(case.get("input") or ""), content
+    ) is None
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     return required_ok, forbidden_ok, preserved_ok, meaningful_ok
 

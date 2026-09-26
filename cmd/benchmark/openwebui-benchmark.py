@@ -37,6 +37,7 @@ from benchmark_common import (
     normalize_words,
     prepare_result_dir,
     result_record,
+    translation_literal_integrity_mismatch,
     translation_numeric_values,
     write_benchmark_metadata,
     write_result_summary,
@@ -527,6 +528,9 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
         preserved_ok = preserved_ok and expected_numbers.issubset(
             translation_numeric_values_for_checks(content)
         )
+    preserved_ok = preserved_ok and translation_literal_integrity_mismatch(
+        str(case.get("input") or ""), content
+    ) is None
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     modality_case = "modality" in str(case.get("id") or "").casefold()
     failures: list[str] = []

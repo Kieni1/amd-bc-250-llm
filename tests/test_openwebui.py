@@ -919,6 +919,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
         }
         wrong_currency = asyncio.run(module.Filter().outlet(wrong_currency))
         self.assertIn("currency amount", wrong_currency["messages"][-1]["content"])
+        self.assertIn("translation integrity mismatch", wrong_currency["messages"][-1]["content"])
+        self.assertNotIn("legal/contractual modality mismatch", wrong_currency["messages"][-1]["content"])
 
         leading_zero_percentage = {
             "model": "bc250-office-translation-de-fr",
@@ -947,6 +949,48 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertIn(
             "currency amount", leading_zero_currency["messages"][-1]["content"]
         )
+
+        ambiguous_numeric_cases = (
+            ("Der Satz beträgt 1,234 %.", "Le taux est de 1234 %.", True),
+            ("Der Satz beträgt 1.234 %.", "Le taux est de 1234 %.", True),
+            ("Der Satz beträgt 1,234 %.", "Le taux est de 1,234 %.", False),
+            ("Der Satz beträgt 1.234 %.", "Le taux est de 1.234 %.", False),
+            ("Der Betrag beträgt CHF 1,234.", "Le montant est de CHF 1234.", True),
+            ("Der Betrag beträgt CHF 1.234.", "Le montant est de CHF 1234.", True),
+            ("Der Betrag beträgt CHF 1,234.", "Le montant est de CHF 1,234.", False),
+            ("Der Betrag beträgt CHF 1.234.", "Le montant est de CHF 1.234.", False),
+        )
+        for source, target, expect_mismatch in ambiguous_numeric_cases:
+            with self.subTest(source=source, target=target):
+                mismatch = module.literal_integrity_mismatch(source, target)
+                self.assertEqual(mismatch is not None, expect_mismatch)
+
+        clause_swap_cases = (
+            (
+                "bc250-office-translation-fr-de",
+                "Vous devriez signer. Vous devez payer.",
+                "Sie müssen unterschreiben. Sie sollten zahlen.",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Sie dürfen unterschreiben. Sie müssen zahlen.",
+                "Vous devez signer. Vous pouvez payer.",
+            ),
+        )
+        for model_id, source, target in clause_swap_cases:
+            with self.subTest(model_id=model_id, source=source, target=target):
+                body = {
+                    "model": model_id,
+                    "messages": [
+                        {"role": "user", "content": module.WRAPPERS[model_id] + source},
+                        {"role": "assistant", "content": target},
+                    ],
+                }
+                guarded_swap = asyncio.run(module.Filter().outlet(body))
+                self.assertIn(
+                    "translation integrity mismatch",
+                    guarded_swap["messages"][-1]["content"],
+                )
 
         permission_strengthened = {
             "model": "bc250-office-translation-de-fr",
