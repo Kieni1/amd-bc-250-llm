@@ -60,6 +60,7 @@ def check_required_inputs() -> None:
         "packaging/bc250-llm-server.sysusers",
         "packaging/upstreams.toml",
         "models/modelctl.py",
+        "models/model-profiles.json",
         "cmd/monitoring/status.sh",
         "cmd/monitoring/support-bundle.sh",
         "cmd/maintenance/maintenance.sh",
@@ -153,6 +154,8 @@ def check_configuration() -> None:
         fail("packaged governor fix-freq must be explicitly false")
     if gpu_usage.get("method") != "busy-flag":
         fail("packaged governor usage method must remain busy-flag")
+    if gpu_usage.get("temp-read") != "sysfs":
+        fail("packaged governor v0.4.13 temperature source must be sysfs")
     points = governor.get("safe-points", [])
     if not any(
         isinstance(point, dict)
@@ -291,11 +294,6 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "/var/lib/bc250-llm-server",
             "/var/lib/open-webui",
         ),
-        "config/runtime.env": (
-            "BC250_OLLAMA_VERSION=0.34.2",
-            "BC250_OLLAMA_PAYLOAD_URL=https://github.com/ollama/ollama/releases/download/v0.34.2/ollama-linux-amd64.tar.zst",
-            "BC250_OLLAMA_PAYLOAD_SHA256=e155b83589986d2c581fdbf1381ea3ebdb16549883679cd5a0627f7cdc05b12b",
-        ),
         "cmd/system/install-ollama.sh": (
             'source "$runtime_env"',
             'VERSION="${OLLAMA_VERSION:-$BC250_OLLAMA_VERSION}"',
@@ -348,6 +346,38 @@ def check_dispatcher_and_runtime_contracts() -> None:
         for snippet in snippets:
             if snippet not in text:
                 fail(f"{relative}: required behavior is missing: {snippet}")
+
+    runtime_path = ROOT / "config/runtime.env"
+    try:
+        runtime_lines = runtime_path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        fail(f"cannot read runtime metadata: {error}")
+    else:
+        runtime: dict[str, str] = {}
+        for raw in runtime_lines:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            runtime[key] = value
+        ollama_version = runtime.get("BC250_OLLAMA_VERSION", "")
+        ollama_url = runtime.get("BC250_OLLAMA_PAYLOAD_URL", "")
+        ollama_sha = runtime.get("BC250_OLLAMA_PAYLOAD_SHA256", "")
+        owui_version = runtime.get("BC250_OPEN_WEBUI_VERSION", "")
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", ollama_version):
+            fail("runtime metadata has invalid BC250_OLLAMA_VERSION")
+        if f"/v{ollama_version}/ollama-linux-amd64.tar.zst" not in ollama_url:
+            fail("runtime Ollama payload URL does not match BC250_OLLAMA_VERSION")
+        if re.fullmatch(r"[0-9a-f]{64}", ollama_sha) is None:
+            fail("runtime Ollama payload SHA-256 is malformed")
+        if not owui_version or runtime.get("BC250_OPEN_WEBUI_TASK_CONTRACT") != owui_version:
+            fail("Open WebUI task contract must match the pinned Open WebUI version")
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", runtime.get("BC250_OPEN_WEBUI_IMAGE_DIGEST", "")) is None:
+            fail("runtime Open WebUI image digest is malformed")
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", runtime.get("BC250_GOVERNOR_VERSION", "")):
+            fail("runtime governor version metadata is malformed")
+        if re.fullmatch(r"[0-9a-f]{40}", runtime.get("BC250_GOVERNOR_COMMIT", "")) is None:
+            fail("runtime governor commit metadata is malformed")
 
     workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
     refs = re.findall(r"uses:\s+actions/[^@\s]+@([^\s#]+)", workflow)
