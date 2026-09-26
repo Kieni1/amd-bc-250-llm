@@ -64,7 +64,8 @@ account is explicitly enabled, the reserved group has no members and newly publi
 artifacts remain private `0600`; after enablement they are published `0640`.
 
 Before upgrading Open WebUI or moving the complete instance, take a stopped
-filesystem snapshot:
+filesystem snapshot. The automatic RPM-migration snapshot uses the same ownership,
+ACL and xattr-preserving tar semantics before the new image is allowed to start:
 
 ```bash
 sudo systemctl stop open-webui.service
@@ -72,6 +73,29 @@ sudo tar --xattrs --acls --numeric-owner -C /var/lib \
   -czf /ENCRYPTED-BACKUP/open-webui-full-$(date +%F).tar.gz open-webui
 sudo systemctl start open-webui.service
 ```
+
+For RPM migrations the verified automatic archive and `.sha256` sidecar are written
+under `/var/backups/bc250-llm-server/rollback/openwebui/`. To restore one after a
+failed migration, keep Open WebUI stopped, verify the sidecar, move the failed tree
+out of the way, extract the archive as root with ACL/xattr/ownership preservation,
+restore the current SELinux labels, verify SQLite integrity and only then start the
+service:
+
+```bash
+sudo systemctl stop open-webui.service
+cd /var/backups/bc250-llm-server/rollback/openwebui
+sudo sha256sum -c openwebui-FROM-to-TO-TIMESTAMP.tar.gz.sha256
+sudo mv /var/lib/open-webui /var/lib/open-webui.failed-$(date +%F_%H%M%S)
+sudo tar --xattrs --acls --numeric-owner -C /var/lib \
+  -xzf openwebui-FROM-to-TO-TIMESTAMP.tar.gz
+sudo restorecon -RF /var/lib/open-webui
+sudo sqlite3 /var/lib/open-webui/webui.db 'PRAGMA integrity_check;'
+sudo systemctl start open-webui.service
+```
+
+The integrity command must print `ok`. Keep the moved failed tree until the restored
+instance has been verified; it is diagnostic evidence, not the authoritative rollback
+copy.
 
 Restore helpers require confirmation, verify checksum sidecars and create
 rollback data before replacement. Configuration restore remains strict about the

@@ -289,7 +289,8 @@ Open WebUI version migration with an existing database, RPM upgrade holds OWUI b
 installer creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
-replacement for the normal retention policy.
+replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and
+xattrs; the supported restore sequence is documented in [`MAINTENANCE.md`](MAINTENANCE.md).
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
 upload/extraction, embedding/retrieval, the six active package presets and an

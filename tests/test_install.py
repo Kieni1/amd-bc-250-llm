@@ -638,7 +638,7 @@ step_11_maintenance
         source = (ROOT / "cmd/maintenance/backup-upgrade-state.sh").read_text(encoding="utf-8")
         self.assertIn("open-webui.service must be stopped", source)
         self.assertIn("PRAGMA integrity_check", source)
-        self.assertIn("tar --one-file-system --numeric-owner", source)
+        self.assertIn("tar --xattrs --acls --numeric-owner", source)
         self.assertIn("unsupported backup member", source)
         self.assertIn("upgrade backup does not contain webui.db", source)
         self.assertIn('sha256sum -c "$out.sha256"', source)

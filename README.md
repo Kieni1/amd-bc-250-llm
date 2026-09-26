@@ -179,7 +179,10 @@ Ollama 0.34.4 is the next package runtime candidate. The preceding 0.34.2 payloa
 passed BC-250 clean-boot generation, UMA-memory, embedding, Deep-to-task and Documents/RAG
 qualification; 0.34.4 must repeat the focused runtime/resource gate before release acceptance.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
-See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
+Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
+snapshot exists; recovery from that archive is documented in
+[`docs/MAINTENANCE.md`](docs/MAINTENANCE.md). See [`docs/OLLAMA.md`](docs/OLLAMA.md)
+for Ollama upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.
 Coding/agent mode uses `11436` exclusively and stops the normal lanes. `bc250-code`

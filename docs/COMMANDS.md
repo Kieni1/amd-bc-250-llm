@@ -566,7 +566,9 @@ Office roles remain the supported product paths. `status` verifies those persist
 visibility/tool-policy metadata, package Function source/state and package-owned preset fields needed
 by the selected production translation contract. Credentials/tokens
 are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
-synchronized away.
+synchronized away. RPM upgrades that cross an Open WebUI version with existing state hold OWUI
+startup until the guided installer has produced and verified the stopped-state migration rollback
+archive. See [`MAINTENANCE.md`](MAINTENANCE.md) for archive semantics and restoration.
 
 Agent mode is separate from Open WebUI:
 

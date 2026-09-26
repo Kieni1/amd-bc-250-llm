@@ -33,7 +33,8 @@ out="$OUT_DIR/openwebui-${safe_from}-to-${safe_to}-${stamp}.tar.gz"
 
 # Service is stopped, so the complete package-owned persistent tree can be copied
 # consistently, including uploads, vector data and any migration-relevant sidecars.
-tar --one-file-system --numeric-owner -C "$(dirname -- "$DATA")" -czf "$archive_tmp" "$(basename -- "$DATA")"
+tar --xattrs --acls --numeric-owner -C "$(dirname -- "$DATA")" \
+  -czf "$archive_tmp" "$(basename -- "$DATA")"
 tar -tzf "$archive_tmp" >/dev/null
 python3 - "$archive_tmp" "$(basename -- "$DATA")/webui.db" <<'PY'
 import pathlib
