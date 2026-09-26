@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.12.2-0.1 - 2026-09-26
+
+- Advance the next device candidate to Ollama 0.34.4, Open WebUI 0.11.4 and Cyan Skillfish governor 0.4.13 while retaining Tika 4.0.0-full, the standard Open WebUI image, Mesa/Vulkan, the four-lane topology and `OLLAMA_MAX_LOADED_MODELS=1`.
+- Make Open WebUI upgrades rollback-safe: an RPM upgrade with existing OWUI state holds boot enablement, and the guided installer must stop OWUI, pass SQLite integrity, archive the complete persistent tree, validate archive paths/content, create and verify a SHA-256 sidecar, then re-enable/start the new image.
+- Harden DE↔FR translation modality with explicit `sollte`/`devrait` recommendation examples and classify recommendation→obligation drift as `modality` rather than `source-leakage`.
+- Move production Advanced to a reasoning-enabled Qwen3.5 test candidate (`think=true`) while retaining the existing sampler policy; the new device gate decides whether this quality tradeoff remains.
+- Reduce the pressure-heavy Qwen3.6 35B and Qwen3.8 27B Unsloth experimental profiles from 16K to 8K, retain distinct ISTA quality/deployability profiles, and add package-owned role/profile metadata so specialized translation/OCR models are qualified by intended role.
+- Retire experimental Gemma4 26B after repeated arithmetic/template failures and output degeneration, and retire the LFM 8B comparison translator after it reproduced the production recommendation→obligation failure; neither remains an active candidate/rollback path.
+- Make pressure-heavy large-model OWUI surfaces admin/testing-only (Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S) while retaining IQ3_XXS as the ordinary-user deployability comparison. ACL convergence removes only the package-owned wildcard read grant from package-managed discovery records and preserves unrelated administrator grants.
+- Normalize paired Markdown emphasis plus Unicode spacing/hyphen presentation before semantic literal checks so formatting-only differences do not inflate review/defect counts.
+- Parallelize only independent read-only Ollama inventory probes, clarify live 40-CU routing versus optional persistent boot activation, centralize runtime version assertions, and advance revalidation metadata to v4.6 for the new candidate.
+- Expand the next-release qualification contract around all curated OWUI stored records, effective outbound model parameters, exact browser journeys, reasoning persistence/background tasks, Tika 4 Markdown structure, structured outputs, large-library lookup and focused Vulkan/UMA restoration.
+
 ## 0.12.1-0.6 - 2026-09-25
 
 - Make the pre-v1 model-visibility policy real for ordinary users: discover the current main (`11434`) and task (`11435`) Ollama inventories, create/update package-managed visible testing records with additive `user:*:read` access, remove only stale package-managed discovery records from successfully inspected lanes, and continue excluding embedding/agent lanes from normal chat selection.

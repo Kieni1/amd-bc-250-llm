@@ -42,13 +42,14 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.12.1-0.6 source preserves the core-verification boundary while keeping installer UX
+The current 0.12.2-0.1 source preserves the core-verification boundary while keeping installer UX
 concise. Open WebUI desired state remains one existing subsystem rather than gaining another policy
-framework. During pre-v1 testing, implementation and comparison models on the normal main/task lanes
-are intentionally visible: authenticated setup discovers the live 11434/11435 inventories, maintains
-only package-marked testing records and additive ordinary-user read grants, and never treats an
-unavailable lane as an empty lane. The older hidden-implementation policy belongs to historical 2.4
-evidence and must not be reused as a current assertion. Embedding/agent lanes remain excluded.
+framework. During pre-v1 testing, authenticated setup discovers the live 11434/11435 inventories and maintains
+only package-marked testing records without treating an unavailable lane as empty. Raw production/task
+models and ordinary-size experiments remain ordinary-user comparison surfaces, but resource evidence
+now makes Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S admin/testing-only; IQ3_XXS remains the
+ordinary-user deployability comparison. The package owns removal only of its own wildcard read grant
+on those managed records and preserves unrelated administrator grants. Embedding/agent lanes remain excluded.
 Post-install guidance should point at a small set of next commands plus installed documentation/config/
 state/evidence paths; it must not become a second full command reference.
 
@@ -98,6 +99,15 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
+## Current 0.12.2-0.1 qualification boundary
+
+0.12.2 is a crossed-boundary candidate, not a narrow documentation release. Use
+`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.1.md` for the authoritative next device
+sequence. Source checks must prove package structure/contracts only; OWUI 0.11.4 migrations, exact browser
+journeys, effective Ollama requests, model quality and UMA/Vulkan behavior remain device-owned. The new
+package role metadata should drive specialized translation/OCR/experimental probes rather than generic
+capability inference.
+
 ## 6. Recommended current work order
 
 ### Lane A — general operations / office availability / power
@@ -119,13 +129,13 @@ than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
 
 Exact 2.3 has now passed the targeted operations acceptance introduced by the 2.3 release: clean `rpm -V`, swap 0750 convergence, topology-aware status/verifier UX, `bc250-agent-mode normal`, degraded recovery, DRY_RUN/timer output, Tika restart semantics, baseline-aware identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. Preserve this as exact-2.3 evidence.
 
-A separate exact-2.3 authenticated Open WebUI investigation found the application path healthy: HTTP readiness, task routing, Standard/Higher Quality/Deep Reasoning roles, translation 8/8 and bounded RAG 3/3 all passed. It also found three product-state ownership gaps addressed in the historical 2.4 source: Arena persistence, explicit ownership of implementation-model visibility, and persisted local/offline/upload policy in apply/status. Release 0.6 intentionally supersedes the old hidden-implementation selector policy for pre-v1 testing: discovered normal main/task models are visible and synchronized, while agent/embed lanes remain excluded. The current 0.6 OWUI check is one bounded authenticated apply/status/UI/drift-reconvergence batch that also confirms nested request parameters survive import and reach the intended model requests; it is not another model campaign.
+A separate exact-2.3 authenticated Open WebUI investigation found the application path healthy: HTTP readiness, task routing, Standard/Higher Quality/Deep Reasoning roles, translation 8/8 and bounded RAG 3/3 all passed. It also found three product-state ownership gaps addressed in the historical 2.4 source: Arena persistence, explicit ownership of implementation-model visibility, and persisted local/offline/upload policy in apply/status. Exact 0.12.1-0.6 then qualified the ordinary-user lifecycle, curated roles, raw testing-surface visibility, RAG and multi-model compare on OWUI 0.11.3. Current 0.12.2 keeps discovered normal main/task testing records but selectively withholds the three pressure-heavy large experiments from ordinary users, but crosses to OWUI 0.11.4 and therefore requires the bounded stored-record, browser-journey, ACL, reasoning-persistence and effective-request checks in the release handover rather than inheriting the 0.11.3 result.
 
 The distinct `sudo systemctl reboot` invocation is device-proven unreliable on this BC-250: it enters a new boot and progresses substantially before the boot can become unusable/crash-recorded. Do not keep reproducing that failure. Exact-2.3 acceptance found one remaining reachable occurrence in the pinned CU live manager's interactive CPU-core-unlock reboot prompt. Source 2.4 patches that upstream path to `/usr/sbin/reboot` through the existing package patch while preserving its interactive/no-reboot-under-`--yes` contract.
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.5 includes the actual package-owned production translation roles
+The current harness v4.6 includes the package-owned production roles and identifies the 0.12.2 candidate
 and remains the milestone whole-appliance gate.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
@@ -134,7 +144,7 @@ and multisource questions, upload/delete/re-upload, one unload/reload and a long
 not another model zoo or a new benchmark framework. Treat this as product acceptance, not an
 automatic RPM-release gate.
 
-To preserve evidence value while avoiding redundant runtime, v4.5 keeps direct and
+To preserve evidence value while avoiding redundant runtime, v4.6 keeps direct and
 product-path semantic checks distinct, but removes the duplicate generic GPT-OSS edge
 performance pass because the dedicated GPT-OSS/Jina coexistence stage is the stronger
 resource check. Successful intermediate phases use lightweight checkpoints; full
@@ -179,8 +189,9 @@ Translate-Gemma E4B with the exact explicit-direction v1 contract, thinking omit
 `max_tokens=2048`. By maintainer decision, Translate-Gemma is now the package production
 translation base behind the two package-owned direction roles. The current release still
 needs one bounded post-install product-path verification before it is called fully
-hardware-qualified. LFM is retained only as an experimental rollback/reference; TIR is
-closed as the normal deployment choice under current evidence.
+hardware-qualified. Corrected long-run evidence retires LFM from active comparison because it
+reproduces the same recommendation→obligation failure; TIR is closed as the normal deployment
+choice under current evidence.
 
 Next translation sequence:
 

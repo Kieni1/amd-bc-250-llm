@@ -791,3 +791,34 @@ external contract, a newer pinned Open WebUI version is evaluated, or a package-
 depending on root `max_tokens` / reasoning-token / finish-reason semantics. In that case qualify all
 three adapter semantics together rather than fixing one field in isolation.
 
+
+
+## DEC-030 — Retire failed long-run candidates and make pressure-heavy OWUI experiments admin-only
+
+**Status:** ACCEPTED — 0.12.2-0.1 source policy; exact-device verification remains required.
+
+**Context:** Corrected long-run scoring removed prior harness noise and left repeatable model-level
+quality/resource signals. Experimental Gemma4 26B showed wrong/template-contaminated arithmetic and
+output degeneration. Experimental LFM 8B reproduced the same DE→FR recommendation→obligation
+strengthening as the production translator, so it is not a credible rollback solution. Qwen3.6 35B,
+Qwen3.8 27B Unsloth and ISTA IQ3_S remained useful experiments but repeatedly operated with much
+tighter UMA headroom than is desirable for routine ordinary-user selection. ISTA IQ3_XXS retained
+the better deployability profile.
+
+**Decision:**
+
+- move Gemma4 26B and experimental LFM 8B to the source graveyard and add both identities to the
+  installed retired-model catalog;
+- remove the inactive legacy LFM Open WebUI preset and its dedicated quality-check wrappers; generic
+  candidate screens remain available for deliberate archaeology;
+- keep Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S package-managed in OWUI but
+  admin/testing-only by default; keep ISTA IQ3_XXS as the ordinary-user 27B deployability comparison;
+- on package-managed discovery records only, the package may remove its own historical `user:*:read`
+  grant when changing a model to admin/testing-only, while preserving every unrelated administrator
+  grant;
+- normalize paired Markdown emphasis and Unicode presentation before semantic literal matching so
+  formatting-only review noise does not become a model-quality defect.
+
+**Boundary:** This does not alter production Gemma E2B/E4B, GPT-OSS Deep, lane architecture,
+`OLLAMA_MAX_LOADED_MODELS=1`, or the no-generic-scheduler decision. Model/runtime acceptance remains
+part of the new exact-device 0.12.2 campaign.

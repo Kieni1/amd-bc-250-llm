@@ -80,11 +80,14 @@ Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
 create/sign in the administrator and apply the package-owned Open WebUI baseline.
 Persisted providers, task, embedding, RAG and local/offline application policy come
 from the single packaged `openwebui/desired-state.json` through supported APIs.
-During the pre-v1 testing phase the normal main/task Open WebUI providers are unrestricted and
-`bc250-openwebui-setup` synchronizes their discovered Ollama inventories into package-managed visible
-testing records with ordinary-user read access. Curated Office roles remain the recommended product
-paths, while raw production/experimental/task models are visible for comparison testing. Only
-package-managed discovery records are reconciled; administrator-created records/grants are preserved.
+During the pre-v1 testing phase the normal main/task Open WebUI providers remain available for
+comparison, and `bc250-openwebui-setup` synchronizes their discovered Ollama inventories into
+package-managed testing records. Curated Office roles remain the recommended product paths. Raw
+production/task models and ordinary-size experiments remain visible for comparison, while the
+pressure-heavy Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S profiles are admin/testing-only;
+IQ3_XXS remains the ordinary-user deployability comparison. Only the package-owned wildcard grant
+on package-managed discovery records may be removed when this visibility policy changes; unrelated
+administrator-created records and grants are preserved.
 Agent `11436` and embedding `11437` remain separate from the chat selector by topology. Arena is
 package-converged off; use `sudo bc250-openwebui-setup init` later
 if that step was skipped. The default endpoint is unencrypted HTTP; see
@@ -111,7 +114,7 @@ separate higher-quality general-office option; this RAG decision is about sustai
 not a semantic-quality failure.
 
 The packaged comparison catalog retains active measured challengers, including
-`exp-granite42-3b-ibm-q6-k`, the former LFM translator as an explicit rollback/reference,
+`exp-granite42-3b-ibm-q6-k`, the distinct Qwen3.8 27B quality/deployability profiles,
 and the compact `agentic-qwen35-4b-khazarai-q6-k` /
 `agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
 kept only in the source graveyard and are not
@@ -163,19 +166,19 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 | Component | Purpose |
 |---|---|
-| Cyan Skillfish governor v0.4.12 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.34.2 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.11.3 and Tika v4.0.0 | Digest-pinned local UI, API-driven baseline setup and document extraction |
+| Cyan Skillfish governor v0.4.13 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
+| Ollama v0.34.4 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Open WebUI v0.11.4 and Tika v4.0.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG lifecycle | Local DE/FR/bilingual batch preparation, human review, provenance validation and Open WebUI sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 
-Ollama 0.34.2 is the package runtime baseline because that exact payload passed the
-BC-250 clean-boot generation, UMA-memory, embedding, Deep-to-task and Documents/RAG
-qualification. Runtime updates remain deliberately gated: package the last BC-250-
-qualified payload rather than automatically following the newest upstream release.
+Ollama 0.34.4 is the next package runtime candidate. The preceding 0.34.2 payload
+passed BC-250 clean-boot generation, UMA-memory, embedding, Deep-to-task and Documents/RAG
+qualification; 0.34.4 must repeat the focused runtime/resource gate before release acceptance.
+Runtime updates remain deliberately pinned rather than following upstream automatically.
 See [`docs/OLLAMA.md`](docs/OLLAMA.md) for upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.

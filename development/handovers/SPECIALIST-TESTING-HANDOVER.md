@@ -40,7 +40,7 @@ retest conditions from existing decisions:
   topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
   supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
   ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.1-0.6 preserves the established runtime configuration and focuses on effective ordinary-user model visibility, translation integrity, centralized Qwen request policy and operator/evidence observability. Exact 0.4 already provides broad runtime/model evidence; do not replay it unless the repair crosses that boundary. Keep the pinned-v0.11.3 adapter limitations documented rather than
+  narrow temporary mitigations. Current source 0.12.2-0.1 is a new runtime/model-policy candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, reasoning-enabled Advanced, hardened translation modality, and 8K pressure-profile retests. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
   treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
   rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
   live pruning and other destructive support checks remain conditional, not automatic release gates.
@@ -70,11 +70,13 @@ retest conditions from existing decisions:
   drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
   new runtime/model/hardware or product question.
 
-## Current 0.12.1-0.6 testing priority
+## Current 0.12.2-0.1 testing priority
 
-Keep this round impact-based and use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-0.6.md`. Do not replay broad closed campaigns. Prove the effective ordinary-user model selector against actual 11434/11435 inventory, embedding/agent exclusion, additive/non-destructive model reconciliation, DE↔FR modality/literal integrity behavior, Advanced effective nested request params, status residency/reboot wording, revalidation v4.5 identity/raw output, support-bundle timeout/self-verification, package integrity/verifier and final normal topology.
-
-The already-repaired RAG lifecycle semantics from 0.5 remain in force; reopen them only if a 0.6 change demonstrably crosses that boundary. Qwen template replacement, generic memory admission and the model-only deployment profile are not part of this release.
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.1.md`. This candidate deliberately crosses
+OWUI/Ollama runtime, Advanced request policy, translation prompt, selected large-model context and upgrade
+migration boundaries, so test those surfaces directly. Preserve the previous clean topology/restoration
+evidence as comparison context, but do not relabel it as current qualification. Qwen template replacement,
+generic memory admission, ROCm migration and pre-emptive multi-model restriction are not part of this release.
 
 ## Acceptance-harness evidence policy
 
