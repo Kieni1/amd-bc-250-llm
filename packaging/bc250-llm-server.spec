@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.2
-Release:        0.2%{?dist}
+Release:        0.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -136,6 +136,22 @@ python3 scripts/install-manifest.py \
   --define "unlock_commit=%{unlock_commit}" \
   --define "live_manager_commit=%{live_manager_commit}"
 
+%pre
+# On upgrades with existing Open WebUI state, stop the currently running
+# service before the new Quadlet payload can become eligible through any
+# subsequent daemon-reload.  Keep boot enablement held until bc250-install
+# creates and verifies the stopped-state rollback snapshot.
+if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
+  if systemctl is-active --quiet open-webui.service 2>/dev/null; then
+    if ! systemctl stop open-webui.service >/dev/null 2>&1; then
+      echo "ERROR: could not stop Open WebUI before migration-safe package upgrade." >&2
+      exit 1
+    fi
+  fi
+  rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
+  echo "Open WebUI runtime and boot held for migration safety. Run: sudo bc250-install"
+fi
+
 %post
 %systemd_post %{bc250_units}
 %tmpfiles_create bc250-llm-server.conf
@@ -145,12 +161,12 @@ if [ ! -s "$secret_env" ]; then
   python3 -c 'import secrets; print("WEBUI_SECRET_KEY=" + secrets.token_hex(32))' > "$secret_env"
 fi
 chmod 0600 "$secret_env"
-# Hold Open WebUI boot across package upgrades when persistent state exists. The
-# guided installer creates and verifies the full stopped-state rollback snapshot
-# before restoring boot enablement and starting the newly pinned image.
+# The upgrade %pre scriptlet already stopped Open WebUI and removed its boot
+# drop-in before the new Quadlet payload was installed.  Reassert the boot hold
+# defensively; guided convergence restores it only after the verified snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
-  echo "Open WebUI boot held for migration safety. Run: sudo bc250-install"
+  echo "Open WebUI remains stopped and boot-held for migration safety. Run: sudo bc250-install"
 fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 echo "BC-250 package installed. Run: sudo bc250-install"
@@ -219,6 +235,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.3
+- Stop an existing Open WebUI service in the RPM pre-upgrade phase before the new Quadlet can become restart-eligible; keep boot/runtime held until the verified migration snapshot and guided convergence.
+- Make translation modality checks clause-local so recommendation/obligation/permission swaps cannot pass through document-global category matching.
+- Treat single-separator three-decimal numeric forms as ambiguous and require the complete interpretation set to match, preventing 1000x corruption from being accepted.
+- Use neutral translation-integrity rejection wording for modality and literal/numeric failures and extend direct/OWUI qualification to the same runtime literal-integrity authority.
+
 * Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.2
 - Complete French recommendation/obligation/permission/prohibition conjugation coverage in the bounded translation guard and reject leading-zero decimal value changes such as 0.125 -> 125.
 - Make direct and Open WebUI translation qualification load the package runtime numeric authority, and make the direct production benchmark load the exact packaged translation prompt/wrappers with modality-specific failure classification.

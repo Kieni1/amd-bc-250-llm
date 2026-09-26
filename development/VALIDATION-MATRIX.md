@@ -14,7 +14,7 @@ Status vocabulary:
 - **PENDING** — no sufficient evidence yet.
 - **N/A** — that validation class does not apply.
 
-Current source baseline while this file was refreshed: `0.12.2-0.2`. Historical rows below retain the
+Current source baseline while this file was refreshed: `0.12.2-0.3`. Historical rows below retain the
 exact release labels of the evidence they describe. Exact-installed 0.12.1-0.6 provides the immediate
 comparison baseline: infrastructure/resource/restoration passed, but translation recommendation modality
 was not clean. Current 0.12.2 crosses runtime/model-policy boundaries (Ollama 0.34.4, Open WebUI 0.11.4,
@@ -42,8 +42,8 @@ Exact 2.3 has now passed the targeted operations acceptance introduced through 2
 
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
-| repository/unit validation | SOURCE PASS — static RPM preflight, shell/Python/JSON syntax checks and focused affected-module tests pass after the 0.12.2-0.2 translation/rollback logic closure; current deterministic inventory is 483 methods and the full suite was intentionally not rerun in this integration pass; `development/` remains excluded from production discovery | PENDING/EXTERNAL | 0.12.1-0.6 exact device baseline available | build exact 0.12.2-0.2, then run the crossed-boundary release handover |
-| RPM build/install | source metadata targets 0.12.2-0.2; RPM/SRPM build remains an external package-build gate | PENDING/EXTERNAL | exact 0.12.1-0.6 is the immediate device comparison baseline | build/install exact 0.12.2-0.2, then run the crossed-boundary release handover |
+| repository/unit validation | SOURCE PASS — static RPM preflight, shell/Python/JSON syntax checks and focused affected-boundary tests pass after the 0.12.2-0.3 translation/migration-race closure; deterministic inventory is tracked separately from this focused repair pass and the full suite is not required for this integration fix; `development/` remains excluded from production discovery | PENDING/EXTERNAL | 0.12.1-0.6 exact device baseline available | build exact 0.12.2-0.3, then run the crossed-boundary release handover |
+| RPM build/install | source metadata targets 0.12.2-0.3; RPM/SRPM build remains an external package-build gate | PENDING/EXTERNAL | exact 0.12.1-0.6 is the immediate device comparison baseline | build/install exact 0.12.2-0.3, then run the crossed-boundary release handover |
 | normal service topology | SOURCE PASS — canonical normal/degraded/stopped/agent classifier retained; status version probing follows an active lane | external | EXACT 2.3 — normal/degraded/agent convergence UX accepted; final failed units 0 and verifier clean | preserve; next work is OWUI application behavior rather than topology replay |
 | office HTTP readiness | SOURCE PASS — installer/verifier/revalidation/OWUI benchmarks distinguish HTTP/API readiness from mere service activity | external | EXACT 2.2 — Open WebUI/nginx recovered after restart and after supported reboot; Open WebUI service became active before HTTP readiness by ~20 s | preserve HTTP-based readiness; no new health framework required |
 | Open WebUI product surface / desired state | SOURCE PASS — 0.12.2 targets OWUI 0.11.4, keeps Arena/local-offline policy and curated workspace/derived presets, preserves additive ACL convergence, explicitly configures Tika 4, and retains discovered normal main/task testing records while making the three pressure-heavy large experiments admin/testing-only | external | EXACT 0.12.1-0.6 ordinary-user lifecycle/roles/RAG/compare passed on OWUI 0.11.3; it is comparison evidence, not qualification of 0.11.4 | qualify migration-safe upgrade, every curated stored record, ordinary-user ACL/visibility, canonical browser journey, reasoning persistence and background tasks on exact 0.12.2 |

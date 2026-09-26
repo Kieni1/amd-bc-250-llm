@@ -42,7 +42,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.12.2-0.2 source preserves the core-verification boundary while keeping installer UX
+The current 0.12.2-0.3 source preserves the core-verification boundary while keeping installer UX
 concise. Open WebUI desired state remains one existing subsystem rather than gaining another policy
 framework. During pre-v1 testing, authenticated setup discovers the live 11434/11435 inventories and maintains
 only package-marked testing records without treating an unavailable lane as empty. Raw production/task
@@ -99,10 +99,10 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## Current 0.12.2-0.2 qualification boundary
+## Current 0.12.2-0.3 qualification boundary
 
 0.12.2 is a crossed-boundary candidate, not a narrow documentation release. Use
-`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.2.md` for the authoritative next device
+`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.3.md` for the authoritative next device
 sequence. Source checks must prove package structure/contracts only; OWUI 0.11.4 migrations, exact browser
 journeys, effective Ollama requests, model quality and UMA/Vulkan behavior remain device-owned. The new
 package role metadata should drive specialized translation/OCR/experimental probes rather than generic
