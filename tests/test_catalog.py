@@ -315,9 +315,11 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("production German/French translation base", translator)
         self.assertIn("PARAMETER num_predict 2048", translator)
         self.assertNotRegex(translator, r"(?m)^SYSTEM\s")
-        lfm = (MODELFILES / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
-        self.assertIn("experimental rollback/control", lfm)
-        self.assertIn("Preserve legal and contractual modality exactly", lfm)
+        graveyard = ROOT / "models/modelfiles-graveyard"
+        lfm = (graveyard / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("retired from active comparison", lfm)
+        gemma26 = (graveyard / "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("output degeneration", gemma26)
 
     def test_qwen38_ista_profiles_match_intended_bc250_roles(self) -> None:
         quality = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile").read_text(encoding="utf-8")
@@ -1141,6 +1143,26 @@ class StatusTests(unittest.TestCase):
             self.assertIn("downloaded, not set up", text)
             self.assertNotIn("download unknown", text)
 
+
+    def test_package_model_profiles_encode_specialized_roles_and_pressure_candidates(self) -> None:
+        document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        self.assertEqual(document["schema"], 1)
+        profiles = document["profiles"]
+        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k:latest"]["reasoning_policy"], "request-think-true-candidate")
+        self.assertEqual(profiles["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]["context_target"], 8192)
+        self.assertEqual(profiles["exp-qwen38-27b-unsloth-ud-iq3-s:latest"]["context_target"], 8192)
+        self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-s:latest"]["profile_class"], "experimental-quality")
+        self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]["profile_class"], "experimental-deployability")
+        self.assertTrue(profiles["prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest"]["specialized"])
+        self.assertTrue(profiles["exp-glm-ocr-ggml-q8-0:latest"]["specialized"])
+
+    def test_pressure_heavy_qwen_profiles_are_reset_to_8k_for_next_device_gate(self) -> None:
+        q36 = (MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
+        q38 = (MODELFILES / "exp-qwen38-27b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
+        self.assertIn("PARAMETER num_ctx 8192", q36)
+        self.assertNotIn("PARAMETER num_ctx 16384", q36)
+        self.assertIn("PARAMETER num_ctx 8192", q38)
+        self.assertNotIn("PARAMETER num_ctx 16384", q38)
 
 if __name__ == "__main__":
     unittest.main()

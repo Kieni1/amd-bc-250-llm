@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fully automated BC-250 main-model screen against production GPT-OSS.
 #
-# Intended to run on the real appliance after these four experimental Modelfiles
+# Intended to run on the real appliance after these active experimental Modelfiles
 # are installed by the package. It downloads/registers one candidate at a time,
 # runs the package-owned generation compare + edge profiles, unloads all normal
 # lanes between runs, records journal/resource evidence, and removes only
@@ -23,7 +23,6 @@ BASELINE='prod-gpt-oss20b-ggml-org-mxfp4'
 CANDIDATES=(
   'exp-qwen36-35b-a3b-unsloth-ud-iq3-s'
   'exp-qwen38-27b-ista-gsq-rco-iq3-s'
-  'exp-gemma4-26b-a4b-mradermacher-i1-iq3-s'
   'exp-qwen38-27b-unsloth-ud-iq3-s'
 )
 

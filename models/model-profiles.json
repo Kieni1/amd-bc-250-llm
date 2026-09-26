@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "authority": "package-owned role/profile metadata for qualification; Modelfiles remain runtime parameter authority",
+  "profiles": {
+    "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest": {
+      "intended_role": "office-standard-implementation",
+      "profile_class": "production",
+      "reasoning_policy": "system-selected-nonthinking",
+      "residency_policy": "default",
+      "context_target": 32768
+    },
+    "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest": {
+      "intended_role": "documents-rag-implementation",
+      "profile_class": "production",
+      "reasoning_policy": "system-selected-nonthinking",
+      "residency_policy": "default",
+      "context_target": 32768
+    },
+    "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest": {
+      "intended_role": "translation-implementation",
+      "profile_class": "translation",
+      "reasoning_policy": "translation-task",
+      "residency_policy": "default",
+      "context_target": 8192,
+      "output_token_expectation": 2048,
+      "specialized": true
+    },
+    "prod-qwen35-9b-unsloth-q6-k:latest": {
+      "intended_role": "office-advanced-implementation",
+      "profile_class": "production",
+      "reasoning_policy": "request-think-true-candidate",
+      "residency_policy": "default",
+      "context_target": 32768
+    },
+    "prod-gpt-oss20b-ggml-org-mxfp4:latest": {
+      "intended_role": "deep-reasoning-implementation",
+      "profile_class": "production",
+      "reasoning_policy": "reasoning",
+      "residency_policy": "request-keep-alive-0",
+      "context_target": 16384
+    },
+    "task-lfm25-1.2b-instruct-liquidai-q6-k:latest": {
+      "intended_role": "openwebui-task-model",
+      "profile_class": "task",
+      "reasoning_policy": "task-generation",
+      "residency_policy": "task-lane",
+      "context_target": 4096,
+      "output_token_expectation": 128
+    },
+    "embed-jina-v5-small-retrieval-q4-k-m:latest": {
+      "intended_role": "embedding",
+      "profile_class": "embedding",
+      "reasoning_policy": "not-applicable",
+      "residency_policy": "embedding-lane",
+      "context_target": 4096
+    },
+    "agentic-ornith15-9b-ornith-q5-k-m:latest": {
+      "intended_role": "coding-agent",
+      "profile_class": "agentic",
+      "reasoning_policy": "native-reasoning",
+      "residency_policy": "agent-mode-only",
+      "context_target": 32768,
+      "output_token_expectation": 3072
+    },
+    "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest": {
+      "intended_role": "general-reasoning",
+      "profile_class": "experimental-quality",
+      "reasoning_policy": "request-think-false",
+      "residency_policy": "experimental",
+      "context_target": 8192
+    },
+    "exp-qwen38-27b-unsloth-ud-iq3-s:latest": {
+      "intended_role": "general-reasoning",
+      "profile_class": "experimental-quality",
+      "reasoning_policy": "request-think-medium",
+      "residency_policy": "experimental",
+      "context_target": 8192
+    },
+    "exp-qwen38-27b-ista-gsq-rco-iq3-s:latest": {
+      "intended_role": "general-reasoning",
+      "profile_class": "experimental-quality",
+      "reasoning_policy": "reasoning-comparison",
+      "residency_policy": "experimental",
+      "context_target": 8192,
+      "output_token_expectation": 3072
+    },
+    "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest": {
+      "intended_role": "general-reasoning",
+      "profile_class": "experimental-deployability",
+      "reasoning_policy": "request-think-false",
+      "residency_policy": "experimental",
+      "context_target": 8192,
+      "output_token_expectation": 1024
+    },
+    "exp-glm-ocr-ggml-q8-0:latest": {
+      "intended_role": "ocr",
+      "profile_class": "specialized-ocr",
+      "reasoning_policy": "specialized",
+      "residency_policy": "experimental",
+      "context_target": 16384,
+      "specialized": true
+    },
+    "exp-ovisocr2-abiray-q8-0:latest": {
+      "intended_role": "ocr",
+      "profile_class": "specialized-ocr",
+      "reasoning_policy": "specialized",
+      "residency_policy": "experimental",
+      "context_target": 16384,
+      "specialized": true
+    }
+  }
+}

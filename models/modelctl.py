@@ -21,6 +21,7 @@ import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -570,6 +571,16 @@ def registered_models(host: str) -> set[str] | None:
     )
 
 
+def registered_models_by_host(hosts: list[str] | set[str] | tuple[str, ...]) -> dict[str, set[str] | None]:
+    """Probe distinct Ollama hosts concurrently; probes are read-only and independently bounded."""
+    ordered = list(dict.fromkeys(hosts))
+    if not ordered:
+        return {}
+    with ThreadPoolExecutor(max_workers=min(4, len(ordered))) as pool:
+        values = list(pool.map(registered_models, ordered))
+    return dict(zip(ordered, values, strict=True))
+
+
 def print_models(
     defaults: dict, models: list[dict], registered=None, destination=None
 ) -> None:
@@ -671,7 +682,7 @@ def purge_retired(*, yes: bool) -> int:
         raise ModelError("run with sudo")
     retired = load_retired_models()
     hosts = sorted({CATEGORY_DEFAULTS[category]["ollama_host"] for category in OLLAMA_CATEGORIES})
-    registrations = {host: registered_models(host) for host in hosts}
+    registrations = registered_models_by_host(hosts)
     present = [item for item in retired if retired_present(item, registrations)]
     if not present:
         print("No retired package-managed models are present.")
@@ -751,7 +762,7 @@ def print_all_models(directories: list[Path]) -> None:
     hosts = {
         CATEGORY_DEFAULTS[category]["ollama_host"] for category in OLLAMA_CATEGORIES
     }
-    registrations = {host: registered_models(host) for host in hosts}
+    registrations = registered_models_by_host(hosts)
     for category in OLLAMA_CATEGORIES:
         defaults = CATEGORY_DEFAULTS[category]
         selected = [model for model in models if model["category"] == category]
@@ -804,11 +815,13 @@ def print_all_models(directories: list[Path]) -> None:
 
 def print_catalogs(catalogs: list[tuple[dict, list[dict]]], *, include_disabled_mtp: bool = False) -> None:
     """Print mixed catalogs while preserving each category's runtime/status rules."""
-    registrations = {
-        defaults["ollama_host"]: registered_models(defaults["ollama_host"])
-        for defaults, _models in catalogs
-        if defaults.get("ollama_host")
-    }
+    registrations = registered_models_by_host(
+        [
+            defaults["ollama_host"]
+            for defaults, _models in catalogs
+            if defaults.get("ollama_host")
+        ]
+    )
     for defaults, models in catalogs:
         category = defaults["category"]
         available = (
@@ -2490,11 +2503,11 @@ def main(argv: list[str] | None = None) -> int:
                 available, args.selection, interactive=False
             )
             selected_ids = {(model["category"], model["id"]) for model in selected}
-            registrations: dict[str, set[str] | None] = {}
+            registrations = registered_models_by_host(
+                [defaults["ollama_host"] for defaults, _models in catalogs if defaults.get("ollama_host")]
+            )
             for defaults, models in catalogs:
                 host = defaults.get("ollama_host")
-                if host and host not in registrations:
-                    registrations[host] = registered_models(host)
                 category_models = [
                     model
                     for model in models

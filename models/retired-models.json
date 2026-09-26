@@ -2,6 +2,13 @@
   "schema": 1,
   "models": [
     {
+      "name": "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-26b-a4b-mradermacher-i1-iq3-s/gemma-4-26B-A4B.i1-IQ3_S.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile"
+    },
+    {
       "name": "exp-gemma4-e4b-hauhaucs-aggressive-q6-k-p",
       "category": "experiments",
       "ollama_host": "127.0.0.1:11434",
@@ -28,6 +35,13 @@
       "ollama_host": "127.0.0.1:11434",
       "source": "/var/lib/bc250-llm-server/gguf/experiments/LFM2.5-1.2B-Instruct-Q6_K.gguf",
       "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
+    },
+    {
+      "name": "exp-lfm25-8b-a1b-liquidai-q6-k",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/LFM2.5-8B-A1B-Q6_K.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile"
     },
     {
       "name": "exp-ling30-tiny-bloomer-q5-k-m",

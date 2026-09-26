@@ -22,8 +22,7 @@ need_file "$SHARE/model-management/retired-models.json"
 
 for name in \
   task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile \
-  prod-translate-gemma4-sub-e4b-17s-q4-k-xl.Modelfile \
-  exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile
+  prod-translate-gemma4-sub-e4b-17s-q4-k-xl.Modelfile
 do
     need_file "$MODEL_DIR/$name"
 done
@@ -32,10 +31,8 @@ for path in \
   "$QUALITY_DIR/task/10-candidate-screen.sh" \
   "$QUALITY_DIR/translation/10-direct-candidate-screen.sh" \
   "$QUALITY_DIR/translation/13-translate-gemma-direct.sh" \
-  "$QUALITY_DIR/translation/14-lfm-direct-reference.sh" \
   "$QUALITY_DIR/translation/20-owui-candidate-screen.sh" \
   "$QUALITY_DIR/translation/22-translate-gemma-owui.sh" \
-  "$QUALITY_DIR/translation/23-lfm-owui-reference.sh" \
   "$QUALITY_DIR/utils/inspect-latest-evidence.sh"
 do
     need_file "$path"
@@ -62,11 +59,10 @@ grep -Fq 'task-lfm25-1.2b-instruct-liquidai-q6-k' "$tmp_task" || {
 grep -Fq 'prod-translate-gemma4-sub-e4b-17s-q4-k-xl' "$tmp_prod" || {
     printf 'NOT DISCOVERED: production translation model\n' >&2; exit 1;
 }
-grep -Fq 'exp-lfm25-8b-a1b-liquidai-q6-k' "$tmp_exp" || {
-    printf 'NOT DISCOVERED: experimental LFM translation reference\n' >&2; exit 1;
-}
 for retired in \
   exp-lfm25-1.2b-instruct-liquidai-q6-k \
+  exp-lfm25-8b-a1b-liquidai-q6-k \
+  exp-gemma4-26b-a4b-mradermacher-i1-iq3-s \
   exp-minicpm5-2b-openbmb-q4-k-m \
   exp-qwen3-1.7b-ggml-q4-k-m \
   exp-qwen38-2b-distill-empero-q6-k \

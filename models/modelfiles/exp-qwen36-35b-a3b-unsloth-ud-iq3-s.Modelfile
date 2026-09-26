@@ -19,7 +19,7 @@ PARAMETER num_gpu 99
 PARAMETER num_keep 256
 
 # Match the current GPT-OSS comparison envelope first; raise only after memory evidence.
-PARAMETER num_ctx 16384
+PARAMETER num_ctx 8192
 
 # Conservative Qwen-family reasoning sampling for comparison use.
 PARAMETER temperature 0.6

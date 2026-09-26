@@ -25,12 +25,13 @@ This preserves interactive chat latency while keeping background task residency 
 Agent/coding is **exclusive**: `bc250-agent-mode enter` stops main/task/embedding and
 starts only 11436; `leave` restores normal mode.
 
-During pre-v1 comparison testing Open WebUI exposes every model actually installed on the normal
-main (`11434`) and task (`11435`) providers. Setup discovers those inventories and maintains
-package-managed visible testing records with additive ordinary-user read access; it never uses an
-unavailable lane as evidence that all of that lane's models vanished. Curated `bc250-office-*` roles
-remain the product contracts; raw production, experimental and task identities are visible for direct
-comparison. The embedding and exclusive agent lanes remain outside the normal chat selector.
+During pre-v1 comparison testing Open WebUI discovers models installed on the normal main (`11434`)
+and task (`11435`) providers and maintains package-managed testing records without treating an
+unavailable lane as empty. Curated `bc250-office-*` roles remain the product contracts. Raw
+production/task models and ordinary-size experiments remain ordinary-user comparison surfaces, while
+the pressure-heavy Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S profiles are admin/testing-only;
+ISTA IQ3_XXS remains the ordinary-user deployability comparison. Embedding and exclusive agent lanes
+remain outside the normal chat selector.
 
 MTP is different from the agent lane: it shares catalog/provenance handling with `bc250-model`, but
 its runtime is a standalone opt-in external llama.cpp server rather than an Ollama service lane.
@@ -257,10 +258,12 @@ the focused `Avoir AV-19` case did not produce the preferred explicit `Gutschrif
 The numeric evaluator correctly treats locale-equivalent values such as `8.1` and `8,1`
 as equal without claiming byte-for-byte formatting preservation.
 
-The former `prod-lfm25-8b-a1b-liquidai-q6-k` identity is retired; the same LFM family is
-retained as `exp-lfm25-8b-a1b-liquidai-q6-k` only for deliberate rollback/reference
-comparisons. Hunyuan-MT and Ministral translation-only challengers are retired to the
-source graveyard. TIR Qwen3.5 9B remains active only as a broader office/RAG experiment;
+The former `prod-lfm25-8b-a1b-liquidai-q6-k` identity and its later
+`exp-lfm25-8b-a1b-liquidai-q6-k` comparison identity are both retired. Corrected long-run evidence
+showed the LFM model reproduces the same recommendation→obligation strengthening as the production
+translator, so it is no longer described as a rollback candidate. Hunyuan-MT and Ministral
+translation-only challengers are likewise in the source graveyard. TIR Qwen3.5 9B remains active
+only as a broader office/RAG experiment;
 its translation deployment path is closed under current evidence. The old experimental
 Translate-Gemma identity is also retired after promotion to the production name.
 
@@ -296,12 +299,12 @@ mirrored in `models/retired-models.json` so stale installed registrations remain
 distinguishable from operator-created unmanaged models and can be removed safely with
 `bc250-model purge-retired`.
 
-The graveyard currently contains 17 definitions. Important recent role changes are:
+The graveyard currently contains 19 definitions. Important recent role changes are:
 
 | Model | Why it is retired from routine discovery |
 |---|---|
 | `task-gemma3-1b-unsloth-ud-q4-k-xl` | superseded by the proven LFM 1.2B task model; current task quality remained about 2/6 |
-| `prod-lfm25-8b-a1b-liquidai-q6-k` | former production translation identity; superseded by production Translate-Gemma, with LFM retained only as `exp-lfm25-8b-a1b-liquidai-q6-k` |
+| `prod-lfm25-8b-a1b-liquidai-q6-k` | former production translation identity superseded by production Translate-Gemma |
 | `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | experimental identity retired after the same selected weights were promoted under the production name |
 | `exp-hunyuan-mt-7b-mungert-q4-k-m` | translation-only challenger behind Translate-Gemma with reproducible CHF preservation weakness |
 | `exp-ministral3-8b-unsloth-ud-q5-k-xl` | translation-only finalist superseded when Stage-2E selected Translate-Gemma |
@@ -312,9 +315,9 @@ Other older graveyard entries remain documented by their Modelfiles, decision hi
 retired catalog. Do not resurrect them because of an isolated benchmark score; require a
 new role, changed hardware/runtime envelope or other explicit retest condition.
 
-Active experiments must retain a current comparison purpose. The former production LFM
-translation model is an explicit rollback/reference; TIR remains a broader office/RAG
-comparison; general-main, OCR, embedding and agent experiments keep their separate lanes.
+Active experiments must retain a current comparison purpose. LFM and Gemma4 26B are now retired;
+TIR remains a broader office/RAG comparison, while general-main, OCR, embedding and agent
+experiments keep their separate lanes.
 
 Use the role-specific lanes before changing defaults:
 
@@ -338,12 +341,10 @@ separately below.
 ```text
 exp-gemma4-12b-google-qat-q4-0
 exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
-exp-gemma4-26b-a4b-mradermacher-i1-iq3-s
 exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
-exp-lfm25-8b-a1b-liquidai-q6-k
 exp-ovisocr2-abiray-q8-0
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
@@ -391,23 +392,27 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | experimental memory-edge 35B; integrated OWUI/Tika repeatedly crosses the 512 MiB safety floor, while model-only 16K is viable with ~0.8-0.95 GiB residual headroom; prefer `think=false`; named reasoning effort is not exposed by the embedded template |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | experimental dense 27B; non-thinking is more predictable, while named reasoning effort is supported and the next bounded comparison is `low` versus `medium`; do not promote medium as solved |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | memory-efficient comparison only; despite comfortable fit it returned `56` for `7*9-17` under both tested non-thinking sampler configurations, so quality qualification failed and no production/RAG promotion is allowed |
-| `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental dense 27B control; native `think=medium` improved the office-list workload and is the preferred reasoning experiment, but open-ended tasks can still exhaust reasoning budget and prior memory evidence excludes production RAG |
-| `exp-gemma4-26b-a4b-mradermacher-i1-iq3-s` | Gemma 4 MoE main-lane challenger; i1-IQ3_S first, i1-IQ3_XS fallback; projector omitted for initial text comparison |
+| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | experimental memory-edge 35B; the prior 16K profile repeatedly entered sub-512 MiB headroom, so 0.12.2 reduces the candidate to 8K; retain only if device requalification shows materially better headroom; prefer `think=false`; named reasoning effort is not exposed by the embedded template |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | experimental 8K quality profile; tighter than IQ3_XXS but mechanically strong in the corrected long-run evidence; retain as the quality-oriented ISTA comparison and keep unload/recovery evidence separate from routine-headroom quality |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |
+| `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental dense 27B control; the prior 16K profile reached ~200 MiB headroom, so 0.12.2 reduces it to 8K for requalification; retain only if headroom materially improves without losing its intended quality role |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
-| `exp-lfm25-8b-a1b-liquidai-q6-k` | former production DE/FR translator retained as rollback/reference while the promoted Translate-Gemma product path is verified |
 | `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; retain as the baseline while product-path completion/extraction is qualified |
 | `agentic-qwable9b-empero-q6-k` | active 9B coding/agent challenger; retain for the next comparative funnel |
 | `agentic-qwen35-4b-khazarai-q6-k` | new compact Qwen3.5 agentic-coding challenger; Q6_K with the Qwen precise-coding sampling profile; qualification pending |
 | `agentic-gemma4-e4b-sol-fable-q4-k-m` | new compact Gemma 4 E4B agentic/coding challenger; conservative 16K deterministic BC-250 test profile; qualification pending |
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use comparison; retain until the E4B challenger establishes whether a final 12B comparison is useful |
 | `agentic-qwen25-coder7b-unsloth-q5-k-m` | legacy coding comparison; lifecycle decision remains pending canonical campaign-evidence reconciliation |
+
+Package-owned role/profile metadata for production and significant experimental models lives in
+`models/model-profiles.json`. Qualification should select probes from that intended role rather than
+inferring product purpose from generic Ollama capabilities. Repeated successful unload/recovery is
+not a memory leak, but repeated sub-512 MiB recovery is still a profile-quality signal: distinguish
+leak/unload failure, successful-but-excessively-tight operation, and comfortable operation.
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,

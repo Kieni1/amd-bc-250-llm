@@ -4,7 +4,7 @@
 # GGUF: LFM2.5-8B-A1B-Q6_K.gguf
 FROM /var/lib/bc250-llm-server/gguf/experiments/LFM2.5-8B-A1B-Q6_K.gguf
 
-# Former production DE↔FR baseline retained as an experimental rollback/control.
+# Former production DE↔FR baseline; retired from active comparison after reproducing recommendation→obligation drift.
 # BC-250: force full GPU offload; do not remove.
 PARAMETER num_gpu 99
 # Preserve the SYSTEM prefix when old context is evicted.
