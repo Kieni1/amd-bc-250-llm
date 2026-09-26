@@ -10,8 +10,8 @@ journalctl -u cyan-skillfish-governor-smu.service -b
 sudo bc250-verify
 ```
 
-The RPM pins `filippor/cyan-skillfish-governor` v0.4.12 at commit
-`be9537fc36f24b17570088cafa8c79365f80fee8`. Fresh installations use a
+The RPM pins `filippor/cyan-skillfish-governor` v0.4.13 at commit
+`aaed42535622aee1a93df8b22860c409539f67f8`. Fresh installations use a
 350–1850 MHz range. The 2000 MHz / 960 mV point remains in the curve only for
 deliberate operator testing. `%config(noreplace)` preserves local tuning on
 upgrades.
@@ -21,6 +21,7 @@ The packaged usage policy is:
 ```text
 fix-freq = false
 method = "busy-flag"
+temp-read = "sysfs"
 ```
 
 Use `fix-freq = true` only when an eight-core configuration misreports
@@ -35,7 +36,7 @@ to a fixed 1850-MHz run while still returning to low clocks between work. Fixed
 workloads, so 1850 remains the normal package maximum rather than adopting 1750
 as the default.
 
-One important upstream-helper behavior was exposed: on the pinned v0.4.12 stack,
+One important upstream-helper behavior was exposed on the earlier v0.4.12 stack:
 `cyan-skillfish-performance-mode --on` selected the 2000-MHz safe point even
 though `[frequency-range].max` was 1850. It produced a measurable prefill gain but
 also higher power/temperature. Therefore **do not interpret `--on` as "use the

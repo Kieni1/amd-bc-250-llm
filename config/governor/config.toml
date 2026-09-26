@@ -1,4 +1,4 @@
-# Based on filippor/cyan-skillfish-governor v0.4.12 default-config.toml.
+# Based on filippor/cyan-skillfish-governor v0.4.13 default-config.toml.
 # Microseconds.
 [timing.intervals]
 sample = 250
@@ -9,6 +9,7 @@ fix-metrics = true
 fix-freq = false
 method = "busy-flag" # "kernel" requires a separately patched compatible kernel
 flush-every = 10
+temp-read = "sysfs" # v0.4.13: prefer sysfs with upstream fallback on transient read failures
 
 [gpu]
 set-method = "smu" # "smu" or "kernel"

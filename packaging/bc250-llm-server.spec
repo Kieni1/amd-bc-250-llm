@@ -1,5 +1,5 @@
-%global governor_version 0.4.12
-%global governor_commit be9537fc36f24b17570088cafa8c79365f80fee8
+%global governor_version 0.4.13
+%global governor_commit aaed42535622aee1a93df8b22860c409539f67f8
 %global unlock_commit 6c3969ddee40e894297869e6ca30537f274619cb
 %global live_manager_commit a929085d791f126ce76a60eb609610820fb08066
 %global source_date_epoch_from_changelog 1
@@ -10,13 +10,13 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.12.1
-Release:        0.6%{?dist}
+Version:        0.12.2
+Release:        0.1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
 Source0:        %{name}-%{version}.tar.gz
-# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.12
+# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.13
 Source1:        cyan-skillfish-governor-%{governor_commit}.tar.gz
 Source2:        cyan-skillfish-governor-vendor-%{governor_commit}.tar.xz
 # fduraibi/bc250-40cu-unlock, pinned Fedora helper revision
@@ -145,6 +145,13 @@ if [ ! -s "$secret_env" ]; then
   python3 -c 'import secrets; print("WEBUI_SECRET_KEY=" + secrets.token_hex(32))' > "$secret_env"
 fi
 chmod 0600 "$secret_env"
+# Hold Open WebUI boot across package upgrades when persistent state exists. The
+# guided installer creates and verifies the full stopped-state rollback snapshot
+# before restoring boot enablement and starting the newly pinned image.
+if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
+  rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
+  echo "Open WebUI boot held for migration safety. Run: sudo bc250-install"
+fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 echo "BC-250 package installed. Run: sudo bc250-install"
 
@@ -209,8 +216,18 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/config
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
+%ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.1
+- Retire the failed Gemma4 26B and LFM 8B comparison candidates, keep pressure-heavy large experiments admin/testing-only while retaining IQ3_XXS as the ordinary-user deployability comparison, and preserve unrelated administrator ACL grants.
+- Normalize Markdown emphasis and Unicode presentation variants in semantic benchmark matching so formatting-only differences do not inflate model-quality defects.
+- Advance the qualified runtime candidates to Ollama 0.34.4, Open WebUI 0.11.4 and Cyan Skillfish governor 0.4.13 while retaining the standard OWUI image, Mesa/Vulkan path, Tika 4.0.0-full and existing lane architecture.
+- Make Open WebUI upgrades migration-safe: hold boot on RPM upgrade with existing state and require a stopped, integrity-checked, full persistent-state rollback snapshot before the guided installer starts the new image.
+- Harden production translation modality, test reasoning-enabled Qwen3.5 Advanced policy, reduce the pressure-heavy Qwen3.6 35B and Qwen3.8 27B Unsloth profiles to 8K, and add package-owned role/profile metadata for role-aware qualification.
+- Parallelize independent read-only Ollama inventory probes, clarify live versus persistent 40-CU state, and correct translation benchmark modality classification.
+- Prepare revalidation v4.6 and the next device gate for OWUI stored/effective request contracts, Tika 4 Markdown structure, reasoning persistence/tasks, structured outputs, model-library lookup and focused UMA/Vulkan regressions.
+
 * Fri Sep 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.6
 - Synchronize all models discovered on the normal main/task Ollama lanes into package-managed visible Open WebUI testing records with additive ordinary-user read access, while excluding embedding/agent lanes and failing safe on unavailable provider discovery.
 - Centralize qualified Qwen request policy in the existing Open WebUI model authority, expose effective nested parameters in diagnostics, and reuse those policies in production-mode generation benchmarks without repacking embedded chat templates.
