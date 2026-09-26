@@ -872,6 +872,31 @@ class OpenWebUIStatusTests(unittest.TestCase):
         missing_identifier = asyncio.run(module.Filter().outlet(missing_identifier))
         self.assertIn("FR-MARKER-8520", missing_identifier["messages"][-1]["content"])
 
+        unicode_identifier_presentation = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": wrapper
+                    + "Referenzen INV-4821 und ZH-204; IBAN CH93 0076 2011 6238 5295 7.",
+                },
+                {
+                    "role": "assistant",
+                    "content": (
+                        "Références INV‑4821 et ZH‑204 ; IBAN "
+                        "CH93\u00a00076\u202f2011 6238 5295 7."
+                    ),
+                },
+            ],
+        }
+        unicode_identifier_presentation = asyncio.run(
+            module.Filter().outlet(unicode_identifier_presentation)
+        )
+        self.assertEqual(
+            unicode_identifier_presentation["messages"][-1]["content"],
+            "Références INV‑4821 et ZH‑204 ; IBAN CH93\u00a00076\u202f2011 6238 5295 7.",
+        )
+
         locale_currency = {
             "model": "bc250-office-translation-de-fr",
             "messages": [

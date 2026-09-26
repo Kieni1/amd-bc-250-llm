@@ -1,6 +1,7 @@
 """Apply BC-250 translation direction and bounded translation integrity checks."""
 
 import re
+import unicodedata
 from decimal import Decimal, InvalidOperation
 
 DE_FR_MODEL = "bc250-office-translation-de-fr"
@@ -269,25 +270,43 @@ def _format_interpretations(values: frozenset[Decimal]) -> str:
     return " / ".join(str(value) for value in sorted(values))
 
 
+_PRESENTATION_HYPHENS = str.maketrans(
+    {"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"}
+)
+
+
+def _literal_match_text(text: str) -> str:
+    """Normalize presentation-only Unicode differences for contractual literals."""
+    normalized = unicodedata.normalize("NFKC", text).translate(_PRESENTATION_HYPHENS)
+    normalized = normalized.replace("’", "'").casefold()
+    return " ".join(normalized.split())
+
+
 def _integrity_tokens(text: str) -> set[str]:
     """Extract source tokens whose literal preservation is part of the translation contract."""
     # Dates may be rendered in locale-equivalent target-language wording (for
     # example 03.11.2026 -> 3 novembre 2026), so only identifiers whose
-    # literal spelling is itself contractual are enforced here.
+    # literal spelling is itself contractual are enforced here. Normalize
+    # presentation-only Unicode hyphen/space variants before extraction so the
+    # source and translated identifier contract uses the same canonical form.
+    normalized_text = _literal_match_text(text).upper()
     patterns = (
         r"\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b",
         r"\b(?=[A-Z0-9_-]*[A-Z])(?=[A-Z0-9_-]*\d)[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)+\b",
     )
     found: set[str] = set()
     for pattern in patterns:
-        found.update(match.group(0).strip() for match in re.finditer(pattern, text, re.IGNORECASE))
+        found.update(
+            match.group(0).strip()
+            for match in re.finditer(pattern, normalized_text, re.IGNORECASE)
+        )
     return found
 
 
 def literal_integrity_mismatch(source: str, target: str) -> str | None:
-    target_folded = target.casefold().replace("’", "'")
+    target_folded = _literal_match_text(target)
     for token in sorted(_integrity_tokens(source)):
-        normalized = token.casefold().replace("’", "'")
+        normalized = _literal_match_text(token)
         if normalized not in target_folded:
             return f"source token missing from translation ({token})"
     missing_currency = _currency_signatures(source) - _currency_signatures(target)
