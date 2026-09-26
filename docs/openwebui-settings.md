@@ -1,6 +1,6 @@
 # Open WebUI settings
 
-Package baseline: **Open WebUI v0.11.3** with **Ollama v0.34.2** and **Apache Tika v4.0.0**. Runtime pins
+Package candidate baseline: **Open WebUI v0.11.4** with **Ollama v0.34.4** and **Apache Tika v4.0.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -82,10 +82,14 @@ sync and therefore does not remove operator-created models.
 Required model access is converged separately and additively: package desired state
 means that required grants must exist, not that the complete ACL must equal a package-owned
 set. Existing unrelated grants are retained, including historical grants on inactive records.
-The current pre-v1 testing policy deliberately keeps raw production/task implementations visible.
-Provider allowlists alone are not treated as proof of the ordinary-user selector. On authenticated
+The current pre-v1 testing policy keeps raw production/task implementations and ordinary-size
+experiments visible, while pressure-heavy large experimental profiles can be package-marked
+admin/testing-only. Provider allowlists alone are not treated as proof of the ordinary-user selector. On authenticated
 apply/status, `bc250-openwebui-setup` also discovers the actual `11434`/`11435` Ollama inventories and
-creates or updates lightweight package-managed testing records with additive `user:*:read` access.
+creates or updates lightweight package-managed testing records. Ordinary-user-visible records receive
+additive `user:*:read` access; package-managed records explicitly marked admin/testing-only do not. When a
+previously public package-managed discovery record becomes admin/testing-only, convergence may remove only
+the package wildcard `user:*:read` grant while preserving unrelated administrator grants.
 Only records marked `bc250_managed=testing-discovery` are eligible for stale cleanup, and cleanup is
 limited to provider lanes successfully inspected during that run. A temporarily unavailable lane is
 therefore never interpreted as an empty lane. Administrator-created records and unrelated grants are
@@ -132,7 +136,9 @@ metadata disables them. The package therefore makes the role boundary explicit:
 - `Office - Documents / RAG` keeps built-in retrieval enabled, but disables unrelated chat-history,
   notes, web, automation and similar tool categories. Knowledge retrieval is therefore concentrated in
   the dedicated document role instead of being silently attempted by general chat roles.
-- raw/experimental models are exposed for comparison testing and may retain their own native/default
+- raw/testing models are exposed according to package visibility policy; pressure-heavy Qwen3.6 35B,
+  Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only while IQ3_XXS remains the ordinary-user
+  deployability comparison; models may retain their own native/default
   behavior unless a package-owned base override says otherwise.
 
 The system prompts in the production Modelfiles remain authoritative for Standard, Documents,
@@ -143,8 +149,9 @@ Open WebUI translation preset plus direction filter.
 ## OpenAI-style API compatibility boundary
 
 Open WebUI's `/api/chat/completions` endpoint is used internally by package product-path tests, but
-the pinned Open WebUI v0.11.3 OpenAI-style adapter is **not** an advertised external BC-250 API
-contract. Exact-device attribution found three upstream adapter limitations for Ollama-backed models:
+the Open WebUI OpenAI-style adapter is **not** an advertised external BC-250 API contract. Exact-device
+attribution on the preceding v0.11.3 baseline found three limitations that must be rechecked rather than
+assumed fixed merely because the candidate pin is v0.11.4:
 
 - a root OpenAI-style `max_tokens=N` is not reliably propagated as an Ollama generation cap;
 - `completion_tokens_details.reasoning_tokens` can be `0` even when `reasoning_content` is present;
@@ -153,9 +160,9 @@ contract. Exact-device attribution found three upstream adapter limitations for 
 Package-owned callers that require a hard Ollama generation cap use the native nested
 `options.num_predict` path. Package preset `params.max_tokens` is a separate Open WebUI model-parameter
 path and remains part of the device-tested translation contract. Do not infer absence of reasoning or
-absence of truncation from the two affected OpenAI-style metadata fields on v0.11.3. If a future
-release wants to advertise this endpoint as an external compatibility surface, first qualify a newer
-Open WebUI version or carry a deliberately reviewed adapter patch with dedicated device tests.
+absence of truncation from those metadata fields until the v0.11.4 candidate is explicitly requalified.
+`/openai/responses` workspace aliases likewise remain outside the qualified product path unless they are
+explicitly adopted and tested.
 
 ## Package model presets
 
@@ -167,7 +174,6 @@ Open WebUI version or carry a deliberately reviewed adapter patch with dedicated
 | Office – Documents | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` | active |
 | Office – Translation DE → FR | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
 | Office – Translation FR → DE | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
-| Office – Translation DE/FR (Legacy LFM reference) | `exp-lfm25-8b-a1b-liquidai-q6-k` | inactive |
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` | active |
 
@@ -194,11 +200,13 @@ To inspect the live verified contract:
 sudo bc250-openwebui-setup status --verbose --token-file /root/owui-test.key
 ```
 
-The legacy LFM preset is intentionally inactive. Its base model now lives in the
-experiments catalog and is installed only for deliberate rollback/comparison work.
+The former LFM comparison translator is retired from active discovery and no longer has an Open WebUI
+preset. Its source Modelfile remains only in the graveyard as historical comparison evidence.
 
-The Qwen3.5 preset carries request-level `think=false`; the package keeps Ollama's
-native renderer/parser rather than replacing the model template. The Deep Reasoning
+The Qwen3.5 Advanced preset carries request-level `think=true` for the 0.12.2 quality candidate;
+the package keeps Ollama's native renderer/parser rather than replacing the model template. The
+existing temperature/top-p/top-k/min-p/presence/repeat sampler policy remains unchanged and the
+next device gate decides whether this reasoning-enabled candidate is retained. The Deep Reasoning
 preset sets `keep_alive=0` so GPT-OSS unloads after each response before the dedicated
 task model cold-loads for title/tag generation. Standard and Advanced keep their
 existing residency behavior. The GPT-OSS Modelfile also carries an accuracy-first factual fallback: when reliable recall is insufficient, it should return fewer items and state uncertainty instead of filling a requested list with plausible names or placeholders. Sampling/context/residency are unchanged. GPT-OSS remains the likely memory-edge production model
@@ -214,8 +222,8 @@ task-lfm25-1.2b-instruct-liquidai-q6-k:latest
 
 and keeps title/tag generation on while follow-up, autocomplete, search-query and
 retrieval-query generation remain off. `TASK_MODEL_PARAMS` stays `{}` so Open
-WebUI v0.11.3 retains its upstream task-token behavior. The helper first reads the
-complete v0.11.3 task configuration and then updates only reviewed fields. Those
+WebUI v0.11.4 retains its upstream task-token behavior. The helper first reads the
+complete v0.11.4 task configuration and then updates only reviewed fields. Those
 reviewed fields now include package-owned title, tag and retrieval-query prompt
 templates so live Open WebUI and direct task qualification share one prompt policy. The
 0.11.3-0.3 tag prompt keeps broad themes and specific subtopics in one `tags` array and
@@ -275,10 +283,13 @@ networks.
 Open WebUI persists many settings in its database. The packaged JSON plus the
 supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
-The package now provides scheduled, verified config and identity/user backups through
-`bc250-maintenance`; those are deliberately scoped recovery artifacts, not a complete
-`/var/lib/open-webui` snapshot or an automatic database-migration framework. Keep any
-broader operator retention/migration policy explicit and separate.
+The package provides two distinct backup classes. Scheduled `bc250-maintenance` config and
+identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
+Open WebUI version migration with an existing database, RPM upgrade holds OWUI boot and the guided
+installer creates a stopped-state, SQLite-integrity-checked archive of the complete
+`/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
+then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
+replacement for the normal retention policy.
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
 upload/extraction, embedding/retrieval, the six active package presets and an

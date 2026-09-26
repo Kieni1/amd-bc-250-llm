@@ -246,7 +246,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 OPENWEBUI.status(FakeClient({"/api/v1/models/base": bases}), True),
                 2,
             )
-        self.assertIn("Package base-model override differs", output.getvalue())
+        self.assertIn("Package direct/base-model override differs", output.getvalue())
         self.assertIn(".meta.hidden", output.getvalue())
 
         presets = status_responses()["/api/v1/models/export"]
@@ -299,7 +299,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertIn("Task and RAG", text)
         self.assertIn("Package-owned functions", text)
         self.assertIn("Implementation/task models", text)
-        self.assertIn("visible for testing", text)
+        self.assertIn("ordinary-user testing", text)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k:latest", text)
 
     def test_status_rejects_non_object_config_responses(self) -> None:
@@ -342,9 +342,6 @@ class OpenWebUIStatusTests(unittest.TestCase):
         for model_id in PRODUCTION_MODEL_IDS:
             self.assertEqual(OPENWEBUI.desired_access_grants(models[model_id]), [REQUIRED_READ])
 
-        legacy = models["bc250-office-translation"]
-        self.assertFalse(legacy["is_active"])
-        self.assertEqual(OPENWEBUI.desired_access_grants(legacy), [])
 
     def test_testing_visibility_tool_policy_and_deep_reasoning_keep_alive(self) -> None:
         models = {model["id"]: model for model in desired_models()}
@@ -385,7 +382,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(models["bc250-office-deep-reasoning"]["params"].get("keep_alive"), 0)
         self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["params"].get("keep_alive"), 0)
         advanced_policy = models["bc250-office-advanced"]["params"]["custom_params"]
-        self.assertEqual(advanced_policy["think"], False)
+        self.assertEqual(advanced_policy["think"], True)
         self.assertEqual(advanced_policy["temperature"], 0.7)
         self.assertEqual(advanced_policy["top_p"], 0.8)
         self.assertEqual(advanced_policy["top_k"], 20)
@@ -416,14 +413,18 @@ class OpenWebUIStatusTests(unittest.TestCase):
         )
         models = {model["id"]: model for model in effective["models"]}
         q36 = models["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]
-        self.assertFalse(q36["meta"]["hidden"])
+        self.assertTrue(q36["meta"]["hidden"])
+        self.assertFalse(q36["meta"]["bc250_ordinary_user_visible"])
         self.assertEqual(q36["meta"]["bc250_lane"], "main")
         self.assertIn({"name": OPENWEBUI.AUTO_VISIBLE_TAG}, q36["meta"]["tags"])
         self.assertEqual(q36["params"]["custom_params"]["think"], False)
         self.assertEqual(q36["params"]["custom_params"]["temperature"], 0.7)
-        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [REQUIRED_READ])
+        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [])
         xxs = models["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]
-        self.assertEqual(xxs["meta"]["bc250_qualification"]["quality_warning"], "arithmetic-probe-failed")
+        self.assertFalse(xxs["meta"]["hidden"])
+        self.assertTrue(xxs["meta"]["bc250_ordinary_user_visible"])
+        self.assertEqual(OPENWEBUI.desired_access_grants(xxs), [REQUIRED_READ])
+        self.assertEqual(xxs["meta"]["bc250_qualification"]["profile_role"], "experimental-deployability")
         task = models["task-extra:latest"]
         self.assertEqual(task["meta"]["bc250_lane"], "task")
         self.assertFalse(task["meta"]["capabilities"]["builtin_tools"])
@@ -466,7 +467,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             self.assertEqual(
                 model["params"]["custom_params"],
                 {
-                    "think": False,
+                    "think": True,
                     "temperature": 0.7,
                     "top_p": 0.8,
                     "top_k": 20,
@@ -539,8 +540,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 2)
-        self.assertIn(f"Package base-model override missing: {missing}", output.getvalue())
-        self.assertNotIn(f"Package model preset missing: {missing}", output.getvalue())
+        self.assertIn(f"Package direct/base-model override missing: {missing}", output.getvalue())
+        self.assertNotIn(f"Package workspace/derived model missing: {missing}", output.getvalue())
 
     def test_status_detects_missing_required_acl_but_allows_extra_grants(self) -> None:
         responses = status_responses()
@@ -556,13 +557,6 @@ class OpenWebUIStatusTests(unittest.TestCase):
         target["access_grants"].append(copy.deepcopy(REQUIRED_READ))
         self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 0)
 
-    def test_status_allows_historical_grant_on_inactive_legacy_record(self) -> None:
-        responses = status_responses()
-        legacy = next(
-            model for model in responses["/api/v1/models/export"] if model["id"] == "bc250-office-translation"
-        )
-        legacy["access_grants"] = [copy.deepcopy(REQUIRED_READ)]
-        self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 0)
 
     def test_status_detects_inactive_required_model(self) -> None:
         responses = status_responses()
@@ -575,7 +569,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         with redirect_stdout(output):
             self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 2)
         self.assertIn(
-            "Package base-model override differs: prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest.is_active",
+            "Package direct/base-model override differs: prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest.is_active",
             output.getvalue(),
         )
 
@@ -589,7 +583,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 2)
-        self.assertIn("Package model preset differs: bc250-office-deep-reasoning.params", output.getvalue())
+        self.assertIn("Package workspace/derived model differs: bc250-office-deep-reasoning.params", output.getvalue())
 
     def test_status_bad_model_api_shape_is_inspection_error_not_mass_drift(self) -> None:
         output = io.StringIO()
@@ -625,12 +619,6 @@ class OpenWebUIStatusTests(unittest.TestCase):
         )
         unrelated = {"principal_type": "group", "principal_id": "operators", "permission": "write"}
         standard["access_grants"] = [copy.deepcopy(unrelated)]
-        legacy = next(
-            model for model in client.responses["/api/v1/models/export"]
-            if model["id"] == "bc250-office-translation"
-        )
-        legacy["access_grants"] = [copy.deepcopy(REQUIRED_READ)]
-
         desired = desired_models()
         presets = OPENWEBUI.model_view_map(
             client.get("/api/v1/models/export"), "model export", base_model_id_is_none=False
@@ -649,8 +637,6 @@ class OpenWebUIStatusTests(unittest.TestCase):
         standard_update = next(payload for payload in updates if payload["id"] == "bc250-office-standard")
         self.assertIn(unrelated, standard_update["access_grants"])
         self.assertIn(REQUIRED_READ, standard_update["access_grants"])
-        self.assertNotIn("bc250-office-translation", {payload["id"] for payload in updates})
-        self.assertEqual(legacy["access_grants"], [REQUIRED_READ])
 
         client.calls.clear()
         presets = OPENWEBUI.model_view_map(
@@ -666,6 +652,52 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 for method, path, _payload in client.calls
             )
         )
+
+    def test_package_managed_private_testing_model_removes_only_public_read(self) -> None:
+        desired = OPENWEBUI.auto_visible_model_record(
+            "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest",
+            "main",
+            {"ordinary_user_visible": False},
+        )
+        unrelated = {"principal_type": "group", "principal_id": "operators", "permission": "write"}
+        live = copy.deepcopy(desired)
+        live["access_grants"] = [copy.deepcopy(REQUIRED_READ), copy.deepcopy(unrelated)]
+
+        class AccessClient:
+            def __init__(self) -> None:
+                self.posts: list[tuple[str, Any]] = []
+
+            def post(self, path: str, payload: Any) -> Any:
+                self.posts.append((path, copy.deepcopy(payload)))
+                result = copy.deepcopy(live)
+                result["access_grants"] = copy.deepcopy(payload["access_grants"])
+                return result
+
+        client = AccessClient()
+        OPENWEBUI.apply_model_access(client, [desired], {}, {desired["id"]: live})
+        self.assertEqual(len(client.posts), 1)
+        payload = client.posts[0][1]
+        self.assertEqual(payload["access_grants"], [unrelated])
+
+    def test_status_rejects_stale_public_read_on_private_testing_model(self) -> None:
+        document = OPENWEBUI.load_models()
+        effective = OPENWEBUI.effective_model_document(
+            document, {"main": ["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"], "task": []}
+        )
+        q36 = next(
+            model for model in effective["models"]
+            if model["id"] == "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+        )
+        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [])
+        live = copy.deepcopy(q36)
+        live["access_grants"] = [copy.deepcopy(REQUIRED_READ)]
+        responses = status_responses()
+        responses["/api/v1/models/base"].append(live)
+        with mock.patch.object(OPENWEBUI, "discover_normal_provider_models", return_value={"main": [q36["id"]], "task": []}):
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 2)
+        self.assertIn("package public read grant must be absent", output.getvalue())
 
     def test_status_does_not_expose_api_token(self) -> None:
         secret = "owui-secret-token-do-not-print-0121"
@@ -692,7 +724,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         prompt = prompt_path.read_text(encoding="utf-8")
         self.assertEqual(
             hashlib.sha256(prompt.encode()).hexdigest(),
-            "93daa33b148423cfc7f909c2c4b1f1ba7567c9cfe21ffa599c79b0b6b1175a52",
+            "f6a093acc99bfda173e89bafc350290523d3ab85eb8381cdbed589bd60426d13",
         )
         models = {item["id"]: item for item in OPENWEBUI.load_models()["models"]}
         for model_id in (
@@ -716,9 +748,6 @@ class OpenWebUIStatusTests(unittest.TestCase):
         task_models = OPENWEBUI.desired_ollama()["OLLAMA_API_CONFIGS"]["1"]["model_ids"]
         self.assertEqual(main_models, [])
         self.assertEqual(task_models, [])
-        legacy = models["bc250-office-translation"]
-        self.assertEqual(legacy["base_model_id"], "exp-lfm25-8b-a1b-liquidai-q6-k:latest")
-        self.assertFalse(legacy["is_active"])
 
     def test_translation_direction_filter_wraps_source_exactly(self) -> None:
         path = ROOT / "config/openwebui/functions/bc250_translation_direction.py"
@@ -733,6 +762,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "Translate from German to French. Translate every ordinary-language source word "
                 + "and preserve the document structure. Preserve legal/contractual modality without "
                 + "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+                + "German sollte must stay a recommendation (French devrait), never doit; true muss/doit obligations must remain obligations. "
                 + "Return only the translation.\n\n"
                 + "[CURRENT_SOURCE]\n",
                 "Guten Tag.\nZweite Zeile.",
@@ -741,6 +771,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "Translate from French to German. Translate every ordinary-language source word "
                 + "and preserve the document structure. Preserve legal/contractual modality without "
                 + "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+                + "French devrait must stay a recommendation (German sollte), never muss; true muss/doit obligations must remain obligations. "
                 + "Return only the translation.\n\n"
                 + "[CURRENT_SOURCE]\n",
                 "Bonjour.\nDeuxième ligne.",
@@ -810,6 +841,25 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(
             locale_currency["messages"][-1]["content"],
             "Le montant total est de 10.450,00 CHF ;",
+        )
+
+        localized_date = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": wrapper + "Die Sitzung findet am 03.11.2026 statt.",
+                },
+                {
+                    "role": "assistant",
+                    "content": "La séance aura lieu le 3 novembre 2026.",
+                },
+            ],
+        }
+        localized_date = asyncio.run(module.Filter().outlet(localized_date))
+        self.assertEqual(
+            localized_date["messages"][-1]["content"],
+            "La séance aura lieu le 3 novembre 2026.",
         )
 
         wrong_currency = {

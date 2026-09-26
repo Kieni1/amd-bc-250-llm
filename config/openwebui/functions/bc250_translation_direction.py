@@ -11,6 +11,7 @@ WRAPPERS = {
         "Translate from German to French. Translate every ordinary-language source word "
         "and preserve the document structure. Preserve legal/contractual modality without "
         "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+        "German sollte must stay a recommendation (French devrait), never doit; true muss/doit obligations must remain obligations. "
         "Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
@@ -18,6 +19,7 @@ WRAPPERS = {
         "Translate from French to German. Translate every ordinary-language source word "
         "and preserve the document structure. Preserve legal/contractual modality without "
         "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
+        "French devrait must stay a recommendation (German sollte), never muss; true muss/doit obligations must remain obligations. "
         "Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
@@ -147,9 +149,10 @@ def _percentage_values(text: str) -> set[Decimal]:
 
 def _integrity_tokens(text: str) -> set[str]:
     """Extract source tokens whose literal preservation is part of the translation contract."""
+    # Dates may be rendered in locale-equivalent target-language wording (for
+    # example 03.11.2026 -> 3 novembre 2026), so only identifiers whose
+    # literal spelling is itself contractual are enforced here.
     patterns = (
-        r"\b\d{4}-\d{2}-\d{2}\b",
-        r"\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b",
         r"\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b",
         r"\b(?=[A-Z0-9_-]*[A-Z])(?=[A-Z0-9_-]*\d)[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)+\b",
     )

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure the package-owned Open WebUI 0.11.3 baseline through supported APIs."""
+"""Configure the package-owned Open WebUI 0.11.4 baseline through supported APIs."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ DEFAULT_FUNCTIONS = Path("/usr/share/bc250-llm-server/openwebui/functions.json")
 SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
 # The model-view/access contract below is qualified against the packaged Open WebUI pin.
-OPENWEBUI_MODEL_API_VERSION = "0.11.3"
+OPENWEBUI_MODEL_API_VERSION = "0.11.4"
 AUTO_VISIBLE_TAG = "bc250-auto-visible"
 NORMAL_PROVIDER_LANES = {
     "main": "http://127.0.0.1:11434",
@@ -41,7 +41,7 @@ REQUEST_CUSTOM_PARAM_KEYS = frozenset(
     }
 )
 NATIVE_MODEL_PARAM_KEYS = frozenset({"system", "max_tokens", "keep_alive", "custom_params"})
-TESTING_MODEL_POLICY_KEYS = frozenset({"description", "tags", "custom_params", "qualification"})
+TESTING_MODEL_POLICY_KEYS = frozenset({"description", "tags", "custom_params", "qualification", "ordinary_user_visible"})
 _DISCOVERED_MODEL_CACHE: dict[str, list[str]] | None = None
 
 
@@ -271,32 +271,36 @@ def auto_visible_model_record(
             tags.append({"name": tag})
     custom_params = policy.get("custom_params", {})
     params = {"custom_params": custom_params} if isinstance(custom_params, dict) and custom_params else {}
+    ordinary_user_visible = policy.get("ordinary_user_visible", True) is not False
     description = str(policy.get("description") or (
         f"Installed {lane}-lane model exposed for pre-v1 comparison testing. "
         "Use a curated Office role for normal product use."
     ))
     qualification = policy.get("qualification")
     meta: dict[str, Any] = {
-        "hidden": False,
+        "hidden": not ordinary_user_visible,
         "description": description,
         "tags": tags,
         "capabilities": {"builtin_tools": False, "file_context": True},
         "bc250_managed": "testing-discovery",
         "bc250_lane": lane,
+        "bc250_ordinary_user_visible": ordinary_user_visible,
     }
     if isinstance(qualification, dict) and qualification:
         meta["bc250_qualification"] = qualification
-    return {
+    record: dict[str, Any] = {
         "id": model_id,
         "base_model_id": None,
         "name": model_id,
         "meta": meta,
         "params": params,
         "is_active": True,
-        "access_grants": [
-            {"principal_type": "user", "principal_id": "*", "permission": "read"}
-        ],
     }
+    if ordinary_user_visible:
+        record["access_grants"] = [
+            {"principal_type": "user", "principal_id": "*", "permission": "read"}
+        ]
+    return record
 
 
 def effective_model_document(
@@ -543,7 +547,7 @@ def model_record_kind(model: dict[str, Any]) -> str:
 
 
 def model_record_label(model: dict[str, Any]) -> str:
-    return "base-model override" if model_record_kind(model) == "base_override" else "model preset"
+    return "direct/base-model override" if model_record_kind(model) == "base_override" else "workspace/derived model"
 
 
 def model_import_payload(document: dict[str, Any]) -> dict[str, Any]:
@@ -642,7 +646,7 @@ def model_view_map(
 def load_live_model_views(
     client: Client,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    # Open WebUI v0.11.3 represents curated presets and raw-model overrides in
+    # Open WebUI v0.11.4 represents curated presets and raw-model overrides in
     # separate API views. Keep this explicit so a future pin change fails as an
     # inspection-compatibility issue instead of looking like mass desired-state drift.
     presets = model_view_map(
@@ -673,10 +677,9 @@ def apply_model_access(
     presets: dict[str, dict[str, Any]],
     base_overrides: dict[str, dict[str, Any]],
 ) -> None:
+    package_public_read = ("user", "*", "read")
     for desired in models:
         required = desired_access_grants(desired)
-        if not required:
-            continue
         model_id = desired.get("id")
         if not isinstance(model_id, str) or not model_id:
             raise ApiError("package model record has invalid id")
@@ -685,18 +688,29 @@ def apply_model_access(
             raise ApiError(
                 f"package {model_record_label(desired)} missing after import: {model_id}"
             )
-        live_keys = access_grant_keys(
+        live_grants = require_list(
             live.get("access_grants", []), f"access grants for {model_id}"
         )
+        live_keys = access_grant_keys(live_grants, f"access grants for {model_id}")
         required_keys = {
             access_grant_key(grant, f"required grant for {model_id}")
             for grant in required
         }
-        if required_keys <= live_keys:
-            continue
-        merged = merge_access_grants(
-            live.get("access_grants", []), required, f"access grants for {model_id}"
+        meta = desired.get("meta") if isinstance(desired.get("meta"), dict) else {}
+        package_managed_private = (
+            is_auto_visible_model(desired)
+            and meta.get("bc250_ordinary_user_visible") is False
         )
+        needs_remove_public = package_managed_private and package_public_read in live_keys
+        if required_keys <= live_keys and not needs_remove_public:
+            continue
+        merged = merge_access_grants(live_grants, required, f"access grants for {model_id}")
+        if needs_remove_public:
+            merged = [
+                grant
+                for grant in merged
+                if access_grant_key(grant, f"access grants for {model_id}") != package_public_read
+            ]
         updated = require_object(
             client.post(
                 "/api/v1/models/model/access/update",
@@ -709,6 +723,8 @@ def apply_model_access(
         )
         if not required_keys <= updated_keys:
             raise ApiError(f"Open WebUI did not retain required access grants for {model_id}")
+        if package_managed_private and package_public_read in updated_keys:
+            raise ApiError(f"Open WebUI retained package public read access for {model_id}")
 
 
 def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str, Any]]) -> None:
@@ -750,7 +766,7 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
         print()
         print("Implementation/task models")
         for model_id, hidden, params, lane in implementation_models:
-            visibility = "hidden" if hidden else "visible for testing"
+            visibility = "admin/testing only" if hidden else "ordinary-user testing"
             custom_params = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
             effective = ""
             if custom_params:
@@ -887,14 +903,19 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
         for key in (
             "description", "tags", "filterIds", "defaultFilterIds", "hidden",
             "capabilities", "builtinTools", "bc250_managed", "bc250_lane",
-            "bc250_qualification",
+            "bc250_qualification", "bc250_ordinary_user_visible",
         ):
             if key in desired_meta and canonical(live_meta.get(key)) != canonical(
                 desired_meta[key]
             ):
                 problems.append(f"Package {label} differs: {model_id}.meta.{key}")
         required_grants = desired_access_grants(model)
-        if required_grants:
+        desired_meta = model.get("meta") if isinstance(model.get("meta"), dict) else {}
+        access_policy_relevant = bool(required_grants) or (
+            is_auto_visible_model(model)
+            and desired_meta.get("bc250_ordinary_user_visible") is False
+        )
+        if access_policy_relevant:
             try:
                 live_grants = access_grant_keys(
                     live.get("access_grants", []), f"access grants for {model_id}"
@@ -912,6 +933,15 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
                     f"Package {label} access differs: {model_id} "
                     "(missing "
                     f"{grant['principal_type']}:{grant['principal_id']}:{grant['permission']})"
+                )
+            if (
+                is_auto_visible_model(model)
+                and desired_meta.get("bc250_ordinary_user_visible") is False
+                and ("user", "*", "read") in live_grants
+            ):
+                problems.append(
+                    f"Package {label} access differs: {model_id} "
+                    "(package public read grant must be absent)"
                 )
 
     desired_ids = {str(model.get("id")) for model in desired_models}
