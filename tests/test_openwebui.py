@@ -990,7 +990,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 mismatch = module.literal_integrity_mismatch(source, target)
                 self.assertEqual(mismatch is not None, expect_mismatch)
 
-        clause_swap_cases = (
+        rejected_modality_cases = (
             (
                 "bc250-office-translation-fr-de",
                 "Vous devriez signer. Vous devez payer.",
@@ -1001,8 +1001,28 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "Sie dürfen unterschreiben. Sie müssen zahlen.",
                 "Vous devez signer. Vous pouvez payer.",
             ),
+            (
+                "bc250-office-translation-de-fr",
+                "Sie sollten nicht unterschreiben.",
+                "Vous devriez signer.",
+            ),
+            (
+                "bc250-office-translation-fr-de",
+                "Vous ne devriez pas signer.",
+                "Sie sollten unterschreiben.",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Sie müssen nicht zahlen.",
+                "Vous devez payer.",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Der Mieter darf die Küche nutzen und muss sie reinigen.",
+                "Le locataire doit utiliser la cuisine et peut la nettoyer.",
+            ),
         )
-        for model_id, source, target in clause_swap_cases:
+        for model_id, source, target in rejected_modality_cases:
             with self.subTest(model_id=model_id, source=source, target=target):
                 body = {
                     "model": model_id,
@@ -1011,11 +1031,32 @@ class OpenWebUIStatusTests(unittest.TestCase):
                         {"role": "assistant", "content": target},
                     ],
                 }
-                guarded_swap = asyncio.run(module.Filter().outlet(body))
+                guarded_result = asyncio.run(module.Filter().outlet(body))
                 self.assertIn(
                     "translation integrity mismatch",
-                    guarded_swap["messages"][-1]["content"],
+                    guarded_result["messages"][-1]["content"],
                 )
+
+        no_obligation_preserved = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": wrapper + "Sie müssen nicht zahlen.",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Vous n'êtes pas obligé de payer.",
+                },
+            ],
+        }
+        no_obligation_preserved = asyncio.run(
+            module.Filter().outlet(no_obligation_preserved)
+        )
+        self.assertEqual(
+            no_obligation_preserved["messages"][-1]["content"],
+            "Vous n'êtes pas obligé de payer.",
+        )
 
         permission_strengthened = {
             "model": "bc250-office-translation-de-fr",

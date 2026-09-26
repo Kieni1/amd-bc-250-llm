@@ -45,95 +45,155 @@ def _split_clauses(text: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?:[.!?;]+|\n+)", text) if part.strip()]
 
 
-def _de_modalities(clause: str) -> frozenset[str]:
-    folded = clause.casefold()
-    prohibition = bool(
-        re.search(r"\b(?:darf|dürfen|darfst|dürft)\b[^.!?;]{0,40}\bnicht\b", folded)
-        or re.search(r"\b(?:nicht\s+erlaubt|verboten)\b", folded)
-    )
-    modes: set[str] = set()
-    if re.search(r"\bsollt(?:e|en|est|et)\b", folded):
-        modes.add("recommendation")
-    if re.search(r"\b(?:muss|müssen|musst|müsst)\b", folded):
-        modes.add("obligation")
-    if prohibition:
-        modes.add("prohibition")
-    elif re.search(r"\b(?:darf|dürfen|darfst|dürft)\b", folded) or re.search(
-        r"\berlaubt\b", folded
-    ):
-        modes.add("permission")
-    return frozenset(modes)
+def _modal_candidates(
+    text: str, patterns: tuple[tuple[str, str], ...]
+) -> list[tuple[int, int, str]]:
+    candidates = [
+        (match.start(), match.end(), mode)
+        for pattern, mode in patterns
+        for match in re.finditer(pattern, text)
+    ]
+    return sorted(candidates, key=lambda item: (item[0], item[1]))
 
 
-def _fr_modalities(clause: str) -> frozenset[str]:
-    folded = clause.casefold()
-    modal_forms = (
-        r"(?:dois|doit|devons|devez|doivent|peux|peut|pouvons|pouvez|peuvent)"
-    )
-    prohibition = bool(
-        re.search(
-            rf"\bne\b[^.!?;]{{0,50}}\b{modal_forms}\b[^.!?;]{{0,30}}\b(?:pas|jamais|plus)\b",
-            folded,
+def _modal_contexts(
+    text: str, candidates: list[tuple[int, int, str]]
+) -> list[tuple[int, int, str, str, str]]:
+    contexts: list[tuple[int, int, str, str, str]] = []
+    for index, (start, end, mode) in enumerate(candidates):
+        previous_end = candidates[index - 1][1] if index else 0
+        next_start = (
+            candidates[index + 1][0]
+            if index + 1 < len(candidates)
+            else len(text)
         )
-        or re.search(r"\binterdit(?:e|es|s)?\b", folded)
-        or re.search(r"\bpas\s+autorisé(?:e|es|s)?\b", folded)
+        contexts.append(
+            (start, end, mode, text[previous_end:start], text[end:next_start])
+        )
+    return contexts
+
+
+def _de_modality_events(clause: str) -> tuple[str, ...]:
+    """Return protected German modality events in source order."""
+    folded = clause.casefold()
+    candidates = _modal_candidates(
+        folded,
+        (
+            (r"\bsollt(?:e|en|est|et)\b", "recommendation"),
+            (r"\b(?:muss|müssen|musst|müsst)\b", "obligation"),
+            (r"\b(?:darf|dürfen|darfst|dürft)\b", "permission"),
+            (r"\berlaubt\b", "permission"),
+            (r"\bverpflichtet\b", "obligation"),
+            (r"\bverboten\b", "prohibition"),
+        ),
     )
-    modes: set[str] = set()
-    if re.search(r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", folded):
-        modes.add("recommendation")
-    if re.search(r"\b(?:dois|doit|devons|devez|doivent)\b", folded) and not prohibition:
-        modes.add("obligation")
-    if prohibition:
-        modes.add("prohibition")
-    elif (
-        re.search(r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", folded)
-        or re.search(r"\bautorisé(?:e|es|s)?\b", folded)
-    ):
-        modes.add("permission")
-    return frozenset(modes)
+
+    events: list[str] = []
+    for start, end, mode, before, after in _modal_contexts(folded, candidates):
+        token = folded[start:end]
+        negated_after = bool(re.search(r"\bnicht\b", after))
+        negated_before = bool(re.search(r"\bnicht\b", before))
+        negated = negated_after or (
+            token in {"erlaubt", "verpflichtet"} and negated_before
+        )
+        if mode == "recommendation":
+            events.append("recommendation-negative" if negated else "recommendation")
+        elif mode == "obligation":
+            events.append("no-obligation" if negated else "obligation")
+        elif mode == "permission":
+            events.append("prohibition" if negated else "permission")
+        else:
+            events.append(mode)
+    return tuple(events)
 
 
-def _modality_sequence(text: str, language: str) -> list[frozenset[str]]:
-    detector = _de_modalities if language == "de" else _fr_modalities
-    return [modes for clause in _split_clauses(text) if (modes := detector(clause))]
+def _fr_modality_events(clause: str) -> tuple[str, ...]:
+    """Return protected French modality events in source order."""
+    folded = clause.casefold()
+    candidates = _modal_candidates(
+        folded,
+        (
+            (r"\b(?:devrais|devrait|devrions|devriez|devraient)\b", "recommendation"),
+            (r"\b(?:dois|doit|devons|devez|doivent)\b", "obligation"),
+            (r"\b(?:peux|peut|pouvons|pouvez|peuvent)\b", "permission"),
+            (r"\bautorisé(?:e|es|s)?\b", "permission"),
+            (r"\bobligé(?:e|es|s)?\b", "obligation"),
+            (r"\binterdit(?:e|es|s)?\b", "prohibition"),
+        ),
+    )
+
+    events: list[str] = []
+    for start, end, mode, before, after in _modal_contexts(folded, candidates):
+        has_ne = bool(re.search(r"(?:\bne\b|\bn['’])", before))
+        has_negative_particle = bool(
+            re.search(r"\b(?:pas|jamais|plus)\b", before)
+            or re.search(r"\b(?:pas|jamais|plus)\b", after)
+        )
+        negated = has_ne and has_negative_particle
+
+        if mode == "recommendation":
+            events.append("recommendation-negative" if negated else "recommendation")
+        elif mode == "obligation":
+            no_obligation = negated and (
+                "nécessairement" in after or folded[start:end].startswith("oblig")
+            )
+            if no_obligation:
+                events.append("no-obligation")
+            elif negated:
+                events.append("prohibition")
+            else:
+                events.append("obligation")
+        elif mode == "permission":
+            events.append("prohibition" if negated else "permission")
+        else:
+            events.append(mode)
+    return tuple(events)
+
+
+def _modality_sequence(text: str, language: str) -> list[tuple[str, ...]]:
+    detector = _de_modality_events if language == "de" else _fr_modality_events
+    return [events for clause in _split_clauses(text) if (events := detector(clause))]
 
 
 def _modality_change_reason(
-    source_modes: frozenset[str], target_modes: frozenset[str], model_id: str
+    source_modes: tuple[str, ...], target_modes: tuple[str, ...], model_id: str
 ) -> str:
-    if "recommendation" in source_modes and "obligation" in target_modes and "recommendation" not in target_modes:
+    if source_modes == ("recommendation",) and target_modes == ("obligation",):
         return (
             "recommendation strengthened to obligation (sollte -> doit)"
             if model_id == DE_FR_MODEL
             else "recommendation strengthened to obligation (devrait -> muss)"
         )
-    if "obligation" in source_modes and "recommendation" in target_modes and "obligation" not in target_modes:
+    if source_modes == ("obligation",) and target_modes == ("recommendation",):
         return (
             "obligation weakened to recommendation (muss -> devrait)"
             if model_id == DE_FR_MODEL
             else "obligation weakened to recommendation (doit -> sollte)"
         )
-    if "permission" in source_modes and "obligation" in target_modes and "permission" not in target_modes:
+    if source_modes == ("permission",) and target_modes == ("obligation",):
         return (
             "permission strengthened to obligation (darf -> doit)"
             if model_id == DE_FR_MODEL
             else "permission strengthened to obligation (peut -> muss)"
         )
-    if "obligation" in source_modes and "permission" in target_modes and "obligation" not in target_modes:
+    if source_modes == ("obligation",) and target_modes == ("permission",):
         return (
             "obligation weakened to permission (muss -> peut)"
             if model_id == DE_FR_MODEL
             else "obligation weakened to permission (doit -> darf)"
         )
+    if (
+        source_modes == ("recommendation-negative",)
+        and target_modes == ("recommendation",)
+    ):
+        return "recommendation negation/polarity was lost"
+    if source_modes == ("no-obligation",) and target_modes == ("obligation",):
+        return "absence of obligation was strengthened to obligation"
     if "prohibition" in source_modes and "prohibition" not in target_modes:
-        return (
-            "prohibition/negation may have been lost (darf nicht)"
-            if model_id == DE_FR_MODEL
-            else "prohibition/negation may have been lost (ne ... pas)"
-        )
-    source_label = ",".join(sorted(source_modes)) or "none"
-    target_label = ",".join(sorted(target_modes)) or "none"
-    return f"clause modality changed ({source_label} -> {target_label})"
+        return "prohibition/negation may have been lost"
+    source_label = ",".join(source_modes) or "none"
+    target_label = ",".join(target_modes) or "none"
+    return f"clause modality sequence changed ({source_label} -> {target_label})"
 
 
 def modality_mismatch(source: str, target: str, model_id: str) -> str | None:
@@ -158,7 +218,8 @@ def modality_mismatch(source: str, target: str, model_id: str) -> str | None:
         zip(source_sequence, target_sequence, strict=True), start=1
     ):
         if source_modes != target_modes:
-            return f"clause {index}: {_modality_change_reason(source_modes, target_modes, model_id)}"
+            reason = _modality_change_reason(source_modes, target_modes, model_id)
+            return f"clause {index}: {reason}"
     return None
 
 
