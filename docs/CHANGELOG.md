@@ -1,9 +1,22 @@
 # Changelog
 
+## 0.12.2-0.4 - 2026-09-27
+
+- Repair revalidation semantic interpretation for grounded negative answers and FR→DE recommendation modality, classify reasoning-only output-budget exhaustion as `INCOMPLETE`, retain repetition as a separate defect class, aggregate direct/OWUI parity under one root cause, and separate run completion from Infrastructure / Quality / Restoration / Coverage.
+- Record effective production-usecase controls (`think`, `num_predict`/max tokens, context and `keep_alive`) and surface compact failure/diagnostic context without changing the 128 MiB hard memory floor.
+- Bound Advanced reasoning generation at `max_tokens=4096`; externally supplied exact-device evidence reports OWUI adapter propagation to Ollama `options.num_predict=4096` with no root-level `max_tokens`. The raw outbound capture is not retained in source, so release qualification keeps this as a no-regression check.
+- Retire Qwen3.6 35B from the active candidate set, keep Qwen3.8 Unsloth pressure-heavy/admin-only, and align ISTA IQ3_S as the `think=true` quality/reasoning profile while IQ3_XXS remains the deployability profile.
+- Restore migration-safe RPM `%pre` behavior: always request `open-webui.service` stop when persistent state exists, prove `ActiveState=inactive`, and fail closed before the new Quadlet can become restart-eligible.
+- Add transaction-final `sudo bc250-install` guidance, verifier-derived final PASS/WARN/FAIL state, an explicit setup summary/reboot state, accurate optional-component terminology, optional-model drift counts, and clearer root/VG growth planning.
+- Make CU health saved-profile/live-layout based instead of universally requiring 40/40: parse `BC250_WGP_MASKS`, compare all four configured row masks with live SPI masks, treat `--` as intentionally unselected, keep `D!` as a separate inconsistency, distinguish live/saved/boot/persistent states, and label RADV CU count diagnostic-only.
+- Add the optional root-only Open WebUI maintenance credential (`0700` secrets directory, `0600` key), atomic no-overwrite creation, live authentication before `CONFIGURED`, automatic package-consumer discovery and explicit-token override.
+- Add fail-closed pre-Deep task/embedding eviction through package-owned model-residency APIs and set Deep bounded idle residency to exactly `2m`; preserve four lanes, `OLLAMA_MAX_LOADED_MODELS=1`, and no generic scheduler.
+- Make exact-device product/runtime qualification part of candidate acceptance, including browser UX, Advanced quality under the 4096 ceiling, Deep residency/UMA behavior, CU live-layout semantics, migration/runtime behavior, model quality and final restoration. Tika list extraction, intermittent multi-model tags and BTF-warning interpretation remain evidence-first investigations rather than speculative defaults.
+
 ## 0.12.2-0.3 - 2026-09-26
 
-- Close the Open WebUI migration restart race by unconditionally stopping Open WebUI when existing state is present, verifying `ActiveState=inactive`, and removing its boot-enablement drop-in in RPM `%pre`, before the new Quadlet payload or any subsequent daemon-reload can make Open WebUI 0.11.4 restart-eligible. Guided `bc250-install` still creates/verifies the stopped-state rollback snapshot before re-enabling and starting OWUI.
-- Make translation modality integrity clause-local and order-aware: protected modal events retain polarity, `muss nicht` is distinguished from obligation, and recommendation/obligation or permission/obligation swaps are withheld even when they occur inside one clause.
+- Close the Open WebUI migration restart race by stopping an active OWUI service and removing its boot-enablement drop-in in RPM `%pre`, before the new Quadlet payload or any subsequent daemon-reload can make Open WebUI 0.11.4 restart-eligible. Guided `bc250-install` still creates/verifies the stopped-state rollback snapshot before re-enabling and starting OWUI.
+- Make translation modality integrity clause-local rather than document-global, so recommendation/obligation and permission/obligation swaps across adjacent clauses are withheld.
 - Treat single-separator three-decimal forms such as `1,234` / `1.234` as numerically ambiguous and require the complete interpretation set to survive translation; collapsing either form to `1234` now fails closed for percentages and currencies.
 - Use neutral translation-integrity withholding wording for modality and literal/numeric failures, and make both direct and Open WebUI translation qualification reuse the runtime literal-integrity authority.
 
