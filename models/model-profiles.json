@@ -28,10 +28,10 @@
     "prod-qwen35-9b-unsloth-q6-k:latest": {
       "intended_role": "office-advanced-implementation",
       "profile_class": "production",
-      "reasoning_policy": "request-think-true-bounded-4096",
+      "reasoning_policy": "request-think-true-bounded-6144",
       "residency_policy": "default",
       "context_target": 32768,
-      "output_token_expectation": 4096
+      "output_token_expectation": 6144
     },
     "prod-gpt-oss20b-ggml-org-mxfp4:latest": {
       "intended_role": "deep-reasoning-implementation",

@@ -1148,7 +1148,7 @@ class StatusTests(unittest.TestCase):
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
         self.assertEqual(document["schema"], 1)
         profiles = document["profiles"]
-        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k:latest"]["reasoning_policy"], "request-think-true-bounded-4096")
+        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k:latest"]["reasoning_policy"], "request-think-true-bounded-6144")
         self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest", profiles)
         self.assertEqual(profiles["exp-qwen38-27b-unsloth-ud-iq3-s:latest"]["context_target"], 8192)
         self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-s:latest"]["profile_class"], "experimental-quality")
