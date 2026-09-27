@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.2
-Release:        0.4%{?dist}
+Release:        0.5%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -253,6 +253,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Sep 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.5
+- Harden guided Open WebUI convergence so package-owned desired state is applied and verified before public/boot publication, preventing stale live policy after upgrades.
+- Raise the bounded Advanced candidate to max_tokens=6144 with think=true and the established sampler contract; preserve clean budget exhaustion as INCOMPLETE and repetition as a quality defect.
+- Restore neighbor-bounded German modal negation ownership and fix the FR->DE integrity false positive for faithful positive pouvoir -> können permission/possibility translations without weakening prohibition, polarity or modality-order safeguards.
+- Close the Tika middle-dot list and title/tag persistence investigations from exact-device evidence without changing Tika or task-lane topology.
+
 * Sun Sep 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.4
 - Repair revalidation semantic interpretation, incomplete-budget classification, root-cause aggregation and completion/quality reporting while preserving the existing evidence architecture.
 - Bound Advanced reasoning with max_tokens=4096, retire Qwen3.6 35B from active candidates, and align experimental Qwen3.8 role/reasoning metadata.
