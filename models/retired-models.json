@@ -133,6 +133,13 @@
       "ollama_host": "127.0.0.1:11435",
       "source": "/var/lib/bc250-llm-server/gguf/task/LFM2.5-2.6B-Q6_K.gguf",
       "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/task/task-lfm25-2.6b-liquidai-q6-k.Modelfile"
+    },
+    {
+      "name": "exp-qwen36-35b-a3b-unsloth-ud-iq3-s",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen36-35b-a3b-unsloth-ud-iq3-s/Qwen3.6-35B-A3B-UD-IQ3_S.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
     }
   ]
 }

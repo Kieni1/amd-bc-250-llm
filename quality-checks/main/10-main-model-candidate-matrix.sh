@@ -21,7 +21,6 @@ umask 077
 
 BASELINE='prod-gpt-oss20b-ggml-org-mxfp4'
 CANDIDATES=(
-  'exp-qwen36-35b-a3b-unsloth-ud-iq3-s'
   'exp-qwen38-27b-ista-gsq-rco-iq3-s'
   'exp-qwen38-27b-unsloth-ud-iq3-s'
 )

@@ -29,7 +29,7 @@ During pre-v1 comparison testing Open WebUI discovers models installed on the no
 and task (`11435`) providers and maintains package-managed testing records without treating an
 unavailable lane as empty. Curated `bc250-office-*` roles remain the product contracts. Raw
 production/task models and ordinary-size experiments remain ordinary-user comparison surfaces, while
-the pressure-heavy Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S profiles are admin/testing-only;
+Qwen3.6 35B is retired after repeated 8K pressure failures; Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only;
 ISTA IQ3_XXS remains the ordinary-user deployability comparison. Embedding and exclusive agent lanes
 remain outside the normal chat selector.
 
@@ -349,7 +349,6 @@ exp-ovisocr2-abiray-q8-0
 exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
-exp-qwen36-35b-a3b-unsloth-ud-iq3-s
 exp-qwen38-27b-ista-gsq-rco-iq3-s
 exp-qwen38-27b-ista-gsq-rco-iq3-xxs
 exp-qwen38-27b-unsloth-ud-iq3-s
@@ -392,10 +391,10 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | experimental memory-edge 35B; the prior 16K profile repeatedly entered sub-512 MiB headroom, so 0.12.2 reduces the candidate to 8K; retain only if device requalification shows materially better headroom; prefer `think=false`; named reasoning effort is not exposed by the embedded template |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | experimental 8K quality profile; tighter than IQ3_XXS but mechanically strong in the corrected long-run evidence; retain as the quality-oriented ISTA comparison and keep unload/recovery evidence separate from routine-headroom quality |
+| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in graveyard/history |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | admin/testing-only 8K quality/reasoning profile; `think=true`; mechanically strong but memory-tight |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |
-| `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental dense 27B control; the prior 16K profile reached ~200 MiB headroom, so 0.12.2 reduces it to 8K for requalification; retain only if headroom materially improves without losing its intended quality role |
+| `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental/admin-only pressure-heavy non-routine dense 27B control at 8K; retain only if quality value justifies the pressure |
 | `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
 | `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
 | `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |

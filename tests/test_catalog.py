@@ -1148,19 +1148,20 @@ class StatusTests(unittest.TestCase):
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
         self.assertEqual(document["schema"], 1)
         profiles = document["profiles"]
-        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k:latest"]["reasoning_policy"], "request-think-true-candidate")
-        self.assertEqual(profiles["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]["context_target"], 8192)
+        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k:latest"]["reasoning_policy"], "request-think-true-bounded-4096")
+        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest", profiles)
         self.assertEqual(profiles["exp-qwen38-27b-unsloth-ud-iq3-s:latest"]["context_target"], 8192)
         self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-s:latest"]["profile_class"], "experimental-quality")
         self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]["profile_class"], "experimental-deployability")
         self.assertTrue(profiles["prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest"]["specialized"])
         self.assertTrue(profiles["exp-glm-ocr-ggml-q8-0:latest"]["specialized"])
 
-    def test_pressure_heavy_qwen_profiles_are_reset_to_8k_for_next_device_gate(self) -> None:
-        q36 = (MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
+    def test_pressure_heavy_qwen_profiles_are_retired_or_bounded_for_next_device_gate(self) -> None:
+        q36_active = MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
+        q36_retired = ROOT / "models/modelfiles-graveyard/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
         q38 = (MODELFILES / "exp-qwen38-27b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
-        self.assertIn("PARAMETER num_ctx 8192", q36)
-        self.assertNotIn("PARAMETER num_ctx 16384", q36)
+        self.assertFalse(q36_active.exists())
+        self.assertTrue(q36_retired.exists())
         self.assertIn("PARAMETER num_ctx 8192", q38)
         self.assertNotIn("PARAMETER num_ctx 16384", q38)
 
