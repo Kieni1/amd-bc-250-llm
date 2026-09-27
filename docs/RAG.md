@@ -4,7 +4,7 @@ This is the recommended **local, privacy-oriented pilot** for searchable German,
 French and English office documents. It uses the package's existing Open WebUI
 and Tika, the main answer lane on `11434`, and the dedicated embedding lane on
 `11437`. The current package uses Apache Tika 4.0.0 for extraction and tells
-Open WebUI to use its Tika-4 API contract. It adds no separate vector service or
+Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
 
 **Never put confidential documents in this repository.** Keep authoritative
