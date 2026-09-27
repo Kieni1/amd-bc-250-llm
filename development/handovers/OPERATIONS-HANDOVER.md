@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.12.2-0.3
+# BC-250 support / operations handover — current source release 0.12.2-0.4
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,15 +10,14 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.12.2
-RPM Release:  0.2
-NVR:          bc250-llm-server-0.12.2-0.3
+RPM Release:  0.4
+NVR:          bc250-llm-server-0.12.2-0.4
 ```
 
-0.12.2-0.3 is the next operations/device candidate. It keeps the established four-lane topology, Deep
-`keep_alive=0`, TTM/live-40-CU and serialized large-model safety policy, but moves Ollama/Open WebUI/governor
-to 0.34.4/0.11.4/0.4.13 and adds a migration-safe OWUI upgrade hold plus verified full rollback snapshot.
-Advanced becomes a reasoning-enabled test candidate, translation modality instructions are hardened, and two
-large experimental profiles are reduced to 8K. These crossed boundaries require the dedicated 0.12.2 gate.
+0.12.2-0.4 is the current operations/device candidate. It keeps the established four-lane topology,
+TTM thresholds and serialized large-model safety policy, pins Ollama/Open WebUI/governor to
+0.34.4/0.11.4/0.4.13, and retains migration-safe OWUI upgrade hold plus verified full rollback snapshot.
+Advanced is `think=true` with a 4096-token ceiling; Qwen3.6 35B is retired; CU health is saved-profile/live-layout based; and Deep now requires verified task/embedding eviction before admission and uses `keep_alive=2m` for bounded session reuse. These changed boundaries require the dedicated 0.12.2-0.4 gate.
 
 Exact installed `0.12.1-0.4.fc44.x86_64` was runtime healthy: authenticated verifier 54/0, Ollama 0.34.2, normal topology, current Fedora kernel, packaged revalidation quality/restoration PASS and no fresh OOM/GPU/kernel regression. The repaired 0.5 source subsequently passed its deterministic gate, and 0.5 application-plane testing exposed the remaining effective ordinary-user model-selector gap plus reproducible DE→FR modality drift. 0.6 addresses those bounded gaps; do not replay unrelated broad campaigns unless a change crosses that boundary.
 
@@ -107,7 +106,7 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 0.12.2-0.3 implementation is recorded in `development/patchnotes/PATCHNOTE-0.12.2-0.3.md`.
+Current 0.12.2-0.4 implementation is summarized in `docs/CHANGELOG.md` and `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md`; no separate patchnote is required for the current source candidate.
 GitHub remains authoritative for RPM/SRPM build closure; the BC-250 remains authoritative for the new runtime,
 migration, model-quality and resource gates. Exact installed 0.12.1-0.6 is the immediate comparison baseline:
 the finalized source also retires the failed Gemma4 26B/LFM 8B experiments and withholds the three pressure-heavy large comparison profiles from ordinary-user OWUI visibility while preserving admin/native test access.
@@ -260,9 +259,9 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 0.12.2-0.3 source/device follow-up
+## Immediate 0.12.2-0.4 source/device follow-up
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.3.md`. This candidate crosses OWUI/Ollama runtime, migration, Advanced reasoning policy, translation prompt and selected large-model context boundaries; qualify those explicitly while retaining the previous clean topology/restoration baseline as comparison evidence. Preserve package integrity, authenticated verifier cleanliness and final normal topology.
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md`. This candidate crosses OWUI/Ollama runtime, migration, Advanced reasoning policy, translation prompt and selected large-model context boundaries; qualify those explicitly while retaining the previous clean topology/restoration baseline as comparison evidence. Preserve package integrity, authenticated verifier cleanliness and final normal topology.
 
 The exact-2.4/0.4 operations evidence already covers supported reboot reconstruction, live 40/40, maintenance, storage hygiene, backup/restore, runtime soak, model switching and service topology. Repeat those areas only if a corresponding implementation changes.
 
