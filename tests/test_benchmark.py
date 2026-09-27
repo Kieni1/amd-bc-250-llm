@@ -2476,10 +2476,10 @@ quality_state
             {"id": "advanced", "prompt": "answer", "think": True},
             "prod-qwen35-9b-unsloth-q6-k",
         )
-        self.assertEqual(advanced["num_predict"], 4096)
+        self.assertEqual(advanced["num_predict"], 6144)
         self.assertTrue(advanced["budget_is_production_contract"])
         self.assertEqual(advanced["think"], True)
-        self.assertEqual(advanced["options"]["num_predict"], 4096)
+        self.assertEqual(advanced["options"]["num_predict"], 6144)
         self.assertEqual(advanced["options"]["temperature"], 0.7)
         self.assertEqual(advanced["options"]["top_p"], 0.8)
         self.assertEqual(advanced["options"]["top_k"], 20)
@@ -2508,6 +2508,41 @@ quality_state
         self.assertIn("visible-answer-empty", record["diagnostics"])
         self.assertEqual(record["effective_controls"]["think"], True)
         self.assertEqual(record["effective_controls"]["num_predict"], 512)
+
+
+        production_case = {"id": "advanced-production-budget", "prompt": "answer", "think": True}
+        production_record = category._usecase_result_record(
+            case=production_case,
+            model="prod-qwen35-9b-unsloth-q6-k",
+            row=row,
+            ok=False,
+            problems=["missing answer"],
+            content="",
+            thinking="clean reasoning that has not yet reached a visible final answer",
+            telemetry={},
+            wall=1.0,
+            done_reason="length",
+        )
+        self.assertEqual(production_record["outcome"], "incomplete")
+        self.assertIn("production-contract-budget", production_record["diagnostics"])
+        self.assertEqual(production_record["effective_controls"]["num_predict"], 6144)
+
+        repetitive_reasoning = "\n".join(["recheck the same premise"] * 30)
+        repetition_record = category._usecase_result_record(
+            case=production_case,
+            model="prod-qwen35-9b-unsloth-q6-k",
+            row=row,
+            ok=False,
+            problems=["missing answer"],
+            content="",
+            thinking=repetitive_reasoning,
+            telemetry={},
+            wall=1.0,
+            done_reason="length",
+        )
+        self.assertEqual(repetition_record["outcome"], "quality-fail")
+        self.assertEqual(repetition_record["failure_kinds"], ["repetition"])
+        self.assertIn("repetition-loop", repetition_record["diagnostics"])
 
     def test_rag_cycle_residency_loss_is_infrastructure_failure(self) -> None:
         self.assertEqual(category.rag_cycle_outcome(True, False), ("infra-fail", ["coexistence"], 1))

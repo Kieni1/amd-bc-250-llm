@@ -2235,6 +2235,34 @@ USECASE_SAMPLER_KEYS = (
 )
 
 
+def _reasoning_repetition(text: str) -> str | None:
+    """Return a compact repetition diagnostic for exhausted hidden reasoning."""
+    lines = [
+        re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line).strip().casefold()
+        for line in text.splitlines()
+    ]
+    lines = [line for line in lines if line]
+    if len(lines) >= 10 and len(set(lines)) / len(lines) < 0.5:
+        return f"{len(set(lines))}/{len(lines)} distinct reasoning lines"
+    words = re.findall(r"\w+", text.casefold())
+    if len(words) >= 200:
+        word, count = Counter(words).most_common(1)[0]
+        if count / len(words) > 0.30:
+            return f"reasoning token {word!r} repeated {count}/{len(words)} words"
+    return None
+
+
+def _reasoning_exhaustion(
+    content: str, thinking: str, done_reason: str
+) -> tuple[str | None, str | None]:
+    if done_reason != "length" or content.strip() or not thinking.strip():
+        return None, None
+    repetition = _reasoning_repetition(thinking)
+    if repetition:
+        return "repetition", repetition
+    return "incomplete", None
+
+
 def usecase_request_controls(case: dict[str, Any], model: str) -> dict[str, Any]:
     """Resolve a use-case request against the package-owned model policy."""
     policy = request_policy_for_model(model)
@@ -2277,18 +2305,28 @@ def _usecase_result_record(
     done_reason: str,
 ) -> dict[str, Any]:
     controls = usecase_request_controls(case, model)
-    reasoning_budget_exhausted = (
-        done_reason == "length"
-        and not content.strip()
-        and bool(thinking.strip())
-        and not bool(controls["budget_is_production_contract"])
-    )
-    failures = [] if (ok or reasoning_budget_exhausted) else (["empty-output"] if not content.strip() else ["semantic"])
+    exhaustion, repetition_detail = _reasoning_exhaustion(content, thinking, done_reason)
+    reasoning_budget_exhausted = exhaustion == "incomplete"
+    reasoning_repetition = exhaustion == "repetition"
+    if ok:
+        failures: list[str] = []
+    elif reasoning_repetition:
+        failures = ["repetition"]
+    elif reasoning_budget_exhausted:
+        failures = []
+    else:
+        failures = ["empty-output"] if not content.strip() else ["semantic"]
     diagnostics: list[str] = []
     if done_reason == "length":
         diagnostics.append("output-budget")
         if reasoning_budget_exhausted:
             diagnostics.extend(["thinking-budget", "visible-answer-empty"])
+            if controls["budget_is_production_contract"]:
+                diagnostics.append("production-contract-budget")
+        elif reasoning_repetition:
+            diagnostics.append("repetition-loop")
+            if repetition_detail:
+                diagnostics.append(repetition_detail)
     outcome = "incomplete" if reasoning_budget_exhausted else ("pass" if ok else "quality-fail")
     return result_record(
         category="usecase",
@@ -2404,12 +2442,10 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 )
                 ok, problems = _acceptance_ok(content, case)
                 done_reason = str(response.get("done_reason") or "")
-                reasoning_budget_exhausted = (
-                    done_reason == "length"
-                    and not content.strip()
-                    and bool(thinking.strip())
-                    and not bool(controls["budget_is_production_contract"])
+                exhaustion, _repetition_detail = _reasoning_exhaustion(
+                    content, thinking, done_reason
                 )
+                reasoning_budget_exhausted = exhaustion == "incomplete"
                 passed += int(ok)
                 incomplete += int(reasoning_budget_exhausted)
                 quality_failed += int((not ok) and not reasoning_budget_exhausted)
