@@ -1371,20 +1371,39 @@ phase_preflight() {
   install -d -m 0700 "$RAW/preflight"
   ensure_normal_mode
   [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]
+  record_progress "checking packaged Open WebUI bootstrap environment"
   check_openwebui_bootstrap_env
+  record_progress "checking configured CU routing against live layout"
   check_live_cu_routing
+  record_progress "checking Open WebUI private-network connectivity"
   application_network_preflight
-  check_required_models
+  record_progress "checking required packaged-model registrations"
+  if ! check_required_models; then
+    record_event "required-models" infra infra-fail "required packaged model registration check failed"
+    return 1
+  fi
+  record_event "required-models" infra pass "required packaged model registrations current"
   if [[ ${SKIP_OWUI:-0} -eq 0 ]]; then
     local rc
-    validate_owui_token > "$RAW/preflight/token-validation.txt" 2>&1
+    record_progress "validating Open WebUI administrator credential"
+    if ! validate_owui_token > "$RAW/preflight/token-validation.txt" 2>&1; then
+      record_event "openwebui-credential" infra infra-fail "administrator credential validation failed"
+      return 1
+    fi
+    record_event "openwebui-credential" infra pass "administrator credential valid"
+    record_progress "checking authenticated Open WebUI desired state"
     if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$RAW/preflight/package-drift.txt" 2>&1; then rc=0; else rc=$?; fi
-    ((rc == 0)) || { echo "ERROR: packaged Open WebUI state cannot be qualified without first resolving drift/API error (rc=$rc)." >&2; return "$rc"; }
+    if ((rc != 0)); then
+      record_event "openwebui-drift" infra infra-fail "package-owned desired state not current (rc=$rc)"
+      echo "ERROR: packaged Open WebUI state cannot be qualified without first resolving drift/API error (rc=$rc)." >&2
+      return "$rc"
+    fi
     record_event "openwebui-drift" infra pass "package-owned settings current"
   else
     echo "SKIP: authenticated Open WebUI checks explicitly disabled by --skip-owui" > "$RAW/preflight/openwebui-skipped.txt"
     record_event "openwebui-drift" coverage skipped "explicit --skip-owui"
   fi
+  record_progress "running final preflight health gate"
   health_gate "preflight-health" "$RAW/preflight/bc250-verify-gate.txt"
   snapshot preflight/final
   write_phase_report preflight-results preflight
