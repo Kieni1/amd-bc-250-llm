@@ -167,7 +167,7 @@ step_3_install_ollama
         self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
         self.assertIn('bc250-model status mtp --include-disabled --compact', source)
         self.assertIn('sudo bc250-fetch-mtp MODEL_ID', source)
-        self.assertIn('Review or install additional Ollama models now? [y/N]:', source)
+        self.assertIn('Review optional models or reconcile optional-model drift now? [y/N]:', source)
         self.assertNotIn('bc250-model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -498,7 +498,7 @@ step_8_application_services
     def test_setup_plan_covers_resume_decision_points(self) -> None:
         source = INSTALLER.read_text()
         block = source[source.index("show_plan() {"):source.index("wait_for_open_webui() {")]
-        for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "storage headroom", "reboot required"):
+        for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "root filesystem available", "VG expansion available", "root grow required", "reboot required"):
             self.assertIn(label, block)
         self.assertIn("repository check/update in step 2", block)
         self.assertNotIn("${kernel:-current}", block)
@@ -519,7 +519,9 @@ step_8_application_services
         self.assertNotIn("bc250-40cu enable", source)
         self.assertIn("Persistent boot activation: disabled (optional).", (ROOT / "cmd/system/40cu-module.sh").read_text())
         self.assertNotIn("Enable persistent 40-CU boot activation when ready", (ROOT / "cmd/system/40cu-module.sh").read_text())
-        self.assertIn("40-CU live routing: 40/40 healthy", source)
+        self.assertIn("CU live routing:", source)
+        self.assertIn("CU performance profile", source)
+        self.assertIn("CU profile consistency", source)
         self.assertIn("Persistent boot module: disabled (optional; not required for healthy live routing)", source)
 
     def test_root_growth_skips_lvm_when_no_free_extents(self) -> None:
@@ -538,8 +540,7 @@ step_8_application_services
         source = INSTALLER.read_text()
         block = source[source.index("step_10_verify() {"):source.index("run_models_only() {")]
         self.assertIn("bc250-verify --summary", block)
-        self.assertIn("After correcting the reported issue, rerun:", block)
-        self.assertIn("rerun_command", block)
+        self.assertIn("Detailed diagnostics remain available with: sudo bc250-verify", block)
         self.assertNotIn("llm-run-diagnose --no-load", block)
 
     def test_full_installer_separates_local_maintenance_from_pi_setup(self) -> None:
@@ -599,9 +600,11 @@ step_8_application_services
         self.assertIn('OWUI_SETUP_STATE="skipped"', source)
         self.assertIn('OWUI_SETUP_STATE="retry-required"', source)
         self.assertIn("Open WebUI baseline: APPLIED + VERIFIED", source)
-        self.assertIn("Open WebUI baseline: SKIPPED", source)
+        self.assertIn("Open WebUI baseline: NOT REQUESTED", source)
         self.assertIn("Open WebUI baseline: RETRY REQUIRED", source)
-        self.assertIn("Core installation and verification completed successfully.", source)
+        self.assertIn("BC-250 SETUP SUMMARY", source)
+        self.assertIn("Core verification", source)
+        self.assertNotIn("Core installation and verification completed successfully.", source)
         self.assertNotIn("Installation and verification completed successfully.", source)
 
     def test_optional_local_and_pi_setup_can_both_be_skipped(self) -> None:
@@ -613,8 +616,8 @@ bc250-maintenance() { printf 'UNEXPECTED:%s\n' "$*"; return 99; }
 step_11_maintenance
 """)
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("Local maintenance setup skipped", result.stdout)
-        self.assertIn("Raspberry Pi / companion integration skipped", result.stdout)
+        self.assertIn("Local maintenance: NOT REQUESTED", result.stdout)
+        self.assertIn("Raspberry Pi / companion integration: NOT REQUESTED", result.stdout)
         self.assertNotIn("UNEXPECTED:", result.stdout)
 
     def test_models_only_resume_is_public(self) -> None:
@@ -649,26 +652,18 @@ step_11_maintenance
         pre = spec.split("%pre\n", 1)[1].split("%post\n", 1)[0]
         post = spec.split("%post\n", 1)[1].split("%preun\n", 1)[0]
         self.assertIn("systemctl stop open-webui.service", pre)
-        self.assertNotIn("is-active --quiet open-webui.service", pre)
-        self.assertIn(
-            "systemctl show --property=ActiveState --value open-webui.service", pre
-        )
-        self.assertIn('[ "$owui_state" != "inactive" ]', pre)
-        self.assertIn(
-            "rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", pre
-        )
-        self.assertIn("Open WebUI runtime and boot held for migration safety", pre)
+        self.assertNotIn("systemctl is-active --quiet open-webui.service", pre)
+        self.assertIn("systemctl show -p ActiveState --value open-webui.service", pre)
+        self.assertIn('[ "$owui_active_state" != "inactive" ]', pre)
+        self.assertIn("rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf", pre)
+        self.assertIn("Open WebUI inactive and boot-held for migration safety", pre)
+        self.assertLess(pre.index("systemctl stop open-webui.service"), pre.index("systemctl show -p ActiveState --value open-webui.service"))
+        self.assertLess(pre.index("systemctl show -p ActiveState --value open-webui.service"), pre.index("rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf"))
         self.assertIn("%systemd_post", post)
         self.assertIn("systemctl daemon-reload", post)
-        self.assertLess(
-            spec.index("systemctl stop open-webui.service"), spec.index("%systemd_post")
-        )
-        self.assertLess(
-            spec.index("systemctl stop open-webui.service"),
-            spec.index("systemctl daemon-reload"),
-        )
-        units = spec.split("%global bc250_units", 1)[1].split("\n", 1)[0]
-        self.assertNotIn("open-webui.service", units)
+        self.assertLess(spec.index("systemctl stop open-webui.service"), spec.index("%systemd_post"))
+        self.assertLess(spec.index("systemctl stop open-webui.service"), spec.index("systemctl daemon-reload"))
+        self.assertNotIn("open-webui.service", spec.split("%global bc250_units", 1)[1].split("\n", 1)[0])
 
 if __name__ == "__main__":
     unittest.main()

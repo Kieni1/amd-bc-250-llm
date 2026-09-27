@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.2
-Release:        0.3%{?dist}
+Release:        0.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -88,8 +88,10 @@ small local LLM server. It installs the reviewed Cyan Skillfish SMU governor,
 Ollama Vulkan defaults, Open WebUI and Tika Quadlets, an HTTP reverse proxy,
 model and experiment templates, maintenance tools, benchmarks and separated
 production, task, embedding and exclusive coding-agent Ollama workflows. Open
-WebUI can be initialized through its supported admin APIs without storing the
-operator credential. The live CU manager and experimental 40-CU source helper
+WebUI is initialized through its supported admin APIs; at operator request the package
+may save one verified administrator maintenance API key in its root-only secrets
+directory, while explicit protected token files remain supported overrides. The live
+CU manager and experimental 40-CU source helper
 are installed, but the RPM never changes CU routing automatically. The Ollama binary remains an upstream payload installed by the guided helper; the RPM owns the complete four-lane systemd topology. Model weights, users,
 operator-created Open WebUI state, HTTPS and CU changes remain operator-controlled.
 
@@ -142,17 +144,16 @@ python3 scripts/install-manifest.py \
 # subsequent daemon-reload.  Keep boot enablement held until bc250-install
 # creates and verifies the stopped-state rollback snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
-  if ! systemctl stop open-webui.service >/dev/null 2>&1; then
-    echo "ERROR: could not stop Open WebUI before migration-safe package upgrade." >&2
-    exit 1
-  fi
-  owui_state="$(systemctl show --property=ActiveState --value open-webui.service 2>/dev/null || :)"
-  if [ "$owui_state" != "inactive" ]; then
-    echo "ERROR: Open WebUI did not reach inactive state before package upgrade (state: ${owui_state:-unknown})." >&2
+  # Always request a stop: is-active can transiently report activating/deactivating,
+  # and migration safety depends on the proved final state, not the sampled state.
+  systemctl stop open-webui.service >/dev/null 2>&1 || :
+  owui_active_state="$(systemctl show -p ActiveState --value open-webui.service 2>/dev/null || true)"
+  if [ "$owui_active_state" != "inactive" ]; then
+    echo "ERROR: Open WebUI is not inactive after the migration-safety stop request (ActiveState=${owui_active_state:-unknown})." >&2
     exit 1
   fi
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
-  echo "Open WebUI runtime and boot held for migration safety. Run: sudo bc250-install"
+  echo "Open WebUI inactive and boot-held for migration safety. Run: sudo bc250-install"
 fi
 
 %post
@@ -172,7 +173,18 @@ if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
   echo "Open WebUI remains stopped and boot-held for migration safety. Run: sudo bc250-install"
 fi
 systemctl daemon-reload >/dev/null 2>&1 || :
-echo "BC-250 package installed. Run: sudo bc250-install"
+
+%posttrans
+if [ "$1" -gt 1 ] 2>/dev/null; then
+  echo "BC-250 LLM appliance package upgraded."
+  echo "Open WebUI remains held until package setup/migration completes."
+else
+  echo "BC-250 LLM appliance package installed."
+  echo "Appliance setup has not been completed yet."
+fi
+echo
+echo "Next step:"
+echo "  sudo bc250-install"
 
 %preun
 if [ "$1" -eq 0 ]; then
@@ -204,6 +216,9 @@ fi
 %files -f %{payload_filelist}
 %license licenses/LICENSE governor-src/LICENSE licenses/40CU-LICENSE-NOTICE
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server
+%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/secrets
+%ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
+%ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation/results
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/gguf
@@ -238,9 +253,15 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Sep 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.4
+- Repair revalidation semantic interpretation, incomplete-budget classification, root-cause aggregation and completion/quality reporting while preserving the existing evidence architecture.
+- Bound Advanced reasoning with max_tokens=4096, retire Qwen3.6 35B from active candidates, and align experimental Qwen3.8 role/reasoning metadata.
+- Improve installer transaction/final-state UX, optional-state terminology, CU profile semantics and protected authenticated Open WebUI maintenance credentials.
+- Add fail-closed pre-Deep task/embedding eviction and verified two-minute Deep session residency without changing lane topology or introducing a generic scheduler.
+
 * Sat Sep 26 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.3
-- Unconditionally stop Open WebUI and verify ActiveState=inactive in RPM %pre before the new Quadlet can become restart-eligible; keep boot/runtime held until the verified migration snapshot and guided convergence.
-- Make translation modality checks ordered and polarity-aware within each clause so negation/no-obligation loss and recommendation/obligation/permission swaps cannot pass category-set matching.
+- Stop an existing Open WebUI service in the RPM pre-upgrade phase before the new Quadlet can become restart-eligible; keep boot/runtime held until the verified migration snapshot and guided convergence.
+- Make translation modality checks clause-local so recommendation/obligation/permission swaps cannot pass through document-global category matching.
 - Treat single-separator three-decimal numeric forms as ambiguous and require the complete interpretation set to match, preventing 1000x corruption from being accepted.
 - Use neutral translation-integrity rejection wording for modality and literal/numeric failures and extend direct/OWUI qualification to the same runtime literal-integrity authority.
 
