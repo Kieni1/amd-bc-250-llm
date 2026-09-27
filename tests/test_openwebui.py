@@ -475,7 +475,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             if model["id"] == "prod-qwen35-9b-unsloth-q6-k:latest"
         )
         for model in (advanced, raw_qwen):
-            self.assertEqual(model["params"].get("max_tokens"), 4096)
+            self.assertEqual(model["params"].get("max_tokens"), 6144)
             self.assertEqual(
                 model["params"]["custom_params"],
                 {
@@ -1052,6 +1052,109 @@ class OpenWebUIStatusTests(unittest.TestCase):
         }
         obligation_weakened = asyncio.run(module.Filter().outlet(obligation_weakened))
         self.assertIn("obligation weakened to permission", obligation_weakened["messages"][-1]["content"])
+
+        exact_fr_permission_source = (
+            "Les employés peuvent utiliser la salle de réunion jusqu'à 18:00. "
+            "Ils ne peuvent pas modifier l'identifiant AX-88-P. "
+            "Le responsable doit rendre la clé ensuite."
+        )
+        exact_de_permission_target = (
+            "Die Mitarbeiter können den Besprechungsraum bis 18:00 Uhr nutzen. "
+            "Sie dürfen die Kennung AX-88-P nicht ändern. "
+            "Der Verantwortliche muss den Schlüssel anschließend zurückgeben."
+        )
+        self.assertIsNone(
+            module.modality_mismatch(
+                exact_fr_permission_source,
+                exact_de_permission_target,
+                "bc250-office-translation-fr-de",
+            )
+        )
+        faithful_permission = {
+            "model": "bc250-office-translation-fr-de",
+            "messages": [
+                {"role": "user", "content": fr_wrapper + exact_fr_permission_source},
+                {"role": "assistant", "content": exact_de_permission_target},
+            ],
+        }
+        faithful_permission = asyncio.run(module.Filter().outlet(faithful_permission))
+        self.assertEqual(
+            faithful_permission["messages"][-1]["content"], exact_de_permission_target
+        )
+
+        lost_prohibition = {
+            "model": "bc250-office-translation-fr-de",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": fr_wrapper + "Ils ne peuvent pas modifier l'identifiant AX-88-P.",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Sie können die Kennung AX-88-P ändern.",
+                },
+            ],
+        }
+        lost_prohibition = asyncio.run(module.Filter().outlet(lost_prohibition))
+        self.assertIn("Translation withheld", lost_prohibition["messages"][-1]["content"])
+        self.assertIn("prohibition", lost_prohibition["messages"][-1]["content"])
+
+        # Keep this compact matrix as the regression authority for clause-local
+        # modality order and polarity. In particular, ``nicht`` must bind only
+        # to its owning finite modal up to the next protected modal.
+        self.assertIsNone(
+            module.modality_mismatch(
+                "Sie darf die Küche nicht nutzen und muss sie reinigen.",
+                "Vous ne pouvez pas utiliser la cuisine et devez la nettoyer.",
+                "bc250-office-translation-de-fr",
+            )
+        )
+
+        polarity_and_order_cases = (
+            (
+                "bc250-office-translation-de-fr",
+                "Sie muss zahlen und darf nicht unterschreiben.",
+                "Vous n'êtes pas obligé de payer et ne pouvez pas signer.",
+                "obligation weakened to no-obligation",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Sie sollten nicht unterschreiben.",
+                "Vous devriez signer.",
+                "negative recommendation",
+            ),
+            (
+                "bc250-office-translation-fr-de",
+                "Vous ne devriez pas signer.",
+                "Sie sollten unterschreiben.",
+                "negative recommendation",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Sie müssen nicht zahlen.",
+                "Vous devez payer.",
+                "no-obligation",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Sie dürfen unterschreiben und müssen zahlen.",
+                "Vous devez signer et pouvez payer.",
+                "modality order",
+            ),
+        )
+        for model_id, source, target, expected_reason in polarity_and_order_cases:
+            with self.subTest(model_id=model_id, source=source, target=target):
+                mismatch = module.modality_mismatch(source, target, model_id)
+                self.assertIsNotNone(mismatch)
+                self.assertIn(expected_reason, mismatch)
+
+        self.assertIsNone(
+            module.modality_mismatch(
+                "Sie müssen nicht zahlen.",
+                "Vous n'êtes pas obligé de payer.",
+                "bc250-office-translation-de-fr",
+            )
+        )
 
     def test_deep_residency_filter_evicts_and_verifies_competing_lanes(self) -> None:
         with mock.patch.object(DEEP, "_resident_models", side_effect=[["embed-model"], [], ["task-model"], []]), \
