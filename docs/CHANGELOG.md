@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.2-0.5 - 2026-09-27
+
+- Gate guided Open WebUI publication on authenticated package desired-state convergence: migration/backup first, local OWUI start for apply/status, then verified boot enablement and nginx publication only after package verification. Failed apply/status/enablement/publication remains held and is reported as retry-required instead of silently serving stale model/filter/function state.
+- Raise the bounded Advanced candidate from 4096 to `max_tokens=6144` while retaining request-scoped `think=true` and the established sampler contract. Exact-device 4096 propagation was proven; 6144 requires focused stored/effective-request and completion-quality qualification. Clean reasoning-only ceiling exhaustion remains `INCOMPLETE`; repetitive reasoning remains a quality defect.
+- Restore ordered, clause-local and polarity-aware translation modality integrity (including negated recommendations, no-obligation and same-clause modality order), bound German `nicht` ownership to each finite modal only until the next protected modal (with preceding negation reserved for participial forms such as `nicht erlaubt` / `nicht verpflichtet`), then fix the FR->DE false positive for faithful French positive `pouvoir` translated as German `kann/können/kannst/könnt` without weakening prohibition or strengthening/weakening checks.
+- Record exact-device closure of the Tika 4 DOCX list investigation: genuine Word bullets serialize as `· item`, while headings, tables, list ordering and retrieved facts remain intact; no package rewrite is justified. Close the previously isolated title/tag persistence observation after repeated single-model and Advanced+Deep runs persisted both correctly.
+- Preserve the qualified Deep design unchanged: verified pre-Deep task/embedding eviction, `keep_alive=2m`, second-request reuse, idle expiry and later task/embedding cold reload.
+
 ## 0.12.2-0.4 - 2026-09-27
 
 - Repair revalidation semantic interpretation for grounded negative answers and FR→DE recommendation modality, classify reasoning-only output-budget exhaustion as `INCOMPLETE`, retain repetition as a separate defect class, aggregate direct/OWUI parity under one root cause, and separate run completion from Infrastructure / Quality / Restoration / Coverage.
