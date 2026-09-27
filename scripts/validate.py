@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import ast
 import glob
 import os
 import re
@@ -113,6 +114,72 @@ def check_syntax() -> None:
             compile(path.read_text(encoding="utf-8"), str(relative), "exec")
         except (OSError, SyntaxError) as error:
             fail(f"Python syntax check failed for {relative}: {error}")
+
+
+def check_known_lint_regressions() -> None:
+    """Catch repository-specific regressions even when Ruff is unavailable locally."""
+    category_path = ROOT / "cmd/benchmark/category-benchmark.py"
+    try:
+        category_tree = ast.parse(category_path.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError) as error:
+        fail(f"cannot inspect category benchmark lint guards: {error}")
+    else:
+        benchmark_translation = next(
+            (
+                node
+                for node in category_tree.body
+                if isinstance(node, ast.FunctionDef) and node.name == "benchmark_translation"
+            ),
+            None,
+        )
+        if benchmark_translation is None:
+            fail("category benchmark is missing benchmark_translation")
+        else:
+            outcome_load = any(
+                isinstance(node, ast.Name)
+                and node.id == "outcome"
+                and isinstance(node.ctx, ast.Load)
+                for node in ast.walk(benchmark_translation)
+            )
+            outcome_store = any(
+                isinstance(node, ast.Name)
+                and node.id == "outcome"
+                and isinstance(node.ctx, ast.Store)
+                for node in ast.walk(benchmark_translation)
+            )
+            if outcome_load and not outcome_store:
+                fail("category benchmark loads translation outcome without assigning it (Ruff F821 regression)")
+
+    deep_path = ROOT / "config/openwebui/functions/bc250_deep_residency.py"
+    try:
+        deep_text = deep_path.read_text(encoding="utf-8")
+    except OSError as error:
+        fail(f"cannot inspect Deep residency lint guards: {error}")
+    else:
+        if "# noqa: S310" in deep_text:
+            fail("Deep residency filter restored an unused S310 noqa (Ruff RUF100 regression)")
+        required_type_errors = (
+            "raise TypeError(f\"BC-250 Deep residency check returned invalid JSON",
+            "raise TypeError(f\"BC-250 Deep residency check could not parse",
+        )
+        for snippet in required_type_errors:
+            if snippet not in deep_text:
+                fail("Deep residency invalid-type paths must raise TypeError (Ruff TRY004 regression)")
+
+    for relative, path in included_files():
+        if path.suffix != ".py":
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, (ast.With, ast.AsyncWith))
+                and len(node.body) == 1
+                and isinstance(node.body[0], (ast.With, ast.AsyncWith))
+            ):
+                fail(f"{relative}:{node.lineno}: directly nested with-statements (Ruff SIM117 regression)")
 
 
 def check_version() -> None:
@@ -449,6 +516,7 @@ def check_upstream_manifest() -> None:
 def main() -> int:
     check_required_inputs()
     check_syntax()
+    check_known_lint_regressions()
     check_version()
     check_configuration()
     check_layout_and_docs()
