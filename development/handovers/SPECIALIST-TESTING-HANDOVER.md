@@ -40,7 +40,7 @@ retest conditions from existing decisions:
   topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
   supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
   ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.2-0.4 is the active runtime/model-policy candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, Advanced `think=true` with `max_tokens=4096`, retired Qwen3.6 35B, profile-aligned Qwen3.8 experiments, protected OWUI maintenance authentication, saved-profile/live-layout CU semantics, and fail-closed pre-Deep eviction with `keep_alive=2m`. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
+  narrow temporary mitigations. Current source 0.12.2-0.5 is the active runtime/model-policy candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, Advanced `think=true` with `max_tokens=6144`, retired Qwen3.6 35B, profile-aligned Qwen3.8 experiments, protected OWUI maintenance authentication, saved-profile/live-layout CU semantics, and fail-closed pre-Deep eviction with `keep_alive=2m`. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
   treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
   rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
   live pruning and other destructive support checks remain conditional, not automatic release gates.
@@ -49,10 +49,11 @@ retest conditions from existing decisions:
   result completeness, resource telemetry and restoration on a known production control before a
   large campaign.
 - **RAG / documents:** production answer role is Gemma E4B via `bc250-office-documents`; model
-  selection is closed for the current 16 GiB profile. The active question is real-office-document
-  acceptance: actual PDFs/Tika, messy tables, multilingual/multi-source questions, OCR-derived text,
-  update/delete/re-import behavior, long residency and one deliberate unload/reload. Direct RAG work
-  must preserve starting residency and use non-empty embedding probes for embedding reload.
+  selection is closed for the current 16 GiB profile. The focused Tika DOCX list question is also closed:
+  genuine LibreOffice bullets serialize as `· item`, while heading/table/list content and retrieved facts
+  remain intact, so no package rewrite is indicated. Broader arbitrary-document/OCR lifecycle work is
+  optional product qualification rather than a blocker for the current 0.5 delta. Direct RAG work must
+  preserve starting residency and use non-empty embedding probes for embedding reload.
 - **translation:** production is Translate-Gemma E4B through explicit DE→FR / FR→DE roles. Broad
   discovery is closed; run only integrated requalification or investigate a proven product-level
   failure.
@@ -70,9 +71,9 @@ retest conditions from existing decisions:
   drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
   new runtime/model/hardware or product question.
 
-## Current 0.12.2-0.4 testing priority
+## Current 0.12.2-0.5 testing priority
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md`. This candidate deliberately crosses
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md`. This candidate deliberately crosses
 OWUI/Ollama runtime, Advanced request policy, Deep cross-lane residency, CU verification, protected maintenance authentication, translation prompt, selected large-model policy and upgrade migration boundaries, so test those surfaces directly. Preserve the previous clean topology/restoration
 evidence as comparison context, but do not relabel it as current qualification. Qwen template replacement,
 generic memory admission, ROCm migration and pre-emptive multi-model restriction are not part of this release.

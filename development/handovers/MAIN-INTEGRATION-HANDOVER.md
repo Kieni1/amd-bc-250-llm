@@ -26,8 +26,8 @@ Current source release:
 
 ```text
 VERSION       0.12.2
-RPM Release   0.4%{?dist}
-NVR           bc250-llm-server-0.12.2-0.4
+RPM Release   0.5%{?dist}
+NVR           bc250-llm-server-0.12.2-0.5
 Ollama        0.34.4
 Open WebUI    0.11.4
 Tika          4.0.0-full / TIKA_SERVER_VERSION=4
@@ -35,19 +35,15 @@ Governor      0.4.13
 Revalidation  v4.6
 ```
 
-`0.12.2-0.4` is the current source/device candidate. Exact-installed 0.12.1-0.6 established a clean
-infrastructure/resource/restoration baseline but left production recommendation-modality translation
-quality unresolved; the subsequent long-run model review also found repeatable Advanced arithmetic
-weakness under `think=false` and excessive warm-memory pressure in two large 16K experimental profiles.
-0.12.2 therefore hardens translation instructions, keeps Advanced request-scoped `think=true` with a
-4096-token production ceiling, retires Qwen3.6 35B from active candidates, keeps Qwen3.8 27B Unsloth
-pressure-heavy/admin-only at 8K, moves Ollama/Open WebUI/governor to 0.34.4/0.11.4/0.4.13, and makes
-the OWUI upgrade path rollback-snapshot gated. The four-lane topology,
-Mesa/Vulkan backend, task/embed lane separation, `OLLAMA_MAX_LOADED_MODELS=1` and
-administrator ownership of multi-model permission remain unchanged. Deep now uses verified pre-admission task/embedding eviction plus package-owned `keep_alive=2m`; failure to prove competing-lane eviction defers Deep startup. 0.12.2-0.4 also closes the
-pre-device translation/rollback logic review: complete French modality forms, clause-local modality association, conservative ambiguous-three-decimal integrity, shared production translation authorities in direct/OWUI qualification, fail-closed
-visibility typing, and ACL/xattr-preserving OWUI rollback archives. Use
-`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md` for the next device gate.
+`0.12.2-0.5` is the current source/device candidate. Exact-installed `0.12.2-0.4` supplied the immediate
+product/runtime evidence: the converged Deep residency design passed pre-eviction/reuse/2-minute expiry/cold-reload
+qualification with materially improved headroom; Advanced 4096 propagation was proven end-to-end but clean reasoning-only
+exhaustion remained too frequent; translation modality hardening was effective except for one attributable FR→DE positive
+`pouvoir` -> `können` detector false hold. The 0.5 delta therefore preserves Deep unchanged, raises Advanced to a bounded
+6144 candidate with `think=true`, restores ordered clause-local/polarity-aware modality events (including negated recommendations, no-obligation and same-clause order), recognizes positive German `kann/können/kannst/könnt` narrowly in that integrity detector,
+and hardens guided upgrade convergence so OWUI boot/nginx publication occurs only after authenticated desired-state apply/status plus verified boot enablement. Genuine LibreOffice DOCX testing closes the Tika middle-dot list question as a Tika 4 serialization characteristic,
+and repeated title/tag testing closes the old isolated persistence observation without task-lane changes. Use
+`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md` for the focused device gate.
 
 Exact installed `0.12.1-0.4.fc44.x86_64` reached package convergence, authenticated verifier 54/0, healthy normal topology, Ollama 0.34.2, current Fedora kernel operation, packaged revalidation infrastructure/quality/restoration PASS and the first bounded RAG filesystem/security gate. Device testing then found two source blockers: the RAG agent path consumed native reasoning as document text and could falsely satisfy fidelity checks, while `bc250-revalidate status --raw` discarded its option. Those findings block 0.4 release acceptance but do not invalidate its broad runtime/model evidence. 0.5 therefore needs focused RAG-preparation/CLI/UX acceptance rather than replaying the completed broad model campaign. Exact-installed 2.4 remains historical broad operations evidence only.
 
@@ -87,17 +83,15 @@ supported `sudo reboot`. The separate final Open WebUI investigation also proved
 ACL and Deep Reasoning memory defects and their narrow temporary mitigations on exact 2.4. Those
 results motivate 0.12.1-0.1 but do not qualify the new NVR.
 
-Current 0.12.2-0.4 evidence boundary:
+Current 0.12.2-0.5 evidence boundary:
 
 ```text
-release metadata                 0.12.2-0.4
-exact-installed 0.12.1-0.6       device infrastructure/resource/restoration PASS
-0.12.1-0.6 production finding     translation recommendation modality NOT CLEAN
-long-run model findings           Advanced think=false arithmetic weakness; two large 16K profiles too tight
-final long-run cleanup           retire Gemma4 26B/LFM 8B/Qwen3.6 35B; retained pressure-heavy profiles admin/testing-only
-0.12.2-0.4 source gate        PASS — static preflight + syntax checks + focused affected tests; 484-method full inventory not rerun by integration instruction
-GitHub RPM/SRPM build gate         pending
-exact-0.12.2-0.4 device gate      pending
+release metadata                  0.12.2-0.5
+exact-installed 0.12.2-0.4       Deep architecture PASS; 4096 propagation PASS; translation broad PASS with one detector false hold
+0.12.2-0.5 source delta           OWUI convergence gate + Advanced 6144 candidate + narrow können-family detector fix
+Tika/title-tag investigations     CLOSED / no package topology change
+GitHub RPM/SRPM build gate        pending
+exact-0.12.2-0.5 focused gate    pending: translation regression + Advanced 6144 + final OWUI release qualification
 ```
 
 Exact installed `0.11.3-2.3.fc44.x86_64` targeted operations acceptance has now demonstrated:
@@ -657,29 +651,20 @@ Exact installed 0.12.1-0.6 is now the immediate comparison baseline: its device 
 
 # 13. Current open gaps and priority order
 
-## P0 — build and exact-0.12.2-0.4 crossed-boundary qualification
+## P0 — build and exact-0.12.2-0.5 focused qualification
 
-The current release requires the following acceptance boundaries:
+The current release requires only the crossed boundaries justified by the newest evidence:
 
 ```text
-1. RPM upgrade with existing OWUI state unconditionally requests OWUI stop in `%pre`, proves `ActiveState=inactive`, and holds boot before the new Quadlet can become restart-eligible; a verified full stopped-state rollback snapshot then gates guided migration; migration/readiness/convergence then succeed on Open WebUI 0.11.4;
-2. Ollama 0.34.4 normal lanes and Mesa/Vulkan/UMA behavior remain clean; /api/show thinking metadata is captured as diagnostic evidence;
-3. every curated OWUI workspace/derived record matches package base_model_id, params/custom_params, meta, attachments and minimum ACL; unrelated grants survive;
-4. Advanced stored/effective request preserves root `think=true`, `max_tokens=4096` -> Ollama `options.num_predict=4096` with no root-level Ollama `max_tokens`, plus 0.7/0.8/20/min_p=0/presence=0/repeat=1 samplers; device work is a no-regression/quality/resource check;
-5. Deep pre-eviction is verified, consecutive requests reuse `keep_alive=2m`, idle expiry unloads Deep, and later task/embed work cold-loads correctly;
-6. translation recommendation/obligation quality is requalified both directions and modality drift is classified as modality, not source-leakage;
-7. Tika 4 extraction preserves meaningful heading/list/table Markdown structure through Documents/RAG;
-8. Qwen3.6 35B is absent from active candidates; Qwen3.8 Unsloth remains pressure-heavy/admin-only if retained; ISTA IQ3_S and IQ3_XXS remain distinct quality/deployability profiles;
-9. browser journey/task settings, structured outputs, large-library lookup, role-aware OCR/specialized probing and finite factual calibration follow the dedicated release handover;
-10. final normal topology, residency restoration, rpm -V, verifier and kernel/GPU safety are clean;
-11. build RPM/SRPM in the authoritative Fedora path, then run development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md.
+1. build/install exact 0.12.2-0.5 and prove guided upgrade convergence keeps OWUI boot/nginx held until authenticated desired state is current;
+2. focused FR→DE regression with the exact pouvoir/können pair plus existing negative strengthening/weakening/swap/prohibition cases;
+3. Advanced stored preset `max_tokens=6144` -> effective Ollama `options.num_predict=6144`, root `think=true`, unchanged samplers and no root-level Ollama max_tokens;
+4. Advanced arithmetic, structured JSON, constraints, two-turn history, office writing, bounded short-answer and Advanced side of Advanced+Deep; classify clean ceiling exhaustion as INCOMPLETE and repetition as quality-fail;
+5. one final full OWUI release qualification after convergence. Deep is a preservation/no-regression observation, not a reason to replay the long native campaign;
+6. final normal topology, residency, verifier, rpm -V and kernel/GPU safety clean.
 ```
 
-Do not reopen Qwen template repacking, a generic memory scheduler, ROCm packaging or a package-owned multi-model restriction unless the new candidate produces evidence that requires it.
-
-Backup restore is already accepted for configuration on exact 2.2 and identity on exact 2.3. Live
-pruning, Pi forced-command shutdown, idle S5/WOL and full whole-appliance revalidation remain
-conditional rather than automatic release gates.
+Do not rerun the old native long-run, Tika investigation or title/tag investigation merely for closure. Do not add a generic memory scheduler or Tika list-marker rewrite.
 
 ## P1 — real-office RAG acceptance
 
@@ -734,7 +719,7 @@ Canonical detailed rationale belongs in `development/DECISIONS.md`.
 
 # 15. Known gaps that are still current
 
-- 0.12.2-0.4 needs the authoritative Fedora RPM/SRPM build plus the crossed-boundary device gate in `RELEASE-TESTING-HANDOVER-0.12.2-0.4.md`; exact 0.12.1-0.6 remains comparison evidence, not qualification of the new runtime/model candidate;
+- 0.12.2-0.5 needs the authoritative Fedora RPM/SRPM build plus the focused device gate in `RELEASE-TESTING-HANDOVER-0.12.2-0.5.md`; exact 0.12.2-0.4 provides the immediate product/runtime evidence for unchanged Deep/Tika/task boundaries, not qualification of the new 6144/translation/convergence delta;
 - the new upstream patch/provenance gate still needs to run against the exact prepared source cache in
   the authoritative build environment; the current source environment has no network-populated cache;
 - Pi forced-command shutdown, idle S5/WOL and live prune remain conditional acceptance work;
@@ -786,10 +771,10 @@ Main integration owns final promotion, release metadata and cross-stream policy.
 > evidence as authoritative over handovers. Read `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
 > `development/VALIDATION-MATRIX.md`, `development/TESTING-STRATEGY.md`,
 > `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source target is
-> `0.12.2-0.4`; exact installed `0.12.1-0.6` is the immediate clean device/runtime comparison baseline,
+> `0.12.2-0.5`; exact installed `0.12.1-0.6` is the immediate clean device/runtime comparison baseline,
 > while older 0.11.3 evidence remains historical support for closed operational areas. Do not call
 > 0.12.2 accepted before the crossed-boundary release gate in
-> `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md`. GitHub/Fedora owns RPM/SRPM builds,
+> `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md`. GitHub/Fedora owns RPM/SRPM builds,
 > the developer source environment owns deterministic/static validation, and BC-250 owns hardware/runtime
 > qualification. Preserve verified GGUFs, keep destructive operations explicit, fail closed on ambiguous
 > state, and qualify the changed OWUI/Ollama, migration, model-profile, translation and Advanced-policy
