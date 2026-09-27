@@ -39,3 +39,10 @@ Dated specialist evidence handovers may also be retained here as source-only `.t
 references when they capture a large campaign that should not be collapsed into the
 operator documentation. The 2026-09-17 task/translation specialist snapshots were
 retired after their durable evidence was integrated into model-run and decision records.
+
+## Current main-integration continuity
+
+- `MAIN-INTEGRATION-HANDOVER.md` — durable project state/history.
+- `MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md` — current procedural authority and implemented contracts.
+- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.4.md` — current implementation/device-qualification boundary.
+- `RELEASE-TESTING-HANDOVER-0.12.2-0.4.md` — exact-device acceptance sequence.
