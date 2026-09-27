@@ -232,9 +232,8 @@ The pinned Open WebUI v0.11.4 OpenAI-style adapter is not an external BC-250 com
 contract. A client-supplied root `max_tokens` field on that external-style endpoint is not advertised
 as a reliable hard cap for Ollama-backed requests. The package-owned Advanced model record is a
 different package-owned internal path: externally supplied exact-device evidence accepted by integration
-reports that stored `params.max_tokens=4096` maps to outbound Ollama `options.num_predict=4096`, with no
-root-level `max_tokens` sent to Ollama. The raw outbound capture is not retained in this source tree, so
-release qualification reconfirms the mapping as a no-regression observation. Direct benchmark callers
+records the current `params.max_tokens=6144` candidate and expects outbound Ollama `options.num_predict=6144`, with no
+root-level Ollama `max_tokens`. The same adapter path was proven end-to-end at 4096 on the previous exact-device run; 6144 requires focused no-regression qualification after install. The raw outbound capture of the prior 4096 run is not retained in this source tree. Direct benchmark callers
 that require a hard generation cap likewise use native nested `options.num_predict`. See
 `docs/openwebui-settings.md` for the related reasoning-token and finish-reason metadata limitations.
 
