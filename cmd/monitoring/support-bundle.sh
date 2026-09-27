@@ -145,7 +145,7 @@ manifest = {
     "ended_at": ended,
     "scope": "redacted-read-only-support-evidence",
     "excludes": [
-        "Open WebUI API tokens and passwords",
+        "Open WebUI API tokens and passwords, including /var/lib/bc250-llm-server/secrets/openwebui-admin.key",
         "prompts and chat content",
         "uploaded document contents",
         "Open WebUI database rows and identity SQL",
