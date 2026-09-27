@@ -5,7 +5,17 @@
       "name": "BC-250 Translation Direction Wrapper",
       "content_file": "functions/bc250_translation_direction.py",
       "meta": {
-        "description": "Package-owned non-global filter that applies the tested Stage-2E DE↔FR user wrapper to the two BC-250 translation roles."
+        "description": "Package-owned non-global filter that applies the tested Stage-2E DE\u2194FR user wrapper to the two BC-250 translation roles."
+      },
+      "is_active": true,
+      "is_global": false
+    },
+    {
+      "id": "bc250_deep_residency",
+      "name": "BC-250 Deep Residency Guard",
+      "content_file": "functions/bc250_deep_residency.py",
+      "meta": {
+        "description": "Package-owned model-specific filter that unloads and verifies task/embedding residency before Deep starts."
       },
       "is_active": true,
       "is_global": false

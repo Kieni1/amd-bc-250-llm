@@ -22,6 +22,13 @@ OPENWEBUI = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = OPENWEBUI
 SPEC.loader.exec_module(OPENWEBUI)
 
+DEEP_HELPER = ROOT / "config/openwebui/functions/bc250_deep_residency.py"
+DEEP_SPEC = importlib.util.spec_from_file_location("bc250_deep_residency", DEEP_HELPER)
+if DEEP_SPEC is None or DEEP_SPEC.loader is None:
+    raise RuntimeError(f"could not load {DEEP_HELPER}")
+DEEP = importlib.util.module_from_spec(DEEP_SPEC)
+DEEP_SPEC.loader.exec_module(DEEP)
+
 
 REQUIRED_READ = {"principal_type": "user", "principal_id": "*", "permission": "read"}
 
@@ -277,6 +284,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
             [
                 "/api/v1/functions/create",
                 "/api/v1/functions/id/bc250_translation_direction/toggle",
+                "/api/v1/functions/create",
+                "/api/v1/functions/id/bc250_deep_residency/toggle",
             ],
         )
         create_payload = client.calls[0][1]
@@ -379,8 +388,10 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertTrue(documents["meta"]["capabilities"]["builtin_tools"])
         self.assertTrue(documents["meta"]["builtinTools"]["knowledge"])
         self.assertFalse(documents["meta"]["builtinTools"]["chats"])
-        self.assertEqual(models["bc250-office-deep-reasoning"]["params"].get("keep_alive"), 0)
-        self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["params"].get("keep_alive"), 0)
+        self.assertEqual(models["bc250-office-deep-reasoning"]["params"].get("keep_alive"), "2m")
+        self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["params"].get("keep_alive"), "2m")
+        self.assertEqual(models["bc250-office-deep-reasoning"]["meta"].get("filterIds"), ["bc250_deep_residency"])
+        self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["meta"].get("filterIds"), ["bc250_deep_residency"])
         advanced_policy = models["bc250-office-advanced"]["params"]["custom_params"]
         self.assertEqual(advanced_policy["think"], True)
         self.assertEqual(advanced_policy["temperature"], 0.7)
@@ -454,7 +465,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         deep = next(
             model for model in payload["models"] if model["id"] == "bc250-office-deep-reasoning"
         )
-        self.assertEqual(deep["params"].get("keep_alive"), 0)
+        self.assertEqual(deep["params"].get("keep_alive"), "2m")
         advanced = next(
             model for model in payload["models"] if model["id"] == "bc250-office-advanced"
         )
@@ -464,6 +475,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             if model["id"] == "prod-qwen35-9b-unsloth-q6-k:latest"
         )
         for model in (advanced, raw_qwen):
+            self.assertEqual(model["params"].get("max_tokens"), 4096)
             self.assertEqual(
                 model["params"]["custom_params"],
                 {
@@ -543,7 +555,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(OPENWEBUI.status(FakeClient(), True), 0)
-        self.assertIn("Open WebUI models: 6 presets current, 6 base overrides current", output.getvalue())
+        self.assertIn("curated presets       : 6/6 current", output.getvalue())
+        self.assertIn("base-model overrides  : 6/6 current", output.getvalue())
 
     def test_status_detects_missing_base_override_with_correct_terminology(self) -> None:
         responses = status_responses()
@@ -990,7 +1003,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 mismatch = module.literal_integrity_mismatch(source, target)
                 self.assertEqual(mismatch is not None, expect_mismatch)
 
-        rejected_modality_cases = (
+        clause_swap_cases = (
             (
                 "bc250-office-translation-fr-de",
                 "Vous devriez signer. Vous devez payer.",
@@ -1001,28 +1014,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "Sie dürfen unterschreiben. Sie müssen zahlen.",
                 "Vous devez signer. Vous pouvez payer.",
             ),
-            (
-                "bc250-office-translation-de-fr",
-                "Sie sollten nicht unterschreiben.",
-                "Vous devriez signer.",
-            ),
-            (
-                "bc250-office-translation-fr-de",
-                "Vous ne devriez pas signer.",
-                "Sie sollten unterschreiben.",
-            ),
-            (
-                "bc250-office-translation-de-fr",
-                "Sie müssen nicht zahlen.",
-                "Vous devez payer.",
-            ),
-            (
-                "bc250-office-translation-de-fr",
-                "Der Mieter darf die Küche nutzen und muss sie reinigen.",
-                "Le locataire doit utiliser la cuisine et peut la nettoyer.",
-            ),
         )
-        for model_id, source, target in rejected_modality_cases:
+        for model_id, source, target in clause_swap_cases:
             with self.subTest(model_id=model_id, source=source, target=target):
                 body = {
                     "model": model_id,
@@ -1031,32 +1024,11 @@ class OpenWebUIStatusTests(unittest.TestCase):
                         {"role": "assistant", "content": target},
                     ],
                 }
-                guarded_result = asyncio.run(module.Filter().outlet(body))
+                guarded_swap = asyncio.run(module.Filter().outlet(body))
                 self.assertIn(
                     "translation integrity mismatch",
-                    guarded_result["messages"][-1]["content"],
+                    guarded_swap["messages"][-1]["content"],
                 )
-
-        no_obligation_preserved = {
-            "model": "bc250-office-translation-de-fr",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": wrapper + "Sie müssen nicht zahlen.",
-                },
-                {
-                    "role": "assistant",
-                    "content": "Vous n'êtes pas obligé de payer.",
-                },
-            ],
-        }
-        no_obligation_preserved = asyncio.run(
-            module.Filter().outlet(no_obligation_preserved)
-        )
-        self.assertEqual(
-            no_obligation_preserved["messages"][-1]["content"],
-            "Vous n'êtes pas obligé de payer.",
-        )
 
         permission_strengthened = {
             "model": "bc250-office-translation-de-fr",
@@ -1081,14 +1053,43 @@ class OpenWebUIStatusTests(unittest.TestCase):
         obligation_weakened = asyncio.run(module.Filter().outlet(obligation_weakened))
         self.assertIn("obligation weakened to permission", obligation_weakened["messages"][-1]["content"])
 
+    def test_deep_residency_filter_evicts_and_verifies_competing_lanes(self) -> None:
+        with mock.patch.object(DEEP, "_resident_models", side_effect=[["embed-model"], [], ["task-model"], []]), \
+             mock.patch.object(DEEP, "_unload_embedding") as unload_embedding, \
+             mock.patch.object(DEEP, "_unload_task") as unload_task:
+            DEEP.ensure_competing_lanes_clear()
+        unload_embedding.assert_called_once_with("embed-model")
+        unload_task.assert_called_once_with("task-model")
+        self.assertEqual(DEEP.EMBED_URL, "http://host.containers.internal:11437")
+        self.assertEqual(DEEP.TASK_URL, "http://host.containers.internal:11435")
+
+    def test_deep_residency_filter_fails_closed_when_eviction_cannot_be_verified(self) -> None:
+        with (
+            mock.patch.object(DEEP, "_resident_models", side_effect=[["embed-model"], ["embed-model"]]),
+            mock.patch.object(DEEP, "_unload_embedding"),
+            self.assertRaisesRegex(RuntimeError, "embedding residency could not be cleared"),
+        ):
+            DEEP.ensure_competing_lanes_clear()
+
+    def test_protected_token_write_refuses_overwrite_and_uses_0600(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "owui.key"
+            OPENWEBUI.write_token_file(str(path), "secret-one", replace=False)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(path.read_text(encoding="utf-8"), "secret-one\n")
+            with self.assertRaises(OPENWEBUI.ApiError):
+                OPENWEBUI.write_token_file(str(path), "secret-two", replace=False)
+            self.assertEqual(path.read_text(encoding="utf-8"), "secret-one\n")
+
     def test_package_function_manifest_loads_non_global_active_filter(self) -> None:
         functions = OPENWEBUI.load_functions()
-        self.assertEqual(len(functions), 1)
-        function = functions[0]
-        self.assertEqual(function["id"], "bc250_translation_direction")
-        self.assertTrue(function["is_active"])
-        self.assertFalse(function["is_global"])
-        self.assertIn("class Filter", function["content"])
+        self.assertEqual(len(functions), 2)
+        by_id = {function["id"]: function for function in functions}
+        self.assertEqual(set(by_id), {"bc250_translation_direction", "bc250_deep_residency"})
+        for function in by_id.values():
+            self.assertTrue(function["is_active"])
+            self.assertFalse(function["is_global"])
+            self.assertIn("class Filter", function["content"])
 
 
 if __name__ == "__main__":

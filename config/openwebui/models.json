@@ -163,7 +163,7 @@
       "base_model_id": "prod-qwen35-9b-unsloth-q6-k:latest",
       "name": "Office - General / Higher Quality",
       "meta": {
-        "description": "Higher-quality general office model. Uses reasoning-enabled Qwen3.5 for the 0.12.2 quality candidate; device qualification will confirm the latency/resource tradeoff.",
+        "description": "Higher-quality general office model. Uses reasoning-enabled Qwen3.5 with a bounded 4096-token generation ceiling for the current 0.12.2-0.4 source.",
         "tags": [
           {
             "name": "BC250"
@@ -189,7 +189,8 @@
           "min_p": 0.0,
           "presence_penalty": 0.0,
           "repeat_penalty": 1.0
-        }
+        },
+        "max_tokens": 4096
       },
       "is_active": true,
       "access_grants": [
@@ -205,7 +206,7 @@
       "base_model_id": "prod-gpt-oss20b-ggml-org-mxfp4:latest",
       "name": "Office - Deep Reasoning",
       "meta": {
-        "description": "For complex analysis and reasoning. Slower to start and automatically unloads after each response to preserve BC-250 memory.",
+        "description": "For complex analysis and reasoning. Pre-Deep task/embedding eviction is required; Deep remains resident for a bounded 2m idle window for consecutive requests.",
         "tags": [
           {
             "name": "BC250"
@@ -217,10 +218,13 @@
         "capabilities": {
           "builtin_tools": false,
           "file_context": true
-        }
+        },
+        "filterIds": [
+          "bc250_deep_residency"
+        ]
       },
       "params": {
-        "keep_alive": 0
+        "keep_alive": "2m"
       },
       "is_active": true,
       "access_grants": [
@@ -362,7 +366,8 @@
           "min_p": 0.0,
           "presence_penalty": 0.0,
           "repeat_penalty": 1.0
-        }
+        },
+        "max_tokens": 4096
       },
       "is_active": true,
       "access_grants": [
@@ -379,7 +384,7 @@
       "name": "prod-gpt-oss20b-ggml-org-mxfp4:latest",
       "meta": {
         "hidden": false,
-        "description": "Raw GPT-OSS implementation model; visible for pre-v1 comparison testing. keep_alive=0 is retained for BC-250 memory safety.",
+        "description": "Raw GPT-OSS implementation model; visible for pre-v1 comparison testing. Uses the package Deep policy with verified pre-eviction and a bounded 2m idle residency window.",
         "tags": [
           {
             "name": "BC250"
@@ -394,10 +399,13 @@
         "capabilities": {
           "builtin_tools": false,
           "file_context": true
-        }
+        },
+        "filterIds": [
+          "bc250_deep_residency"
+        ]
       },
       "params": {
-        "keep_alive": 0
+        "keep_alive": "2m"
       },
       "is_active": true,
       "access_grants": [
@@ -443,34 +451,8 @@
     }
   ],
   "testing_model_policies": {
-    "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest": {
-      "description": "Admin/testing-only experimental 35B Qwen3.6 memory-edge model. The 0.12.2 candidate reduces context to 8K after repeated sub-512 MiB headroom at 16K; keep experimental until device requalification.",
-      "tags": [
-        "qwen3.6",
-        "memory-edge",
-        "model-only-recommended",
-        "admin-testing-only"
-      ],
-      "custom_params": {
-        "think": false,
-        "temperature": 0.7,
-        "top_p": 0.8,
-        "top_k": 20,
-        "min_p": 0.0,
-        "presence_penalty": 0.0,
-        "repeat_penalty": 1.0
-      },
-      "qualification": {
-        "deployment": "model-only-recommended",
-        "supports_named_effort": false,
-        "production": "not-qualified",
-        "context_target": 8192,
-        "pressure_profile": "requalification-required"
-      },
-      "ordinary_user_visible": false
-    },
     "exp-qwen38-27b-ista-gsq-rco-iq3-s:latest": {
-      "description": "Admin/testing-only experimental Qwen3.8 ISTA IQ3_S 8K quality profile. Retain as the tighter quality-oriented variant; unload/recovery worked, but device headroom remains part of qualification.",
+      "description": "Admin/testing-only experimental Qwen3.8 ISTA IQ3_S 8K quality/reasoning profile; mechanically strong but memory-tight.",
       "tags": [
         "qwen3.8",
         "reasoning-experiment",
@@ -478,16 +460,16 @@
         "admin-testing-only"
       ],
       "custom_params": {
-        "think": false,
-        "temperature": 0.7,
-        "top_p": 0.8,
+        "think": true,
+        "temperature": 1.0,
+        "top_p": 0.95,
         "top_k": 20,
         "min_p": 0.0,
         "presence_penalty": 0.0,
         "repeat_penalty": 1.0
       },
       "qualification": {
-        "preferred_reasoning_experiment": "low-vs-medium",
+        "preferred_reasoning_experiment": "think-true",
         "supports_named_effort": true,
         "production": "not-qualified",
         "context_target": 8192,
@@ -496,7 +478,7 @@
       "ordinary_user_visible": false
     },
     "exp-qwen38-27b-unsloth-ud-iq3-s:latest": {
-      "description": "Admin/testing-only experimental Qwen3.8 Unsloth IQ3_S. The 0.12.2 candidate reduces context to 8K after repeated very-low-headroom operation at 16K; production RAG remains unqualified.",
+      "description": "Admin/testing-only experimental Qwen3.8 Unsloth IQ3_S 8K pressure-heavy/non-routine quality experiment; repeated sub-512 MiB operation requires caution.",
       "tags": [
         "qwen3.8",
         "reasoning-experiment",
@@ -546,6 +528,32 @@
         "production": "not-qualified"
       },
       "ordinary_user_visible": true
+    },
+    "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest": {
+      "description": "Retired Qwen3.6 35B profile retained only to keep stale registrations admin/testing-only during cleanup.",
+      "tags": [
+        "qwen3.6",
+        "retired",
+        "pressure-heavy",
+        "admin-testing-only"
+      ],
+      "custom_params": {
+        "think": false,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "qualification": {
+        "deployment": "retired",
+        "supports_named_effort": false,
+        "production": "retired",
+        "context_target": 8192,
+        "pressure_profile": "retired-after-pressure-resets"
+      },
+      "ordinary_user_visible": false
     }
   }
 }

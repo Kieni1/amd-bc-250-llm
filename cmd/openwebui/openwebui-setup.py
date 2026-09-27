@@ -20,6 +20,7 @@ SOURCE_MODELS = Path(__file__).resolve().parents[2] / "config/openwebui/models.j
 DEFAULT_DESIRED = Path("/usr/share/bc250-llm-server/openwebui/desired-state.json")
 SOURCE_DESIRED = Path(__file__).resolve().parents[2] / "config/openwebui/desired-state.json"
 DEFAULT_FUNCTIONS = Path("/usr/share/bc250-llm-server/openwebui/functions.json")
+DEFAULT_TOKEN_FILE = Path("/var/lib/bc250-llm-server/secrets/openwebui-admin.key")
 SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
 # The model-view/access contract below is qualified against the packaged Open WebUI pin.
@@ -964,10 +965,10 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
             print(f"  - {problem}")
         return 2
     print("Desired-state drift: none in package-owned settings")
-    print(
-        f"Open WebUI models: {active_presets} presets current, "
-        f"{active_base_overrides} base overrides current"
-    )
+    expected_presets = sum(1 for item in desired_models if item.get("base_model_id") is not None and item.get("is_active") is True)
+    expected_overrides = sum(1 for item in desired_models if item.get("base_model_id") is None and item.get("is_active") is True)
+    print(f"curated presets       : {active_presets}/{expected_presets} current")
+    print(f"base-model overrides  : {active_base_overrides}/{expected_overrides} current")
     if verbose:
         print_verbose_summary(desired_models, load_functions())
         compare_state = multiple_models_state(application)
@@ -991,6 +992,12 @@ def read_token_file(path: str) -> str:
         raise ApiError(f"API key file is not a regular file: {token_path}")
     if st.st_mode & 0o077:
         raise ApiError(f"API key file must not be group/world accessible: {token_path}")
+    if token_path == DEFAULT_TOKEN_FILE:
+        parent = token_path.parent.stat()
+        if st.st_uid != 0 or parent.st_uid != 0:
+            raise ApiError(f"package default API key and secrets directory must be owned by root: {token_path}")
+        if parent.st_mode & 0o077:
+            raise ApiError(f"package secrets directory must not be group/world accessible: {token_path.parent}")
     try:
         token = token_path.read_text(encoding="utf-8").strip()
     except OSError as exc:
@@ -1000,26 +1007,52 @@ def read_token_file(path: str) -> str:
     return token
 
 
-def write_token_file(path: str, token: str) -> None:
+def write_token_file(path: str, token: str, *, replace: bool = True) -> None:
     token_path = Path(path)
-    token_path.parent.mkdir(parents=True, exist_ok=True)
-    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-    fd = os.open(token_path, flags, 0o600)
+    token_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(token_path.parent, 0o700)
+    temp_path = token_path.parent / f".{token_path.name}.{os.getpid()}.tmp"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    fd = os.open(temp_path, flags, 0o600)
     try:
         os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8", closefd=False) as handle:
             handle.write(token + "\n")
             handle.flush()
+            os.fsync(handle.fileno())
+        if replace:
+            os.replace(temp_path, token_path)
+        else:
+            try:
+                os.link(temp_path, token_path)
+            except FileExistsError as exc:
+                raise ApiError(f"refusing to overwrite existing API key file: {token_path}") from exc
+            temp_path.unlink()
+        dir_fd = os.open(token_path.parent, os.O_RDONLY)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
     finally:
-        os.close(fd)
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        temp_path.unlink(missing_ok=True)
+
+
+def verify_token(client_url: str, token: str) -> None:
+    probe = Client(client_url, token)
+    require_object(probe.get("/ollama/config"), "authenticated Ollama configuration")
 
 
 def suggested_token_file() -> str:
     configured = os.environ.get("BC250_OWUI_TOKEN_FILE", "").strip()
     if configured:
         return configured
-    default = Path("/root/owui-test.key")
-    return str(default) if default.is_file() else ""
+    if DEFAULT_TOKEN_FILE.is_file():
+        return str(DEFAULT_TOKEN_FILE)
+    return ""
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
@@ -1034,6 +1067,11 @@ def parser() -> argparse.ArgumentParser:
         help="write the authenticated token to a protected temporary file for the caller",
     )
     p.add_argument(
+        "--save-default-token",
+        action="store_true",
+        help="save a verified administrator API key to the package protected default without overwriting an existing key",
+    )
+    p.add_argument(
         "--verbose",
         action="store_true",
         help="show the verified active role, task, RAG and package-function summary",
@@ -1044,13 +1082,15 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     env_token = os.environ.get("OWUI_API_KEY", "").strip() or None
-    token = read_token_file(args.token_file) if args.token_file else env_token
+    default_token_file = str(DEFAULT_TOKEN_FILE) if DEFAULT_TOKEN_FILE.is_file() else None
+    selected_token_file = args.token_file or (None if env_token else default_token_file)
+    token = read_token_file(selected_token_file) if selected_token_file else env_token
     client = Client(args.url, token)
     if args.command == "status":
         return status(client, bool(token), verbose=args.verbose)
     if args.command == "init":
-        if args.token_file:
-            print(f"Using Open WebUI administrator API key file: {args.token_file}")
+        if selected_token_file:
+            print(f"Using Open WebUI administrator API key file: {selected_token_file}")
         elif token:
             print("Using OWUI_API_KEY from the environment; interactive sign-in is not required.")
         else:
@@ -1100,13 +1140,24 @@ def main() -> int:
             client = Client(args.url, token)
     elif not token:
         raise ApiError(
-            f"{args.command} requires --token-file or OWUI_API_KEY; the key is never stored by default"
+            f"{args.command} requires --token-file, OWUI_API_KEY, or the protected package default {DEFAULT_TOKEN_FILE}"
         )
 
+    apply(client)
+    verify_token(args.url, token)
     if args.token_output and token:
         write_token_file(args.token_output, token)
-
-    apply(client)
+    if args.save_default_token and token:
+        if os.geteuid() != 0:
+            raise ApiError("--save-default-token requires root so the package credential remains root-owned")
+        write_token_file(str(DEFAULT_TOKEN_FILE), token, replace=False)
+        try:
+            saved = read_token_file(str(DEFAULT_TOKEN_FILE))
+            verify_token(args.url, saved)
+        except Exception:
+            DEFAULT_TOKEN_FILE.unlink(missing_ok=True)
+            raise
+        print(f"Saved verified BC-250 maintenance API key: {DEFAULT_TOKEN_FILE}")
     print("Open WebUI package-owned baseline applied through supported APIs.")
     return status(client, True, verbose=args.verbose)
 
