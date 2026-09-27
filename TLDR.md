@@ -3,6 +3,8 @@
 This is the common-path operator sheet. Use [`docs/COMMANDS.md`](docs/COMMANDS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
+Current source candidate: `bc250-llm-server-0.12.2-0.4`.
+
 ## Install
 
 Keep the binary RPM beside the repository bootstrap:
@@ -49,7 +51,7 @@ reflects reclaimed capacity even when `du` counts both names. Open
 sudo bc250-openwebui-setup init
 ```
 
-When an RPM upgrade changes Open WebUI with existing persistent state, RPM `%pre` unconditionally stops Open WebUI, verifies it is inactive, and holds boot enablement before the new Quadlet can restart. The guided installer then creates a verified stopped-state rollback archive before allowing the new image to start. See
+When an RPM upgrade changes Open WebUI with existing persistent state, RPM `%pre` unconditionally requests Open WebUI stop, proves `ActiveState=inactive`, and holds boot enablement before the new Quadlet can restart. The guided installer then creates a verified stopped-state rollback archive before allowing the new image to start. See
 [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) for the supported restore procedure.
 
 For RAG, keep operator documents under `/srv/bc250-documents`; batch preparation stops at a human review gate:
@@ -185,7 +187,7 @@ growth. `bc250-uninstall` remains a compatibility alias. Read
 ## Full qualification
 
 ```bash
-sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+sudo bc250-revalidate start
 ```
 
 It is opt-in/root-only, includes authenticated production translation-role and RAG

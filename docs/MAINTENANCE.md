@@ -42,7 +42,9 @@ sudo bc250-maintenance disable
 SHA-256 sidecar. It includes Open WebUI accounts, settings and chats but excludes
 bulky uploads, vector data and caches. It is therefore **not a complete RAG
 backup** and cannot restore an ingested document library by itself. `backup-users` is a selective identity
-export and contains password hashes, API keys and access-control data.
+export and contains password hashes, API keys and access-control data. The package maintenance credential
+`/var/lib/bc250-llm-server/secrets/openwebui-admin.key` is separate root-only appliance state: it is not
+placed in config/users backups or support/revalidation evidence and must be re-established separately if needed.
 
 Backups under `/var/backups/bc250-llm-server` remain local by default. Treat
 them as confidential recovery points, not protection against theft or disk
@@ -65,8 +67,8 @@ artifacts remain private `0600`; after enablement they are published `0640`.
 
 Before upgrading Open WebUI or moving the complete instance, take a stopped
 filesystem snapshot. On a package upgrade with an existing Open WebUI database, RPM `%pre`
-issues `systemctl stop open-webui.service` unconditionally and verifies `ActiveState=inactive` before removing its boot-enablement drop-in. The new
-Quadlet payload or a later daemon-reload cannot make the new image restart-eligible until that stopped invariant has been established. The automatic
+unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its
+boot-enablement drop-in before the new Quadlet payload or a later daemon-reload can make the new image restart-eligible. The automatic
 RPM-migration snapshot uses the same ownership, ACL and xattr-preserving tar semantics before
 the new image is allowed to start:
 
@@ -123,7 +125,7 @@ OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
 The Qwen3.5 workspace preset is imported additively with request-level
-`custom_params.think=true` for the 0.12.2 quality candidate; unrelated operator models and settings are not synchronized away.
+`custom_params.think=true` for the current 0.12.2-0.4 source; unrelated operator models and settings are not synchronized away.
 The temporary administrator credential is not stored by this helper.
 
 ## Storage and retention

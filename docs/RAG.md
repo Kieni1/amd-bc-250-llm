@@ -172,11 +172,11 @@ bc250-benchmark rag-quality --think false
 bc250-benchmark generation --profile compare \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 bc250-benchmark owui-rag OWUI_RAG_MODEL \
-  --token-file /root/owui-test.key
-sudo bc250-benchmark owui-embedding-batch --token-file /root/owui-test.key
-sudo bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /root/owui-test.key
+  --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250-benchmark owui-embedding-batch --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 sudo bc250-benchmark owui-system-context OWUI_RAG_MODEL \
-  --token-file /root/owui-test.key
+  --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
 The Open WebUI tuning commands are explicit experiments and restore the observed

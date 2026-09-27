@@ -66,11 +66,11 @@ Packaged orchestrator:
 
 ```bash
 sudo bc250-install
-
-For an RPM upgrade with an existing Open WebUI database, the package stops OWUI in RPM `%pre` and holds its boot drop-in before the new Quadlet can restart. `bc250-install` is the supported continuation: it verifies the stopped-state rollback snapshot before re-enabling/starting the new image. See `MAINTENANCE.md` for restore steps.
 sudo bc250-install --models-only
-sudo bc250-install --owui-token-file /root/owui-test.key
+sudo bc250-install --owui-token-file FILE
 ```
+
+For an RPM upgrade with an existing Open WebUI database, RPM `%pre` unconditionally requests OWUI stop, proves `ActiveState=inactive`, and holds its boot drop-in before the new Quadlet can restart. `bc250-install` is the supported continuation: it verifies the stopped-state rollback snapshot before re-enabling/starting the new image. See `MAINTENANCE.md` for restore steps.
 
 Normal mode prints a setup plan covering root growth, Fedora/package/Ollama,
 TTM/swap, 40-CU, storage headroom, models, Open WebUI and reboot state; it applies
@@ -389,15 +389,15 @@ sudo bc250-status
 sudo bc250-support-bundle
 sudo bc250-verify
 sudo bc250-verify --summary
-sudo bc250-verify --owui-token-file /root/owui-test.key
-sudo bc250-openwebui-setup status --verbose --owui-token-file /root/owui-test.key
+sudo bc250-verify --owui-token-file FILE
+sudo bc250-openwebui-setup status --verbose --owui-token-file FILE
 RUN_MODEL_TESTS=1 sudo bc250-verify
 bc250-verify-lan SERVER_IP
 sudo llm-run-diagnose --no-load
 MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
 bc250-check-temp --once
 bc250-benchmark generation
-sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+sudo bc250-revalidate start
 sudo bc250-revalidate start --skip-owui
 sudo bc250-revalidate status
 sudo bc250-revalidate status --raw  # machine-readable key=value state
@@ -445,8 +445,11 @@ checkpoints while high-value topology/restoration boundaries retain full snapsho
 Revalidation tests only promoted package defaults. Configuration-decision work
 (`num_batch`, embedding batch, chunk-min, `RAG_SYSTEM_CONTEXT`, thinking-policy,
 keepalive, kernel/governor and experimental-model A/B) belongs to explicit
-benchmark/diagnostic commands. The preflight also requires a healthy complete live
-SPI/WGP routing table with no off/problem cells; it does not hard-code `40/40`.
+benchmark/diagnostic commands. The preflight also requires a parseable live SPI/WGP
+routing table with no unexpected `D!` cells. If a saved `BC250_WGP_MASKS` profile is
+configured, the four live SPI row masks must match it exactly; no saved profile is a valid
+optional state. Intentionally unselected `--` cells are not faults, and health does not
+hard-code `40/40`.
 
 Benchmark quality exit `3` is recorded and nonfatal. Other benchmark/helper errors
 are infrastructure failures and enter the single top-level restoration/finalization
@@ -546,18 +549,18 @@ for result schema, category contracts and the package-pinned Ollama request poli
 
 ```bash
 sudo bc250-openwebui-setup init
-sudo bc250-openwebui-setup init --token-file /root/owui-test.key
-sudo bc250-openwebui-setup init --owui-token-file /root/owui-test.key  # alias
+sudo bc250-openwebui-setup init --token-file FILE
+sudo bc250-openwebui-setup init --owui-token-file FILE  # alias
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
-sudo bc250-openwebui-setup status --token-file /root/owui-test.key
+sudo bc250-openwebui-setup status --token-file FILE
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
 `init` can create the first administrator, sign in an existing administrator or
 use a protected administrator API-key file. The guided installer exposes the same
-choice and suggests `/root/owui-test.key` when it already exists with protected
-permissions. It applies the package-owned main/task provider, dedicated embedding, task/RAG, reviewed
+choice and automatically uses the verified package credential at
+`/var/lib/bc250-llm-server/secrets/openwebui-admin.key` when available. An explicit protected token file overrides it. It applies the package-owned main/task provider, dedicated embedding, task/RAG, reviewed
 package-owned Open WebUI Functions and additive model-preset baseline. The package also owns the
 persisted local/offline application policy that matters to the appliance contract: Arena is disabled,
 external OpenAI/direct/code-execution/interpreter/memory/community-sharing features remain disabled,
@@ -566,9 +569,8 @@ pre-v1 testing phase both normal Ollama providers are unrestricted and the raw p
 overrides are visible, so installed main/task models can be selected directly for comparison. Curated
 Office roles remain the supported product paths. `status` verifies those persisted values, testing
 visibility/tool-policy metadata, package Function source/state and package-owned preset fields needed
-by the selected production translation contract. Credentials/tokens
-are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
-synchronized away. RPM upgrades that cross an Open WebUI version with existing state unconditionally stop OWUI, verify the service is inactive, and hold
+by the selected production translation contract. The optional maintenance API key is persisted only when the operator requests it, at the root-only package credential path; token contents are never printed. Other temporary credentials/tokens are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
+synchronized away. RPM upgrades that cross an Open WebUI version with existing state hold OWUI
 startup until the guided installer has produced and verified the stopped-state migration rollback
 archive. See [`MAINTENANCE.md`](MAINTENANCE.md) for archive semantics and restoration.
 

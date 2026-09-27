@@ -30,24 +30,22 @@ Manual equivalents:
 
 ```bash
 sudo bc250-openwebui-setup init
-sudo bc250-openwebui-setup init --token-file /root/owui-test.key
+sudo bc250-openwebui-setup init --token-file FILE
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
-sudo bc250-openwebui-setup status --verbose --token-file /root/owui-test.key
+sudo bc250-openwebui-setup status --verbose
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
 `init` offers administrator sign-in/create or protected API-key-file authentication.
-When `/root/owui-test.key` is present with protected permissions, it is offered as
-the default choice without asking for the same path a second time. It is never
-consumed silently: the operator still selects whether to use it, sign in, create
-the first administrator, or choose a different API key file. `status` without a key checks reachability only. With a
-temporary administrator key or `--token-file` it also compares the package-owned
-settings with the reviewed desired state. Add `--verbose` to print the verified active
-role/base-model mapping, translation budget/filter attachment, task/RAG defaults and
-package-owned Function state. The helper does not persist credentials;
-the install orchestrator may hold the authenticated token briefly under `/run` so
-its final verification can reuse the same session, then removes it on exit.
+When the verified package credential at `/var/lib/bc250-llm-server/secrets/openwebui-admin.key`
+is present, package consumers use it automatically. An explicit `--token-file FILE` overrides that
+default. `status` without usable authentication checks reachability only; with the package key, a temporary
+administrator key, or `--token-file`, it also compares package-owned settings with the reviewed desired state.
+Add `--verbose` to print the verified active role/base-model mapping, translation budget/filter attachment,
+task/RAG defaults and package-owned Function state. The installer may hold an authenticated token briefly
+under `/run` for final verification and removes that temporary copy on exit. The package default key is
+persisted only when explicitly requested, with root-only ownership/mode, and its contents are never printed.
 A reported difference may be an intentional operator override; `status` does not
 reset it. Verbose status also renders effective nested `params.custom_params` for model/request
 policy and, when the pinned API exports it, reports the administrator-owned multi-model-chat
@@ -136,7 +134,7 @@ metadata disables them. The package therefore makes the role boundary explicit:
 - `Office - Documents / RAG` keeps built-in retrieval enabled, but disables unrelated chat-history,
   notes, web, automation and similar tool categories. Knowledge retrieval is therefore concentrated in
   the dedicated document role instead of being silently attempted by general chat roles.
-- raw/testing models are exposed according to package visibility policy; pressure-heavy Qwen3.6 35B,
+- raw/testing models are exposed according to package visibility policy; Qwen3.6 35B is retired from active candidates,
   Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only while IQ3_XXS remains the ordinary-user
   deployability comparison; models may retain their own native/default
   behavior unless a package-owned base override says otherwise.
@@ -157,10 +155,14 @@ assumed fixed merely because the candidate pin is v0.11.4:
 - `completion_tokens_details.reasoning_tokens` can be `0` even when `reasoning_content` is present;
 - an Ollama `done_reason=length` can be surfaced as OpenAI-style `finish_reason=stop`.
 
-Package-owned callers that require a hard Ollama generation cap use the native nested
-`options.num_predict` path. Package preset `params.max_tokens` is a separate Open WebUI model-parameter
-path and remains part of the device-tested translation contract. Do not infer absence of reasoning or
-absence of truncation from those metadata fields until the v0.11.4 candidate is explicitly requalified.
+Package-owned direct callers that require a hard Ollama generation cap use native nested
+`options.num_predict`. Separately, the package-owned Advanced Open WebUI record stores
+`params.max_tokens=4096`; externally supplied exact-device evidence accepted by integration reports
+that the supported internal Open WebUI path translates it to outbound Ollama `options.num_predict=4096`
+without forwarding a root-level `max_tokens`. The raw outbound capture is not retained in this source tree,
+so exact-device qualification keeps this as a no-regression observation. The external
+OpenAI-style client field above remains outside the advertised product contract. Do not infer absence
+of reasoning or truncation from the adapter metadata fields alone.
 `/openai/responses` workspace aliases likewise remain outside the qualified product path unless they are
 explicitly adopted and tested.
 
@@ -194,23 +196,38 @@ role before applying desired state, including the production Translate-Gemma rol
 model installation is therefore needed only for experiments/rollback paths or deliberate
 operator changes.
 
-To inspect the live verified contract:
+To inspect the live verified contract, an explicit protected token file still overrides the package default:
 
 ```bash
-sudo bc250-openwebui-setup status --verbose --token-file /root/owui-test.key
+sudo bc250-openwebui-setup status --verbose
 ```
+
+The package may store a verified administrator maintenance API key at
+`/var/lib/bc250-llm-server/secrets/openwebui-admin.key` inside a root-owned `0700` secrets directory;
+the key file is root-owned `0600`. `bc250-openwebui-setup`, `bc250-verify` and `bc250-revalidate` use this
+default automatically when no explicit token file is supplied. Existing keys are never silently overwritten,
+and token contents must not be printed or collected in support/revalidation evidence.
 
 The former LFM comparison translator is retired from active discovery and no longer has an Open WebUI
 preset. Its source Modelfile remains only in the graveyard as historical comparison evidence.
 
-The Qwen3.5 Advanced preset carries request-level `think=true` for the 0.12.2 quality candidate;
+The Qwen3.5 Advanced preset carries request-level `think=true` and `max_tokens=4096` for the current 0.12.2-0.4 source;
 the package keeps Ollama's native renderer/parser rather than replacing the model template. The
-existing temperature/top-p/top-k/min-p/presence/repeat sampler policy remains unchanged and the
-next device gate decides whether this reasoning-enabled candidate is retained. The Deep Reasoning
-preset sets `keep_alive=0` so GPT-OSS unloads after each response before the dedicated
-task model cold-loads for title/tag generation. Standard and Advanced keep their
-existing residency behavior. The GPT-OSS Modelfile also carries an accuracy-first factual fallback: when reliable recall is insufficient, it should return fewer items and state uncertainty instead of filling a requested list with plausible names or placeholders. Sampling/context/residency are unchanged. GPT-OSS remains the likely memory-edge production model
-when the dedicated embedding service is resident.
+existing temperature/top-p/top-k/min-p/presence/repeat sampler policy remains unchanged. The Open WebUI
+adapter mapping from `max_tokens=4096` to Ollama `options.num_predict=4096` is accepted from externally
+supplied exact-device evidence; the raw outbound capture is not retained in this source tree. Exact-device
+qualification therefore reconfirms it as a no-regression observation, and there must be no root-level
+`max_tokens` in the effective Ollama request.
+
+Deep Reasoning now uses package-owned `keep_alive=2m`. Before either the curated Deep role or the raw
+GPT-OSS implementation is admitted, the `bc250_deep_residency` filter inspects the dedicated embedding
+and task Ollama lanes through `host.containers.internal`, unloads any resident model through its model API,
+and verifies `/api/ps` is empty. If that absence cannot be established, the Deep request is failed/deferred.
+This is a narrow pre-Deep residency rule, not a generic scheduler; services are not restarted. Standard and
+Advanced keep their existing residency behavior. The GPT-OSS Modelfile also carries an accuracy-first factual
+fallback: when reliable recall is insufficient, it should return fewer items and state uncertainty instead of
+filling a requested list with plausible names or placeholders. Exact-device acceptance must verify Deep reuse
+inside the two-minute window, idle unload, task/embedding cold reload and UMA headroom.
 
 ## Task baseline
 
@@ -285,7 +302,7 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250-maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database, RPM `%pre` unconditionally stops OWUI, verifies `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database, RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and

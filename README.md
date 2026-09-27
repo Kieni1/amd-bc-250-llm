@@ -4,6 +4,8 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, model management,
 hardware profiles, diagnostics and optional BC-250 tools.
 
+Current source candidate: `bc250-llm-server-0.12.2-0.4` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13).
+
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
 operator controls. It is not an Internet-facing appliance, and neither model
@@ -26,7 +28,7 @@ sudo bc250-install
 sudo bc250-install --models-only   # model/Open WebUI reconciliation
 ```
 
-When an RPM upgrade changes the pinned Open WebUI image and an existing database is present, the RPM unconditionally stops Open WebUI, verifies it is inactive before the new Quadlet can become restart-eligible, and holds boot enablement. Run `sudo bc250-install` to create/verify the rollback snapshot and perform the guided migration; see [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
+When an RPM upgrade changes the pinned Open WebUI image and an existing database is present, RPM `%pre` unconditionally requests Open WebUI stop, proves `ActiveState=inactive`, and holds boot enablement before the new Quadlet can become restart-eligible. Run `sudo bc250-install` to create/verify the rollback snapshot and perform the guided migration; see [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
 
 Because the 0.x line is greenfield, the RPM owns all four Ollama lane units.
 `bc250-install-ollama` rejects a custom `/etc/systemd/system/ollama.service`, downloads
@@ -86,8 +88,7 @@ During the pre-v1 testing phase the normal main/task Open WebUI providers remain
 comparison, and `bc250-openwebui-setup` synchronizes their discovered Ollama inventories into
 package-managed testing records. Curated Office roles remain the recommended product paths. Raw
 production/task models and ordinary-size experiments remain visible for comparison, while the
-pressure-heavy Qwen3.6 35B, Qwen3.8 27B Unsloth and ISTA IQ3_S profiles are admin/testing-only;
-IQ3_XXS remains the ordinary-user deployability comparison. Only the package-owned wildcard grant
+Qwen3.6 35B is retired from active candidates; Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only, while IQ3_XXS remains the ordinary-user deployability comparison. Only the package-owned wildcard grant
 on package-managed discovery records may be removed when this visibility policy changes; unrelated
 administrator-created records and grants are preserved.
 Agent `11436` and embedding `11437` remain separate from the chat selector by topology. Arena is
@@ -177,9 +178,9 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Default-off replacement-module helper and live WGP manager |
 
-Ollama 0.34.4 is the next package runtime candidate. The preceding 0.34.2 payload
+Ollama 0.34.4 is the package-pinned runtime for source candidate 0.12.2-0.4. The preceding 0.34.2 payload
 passed BC-250 clean-boot generation, UMA-memory, embedding, Deep-to-task and Documents/RAG
-qualification; 0.34.4 must repeat the focused runtime/resource gate before release acceptance.
+qualification; exact-device acceptance of 0.34.4 remains part of the 0.12.2-0.4 release gate.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in

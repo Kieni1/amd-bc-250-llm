@@ -104,7 +104,7 @@ class DocumentationTests(unittest.TestCase):
     def test_revalidate_reference_covers_public_lifecycle(self) -> None:
         reference = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
         for form in (
-            "sudo bc250-revalidate start --owui-token-file /root/owui-test.key",
+            "sudo bc250-revalidate start",
             "sudo bc250-revalidate start --skip-owui",
             "sudo bc250-revalidate status",
             "sudo bc250-revalidate status --raw",
