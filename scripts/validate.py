@@ -334,7 +334,10 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "Requires:       zram-generator",
             "Requires:       util-linux-script",
             "Requires:       xfsprogs",
-            'echo "BC-250 package installed. Run: sudo bc250-install"',
+            "%posttrans",
+            "BC-250 LLM appliance package installed.",
+            "BC-250 LLM appliance package upgraded.",
+            "sudo bc250-install",
         ),
     }
     for relative, snippets in checks.items():
