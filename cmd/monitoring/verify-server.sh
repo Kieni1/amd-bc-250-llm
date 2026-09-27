@@ -11,6 +11,7 @@ else
 fi
 RUN_MODEL_TESTS="${RUN_MODEL_TESTS:-0}"
 OWUI_TOKEN_FILE=""
+DEFAULT_OWUI_TOKEN_FILE=/var/lib/bc250-llm-server/secrets/openwebui-admin.key
 SUMMARY=0
 PASS=0
 WARN=0
@@ -45,6 +46,10 @@ while (($#)); do
   esac
 done
 
+if [[ -z "$OWUI_TOKEN_FILE" && -s "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
+  OWUI_TOKEN_FILE="$DEFAULT_OWUI_TOKEN_FILE"
+fi
+
 if [[ -n "$OWUI_TOKEN_FILE" ]]; then
   [[ -f "$OWUI_TOKEN_FILE" && -r "$OWUI_TOKEN_FILE" && -s "$OWUI_TOKEN_FILE" ]] || {
     echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $OWUI_TOKEN_FILE" >&2
@@ -58,6 +63,12 @@ if [[ -n "$OWUI_TOKEN_FILE" ]]; then
   if (( (8#$token_mode) & 077 )); then
     echo "ERROR: Open WebUI API key file must not be group/world accessible: $OWUI_TOKEN_FILE (mode $token_mode)" >&2
     exit 2
+  fi
+  if [[ "$OWUI_TOKEN_FILE" == "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
+    [[ "$(stat -c '%u' "$OWUI_TOKEN_FILE" 2>/dev/null || echo -1)" == 0 ]] || { echo "ERROR: package default Open WebUI API key must be root-owned" >&2; exit 2; }
+    [[ "$(stat -c '%u' "$(dirname "$OWUI_TOKEN_FILE")" 2>/dev/null || echo -1)" == 0 ]] || { echo "ERROR: package secrets directory must be root-owned" >&2; exit 2; }
+    dir_mode="$(stat -c '%a' "$(dirname "$OWUI_TOKEN_FILE")" 2>/dev/null || true)"
+    [[ "$dir_mode" == 700 || "$dir_mode" == 0700 ]] || { echo "ERROR: package secrets directory must be mode 0700" >&2; exit 2; }
   fi
   OWUI_API_KEY="$(<"$OWUI_TOKEN_FILE")"
   export OWUI_API_KEY
@@ -133,7 +144,7 @@ if command -v modinfo >/dev/null 2>&1; then
   info "amdgpu module: ${amdgpu_path:-unknown}"
   info "amdgpu vermagic: ${amdgpu_vermagic:-unknown}"
   if grep -q 'bc250_cc_write_mode' <<< "$amdgpu_metadata"; then
-    info "amdgpu type: modified 40-CU module"
+    info "amdgpu type: CU-routing-capable modified module"
   else
     info "amdgpu type: stock or unrecognized"
   fi
@@ -357,14 +368,19 @@ else
   fi
 fi
 ((SUMMARY)) || printf '%s\n' "$cu_output" | sed 's/^/  /'
-if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' <<< "$cu_output"; then
-  ok "live CU routing table has routed entries and no off/problem cells"
-elif grep -Fq 'Live routing status     : routed entries present; off/problem cells present' <<< "$cu_output"; then
-  warn "live CU routing table contains off/problem cells; inspect the dashboard above"
-elif grep -Fq 'Live routing status     : no routed cells parsed' <<< "$cu_output"; then
-  warn "live CU routing table contains no parsed routed cells"
+cu_problems="$(sed -n 's/^[[:space:]]*Problem cells[[:space:]]*:[[:space:]]*//p' <<< "$cu_output" | head -1)"
+if [[ "$cu_problems" =~ ^[0-9]+$ ]] && ((cu_problems > 0)); then
+  warn "live CU routing contains $cu_problems unexpected D! cell(s)"
+elif grep -Fq 'Routing profile match   : exact' <<< "$cu_output"; then
+  ok "live CU routing matches the configured saved profile"
+elif grep -Fq 'Routing profile match   : not configured' <<< "$cu_output"; then
+  ok "live CU routing parsed; no saved CU profile is configured (optional)"
+elif grep -Fq 'Routing profile match   : mismatch' <<< "$cu_output"; then
+  warn "live CU routing differs from the configured saved profile"
+elif grep -Fq 'Routing profile match   : invalid saved profile' <<< "$cu_output"; then
+  warn "saved CU routing profile is invalid; rewrite it with the live manager"
 else
-  info "no parseable live CU routing table"
+  info "no parseable live CU routing profile comparison"
 fi
 
 section "Governor and sensors"

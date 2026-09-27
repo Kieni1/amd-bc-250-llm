@@ -145,7 +145,7 @@ ollama_version_line
         for forbidden in (
             "/var/lib/open-webui/webui.db",
             "journalctl -u open-webui.service",
-            "cat /root/owui-test.key",
+            "cat /var/lib/bc250-llm-server/secrets/openwebui-admin.key",
         ):
             self.assertNotIn(forbidden, source)
 
@@ -481,7 +481,13 @@ class CuStatusTests(unittest.TestCase):
         self.assertIn("Kernel diagnostic active_cu_number", main_status)
         self.assertIn('value == "S+"', status)
         self.assertIn('value == "D!"', status)
-        self.assertIn("no off/problem cells", verify)
+        self.assertIn("Routing profile match", verify)
+        self.assertIn("configured saved profile", verify)
+        self.assertIn("BC250_WGP_MASKS", status)
+        self.assertIn("Configured live profile", status)
+        self.assertIn("Live routing profile", status)
+        self.assertIn('[[ "$live_masks" == "$saved_masks" ]]', status)
+        self.assertNotIn("modified 40-CU module", verify)
         self.assertNotIn("40/40 routed", verify)
         self.assertNotIn("partial CU routing table", verify)
         self.assertNotIn("40/40 active and routed", diagnose)
@@ -490,14 +496,25 @@ class CuStatusTests(unittest.TestCase):
         source = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
         start = source.index("routing_cells() {")
         end = source.index("\nread_param() {", start)
-        function = source[start:end]
-        sample = "| SE0.SH0 | W0 | S+ | D+ | D! | -- |\n"
-        result = subprocess.run(
-            ["bash", "-c", function + "\nrouting_cells",],
-            input=sample, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+        functions = source[start:end]
+        sample = (
+            "| SE0.SH0 | D+ | D+ | D+ | -- | -- | 0x07 | 0x0 | 6/10 |\n"
+            "| SE0.SH1 | D+ | D+ | D+ | S+ | -- | 0x0f | 0x0 | 8/10 |\n"
+            "| SE1.SH0 | D+ | D+ | D+ | -- | -- | 0x07 | 0x0 | 6/10 |\n"
+            "| SE1.SH1 | D+ | D+ | D+ | S+ | -- | 0x0f | 0x0 | 8/10 |\n"
         )
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertEqual(result.stdout.strip(), "1 1 1 1")
+        for command, expected in (
+            ("routing_cells", "2 12 0 6"),
+            ("routing_mask_csv", "0x07,0x0f,0x07,0x0f"),
+            ('normalize_mask_csv "0x07,0x0f,0x07,0x0f"', "0x07,0x0f,0x07,0x0f 28"),
+        ):
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    ["bash", "-c", functions + "\n" + command],
+                    input=sample, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertEqual(result.stdout.strip(), expected)
 
 
 class SwapProfileTests(unittest.TestCase):

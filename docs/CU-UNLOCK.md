@@ -46,9 +46,12 @@ and reboots.
 BC-250 boards contain harvested GPU hardware, so do not use the kernel/RADV CU
 number as the live availability criterion. `bc250-cu-status` prints the complete
 live-manager routing dashboard and summarizes `S+`
-(SPI+routed), `D+` (driver+routed), `D!` (driver+off) and `--` (off) cells. Treat
-`D!`/`--` cells as items to inspect rather than declaring every non-40 layout bad.
-Use WGP IDs reported on the actual board, not IDs copied from another system.
+(SPI+routed), `D+` (driver+routed), `D!` (driver+off) and `--` (off) cells. `--` means
+intentionally disabled/not selected and is not a fault by itself; investigate `D!` as an
+unexpected/inconsistent cell. When `/etc/bc250-cu-live-manager.conf` contains a saved
+`BC250_WGP_MASKS` profile, `bc250-cu-status` compares those four saved row masks with
+the four live SPI masks exactly. Use WGP IDs reported on the actual board, not IDs copied
+from another system.
 
 Test representative inference output, Vulkan initialization, temperature and
 kernel logs—not only reported CU count or speed. Use the live manager's save

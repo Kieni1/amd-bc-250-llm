@@ -112,16 +112,21 @@ m=$(active $cardg/pp_dpm_mclk); f=$(active $cardg/pp_dpm_fclk); s=$(active $card
 
 # ---------------------------------------------------------------------------
 sec "4. CU ROUTING"
-exp "Live SPI/driver routing populated; investigate D!/-- cells. Numeric kernel/RADV CU counts are diagnostic only."
+exp "Compare any configured saved WGP mask with the live SPI layout; -- is intentionally unselected, D! is inconsistent. Numeric kernel/RADV CU counts are diagnostic only."
 if have bc250-cu-status; then
   cu_status=$(bc250-cu-status 2>&1 || true)
   printf '%s\n' "$cu_status" | sed 's/^/  /'
-  if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' <<<"$cu_status"; then
-    ok "live routing table has routed entries and no off/problem cells"
-  elif grep -Fq 'Live routing status     : routed entries present; off/problem cells present' <<<"$cu_status"; then
-    wn "live routing table contains off/problem cells"
+  cu_problems="$(sed -n 's/^[[:space:]]*Problem cells[[:space:]]*:[[:space:]]*//p' <<<"$cu_status" | head -1)"
+  if [[ "$cu_problems" =~ ^[0-9]+$ ]] && ((cu_problems > 0)); then
+    wn "live routing table contains $cu_problems unexpected D! cell(s)"
+  elif grep -Fq 'Routing profile match   : exact' <<<"$cu_status"; then
+    ok "live routing matches the configured saved profile"
+  elif grep -Fq 'Routing profile match   : not configured' <<<"$cu_status"; then
+    ok "live routing parsed; no saved profile configured (optional)"
+  elif grep -Fq 'Routing profile match   : mismatch' <<<"$cu_status"; then
+    wn "live routing differs from the configured saved profile"
   else
-    wn "live routing table could not be qualified"
+    wn "live routing table/profile comparison could not be qualified"
   fi
 else
   wn "bc250-cu-status is not installed"
