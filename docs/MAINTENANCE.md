@@ -125,7 +125,7 @@ OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
 ```
 
 The Qwen3.5 workspace preset is imported additively with request-level
-`custom_params.think=true` for the current 0.12.2-0.4 source; unrelated operator models and settings are not synchronized away.
+`custom_params.think=true` for the current 0.12.2-0.5 source; unrelated operator models and settings are not synchronized away.
 The temporary administrator credential is not stored by this helper.
 
 ## Storage and retention
