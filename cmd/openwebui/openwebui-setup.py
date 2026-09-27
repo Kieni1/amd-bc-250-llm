@@ -21,6 +21,7 @@ DEFAULT_DESIRED = Path("/usr/share/bc250-llm-server/openwebui/desired-state.json
 SOURCE_DESIRED = Path(__file__).resolve().parents[2] / "config/openwebui/desired-state.json"
 DEFAULT_FUNCTIONS = Path("/usr/share/bc250-llm-server/openwebui/functions.json")
 DEFAULT_TOKEN_FILE = Path("/var/lib/bc250-llm-server/secrets/openwebui-admin.key")
+LEGACY_TOKEN_FILE = Path("/root/owui-test.key")
 SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
 # The model-view/access contract below is qualified against the packaged Open WebUI pin.
@@ -1050,8 +1051,9 @@ def suggested_token_file() -> str:
     configured = os.environ.get("BC250_OWUI_TOKEN_FILE", "").strip()
     if configured:
         return configured
-    if DEFAULT_TOKEN_FILE.is_file():
-        return str(DEFAULT_TOKEN_FILE)
+    for candidate in (DEFAULT_TOKEN_FILE, LEGACY_TOKEN_FILE):
+        if candidate.is_file():
+            return str(candidate)
     return ""
 
 def parser() -> argparse.ArgumentParser:

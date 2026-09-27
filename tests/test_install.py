@@ -492,8 +492,7 @@ step_8_application_services
             owui = calls.index("systemctl:start tika.service open-webui.service")
             self.assertLess(required, owui)
             self.assertIn("mode:leave", calls)
-            self.assertTrue(enable_target.is_file())
-            self.assertIn("WantedBy=multi-user.target", enable_target.read_text())
+            self.assertFalse(enable_target.exists())
 
     def test_setup_plan_covers_resume_decision_points(self) -> None:
         source = INSTALLER.read_text()
@@ -602,10 +601,16 @@ step_8_application_services
         self.assertIn("Open WebUI baseline: APPLIED + VERIFIED", source)
         self.assertIn("Open WebUI baseline: NOT REQUESTED", source)
         self.assertIn("Open WebUI baseline: RETRY REQUIRED", source)
+        self.assertIn("Open WebUI service", source)
+        self.assertIn("Open WebUI package baseline", source)
+        self.assertIn("Authenticated verification", source)
+        self.assertIn("HELD until package baseline converges", source)
         self.assertIn("BC-250 SETUP SUMMARY", source)
         self.assertIn("Core verification", source)
         self.assertNotIn("Core installation and verification completed successfully.", source)
         self.assertNotIn("Installation and verification completed successfully.", source)
+        self.assertIn('/root/owui-test.key', source)
+        self.assertIn("Checking optional Ollama model registrations in parallel", source)
 
     def test_optional_local_and_pi_setup_can_both_be_skipped(self) -> None:
         result = source_probe(r"""
@@ -627,14 +632,26 @@ step_11_maintenance
         self.assertIn("run_models_only", source)
 
 
-    def test_openwebui_upgrade_backup_precedes_boot_enable_and_start(self) -> None:
+    def test_openwebui_upgrade_backup_precedes_private_start_and_verified_publication(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
-        block = source[source.index("step_8_application_services()"):]
-        backup = block.index("prepare_openwebui_migration_backup")
-        enable = block.index("enable_open_webui_boot", backup)
-        start = block.index("systemctl start tika.service open-webui.service", enable)
-        self.assertLess(backup, enable)
-        self.assertLess(enable, start)
+        step8 = source[source.index("step_8_application_services() {"):source.index("show_plan() {")]
+        backup = step8.index("prepare_openwebui_migration_backup")
+        hold = step8.index("hold_open_webui_publication", backup)
+        start = step8.index("systemctl start tika.service open-webui.service", hold)
+        self.assertLess(backup, hold)
+        self.assertLess(hold, start)
+        self.assertNotIn("enable_open_webui_boot", step8)
+        self.assertNotIn("systemctl enable --now nginx.service", step8)
+        publish = source[source.index("publish_openwebui_after_convergence() {"):source.index("application_network_healthy() {")]
+        self.assertLess(publish.index("bc250-openwebui-setup apply"), publish.index("bc250-openwebui-setup status"))
+        self.assertLess(publish.index("bc250-openwebui-setup status"), publish.index("enable_open_webui_boot"))
+        self.assertLess(publish.index("enable_open_webui_boot"), publish.index("systemctl enable --now nginx.service"))
+        self.assertIn("if ! enable_open_webui_boot; then", publish)
+        self.assertIn("if ! systemctl enable open-webui.service", publish)
+        self.assertIn("systemctl is-enabled --quiet open-webui.service", publish)
+        self.assertIn("if ! systemctl enable --now nginx.service; then", publish)
+        self.assertNotIn("systemctl enable open-webui.service >/dev/null 2>&1 || true", publish)
+        self.assertIn("public/boot publication remains held", source)
         self.assertIn("verified Open WebUI upgrade backup was not produced", source)
 
     def test_openwebui_upgrade_backup_is_full_stopped_state_and_self_verified(self) -> None:

@@ -17,6 +17,7 @@ INSTALL_MODE="full"
 OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
 OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
 DEFAULT_OWUI_TOKEN_FILE="/var/lib/bc250-llm-server/secrets/openwebui-admin.key"
+LEGACY_OWUI_TOKEN_FILE="/root/owui-test.key"
 CORE_VERIFICATION_STATE="NOT RUN"
 LOCAL_MAINTENANCE_STATE="NOT CONFIGURED (optional)"
 COMPANION_STATE="NOT CONFIGURED (optional)"
@@ -87,11 +88,14 @@ cleanup_sensitive_runtime() {
 }
 
 owui_token_candidate() {
-  if [[ -n "$OWUI_TOKEN_FILE" ]]; then
-    printf '%s\n' "$OWUI_TOKEN_FILE"
-  elif [[ -f "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
-    printf '%s\n' "$DEFAULT_OWUI_TOKEN_FILE"
-  fi
+  local candidate
+  for candidate in "$OWUI_TOKEN_FILE" "$DEFAULT_OWUI_TOKEN_FILE" "$LEGACY_OWUI_TOKEN_FILE"; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -f "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
 }
 
 require_root() {
@@ -386,6 +390,7 @@ step_7_models() {
     case "${review,,}" in
       y|yes)
         echo
+        echo "Checking optional Ollama model registrations in parallel; standalone MTP artifacts are checked separately. This may take several minutes. Please wait..."
         local optional_status current_count drift_count deferred_count
         optional_status="$(bc250-model status all --compact 2>&1 || true)"
         current_count="$(grep -c '\[CURRENT\]' <<< "$optional_status" || true)"
@@ -428,6 +433,60 @@ enable_open_webui_boot() {
   }
   install -D -m0644 "$source" "$target"
   systemctl daemon-reload
+}
+
+hold_open_webui_publication() {
+  local target="${BC250_OWUI_ENABLE_DROPIN:-/etc/containers/systemd/open-webui.container.d/90-enable.conf}"
+  systemctl stop nginx.service >/dev/null 2>&1 || true
+  systemctl disable open-webui.service >/dev/null 2>&1 || true
+  rm -f "$target"
+  systemctl daemon-reload
+}
+
+publish_openwebui_after_convergence() {
+  local token_file="$1"
+  [[ -n "$token_file" && -s "$token_file" ]] || {
+    echo "ERROR: cannot publish Open WebUI without a verified administrator credential." >&2
+    return 1
+  }
+  echo "Verifying package-owned Open WebUI desired state before publishing the service."
+  if ! bc250-openwebui-setup apply --token-file "$token_file" >/dev/null; then
+    echo "ERROR: Open WebUI desired-state apply failed; public/boot publication remains held." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  if ! bc250-openwebui-setup status --token-file "$token_file" >/dev/null; then
+    echo "ERROR: Open WebUI desired-state verification failed; public/boot publication remains held." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  if ! enable_open_webui_boot; then
+    echo "ERROR: Open WebUI boot-enablement drop-in could not be installed; publication remains held." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  if ! systemctl enable open-webui.service >/dev/null 2>&1; then
+    echo "ERROR: Open WebUI service could not be enabled for boot; publication remains held." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  if ! systemctl is-enabled --quiet open-webui.service; then
+    echo "ERROR: Open WebUI boot enablement could not be verified; publication remains held." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  if ! systemctl enable --now nginx.service; then
+    echo "ERROR: nginx publication could not be enabled; Open WebUI publication remains held." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  echo "Open WebUI desired state verified; boot and HTTP publication enabled."
 }
 
 
@@ -513,9 +572,11 @@ step_8_application_services() {
   fi
   command -v setsebool >/dev/null 2>&1 && setsebool -P httpd_can_network_connect 1 || true
   # On upgrades the RPM intentionally removes the OWUI boot-enablement drop-in.
-  # Keep it held until a required stopped-state rollback snapshot has succeeded.
+  # Keep public HTTP and boot publication held until authenticated desired-state
+  # convergence succeeds in step 9. The local service is started only so the
+  # package setup helper can perform migration/apply/status verification.
   prepare_openwebui_migration_backup
-  enable_open_webui_boot
+  hold_open_webui_publication
   systemctl start tika.service open-webui.service
   # Recreate already-running containers only when package/firewall state changed
   # or the live private path is unhealthy.  A no-op installer rerun should not
@@ -527,7 +588,6 @@ step_8_application_services() {
   else
     echo "Private application networking is healthy; restart not required."
   fi
-  systemctl enable --now nginx.service
 }
 
 
@@ -588,13 +648,15 @@ wait_for_open_webui() {
 step_9_open_webui() {
   heading "9. CONFIGURE OPEN WEBUI"
   OWUI_SETUP_STATE="retry-required"
+  local publish_token=""
   command -v bc250-openwebui-setup >/dev/null 2>&1 || {
     echo "Open WebUI setup helper is unavailable; application configuration requires a retry."
+    echo "Retry with: sudo bc250-install --models-only"
     return 0
   }
   if ! wait_for_open_webui; then
-    echo "Open WebUI is not reachable on 127.0.0.1:3000; configure it later with:"
-    echo "  sudo bc250-openwebui-setup init"
+    echo "Open WebUI is not reachable on 127.0.0.1:3000; package convergence remains held."
+    echo "Retry with: sudo bc250-install --models-only"
     return 0
   fi
 
@@ -607,7 +669,14 @@ step_9_open_webui() {
     validate_owui_token_file "$OWUI_TOKEN_FILE"
     echo "Applying the package-owned Open WebUI baseline with the supplied administrator API key file."
     if ! bc250-openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
-      echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
+      echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
+      hold_open_webui_publication
+      systemctl stop open-webui.service >/dev/null 2>&1 || true
+      return 0
+    fi
+    publish_token="$OWUI_VERIFY_TOKEN_FILE"
+    [[ -s "$publish_token" ]] || publish_token="$OWUI_TOKEN_FILE"
+    if ! publish_openwebui_after_convergence "$publish_token"; then
       return 0
     fi
     OWUI_SETUP_STATE="applied"
@@ -617,7 +686,12 @@ step_9_open_webui() {
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
     echo "Applying the package-owned Open WebUI baseline with OWUI_API_KEY from the environment."
     if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
-      echo "WARNING: Open WebUI API setup failed; no credentials were stored by the package." >&2
+      echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
+      hold_open_webui_publication
+      systemctl stop open-webui.service >/dev/null 2>&1 || true
+      return 0
+    fi
+    if ! publish_openwebui_after_convergence "$OWUI_VERIFY_TOKEN_FILE"; then
       return 0
     fi
     OWUI_SETUP_STATE="applied"
@@ -626,9 +700,10 @@ step_9_open_webui() {
 
   if [[ "${BC250_ASSUME_YES:-0}" == 1 ]] || ! input_is_interactive; then
     OWUI_SETUP_STATE="skipped"
-    echo "Non-interactive install: Open WebUI administrator setup was not attempted."
+    hold_open_webui_publication
+    echo "Non-interactive install: Open WebUI administrator setup was not attempted; public/boot publication remains held."
     echo "Run later in an interactive terminal:"
-    echo "  sudo bc250-openwebui-setup init"
+    echo "  sudo bc250-install --models-only"
     return 0
   fi
 
@@ -644,14 +719,19 @@ step_9_open_webui() {
       fi
     fi
     if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
-      echo "WARNING: Open WebUI API setup was not completed; the appliance remains usable." >&2
-      echo "Retry later with: sudo bc250-openwebui-setup init" >&2
+      echo "WARNING: Open WebUI API setup was not completed; public/boot publication remains held." >&2
+      echo "Retry with: sudo bc250-install --models-only" >&2
+      return 0
+    fi
+    if ! publish_openwebui_after_convergence "$OWUI_VERIFY_TOKEN_FILE"; then
+      echo "Retry with: sudo bc250-install --models-only" >&2
       return 0
     fi
     OWUI_SETUP_STATE="applied"
   else
     OWUI_SETUP_STATE="skipped"
-    echo "Skipped. Run later with: sudo bc250-openwebui-setup init"
+    hold_open_webui_publication
+    echo "Skipped. Open WebUI public/boot publication remains held. Run later with: sudo bc250-install --models-only"
   fi
 }
 
@@ -680,10 +760,10 @@ print_openwebui_completion_status() {
       echo "Open WebUI baseline: APPLIED + VERIFIED"
       ;;
     skipped)
-      echo "Open WebUI baseline: NOT REQUESTED (run sudo bc250-openwebui-setup init when ready)"
+      echo "Open WebUI baseline: NOT REQUESTED (run sudo bc250-install --models-only when ready)"
       ;;
     retry-required)
-      echo "Open WebUI baseline: RETRY REQUIRED (run sudo bc250-openwebui-setup init)"
+      echo "Open WebUI baseline: RETRY REQUIRED (run sudo bc250-install --models-only)"
       ;;
     *)
       echo "Open WebUI baseline: NOT CHECKED"
@@ -904,6 +984,7 @@ run_models_only() {
   echo "Model/runtime reconciliation completed."
   print_openwebui_completion_status
   echo "Transcript: $LOG_FILE"
+  [[ "$OWUI_SETUP_STATE" != "retry-required" ]] || return 2
 }
 
 print_40cu_completion_status() {
@@ -940,13 +1021,28 @@ print_setup_summary() {
 '
   printf '  Core verification       : %s
 ' "$CORE_VERIFICATION_STATE"
-  printf '  Open WebUI              : %s
+  printf '  Open WebUI service      : %s
 ' "$owui_state"
+  local baseline_state auth_verify_state
+  case "$OWUI_SETUP_STATE" in
+    applied) baseline_state="APPLIED + VERIFIED"; auth_verify_state="PASS" ;;
+    skipped) baseline_state="NOT REQUESTED"; auth_verify_state="NOT RUN" ;;
+    retry-required) baseline_state="RETRY REQUIRED"; auth_verify_state="FAIL / RETRY REQUIRED" ;;
+    *) baseline_state="NOT CHECKED"; auth_verify_state="NOT RUN" ;;
+  esac
+  printf '  Open WebUI package baseline : %s
+' "$baseline_state"
+  printf '  Authenticated verification : %s
+' "$auth_verify_state"
   local owui_host
   owui_host="$(hostname -I 2>/dev/null | awk '{print $1}')"
   [[ -n "$owui_host" ]] || owui_host="$(hostname -f 2>/dev/null || hostname 2>/dev/null || true)"
   [[ -n "$owui_host" ]] || owui_host="127.0.0.1"
-  printf '  Open WebUI URL          : http://%s:80\n' "$owui_host"
+  if systemctl is-active --quiet nginx.service 2>/dev/null; then
+    printf '  Open WebUI URL          : http://%s:80\n' "$owui_host"
+  else
+    printf '  Open WebUI URL          : HELD until package baseline converges\n'
+  fi
   printf '  Ollama                  : %s
 ' "$ollama_state"
   local cu_summary cu_profile="not available" cu_match="not checked" cu_enhancement="NOT CONFIGURED (optional)"
@@ -1007,8 +1103,17 @@ main() {
   step_8_application_services
   step_9_open_webui
   maybe_save_default_owui_token
-  step_10_verify
-  step_11_maintenance
+  local verify_rc=0
+  step_10_verify || verify_rc=$?
+  if ((verify_rc == 0)); then
+    step_11_maintenance
+  else
+    echo
+    echo "Skipping optional maintenance/companion setup because core verification requires attention."
+    LOCAL_MAINTENANCE_STATE="NOT REQUESTED"
+    COMPANION_STATE="NOT REQUESTED"
+    BACKUP_EXPORT_STATE="NOT REQUESTED"
+  fi
   echo
   print_openwebui_completion_status
   print_setup_summary
@@ -1046,6 +1151,8 @@ main() {
   echo "  Runtime/model state:    /var/lib/bc250-llm-server/"
   echo "  Revalidation bundles:   /var/lib/bc250-llm-server/revalidation/results/"
   echo "  Installer transcript:   $LOG_FILE"
+  ((verify_rc == 0)) || return "$verify_rc"
+  [[ "$OWUI_SETUP_STATE" != "retry-required" ]] || return 2
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
