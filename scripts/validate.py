@@ -180,6 +180,15 @@ def check_known_lint_regressions() -> None:
                 and isinstance(node.body[0], (ast.With, ast.AsyncWith))
             ):
                 fail(f"{relative}:{node.lineno}: directly nested with-statements (Ruff SIM117 regression)")
+            if isinstance(node, ast.If) and len(node.orelse) == 1 and isinstance(node.orelse[0], ast.If):
+                next_branch = node.orelse[0]
+                current_body = ast.dump(ast.Module(body=node.body, type_ignores=[]), include_attributes=False)
+                next_body = ast.dump(ast.Module(body=next_branch.body, type_ignores=[]), include_attributes=False)
+                if current_body == next_body:
+                    fail(
+                        f"{relative}:{node.lineno}: adjacent if/elif branches have identical bodies "
+                        "(Ruff SIM114 regression)"
+                    )
 
 
 def check_version() -> None:

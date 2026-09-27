@@ -152,9 +152,7 @@ def _fr_modality_events(clause: str) -> tuple[str, ...]:
             event = "recommendation-negated" if negated else "recommendation"
         elif token in {"dois", "doit", "devons", "devez", "doivent"}:
             event = "prohibition" if negated else "obligation"
-        elif token in {"peux", "peut", "pouvons", "pouvez", "peuvent"}:
-            event = "prohibition" if negated else "permission"
-        elif token.startswith("autoris"):
+        elif token in {"peux", "peut", "pouvons", "pouvez", "peuvent"} or token.startswith("autoris"):
             event = "prohibition" if negated else "permission"
         elif token.startswith("interdit"):
             event = "prohibition"

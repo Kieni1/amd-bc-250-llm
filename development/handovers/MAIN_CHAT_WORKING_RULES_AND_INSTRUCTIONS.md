@@ -64,7 +64,7 @@ After each meaningful source batch:
 
 If the newest checkpoint cannot be recovered, do not silently rebuild from an older release archive. Stop the integration batch until the exact checkpoint is restored or the user explicitly authorizes a different base.
 
-Known Ruff regressions that must be avoided even when Ruff is unavailable locally: `F821` undefined names, `RUF100` unused `noqa`, `TRY004` wrong exception type for invalid types, and `SIM117` directly nested `with` contexts. `scripts/validate.py` carries repository-specific guards for these known failures; workstation Ruff remains authoritative.
+Known Ruff regressions that must be avoided even when Ruff is unavailable locally: `F821` undefined names, `RUF100` unused `noqa`, `TRY004` wrong exception type for invalid types, `SIM114` adjacent `if`/`elif` branches with identical bodies, and `SIM117` directly nested `with` contexts. `scripts/validate.py` carries repository-specific guards for these known failures; workstation Ruff remains authoritative.
 
 ## Evidence closures / remaining investigation
 
