@@ -157,8 +157,7 @@ assumed fixed merely because the candidate pin is v0.11.4:
 
 Package-owned direct callers that require a hard Ollama generation cap use native nested
 `options.num_predict`. Separately, the package-owned Advanced Open WebUI record stores
-`params.max_tokens=4096`; externally supplied exact-device evidence accepted by integration reports
-that the supported internal Open WebUI path translates it to outbound Ollama `options.num_predict=4096`
+`params.max_tokens=6144`; the immediately preceding exact-device run proved that this supported internal Open WebUI path translated the prior 4096 value to outbound Ollama `options.num_predict=4096`. The 6144 candidate must be reconfirmed as outbound Ollama `options.num_predict=6144`
 without forwarding a root-level `max_tokens`. The raw outbound capture is not retained in this source tree,
 so exact-device qualification keeps this as a no-regression observation. The external
 OpenAI-style client field above remains outside the advertised product contract. Do not infer absence
@@ -211,12 +210,13 @@ and token contents must not be printed or collected in support/revalidation evid
 The former LFM comparison translator is retired from active discovery and no longer has an Open WebUI
 preset. Its source Modelfile remains only in the graveyard as historical comparison evidence.
 
-The Qwen3.5 Advanced preset carries request-level `think=true` and `max_tokens=4096` for the current 0.12.2-0.4 source;
+The Qwen3.5 Advanced preset carries request-level `think=true` and `max_tokens=6144` for the current 0.12.2-0.5 source;
 the package keeps Ollama's native renderer/parser rather than replacing the model template. The
 existing temperature/top-p/top-k/min-p/presence/repeat sampler policy remains unchanged. The Open WebUI
-adapter mapping from `max_tokens=4096` to Ollama `options.num_predict=4096` is accepted from externally
+adapter mapping from the prior `max_tokens=4096` value to Ollama `options.num_predict=4096` is proven from externally
 supplied exact-device evidence; the raw outbound capture is not retained in this source tree. Exact-device
-qualification therefore reconfirms it as a no-regression observation, and there must be no root-level
+qualification of this release must confirm that the new stored `max_tokens=6144` becomes Ollama
+`options.num_predict=6144`, retains the established samplers and `think=true`, and sends no root-level
 `max_tokens` in the effective Ollama request.
 
 Deep Reasoning now uses package-owned `keep_alive=2m`. Before either the curated Deep role or the raw
@@ -254,7 +254,9 @@ batch size 1 and asynchronous embedding disabled. The reviewed retrieval baselin
 remains token splitting, 1500-token chunks, 200-token overlap, Markdown-header
 splitting, Top K 8, hybrid search off and Tika extraction. Open WebUI is explicitly
 set to `TIKA_SERVER_VERSION=4` so it uses the Tika 4 API; smoke-test representative
-office/PDF extraction after this major Tika refresh.
+office/PDF extraction after this major Tika refresh. Exact-device testing with genuine LibreOffice-authored DOCX files confirms that Tika 4 serializes real Word bullets as middle-dot-prefixed lines (`· item`) while preserving heading structure, table Markdown, list ordering and list/table facts through Open WebUI extraction and Documents retrieval. Treat this as a Tika 4 Markdown serialization characteristic; no package-side list-marker rewrite is applied.
+
+Dedicated repeated title/tag testing (single-model and Advanced+Deep chats) also persisted titles and tags reliably with task-lane activity and clean cleanup. The earlier isolated missing-tags event is closed unless reproduced by a future release; task-lane topology and title/tag configuration remain unchanged.
 
 `RAG_SYSTEM_CONTEXT=false` remains the packaged default pending promotion evidence
 from repeated-turn RAG acceptance on the real appliance. Likewise keep
