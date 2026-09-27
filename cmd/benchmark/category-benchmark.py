@@ -38,6 +38,7 @@ from benchmark_common import (
     mean,
     normalize_words,
     prepare_result_dir,
+    request_policy_for_model,
     resolve_package_resource,
     result_record,
     translation_direction_wrappers,
@@ -1974,6 +1975,13 @@ def translation_content_checks(
         required_ok = required_ok and any(
             acceptance_text(term) in folded for term in choices
         )
+    for raw_group in case.get("required_any_groups", []):
+        if not isinstance(raw_group, list) or not raw_group:
+            required_ok = False
+            continue
+        required_ok = required_ok and any(
+            acceptance_text(term) in folded for term in raw_group
+        )
     forbidden_ok = not any(
         acceptance_text(term) in folded for term in case.get("forbidden", [])
     )
@@ -2127,6 +2135,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                             diagnostics.append("thinking-budget")
                     if think_policy == "false" and thinking.strip():
                         diagnostics.append("thinking-present-despite-false")
+                    outcome = "pass" if ok else "quality-fail"
 
                     row = {
                         "timestamp": iso_now(),
@@ -2166,7 +2175,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                             model=model,
                             case_id=case["id"],
                             result_type="qualification",
-                            outcome="pass" if ok else "quality-fail",
+                            outcome=outcome,
                             failure_kinds=failures,
                             diagnostics=diagnostics,
                             checks={
@@ -2215,6 +2224,45 @@ def benchmark_translation(args: argparse.Namespace) -> int:
     return 0 if passed == total else 3
 
 
+
+USECASE_SAMPLER_KEYS = (
+    "temperature",
+    "top_p",
+    "top_k",
+    "min_p",
+    "presence_penalty",
+    "repeat_penalty",
+)
+
+
+def usecase_request_controls(case: dict[str, Any], model: str) -> dict[str, Any]:
+    """Resolve a use-case request against the package-owned model policy."""
+    policy = request_policy_for_model(model)
+    package_cap = policy.get("max_tokens")
+    if "num_predict" in case:
+        num_predict = int(case["num_predict"])
+        production_budget = bool(case.get("budget_is_production_contract", False))
+    elif package_cap is not None:
+        num_predict = int(package_cap)
+        production_budget = True
+    else:
+        num_predict = 512
+        production_budget = bool(case.get("budget_is_production_contract", False))
+
+    options: dict[str, Any] = {"num_predict": num_predict}
+    for key in USECASE_SAMPLER_KEYS:
+        if key in policy:
+            options[key] = policy[key]
+
+    return {
+        "think": case.get("think", policy.get("think", "auto")),
+        "num_predict": num_predict,
+        "context": case.get("context", "model-default"),
+        "keep_alive": case.get("keep_alive", policy.get("keep_alive", KEEP_ALIVE)),
+        "options": options,
+        "budget_is_production_contract": production_budget,
+    }
+
 def _usecase_result_record(
     *,
     case: dict[str, Any],
@@ -2228,22 +2276,36 @@ def _usecase_result_record(
     wall: float,
     done_reason: str,
 ) -> dict[str, Any]:
-    failures = [] if ok else (["empty-output"] if not content.strip() else ["semantic"])
+    controls = usecase_request_controls(case, model)
+    reasoning_budget_exhausted = (
+        done_reason == "length"
+        and not content.strip()
+        and bool(thinking.strip())
+        and not bool(controls["budget_is_production_contract"])
+    )
+    failures = [] if (ok or reasoning_budget_exhausted) else (["empty-output"] if not content.strip() else ["semantic"])
     diagnostics: list[str] = []
     if done_reason == "length":
         diagnostics.append("output-budget")
-        if not content.strip() and thinking.strip():
-            diagnostics.append("thinking-budget")
+        if reasoning_budget_exhausted:
+            diagnostics.extend(["thinking-budget", "visible-answer-empty"])
+    outcome = "incomplete" if reasoning_budget_exhausted else ("pass" if ok else "quality-fail")
     return result_record(
         category="usecase",
         model=model,
         case_id=case["id"],
         result_type="qualification",
-        outcome="pass" if ok else "quality-fail",
+        outcome=outcome,
         failure_kinds=failures,
         diagnostics=diagnostics,
         checks={"acceptance": ok},
-        metrics={"wall_s": wall, "answer_chars": len(content)},
+        metrics={"wall_s": wall, "answer_chars": len(content), "reasoning_chars": len(thinking)},
+        effective_controls={
+            "think": controls["think"],
+            "num_predict": controls["num_predict"],
+            "context": controls["context"],
+            "keep_alive": controls["keep_alive"],
+        },
         timestamp=row["timestamp"],
         passed=bool(ok),
         problems=problems,
@@ -2303,6 +2365,8 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
         "problems",
     ]
     passed = 0
+    incomplete = 0
+    quality_failed = 0
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -2311,15 +2375,16 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
             print(f"\n=== usecase: {case['id']} ({model}) ===")
             client.ensure_unloaded(model)
             try:
+                controls = usecase_request_controls(case, model)
                 payload: dict[str, Any] = {
                     "model": model,
                     "messages": [{"role": "user", "content": case["prompt"]}],
                     "stream": False,
-                    "keep_alive": KEEP_ALIVE,
-                    "options": {"num_predict": 512},
+                    "keep_alive": controls["keep_alive"],
+                    "options": controls["options"],
                 }
-                if "think" in case:
-                    payload["think"] = case["think"]
+                if controls["think"] != "auto":
+                    payload["think"] = controls["think"]
                 sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
                 start = time.monotonic()
                 try:
@@ -2338,7 +2403,16 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                     message.get("thinking") or response.get("thinking") or ""
                 )
                 ok, problems = _acceptance_ok(content, case)
+                done_reason = str(response.get("done_reason") or "")
+                reasoning_budget_exhausted = (
+                    done_reason == "length"
+                    and not content.strip()
+                    and bool(thinking.strip())
+                    and not bool(controls["budget_is_production_contract"])
+                )
                 passed += int(ok)
+                incomplete += int(reasoning_budget_exhausted)
+                quality_failed += int((not ok) and not reasoning_budget_exhausted)
                 row = {
                     "timestamp": iso_now(),
                     "case_id": case["id"],
@@ -2354,7 +2428,6 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 }
                 writer.writerow(row)
                 handle.flush()
-                done_reason = str(response.get("done_reason") or "")
                 append_result(
                     jsonl_path,
                     _usecase_result_record(
@@ -2381,9 +2454,13 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                     print(f"WARNING: {exc}", file=sys.stderr)
 
     _sj, summary_txt = write_result_summary(jsonl_path, category="usecase")
-    print(f"\nAcceptance: {passed}/{len(cases)} passed")
+    print(f"\nAcceptance: {passed}/{len(cases)} passed; {incomplete} incomplete")
     print_result_paths(paths, summary_txt)
-    return 0 if passed == len(cases) else 3
+    if quality_failed:
+        return 3
+    if incomplete:
+        return 4
+    return 0
 
 
 def rag_cycle_outcome(answer_ok: bool, answer_model_still_loaded: bool) -> tuple[str, list[str], int]:

@@ -517,6 +517,13 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
         required_ok = required_ok and any(
             translation_acceptance_text(term) in folded for term in choices
         )
+    for raw_group in case.get("required_any_groups", []):
+        if not isinstance(raw_group, list) or not raw_group:
+            required_ok = False
+            continue
+        required_ok = required_ok and any(
+            translation_acceptance_text(term) in folded for term in raw_group
+        )
     forbidden_ok = not any(
         translation_acceptance_text(term) in folded for term in case.get("forbidden", [])
     )

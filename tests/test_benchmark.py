@@ -1558,6 +1558,14 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
                 self.assertEqual(failures, ["modality"])
                 self.assertNotIn("source-leakage", failures)
 
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(encoding="utf-8")
+        )
+        case = next(item for item in cases if item["id"] == "fr-de-recommendation-modality")
+        valid = "Die Besorgungsregeln sollten bei einer neuen Vermietung eingehalten werden."
+        self.assertTrue(category.translation_content_checks(valid, case)[0])
+        self.assertNotIn("required_any", case)
+
     def test_translation_direction_is_explicit_package_policy(self) -> None:
         case = {"source_language": "fr", "target_language": "de", "input": "Bonjour."}
         prompt = category.translation_prompt(case)
@@ -2154,6 +2162,12 @@ printf 'Run state: completed\n'
             stream = completed.stdout.decode("utf-8")
 
             lines = [""]
+
+            def ensure_row(index: int) -> None:
+                missing = index - len(lines) + 1
+                if missing > 0:
+                    lines.extend([""] * missing)
+
             row = col = i = 0
             while i < len(stream):
                 if stream.startswith("\x1b[", i):
@@ -2163,8 +2177,7 @@ printf 'Run state: completed\n'
                     if match.group(2) == "A":
                         row = max(0, row - amount)
                     else:
-                        while row >= len(lines):
-                            lines.append("")
+                        ensure_row(row)
                         lines[row] = ""
                     i += match.end()
                     continue
@@ -2174,11 +2187,9 @@ printf 'Run state: completed\n'
                 elif char == "\n":
                     row += 1
                     col = 0
-                    while row >= len(lines):
-                        lines.append("")
+                    ensure_row(row)
                 else:
-                    while row >= len(lines):
-                        lines.append("")
+                    ensure_row(row)
                     line = lines[row]
                     if col > len(line):
                         line += " " * (col - len(line))
@@ -2459,6 +2470,44 @@ quality_state
             self.assertIn("5/6", completed.stdout)
             self.assertIn("tags-de: format-contract", completed.stdout)
             self.assertIn("evidence: roles/task/results.jsonl", completed.stdout)
+
+    def test_usecase_inherits_package_request_contracts(self) -> None:
+        advanced = category.usecase_request_controls(
+            {"id": "advanced", "prompt": "answer", "think": True},
+            "prod-qwen35-9b-unsloth-q6-k",
+        )
+        self.assertEqual(advanced["num_predict"], 4096)
+        self.assertTrue(advanced["budget_is_production_contract"])
+        self.assertEqual(advanced["think"], True)
+        self.assertEqual(advanced["options"]["num_predict"], 4096)
+        self.assertEqual(advanced["options"]["temperature"], 0.7)
+        self.assertEqual(advanced["options"]["top_p"], 0.8)
+        self.assertEqual(advanced["options"]["top_k"], 20)
+        self.assertEqual(advanced["options"]["min_p"], 0.0)
+        self.assertEqual(advanced["options"]["presence_penalty"], 0.0)
+        self.assertEqual(advanced["options"]["repeat_penalty"], 1.0)
+
+        deep = category.usecase_request_controls(
+            {"id": "deep", "prompt": "answer", "think": "medium"},
+            "prod-gpt-oss20b-ggml-org-mxfp4",
+        )
+        self.assertEqual(deep["keep_alive"], "2m")
+        self.assertEqual(deep["think"], "medium")
+
+    def test_usecase_reasoning_budget_exhaustion_is_incomplete_not_quality_fail(self) -> None:
+        case = {"id": "reasoning-budget", "prompt": "answer", "think": True, "num_predict": 512}
+        row = {"timestamp": "2026-09-27T00:00:00+02:00"}
+        record = category._usecase_result_record(
+            case=case, model="prod-qwen35-9b-unsloth-q6-k", row=row, ok=False,
+            problems=["missing answer"], content="", thinking="reasoning exists",
+            telemetry={}, wall=1.0, done_reason="length",
+        )
+        self.assertEqual(record["outcome"], "incomplete")
+        self.assertEqual(record["failure_kinds"], [])
+        self.assertIn("output-budget", record["diagnostics"])
+        self.assertIn("visible-answer-empty", record["diagnostics"])
+        self.assertEqual(record["effective_controls"]["think"], True)
+        self.assertEqual(record["effective_controls"]["num_predict"], 512)
 
     def test_rag_cycle_residency_loss_is_infrastructure_failure(self) -> None:
         self.assertEqual(category.rag_cycle_outcome(True, False), ("infra-fail", ["coexistence"], 1))
@@ -2976,7 +3025,7 @@ status_run --raw
                 ["bash", "-c", script], text=True, capture_output=True, check=True
             )
             output = completed.stdout.lower()
-            self.assertIn("run state:      incomplete", output)
+            self.assertIn("run completion: incomplete", output)
             self.assertIn("coverage:       partial", output)
             self.assertIn("coverage       : partial", output)
             self.assertIn("coverage=partial", output)
@@ -3027,6 +3076,14 @@ status_run --raw
         self.assertFalse(bad)
         self.assertIn("source-leakage", failures)
         self.assertIn("preservation", failures)
+
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(encoding="utf-8")
+        )
+        modality = next(item for item in cases if item["id"] == "fr-de-recommendation-modality")
+        valid_modality = "Die Besorgungsregeln sollten bei einer neuen Vermietung eingehalten werden."
+        ok, failures = openwebui_workflow.owui_translation_checks(valid_modality, modality)
+        self.assertTrue(ok, failures)
 
     def test_owui_rag_model_resolution_prefers_exact_active_preset(self) -> None:
         class Client:
@@ -3145,7 +3202,7 @@ status_run --raw
         for name in ("RUN_STATE_FILE", "INFRA_STATE_FILE", "QUALITY_STATE_FILE", "RESTORATION_STATE_FILE"):
             self.assertIn(name, source)
         summary = source[source.index("create_summary() {"):source.index("create_final_bundle() {")]
-        self.assertIn("Run state", summary)
+        self.assertIn("Run completion", summary)
         self.assertIn("Infrastructure", summary)
         self.assertIn("Quality", summary)
         self.assertIn("Restoration", summary)
@@ -3520,7 +3577,9 @@ cleanup_failed_launch
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         block = source[source.index("check_live_cu_routing() {"):source.index("phase_preflight() {")]
         self.assertIn("bc250-cu-status --summary", block)
-        self.assertIn("routed entries present; no off/problem cells", block)
+        self.assertIn("Routing profile match   : exact", block)
+        self.assertIn("Routing profile match   : not configured", block)
+        self.assertIn("unexpected D!", block)
         self.assertNotIn("40/40", block)
 
     def test_benchmark_entrypoints_handle_keyboard_interrupt(self) -> None:

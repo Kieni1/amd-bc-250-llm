@@ -229,10 +229,14 @@ Open WebUI benchmark `--token-file` inputs must be non-empty regular files with 
 group/world access (normally mode `0600`), matching the package credential-file boundary.
 
 The pinned Open WebUI v0.11.4 OpenAI-style adapter is not an external BC-250 compatibility
-contract. In particular, a root `max_tokens` field is not a reliable hard cap for Ollama-backed
-requests in this pin. Benchmark/package callers that require a hard generation cap must use the
-native nested `options.num_predict` path. See `docs/openwebui-settings.md` for the related
-reasoning-token and finish-reason metadata limitations.
+contract. A client-supplied root `max_tokens` field on that external-style endpoint is not advertised
+as a reliable hard cap for Ollama-backed requests. The package-owned Advanced model record is a
+different package-owned internal path: externally supplied exact-device evidence accepted by integration
+reports that stored `params.max_tokens=4096` maps to outbound Ollama `options.num_predict=4096`, with no
+root-level `max_tokens` sent to Ollama. The raw outbound capture is not retained in this source tree, so
+release qualification reconfirms the mapping as a no-regression observation. Direct benchmark callers
+that require a hard generation cap likewise use native nested `options.num_predict`. See
+`docs/openwebui-settings.md` for the related reasoning-token and finish-reason metadata limitations.
 
 `concurrency` records both request outcomes, latency, minimum `MemAvailable`, swap
 start/peak/end/delta and device-facing telemetry.
@@ -257,7 +261,7 @@ starts; the readiness allowance is bounded to five minutes for slow application 
 ## Revalidation harness v4.6
 
 ```bash
-sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+sudo bc250-revalidate start
 # Explicit partial coverage only:
 sudo bc250-revalidate start --skip-owui
 sudo bc250-revalidate status

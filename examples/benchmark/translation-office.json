@@ -215,16 +215,22 @@
     "source_language": "fr",
     "target_language": "de",
     "input": "Les règles d'occupation devraient être respectées lors d'une nouvelle location.",
-    "required_any": [
-      "sollten beachtet werden",
-      "sollten eingehalten werden"
-    ],
     "forbidden": [
-      "müssen beachtet werden",
-      "müssen eingehalten werden"
+      "muss",
+      "müssen"
     ],
     "preserve": [],
-    "min_words": 5
+    "min_words": 5,
+    "required_any_groups": [
+      [
+        "sollte",
+        "sollten"
+      ],
+      [
+        "beachtet",
+        "eingehalten"
+      ]
+    ]
   },
   {
     "id": "fr-de-obligation-modality",

@@ -29,7 +29,7 @@ DEFAULT_TIMEOUT = 900.0
 DEFAULT_TELEMETRY_INTERVAL = 0.5
 TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
 RESULT_SCHEMA_VERSION = 1
-VALID_OUTCOMES = {"pass", "quality-fail", "infra-fail", "skipped"}
+VALID_OUTCOMES = {"pass", "quality-fail", "infra-fail", "skipped", "incomplete"}
 VALID_RESULT_TYPES = {"measurement", "qualification"}
 
 
@@ -171,7 +171,11 @@ def request_policy_for_model(model: str) -> dict[str, Any]:
             continue
         params = item.get("params") if isinstance(item.get("params"), dict) else {}
         custom = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
-        return dict(custom)
+        policy = dict(custom)
+        for key in ("max_tokens", "keep_alive"):
+            if key in params:
+                policy[key] = params[key]
+        return policy
     policies = document.get("testing_model_policies", {}) if isinstance(document, dict) else {}
     policy = policies.get(canonical) or policies.get(model) if isinstance(policies, dict) else None
     if isinstance(policy, dict) and isinstance(policy.get("custom_params"), dict):
@@ -827,13 +831,14 @@ def write_result_summary(
             "duplicate_case_ids": duplicates,
         }
 
-    counts = {name: 0 for name in ("pass", "quality-fail", "infra-fail", "skipped")}
+    counts = {name: 0 for name in ("pass", "quality-fail", "infra-fail", "skipped", "incomplete")}
     type_counts = {name: 0 for name in ("measurement", "qualification")}
-    qualification_counts = {name: 0 for name in ("pass", "quality-fail", "skipped")}
+    qualification_counts = {name: 0 for name in ("pass", "quality-fail", "skipped", "incomplete")}
     failures: dict[str, int] = {}
     infra_failures: dict[str, int] = {}
     diagnostics: dict[str, int] = {}
     quality_failures: list[dict[str, Any]] = []
+    incomplete_cases: list[dict[str, Any]] = []
     for row in records:
         outcome = str(row["outcome"])
         result_type = str(row["result_type"])
@@ -855,18 +860,28 @@ def write_result_summary(
                     ],
                 }
             )
+        if result_type == "qualification" and outcome == "incomplete":
+            incomplete_cases.append({
+                "model": str(row.get("model") or "unknown"),
+                "case_id": str(row.get("case_id") or "unknown"),
+                "failure_kinds": [str(name) for name in row.get("failure_kinds", [])],
+                "diagnostics": [str(name) for name in row.get("diagnostics", [])],
+                "done_reason": str(row.get("done_reason") or ""),
+                "reasoning_present": bool(str(row.get("thinking") or "").strip()),
+            })
         if outcome == "infra-fail":
             for name in row.get("failure_kinds", []):
                 infra_failures[str(name)] = infra_failures.get(str(name), 0) + 1
         for name in row.get("diagnostics", []):
             diagnostics[str(name)] = diagnostics.get(str(name), 0) + 1
     quality = "not-run"
-    if qualification_counts["pass"] or qualification_counts["quality-fail"]:
-        quality = (
-            "mixed"
-            if qualification_counts["pass"] and qualification_counts["quality-fail"]
-            else ("fail" if qualification_counts["quality-fail"] else "pass")
-        )
+    if qualification_counts["pass"] or qualification_counts["quality-fail"] or qualification_counts["incomplete"]:
+        if qualification_counts["quality-fail"]:
+            quality = "mixed" if (qualification_counts["pass"] or qualification_counts["incomplete"]) else "fail"
+        elif qualification_counts["incomplete"]:
+            quality = "review"
+        else:
+            quality = "pass"
     infrastructure = "fail" if counts["infra-fail"] else (
         "pass" if records else "not-run"
     )
@@ -882,6 +897,7 @@ def write_result_summary(
         "quality": quality,
         "failure_kinds": dict(sorted(failures.items())),
         "quality_failures": quality_failures,
+        "incomplete_cases": incomplete_cases,
         "infrastructure_failure_kinds": dict(sorted(infra_failures.items())),
         "diagnostics": dict(sorted(diagnostics.items())),
         "aggregates": aggregates,
@@ -916,6 +932,7 @@ def write_result_summary(
         f"Qual pass      {qualification_counts['pass']}",
         f"Quality-fail   {qualification_counts['quality-fail']}",
         f"Qual skipped   {qualification_counts['skipped']}",
+        f"Incomplete     {qualification_counts['incomplete']}",
         f"Infra-fail     {counts['infra-fail']}",
     ]
     if structure == "fail" and completeness is not None:
@@ -936,9 +953,15 @@ def write_result_summary(
         lines += ["", "Failed cases"]
         for item in quality_failures:
             causes = ", ".join(item["failure_kinds"]) or "quality-fail"
+            context = ", ".join(item.get("diagnostics", []))
             lines.append(
-                f"  {item['model']} / {item['case_id']}: {causes}"
+                f"  {item['model']} / {item['case_id']}: {causes}" + (f" [{context}]" if context else "")
             )
+    if incomplete_cases:
+        lines += ["", "Incomplete cases"]
+        for item in incomplete_cases:
+            context = ", ".join(item.get("diagnostics", [])) or "output budget exhausted"
+            lines.append(f"  {item['model']} / {item['case_id']}: {context}; done_reason={item.get('done_reason') or 'unknown'}; reasoning_present={str(bool(item.get('reasoning_present'))).lower()}")
     if diagnostics:
         lines += ["", "Diagnostics"] + [
             f"  {name:<20} {count}" for name, count in sorted(diagnostics.items())

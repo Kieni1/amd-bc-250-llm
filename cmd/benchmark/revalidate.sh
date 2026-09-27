@@ -40,6 +40,7 @@ RAW=$WORK/results
 PHASE_REPORT_DIR=$WORK/phase-reports
 SETTINGS_FILE=$WORK/settings.env
 OWUI_TOKEN=$RUN_DIR/owui-token
+DEFAULT_OWUI_TOKEN_FILE=/var/lib/bc250-llm-server/secrets/openwebui-admin.key
 COVERAGE_STATE_FILE=$WORK/coverage-state
 FAILURE_RC_FILE=$WORK/failure-rc
 FAILURE_GUARD=$WORK/failure-handler-active
@@ -100,7 +101,7 @@ Usage:
   sudo bc250-revalidate cleanup
 
 Recommended authenticated start:
-  sudo bc250-revalidate start --owui-token-file /root/owui-test.key
+  sudo bc250-revalidate start
 
 `start` launches one systemd-owned qualification worker and follows a compact
 six-phase dashboard by default. Ctrl-C detaches from the display; it never kills
@@ -249,6 +250,11 @@ validate_protected_token_file() {
   if (( (8#$mode) & 077 )); then
     echo "ERROR: Open WebUI API key file must not be group/world accessible: $path (mode $mode)" >&2
     return 2
+  fi
+  if [[ "$path" == "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
+    [[ "$(stat -c '%u' "$path" 2>/dev/null || echo -1)" == 0 ]] || { echo "ERROR: package default Open WebUI API key must be root-owned" >&2; return 2; }
+    [[ "$(stat -c '%u' "$(dirname "$path")" 2>/dev/null || echo -1)" == 0 ]] || { echo "ERROR: package secrets directory must be root-owned" >&2; return 2; }
+    [[ "$(stat -c '%a' "$(dirname "$path")" 2>/dev/null || true)" == 700 ]] || { echo "ERROR: package secrets directory must be mode 0700" >&2; return 2; }
   fi
 }
 
@@ -498,15 +504,16 @@ event_age() {
 
 quality_counts() {
   [[ -r "$EVENTS" ]] || { echo "0 0 0"; return; }
-  awk -F '\t' '$4=="quality" {if($5=="pass")p++; else if($5=="quality-fail")q++; else if($5=="skipped")s++} END{print p+0,q+0,s+0}' "$EVENTS"
+  awk -F '\t' '$4=="quality" {if($5=="pass")p++; else if($5=="quality-fail")q++; else if($5=="skipped")s++; else if($5=="incomplete")i++} END{print p+0,q+0,s+0,i+0}' "$EVENTS"
 }
 
 quality_state() {
-  local p q skipped
-  read -r p q skipped <<<"$(quality_counts)"
-  if ((p == 0 && q == 0)); then echo "not-run"
-  elif ((q > 0 && p == 0)); then echo "fail"
+  local p q skipped incomplete
+  read -r p q skipped incomplete <<<"$(quality_counts)"
+  if ((p == 0 && q == 0 && incomplete == 0)); then echo "not-run"
+  elif ((q > 0 && p == 0 && incomplete == 0)); then echo "fail"
   elif ((q > 0)); then echo "mixed"
+  elif ((incomplete > 0)); then echo "review"
   else echo "pass"
   fi
 }
@@ -518,6 +525,7 @@ recent_step_results() {
     case "$outcome" in
       pass) symbol='✓' ;;
       quality-fail) symbol='!' ;;
+      incomplete) symbol='?' ;;
       infra-fail) symbol='×' ;;
       skipped) symbol='·' ;;
       *) symbol='·' ;;
@@ -529,7 +537,7 @@ recent_step_results() {
 }
 
 dashboard_text() {
-  local phase display_phase stage last_event stage_started started now_s elapsed stage_elapsed position label service p q skipped banner
+  local phase display_phase stage last_event stage_started started now_s elapsed stage_elapsed position label service p q skipped incomplete banner
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo initializing)"
   display_phase="$phase"
   stage="$(cat "$STAGE_FILE" 2>/dev/null || echo starting)"
@@ -550,7 +558,7 @@ dashboard_text() {
   position="$(phase_position "$display_phase")"; label="$(phase_label "$display_phase")"
   [[ $phase != failed ]] || label="$label — FAILED"
   service="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
-  read -r p q skipped <<<"$(quality_counts)"
+  read -r p q skipped incomplete <<<"$(quality_counts)"
 
   banner=RUNNING
   [[ $phase != failed ]] || banner=FAILED
@@ -568,10 +576,10 @@ dashboard_text() {
   else
     printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
   fi
-  printf 'Quality steps   %s pass / %s quality-fail / %s skipped\n' "$p" "$q" "$skipped"
+  printf 'Quality steps   %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
   printf '\nRecent results\n'
   recent_step_results
-  if ((q > 0)) && [[ $phase == done || $phase == failed ]]; then
+  if ((q > 0 || incomplete > 0)) && [[ $phase == done || $phase == failed ]]; then
     printf '\nQuality failures\n'
     quality_cause_report
   fi
@@ -634,7 +642,7 @@ follow_run() {
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
   if [[ "$phase" == done ]]; then
     echo "Revalidation run completed."
-    printf 'Run state:      %s\n' "$(effective_run_state)"
+    printf 'Run completion: %s\n' "$(effective_run_state)"
     printf 'Infrastructure: %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
     printf 'Quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
     printf 'Restoration:    %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
@@ -701,8 +709,13 @@ start_run() {
     echo "ERROR: --skip-owui and --owui-token-file are mutually exclusive." >&2
     exit 2
   }
+  if ((skip_owui == 0)) && [[ -z $token_file && -s $DEFAULT_OWUI_TOKEN_FILE ]]; then
+    token_file="$DEFAULT_OWUI_TOKEN_FILE"
+    echo "Using protected BC-250 Open WebUI administrator API key: $DEFAULT_OWUI_TOKEN_FILE"
+  fi
   if ((skip_owui == 0)) && [[ -z $token_file ]]; then
-    echo "ERROR: full package qualification requires --owui-token-file FILE." >&2
+    echo "ERROR: full package qualification requires a protected Open WebUI administrator API key." >&2
+    echo "       Configure the package default or pass --owui-token-file FILE." >&2
     echo "       Use --skip-owui only for an explicitly incomplete run." >&2
     exit 2
   fi
@@ -952,6 +965,7 @@ write_rc_outcome() {
   case "$rc" in
     0) printf 'pass\n' > "$out" ;;
     3) printf 'quality-fail\n' > "$out" ;;
+    4) printf 'incomplete\n' > "$out" ;;
     *) printf 'infra-fail\n' > "$out" ;;
   esac
 }
@@ -984,6 +998,10 @@ run_step() {
   printf '%s\n' "$rc" > "$dir/exit-status.txt"; write_rc_outcome "$rc" "$dir/outcome.txt"; outcome="$(cat "$dir/outcome.txt")"
   if [[ "$kind" == quality && $rc -eq 3 ]]; then
     record_event "$label" quality quality-fail "scope=$scope rc=3"
+    return 0
+  fi
+  if [[ "$kind" == quality && $rc -eq 4 ]]; then
+    record_event "$label" quality incomplete "scope=$scope rc=4 output-budget-exhausted"
     return 0
   fi
   if ((rc == 0)); then
@@ -1325,13 +1343,26 @@ check_recent_device_errors() {
 }
 
 check_live_cu_routing() {
-  local out="$RAW/preflight/cu-routing.txt"
+  local out="$RAW/preflight/cu-routing.txt" problems
   bc250-cu-status --summary > "$out" 2>&1 || true
-  if grep -Fq 'Live routing status     : routed entries present; no off/problem cells' "$out"; then
-    record_event "live-cu-routing" infra pass "complete live routing table healthy"
+  problems="$(sed -n 's/^[[:space:]]*Problem cells[[:space:]]*:[[:space:]]*//p' "$out" | head -1)"
+  if ! [[ "$problems" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: live CU routing table could not be parsed; inspect $out" >&2
+    return 1
+  fi
+  if ((problems > 0)); then
+    echo "ERROR: live CU routing contains $problems unexpected D! cell(s); inspect $out" >&2
+    return 1
+  fi
+  if grep -Fq 'Routing profile match   : exact' "$out"; then
+    record_event "live-cu-routing" infra pass "live CU routing matches configured saved profile"
     return 0
   fi
-  echo "ERROR: complete live SPI/WGP routing table is not healthy; inspect $out" >&2
+  if grep -Fq 'Routing profile match   : not configured' "$out"; then
+    record_event "live-cu-routing" infra pass "live CU routing parsed; no saved profile configured (optional)"
+    return 0
+  fi
+  echo "ERROR: live CU routing does not match the configured saved profile; inspect $out" >&2
   return 1
 }
 
@@ -1450,14 +1481,14 @@ quality_cause_report() {
   python3 - "$RAW" "$EVENTS" <<'PY_CAUSES'
 import json
 import sys
-from collections import defaultdict
 from pathlib import Path
 
 root = Path(sys.argv[1])
 events = Path(sys.argv[2])
-aggregate = {}
+roots = {}
 invalid = []
-covered_labels = set()
+covered_steps = set()
+category_summaries = []
 for path in sorted(root.rglob("summary.json")):
     try:
         summary = json.loads(path.read_text(encoding="utf-8"))
@@ -1469,83 +1500,69 @@ for path in sorted(root.rglob("summary.json")):
         continue
     category = str(summary.get("category") or path.parent.name)
     counts = summary.get("qualification_counts") or {}
+    passed = int(counts.get("pass", 0) or 0)
+    failed = int(counts.get("quality-fail", 0) or 0)
+    incomplete_count = int(counts.get("incomplete", 0) or 0)
+    skipped = int(counts.get("skipped", 0) or 0)
+    total = passed + failed + incomplete_count + skipped
+    failure_kinds = summary.get("failure_kinds") or {}
+    kinds = ", ".join(f"{k}={v}" for k, v in sorted(failure_kinds.items()))
+    if failed or incomplete_count:
+        detail = f"{passed}/{total} pass"
+        if failed:
+            detail += f", {failed} quality-fail"
+        if incomplete_count:
+            detail += f", {incomplete_count} incomplete"
+        if kinds:
+            detail += f" ({kinds})"
+        category_summaries.append((category, detail))
     try:
-        passed = int(counts.get("pass") or 0)
-        failed = int(counts.get("quality-fail") or 0)
-    except (AttributeError, TypeError, ValueError) as exc:
-        invalid.append(f"{path}: invalid qualification_counts: {exc}")
-        continue
-    if failed <= 0:
-        continue
-    covered_labels.add(category)
-    entry = aggregate.setdefault(
-        category,
-        {"pass": 0, "fail": 0, "causes": defaultdict(int), "cases": [], "evidence": []},
-    )
-    entry["pass"] += passed
-    entry["fail"] += failed
-    failures = summary.get("failure_kinds") or {}
-    if not isinstance(failures, dict):
-        invalid.append(f"{path}: failure_kinds is not an object")
-        continue
-    for name, count in failures.items():
-        entry["causes"][str(name)] += int(count)
-
-    case_failures = summary.get("quality_failures")
-    if case_failures is not None:
-        if not isinstance(case_failures, list):
-            invalid.append(f"{path}: quality_failures is not an array")
-            continue
-        for item in case_failures:
-            if not isinstance(item, dict):
-                invalid.append(f"{path}: quality_failures item is not an object")
-                continue
-            entry["cases"].append({
-                "model": str(item.get("model") or "unknown"),
-                "case_id": str(item.get("case_id") or "unknown"),
-                "failure_kinds": [str(value) for value in item.get("failure_kinds") or []],
-            })
-    results_path = path.parent / "results.jsonl"
-    try:
-        evidence = str(results_path.relative_to(root))
+        evidence = str((path.parent / "results.jsonl").relative_to(root))
     except ValueError:
-        evidence = str(results_path)
-    if evidence not in entry["evidence"]:
-        entry["evidence"].append(evidence)
+        evidence = str(path.parent / "results.jsonl")
+    failures = summary.get("quality_failures") or []
+    incomplete = summary.get("incomplete_cases") or []
+    for item, state in [(x, "quality-fail") for x in failures] + [(x, "incomplete") for x in incomplete]:
+        if not isinstance(item, dict):
+            continue
+        case_id = str(item.get("case_id") or "unknown")
+        causes = tuple(sorted(str(v) for v in item.get("failure_kinds") or []))
+        diagnostics = tuple(sorted(str(v) for v in item.get("diagnostics") or []))
+        key = (case_id, causes, state)
+        entry = roots.setdefault(key, {"case_id": case_id, "state": state, "causes": causes,
+                                      "diagnostics": set(), "models": set(), "paths": set(), "evidence": set()})
+        entry["diagnostics"].update(diagnostics)
+        entry["models"].add(str(item.get("model") or "unknown"))
+        entry["paths"].add(category)
+        entry["evidence"].add(evidence)
+        covered_steps.add(category)
 
 failed_steps = []
 if events.exists():
     for line in events.read_text(encoding="utf-8", errors="replace").splitlines():
         fields = line.split("\t")
-        if len(fields) >= 5 and fields[3] == "quality" and fields[4] == "quality-fail":
-            failed_steps.append(fields[2])
+        if len(fields) >= 5 and fields[3] == "quality" and fields[4] in {"quality-fail", "incomplete"}:
+            failed_steps.append((fields[2], fields[4], fields[5] if len(fields) > 5 else ""))
 
-if not aggregate and not invalid and not failed_steps:
+if not roots and not invalid and not failed_steps and not category_summaries:
     print("  (none)")
 else:
-    for category, entry in sorted(aggregate.items()):
-        total = entry["pass"] + entry["fail"]
-        print(f"  {category:<28} {entry['pass']}/{total}")
-        if entry["cases"]:
-            multiple_models = len({case["model"] for case in entry["cases"]}) > 1
-            for case in entry["cases"]:
-                label = (
-                    f"{case['model']}/{case['case_id']}"
-                    if multiple_models
-                    else case["case_id"]
-                )
-                causes = ", ".join(case["failure_kinds"]) or "quality-fail"
-                print(f"    {label}: {causes}")
-        else:
-            for name, count in sorted(entry["causes"].items()):
-                print(f"    {name}={count}")
-        for evidence in entry["evidence"]:
+    for category, detail in category_summaries:
+        print(f"  {category}: {detail}")
+    for (_key, entry) in sorted(roots.items(), key=lambda kv: kv[0]):
+        causes = ", ".join(entry["causes"]) or ("output budget exhausted" if entry["state"] == "incomplete" else "quality-fail")
+        print(f"  {entry['case_id']}: {causes} [{entry['state']}]")
+        if entry["diagnostics"]:
+            print(f"    context: {', '.join(sorted(entry['diagnostics']))}")
+        print(f"    parity paths: {', '.join(sorted(entry['paths']))}")
+        print(f"    models: {', '.join(sorted(entry['models']))}")
+        for evidence in sorted(entry["evidence"]):
             print(f"    evidence: {evidence}")
     for detail in invalid:
         print(f"  canonical summary unavailable — {detail}")
-    for label in sorted(set(failed_steps)):
-        if label not in covered_labels and not any(label in key for key in aggregate):
-            print(f"  {label:<28} quality-fail — canonical summary unavailable")
+    for label, outcome, detail in sorted(set(failed_steps)):
+        if label not in covered_steps and not any(label in entry["paths"] for entry in roots.values()):
+            print(f"  {label}: {outcome} — {detail or 'canonical summary unavailable'}")
 PY_CAUSES
 }
 
@@ -1554,14 +1571,14 @@ diagnostic_count() {
 }
 
 create_summary() {
-  local out="$WORK/revalidation-summary.txt" p q skipped quality coverage diagnostics run_state
-  read -r p q skipped <<<"$(quality_counts)"; quality="$(quality_state)"
+  local out="$WORK/revalidation-summary.txt" p q skipped incomplete quality coverage diagnostics run_state
+  read -r p q skipped incomplete <<<"$(quality_counts)"; quality="$(quality_state)"
   coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
   diagnostics="$(diagnostic_count)"
   run_state="$(tr '[:lower:]' '[:upper:]' < "$RUN_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
   printf '%s\n' "$quality" > "$QUALITY_STATE_FILE"
   {
-    echo "BC-250 revalidation complete"
+    echo "BC-250 revalidation evidence bundle complete"
     echo
     printf 'Run             %s\n' "$(run_id)"
     printf 'Package         %s\n' "$(rpm -q bc250-llm-server 2>/dev/null || true)"
@@ -1569,12 +1586,12 @@ create_summary() {
     printf 'Kernel          %s\n' "$(uname -r)"
     echo
     if ((diagnostics > 0)); then
-      printf 'Run state       %s — %d diagnostic(s)\n' "$run_state" "$diagnostics"
+      printf 'Run completion  %s — %d diagnostic(s)\n' "$run_state" "$diagnostics"
     else
-      printf 'Run state       %s\n' "$run_state"
+      printf 'Run completion  %s\n' "$run_state"
     fi
     printf 'Infrastructure  %s\n' "$(tr '[:lower:]' '[:upper:]' < "$INFRA_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
-    printf 'Quality         %s       %s pass / %s quality-fail / %s skipped\n' "${quality^^}" "$p" "$q" "$skipped"
+    printf 'Quality         %s       %s pass / %s quality-fail / %s incomplete / %s skipped\n' "${quality^^}" "$p" "$q" "$incomplete" "$skipped"
     printf 'Restoration     %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
     printf 'Coverage        %s\n' "${coverage^^}"
     echo
@@ -1775,7 +1792,7 @@ phase_restore_report() {
   fi
   printf 'pass\n' > "$INFRA_STATE_FILE"; printf '%s\n' "$(quality_state)" > "$QUALITY_STATE_FILE"
   printf 'done\n' > "$PHASE_FILE"
-  record_event "qualification-complete" infra pass "qualification sequence completed; report pending"
+  record_event "revalidation-run-complete" infra pass "revalidation sequence completed; report pending"
   create_final_bundle
   finish_worker_session
 }
