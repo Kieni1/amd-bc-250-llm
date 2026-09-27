@@ -2,7 +2,7 @@
 
 The Ollama binary is installed from the pinned upstream release by the guided helper, while the RPM owns all four systemd lane definitions. Use the commands below for an explicit binary reinstall or runtime change.
 
-Package candidate standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device acceptance of this runtime belongs to the 0.12.2-0.4 release gate; v0.34.2 remains the immediate qualified comparison baseline.
+Package candidate standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device acceptance of this runtime belongs to the 0.12.2-0.5 release gate; v0.34.2 remains the immediate qualified comparison baseline.
 
 ## Install and verify
 
@@ -63,13 +63,13 @@ headroom.
 
 ## 0.34.4 candidate runtime notes
 
-Ollama 0.34.4 is the package-pinned candidate for 0.12.2-0.4. Exact v0.34.2 remains the immediate qualified BC-250 comparison baseline because it passed a clean-boot comparison against 0.34.0.
+Ollama 0.34.4 is the package-pinned candidate for 0.12.2-0.5. Exact v0.34.2 remains the immediate qualified BC-250 comparison baseline because it passed a clean-boot comparison against 0.34.0.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
 transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The 0.12.2-0.4 device gate must re-run the focused Vulkan/UMA path because v0.34.4 changes the upstream runtime. It also records `/api/show` `thinking` metadata where available, but absence of that metadata is diagnostic rather than a hard non-reasoning result. Structured-output probes and a cheap large-library `/api/show` lookup regression are part of the candidate gate.
+The 0.12.2-0.5 device gate must re-run the focused Vulkan/UMA path because v0.34.4 changes the upstream runtime. It also records `/api/show` `thinking` metadata where available, but absence of that metadata is diagnostic rather than a hard non-reasoning result. Structured-output probes and a cheap large-library `/api/show` lookup regression are part of the candidate gate.
 
 The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
@@ -139,7 +139,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.34.4** as the package-standard candidate runtime for this source. Exact-device promotion still requires the 0.12.2-0.4 release gate. Before moving beyond it, review
+Treat **0.34.4** as the package-standard candidate runtime for this source. Exact-device promotion still requires the 0.12.2-0.5 release gate. Before moving beyond it, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;
