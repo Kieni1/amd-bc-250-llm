@@ -632,6 +632,16 @@ step_11_maintenance
         self.assertIn("run_models_only", source)
 
 
+    def test_maintenance_key_creation_only_runs_after_successful_publication(self) -> None:
+        source = INSTALLER.read_text()
+        helper = source[source.index("maybe_save_default_owui_token() {"):source.index("print_openwebui_completion_status() {")]
+        self.assertIn('[[ "$OWUI_SETUP_STATE" == "applied" ]] || return 0', helper)
+        self.assertIn("systemctl is-active --quiet open-webui.service", helper)
+        self.assertIn('bc250-openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE"', helper)
+        models_only = source[source.index("run_models_only() {"):source.index("print_40cu_completion_status() {")]
+        self.assertLess(models_only.index("step_9_open_webui"), models_only.index("maybe_save_default_owui_token"))
+
+
     def test_openwebui_upgrade_backup_precedes_private_start_and_verified_publication(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         step8 = source[source.index("step_8_application_services() {"):source.index("show_plan() {")]
@@ -647,10 +657,16 @@ step_11_maintenance
         self.assertLess(publish.index("bc250-openwebui-setup status"), publish.index("enable_open_webui_boot"))
         self.assertLess(publish.index("enable_open_webui_boot"), publish.index("systemctl enable --now nginx.service"))
         self.assertIn("if ! enable_open_webui_boot; then", publish)
-        self.assertIn("if ! systemctl enable open-webui.service", publish)
-        self.assertIn("systemctl is-enabled --quiet open-webui.service", publish)
+        self.assertNotIn("systemctl enable open-webui.service", publish)
+        self.assertNotIn("systemctl is-enabled --quiet open-webui.service", publish)
         self.assertIn("if ! systemctl enable --now nginx.service; then", publish)
-        self.assertNotIn("systemctl enable open-webui.service >/dev/null 2>&1 || true", publish)
+        boot = source[source.index("openwebui_boot_enabled() {"):source.index("hold_open_webui_publication() {")]
+        self.assertIn("systemctl show -p WantedBy --value open-webui.service", boot)
+        self.assertIn("grep -Fxq multi-user.target", boot)
+        hold_block = source[source.index("hold_open_webui_publication() {"):source.index("publish_openwebui_after_convergence() {")]
+        self.assertNotIn("systemctl disable open-webui.service", hold_block)
+        self.assertIn('rm -f "$target"', hold_block)
+        self.assertIn("systemctl daemon-reload", hold_block)
         self.assertIn("public/boot publication remains held", source)
         self.assertIn("verified Open WebUI upgrade backup was not produced", source)
 

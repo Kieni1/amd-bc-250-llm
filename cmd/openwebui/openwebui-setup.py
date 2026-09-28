@@ -7,6 +7,7 @@ import argparse
 import getpass
 import json
 import os
+import re
 import stat
 import sys
 import urllib.error
@@ -130,7 +131,7 @@ class Client:
     def get(self, path: str) -> Any:
         return self.request("GET", path)
 
-    def post(self, path: str, payload: Any) -> Any:
+    def post(self, path: str, payload: Any | None = None) -> Any:
         return self.request("POST", path, payload)
 
 
@@ -1047,18 +1048,91 @@ def verify_token(client_url: str, token: str) -> None:
     require_object(probe.get("/ollama/config"), "authenticated Ollama configuration")
 
 
+def ensure_api_keys_enabled(client: Client) -> None:
+    """Enable Open WebUI API keys without changing unrelated admin settings."""
+    current = require_object(
+        client.get("/api/v1/auths/admin/config"),
+        "Open WebUI administrator configuration",
+    )
+    if current.get("ENABLE_API_KEYS") is True:
+        return
+    updated = dict(current)
+    updated["ENABLE_API_KEYS"] = True
+    result = require_object(
+        client.post("/api/v1/auths/admin/config", updated),
+        "Open WebUI administrator configuration update",
+    )
+    if result.get("ENABLE_API_KEYS") is not True:
+        raise ApiError("Open WebUI API keys could not be enabled")
+
+
+def is_openwebui_api_key(token: str) -> bool:
+    return re.fullmatch(r"sk-[0-9a-fA-F]{32}", token) is not None
+
+
+def maintenance_api_key(client: Client, authenticated_token: str) -> str:
+    """Return a stable Open WebUI API key, reusing one when it already exists."""
+    if is_openwebui_api_key(authenticated_token):
+        return authenticated_token
+    ensure_api_keys_enabled(client)
+    try:
+        current = client.get("/api/v1/auths/api_key")
+    except ApiError as exc:
+        if "GET /api/v1/auths/api_key: HTTP 404:" not in str(exc):
+            raise
+        current = None
+    if isinstance(current, dict):
+        existing = current.get("api_key")
+        if isinstance(existing, str) and is_openwebui_api_key(existing):
+            return existing
+    created = require_object(
+        client.post("/api/v1/auths/api_key"),
+        "Open WebUI API-key creation",
+    )
+    api_key = created.get("api_key")
+    if not isinstance(api_key, str) or not is_openwebui_api_key(api_key):
+        raise ApiError("Open WebUI did not return a valid API key")
+    return api_key
+
+
+def save_default_maintenance_api_key(
+    client_url: str, client: Client, authenticated_token: str
+) -> None:
+    api_key = maintenance_api_key(client, authenticated_token)
+    verify_token(client_url, api_key)
+    replace_legacy = False
+    if DEFAULT_TOKEN_FILE.is_file():
+        existing = read_token_file(str(DEFAULT_TOKEN_FILE))
+        if is_openwebui_api_key(existing):
+            raise ApiError(f"refusing to overwrite existing API key file: {DEFAULT_TOKEN_FILE}")
+        replace_legacy = True
+    write_token_file(str(DEFAULT_TOKEN_FILE), api_key, replace=replace_legacy)
+    try:
+        saved = read_token_file(str(DEFAULT_TOKEN_FILE))
+        verify_token(client_url, saved)
+    except Exception:
+        DEFAULT_TOKEN_FILE.unlink(missing_ok=True)
+        raise
+    print(f"Saved verified BC-250 maintenance API key: {DEFAULT_TOKEN_FILE}")
+
+
 def suggested_token_file() -> str:
     configured = os.environ.get("BC250_OWUI_TOKEN_FILE", "").strip()
     if configured:
         return configured
-    for candidate in (DEFAULT_TOKEN_FILE, LEGACY_TOKEN_FILE):
-        if candidate.is_file():
-            return str(candidate)
+    if DEFAULT_TOKEN_FILE.is_file():
+        try:
+            if is_openwebui_api_key(read_token_file(str(DEFAULT_TOKEN_FILE))):
+                return str(DEFAULT_TOKEN_FILE)
+        except ApiError:
+            pass
+    if LEGACY_TOKEN_FILE.is_file():
+        return str(LEGACY_TOKEN_FILE)
     return ""
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("command", choices=("init", "apply", "status"))
+    p.add_argument("command", choices=("init", "apply", "status", "save-key"))
     p.add_argument("--url", default=os.environ.get("OWUI_URL", DEFAULT_URL))
     p.add_argument(
         "--token-file", "--owui-token-file", dest="token_file",
@@ -1066,12 +1140,12 @@ def parser() -> argparse.ArgumentParser:
     )
     p.add_argument(
         "--token-output",
-        help="write the authenticated token to a protected temporary file for the caller",
+        help="write the authenticated bearer token to a protected temporary file for the caller",
     )
     p.add_argument(
         "--save-default-token",
         action="store_true",
-        help="save a verified administrator API key to the package protected default without overwriting an existing key",
+        help="save/reuse a verified Open WebUI API key at the protected package default without overwriting an existing key",
     )
     p.add_argument(
         "--verbose",
@@ -1084,12 +1158,24 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     env_token = os.environ.get("OWUI_API_KEY", "").strip() or None
-    default_token_file = str(DEFAULT_TOKEN_FILE) if DEFAULT_TOKEN_FILE.is_file() else None
-    selected_token_file = args.token_file or (None if env_token else default_token_file)
+    default_token_file = suggested_token_file()
+    if default_token_file == str(LEGACY_TOKEN_FILE):
+        default_token_file = None
+    selected_token_file = args.token_file or (None if env_token else default_token_file or None)
     token = read_token_file(selected_token_file) if selected_token_file else env_token
     client = Client(args.url, token)
     if args.command == "status":
         return status(client, bool(token), verbose=args.verbose)
+    if args.command == "save-key":
+        if os.geteuid() != 0:
+            raise ApiError("save-key requires root so the package credential remains root-owned")
+        if not token:
+            raise ApiError(
+                f"save-key requires --token-file, OWUI_API_KEY, or the protected package default {DEFAULT_TOKEN_FILE}"
+            )
+        verify_token(args.url, token)
+        save_default_maintenance_api_key(args.url, client, token)
+        return 0
     if args.command == "init":
         if selected_token_file:
             print(f"Using Open WebUI administrator API key file: {selected_token_file}")
@@ -1152,14 +1238,7 @@ def main() -> int:
     if args.save_default_token and token:
         if os.geteuid() != 0:
             raise ApiError("--save-default-token requires root so the package credential remains root-owned")
-        write_token_file(str(DEFAULT_TOKEN_FILE), token, replace=False)
-        try:
-            saved = read_token_file(str(DEFAULT_TOKEN_FILE))
-            verify_token(args.url, saved)
-        except Exception:
-            DEFAULT_TOKEN_FILE.unlink(missing_ok=True)
-            raise
-        print(f"Saved verified BC-250 maintenance API key: {DEFAULT_TOKEN_FILE}")
+        save_default_maintenance_api_key(args.url, client, token)
     print("Open WebUI package-owned baseline applied through supported APIs.")
     return status(client, True, verbose=args.verbose)
 

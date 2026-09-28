@@ -35,6 +35,7 @@ OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
 sudo bc250-openwebui-setup status --verbose
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
+sudo bc250-openwebui-setup save-key --token-file FILE
 ```
 
 `init` offers administrator sign-in/create or protected API-key-file authentication.
@@ -43,13 +44,22 @@ is present, package consumers use it automatically. An explicit `--token-file FI
 default. `status` without usable authentication checks reachability only; with the package key, a temporary
 administrator key, or `--token-file`, it also compares package-owned settings with the reviewed desired state.
 Add `--verbose` to print the verified active role/base-model mapping, translation budget/filter attachment,
-task/RAG defaults and package-owned Function state. The installer may hold an authenticated token briefly
-under `/run` for final verification and removes that temporary copy on exit. The package default key is
-persisted only when explicitly requested, with root-only ownership/mode, and its contents are never printed.
+task/RAG defaults and package-owned Function state. The installer may hold a sign-in JWT or supplied bearer token briefly
+under `/run` for convergence and removes that temporary copy on exit. That temporary JWT is not the durable
+maintenance credential. When the operator explicitly requests a package maintenance key, the helper enables
+Open WebUI API-key support if needed, reuses the administrator's existing `sk-...` key when one already exists
+or creates one through `/api/v1/auths/api_key`, verifies it live, then stores only that real API key at the
+root-only package path. A legacy package-owned JWT at that path is not silently treated as a durable key and
+may be replaced only through the explicit save-key flow. Credential contents are never printed.
 A reported difference may be an intentional operator override; `status` does not
 reset it. Verbose status also renders effective nested `params.custom_params` for model/request
 policy and, when the pinned API exports it, reports the administrator-owned multi-model-chat
 permission without converging that permission.
+
+Open WebUI is a Podman Quadlet. Its generated `open-webui.service` is transient and is not directly
+`systemctl enable`d. The package controls boot publication by installing/removing the Quadlet `[Install]`
+drop-in and reloading systemd; successful publication is verified by the generated unit being wanted by
+`multi-user.target` before nginx is enabled.
 
 ## Configuration ownership
 

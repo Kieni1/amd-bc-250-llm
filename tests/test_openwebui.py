@@ -1184,6 +1184,84 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 OPENWEBUI.write_token_file(str(path), "secret-two", replace=False)
             self.assertEqual(path.read_text(encoding="utf-8"), "secret-one\n")
 
+    def test_maintenance_api_key_enables_feature_and_reuses_existing_key(self) -> None:
+        class KeyClient:
+            def __init__(self) -> None:
+                self.admin = {"ENABLE_API_KEYS": False, "OTHER": "preserved"}
+                self.posts: list[tuple[str, Any]] = []
+
+            def get(self, path: str) -> Any:
+                if path == "/api/v1/auths/admin/config":
+                    return copy.deepcopy(self.admin)
+                if path == "/api/v1/auths/api_key":
+                    return {"api_key": "sk-" + "a" * 32}
+                raise AssertionError(path)
+
+            def post(self, path: str, payload: Any | None = None) -> Any:
+                self.posts.append((path, copy.deepcopy(payload)))
+                if path == "/api/v1/auths/admin/config":
+                    self.admin = copy.deepcopy(payload)
+                    return copy.deepcopy(self.admin)
+                raise AssertionError(path)
+
+        client = KeyClient()
+        key = OPENWEBUI.maintenance_api_key(client, "temporary-jwt")
+        self.assertEqual(key, "sk-" + "a" * 32)
+        self.assertTrue(client.admin["ENABLE_API_KEYS"])
+        self.assertEqual(client.admin["OTHER"], "preserved")
+        self.assertFalse(any(path == "/api/v1/auths/api_key" for path, _ in client.posts))
+
+    def test_maintenance_api_key_creates_key_when_none_exists(self) -> None:
+        class KeyClient:
+            def __init__(self) -> None:
+                self.posts: list[tuple[str, Any]] = []
+
+            def get(self, path: str) -> Any:
+                if path == "/api/v1/auths/admin/config":
+                    return {"ENABLE_API_KEYS": True}
+                if path == "/api/v1/auths/api_key":
+                    raise OPENWEBUI.ApiError(
+                        'GET /api/v1/auths/api_key: HTTP 404: {"detail":"API key not found"}'
+                    )
+                raise AssertionError(path)
+
+            def post(self, path: str, payload: Any | None = None) -> Any:
+                self.posts.append((path, copy.deepcopy(payload)))
+                if path == "/api/v1/auths/api_key":
+                    return {"api_key": "sk-" + "b" * 32}
+                raise AssertionError(path)
+
+        client = KeyClient()
+        key = OPENWEBUI.maintenance_api_key(client, "temporary-jwt")
+        self.assertEqual(key, "sk-" + "b" * 32)
+        self.assertEqual(client.posts, [("/api/v1/auths/api_key", None)])
+
+    def test_saved_maintenance_credential_is_real_api_key_not_session_jwt(self) -> None:
+        class KeyClient:
+            def get(self, path: str) -> Any:
+                if path == "/api/v1/auths/admin/config":
+                    return {"ENABLE_API_KEYS": True}
+                if path == "/api/v1/auths/api_key":
+                    return {"api_key": "sk-" + "c" * 32}
+                raise AssertionError(path)
+
+            def post(self, path: str, payload: Any | None = None) -> Any:
+                raise AssertionError((path, payload))
+
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "openwebui-admin.key"
+            with (
+                mock.patch.object(OPENWEBUI, "DEFAULT_TOKEN_FILE", path),
+                mock.patch.object(OPENWEBUI, "verify_token") as verify,
+            ):
+                OPENWEBUI.save_default_maintenance_api_key(
+                    "http://127.0.0.1:3000", KeyClient(), "temporary-jwt"
+                )
+            saved = path.read_text(encoding="utf-8").strip()
+            self.assertEqual(saved, "sk-" + "c" * 32)
+            self.assertNotEqual(saved, "temporary-jwt")
+            self.assertEqual(verify.call_count, 2)
+
     def test_package_function_manifest_loads_non_global_active_filter(self) -> None:
         functions = OPENWEBUI.load_functions()
         self.assertEqual(len(functions), 2)

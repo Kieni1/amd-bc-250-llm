@@ -10,7 +10,7 @@ Tika          4.0.0-full
 Governor      0.4.13
 ```
 
-Source/static success is not device acceptance. Install the exact NVR and first confirm `rpm -V`, runtime pins, normal topology and successful authenticated OWUI desired-state convergence. The installer must not publish OWUI through boot/nginx before package apply/status is verified, Open WebUI boot enablement succeeds and `systemctl is-enabled` confirms it. Any failure in apply/status/boot enablement/nginx publication must return to the held state.
+Source/static success is not device acceptance. Install the exact NVR and first confirm `rpm -V`, runtime pins, normal topology and successful authenticated OWUI desired-state convergence. The installer must not publish OWUI through boot/nginx before package apply/status is verified, the Quadlet `[Install]` drop-in has regenerated `open-webui.service` with `WantedBy=multi-user.target`, and nginx publication succeeds. Do not use `systemctl enable open-webui.service`: Quadlet-generated services are transient. Any failure in apply/status/boot-link verification/nginx publication must return to the held state.
 
 ## 1. Focused FR→DE integrity regression
 

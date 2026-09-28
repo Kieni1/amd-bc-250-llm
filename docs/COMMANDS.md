@@ -555,6 +555,7 @@ OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
 bc250-openwebui-setup status
 sudo bc250-openwebui-setup status --token-file FILE
 OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
+sudo bc250-openwebui-setup save-key --token-file FILE
 ```
 
 `init` can create the first administrator, sign in an existing administrator or
@@ -569,7 +570,7 @@ pre-v1 testing phase both normal Ollama providers are unrestricted and the raw p
 overrides are visible, so installed main/task models can be selected directly for comparison. Curated
 Office roles remain the supported product paths. `status` verifies those persisted values, testing
 visibility/tool-policy metadata, package Function source/state and package-owned preset fields needed
-by the selected production translation contract. The optional maintenance API key is persisted only when the operator requests it, at the root-only package credential path; token contents are never printed. Other temporary credentials/tokens are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
+by the selected production translation contract. The optional maintenance API key is persisted only when the operator requests it, at the root-only package credential path; token contents are never printed. The persisted credential is a real Open WebUI `sk-...` API key, not the temporary JWT returned by sign-in/signup. Existing API keys are reused instead of rotated; an absent key is created through the supported API-key endpoint after enabling API-key support. Other temporary credentials/tokens are not persisted by the package. Unrelated operator models, users, prompts and knowledge are not
 synchronized away. RPM upgrades that cross an Open WebUI version with existing state hold OWUI
 startup until the guided installer has produced and verified the stopped-state migration rollback
 archive. See [`MAINTENANCE.md`](MAINTENANCE.md) for archive semantics and restoration.
