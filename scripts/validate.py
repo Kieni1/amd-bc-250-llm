@@ -490,6 +490,30 @@ def check_manifest_sources() -> None:
             fail(f"install manifest line {number}: source does not exist: {source}")
 
 
+def check_development_scope() -> None:
+    """Verify frozen/archive development domains without loading their internals."""
+    scope = ROOT / "development/scope.py"
+    manifest = ROOT / "development/DEVELOPMENT-SCOPE.json"
+    if not scope.is_file() or not manifest.is_file():
+        fail("development scope manifest/helper is missing")
+        return
+    try:
+        compile(scope.read_text(encoding="utf-8"), str(scope.relative_to(ROOT)), "exec")
+    except (OSError, SyntaxError) as error:
+        fail(f"development scope helper syntax check failed: {error}")
+        return
+    result = subprocess.run(
+        [sys.executable, str(scope), "check", "--quiet"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip()
+        fail(f"development scope check failed: {detail}")
+
+
 def check_upstream_manifest() -> None:
     try:
         with UPSTREAMS.open("rb") as stream:
@@ -532,6 +556,7 @@ def main() -> int:
     check_repository_safety()
     check_dispatcher_and_runtime_contracts()
     check_manifest_sources()
+    check_development_scope()
     check_upstream_manifest()
     if FAILURES:
         print(f"RPM preflight failed with {len(FAILURES)} error(s).", file=sys.stderr)

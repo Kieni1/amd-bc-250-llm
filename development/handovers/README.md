@@ -3,6 +3,14 @@
 These handovers are Git/source-only coordination documents. They are not installed by
 the binary RPM and are not package API contracts.
 
+## Read scope before handovers
+
+`development/DEVELOPMENT-SCOPE.json` is the first file for routine development. It identifies current
+active, boundary-active, frozen and archive-only domains. Historical release handovers and model-run
+evidence remain in the tree, but archive-only material should not be loaded into a normal current batch.
+Use `python3 development/scope.py check` to prove frozen/archive trees are unchanged and `scope.py map`
+to select the smallest relevant handover/test surface.
+
 Maintain three durable roles:
 
 - `DEVELOPMENT-WORKFLOW.md` — stable rules for how development/review chats work;
@@ -42,6 +50,7 @@ retired after their durable evidence was integrated into model-run and decision 
 
 ## Current main-integration continuity
 
+- `../DEVELOPMENT-SCOPE.json` + `../scope.py` — first-stop current development scope and frozen-domain guard.
 - `MAIN-INTEGRATION-HANDOVER.md` — durable project state/history.
 - `MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md` — current procedural authority and implemented contracts.
 - `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md` — current implementation/device-qualification boundary.

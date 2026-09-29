@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "kind": "workbench-checkpoint",
+  "release_identity": "bc250-llm-server-0.12.2-0.5",
+  "predecessor_artifact": "amd-bc-250-llm-0.12.2-0.5-workbench-openwebui-auth-fix.zip",
+  "predecessor_sha256": "7e2020e4ee024ab05e7b05e1ea23e1085981a54a0a30e06b97a9294057c6c394",
+  "batch": "development-scope-freeze",
+  "changed_files": [
+    "development/DEVELOPMENT-SCOPE.json",
+    "development/scope.py",
+    "development/TESTING-STRATEGY.md",
+    "development/VALIDATION-MATRIX.md",
+    "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md",
+    "development/handovers/DEVELOPMENT-WORKFLOW.md",
+    "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
+    "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
+    "development/handovers/README.md",
+    "scripts/validate.py"
+  ],
+  "completed": [
+    "Added authoritative development/DEVELOPMENT-SCOPE.json with active, boundary-active, frozen and archive-only components",
+    "Frozen maintenance/companion, RAG/Tika, MTP, coding-agent, OCR and uninstall at deterministic tree hashes",
+    "Marked historical development/model-run evidence, quality history and graveyard Modelfiles archive-only",
+    "Added development/scope.py summary/check/map/hash helper with frozen boundary watches",
+    "Made scripts/validate.py verify scope metadata and frozen/archive hashes",
+    "Updated current workflow/testing/validation handovers to read development scope before broad historical context",
+    "Classified every current repository file into at least one development component",
+    "Preserved full package source and final full-release gate; scope reduction affects routine iteration only"
+  ],
+  "validation": [
+    "python3 development/scope.py check --quiet: PASS",
+    "deliberate cmd/maintenance/maintenance.sh tamper: scope check FAIL as required; exact file restored; scope check PASS",
+    "python3 scripts/validate.py: PASS",
+    "python3 -m unittest tests.test_documentation tests.test_sources tests.test_packaging: 58/58 PASS",
+    "development/scope.py and scripts/validate.py compile: PASS",
+    "repository classification scan: 0 unclassified files",
+    "ruff executable unavailable locally; workstation/GitHub Ruff remains authoritative",
+    "frozen component suites intentionally NOT rerun because their hashes are unchanged"
+  ],
+  "current_scope": {
+    "active": ["installer-convergence", "openwebui-product", "benchmark-revalidation", "model-catalog-current"],
+    "boundary_active": ["runtime-cu-memory", "verification-diagnostics", "packaging-source", "global-docs-coordination"],
+    "frozen": ["maintenance-companion", "rag-tika", "mtp", "coding-agent", "ocr", "uninstall"],
+    "archive_only": ["historical-development", "quality-history", "graveyard-models"]
+  },
+  "device_followup": [
+    "Continue current 0.12.2-0.5 device work on installer/Open WebUI auth, Advanced 6144, translation and benchmark/revalidation surfaces",
+    "Do not reopen frozen maintenance/RAG/Tika/MTP/coding-agent/OCR/uninstall work unless an explicit request or declared interface dependency requires thawing",
+    "Run the complete deterministic/package gate again at the next release milestone"
+  ]
+}

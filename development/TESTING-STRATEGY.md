@@ -4,6 +4,25 @@ This is the development plan for continuing BC-250 qualification without repeate
 running one giant hardware campaign. The package already separates health,
 measurement, and qualification; the testing process should preserve that separation.
 
+## 0. Select development scope before selecting tests
+
+The routine test surface is defined by `development/DEVELOPMENT-SCOPE.json`. Before a batch:
+
+1. run `python3 development/scope.py check`;
+2. map the changed paths with `python3 development/scope.py map ...`;
+3. run focused tests for affected **active** components;
+4. add **boundary_active** tests only when that boundary changed or an active change crosses its listed interface;
+5. do not rerun **frozen** component suites when their baseline hash is unchanged;
+6. do not load **archive_only** evidence unless a specific provenance question requires it.
+
+Current frozen domains are maintenance/companion, RAG/Tika, MTP, coding-agent, OCR and uninstall.
+This does not delete or de-scope them from the product. It freezes their current source until deliberately
+thawed. The full deterministic/package gate still applies at a release milestone.
+
+This scope layer is specifically intended to avoid repeatedly paying for closed investigations such as the
+current Tika serialization work and for unrelated optional subsystems such as maintenance while Advanced,
+translation, installer/Open WebUI and benchmark/revalidation work continues.
+
 ## 1. Three different questions
 
 Use the right tool for the question:

@@ -4,6 +4,11 @@ This file tracks **what kind of evidence exists** and what still needs qualifica
 It is development memory, not an installed operator contract. Do not convert `historical`
 into `current` merely because a past run was successful.
 
+Routine-development scope is separately controlled by `development/DEVELOPMENT-SCOPE.json`. A row can
+remain part of the package/release matrix while its implementation component is **frozen** for current
+iteration. Frozen means tree-hash verification instead of routine internal review/tests; it does not mean
+removed, unsupported, or accepted for a new release without the final full gate.
+
 Status vocabulary:
 
 - **SOURCE PASS** — source-side/unit/static validation exists for the current source.

@@ -2,6 +2,13 @@
 
 ## Purpose and authority
 
+## Routine loading rule
+
+For ordinary current development, read `development/DEVELOPMENT-SCOPE.json` first. Do **not** load this
+entire historical handover unless the active change needs cross-stream history that is not captured by the
+current-work/release handovers. Frozen/archive-only domains should stay out of routine context while their
+baseline hashes remain unchanged.
+
 This is the durable state transfer for a fresh **main integration** chat. It should contain the
 current appliance contract, durable constraints, current evidence, important negative results and
 open work. Release-by-release chronology belongs in `docs/CHANGELOG.md`; detailed rationale belongs

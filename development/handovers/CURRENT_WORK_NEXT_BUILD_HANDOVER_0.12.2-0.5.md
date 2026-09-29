@@ -13,6 +13,21 @@ Governor      0.4.13
 Revalidation  v4.6
 ```
 
+## Current development scope
+
+Routine work is now intentionally narrowed by `development/DEVELOPMENT-SCOPE.json`.
+
+```text
+ACTIVE           installer/convergence, Open WebUI product roles, benchmark/revalidation, current model catalog
+BOUNDARY-ACTIVE  runtime/CU/memory, verification/diagnostics, packaging/source, current docs/coordination
+FROZEN           maintenance/companion, RAG/Tika, MTP, coding-agent, OCR, uninstall
+ARCHIVE-ONLY     historical development/model-run evidence, quality history, graveyard models
+```
+
+Do not reopen frozen domains merely because they remain in the package. `scripts/validate.py` verifies their
+baseline tree hashes. Thaw only when an explicit user request or listed interface dependency crosses that
+domain. Final release closure still runs the full deterministic/package gates.
+
 ## Implemented source delta
 
 - Guided OWUI convergence is safety-gated: rollback boundary -> private/local OWUI readiness -> authenticated package apply/status -> install the Quadlet `[Install]` drop-in -> daemon-reload -> verify generated `WantedBy=multi-user.target` boot linkage -> enable nginx. `open-webui.service` is generated/transient and must never be passed to `systemctl enable`. Any failure leaves publication held and returns degraded/nonzero.

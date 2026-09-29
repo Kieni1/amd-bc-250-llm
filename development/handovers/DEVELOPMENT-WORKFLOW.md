@@ -17,6 +17,28 @@ Use, in order:
 
 Never silently merge an older handover assumption into newer source.
 
+## Scope-aware routine development
+
+Start every normal source batch with `development/DEVELOPMENT-SCOPE.json`, not with a recursive
+review of the whole repository. `development/scope.py` provides the mechanical checks:
+
+```bash
+python3 development/scope.py check
+python3 development/scope.py map path/to/changed-file ...
+```
+
+- **active**: normal current work; inspect and test when relevant.
+- **boundary_active**: inspect/test only when changed directly or an active change crosses its interface.
+- **frozen**: preserve byte-for-byte/tree-hash during routine work; do not load or run dedicated tests.
+- **archive_only**: provenance only; do not load into current reasoning unless tracing a specific historical claim.
+
+If a frozen hash changes unexpectedly, stop the batch and resolve it. If a frozen domain needs intentional
+work, thaw it in the manifest first, state the reason, run its focused tests, and establish a new baseline
+only after the change is accepted. Never update a frozen baseline merely to make `scope.py check` green.
+
+At a release milestone the complete deterministic/package gate still runs; freezing reduces iteration cost,
+not release coverage.
+
 ## Validation ownership
 
 Do not try to run checks that are unavailable in the current environment.

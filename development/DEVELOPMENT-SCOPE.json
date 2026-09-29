@@ -1,0 +1,434 @@
+{
+  "schema_version": 1,
+  "release": {
+    "version": "0.12.2",
+    "rpm_release": "0.5",
+    "nvr": "bc250-llm-server-0.12.2-0.5"
+  },
+  "policy": {
+    "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
+    "routine_start": [
+      "Read this manifest before broad development handovers.",
+      "Map changed files with development/scope.py map.",
+      "Work only in active components plus any boundary-active component crossed by the change.",
+      "Do not inspect or run dedicated tests for frozen/archive-only components when their baseline hashes are unchanged.",
+      "Run the full deterministic/package/release gates only at a release milestone or when explicitly requested."
+    ],
+    "status_meaning": {
+      "active": "Routine current development surface; inspect and run focused tests when relevant.",
+      "boundary_active": "Normally stable interface layer; inspect/test only when an active change crosses its boundary or the component itself changes.",
+      "frozen": "Retained unchanged in package; verify tree hash only during routine work. Thaw before intentional edits.",
+      "archive_only": "Historical evidence/source retained for provenance; do not load during routine current-state reasoning."
+    },
+    "full_release_gate": {
+      "required": true,
+      "note": "Frozen status reduces routine iteration only. Before final release acceptance, run the complete deterministic/source/package gates and any device gates required by the current release handover."
+    }
+  },
+  "fast_global_checks": [
+    "python3 development/scope.py check",
+    "python3 scripts/validate.py",
+    "workstation: ruff check ."
+  ],
+  "components": {
+    "installer-convergence": {
+      "status": "active",
+      "description": "Install/upgrade lifecycle, Open WebUI migration/convergence/publication, administrator/API-key bootstrap and Ollama setup.",
+      "paths": [
+        "cmd/system/install.sh",
+        "cmd/system/install-ollama.sh",
+        "cmd/openwebui/openwebui-setup.py",
+        "config/containers/open-webui.container",
+        "config/nginx/*.conf",
+        "config/openwebui/open-webui-enable.conf",
+        "tests/test_install.py"
+      ],
+      "focused_tests": [
+        "tests.test_install",
+        "tests.test_openwebui"
+      ],
+      "notes": [
+        "Open WebUI publication remains fail-closed until authenticated desired-state convergence succeeds.",
+        "The protected maintenance credential is a real Open WebUI sk-* API key, not a signin JWT."
+      ]
+    },
+    "openwebui-product": {
+      "status": "active",
+      "description": "Curated roles, Advanced/Deep/translation behavior, desired state, functions, prompts and Open WebUI product contracts.",
+      "paths": [
+        "config/openwebui/desired-state.json",
+        "config/openwebui/functions.json",
+        "config/openwebui/functions/*.py",
+        "config/openwebui/models.json",
+        "config/openwebui/prompts/*",
+        "docs/openwebui-settings.md",
+        "tests/test_openwebui.py",
+        "tests/test_translation_provider.py"
+      ],
+      "focused_tests": [
+        "tests.test_openwebui",
+        "tests.test_translation_provider"
+      ],
+      "notes": [
+        "Advanced current candidate is think=true with max_tokens=6144 and unchanged samplers.",
+        "Deep pre-evicts task/embedding and uses exact keep_alive=2m.",
+        "Translation integrity is ordered, clause-local and polarity-aware."
+      ]
+    },
+    "benchmark-revalidation": {
+      "status": "active",
+      "description": "Benchmarking, quality classification, resource evidence and whole-appliance revalidation.",
+      "paths": [
+        "cmd/benchmark/**",
+        "tests/test_benchmark.py",
+        "examples/benchmark/task-cases.json",
+        "examples/benchmark/usecase-office.json",
+        "examples/benchmark/translation-office.json",
+        "quality-checks/README.md",
+        "quality-checks/main/**",
+        "quality-checks/task/**",
+        "quality-checks/translation/**",
+        "quality-checks/utils/**"
+      ],
+      "focused_tests": [
+        "tests.test_benchmark"
+      ],
+      "notes": [
+        "Clean reasoning-only exhaustion at the production ceiling is INCOMPLETE; repetitive degeneration remains a quality defect."
+      ]
+    },
+    "model-catalog-current": {
+      "status": "active",
+      "description": "Current production/experiment/task/embedding/agent model registry, model profiles and model lifecycle controller. Retired/graveyard content is separate archive-only scope.",
+      "paths": [
+        "models/model-profiles.json",
+        "models/modelctl.py",
+        "models/README.md",
+        "models/experiments/README.md",
+        "models/task-model/**",
+        "models/modelfiles/*.Modelfile",
+        "models/retired-models.json",
+        "tests/test_catalog.py",
+        "MODELS.md",
+        "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
+        "development/MODEL-MANAGER-CLI-CONTRACT.md"
+      ],
+      "focused_tests": [
+        "tests.test_catalog"
+      ],
+      "notes": [
+        "Qwen3.6 35B remains retired from active qualification.",
+        "Catalog work may mention frozen MTP/RAG/OCR surfaces but must not thaw them unless their implementation boundary changes."
+      ]
+    },
+    "runtime-cu-memory": {
+      "status": "boundary_active",
+      "description": "CU routing, memory/swap profile, Ollama lane topology, governor and runtime state.",
+      "paths": [
+        "cmd/system/40cu*.sh",
+        "cmd/system/agent-mode.sh",
+        "cmd/system/cu-status.sh",
+        "cmd/system/memory-profile.sh",
+        "cmd/system/ollama-profile.sh",
+        "cmd/system/storage.py",
+        "cmd/system/swap-profile.sh",
+        "config/runtime.env",
+        "config/systemd/ollama*.service",
+        "config/governor/**",
+        "tests/test_runtime.py",
+        "tests/test_state.py",
+        "tests/test_storage.py",
+        "config/containers/llm.network",
+        "cmd/system/99-sensors.conf",
+        "cmd/system/options-sensors.conf",
+        "cmd/system/GOVERNOR.md",
+        "cmd/system/kernel-cmdline.md",
+        "cmd/system/ollama-profiles/**",
+        "docs/CU-UNLOCK.md",
+        "docs/MEMORY.md",
+        "docs/GFX1013-COMPUTE-QUEUES.md",
+        "docs/SENSORS.md"
+      ],
+      "focused_tests": [
+        "tests.test_runtime",
+        "tests.test_state",
+        "tests.test_storage"
+      ],
+      "boundary_interfaces": [
+        "service/unit names and ports 11434/11435/11436/11437",
+        "configured BC250_WGP_MASKS versus live SPI layout",
+        "memory hard floor and swap/zram policy",
+        "normal versus agent lane ownership"
+      ]
+    },
+    "verification-diagnostics": {
+      "status": "boundary_active",
+      "description": "Verifier, status, diagnostics, support bundles and LAN verification.",
+      "paths": [
+        "cmd/monitoring/**",
+        "tests/test_operations.py",
+        "docs/HARDENING.md",
+        "docs/DEPLOYMENT.md",
+        "docs/HTTPS.md"
+      ],
+      "focused_tests": [
+        "tests.test_operations"
+      ],
+      "boundary_interfaces": [
+        "installer final health summary",
+        "revalidation health gate",
+        "secret exclusion from diagnostics/support bundles",
+        "service and listener topology"
+      ]
+    },
+    "packaging-source": {
+      "status": "boundary_active",
+      "description": "RPM metadata, install manifest, upstream/source preparation and source validators.",
+      "paths": [
+        "packaging/**",
+        "scripts/check-upstream-patches.py",
+        "scripts/install-manifest.py",
+        "scripts/make-source-tarball.sh",
+        "scripts/prepare-sources.py",
+        "scripts/validate.py",
+        "scripts/validate.sh",
+        "tests/test_packaging.py",
+        "tests/test_sources.py",
+        "tests/test_upstream_patch_validation.py",
+        "Makefile",
+        "VERSION",
+        "install",
+        ".gitignore",
+        ".gitattributes",
+        ".github/workflows/**",
+        "patches/**",
+        "licenses/**",
+        "scripts/ci-local.sh",
+        "quality-checks/package/**"
+      ],
+      "focused_tests": [
+        "tests.test_packaging",
+        "tests.test_sources",
+        "tests.test_upstream_patch_validation"
+      ],
+      "boundary_interfaces": [
+        "installed path ownership",
+        "service/config payload",
+        "source pinning and RPM/SRPM reproducibility",
+        "release identity"
+      ]
+    },
+    "global-docs-coordination": {
+      "status": "boundary_active",
+      "description": "Current operator docs, validation strategy and current integration handovers. Historical evidence remains archive-only.",
+      "paths": [
+        "README.md",
+        "TLDR.md",
+        "docs/COMMANDS.md",
+        "docs/QUALITY-CHECKS.md",
+        "docs/OLLAMA.md",
+        "docs/CHANGELOG.md",
+        "development/DEVELOPMENT-SCOPE.json",
+        "development/scope.py",
+        "development/TESTING-STRATEGY.md",
+        "development/VALIDATION-MATRIX.md",
+        "development/handovers/DEVELOPMENT-WORKFLOW.md",
+        "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
+        "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
+        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md",
+        "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
+        "development/handovers/README.md",
+        "tests/test_documentation.py",
+        "WORKBENCH-STATE.json",
+        "docs/FILESTRUCTURE.md",
+        "development/README.md",
+        "development/DECISIONS.md",
+        "development/handovers/OPERATIONS-HANDOVER.md"
+      ],
+      "focused_tests": [
+        "tests.test_documentation"
+      ],
+      "boundary_interfaces": [
+        "current instructions must override historical evidence",
+        "scope/freeze policy"
+      ]
+    },
+    "maintenance-companion": {
+      "status": "frozen",
+      "description": "Local maintenance timers, backups/restores, safe power, WOL/companion integration and their dedicated docs/tests.",
+      "paths": [
+        "cmd/maintenance/**",
+        "docs/MAINTENANCE.md",
+        "docs/MAINTENANCE-CONTRACT.md",
+        "examples/raspi-wol/**",
+        "tests/test_maintenance.py"
+      ],
+      "focused_tests": [
+        "tests.test_maintenance"
+      ],
+      "baseline_sha256": "90bab86d302fe05fae6c0dea7d60a5b8852e34e9c48c1006aedb88ed46ee404f",
+      "thaw_if": [
+        "maintenance/companion behavior is intentionally changed",
+        "protected Open WebUI credential path/format changes",
+        "Open WebUI database or backup path changes",
+        "service/unit names used by maintenance change",
+        "backup/restore ownership or shutdown policy changes"
+      ],
+      "watch_paths": [
+        "cmd/openwebui/openwebui-setup.py",
+        "cmd/system/install.sh",
+        "config/containers/open-webui.container",
+        "config/systemd/ollama*.service"
+      ]
+    },
+    "rag-tika": {
+      "status": "frozen",
+      "description": "RAG import helpers, embedding setup, Tika container and dedicated RAG tests/docs. Current Tika list-marker investigation is closed.",
+      "paths": [
+        "models/rag/**",
+        "models/embedding/**",
+        "config/containers/tika.container",
+        "config/systemd/ollama-embedding.service",
+        "docs/RAG.md",
+        "tests/test_rag.py",
+        "tests/test_rag_import.py",
+        "examples/rag/**",
+        "examples/benchmark/rag-cycle.json",
+        "examples/benchmark/rag-quality-office.json",
+        "examples/benchmark/embedding-office.json"
+      ],
+      "focused_tests": [
+        "tests.test_rag",
+        "tests.test_rag_import"
+      ],
+      "baseline_sha256": "8321bd28c3c98309107190e604e83ae6c327ae589ee4c6d364371f57afd56194",
+      "thaw_if": [
+        "embedding model or port 11437 contract changes",
+        "Tika image/version/container behavior changes",
+        "Open WebUI Documents/RAG desired-state keys change",
+        "document ingestion/retrieval product requirements change"
+      ],
+      "watch_paths": [
+        "config/openwebui/desired-state.json",
+        "config/containers/open-webui.container",
+        "models/model-profiles.json"
+      ]
+    },
+    "mtp": {
+      "status": "frozen",
+      "description": "Standalone llama.cpp MTP models and comparison helper; not part of current qualification focus.",
+      "paths": [
+        "models/mtp/**",
+        "models/experiments/compare-mtp.sh"
+      ],
+      "focused_tests": [],
+      "baseline_sha256": "78bfe564a1791b5dac0f06d787c771a8c027b64b470b014ca404b40eb17227b4",
+      "thaw_if": [
+        "MTP is explicitly returned to active comparison",
+        "generic model lifecycle begins managing MTP"
+      ],
+      "watch_paths": [
+        "models/modelctl.py",
+        "packaging/install-manifest.tsv"
+      ]
+    },
+    "coding-agent": {
+      "status": "frozen",
+      "description": "Coding/Gitea agent workflow helpers; current agentic model catalog records remain in the active catalog component.",
+      "paths": [
+        "models/coding-agent/**",
+        "examples/benchmark/agent-cases.json"
+      ],
+      "focused_tests": [],
+      "baseline_sha256": "72067580d7552cf37e638f5be79f505272b18c57da441a7da7c5bff479710b6a",
+      "thaw_if": [
+        "coding/Gitea agent workflow is explicitly resumed",
+        "agent execution interface changes"
+      ],
+      "watch_paths": [
+        "cmd/system/agent-mode.sh",
+        "config/systemd/ollama-agent.service",
+        "models/modelctl.py"
+      ]
+    },
+    "ocr": {
+      "status": "frozen",
+      "description": "Dedicated OCR helper workflow. OCR model records remain visible to the active model catalog but helper behavior is not current work.",
+      "paths": [
+        "models/ocr/**",
+        "examples/benchmark/ocr/**"
+      ],
+      "focused_tests": [],
+      "baseline_sha256": "55991c6374aaa2e8474721cca4769255ebd52057dd548fa1e9fac6cea0dd28fb",
+      "thaw_if": [
+        "OCR workflow becomes a current device/product requirement"
+      ],
+      "watch_paths": [
+        "models/modelctl.py",
+        "models/modelfiles/exp-glm-ocr-ggml-q8-0.Modelfile",
+        "models/modelfiles/exp-ovisocr2-abiray-q8-0.Modelfile"
+      ]
+    },
+    "uninstall": {
+      "status": "frozen",
+      "description": "Package uninstall behavior and its dedicated source test.",
+      "paths": [
+        "uninstall.sh",
+        "tests/test_uninstall.py",
+        "docs/UNINSTALL.md"
+      ],
+      "focused_tests": [
+        "tests.test_uninstall"
+      ],
+      "baseline_sha256": "2529586ea1f2be1d810947141164986316b327415284b3250ed44f6891d57448",
+      "thaw_if": [
+        "installed path ownership changes materially",
+        "service/config cleanup semantics change",
+        "uninstall behavior is explicitly modified"
+      ],
+      "watch_paths": [
+        "packaging/install-manifest.tsv",
+        "packaging/bc250-llm-server.spec",
+        "packaging/bc250"
+      ]
+    },
+    "historical-development": {
+      "status": "archive_only",
+      "description": "Historical model runs, references, patch notes and superseded release handovers retained for provenance only.",
+      "paths": [
+        "development/model-runs/**",
+        "development/patchnotes/**",
+        "development/references/**",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-*.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.1.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.2.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.3.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md",
+        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.4.md",
+        "development/handovers/RAG-TESTING-HANDOVER-*.md",
+        "development/SOURCE-REFRESH-*.md"
+      ],
+      "focused_tests": [],
+      "baseline_sha256": "df45516bd9c1b29070973122a6301e3578b8d833daf92735e95894f0ad1c5f6c"
+    },
+    "quality-history": {
+      "status": "archive_only",
+      "description": "Historical quality-check result snapshots retained for evidence provenance, not current routine reasoning.",
+      "paths": [
+        "quality-checks/history/**"
+      ],
+      "focused_tests": [],
+      "baseline_sha256": "b6c5bf84e1fe00b8618835b521e737dca04cb9abc759b8aeab6411e0242380eb"
+    },
+    "graveyard-models": {
+      "status": "archive_only",
+      "description": "Retired Modelfiles retained for provenance; active retirement state is owned by models/retired-models.json.",
+      "paths": [
+        "models/modelfiles-graveyard/**"
+      ],
+      "focused_tests": [],
+      "baseline_sha256": "2f6cdc671d0a432dfeac5b8816850b65159e3edb9461ed3056249a2f01135e97"
+    }
+  }
+}

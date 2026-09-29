@@ -13,6 +13,35 @@ When facts disagree, use this order:
 
 Never transfer qualification between NVRs automatically.
 
+## Development scope first
+
+Before broad review, read `development/DEVELOPMENT-SCOPE.json` and run:
+
+```bash
+python3 development/scope.py check
+python3 development/scope.py summary
+```
+
+Routine integration is intentionally narrow. Work in **active** components plus any crossed
+**boundary_active** component. Do not routinely open, diff internally, or run dedicated tests for
+**frozen** or **archive_only** components when their recorded tree hash is unchanged. `scripts/validate.py`
+verifies those hashes automatically.
+
+Current freeze:
+
+```text
+frozen       maintenance/companion, RAG/Tika, MTP, coding-agent, OCR, uninstall
+archive-only  historical development/model-run evidence, quality history, graveyard Modelfiles
+```
+
+A frozen component must be deliberately thawed before intentional edits when either the user resumes
+that work or an active change crosses one of its `thaw_if` interfaces. Frozen status is an iteration
+optimization only; it never removes source and does not waive the final full-release gate.
+
+For changed files, use `python3 development/scope.py map <paths...>` (or pipe a Git name-only list)
+before choosing tests. If the newest scope manifest and checkpoint disagree, the newest explicit
+checkpoint/Git SHA wins only after the mismatch is resolved deliberately.
+
 ## Current source
 
 ```text
