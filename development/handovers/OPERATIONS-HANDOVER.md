@@ -1,4 +1,4 @@
-# BC-250 support / operations handover — current source release 0.12.2-0.5
+# BC-250 support / operations handover — current source release 0.12.2-0.6
 
 This handover is for the real-device support/operations lane: service topology, model lifecycle
 operations, storage, maintenance/backups, power/WOL, Open WebUI operational integration and bounded
@@ -10,16 +10,24 @@ Use newest source/package first, then exact installed device evidence. Current s
 
 ```text
 VERSION:      0.12.2
-RPM Release:  0.5
-NVR:          bc250-llm-server-0.12.2-0.5
+RPM Release:  0.6
+NVR:          bc250-llm-server-0.12.2-0.6
 ```
 
-0.12.2-0.5 is the current operations/device candidate. It keeps the established four-lane topology,
-TTM thresholds and serialized large-model safety policy, pins Ollama/Open WebUI/governor to
-0.34.4/0.11.4/0.4.13, and retains migration-safe OWUI upgrade hold plus verified full rollback snapshot.
-Advanced is `think=true` with a 6144-token candidate; Qwen3.6 35B is retired; CU health is saved-profile/live-layout based; and Deep now requires verified task/embedding eviction before admission and uses `keep_alive=2m` for bounded session reuse. These changed boundaries require the dedicated 0.12.2-0.5 gate.
+0.12.2-0.6 is the current operations/device candidate. It preserves the 0.5 four-lane topology,
+TTM thresholds, Ollama/Open WebUI/governor pins, migration-safe OWUI convergence/API-key handling,
+Advanced 6144, Deep 2m and saved-profile/live-layout CU semantics. Exact 0.12.2-0.5 testing completed
+all six revalidation phases after manual Agent installation with Infrastructure PASS, Restoration PASS,
+Coverage FULL and Quality MIXED only on the DE->FR recommendation-modality case. Final CU evidence after
+operator setup was configured/live 40/40 with exact profile match/no problem cells; Deep/Jina 334 MiB
+minimum MemAvailable was correctly diagnostic-only above the 128 MiB hard floor.
 
-Exact installed `0.12.2-0.4.fc44.x86_64` is the immediate current-device evidence base. After OWUI desired-state convergence, Deep pre-eviction/reuse/2-minute expiry/cold reload passed without OOM and with materially improved headroom; the supported Advanced adapter path proved 4096 -> Ollama `num_predict=4096`; translation modality hardening broadly passed. The 0.5 delta is narrow: convergence publication gating, Advanced 6144 qualification, and the attributable FR→DE `pouvoir` -> `können` detector fix. Tika middle-dot list serialization and title/tag persistence are closed evidence items with no topology change.
+The 0.6 operational delta keeps completion compact while foregrounding CU routing/model reconciliation/
+validation. Agent is optional: absence is optional coverage unavailable/skipped (PARTIAL acceptable), while
+installed Agent runtime/topology failures remain infrastructure failures. Structured-output policy is explicit
+and role-specific, production translation keeps its fail-closed modality guard with the native limitation
+accepted/documented, and EuroLLM is only an opt-in experimental challenger. Generation summaries add
+cold-load/deep-context/thermal/completeness evidence. Next device kernel note: `7.2.8-200.fc44`.
 
 The earlier full whole-appliance revalidation campaign on exact installed `0.11.3-1.7.fc44.x86_64` remains useful historical evidence:
 
@@ -106,7 +114,7 @@ workstation  Ruff/developer linting
 BC-250       hardware, services, models, Open WebUI, backup/restore, power/WOL
 ```
 
-Current 0.12.2-0.5 implementation is summarized in `docs/CHANGELOG.md` and `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md`; no separate patchnote is required for the current source candidate.
+Current 0.12.2-0.6 implementation is summarized in `docs/CHANGELOG.md` and `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md`; no separate patchnote is required for the current source candidate.
 GitHub remains authoritative for RPM/SRPM build closure; the BC-250 remains authoritative for the new runtime,
 migration, model-quality and resource gates. Exact installed 0.12.1-0.6 is the immediate comparison baseline:
 the finalized source also retires the failed Gemma4 26B/LFM 8B experiments and withholds the three pressure-heavy large comparison profiles from ordinary-user OWUI visibility while preserving admin/native test access.
@@ -259,11 +267,11 @@ still block poweroff. Missing/failed TCP inspection must defer.
 
 WOL must be proven from real powered-off/S5 state before automatic after-hours poweroff is enabled.
 
-## Immediate 0.12.2-0.5 source/device follow-up
+## Immediate 0.12.2-0.6 source/device follow-up
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md`. This candidate crosses OWUI/Ollama runtime, migration, Advanced reasoning policy, translation prompt and selected large-model context boundaries; qualify those explicitly while retaining the previous clean topology/restoration baseline as comparison evidence. Preserve package integrity, authenticated verifier cleanliness and final normal topology.
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md`. Verify the completion `OVERVIEW`/amber `NEXT STEPS`, optional-Agent skip semantics (and normal-mode restoration when Agent is installed), the integrated structured-output product path, optional EuroLLM modality screen, and one final full revalidation. Preserve package integrity, authenticated verifier cleanliness, configured/live CU profile consistency and final normal topology.
 
-The exact-2.4/0.4 operations evidence already covers supported reboot reconstruction, live 40/40, maintenance, storage hygiene, backup/restore, runtime soak, model switching and service topology. Repeat those areas only if a corresponding implementation changes.
+The exact-0.5/earlier operations evidence already covers the unchanged Deep architecture, supported reboot reconstruction, maintenance, storage hygiene, backup/restore and broad service topology. Repeat those areas only if a corresponding 0.6 focused result crosses the boundary.
 
 ## UX acceptance during support tests
 

@@ -46,8 +46,8 @@ checkpoint/Git SHA wins only after the mismatch is resolved deliberately.
 
 ```text
 VERSION       0.12.2
-RPM Release   0.5
-NVR           bc250-llm-server-0.12.2-0.5
+RPM Release   0.6
+NVR           bc250-llm-server-0.12.2-0.6
 Ollama        0.34.4
 Open WebUI    0.11.4
 Tika          4.0.0-full / TIKA_SERVER_VERSION=4
@@ -59,13 +59,15 @@ The four source batches are implemented. Source/static success does not qualify 
 
 ## Implemented current contracts
 
-- Advanced: request-scoped `think=true`, current candidate `max_tokens=6144`; the preceding exact-device run proved the same supported OWUI adapter path at 4096 -> Ollama `options.num_predict=4096`, and 0.5 must verify exact 6144 -> `options.num_predict=6144`, samplers `temperature=0.7`, `top_p=0.8`, `top_k=20`, `min_p=0`, `presence_penalty=0`, `repeat_penalty=1`.
+- Advanced remains request-scoped `think=true`, `max_tokens=6144`, with samplers `temperature=0.7`, `top_p=0.8`, `top_k=20`, `min_p=0`, `presence_penalty=0`, `repeat_penalty=1`; 0.6 does not change this contract.
 - Deep: before either curated or raw Deep starts, evict and verify absence of embedding/task residency; fail/defer if that cannot be proven; use exact bounded `keep_alive=2m`; preserve separate lanes and `OLLAMA_MAX_LOADED_MODELS=1`.
 - Qwen3.6 35B is retired from active candidates. Qwen3.8 Unsloth and ISTA IQ3_S are admin/testing-only; ISTA IQ3_XXS is the ordinary-user deployability comparison.
 - CU verification compares the configured saved `BC250_WGP_MASKS` profile/layout with live SPI routing when a profile exists. `--` is intentionally unselected, not a fault; `D!` is inconsistent. 40/40 is one valid device profile, not universal health.
 - The optional package maintenance key is `/var/lib/bc250-llm-server/secrets/openwebui-admin.key`, directory `0700`, file `0600`, root-owned, atomically created without silent overwrite and verified against OWUI before `CONFIGURED`. Explicit token-file options override it. Token contents never enter logs, support bundles, evidence or handovers.
 - Revalidation separates run completion, Infrastructure, Quality, Restoration and Coverage; reasoning-only ceiling exhaustion without a visible answer is `INCOMPLETE` (including the production contract); repetitive/degenerate reasoning remains a quality defect.
-- Installer final state is verifier-derived and reports PASS/WARN/FAIL, final reboot state, OWUI readiness/URL, Ollama, CU profile consistency, revalidation state, authenticated maintenance and optional-component state.
+- Installer final state is verifier-derived and reports PASS/WARN/FAIL, final reboot state, OWUI readiness/URL, Ollama, CU profile consistency, revalidation state, authenticated maintenance and optional-component state. 0.6 adds a plain completion `OVERVIEW` plus amber `NEXT STEPS` with CU routing, model reconciliation and validation.
+- Agent is an optional add-on. Missing Agent coverage is SKIPPED/PARTIAL and does not fail core infrastructure; if an Agent model is installed, its exclusive-lane topology/API failures remain infrastructure failures.
+- Translation keeps the ordered clause-local/polarity guard, expands recommendation prompting across person/number forms including plural `sollten -> devraient`, and qualifies post-generation enforcement through Open WebUI `/api/chat/completed` before scoring finalized output.
 
 ## Validation ownership
 

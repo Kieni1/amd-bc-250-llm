@@ -53,5 +53,5 @@ retired after their durable evidence was integrated into model-run and decision 
 - `../DEVELOPMENT-SCOPE.json` + `../scope.py` — first-stop current development scope and frozen-domain guard.
 - `MAIN-INTEGRATION-HANDOVER.md` — durable project state/history.
 - `MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md` — current procedural authority and implemented contracts.
-- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md` — current implementation/device-qualification boundary.
-- `RELEASE-TESTING-HANDOVER-0.12.2-0.5.md` — exact-device acceptance sequence.
+- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.6.md` — current implementation/device-qualification boundary.
+- `RELEASE-TESTING-HANDOVER-0.12.2-0.6.md` — exact-device acceptance sequence.
