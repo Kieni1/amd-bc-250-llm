@@ -1,51 +1,98 @@
 {
   "schema": 1,
   "kind": "workbench-checkpoint",
-  "release_identity": "bc250-llm-server-0.12.2-0.5",
-  "predecessor_artifact": "amd-bc-250-llm-0.12.2-0.5-workbench-openwebui-auth-fix.zip",
-  "predecessor_sha256": "7e2020e4ee024ab05e7b05e1ea23e1085981a54a0a30e06b97a9294057c6c394",
-  "batch": "development-scope-freeze",
+  "release_identity": "bc250-llm-server-0.12.2-0.6",
+  "predecessor_artifact": "amd-bc-250-llm-0.12.2-0.6-workbench-release-testing-fixes(2).zip",
+  "predecessor_sha256": "19b40a0901e0f79d50cc9d6d7681a6c495ccf9ed3640f97aa25033b32f52f198",
+  "batch": "0.12.2-0.6-final-integration",
   "changed_files": [
-    "development/DEVELOPMENT-SCOPE.json",
-    "development/scope.py",
+    "MODELS.md",
+    "README.md",
+    "WORKBENCH-STATE.json",
+    "cmd/benchmark/README.md",
+    "cmd/benchmark/benchmark_common.py",
+    "cmd/benchmark/generation-benchmark.py",
+    "cmd/benchmark/revalidate.sh",
+    "cmd/system/install.sh",
+    "config/openwebui/models.json",
     "development/TESTING-STRATEGY.md",
     "development/VALIDATION-MATRIX.md",
-    "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md",
-    "development/handovers/DEVELOPMENT-WORKFLOW.md",
+    "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.6.md",
     "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
     "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
-    "development/handovers/README.md",
-    "scripts/validate.py"
+    "development/handovers/OPERATIONS-HANDOVER.md",
+    "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md",
+    "docs/CHANGELOG.md",
+    "docs/COMMANDS.md",
+    "docs/openwebui-settings.md",
+    "models/model-profiles.json",
+    "models/modelfiles/exp-eurollm9b-instruct-2512-mradermacher-q4-k-m.Modelfile",
+    "packaging/bc250-llm-server.spec",
+    "tests/test_benchmark.py",
+    "tests/test_catalog.py",
+    "tests/test_install.py",
+    "tests/test_openwebui.py"
   ],
   "completed": [
-    "Added authoritative development/DEVELOPMENT-SCOPE.json with active, boundary-active, frozen and archive-only components",
-    "Frozen maintenance/companion, RAG/Tika, MTP, coding-agent, OCR and uninstall at deterministic tree hashes",
-    "Marked historical development/model-run evidence, quality history and graveyard Modelfiles archive-only",
-    "Added development/scope.py summary/check/map/hash helper with frozen boundary watches",
-    "Made scripts/validate.py verify scope metadata and frozen/archive hashes",
-    "Updated current workflow/testing/validation handovers to read development scope before broad historical context",
-    "Classified every current repository file into at least one development component",
-    "Preserved full package source and final full-release gate; scope reduction affects routine iteration only"
+    "Finalized explicit Office - Advanced Structured preset on the production Qwen3.5 9B base with the same Advanced samplers/max_tokens=6144 and only think=false; ordinary Advanced remains think=true",
+    "Recorded role-specific strict structured-output policy: Standard exact schema plus request temperature=0.0 with default thinking, Documents exact schema with normal policy, Advanced explicit Structured preset, Deep unchanged",
+    "Kept Open WebUI/Ollama payload translation generic; no payload.py policy fork and no prompt-text JSON heuristic",
+    "Returned Agent to optional add-on status: installer baseline excludes Ornith and revalidation classifies absence as optional coverage unavailable/skipped rather than core infrastructure failure",
+    "Documented production Translate-Gemma recommendation-strengthening as an accepted native-model limitation protected by the existing fail-closed modality guard rather than a 0.12.2-0.6 release blocker",
+    "Added opt-in Apache-2.0 exp-eurollm9b-instruct-2512-mradermacher-q4-k-m as a translation challenger only; no promotion is implied",
+    "Extended generation summaries with cold_load_s, 4K/16K target-vs-actual context aggregates, thermal mean/min/max/first/last/drift and selected-lane completeness checks",
+    "Reduced installer completion to compact OVERVIEW plus amber NEXT STEPS for CU routing, models, validation and benchmark entry points",
+    "Kept Qwen3.6 35B graveyard/retired-only and did not promote an unqualified replacement",
+    "Closed the request for extra Documents-only confirmation; focused 25/25 schema evidence is retained as sufficient pending integrated product-path regression",
+    "Refreshed current integration, operations, testing strategy, validation matrix, changelog and RPM changelog to the final 0.6 policy"
   ],
   "validation": [
-    "python3 development/scope.py check --quiet: PASS",
-    "deliberate cmd/maintenance/maintenance.sh tamper: scope check FAIL as required; exact file restored; scope check PASS",
-    "python3 scripts/validate.py: PASS",
-    "python3 -m unittest tests.test_documentation tests.test_sources tests.test_packaging: 58/58 PASS",
-    "development/scope.py and scripts/validate.py compile: PASS",
-    "repository classification scan: 0 unclassified files",
-    "ruff executable unavailable locally; workstation/GitHub Ruff remains authoritative",
-    "frozen component suites intentionally NOT rerun because their hashes are unchanged"
+    "development scope check: PASS; frozen/archive-only hashes restored and unchanged",
+    "changed-surface deterministic tests: 329/329 PASS (Open WebUI, installer, catalog, maintenance baseline, benchmark/revalidation)",
+    "remaining deterministic modules: 171/171 PASS; total module-by-module suite 500/500 PASS",
+    "python3 scripts/validate.py: PASS (RPM preflight)",
+    "bash syntax for installer/revalidation: PASS",
+    "Python compile for changed Python/tests: PASS",
+    "JSON parse for Open WebUI models, model profiles, retired models and development scope: PASS",
+    "project source tarball generation: PASS",
+    "Ruff executable unavailable locally; workstation/CI Ruff remains authoritative",
+    "binary RPM/SRPM build not executed in this sandbox: rpmbuild is unavailable and pinned upstream source fetch cannot resolve github.com; do not treat this as a package-build PASS"
   ],
   "current_scope": {
-    "active": ["installer-convergence", "openwebui-product", "benchmark-revalidation", "model-catalog-current"],
-    "boundary_active": ["runtime-cu-memory", "verification-diagnostics", "packaging-source", "global-docs-coordination"],
-    "frozen": ["maintenance-companion", "rag-tika", "mtp", "coding-agent", "ocr", "uninstall"],
-    "archive_only": ["historical-development", "quality-history", "graveyard-models"]
+    "active": [
+      "installer-convergence",
+      "openwebui-product",
+      "benchmark-revalidation",
+      "model-catalog-current"
+    ],
+    "boundary_active": [
+      "runtime-cu-memory",
+      "verification-diagnostics",
+      "packaging-source",
+      "global-docs-coordination"
+    ],
+    "frozen": [
+      "maintenance-companion",
+      "rag-tika",
+      "mtp",
+      "coding-agent",
+      "ocr",
+      "uninstall"
+    ],
+    "archive_only": [
+      "historical-development",
+      "quality-history",
+      "graveyard-models"
+    ]
   },
   "device_followup": [
-    "Continue current 0.12.2-0.5 device work on installer/Open WebUI auth, Advanced 6144, translation and benchmark/revalidation surfaces",
-    "Do not reopen frozen maintenance/RAG/Tika/MTP/coding-agent/OCR/uninstall work unless an explicit request or declared interface dependency requires thawing",
-    "Run the complete deterministic/package gate again at the next release milestone"
+    "Build RPM/SRPM in the normal Fedora/GitHub package environment with pinned upstream sources, then install exact 0.12.2-0.6 and record rpm -V/runtime pins/kernel/final topology",
+    "Verify compact plain OVERVIEW plus amber NEXT STEPS and CU routing guidance on a real terminal",
+    "Verify Agent absence reports optional coverage unavailable/skipped (PARTIAL acceptable) without core infrastructure failure; if Agent is installed, qualify exclusive-lane runtime and normal-mode restoration",
+    "Run one integrated ordinary-user structured-output qualification: Standard schema+temperature0, Documents schema, Advanced normal think=true, Advanced Structured think=false, Deep unchanged, plus non-structured controls and effective-param evidence",
+    "Optionally fetch EuroLLM experimental challenger and run one short DE<->FR modality/ordinary-office comparison using the existing direct candidate screen; qualify further only if clearly better",
+    "Preserve production Translate-Gemma fail-closed modality guard; the native sollten->doivent limitation is documented/accepted if EuroLLM does not clearly win",
+    "Run one final whole-appliance revalidation with Infrastructure/Quality/Restoration/Coverage separated and final CU/topology clean",
+    "Do not reopen closed Deep/RAG/Tika/MTP/title-tag/broad model campaigns unless a current 0.6 boundary changes"
   ]
 }
