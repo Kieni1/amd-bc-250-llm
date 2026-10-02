@@ -2,8 +2,8 @@
   "schema_version": 1,
   "release": {
     "version": "0.12.2",
-    "rpm_release": "0.5",
-    "nvr": "bc250-llm-server-0.12.2-0.5"
+    "rpm_release": "0.6",
+    "nvr": "bc250-llm-server-0.12.2-0.6"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
@@ -235,12 +235,11 @@
         "development/handovers/DEVELOPMENT-WORKFLOW.md",
         "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
         "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
-        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md",
+        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.6.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md",
         "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
         "development/handovers/README.md",
         "tests/test_documentation.py",
-        "WORKBENCH-STATE.json",
         "docs/FILESTRUCTURE.md",
         "development/README.md",
         "development/DECISIONS.md",
@@ -252,6 +251,9 @@
       "boundary_interfaces": [
         "current instructions must override historical evidence",
         "scope/freeze policy"
+      ],
+      "notes": [
+        "WORKBENCH-STATE.json is checkpoint-only continuity metadata and is intentionally absent from clean release/source-package payloads."
       ]
     },
     "maintenance-companion": {
@@ -407,10 +409,12 @@
         "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md",
         "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.4.md",
         "development/handovers/RAG-TESTING-HANDOVER-*.md",
-        "development/SOURCE-REFRESH-*.md"
+        "development/SOURCE-REFRESH-*.md",
+        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md"
       ],
       "focused_tests": [],
-      "baseline_sha256": "df45516bd9c1b29070973122a6301e3578b8d833daf92735e95894f0ad1c5f6c"
+      "baseline_sha256": "60ba4996e716377ce7b543138a6e4a26d60e1a332de29db7405d81f39019ae2d"
     },
     "quality-history": {
       "status": "archive_only",

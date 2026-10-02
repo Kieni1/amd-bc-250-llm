@@ -30,9 +30,18 @@ def load_manifest() -> dict:
     return data
 
 
+def ignored_generated_path(path: Path) -> bool:
+    rel = path.relative_to(ROOT)
+    return "__pycache__" in rel.parts or path.suffix in {".pyc", ".pyo"}
+
+
 @lru_cache(maxsize=1)
 def all_source_files() -> tuple[Path, ...]:
-    return tuple(path for path in ROOT.rglob("*") if path.is_file() or path.is_symlink())
+    return tuple(
+        path
+        for path in ROOT.rglob("*")
+        if (path.is_file() or path.is_symlink()) and not ignored_generated_path(path)
+    )
 
 
 def matching_files(patterns: list[str]) -> list[Path]:

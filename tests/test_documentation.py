@@ -4,6 +4,7 @@ import glob
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -324,6 +325,26 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("finish_reason=stop", settings)
         self.assertIn("advertised external BC-250 API", settings)
 
+
+    def test_development_scope_ignores_python_bytecode_in_frozen_trees(self) -> None:
+        cache_dir = ROOT / "models/rag/__pycache__"
+        cache_dir.mkdir(exist_ok=True)
+        probe = cache_dir / "scope-test-probe.pyc"
+        probe.write_bytes(b"generated-bytecode-probe")
+        try:
+            completed = subprocess.run(
+                [sys.executable, str(ROOT / "development/scope.py"), "check", "--quiet"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        finally:
+            probe.unlink(missing_ok=True)
+            try:
+                cache_dir.rmdir()
+            except OSError:
+                pass
 
 if __name__ == "__main__":
     unittest.main()
