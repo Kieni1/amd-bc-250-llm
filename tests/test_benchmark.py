@@ -11,6 +11,7 @@ import sys
 import tempfile
 import time
 import unittest
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -112,6 +113,63 @@ class BenchmarkResourceResolutionTests(unittest.TestCase):
                 (output / "fixtures" / fixture.name).read_text(encoding="utf-8"),
                 "[]\n",
             )
+
+
+    def test_owui_translation_finalizes_through_completed_endpoint(self) -> None:
+        class FakeClient:
+            def __init__(self) -> None:
+                self.calls: list[tuple[str, dict]] = []
+
+            def post(self, path: str, payload: dict) -> dict:
+                self.calls.append((path, payload))
+                if path == "/api/chat/completions":
+                    return {
+                        "id": "assistant-message-1",
+                        "choices": [
+                            {
+                                "message": {
+                                    "role": "assistant",
+                                    "content": "Les règles d'occupation doivent être respectées.",
+                                }
+                            }
+                        ],
+                    }
+                if path == "/api/chat/completed":
+                    self.assert_completed_payload(payload)
+                    return {
+                        "id": payload["id"],
+                        "messages": [
+                            {"role": "user", "content": payload["messages"][0]["content"]},
+                            {
+                                "role": "assistant",
+                                "content": "Translation withheld: recommendation strengthened to obligation",
+                            },
+                        ],
+                    }
+                raise AssertionError(path)
+
+            @staticmethod
+            def assert_completed_payload(payload: dict) -> None:
+                assert payload["model"] == "bc250-office-translation-de-fr"
+                uuid.UUID(str(payload["id"]))
+                assert payload["chat_id"] == ""
+                assert payload["session_id"] == ""
+                assert payload["messages"][-1]["role"] == "assistant"
+
+        client = FakeClient()
+        raw, completed, final = openwebui_workflow.finalized_plain_chat(
+            client,  # type: ignore[arg-type]
+            "bc250-office-translation-de-fr",
+            "Die Regeln sollten beachtet werden.",
+        )
+        self.assertIn("doivent", openwebui_workflow.response_text(raw))
+        self.assertIn("Translation withheld", final)
+        uuid.UUID(str(completed["id"]))
+        self.assertEqual(
+            [path for path, _payload in client.calls],
+            ["/api/chat/completions", "/api/chat/completed"],
+        )
+
 
 
 class GenerationPolicyTests(unittest.TestCase):
@@ -1388,6 +1446,8 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             ROOT / "config/openwebui/prompts/translation-explicit-direction-v1.txt"
         ).read_text(encoding="utf-8")
         self.assertEqual(category.TRANSLATE_GEMMA_EXPLICIT_DIRECTION_V1, prompt_authority)
+        self.assertIn("plural sollten -> devraient", prompt_authority)
+        self.assertIn("devrais/devrait/devrions/devriez/devraient", prompt_authority)
         filter_path = ROOT / "config/openwebui/functions/bc250_translation_direction.py"
         filter_spec = importlib.util.spec_from_file_location(
             "bc250_translation_contract_test", filter_path
@@ -1867,6 +1927,19 @@ class TelemetryTests(unittest.TestCase):
             self.assertIn(phase, sequence)
         for obsolete in ("phase_num_batch", "phase_kernel", "phase_governor", "translation-implicit", "translation-explicit", "rag-quality-nonthinking"):
             self.assertNotIn(obsolete, sequence)
+
+    def test_revalidation_agent_missing_prerequisite_is_partial_coverage_not_generic_infra(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        preflight = source[source.index("phase_preflight() {"):source.index("phase_roles() {")]
+        agent = source[source.index("phase_agent() {"):source.index("phase_owui() {")]
+        self.assertIn("agent_model_source_ready", preflight)
+        self.assertIn('record_event "agent-add-on" coverage skipped', preflight)
+        self.assertIn("mark_partial_coverage", preflight)
+        self.assertIn("This is optional coverage unavailable/skipped, not an Agent runtime/GPU failure.", agent)
+        self.assertIn('record_event "agent" coverage skipped', agent)
+        self.assertIn("sudo bc250-model apply agentic $AGENT_MODEL", agent)
+        self.assertIn("agent-model-prerequisite.txt", agent)
+        self.assertNotIn('model_registered 11436 "$AGENT_MODEL" || {', agent)
 
     def test_revalidation_loads_target_version_from_package_owned_file(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -3069,15 +3142,11 @@ status_run --raw
 
     def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
-        self.assertNotIn(
-            'echo "  Revalidation:           sudo bc250-revalidate start"', source
-        )
-        self.assertIn(
-            "sudo bc250-revalidate start --owui-token-file $completion_owui_token",
-            source,
-        )
-        self.assertIn("sudo bc250-revalidate start --owui-token-file FILE", source)
-        self.assertNotIn('echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"', source)
+        main = source[source.index("main() {"):]
+        self.assertIn('echo "  sudo bc250-revalidate start"', main)
+        self.assertNotIn("completion_owui_token", main)
+        self.assertNotIn("sudo bc250-revalidate start --owui-token-file FILE", main)
+        self.assertNotIn('echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"', main)
 
     def test_edge_policy_documents_conservative_threshold_rationale(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
@@ -3373,6 +3442,75 @@ status_run --raw
                 summary["aggregates"]["runtime_diagnostics"]["checks"],
                 {"journal_available": True, "gpu_error_count": 0},
             )
+
+    def test_generation_summary_exposes_cold_deep_context_thermal_and_lane_completeness(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "results.jsonl"
+            common.append_result(path, common.result_record(
+                category="generation", model="m", case_id="cold_chat-1",
+                result_type="measurement", outcome="pass", test="cold_chat", run=1,
+                metrics={"wall_duration_s": 3.2, "load_duration_s": 1.4},
+            ))
+            for label, target, actual, tps in (("4k", 4096, 4010, 350.0), ("16k", 16384, 16040, 330.0)):
+                common.append_result(path, common.result_record(
+                    category="generation", model="m", case_id=f"ctx_{label}-1",
+                    result_type="measurement", outcome="pass", test=f"ctx_{label}", run=1,
+                    context_target_tokens=target,
+                    metrics={
+                        "prompt_eval_count": actual, "prompt_tokens_per_second": tps,
+                        "wall_duration_s": 2.0, "allocated_context": 32768,
+                    },
+                ))
+            for window, tps in enumerate((50.0, 48.0, 49.0), start=1):
+                common.append_result(path, common.result_record(
+                    category="generation", model="m", case_id=f"thermal_w{window}-1",
+                    result_type="measurement", outcome="pass", test=f"thermal_w{window}", run=1,
+                    metrics={"tokens_per_second": tps, "wall_duration_s": 10.0},
+                ))
+            checks = {"short": {"expected": 3, "observed": 3, "ok": True}}
+            common.append_result(path, common.result_record(
+                category="generation", model="m", case_id="lane-completeness",
+                result_type="qualification", outcome="pass", checks=checks,
+                metrics={"selected_lane_count": 1}, missing_lanes=[],
+            ))
+            summary_json, _ = common.write_result_summary(path, category="generation")
+            model = json.loads(summary_json.read_text())["aggregates"]["models"]["m"]
+            self.assertEqual(model["cold_wall_s"], 3.2)
+            self.assertEqual(model["cold_load_s"], 1.4)
+            self.assertEqual(model["deep_context"]["4k"]["target_prompt_tokens"], 4096)
+            self.assertEqual(model["deep_context"]["4k"]["actual_prompt_tokens"], 4010)
+            self.assertEqual(model["deep_context"]["4k"]["target_delta_tokens"], -86)
+            self.assertEqual(model["deep_context"]["16k"]["actual_prompt_tokens"], 16040)
+            self.assertEqual(model["thermal"]["windows"], 3)
+            self.assertAlmostEqual(model["thermal"]["decode_mean_tps"], 49.0)
+            self.assertAlmostEqual(model["thermal"]["decode_first_tps"], 50.0)
+            self.assertAlmostEqual(model["thermal"]["decode_last_tps"], 49.0)
+            self.assertAlmostEqual(model["thermal"]["decode_drift_pct"], -2.0)
+            self.assertEqual(model["thermal"]["wall_total_s"], 30.0)
+            self.assertEqual(model["lane_completeness"]["outcome"], "pass")
+            self.assertEqual(model["lane_completeness"]["checks"], checks)
+
+    def test_generation_selected_lane_completeness_checks_only_enabled_lanes(self) -> None:
+        rows = [
+            {"model": "m", "status": "ok", "test": "short"},
+            {"model": "m", "status": "ok", "test": "short"},
+            {"model": "m", "status": "ok", "test": "prefill"},
+            {"model": "m", "status": "ok", "test": "ctx_4k"},
+            {"model": "m", "status": "ok", "test": "ctx_16k"},
+            {"model": "m", "status": "ok", "test": "thermal_w1"},
+            {"model": "m", "status": "ok", "test": "thermal_w2"},
+        ]
+        checks, missing = generation.generation_lane_completeness(
+            rows, "m", run_latency=False, latency_repeats=2, repeats=2,
+            run_context=False, ctx_points=[64, 128], deep_context=True,
+            run_warm_prefix=False, run_thermal=True, thermal_windows=3,
+        )
+        self.assertEqual(missing, ["thermal_windows"])
+        self.assertTrue(checks["short"]["ok"])
+        self.assertTrue(checks["ctx_4k"]["ok"])
+        self.assertFalse(checks["thermal_windows"]["ok"])
+        self.assertNotIn("cold_chat", checks)
+        self.assertNotIn("ctx_64", checks)
 
     def test_rag_quality_summary_exposes_resident_session_resources(self) -> None:
         records = [

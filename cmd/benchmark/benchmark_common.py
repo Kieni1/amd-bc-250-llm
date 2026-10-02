@@ -554,10 +554,71 @@ def category_aggregates(records: list[dict[str, Any]], category: str) -> dict[st
             for row in rows:
                 for name in row.get("diagnostics", []):
                     diagnostics[str(name)] = diagnostics.get(str(name), 0) + 1
+            deep_context: dict[str, Any] = {}
+            for label in ("4k", "16k"):
+                ctx_rows = [row for row in ok if row.get("test") == f"ctx_{label}"]
+                if not ctx_rows:
+                    continue
+                row = ctx_rows[-1]
+                metrics = row.get("metrics") or {}
+                target = row.get("context_target_tokens")
+                actual = metrics.get("prompt_eval_count")
+                delta = (
+                    int(actual) - int(target)
+                    if isinstance(actual, (int, float)) and isinstance(target, (int, float))
+                    else None
+                )
+                deep_context[label] = {
+                    "target_prompt_tokens": target,
+                    "actual_prompt_tokens": actual,
+                    "target_delta_tokens": delta,
+                    "prompt_tokens_per_second": metrics.get("prompt_tokens_per_second"),
+                    "wall_s": metrics.get("wall_duration_s"),
+                    "allocated_context": metrics.get("allocated_context"),
+                }
+
+            def thermal_index(row: dict[str, Any]) -> int:
+                test = str(row.get("test") or "")
+                try:
+                    return int(test.removeprefix("thermal_w"))
+                except ValueError:
+                    return 0
+
+            thermal_rows = sorted(
+                [row for row in ok if str(row.get("test") or "").startswith("thermal_w")],
+                key=thermal_index,
+            )
+            thermal_tps = _metric_values(thermal_rows, "tokens_per_second")
+            thermal_summary: dict[str, Any] = {}
+            if thermal_tps:
+                first = thermal_tps[0]
+                last = thermal_tps[-1]
+                thermal_summary = {
+                    "windows": len(thermal_tps),
+                    "decode_mean_tps": statistics.fmean(thermal_tps),
+                    "decode_min_tps": min(thermal_tps),
+                    "decode_max_tps": max(thermal_tps),
+                    "decode_first_tps": first,
+                    "decode_last_tps": last,
+                    "decode_drift_pct": ((last - first) / first * 100.0) if first else None,
+                    "wall_total_s": sum(_metric_values(thermal_rows, "wall_duration_s")),
+                }
+
+            lane_rows = [row for row in rows if row.get("case_id") == "lane-completeness"]
+            lane_completeness = None
+            if lane_rows:
+                latest_lane = lane_rows[-1]
+                lane_completeness = {
+                    "outcome": latest_lane.get("outcome"),
+                    "checks": latest_lane.get("checks", {}),
+                    "missing_lanes": latest_lane.get("missing_lanes", []),
+                }
+
             models[model] = {
                 "decode_mean_tps": mean_decode,
                 "decode_cv_pct": cv,
                 "cold_wall_s": (_metric_values(cold, "wall_duration_s") or [None])[0],
+                "cold_load_s": (_metric_values(cold, "load_duration_s") or [None])[0],
                 "warm_answer_latency_s": (
                     statistics.fmean(_metric_values(warm, "time_to_first_answer_s"))
                     if _metric_values(warm, "time_to_first_answer_s") else None
@@ -566,6 +627,9 @@ def category_aggregates(records: list[dict[str, Any]], category: str) -> dict[st
                     statistics.fmean(_metric_values(prefill, "prompt_tokens_per_second"))
                     if _metric_values(prefill, "prompt_tokens_per_second") else None
                 ),
+                "deep_context": deep_context,
+                "thermal": thermal_summary,
+                "lane_completeness": lane_completeness,
                 "resident_size_bytes": resources["resident_size_bytes"],
                 "mem_available_min_mib": resources["mem_available_min_mib"],
                 "swap_start_mib": resources["swap_used_start_mib"],

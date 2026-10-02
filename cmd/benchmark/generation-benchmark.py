@@ -584,6 +584,59 @@ def answer_budget_warning(metrics: dict[str, Any], requested: int) -> str | None
     return None
 
 
+def generation_lane_completeness(
+    rows: list[dict[str, Any]],
+    model: str,
+    *,
+    run_latency: bool,
+    latency_repeats: int,
+    repeats: int,
+    run_context: bool,
+    ctx_points: list[int],
+    deep_context: bool,
+    run_warm_prefix: bool,
+    run_thermal: bool,
+    thermal_windows: int,
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Check that every selected generation lane produced its planned records."""
+    model_rows = [row for row in rows if row.get("model") == model and row.get("status") == "ok"]
+    observed: dict[str, int] = {}
+    for row in model_rows:
+        test = str(row.get("test") or "")
+        observed[test] = observed.get(test, 0) + 1
+
+    expected: dict[str, int] = {"short": repeats, "prefill": 1}
+    if run_latency:
+        expected.update({"cold_chat": 1, "warm_chat": latency_repeats})
+    if run_context:
+        expected.update({f"ctx_{point}": 1 for point in ctx_points})
+    if deep_context:
+        expected.update({"ctx_4k": 1, "ctx_16k": 1})
+    if run_warm_prefix:
+        expected.update({"prefix_cold": 1, "prefix_warm": 1})
+
+    checks: dict[str, dict[str, Any]] = {}
+    missing: list[str] = []
+    for lane, count in expected.items():
+        got = observed.get(lane, 0)
+        ok = got == count
+        checks[lane] = {"expected": count, "observed": got, "ok": ok}
+        if not ok:
+            missing.append(lane)
+
+    if run_thermal:
+        got = sum(count for lane, count in observed.items() if lane.startswith("thermal_w"))
+        ok = got >= thermal_windows
+        checks["thermal_windows"] = {
+            "expected_min": thermal_windows,
+            "observed": got,
+            "ok": ok,
+        }
+        if not ok:
+            missing.append("thermal_windows")
+    return checks, missing
+
+
 def budget_diagnostics(
     metrics: dict[str, Any], requested: int, thinking: str
 ) -> list[str]:
@@ -1283,6 +1336,37 @@ def main() -> int:
                             f"    thermal decode drift: {first_tps:.2f} -> {last_tps:.2f} tok/s "
                             f"({drop:+.1f}%, elapsed={time.monotonic() - thermal_started:.1f}s)"
                         )
+
+                lane_checks, missing_lanes = generation_lane_completeness(
+                    rows,
+                    model,
+                    run_latency=run_latency,
+                    latency_repeats=latency_repeats,
+                    repeats=repeats,
+                    run_context=run_context,
+                    ctx_points=ctx_points,
+                    deep_context=args.deep_context,
+                    run_warm_prefix=run_warm_prefix,
+                    run_thermal=run_thermal,
+                    thermal_windows=thermal_windows,
+                )
+                lane_outcome = "pass" if not missing_lanes else "infra-fail"
+                if missing_lanes:
+                    infra_failed = True
+                append_result(
+                    jsonl_path,
+                    result_record(
+                        category="generation",
+                        model=model,
+                        case_id="lane-completeness",
+                        result_type="measurement",
+                        outcome=lane_outcome,
+                        failure_kinds=[] if not missing_lanes else ["selected-lane-incomplete"],
+                        checks=lane_checks,
+                        metrics={"selected_lane_count": len(lane_checks)},
+                        missing_lanes=missing_lanes,
+                    ),
+                )
 
             except BenchmarkError as exc:
                 infra_failed = True
