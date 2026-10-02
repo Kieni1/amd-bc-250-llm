@@ -224,6 +224,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("%tmpfiles_create", post)
         self.assertIn("WEBUI_SECRET_KEY", post)
         self.assertIn("sudo bc250-install", post)
+        self.assertIn("\\033[1;33m", post)
+        self.assertIn("printf '%b' \"$bc250_amber\"", post)
         for forbidden in ("firewall-cmd", "setsebool", "dnf ", "bc250-model", "systemctl enable --now"):
             self.assertNotIn(forbidden, post)
 

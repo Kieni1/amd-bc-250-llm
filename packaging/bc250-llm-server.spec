@@ -11,7 +11,7 @@
 
 Name:           bc250-llm-server
 Version:        0.12.2
-Release:        0.5%{?dist}
+Release:        0.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -183,8 +183,16 @@ else
   echo "Appliance setup has not been completed yet."
 fi
 echo
+bc250_amber=''
+bc250_reset=''
+if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then
+  bc250_amber='\033[1;33m'
+  bc250_reset='\033[0m'
+fi
+printf '%b' "$bc250_amber"
 echo "Next step:"
 echo "  sudo bc250-install"
+printf '%b' "$bc250_reset"
 
 %preun
 if [ "$1" -eq 0 ]; then
@@ -253,6 +261,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 02 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.6
+- Add explicit Advanced Structured (`think=false`) while preserving normal Advanced reasoning; document Standard/Documents role-specific schema policy and leave Deep unchanged.
+- Keep Agent optional: absent Agent coverage is skipped/partial rather than core infrastructure failure; installed Agent runtime/topology failures remain infrastructure failures.
+- Document the accepted Translate-Gemma recommendation-strengthening limitation and add opt-in EuroLLM 9B Instruct 2512 Q4_K_M as an experimental translation challenger.
+- Add generation cold-load/deep-context/thermal/completeness summaries, compact installer completion guidance and graveyard-only Qwen3.6 35B retention.
 * Sun Sep 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.5
 - Harden guided Open WebUI convergence so package-owned desired state is applied and verified before public/boot publication, preventing stale live policy after upgrades.
 - Raise the bounded Advanced candidate to max_tokens=6144 with think=true and the established sampler contract; preserve clean budget exhaustion as INCOMPLETE and repetition as a quality defect.
