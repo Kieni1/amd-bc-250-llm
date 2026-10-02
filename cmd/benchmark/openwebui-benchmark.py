@@ -491,6 +491,54 @@ def plain_chat(client: JsonClient, model: str, text: str) -> dict[str, Any]:
     )
 
 
+def completed_response_text(result: dict[str, Any]) -> str:
+    """Return the final assistant text from Open WebUI's completed-chat payload."""
+    messages = result.get("messages") if isinstance(result, dict) else None
+    if not isinstance(messages, list):
+        return ""
+    for message in reversed(messages):
+        if isinstance(message, dict) and message.get("role") == "assistant":
+            return str(message.get("content") or "")
+    return ""
+
+
+def finalized_plain_chat(
+    client: JsonClient, model: str, text: str
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """Run a role request and the stable Open WebUI outlet/finalization path.
+
+    Tagged Open WebUI releases do not rewrite the direct /api/chat/completions
+    HTTP response with outlet-filter changes. /api/chat/completed is therefore
+    part of product-path qualification whenever the role owns a post-generation
+    integrity filter.
+    """
+    raw = plain_chat(client, model, text)
+    raw_content = response_text(raw)
+    if not raw_content:
+        raise Failure("Open WebUI chat completion returned no assistant content")
+    message_id = str(uuid.uuid4())
+    completed = require_object(
+        client.post(
+            "/api/chat/completed",
+            {
+                "model": model,
+                "messages": [
+                    {"role": "user", "content": text},
+                    {"role": "assistant", "content": raw_content},
+                ],
+                "id": message_id,
+                "chat_id": "",
+                "session_id": "",
+            },
+        ),
+        "Open WebUI completed-chat response",
+    )
+    final_content = completed_response_text(completed)
+    if not final_content:
+        raise Failure("Open WebUI completed-chat response returned no assistant content")
+    return raw, completed, final_content
+
+
 def translation_acceptance_text(text: str) -> str:
     normalized = unicodedata.normalize("NFKC", text).translate(
         str.maketrans({"‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "−": "-"})
@@ -754,9 +802,10 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
             if role is None:
                 raise Failure(f"unsupported packaged translation direction: {direction!r}")
             started = time.monotonic()
-            result = plain_chat(client, role, str(case["input"]))
+            result, completed, content = finalized_plain_chat(
+                client, role, str(case["input"])
+            )
             wall = time.monotonic() - started
-            content = response_text(result)
             ok, failure_kinds = owui_translation_checks(content, case)
             failures += int(not ok)
             append_result(
@@ -770,6 +819,7 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                     failure_kinds=failure_kinds,
                     checks={
                         "semantic": "semantic" not in failure_kinds,
+                        "modality": "modality" not in failure_kinds,
                         "preservation": "preservation" not in failure_kinds,
                         "source_leakage": "source-leakage" not in failure_kinds,
                     },
@@ -777,6 +827,9 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                     source_language=case["source_language"],
                     target_language=case["target_language"],
                     response=content,
+                    raw_response=response_text(result),
+                    outlet_finalized=True,
+                    completed_message_id=str(completed.get("id") or result.get("id") or ""),
                     role=role,
                 ),
             )

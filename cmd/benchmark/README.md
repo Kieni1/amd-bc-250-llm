@@ -154,6 +154,13 @@ while omitting `-r` remains an empty-input robustness miss. The benchmark does n
 execute generated Bash/Python as root and does not claim arbitrary behavioral
 correctness.
 
+Generation canonical summaries expose more than headline decode throughput: cold request wall time and
+actual `cold_load_s` are separate, optional 4K/16K deep-context lanes report target versus actual prompt
+tokens plus prefill rate, thermal runs report window count/mean/min/max/first/last/drift, and each selected
+lane emits a completeness qualification. Missing selected lanes are infrastructure evidence rather than a
+silently incomplete benchmark summary. These are observability improvements; no synthetic board score or
+machine ranking is produced.
+
 ## Production use-case acceptance
 
 ```bash
@@ -266,6 +273,15 @@ sudo bc250-revalidate start --skip-owui
 sudo bc250-revalidate status
 sudo bc250-revalidate status --raw  # machine-readable key=value state
 ```
+
+Agent is an optional add-on. If the recommended Ornith Agent source/registration is absent, its
+qualification is reported as `coverage unavailable/skipped` and overall coverage becomes PARTIAL; this is
+not a GPU/runtime infrastructure failure and does not invalidate the core appliance. Install it explicitly
+with `sudo bc250-model apply agentic agentic-ornith15-9b-ornith-q5-k-m` when Agent coverage is desired.
+
+The Open WebUI translation phase finalizes direct API completions through `/api/chat/completed`
+before scoring so the package-owned translation `outlet()` integrity filter is part of the
+qualified product path on tagged Open WebUI releases.
 
 The systemd-owned worker uses six phases:
 
