@@ -92,6 +92,9 @@ class TranslationProviderConfigTests(unittest.TestCase):
     def test_owui_wrapper_fails_closed_around_provider_mutation(self):
         script = (ROOT / "quality-checks/translation/20-owui-candidate-screen.sh").read_text(encoding="utf-8")
         self.assertIn("flock -n", script)
+        self.assertIn("PRESET='bc250-office-translation-de-fr'", script)
+        self.assertNotIn("PRESET='bc250-office-translation'", script)
+        self.assertIn("{filterIds:[]}", script)
         self.assertIn("save_original_ollama_config", script)
         self.assertIn("restore_original_ollama_config", script)
         self.assertIn("candidate effective visibility was not restored", script)

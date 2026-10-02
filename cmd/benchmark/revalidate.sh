@@ -1170,7 +1170,14 @@ checks = {}
 diagnostics = []
 for model, limits in policy["models"].items():
     rows = [r for r in records if str(r.get("model", "")).removesuffix(":latest") == model]
-    passed = [r for r in rows if r.get("outcome") == "pass"]
+    # lane-completeness is a synthetic coverage marker. Its own outcome/missing_lanes
+    # already gates generation-benchmark infrastructure, but it intentionally does not
+    # duplicate per-request allocation/residency/memory/temperature telemetry. Keep it
+    # out of the resource-measurement sanity set.
+    passed = [
+        r for r in rows
+        if r.get("outcome") == "pass" and r.get("case_id") != "lane-completeness"
+    ]
     model_checks = {}
     if not passed:
         failures.append(f"{model}: no successful generation measurements")

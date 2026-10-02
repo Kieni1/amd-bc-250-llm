@@ -14,7 +14,7 @@ CANDIDATE="${1:-}"
 PROMPT_FILE="${2:-}"
 ROUNDS="${3:-${BC250_SCREEN_ROUNDS:-3}}"
 ALLOW_PRODUCTION_REFERENCE="${BC250_ALLOW_PRODUCTION_REFERENCE:-0}"
-PRESET='bc250-office-translation'
+PRESET='bc250-office-translation-de-fr'
 MAIN_URL='http://127.0.0.1:11434'
 MAIN_HOST='127.0.0.1:11434'
 OWUI_URL='http://127.0.0.1:3000'
@@ -581,7 +581,7 @@ capture_provenance
 
 SYSTEM_PROMPT="$(cat "$PROMPT_FILE")"
 jq --arg base "$CANDIDATE_BASE_ID" --arg system "$SYSTEM_PROMPT" '
-  .base_model_id=$base | .params=((.params // {}) + {system:$system}) | del(.params.temperature)
+  .base_model_id=$base | .params=((.params // {}) + {system:$system}) | del(.params.temperature) | .meta=((.meta // {}) + {filterIds:[]})
 ' "$OUT/setup/original-preset.json" > "$OUT/setup/candidate-preset.json"
 jq -n --slurpfile model "$OUT/setup/candidate-preset.json" '{models:[$model[0]]}' > "$OUT/setup/candidate-import.json"
 owui_request 'import-candidate-preset' POST '/api/v1/models/import' "$OUT/setup/candidate-import.json" \
@@ -607,7 +607,7 @@ python3 - "$OUT/setup/original-preset.json" "$OUT/setup/live-candidate-preset.js
 import copy,json,sys
 with open(sys.argv[1],encoding='utf-8') as f: original=json.load(f)
 with open(sys.argv[2],encoding='utf-8') as f: live=json.load(f)
-expected=copy.deepcopy(original); expected['base_model_id']=sys.argv[3]; expected['params']=dict(expected.get('params') or {}); expected['params']['system']=sys.argv[4]; expected['params'].pop('temperature',None)
+expected=copy.deepcopy(original); expected['base_model_id']=sys.argv[3]; expected['params']=dict(expected.get('params') or {}); expected['params']['system']=sys.argv[4]; expected['params'].pop('temperature',None); expected['meta']=dict(expected.get('meta') or {}); expected['meta']['filterIds']=[]
 def stable(x): return {k:x.get(k) for k in ('id','base_model_id','name','params','meta','is_active','access_grants')}
 if stable(expected)!=stable(live): raise SystemExit('selected stable live preset fields differ outside the intended candidate delta')
 print('Live candidate preset verified.')

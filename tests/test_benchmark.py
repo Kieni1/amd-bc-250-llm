@@ -3922,6 +3922,80 @@ raise SystemExit(module.entrypoint())
                     (field, check),
                 )
 
+    def test_edge_ignores_lane_completeness_marker_for_resource_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            specs = {
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": 32768,
+                "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": 8192,
+                "prod-qwen35-9b-unsloth-q6-k": 32768,
+                "prod-gpt-oss20b-ggml-org-mxfp4": 16384,
+            }
+            rows = []
+            for model, context in specs.items():
+                rows.append(
+                    {
+                        "category": "generation",
+                        "model": model,
+                        "case_id": "short-1",
+                        "result_type": "measurement",
+                        "outcome": "pass",
+                        "diagnostics": [],
+                        "metrics": {
+                            "tokens_per_second": 100.0,
+                            "allocated_context": context,
+                            "resident_size_bytes": 1000,
+                            "resident_vram_bytes": 1000,
+                            "mem_available_min_mib": 1024,
+                            "temp_max_c": 70,
+                            "prompt_eval_count": 5000,
+                        },
+                    }
+                )
+                rows.append(
+                    {
+                        "category": "generation",
+                        "model": model,
+                        "case_id": "lane-completeness",
+                        "result_type": "measurement",
+                        "outcome": "pass",
+                        "failure_kinds": [],
+                        "checks": {
+                            "short": {
+                                "expected": 1,
+                                "observed": 1,
+                                "ok": True,
+                            }
+                        },
+                        "metrics": {"selected_lane_count": 1},
+                        "missing_lanes": [],
+                    }
+                )
+
+            jsonl = t / "results.jsonl"
+            jsonl.write_text(
+                "".join(json.dumps(row) + "\n" for row in rows),
+                encoding="utf-8",
+            )
+            policy = t / "policy.json"
+            output = t / "sanity.json"
+            script = "\n".join(
+                [
+                    f'source "{source}" help >/dev/null',
+                    f'write_edge_policy "{policy}"',
+                    f'check_edge_generation_sanity "{jsonl}" "{policy}" "{output}"',
+                ]
+            )
+            subprocess.run(["bash", "-c", script], check=True)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertTrue(result["passed"], result)
+            for model in specs:
+                check = result["checks"][model]
+                self.assertTrue(check["resource_evidence_complete"], check)
+                self.assertEqual(check["missing_required_evidence"], [])
+
     def test_manifest_executable_sources_have_git_executable_bit(self) -> None:
         manifest = ROOT / "packaging/install-manifest.tsv"
         checked = []
