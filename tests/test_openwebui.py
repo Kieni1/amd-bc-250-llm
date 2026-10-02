@@ -38,6 +38,7 @@ PRODUCTION_MODEL_IDS = {
     "bc250-office-translation-de-fr",
     "bc250-office-translation-fr-de",
     "bc250-office-advanced",
+    "bc250-office-advanced-structured",
     "bc250-office-deep-reasoning",
     "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
     "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
@@ -381,6 +382,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             "bc250-office-translation-de-fr",
             "bc250-office-translation-fr-de",
             "bc250-office-advanced",
+            "bc250-office-advanced-structured",
             "bc250-office-deep-reasoning",
         ):
             self.assertFalse(models[model_id]["meta"]["capabilities"]["builtin_tools"])
@@ -393,7 +395,13 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(models["bc250-office-deep-reasoning"]["meta"].get("filterIds"), ["bc250_deep_residency"])
         self.assertEqual(models["prod-gpt-oss20b-ggml-org-mxfp4:latest"]["meta"].get("filterIds"), ["bc250_deep_residency"])
         advanced_policy = models["bc250-office-advanced"]["params"]["custom_params"]
+        structured_policy = models["bc250-office-advanced-structured"]["params"]["custom_params"]
         self.assertEqual(advanced_policy["think"], True)
+        self.assertEqual(structured_policy["think"], False)
+        for key in ("temperature", "top_p", "top_k", "min_p", "presence_penalty", "repeat_penalty"):
+            self.assertEqual(structured_policy[key], advanced_policy[key])
+        self.assertEqual(models["bc250-office-advanced"]["params"]["max_tokens"], 6144)
+        self.assertEqual(models["bc250-office-advanced-structured"]["params"]["max_tokens"], 6144)
         self.assertEqual(advanced_policy["temperature"], 0.7)
         self.assertEqual(advanced_policy["top_p"], 0.8)
         self.assertEqual(advanced_policy["top_k"], 20)
@@ -405,6 +413,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             "bc250-office-standard",
             "bc250-office-documents",
             "bc250-office-advanced",
+            "bc250-office-advanced-structured",
             "bc250-office-deep-reasoning",
         ):
             self.assertNotIn("system", models[model_id]["params"])
@@ -555,7 +564,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(OPENWEBUI.status(FakeClient(), True), 0)
-        self.assertIn("curated presets       : 6/6 current", output.getvalue())
+        self.assertIn("curated presets       : 7/7 current", output.getvalue())
         self.assertIn("base-model overrides  : 6/6 current", output.getvalue())
 
     def test_status_detects_missing_base_override_with_correct_terminology(self) -> None:
@@ -660,7 +669,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             for method, path, payload in client.calls
             if method == "POST" and path == "/api/v1/models/model/access/update"
         ]
-        self.assertEqual(len(updates), 12)
+        self.assertEqual(len(updates), 13)
         standard_update = next(payload for payload in updates if payload["id"] == "bc250-office-standard")
         self.assertIn(unrelated, standard_update["access_grants"])
         self.assertIn(REQUIRED_READ, standard_update["access_grants"])
@@ -751,7 +760,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         prompt = prompt_path.read_text(encoding="utf-8")
         self.assertEqual(
             hashlib.sha256(prompt.encode()).hexdigest(),
-            "f6a093acc99bfda173e89bafc350290523d3ab85eb8381cdbed589bd60426d13",
+            "1d5759e7110efeee7f076717039bdc0cc3bf8f70e965fab7f431c8227b14fdd3",
         )
         models = {item["id"]: item for item in OPENWEBUI.load_models()["models"]}
         for model_id in (
@@ -761,6 +770,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
             model = models[model_id]
             self.assertEqual(model["params"]["system"], prompt)
             self.assertIn("Preserve legal and contractual modality exactly", model["params"]["system"])
+            self.assertIn("plural sollten -> devraient", model["params"]["system"])
+            self.assertIn("devrais/devrait/devrions/devriez/devraient", model["params"]["system"])
             self.assertEqual(model["params"]["max_tokens"], 2048)
             self.assertNotIn("think", model["params"])
             self.assertEqual(
@@ -789,7 +800,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "Translate from German to French. Translate every ordinary-language source word "
                 + "and preserve the document structure. Preserve legal/contractual modality without "
                 + "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
-                + "German sollte must stay a recommendation (French devrait), never doit; true muss/doit obligations must remain obligations. "
+                + "German sollte/sollten/solltest/solltet must stay recommendations (for example sollte -> devrait and plural sollten -> devraient), never obligation forms doit/doivent; true muss/müssen <-> doit/doivent obligations must remain obligations. "
                 + "Return only the translation.\n\n"
                 + "[CURRENT_SOURCE]\n",
                 "Guten Tag.\nZweite Zeile.",
@@ -798,7 +809,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "Translate from French to German. Translate every ordinary-language source word "
                 + "and preserve the document structure. Preserve legal/contractual modality without "
                 + "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
-                + "French devrait must stay a recommendation (German sollte), never muss; true muss/doit obligations must remain obligations. "
+                + "French devrais/devrait/devrions/devriez/devraient must stay recommendations (for example devrait -> sollte and plural devraient -> sollten), never obligation forms muss/müssen; true doit/doivent <-> muss/müssen obligations must remain obligations. "
                 + "Return only the translation.\n\n"
                 + "[CURRENT_SOURCE]\n",
                 "Bonjour.\nDeuxième ligne.",
@@ -821,6 +832,28 @@ class OpenWebUIStatusTests(unittest.TestCase):
         }
         guarded = asyncio.run(module.Filter().outlet(guarded))
         self.assertIn("Translation withheld", guarded["messages"][-1]["content"])
+
+        exact_release_regression = {
+            "model": "bc250-office-translation-de-fr",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": wrapper
+                    + "Die Belegungsvorschriften bei Neuvermietungen sollten beachtet werden.",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Les règles d'occupation doivent être respectées lors de nouvelles locations.",
+                },
+            ],
+        }
+        exact_release_regression = asyncio.run(
+            module.Filter().outlet(exact_release_regression)
+        )
+        self.assertIn(
+            "recommendation strengthened to obligation",
+            exact_release_regression["messages"][-1]["content"],
+        )
         clean = {
             "model": "bc250-office-translation-de-fr",
             "messages": [

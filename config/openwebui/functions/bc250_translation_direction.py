@@ -12,7 +12,7 @@ WRAPPERS = {
         "Translate from German to French. Translate every ordinary-language source word "
         "and preserve the document structure. Preserve legal/contractual modality without "
         "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
-        "German sollte must stay a recommendation (French devrait), never doit; true muss/doit obligations must remain obligations. "
+        "German sollte/sollten/solltest/solltet must stay recommendations (for example sollte -> devrait and plural sollten -> devraient), never obligation forms doit/doivent; true muss/müssen <-> doit/doivent obligations must remain obligations. "
         "Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
@@ -20,7 +20,7 @@ WRAPPERS = {
         "Translate from French to German. Translate every ordinary-language source word "
         "and preserve the document structure. Preserve legal/contractual modality without "
         "strengthening or weakening obligations, permissions, recommendations or prohibitions. "
-        "French devrait must stay a recommendation (German sollte), never muss; true muss/doit obligations must remain obligations. "
+        "French devrais/devrait/devrions/devriez/devraient must stay recommendations (for example devrait -> sollte and plural devraient -> sollten), never obligation forms muss/müssen; true doit/doivent <-> muss/müssen obligations must remain obligations. "
         "Return only the translation.\n\n"
         "[CURRENT_SOURCE]\n"
     ),
