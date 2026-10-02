@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.2-0.6 - 2026-10-02
+
+- Add the explicit `Office - Advanced Structured` Open WebUI preset on the production Qwen3.5 9B base. It preserves Advanced's 6144-token budget and sampler set but stores `think=false`; ordinary Advanced remains `think=true`. Standard strict structured output is qualified with exact schema `format` plus request `temperature=0.0` and no `think` override; Documents uses exact schema `format` with its normal reasoning policy; Deep is unchanged.
+- Keep Open WebUI/Ollama payload translation generic. Open WebUI 0.11.4 already merges correctly placed request/model params and promotes `think`, `format` and `keep_alive` to the Ollama root while mapping `max_tokens` to `options.num_predict`; no `payload.py` policy patch or prompt-text JSON heuristic is introduced.
+- Treat the package-default Ornith Agent as an optional add-on rather than a fresh-install prerequisite. Revalidation reports absent Agent coverage as `SKIPPED`/`PARTIAL` without failing core infrastructure; when Agent is installed its exclusive-lane runtime/topology checks remain authoritative infrastructure tests.
+- Preserve the production Translate-Gemma role and fail-closed modality guard while documenting the native DE→FR recommendation-strengthening limitation (`sollten` may become `doivent`) as accepted rather than release-blocking. Add opt-in Apache-2.0 `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` for one short modality comparison; no promotion is implied.
+- Extend generation benchmark reporting with separate `cold_load_s`, 4K/16K target-vs-actual deep-context aggregates, thermal mean/min/max/first/last/drift summaries and selected-lane completeness checks. These remain measurement/coverage outputs, not synthetic device scores.
+- Finish the guided installer footer as a compact `OVERVIEW` plus amber `NEXT STEPS` with CU routing, models, validation and benchmark entry points. Retain Qwen3.6 35B only in the graveyard/retired catalog; no unqualified replacement is promoted.
+- Target RPM release `0.12.2-0.6`; Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, Advanced 6144 and Deep 2m remain unchanged.
+
 ## 0.12.2-0.5 - 2026-09-27
 
 - Gate guided Open WebUI publication on authenticated package desired-state convergence: migration/backup first, local OWUI start for apply/status, then verified boot enablement and nginx publication only after package verification. Failed apply/status/enablement/publication remains held and is reported as retry-required instead of silently serving stale model/filter/function state.

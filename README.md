@@ -41,8 +41,9 @@ the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
 TTM activation into one primary reboot. After reboot it prepares 40-CU support
 for the exact running kernel, establishes the static main/task/embedding normal
 mode, installs every model required by the active package-owned Open WebUI roles
-plus the task and Jina embedding defaults, then presents one global prompt only for
-experiments, rollback/reference, agent and other optional models. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
+plus the task and Jina embedding baselines, then presents one global prompt only for experiments,
+Agent add-ons, rollback/reference and other optional models. Ornith remains the recommended Agent
+when installed, but Agent coverage is optional and is not downloaded by the baseline installer. The base Open WebUI Quadlet is deliberately not boot-enabled, so the primary reboot cannot expose an incomplete application. The resumed installer enables and starts Open WebUI only after that model infrastructure is ready, then finishes by applying its
 desired state, then offers local BC-250 maintenance and Raspberry Pi/companion integration
 as two separate optional setup decisions after core appliance verification. Both top-level choices remain optional/default-No; Pi/companion setup
 remains separate. Selected optional setup is verified before the installer
@@ -103,7 +104,7 @@ if that step was skipped. The default endpoint is unencrypted HTTP; see
 | Standard office work | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
 | Documents and RAG | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
 | German–French translation | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` via explicit DE→FR / FR→DE Open WebUI roles |
-| General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` |
+| General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` via normal Advanced (`think=true`) and explicit Advanced Structured (`think=false`) roles |
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
 | Open WebUI task model | `task-lfm25-1.2b-instruct-liquidai-q6-k` |
@@ -117,7 +118,8 @@ separate higher-quality general-office option; this RAG decision is about sustai
 not a semantic-quality failure.
 
 The packaged comparison catalog retains active measured challengers, including
-`exp-granite42-3b-ibm-q6-k`, the distinct Qwen3.8 27B quality/deployability profiles,
+`exp-granite42-3b-ibm-q6-k`, the opt-in `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m`
+translation-modality challenger, the distinct Qwen3.8 27B quality/deployability profiles,
 and the compact `agentic-qwen35-4b-khazarai-q6-k` /
 `agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
 kept only in the source graveyard and are not
