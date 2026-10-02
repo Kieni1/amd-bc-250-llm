@@ -78,17 +78,18 @@ only pending work where practical and
 combines kernel update plus TTM configuration before the primary reboot. After
 that reboot it prepares 40-CU support for the exact running kernel. The base
 Open WebUI Quadlet is intentionally dormant across the primary reboot; after
-all active role base models plus task/Jina defaults are registered, the installer adds
+all active role base models plus task/Jina defaults are reconciled, the installer adds
 its small `[Install]` drop-in,
 reloads systemd and starts Open WebUI. A second reboot is requested only when
 persistent 40-CU mode is already configured and the prepared replacement module
 is not yet running.
 
 The installer ensures every base model required by active package-owned Open WebUI
-roles, plus the task and embedding defaults, without printing the full catalog. Fully
-unchanged required models are summarized by category; downloads or repairs remain verbose.
-It then presents compact state for ordinary production/experiment/task/agent/embedding
-extras. Fully current rows collapse to `[CURRENT]`, and the intentionally inactive agent
+roles, plus the task and embedding defaults, without printing the full catalog. Agent models are
+optional add-ons and are not downloaded by baseline reconciliation. Fully unchanged required models are summarized
+by category; downloads or repairs remain verbose. Model management temporarily enters exclusive
+Agent mode when explicitly managing an Agent add-on and restores normal mode afterward. It then presents
+compact state for other production/experiment/task/agent/embedding extras. Fully current rows collapse to `[CURRENT]`, and the intentionally inactive agent
 lane is shown as deferred without waiting on that stopped Ollama instance. Stage 7 also shows a
 **read-only, non-indexed MTP inventory** so fetched/current standalone llama.cpp artifacts are visible,
 but MTP is not part of the generic picker and is never fetched by installer convergence. Use
@@ -103,7 +104,8 @@ a no-op update with current model sources does not ask for one.
 `BC250_UPDATE_OLLAMA=1` explicitly reinstalls the package-qualified Ollama payload. The completion summary separates
 core installation/verification from package-owned Open WebUI state and reports the latter as
 `APPLIED + VERIFIED`, `SKIPPED`, or `RETRY REQUIRED`; a nonfatal Open WebUI setup problem is no
-longer hidden behind an unconditional whole-install success message.
+longer hidden behind an unconditional whole-install success message. Completion then prints a plain
+`OVERVIEW` followed by an amber `NEXT STEPS` block for CU routing, model reconciliation and validation.
 
 ## Models
 

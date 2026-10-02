@@ -160,6 +160,8 @@ step_3_install_ollama
         self.assertIn("select(.is_active == true)", source)
         self.assertIn(".task.TASK_MODEL", source)
         self.assertIn(".embedding.RAG_EMBEDDING_MODEL", source)
+        self.assertNotIn("PACKAGE_DEFAULT_AGENT_MODEL", source)
+        self.assertIn("Optional Agent models remain add-ons and are not downloaded by the baseline installer.", source)
         self.assertIn('bc250-model apply all "$required_csv"', source)
         self.assertIn('bc250-model apply all "$selection"', source)
         self.assertNotIn('bc250-model apply all "$selection" --include-disabled', source)
@@ -193,6 +195,7 @@ step_7_models
             "embed-jina-v5-small-retrieval-q4-k-m",
         ):
             self.assertIn(model, result.stdout)
+        self.assertNotIn("agentic-ornith15-9b-ornith-q5-k-m", result.stdout)
         self.assertIn("no additional models selected", result.stdout)
         self.assertEqual(result.stdout.count("model:apply"), 1)
 
@@ -567,30 +570,37 @@ step_8_application_services
         self.assertNotIn("11435", block)
         self.assertNotIn("11437", block)
 
-    def test_installer_completion_groups_commands_and_surfaces_installed_docs(self) -> None:
+    def test_installer_completion_has_plain_overview_and_amber_next_steps(self) -> None:
         source = INSTALLER.read_text()
+        main = source[source.index("main() {"):]
         for heading in (
-            "Validation / benchmark",
-            "Models / runtime lanes",
-            "Further setup",
-            "Installed documentation",
-            "Important appliance paths",
+            'echo "OVERVIEW"',
+            'echo "Further setup"',
+            'echo "Storage"',
+            'echo "NEXT STEPS"',
+            'echo "CU routing"',
+            'echo "Models"',
+            'echo "Validation"',
+            'echo "Benchmark"',
         ):
-            self.assertIn(heading, source)
-        for command in (
-            "sudo bc250-verify",
-            "bc250-benchmark --help",
-            "bc250-model list",
-            "sudo bc250-model status production",
-            "bc250-agent-mode status",
+            self.assertIn(heading, main)
+        for item in (
             "sudo bc250-openwebui-setup init",
-            "sudo bc250-maintenance setup",
-            "sudo bc250-maintenance companion enable",
+            "sudo bc250-maintenance --help",
+            "sudo bc250-storage -h",
+            "sudo bc250-cu-live-manager menu",
+            "sudo bc250-install --models-only",
+            "sudo bc250-verify",
+            "sudo bc250-revalidate start",
+            "sudo bc250-40cu status",
+            "bc250-benchmark --help",
         ):
-            self.assertIn(command, source)
-        self.assertIn("/usr/share/doc/bc250-llm-server/", source)
-        self.assertIn("docs/FILESTRUCTURE.md", source)
-        self.assertIn("/var/lib/bc250-llm-server/revalidation/results/", source)
+            self.assertIn(item, main)
+        self.assertIn("completion_amber=$'\\033[1;33m'", main)
+        self.assertLess(main.index('echo "OVERVIEW"'), main.index("completion_amber=$'\\033[1;33m'"))
+        self.assertLess(main.index("completion_amber=$'\\033[1;33m'"), main.index('echo "NEXT STEPS"'))
+        self.assertNotIn('echo "Validation / benchmark"', main)
+        self.assertNotIn('echo "Models / runtime lanes"', main)
 
     def test_installer_final_summary_reports_openwebui_completion_state(self) -> None:
         source = INSTALLER.read_text()

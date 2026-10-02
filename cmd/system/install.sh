@@ -373,10 +373,10 @@ step_7_models() {
     jq -r '.models[] | select(.is_active == true) | .base_model_id // empty | sub(":latest$"; "")' "$owui_models_file"
     jq -r '(.task.TASK_MODEL // empty | sub(":latest$"; "")), (.embedding.RAG_EMBEDDING_MODEL // empty | sub(":latest$"; ""))' "$owui_desired_file"
   } | awk 'NF && !seen[$0]++' | paste -sd, -)"
-  [[ -n "$required_csv" ]] || { echo "ERROR: package-owned Open WebUI required-model set is empty." >&2; return 1; }
+  [[ -n "$required_csv" ]] || { echo "ERROR: package baseline model set is empty." >&2; return 1; }
 
-  echo "Ensuring models required by active package-owned Open WebUI roles."
-  echo "A fresh install may download all active production role models before Open WebUI starts."
+  echo "Ensuring package baseline models required by active Open WebUI roles, task and embedding."
+  echo "Optional Agent models remain add-ons and are not downloaded by the baseline installer."
   printf '%s
 ' "$required_csv" | tr ',' '
 ' | sed 's/^/  - /'
@@ -385,7 +385,7 @@ step_7_models() {
     bc250-model apply all "$required_csv"
 
   echo
-  echo "Required role models are current."
+  echo "Required package baseline models are current."
   echo "Additional Ollama models are optional and are not listed on a converged install."
   echo "MTP remains a separate opt-in workflow: sudo bc250-fetch-mtp MODEL_ID"
   local selection="${BC250_MODEL_SELECTION:-}" review=""
@@ -413,16 +413,16 @@ step_7_models() {
         read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
         ;;
       *)
-        echo "Skipping additional-model review; required Open WebUI role models are installed."
+        echo "Skipping additional-model review; required package baseline models are installed."
         return 0
         ;;
     esac
   elif [[ -z "$selection" ]]; then
     echo "BC250_MODEL_SELECTION is unset; no additional models selected in non-interactive mode."
-    echo "All models required by active package-owned Open WebUI roles are installed."
+    echo "All package baseline models are installed."
     return 0
   fi
-  [[ -n "$selection" ]] || { echo "Skipping additional models; required Open WebUI role models are installed."; return 0; }
+  [[ -n "$selection" ]] || { echo "Skipping additional models; required package baseline models are installed."; return 0; }
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
     bc250-model apply all "$selection"
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
@@ -1130,38 +1130,38 @@ main() {
   print_setup_summary
   echo "Transcript: $LOG_FILE"
   echo
-  completion_owui_token="${OWUI_TOKEN_FILE:-${BC250_OWUI_TOKEN_FILE:-}}"
-  echo "Validation / benchmark"
-  echo "  sudo bc250-verify"
-  if [[ -n "$completion_owui_token" && -f "$completion_owui_token" && -r "$completion_owui_token" ]]; then
-    echo "  sudo bc250-revalidate start --owui-token-file $completion_owui_token"
-  elif [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
-    echo "  sudo bc250-revalidate start"
-  else
-    echo "  sudo bc250-revalidate start --owui-token-file FILE"
-  fi
-  echo "  bc250-benchmark --help"
-  echo
-  echo "Models / runtime lanes"
-  echo "  bc250-model list"
-  echo "  sudo bc250-model status production"
-  echo "  bc250-agent-mode status"
+  echo "OVERVIEW"
   echo
   echo "Further setup"
-  echo "  sudo bc250-openwebui-setup init"
-  echo "  sudo bc250-maintenance setup"
-  echo "  sudo bc250-maintenance companion enable"
+  echo "  Open WebUI:    sudo bc250-openwebui-setup init"
+  echo "  Maintenance:   sudo bc250-maintenance --help"
+  echo "  Documentation: /usr/share/doc/bc250-llm-server/"
   echo
-  echo "Installed documentation"
-  echo "  /usr/share/doc/bc250-llm-server/"
-  echo "  Start with: README.md, TLDR.md, docs/COMMANDS.md, MODELS.md"
-  echo "  File/path map: docs/FILESTRUCTURE.md"
+  echo "Storage"
+  echo "  sudo bc250-storage -h"
   echo
-  echo "Important appliance paths"
-  echo "  Configuration:          /etc/bc250-llm-server/"
-  echo "  Runtime/model state:    /var/lib/bc250-llm-server/"
-  echo "  Revalidation bundles:   /var/lib/bc250-llm-server/revalidation/results/"
-  echo "  Installer transcript:   $LOG_FILE"
+  local completion_amber="" completion_reset=""
+  if [[ -t 1 && ${TERM:-dumb} != dumb ]]; then
+    completion_amber=$'\033[1;33m'
+    completion_reset=$'\033[0m'
+  fi
+  printf '%s' "$completion_amber"
+  echo "NEXT STEPS"
+  echo
+  echo "CU routing"
+  echo "  sudo bc250-cu-live-manager menu"
+  echo
+  echo "Models"
+  echo "  sudo bc250-install --models-only"
+  echo
+  echo "Validation"
+  echo "  sudo bc250-verify"
+  echo "  sudo bc250-revalidate start"
+  echo "  sudo bc250-40cu status"
+  echo
+  echo "Benchmark"
+  echo "  bc250-benchmark --help"
+  printf '%s' "$completion_reset"
   ((verify_rc == 0)) || return "$verify_rc"
   [[ "$OWUI_SETUP_STATE" != "retry-required" ]] || return 2
 }

@@ -315,6 +315,21 @@ model_registered() {
     jq -e --arg m "$model" 'any(.models[]?; (.name | sub(":latest$"; "")) == $m)' >/dev/null 2>&1
 }
 
+
+agent_model_source_path() {
+  bc250-model path agentic "$AGENT_MODEL" 2>/dev/null | cut -f1 | head -1
+}
+
+agent_model_source_ready() {
+  local path
+  path="$(agent_model_source_path)"
+  [[ -n "$path" && -s "$path" ]]
+}
+
+mark_partial_coverage() {
+  printf 'partial\n' > "$COVERAGE_STATE_FILE"
+}
+
 load_target_version() {
   local value
   [[ -n $TARGET_VERSION ]] && return 0
@@ -1382,7 +1397,14 @@ phase_preflight() {
     record_event "required-models" infra infra-fail "required packaged model registration check failed"
     return 1
   fi
-  record_event "required-models" infra pass "required packaged model registrations current"
+  record_event "required-models" infra pass "required normal-lane packaged model registrations current"
+  record_progress "checking optional Agent add-on coverage"
+  if agent_model_source_ready; then
+    record_event "agent-add-on" coverage pass "optional Agent add-on is installed and can be qualified"
+  else
+    mark_partial_coverage
+    record_event "agent-add-on" coverage skipped "optional Agent add-on is not installed; Agent coverage unavailable/skipped (install explicitly with sudo bc250-model apply agentic $AGENT_MODEL)"
+  fi
   if [[ ${SKIP_OWUI:-0} -eq 0 ]]; then
     local rc
     record_progress "validating Open WebUI administrator credential"
@@ -1453,19 +1475,67 @@ phase_edge() {
   write_phase_report resource-edge-results edge
 }
 
+check_agent_exclusive_topology() {
+  local port
+  for port in 11434 11435 11437; do
+    if api_ready "$port"; then
+      echo "ERROR: normal Ollama port $port remained available in agent mode." >&2
+      return 1
+    fi
+  done
+}
+
+check_agent_registration() {
+  if model_registered 11436 "$AGENT_MODEL"; then
+    return 0
+  fi
+  echo "COVERAGE UNAVAILABLE: optional Agent model $AGENT_MODEL is not registered on 11436." >&2
+  echo "Install/reconcile it with: sudo bc250-model apply agentic $AGENT_MODEL" >&2
+  return 1
+}
+
 phase_agent() {
-  set_phase agent "qualifying exclusive package-default agent"
-  local dir="$RAW/agent" port
+  set_phase agent "qualifying optional exclusive Agent add-on when installed"
+  local dir="$RAW/agent"
   install -d -m 0700 "$dir"
-  systemctl cat ollama-agent.service >/dev/null 2>&1
-  bc250-agent-mode enter > "$dir/agent-mode-enter.txt" 2>&1
-  wait_api 11436 45
-  for port in 11434 11435 11437; do api_ready "$port" && { echo "ERROR: normal Ollama port $port remained available in agent mode." >&2; return 1; }; done
-  model_registered 11436 "$AGENT_MODEL" || { echo "ERROR: package-default agent model $AGENT_MODEL is not registered on 11436" >&2; return 1; }
+  if ! agent_model_source_ready; then
+    set_stage "optional Agent add-on unavailable — coverage skipped"
+    {
+      echo "Optional Agent add-on qualification was not run."
+      echo "Missing model source: $AGENT_MODEL"
+      echo "Remediation: sudo bc250-model apply agentic $AGENT_MODEL"
+      echo "This is optional coverage unavailable/skipped, not an Agent runtime/GPU failure."
+    } > "$dir/prerequisite.txt"
+    mark_partial_coverage
+    record_event "agent" coverage skipped "optional Agent add-on not installed; coverage unavailable"
+    write_phase_report agent-mode-results agent
+    return 0
+  fi
+
+  run_step agent agent-service-definition infra systemctl cat ollama-agent.service
+  run_step agent enter-agent-mode infra bc250-agent-mode enter
+  run_step agent agent-api infra wait_api 11436 45
+  run_step agent exclusive-topology infra check_agent_exclusive_topology
+  if ! check_agent_registration > "$dir/agent-model-prerequisite.txt" 2>&1; then
+    set_stage "optional Agent registration unavailable — coverage skipped"
+    mark_partial_coverage
+    record_event "agent" coverage skipped "optional Agent add-on is not registered; coverage unavailable; see $dir/agent-model-prerequisite.txt"
+    run_step agent leave-agent-mode infra bc250-agent-mode leave
+    run_step agent normal-main-restored infra wait_api 11434 45
+    run_step agent normal-task-restored infra wait_api 11435 45
+    run_step agent normal-embedding-restored infra wait_api 11437 45
+    record_event "normal-topology-restored" infra pass "agent mode left after prerequisite skip"
+    snapshot agent/restored
+    write_phase_report agent-mode-results agent
+    return 0
+  fi
+  record_event "agent-add-on" coverage pass "optional Agent registration available on exclusive lane"
   snapshot agent/active
   run_step agent agent quality qualification_benchmark bc250-benchmark agent "$AGENT_MODEL" --ollama-url http://127.0.0.1:11436 --output-dir "$RAW/agent/benchmark/results"
-  bc250-agent-mode leave > "$dir/agent-mode-leave.txt" 2>&1
-  wait_api 11434 45; wait_api 11435 45; wait_api 11437 45
+  run_step agent leave-agent-mode infra bc250-agent-mode leave
+  run_step agent normal-main-restored infra wait_api 11434 45
+  run_step agent normal-task-restored infra wait_api 11435 45
+  run_step agent normal-embedding-restored infra wait_api 11437 45
   [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]
   record_event "normal-topology-restored" infra pass "agent mode left successfully"
   snapshot agent/restored
