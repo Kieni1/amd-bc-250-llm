@@ -78,7 +78,7 @@ environment variables:
 - active workspace overrides for the five production implementation models and
   the dedicated task model. During pre-v1 testing these records are deliberately
   visible so operators can compare curated roles with raw implementations;
-- authenticated-read (`user:*:read`) grants on the six active production presets,
+- authenticated-read (`user:*:read`) grants on the seven active production presets,
   the six package implementation/task overrides, and package-managed testing records
   dynamically discovered on the normal main/task lanes.
 
@@ -138,8 +138,8 @@ This is intentional on the BC-250 unified-memory pool.
 Open WebUI 0.11.x injects built-in knowledge/chat tools into native-tool-capable models unless model
 metadata disables them. The package therefore makes the role boundary explicit:
 
-- `Office - Standard`, `Office - General / Higher Quality`, `Office - Deep Reasoning` and both
-  translation roles disable built-in tools. They answer ordinary questions from model knowledge and
+- `Office - Standard`, `Office - General / Higher Quality`, `Office - Advanced Structured`,
+  `Office - Deep Reasoning` and both translation roles disable built-in tools. They answer ordinary questions from model knowledge and
   still accept pre-injected/attached file context.
 - `Office - Documents / RAG` keeps built-in retrieval enabled, but disables unrelated chat-history,
   notes, web, automation and similar tool categories. Knowledge retrieval is therefore concentrated in
@@ -186,6 +186,7 @@ explicitly adopted and tested.
 | Office – Translation DE → FR | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
 | Office – Translation FR → DE | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` | active |
+| Office – Advanced Structured | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` | active |
 
 For the current 16 GiB profile, **Office – Documents** is the production RAG/document role.
@@ -198,7 +199,10 @@ The two active Translate-Gemma roles reproduce the selected Stage-2E product con
 Both use the exact installed `openwebui/prompts/translation-explicit-direction-v1.txt`
 prompt, `max_tokens=2048`, and leave `think` unspecified. The package-owned non-global
 `bc250_translation_direction` Filter prepends only the tested DE→FR or FR→DE wrapper to
-the current text user message.
+the current text user message. Its post-generation `outlet()` performs the bounded modality/literal
+integrity check. Package qualification follows direct `/api/chat/completions` with
+`/api/chat/completed` before scoring the final assistant message, because tagged Open WebUI releases
+do not rewrite the direct completion HTTP response with outlet-filter changes.
 
 `bc250-install` now ensures the base model behind every active package-owned Open WebUI
 role before applying desired state, including the production Translate-Gemma role. Manual
@@ -220,14 +224,25 @@ and token contents must not be printed or collected in support/revalidation evid
 The former LFM comparison translator is retired from active discovery and no longer has an Open WebUI
 preset. Its source Modelfile remains only in the graveyard as historical comparison evidence.
 
-The Qwen3.5 Advanced preset carries request-level `think=true` and `max_tokens=6144` for the current 0.12.2-0.5 source;
-the package keeps Ollama's native renderer/parser rather than replacing the model template. The
-existing temperature/top-p/top-k/min-p/presence/repeat sampler policy remains unchanged. The Open WebUI
-adapter mapping from the prior `max_tokens=4096` value to Ollama `options.num_predict=4096` is proven from externally
-supplied exact-device evidence; the raw outbound capture is not retained in this source tree. Exact-device
-qualification of this release must confirm that the new stored `max_tokens=6144` becomes Ollama
-`options.num_predict=6144`, retains the established samplers and `think=true`, and sends no root-level
-`max_tokens` in the effective Ollama request.
+The Qwen3.5 general Advanced preset carries `think=true` and `max_tokens=6144`; the explicit
+`Office - Advanced Structured` preset uses the same base model, 6144-token ceiling and sampler set with
+only `think=false`. This is intentionally visible product policy rather than prompt-based automatic switching.
+Strict machine-consumed Advanced extraction should use the Structured preset; normal reasoning stays on
+General / Higher Quality. Open WebUI 0.11.4 already translates the stored/request parameter path correctly,
+including `think` at the Ollama root and `max_tokens` as `options.num_predict`; no package patch to generic
+`payload.py` is required.
+
+For other strict structured workflows, use explicit request parameters rather than a global model change:
+
+- Standard: exact JSON schema as `params.format` plus request `temperature=0.0`; do not override `think`.
+  The final focused campaign produced 200/200 strict exact outputs with this policy.
+- Documents: exact JSON schema as `params.format`; leave the model's thinking/sampling policy otherwise unchanged.
+  The focused campaign produced 25/25 strict outputs and no larger confirmation is required for this release.
+- Advanced Structured: use the explicit preset above; a schema may additionally be supplied as `params.format` when
+  the caller has one.
+- Deep: leave production behavior unchanged.
+
+Do not infer structured intent by matching prompt text such as `return JSON`, and do not disable reasoning globally.
 
 Deep Reasoning now uses package-owned `keep_alive=2m`. Before either the curated Deep role or the raw
 GPT-OSS implementation is admitted, the `bc250_deep_residency` filter inspects the dedicated embedding
@@ -321,7 +336,7 @@ replacement for the normal retention policy. The archive preserves numeric owner
 xattrs; the supported restore sequence is documented in [`MAINTENANCE.md`](MAINTENANCE.md).
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
-upload/extraction, embedding/retrieval, the six active package presets and an
+upload/extraction, embedding/retrieval, the seven active package presets and an
 authenticated `bc250-openwebui-setup status` before changing the pin.
 
 ## Deferred candidates
