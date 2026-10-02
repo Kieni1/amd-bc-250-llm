@@ -255,8 +255,15 @@ output tokens under the selected configuration.
 Known caveats remain evidence, not hidden product claims: DE→FR may localize financial
 typography, one targeted bullet case omitted a trailing ordinary-language sentence, and
 the focused `Avoir AV-19` case did not produce the preferred explicit `Gutschrift` word.
-The numeric evaluator correctly treats locale-equivalent values such as `8.1` and `8,1`
-as equal without claiming byte-for-byte formatting preservation.
+A focused exact-device regression also showed that German recommendation `sollten` can be
+strengthened by the native Translate-Gemma generation into French obligation `doivent`.
+The package keeps the clause-local modality integrity guard fail-closed for this class of
+strengthening, but the underlying model behavior is accepted as a documented limitation
+rather than a release blocker. `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` is packaged
+only as an opt-in Apache-2.0 translation challenger for a short modality comparison; it is
+not promoted unless it wins the production path on-device. The numeric evaluator correctly
+treats locale-equivalent values such as `8.1` and `8,1` as equal without claiming
+byte-for-byte formatting preservation.
 
 The former `prod-lfm25-8b-a1b-liquidai-q6-k` identity and its later
 `exp-lfm25-8b-a1b-liquidai-q6-k` comparison identity are both retired. Corrected long-run evidence
@@ -341,6 +348,7 @@ separately below.
 ```text
 exp-gemma4-12b-google-qat-q4-0
 exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
+exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
 exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
@@ -360,8 +368,13 @@ exp-tir-qwen35-9b-nonthinking-v2-q6-k
 
 ## Agent/coding lifecycle
 
-`agentic-ornith15-9b-ornith-q5-k-m` remains the package default and baseline. Installed
-`0.11.2-0.5.fc44` passed the canonical agent benchmark 3/3 during full revalidation.
+`agentic-ornith15-9b-ornith-q5-k-m` remains the package-default Agent when that add-on is
+explicitly installed, but Agent is not part of the core appliance install baseline. Starting with
+`0.12.2-0.6`, full revalidation reports the Agent phase as optional coverage unavailable/skipped
+when no Agent model is installed; that does not fail the core appliance. If Agent is present,
+revalidation still qualifies its exclusive lane and runtime/topology faults remain real
+infrastructure failures.
+Installed `0.11.2-0.5.fc44` passed the canonical agent benchmark 3/3 during full revalidation.
 Separate product-path evidence then showed why static benchmark success is not sufficient:
 a coding helper that writes reasoning or a truncated final answer into a file is a product
 contract failure even when the cleaned body is useful. Source `0.11.2-0.6` therefore
@@ -391,6 +404,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
+| `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` | opt-in Apache-2.0 translation challenger for a short DE↔FR modality comparison against production Translate-Gemma; no promotion implied |
 | `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in graveyard/history |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-s` | admin/testing-only 8K quality/reasoning profile; `think=true`; mechanically strong but memory-tight |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |

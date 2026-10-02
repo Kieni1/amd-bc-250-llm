@@ -1,0 +1,26 @@
+# BC250 category: experiments
+# Ollama model: exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
+# Source: mradermacher/EuroLLM-9B-Instruct-2512-GGUF @ main
+# GGUF: EuroLLM-9B-Instruct-2512.Q4_K_M.gguf
+# SHA256: fe9b50d4ba67eb0131f1ceeaab2e56ea8fb6b2bbc37391d3219c791c3b140a28
+# License: Apache-2.0
+# Upstream base: utter-project/EuroLLM-9B-Instruct-2512
+#
+# Intended role:
+# - Short DE<->FR translation challenger focused on recommendation/obligation modality.
+# - Compare against the production Translate-Gemma role before closing the known
+#   sollten -> doivent limitation. This is an opt-in experiment, not a promotion.
+#
+# Test with:
+#   sudo bc250-model apply experiments exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
+#   quality-checks/translation/10-direct-candidate-screen.sh \
+#     exp-eurollm9b-instruct-2512-mradermacher-q4-k-m 1
+
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-eurollm9b-instruct-2512-mradermacher-q4-k-m/EuroLLM-9B-Instruct-2512.Q4_K_M.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 8192
+PARAMETER num_predict 2048
+# Deterministic translation comparison; the quality screen supplies the task prompt.
+PARAMETER temperature 0

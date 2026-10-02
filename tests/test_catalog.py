@@ -321,6 +321,29 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         gemma26 = (graveyard / "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertIn("output degeneration", gemma26)
 
+    def test_eurollm_translation_challenger_is_opt_in_and_pinned(self) -> None:
+        path = MODELFILES / "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m.Modelfile"
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("# BC250 category: experiments", text)
+        self.assertIn("mradermacher/EuroLLM-9B-Instruct-2512-GGUF @ main", text)
+        self.assertIn("EuroLLM-9B-Instruct-2512.Q4_K_M.gguf", text)
+        self.assertIn("fe9b50d4ba67eb0131f1ceeaab2e56ea8fb6b2bbc37391d3219c791c3b140a28", text)
+        self.assertIn("PARAMETER num_ctx 8192", text)
+        self.assertIn("PARAMETER num_predict 2048", text)
+        self.assertIn("PARAMETER temperature 0", text)
+        discovered = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
+        candidate = discovered["exp-eurollm9b-instruct-2512-mradermacher-q4-k-m"]
+        self.assertEqual(candidate["category"], "experiments")
+        retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
+        self.assertNotIn(candidate["name"], {row["name"] for row in retired["models"]})
+
+    def test_qwen36_35b_remains_graveyard_only(self) -> None:
+        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
+        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", active)
+        self.assertTrue((ROOT / "models/modelfiles-graveyard/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile").is_file())
+        retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
+        self.assertIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", {row["name"] for row in retired["models"]})
+
     def test_qwen38_ista_profiles_match_intended_bc250_roles(self) -> None:
         quality = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertIn("PARAMETER num_ctx 8192", quality)
