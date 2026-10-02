@@ -40,7 +40,7 @@ retest conditions from existing decisions:
   topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
   supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
   ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.2-0.5 is the active runtime/model-policy candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, Advanced `think=true` with `max_tokens=6144`, retired Qwen3.6 35B, profile-aligned Qwen3.8 experiments, protected OWUI maintenance authentication, saved-profile/live-layout CU semantics, and fail-closed pre-Deep eviction with `keep_alive=2m`. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
+  narrow temporary mitigations. Current source 0.12.2-0.6 is the active narrow release candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, Advanced `think=true` with `max_tokens=6144`, retired Qwen3.6 35B, profile-aligned Qwen3.8 experiments, protected OWUI maintenance authentication, saved-profile/live-layout CU semantics, and fail-closed pre-Deep eviction with `keep_alive=2m`. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
   treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
   rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
   live pruning and other destructive support checks remain conditional, not automatic release gates.
@@ -71,12 +71,9 @@ retest conditions from existing decisions:
   drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
   new runtime/model/hardware or product question.
 
-## Current 0.12.2-0.5 testing priority
+## Current 0.12.2-0.6 testing priority
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md`. This candidate deliberately crosses
-OWUI/Ollama runtime, Advanced request policy, Deep cross-lane residency, CU verification, protected maintenance authentication, translation prompt, selected large-model policy and upgrade migration boundaries, so test those surfaces directly. Preserve the previous clean topology/restoration
-evidence as comparison context, but do not relabel it as current qualification. Qwen template replacement,
-generic memory admission, ROCm migration and pre-emptive multi-model restriction are not part of this release.
+Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md`. Exact 0.12.2-0.5 narrowed the remaining work to installer completion/CU orientation, the package-default Agent prerequisite/attribution contract, and the DE->FR recommendation-modality/product-finalization path. Test those surfaces directly plus one final revalidation. Preserve the previous clean Deep/RAG/Tika/title-tag/topology evidence as comparison context; do not replay those closed campaigns unless a focused 0.6 result crosses their boundary.
 
 ## Acceptance-harness evidence policy
 

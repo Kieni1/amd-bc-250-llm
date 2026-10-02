@@ -61,14 +61,13 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.12.2-0.5 source preserves the core-verification boundary while making installer final-state UX, CU selected-profile semantics and authenticated maintenance state explicit. Open WebUI desired state remains one existing subsystem rather than gaining another policy
+The current 0.12.2-0.6 source preserves the core-verification boundary and the established 0.5 convergence/auth/runtime contracts while narrowing release work to installer completion/CU orientation, the default Agent prerequisite, and translation recommendation/finalization behavior. Open WebUI desired state remains one existing subsystem rather than gaining another policy
 framework. During pre-v1 testing, authenticated setup discovers the live 11434/11435 inventories and maintains
 only package-marked testing records without treating an unavailable lane as empty. Raw production/task
 models and ordinary-size experiments remain ordinary-user comparison surfaces, but resource evidence
 retires Qwen3.6 35B from active candidates, keeps Qwen3.8 27B Unsloth and ISTA IQ3_S admin/testing-only, and leaves IQ3_XXS as the ordinary-user deployability comparison. The package owns removal only of its own wildcard read grant
 on those managed records and preserves unrelated administrator grants. Embedding/agent lanes remain excluded.
-Post-install guidance should point at a small set of next commands plus installed documentation/config/
-state/evidence paths; it must not become a second full command reference.
+Post-install guidance is now a plain `OVERVIEW` plus amber `NEXT STEPS`: CU routing, model reconciliation and validation are the compact operator actions; it must not become a second full command reference.
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
 MemAvailable hard floor unchanged; below 512 MiB may be surfaced as tight headroom. Likewise, an
@@ -116,14 +115,17 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## Current 0.12.2-0.5 qualification boundary
+## Current 0.12.2-0.6 qualification boundary
 
-0.12.2-0.5 is a crossed-boundary candidate, not a narrow documentation release. Use
-`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md` for the authoritative next device
-sequence. Source checks must prove package structure/contracts only; OWUI 0.11.4 migrations, exact browser
-journeys, effective Ollama requests, model quality and UMA/Vulkan behavior remain device-owned. The new
-package role metadata should drive specialized translation/OCR/experimental probes rather than generic
-capability inference.
+0.12.2-0.6 is a narrow crossed-boundary candidate. Use
+`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md` for the authoritative next device
+sequence. Source checks must prove the compact completion block, optional-Agent coverage attribution,
+role-specific structured-output policy, experimental EuroLLM catalog entry and generation-summary
+completeness. Device testing must prove the integrated structured product path and normal controls,
+optional-Agent skip semantics (or exclusive-lane restoration when installed), and final topology/CU/
+restoration. The native Translate-Gemma `sollten -> doivent` limitation is documented/guarded rather
+than a release blocker; EuroLLM gets at most one short challenger screen. Do not reopen unchanged
+Deep/RAG/Tika/MTP/title-tag campaigns solely for this release.
 
 ## 6. Recommended current work order
 
