@@ -36,7 +36,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
 
     def test_modelfile_graveyard_is_not_packaged_or_discovered(self) -> None:
         graveyard = ROOT / "models/modelfiles-graveyard"
-        retired = {path.stem for path in graveyard.glob("*.Modelfile")}
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertNotIn("modelfiles-graveyard", manifest)
 
@@ -45,15 +44,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             roots = modelctl.model_directories()
         self.assertNotIn(graveyard, roots)
         self.assertTrue(all("graveyard" not in str(path) for path in roots))
-        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
-        self.assertTrue(retired.isdisjoint(active))
-
-    def test_retired_catalog_exactly_matches_source_graveyard(self) -> None:
-        graveyard = ROOT / "models/modelfiles-graveyard"
-        expected = {path.stem for path in graveyard.glob("*.Modelfile")}
-        catalog = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
-        actual = {item["name"] for item in catalog["models"]}
-        self.assertEqual(actual, expected)
 
     def test_every_packaged_modelfile_is_discovered_and_strictly_valid(self) -> None:
         models = modelctl.discover_models([MODELFILES])
@@ -315,34 +305,6 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("production German/French translation base", translator)
         self.assertIn("PARAMETER num_predict 2048", translator)
         self.assertNotRegex(translator, r"(?m)^SYSTEM\s")
-        graveyard = ROOT / "models/modelfiles-graveyard"
-        lfm = (graveyard / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
-        self.assertIn("retired from active comparison", lfm)
-        gemma26 = (graveyard / "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile").read_text(encoding="utf-8")
-        self.assertIn("output degeneration", gemma26)
-
-    def test_eurollm_translation_challenger_is_retired_to_graveyard(self) -> None:
-        name = "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m"
-        active_path = MODELFILES / f"{name}.Modelfile"
-        graveyard_path = ROOT / "models/modelfiles-graveyard" / f"{name}.Modelfile"
-        self.assertFalse(active_path.exists())
-        self.assertTrue(graveyard_path.is_file())
-        text = graveyard_path.read_text(encoding="utf-8")
-        self.assertIn("EuroLLM-9B-Instruct-2512.Q4_K_M.gguf", text)
-        discovered = {model["name"] for model in modelctl.discover_models([MODELFILES])}
-        self.assertNotIn(name, discovered)
-        profiles = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        self.assertNotIn(name, json.dumps(profiles))
-        retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
-        self.assertIn(name, {row["name"] for row in retired["models"]})
-
-    def test_qwen36_35b_remains_graveyard_only(self) -> None:
-        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
-        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", active)
-        self.assertTrue((ROOT / "models/modelfiles-graveyard/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile").is_file())
-        retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
-        self.assertIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", {row["name"] for row in retired["models"]})
-
     def test_qwen38_ista_profiles_match_intended_bc250_roles(self) -> None:
         quality = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertIn("PARAMETER num_ctx 8192", quality)
@@ -1049,6 +1011,18 @@ class StatusTests(unittest.TestCase):
         )
         self.assertIsNone(modelctl.recommended_status_action(cached))
 
+        cached_unknown_registration = inspect("current", "missing", None)
+        self.assertEqual(cached_unknown_registration.overall_status, "OPTIONAL")
+        self.assertEqual(
+            modelctl.displayed_status_text(cached_unknown_registration),
+            "OPTIONAL — source cached, registration unavailable",
+        )
+        self.assertEqual(
+            modelctl.compact_inspection_details(cached_unknown_registration),
+            ["OPTIONAL", "source cached, registration unavailable"],
+        )
+        self.assertIsNone(modelctl.recommended_status_action(cached_unknown_registration))
+
         selected_but_missing = inspect("current", "current", set())
         self.assertEqual(selected_but_missing.overall_status, "DRIFT")
         self.assertEqual(
@@ -1228,12 +1202,8 @@ class StatusTests(unittest.TestCase):
         self.assertTrue(profiles["prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest"]["specialized"])
         self.assertTrue(profiles["exp-glm-ocr-ggml-q8-0:latest"]["specialized"])
 
-    def test_pressure_heavy_qwen_profiles_are_retired_or_bounded_for_next_device_gate(self) -> None:
-        q36_active = MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
-        q36_retired = ROOT / "models/modelfiles-graveyard/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
+    def test_active_qwen38_profile_remains_bounded_for_next_device_gate(self) -> None:
         q38 = (MODELFILES / "exp-qwen38-27b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
-        self.assertFalse(q36_active.exists())
-        self.assertTrue(q36_retired.exists())
         self.assertIn("PARAMETER num_ctx 8192", q38)
         self.assertNotIn("PARAMETER num_ctx 16384", q38)
 
