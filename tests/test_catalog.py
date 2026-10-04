@@ -70,7 +70,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 patch.object(modelctl, "OPERATOR_MODEL_DIR", operator),
                 self.assertRaisesRegex(
                     modelctl.ModelError,
-                    r"(?s)exp-example.*must end in \.Modelfile.*not modified automatically.*sudo bc250-install",
+                    r"(?s)exp-example.*must end in \.Modelfile.*not modified automatically.*sudo bc250 install",
                 ),
             ):
                 modelctl.discover_models([operator])
@@ -321,21 +321,20 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         gemma26 = (graveyard / "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertIn("output degeneration", gemma26)
 
-    def test_eurollm_translation_challenger_is_opt_in_and_pinned(self) -> None:
-        path = MODELFILES / "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m.Modelfile"
-        text = path.read_text(encoding="utf-8")
-        self.assertIn("# BC250 category: experiments", text)
-        self.assertIn("mradermacher/EuroLLM-9B-Instruct-2512-GGUF @ main", text)
+    def test_eurollm_translation_challenger_is_retired_to_graveyard(self) -> None:
+        name = "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m"
+        active_path = MODELFILES / f"{name}.Modelfile"
+        graveyard_path = ROOT / "models/modelfiles-graveyard" / f"{name}.Modelfile"
+        self.assertFalse(active_path.exists())
+        self.assertTrue(graveyard_path.is_file())
+        text = graveyard_path.read_text(encoding="utf-8")
         self.assertIn("EuroLLM-9B-Instruct-2512.Q4_K_M.gguf", text)
-        self.assertIn("fe9b50d4ba67eb0131f1ceeaab2e56ea8fb6b2bbc37391d3219c791c3b140a28", text)
-        self.assertIn("PARAMETER num_ctx 8192", text)
-        self.assertIn("PARAMETER num_predict 2048", text)
-        self.assertIn("PARAMETER temperature 0", text)
-        discovered = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
-        candidate = discovered["exp-eurollm9b-instruct-2512-mradermacher-q4-k-m"]
-        self.assertEqual(candidate["category"], "experiments")
+        discovered = {model["name"] for model in modelctl.discover_models([MODELFILES])}
+        self.assertNotIn(name, discovered)
+        profiles = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        self.assertNotIn(name, json.dumps(profiles))
         retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
-        self.assertNotIn(candidate["name"], {row["name"] for row in retired["models"]})
+        self.assertIn(name, {row["name"] for row in retired["models"]})
 
     def test_qwen36_35b_remains_graveyard_only(self) -> None:
         active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
@@ -473,11 +472,11 @@ class CategoryInterfaceTests(unittest.TestCase):
         with redirect_stdout(output):
             self.assertEqual(modelctl.main([]), 0)
         text = output.getvalue()
-        self.assertIn("bc250-model status agentic", text)
-        self.assertIn("bc250-model apply agentic MODEL", text)
-        self.assertIn("bc250-model apply all all", text)
-        self.assertIn("bc250-model unregister agentic MODEL", text)
-        self.assertIn("bc250-model remove agentic MODEL", text)
+        self.assertIn("bc250 model status agentic", text)
+        self.assertIn("bc250 model apply agentic MODEL", text)
+        self.assertIn("bc250 model apply all all", text)
+        self.assertIn("bc250 model unregister agentic MODEL", text)
+        self.assertIn("bc250 model remove agentic MODEL", text)
 
     def test_list_is_catalog_only_and_does_not_require_sudo(self) -> None:
         output = StringIO()
@@ -498,37 +497,19 @@ class CategoryInterfaceTests(unittest.TestCase):
     def test_status_requires_sudo_for_protected_runtime_state(self) -> None:
         with (
             patch.object(modelctl.os, "geteuid", return_value=1000),
-            self.assertRaisesRegex(modelctl.ModelError, "sudo bc250-model status"),
+            self.assertRaisesRegex(modelctl.ModelError, "sudo bc250 model status"),
         ):
             modelctl.main(["status", "agentic"])
 
-    def test_incomplete_and_legacy_commands_get_actionable_guidance(self) -> None:
-        cases = (
-            (["apply"], "apply: model category is required"),
-            (["--install"], "bc250-model apply <category>"),
-            (["--refresh"], "bc250-model refresh <category>"),
-            (["install", "agentic"], "'install' was replaced by 'apply'"),
-            (["install", "--all"], "bc250-model apply all all"),
-            (["install", "experiments", "--all"], "bc250-model apply experiments all"),
-            (["install", "experiments", "--refresh", "--all"], "bc250-model refresh experiments all"),
-            (["apply", "--all"], "bc250-model apply all all"),
-            (["apply", "experiments", "--all"], "bc250-model apply experiments all"),
-            (["remove", "--all"], "destructive operations require an explicit"),
-            (["remove", "experiments", "--all"], "bc250-model remove experiments all"),
-            (["unregister", "--all"], "destructive operations require an explicit"),
-            (
-                ["cleanup", "agentic", "x", "--keep-gguf"],
-                "'cleanup' was replaced by 'unregister'",
-            ),
-            (["cleanup-retired"], "'cleanup-retired' was replaced by 'purge-retired'"),
-            (["resolve", "mtp", "x"], "'resolve' was replaced by 'path'"),
-            (["all", "--install"], "bc250-model apply all"),
+    def test_model_command_set_is_greenfield_only(self) -> None:
+        parser = modelctl.build_parser()
+        subparsers = next(
+            action for action in parser._actions if isinstance(action, modelctl.argparse._SubParsersAction)
         )
-        for argv, expected in cases:
-            with self.subTest(argv=argv), self.assertRaisesRegex(
-                modelctl.ModelError, expected
-            ):
-                modelctl.main(argv)
+        self.assertEqual(
+            set(subparsers.choices),
+            {"list", "status", "path", "apply", "refresh", "unregister", "remove", "purge-retired"},
+        )
 
 
     def test_destructive_combined_catalog_prompt_does_not_casually_print_all_command(self) -> None:
@@ -547,14 +528,11 @@ class CategoryInterfaceTests(unittest.TestCase):
         text = output.getvalue()
         self.assertIn("Category 'all' means the combined catalog", text)
         self.assertIn("destructive actions", text)
-        self.assertNotIn("sudo bc250-model remove all all", text)
+        self.assertNotIn("sudo bc250 model remove all all", text)
 
-    def test_active_package_callers_use_new_model_manager_lifecycle(self) -> None:
+    def test_active_package_callers_use_canonical_model_manager_lifecycle(self) -> None:
         callers = (
             "cmd/system/install.sh",
-            "models/coding-agent/setup-ollama.sh",
-            "models/embedding/setup-ollama.sh",
-            "models/task-model/setup-ollama.sh",
             "models/ocr/bc250-ocr.sh",
             "models/mtp/run-mtp-llamacpp.sh",
             "quality-checks/main/10-main-model-candidate-matrix.sh",
@@ -564,21 +542,13 @@ class CategoryInterfaceTests(unittest.TestCase):
             "quality-checks/package/installed-assets.sh",
             "scripts/validate.py",
         )
-        forbidden = (
-            "bc250-model install",
-            "bc250-model cleanup",
-            "bc250-model cleanup-retired",
-            "bc250-model resolve",
-            '"$MANAGER" install',
-            '"$MANAGER" resolve',
-            "--keep-gguf",
-            "sudo bc250-model list",
-            "sudo bc250-model path",
-        )
         for relative in callers:
             text = (ROOT / relative).read_text(encoding="utf-8")
-            for old in forbidden:
-                self.assertNotIn(old, text, f"{relative}: stale model-manager call {old}")
+            self.assertNotRegex(text, r"\bbc250-(?:model|fetch-mtp)\b(?=[\s`'\"),;:]|$)", relative)
+        installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
+        self.assertIn("bc250 model status all --compact", installer)
+        self.assertIn("bc250 model apply all", installer)
+
 
     def test_global_source_override_requires_exactly_one_selected_model(self) -> None:
         catalogs = [
@@ -1032,6 +1002,85 @@ class StatusTests(unittest.TestCase):
         self.assertIn("Source revision: latest", text)
         self.assertIn(f"Source SHA-256: {'b' * 64}", text)
 
+    def test_optional_model_status_distinguishes_unselected_from_real_drift(self) -> None:
+        model = {
+            "id": "exp-test",
+            "name": "exp-test",
+            "category": "experiments",
+            "provider": "ollama",
+            "origin": "packaged",
+            "gguf": "exp-test.gguf",
+            "revision": "latest",
+        }
+        defaults = {"destination": "/unused", "modelfile_destination": "/unused"}
+
+        def inspect(source_status: str, modelfile_status: str, registrations: set[str]):
+            with (
+                patch.object(
+                    modelctl,
+                    "inspect_local_source",
+                    return_value=(source_status, "test source", "a" * 64 if source_status == "current" else ""),
+                ),
+                patch.object(modelctl, "runtime_modelfile_path", return_value=Path("/tmp/exp-test.Modelfile")),
+                patch.object(
+                    modelctl,
+                    "inspect_runtime_modelfile",
+                    return_value=(modelfile_status, "test runtime"),
+                ),
+            ):
+                return modelctl.inspect_model_state(
+                    defaults, model, registrations=registrations, destination="/tmp"
+                )
+
+        absent = inspect("missing", "missing", set())
+        self.assertEqual(absent.overall_status, "OPTIONAL")
+        self.assertEqual(modelctl.displayed_status_text(absent), "OPTIONAL — not installed")
+        self.assertIsNone(modelctl.recommended_status_action(absent))
+
+        cached = inspect("current", "missing", set())
+        self.assertEqual(cached.overall_status, "OPTIONAL")
+        self.assertEqual(
+            modelctl.displayed_status_text(cached),
+            "OPTIONAL — source cached, not registered",
+        )
+        self.assertEqual(
+            modelctl.compact_inspection_details(cached),
+            ["OPTIONAL", "source cached, not registered"],
+        )
+        self.assertIsNone(modelctl.recommended_status_action(cached))
+
+        selected_but_missing = inspect("current", "current", set())
+        self.assertEqual(selected_but_missing.overall_status, "DRIFT")
+        self.assertEqual(
+            modelctl.recommended_status_action(selected_but_missing),
+            "sudo bc250 model apply experiments exp-test",
+        )
+
+        selected_current = inspect("current", "current", {"exp-test"})
+        self.assertEqual(selected_current.overall_status, "CURRENT")
+
+    def test_optional_unselected_model_never_recommends_online_refresh(self) -> None:
+        inspection = modelctl.ModelInspection(
+            model={
+                "id": "exp-test",
+                "name": "exp-test",
+                "category": "experiments",
+                "provider": "ollama",
+            },
+            source_path=Path("/tmp/exp-test.gguf"),
+            state_path=Path("/tmp/exp-test.gguf.bc250.json"),
+            source_status="current",
+            source_detail="verified",
+            source_checksum="a" * 64,
+            runtime_modelfile=Path("/tmp/exp-test.Modelfile"),
+            modelfile_status="missing",
+            registration_status="missing",
+            overall_status="OPTIONAL",
+            remote_status="update available",
+            remote_detail="remote differs",
+        )
+        self.assertIsNone(modelctl.recommended_status_action(inspection))
+
     def test_disabled_mtp_status_recommends_an_action_that_can_select_it(self) -> None:
         model = {
             "id": "qwen3.6-27b-mtp",
@@ -1047,7 +1096,7 @@ class StatusTests(unittest.TestCase):
         )
         self.assertEqual(
             modelctl.recommended_status_action(missing),
-            "sudo bc250-fetch-mtp qwen3.6-27b-mtp",
+            "sudo bc250 fetch-mtp qwen3.6-27b-mtp",
         )
         update = modelctl.ModelInspection(
             model=model, source_path=None, state_path=None, source_status="current",
@@ -1057,7 +1106,7 @@ class StatusTests(unittest.TestCase):
         )
         self.assertEqual(
             modelctl.recommended_status_action(update),
-            "sudo bc250-model refresh mtp qwen3.6-27b-mtp --include-disabled",
+            "sudo bc250 model refresh mtp qwen3.6-27b-mtp --include-disabled",
         )
 
     def test_combined_status_handles_protected_sources_and_unmanaged_models(

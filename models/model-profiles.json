@@ -101,15 +101,6 @@
       "residency_policy": "experimental",
       "context_target": 16384,
       "specialized": true
-    },
-    "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m:latest": {
-      "intended_role": "translation-challenger-de-fr-fr-de",
-      "profile_class": "experimental-translation",
-      "reasoning_policy": "standard-instruct-generation",
-      "residency_policy": "experimental",
-      "context_target": 8192,
-      "output_token_expectation": 2048,
-      "specialized": true
     }
   }
 }

@@ -36,6 +36,7 @@ RETIRED_CATALOG = INSTALLED_SHARE / "retired-models.json"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
+OPTIONAL_CATEGORIES = frozenset({"experiments", "agentic"})
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 MTP_RECOMMENDATIONS = {"primary", "alternative"}
 RECOMMENDED_MODELS = {
@@ -124,12 +125,12 @@ def set_appliance_mode(mode: str) -> None:
     """Switch the package-defined Ollama topology before registration work."""
     if mode not in {"normal", "agent"}:
         raise ModelError(f"unsupported appliance mode: {mode}")
-    command = os.environ.get("BC250_AGENT_MODE") or shutil.which("bc250-agent-mode")
+    command = os.environ.get("BC250_DISPATCHER") or shutil.which("bc250")
     if not command:
-        raise ModelError("bc250-agent-mode is required for package-managed model registration")
+        raise ModelError("bc250 dispatcher is required for package-managed model registration")
     action = "leave" if mode == "normal" else "enter"
     result = subprocess.run(
-        [command, action],
+        [command, "agent-mode", action],
         check=False,
         stdout=(subprocess.DEVNULL if os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1" else None),
     )
@@ -348,7 +349,7 @@ def validate_operator_model_directory(directory: Path) -> None:
             f"invalid operator model definition(s) in {directory}: {names}\n"
             "Files in models.d must end in .Modelfile.\n"
             "Operator-owned files are not modified automatically. Move, rename, or "
-            "remove the listed file(s), then rerun: sudo bc250-install"
+            "remove the listed file(s), then rerun: sudo bc250 install"
         )
 
 
@@ -446,7 +447,7 @@ def load_models(
     if canonical == "mtp":
         defaults, models = load_mtp_catalog(source or default_mtp_catalog())
         # MTP is a separate TOML catalog, but displayed indexes are global across
-        # every bc250-model view. Keep the same MTP index whether the operator
+        # every bc250 model view. Keep the same MTP index whether the operator
         # lists only MTP entries or the combined catalog.
         next_index = len(discover_models(model_directories(directories)))
         normalized: list[dict] = []
@@ -786,7 +787,7 @@ def print_all_models(directories: list[Path]) -> None:
     if retired_registered:
         print("Retired package-managed Ollama models:")
         for host, name in retired_registered:
-            print(f"    - {name:<56} [{host}, set up, cleanup-retired eligible]")
+            print(f"    - {name:<56} [{host}, set up, retired purge eligible]")
     unmanaged = sorted(
         (host, name)
         for host, names in registrations.items()
@@ -1046,7 +1047,16 @@ def inspect_model_state(
         registration_status = "missing"
 
     statuses = {source_status, modelfile_status, registration_status}
-    if source_status == "missing":
+    optional_unselected = (
+        model.get("category") in OPTIONAL_CATEGORIES
+        and modelfile_status == "missing"
+        and registration_status in {"missing", "unavailable"}
+    )
+    if optional_unselected:
+        # A cached optional source is not desired active state by itself.  Only a
+        # runtime Modelfile/registration makes an optional model selected.
+        overall = "OPTIONAL"
+    elif source_status == "missing":
         overall = "MISSING"
     elif "drift" in statuses or "missing" in statuses:
         overall = "DRIFT"
@@ -1201,7 +1211,7 @@ def ollama_identity() -> tuple[int, int]:
         return pwd.getpwnam("ollama").pw_uid, grp.getgrnam("ollama").gr_gid
     except KeyError as error:
         raise ModelError(
-            "ollama user or group is missing; run bc250-install-ollama"
+            "ollama user or group is missing; run sudo bc250 install"
         ) from error
 
 
@@ -1819,16 +1829,16 @@ class FriendlyArgumentParser(argparse.ArgumentParser):
 
 
 CLI_EPILOG = """Common workflows:
-  bc250-model list
-  sudo bc250-model status agentic
-  sudo bc250-model apply agentic MODEL
-  sudo bc250-model apply all all
-  sudo bc250-model refresh agentic MODEL
-  sudo bc250-model unregister agentic MODEL
-  sudo bc250-model remove agentic MODEL
-  sudo bc250-model purge-retired
+  bc250 model list
+  sudo bc250 model status agentic
+  sudo bc250 model apply agentic MODEL
+  sudo bc250 model apply all all
+  sudo bc250 model refresh agentic MODEL
+  sudo bc250 model unregister agentic MODEL
+  sudo bc250 model remove agentic MODEL
+  sudo bc250 model purge-retired
 
-Use 'bc250-model COMMAND --help' for command-specific options.
+Use 'bc250 model COMMAND --help' for command-specific options.
 """
 
 
@@ -1857,7 +1867,7 @@ def selection_arguments(parser: argparse.ArgumentParser) -> None:
         help=(
             "model id/index/range or comma-separated selection; also recommended, "
             "production or all. Category 'all' plus selection 'all' means every "
-            "eligible model: 'bc250-model apply all all'"
+            "eligible model: 'bc250 model apply all all'"
         ),
     )
 
@@ -1916,7 +1926,7 @@ def removal_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = FriendlyArgumentParser(
-        prog="bc250-model",
+        prog="bc250 model",
         description=(
             "Manage BC-250 model catalog definitions, verified local sources and "
             "Ollama registrations."
@@ -2001,80 +2011,16 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def legacy_cli_hint(argv: list[str]) -> str | None:
-    if not argv:
-        return None
-    first = argv[0]
-    if first in {"--install", "-install"}:
-        return "'--install' is not a command; use: sudo bc250-model apply <category> [selection]"
-    if first == "--refresh":
-        return "'--refresh' is now an explicit operation; use: sudo bc250-model refresh <category> [selection]"
-    if first == "install":
-        tail = argv[1:]
-        category = next((item for item in tail if item in CATEGORIES), None)
-        if "--refresh" in tail:
-            cleaned = [item for item in tail if item not in {"--refresh", "--all"}]
-            if "--all" in tail:
-                target = category or "all"
-                return (
-                    "'install --refresh --all' was replaced by explicit category/selection "
-                    f"syntax; use: sudo bc250-model refresh {target} all"
-                )
-            rest = " ".join(cleaned)
-            return f"'install --refresh' was replaced by 'refresh'; use: sudo bc250-model refresh {rest}".rstrip()
-        if "--all" in tail:
-            target = category or "all"
-            return (
-                "'install --all' was replaced by explicit category/selection syntax; "
-                f"use: sudo bc250-model apply {target} all"
-            )
-        rest = " ".join(tail)
-        return f"'install' was replaced by 'apply'; use: sudo bc250-model apply {rest}".rstrip()
-    if first in {"apply", "refresh", "unregister", "remove"} and "--all" in argv[1:]:
-        category = next((item for item in argv[1:] if item in CATEGORIES), None)
-        if first in {"unregister", "remove"}:
-            if category:
-                return (
-                    "'--all' is not a mutation flag; 'all' is an explicit selection. "
-                    f"Use: sudo bc250-model {first} {category} all; confirmation still applies."
-                )
-            return (
-                "'--all' is not a mutation flag; destructive operations require an explicit "
-                "category and selection. Example: sudo bc250-model "
-                f"{first} experiments all; confirmation still applies."
-            )
-        target = category or "all"
-        return (
-            "'--all' is not a mutation flag; 'all' is an explicit selection. "
-            f"Use: sudo bc250-model {first} {target} all"
-        )
-    if first == "cleanup":
-        keep = "--keep-gguf" in argv[1:]
-        rest = " ".join(item for item in argv[1:] if item != "--keep-gguf")
-        replacement = "unregister" if keep else "remove"
-        return f"'cleanup' was replaced by '{replacement}'; use: sudo bc250-model {replacement} {rest}".rstrip()
-    if first == "cleanup-retired":
-        return "'cleanup-retired' was replaced by 'purge-retired'; use: sudo bc250-model purge-retired"
-    if first == "resolve":
-        rest = " ".join(argv[1:])
-        return f"'resolve' was replaced by 'path'; use: bc250-model path {rest}".rstrip()
-    if first in CATEGORIES:
-        if "--install" in argv[1:] or "-install" in argv[1:]:
-            return f"command comes before category; use: sudo bc250-model apply {first} [selection]"
-        if "--refresh" in argv[1:]:
-            return f"command comes before category; use: sudo bc250-model refresh {first} [selection]"
-    return None
-
 
 def category_required(command: str) -> ModelError:
     categories = ", ".join(CATEGORIES)
     example = {
-        "apply": "sudo bc250-model apply agentic",
-        "refresh": "sudo bc250-model refresh agentic MODEL",
-        "unregister": "sudo bc250-model unregister agentic MODEL",
-        "remove": "sudo bc250-model remove agentic MODEL",
-        "path": "bc250-model path agentic MODEL",
-    }.get(command, f"bc250-model {command} agentic")
+        "apply": "sudo bc250 model apply agentic",
+        "refresh": "sudo bc250 model refresh agentic MODEL",
+        "unregister": "sudo bc250 model unregister agentic MODEL",
+        "remove": "sudo bc250 model remove agentic MODEL",
+        "path": "bc250 model path agentic MODEL",
+    }.get(command, f"bc250 model {command} agentic")
     return ModelError(
         f"{command}: model category is required; choose one of: {categories}. Example: {example}"
     )
@@ -2083,7 +2029,7 @@ def category_required(command: str) -> ModelError:
 def require_privilege(command: str) -> None:
     if command == "status" and os.geteuid() != 0:
         raise ModelError(
-            "status inspects protected GGUF/state directories; run: sudo bc250-model status ..."
+            "status inspects protected GGUF/state directories; run: sudo bc250 model status ..."
         )
     if command in {"apply", "refresh", "unregister", "remove", "purge-retired"} and os.geteuid() != 0:
         raise ModelError(f"{command} changes package-managed model state; run with sudo")
@@ -2135,18 +2081,32 @@ def status_source_text(inspection: ModelInspection) -> str:
     return mapping.get(inspection.source_status, inspection.source_status)
 
 
+def displayed_status_text(inspection: ModelInspection) -> str:
+    if inspection.overall_status != "OPTIONAL":
+        return inspection.overall_status
+    if inspection.source_status == "current":
+        return "OPTIONAL — source cached, not registered"
+    if inspection.source_status == "drift":
+        return "OPTIONAL — source cached, not registered (source needs refresh before use)"
+    if inspection.source_status == "unavailable":
+        return "OPTIONAL — not selected (source state unavailable)"
+    return "OPTIONAL — not installed"
+
+
 def recommended_status_action(inspection: ModelInspection) -> str | None:
+    if inspection.overall_status == "OPTIONAL":
+        return None
     model = inspection.model
     category = model["category"]
     name = model.get("name", model["id"])
     if inspection.remote_status == "update available":
         if category == "mtp" and not model.get("enabled", False):
-            return f"sudo bc250-model refresh mtp {name} --include-disabled"
-        return f"sudo bc250-model refresh {category} {name}"
+            return f"sudo bc250 model refresh mtp {name} --include-disabled"
+        return f"sudo bc250 model refresh {category} {name}"
     if inspection.overall_status in {"MISSING", "DRIFT"}:
         if category == "mtp" and not model.get("enabled", False):
-            return f"sudo bc250-fetch-mtp {name}"
-        return f"sudo bc250-model apply {category} {name}"
+            return f"sudo bc250 fetch-mtp {name}"
+        return f"sudo bc250 model apply {category} {name}"
     return None
 
 
@@ -2170,6 +2130,10 @@ def compact_inspection_details(inspection: ModelInspection) -> list[str]:
         return ["agent lane inactive", "deferred"]
     if inspection.overall_status == "CURRENT":
         return ["CURRENT"]
+    if inspection.overall_status == "OPTIONAL":
+        if inspection.source_status in {"current", "drift"}:
+            return ["OPTIONAL", "source cached, not registered"]
+        return ["OPTIONAL", "not installed"]
 
     details = [model["provider"], definition_origin(model)]
     source = {
@@ -2230,7 +2194,7 @@ def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> Non
     print(f"  Upstream:       {upstream}")
     if inspection.remote_detail:
         print(f"    detail:       {inspection.remote_detail}")
-    print(f"  Status:         {inspection.overall_status}")
+    print(f"  Status:         {displayed_status_text(inspection)}")
     action = recommended_status_action(inspection)
     if action:
         print(f"  Recommended:    {action}")
@@ -2428,9 +2392,6 @@ def main(argv: list[str] | None = None) -> int:
     if not values:
         parser.print_help()
         return 0
-    if hint := legacy_cli_hint(values):
-        raise ModelError(hint)
-
     args = parser.parse_args(values)
     if args.command is None:
         parser.print_help()
@@ -2473,7 +2434,7 @@ def main(argv: list[str] | None = None) -> int:
             raise category_required("path")
         if not args.id:
             raise ModelError(
-                "path: model id is required. Example: bc250-model path agentic MODEL"
+                "path: model id is required. Example: bc250 model path agentic MODEL"
             )
         defaults, model = resolve_one_model(
             canonical_category(args.category),
@@ -2590,7 +2551,7 @@ def main(argv: list[str] | None = None) -> int:
                 else:
                     print(
                         f"To select every eligible model explicitly: "
-                        f"sudo bc250-model {args.command} all all"
+                        f"sudo bc250 model {args.command} all all"
                     )
         selected = selected_models_for_catalog(
             available, args.selection, interactive=True
