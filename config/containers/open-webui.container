@@ -1,5 +1,5 @@
 # Packaged rootful Quadlet. Application desired state is applied through
-# bc250-openwebui-setup from /usr/share/bc250-llm-server/openwebui/desired-state.json.
+# bc250 openwebui-setup from /usr/share/bc250-llm-server/openwebui/desired-state.json.
 [Unit]
 Description=Open WebUI (BC-250 local LLM front-end)
 After=network-online.target ollama.service ollama-task.service ollama-embedding.service tika.service
@@ -20,7 +20,7 @@ NoNewPrivileges=true
 DropCapability=all
 
 # Process bootstrap only. Persisted providers, task settings, embedding backend
-# and RAG chunking are owned by bc250-openwebui-setup through supported APIs.
+# and RAG chunking are owned by bc250 openwebui-setup through supported APIs.
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 EnvironmentFile=/var/lib/bc250-llm-server/secrets/open-webui.env
