@@ -733,7 +733,7 @@ def fmt(value: Any, digits: int = 2) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250-benchmark generation",
+        prog="bc250 benchmark generation",
         description="BC-250 generation benchmark for the package-pinned Ollama runtime.",
     )
     parser.add_argument(
@@ -910,7 +910,7 @@ def main() -> int:
         encoding="utf-8",
     )
     runtime_evidence = ollama_runtime_evidence(client.base_url)
-    cu_evidence = command_evidence(["bc250-cu-status"])
+    cu_evidence = command_evidence([os.environ.get("BC250_CU_STATUS", "/usr/libexec/bc250-llm-server/cu-status.sh")])
     model_metadata: list[dict[str, Any]] = []
     for model in models:
         try:

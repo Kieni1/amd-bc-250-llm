@@ -3070,7 +3070,7 @@ def add_common(parser: argparse.ArgumentParser, default_url: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250-benchmark",
+        prog="bc250 benchmark",
         description="Category-specific BC-250 benchmark suites for the package-pinned Ollama runtime.",
     )
     sub = parser.add_subparsers(dest="category", required=True)
