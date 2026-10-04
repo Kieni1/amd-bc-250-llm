@@ -1,10 +1,10 @@
-# BC-250 benchmark and package qualification
+# Benchmarking and package qualification
 
 The package deliberately separates three operator questions:
 
-- `bc250-verify`: is the appliance healthy now?
-- `bc250-benchmark`: which model or setting behaves better?
-- `bc250-revalidate`: does the configuration shipped by this package qualify on this BC-250?
+- `bc250 verify`: is the appliance healthy now?
+- `bc250 benchmark`: which model or setting behaves better?
+- `bc250 revalidate`: does the configuration shipped by this package qualify on this BC-250?
 
 Revalidation does not choose settings. Tuning and A/B comparisons are explicit benchmark commands.
 
@@ -51,12 +51,12 @@ Quality `NOT-RUN` even when the measurements themselves completed successfully.
 ## Generation
 
 ```bash
-bc250-benchmark generation MODEL [MODEL ...]
-bc250-benchmark generation --profile compare MODEL...
-bc250-benchmark generation --profile edge --mode production MODEL...
-bc250-benchmark generation --profile thermal MODEL...
-bc250-benchmark generation --deep-context MODEL...
-bc250-benchmark generation --profile thermal --sustained-seconds 180 MODEL...
+bc250 benchmark generation MODEL [MODEL ...]
+bc250 benchmark generation --profile compare MODEL...
+bc250 benchmark generation --profile edge --mode production MODEL...
+bc250 benchmark generation --profile thermal MODEL...
+bc250 benchmark generation --deep-context MODEL...
+bc250 benchmark generation --profile thermal --sustained-seconds 180 MODEL...
 ```
 
 Profiles and optional qualification modes:
@@ -81,7 +81,7 @@ more aggressive comparison, but neither is globally promoted by this policy. Do 
 F16 when it makes the target context infeasible.
 
 After load/resource/completion-integrity smoke, use the existing compact
-`bc250-benchmark usecase MODEL` as the tiny semantic sanity gate before expensive
+`bc250 benchmark usecase MODEL` as the tiny semantic sanity gate before expensive
 deep-context or sustained testing.
 
 The normal comparison summary emphasizes decode mean/CV, cold load, warm answer
@@ -103,7 +103,7 @@ thinking policy for a comparison.
 ## Embeddings
 
 ```bash
-bc250-benchmark embeddings [MODEL ...]
+bc250 benchmark embeddings [MODEL ...]
 ```
 
 Reports Recall@1, Recall@3, MRR, cross-language metrics, hard-case Recall@1 and
@@ -114,7 +114,7 @@ qualification policy; individual query rows are observations.
 ## OCR
 
 ```bash
-bc250-benchmark ocr [MODEL ...]
+bc250 benchmark ocr [MODEL ...]
 ```
 
 Text fidelity is scored on canonicalized plain text so requested Markdown/HTML
@@ -126,7 +126,7 @@ separately. OCR remains a benchmark role until a production OCR model is promote
 ## Task
 
 ```bash
-bc250-benchmark task [MODEL ...]
+bc250 benchmark task [MODEL ...]
 ```
 
 Exercises title, tag and retrieval-query shapes using the exact package-owned prompt
@@ -142,9 +142,9 @@ upstream/default Open WebUI prompts could turn a 15/18 direct result into 6/18 l
 Agent mode is exclusive. Enter it before benchmarking the packaged agent lane:
 
 ```bash
-sudo bc250-agent-mode enter
-bc250-benchmark agent MODEL --ollama-url http://127.0.0.1:11436
-sudo bc250-agent-mode leave
+sudo bc250 agent-mode enter
+bc250 benchmark agent MODEL --ollama-url http://127.0.0.1:11436
+sudo bc250 agent-mode leave
 ```
 
 The agent benchmark is a safe static contract check. It records raw-format, syntax
@@ -164,7 +164,7 @@ machine ranking is produced.
 ## Production use-case acceptance
 
 ```bash
-bc250-benchmark usecase [MODEL ...]
+bc250 benchmark usecase [MODEL ...]
 ```
 
 Runs a compact deterministic role-level acceptance set. This is quality evidence,
@@ -173,7 +173,7 @@ not a general model ranking score.
 ## Translation
 
 ```bash
-bc250-benchmark translation [--think auto|true|false] [MODEL ...]
+bc250 benchmark translation [--think auto|true|false] [MODEL ...]
 ```
 
 Records target-language adherence, semantic anchors, preserved identifiers/numbers,
@@ -187,10 +187,10 @@ translation preset.
 ## Direct RAG
 
 ```bash
-bc250-benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
-bc250-benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
-bc250-benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
-bc250-benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
+bc250 benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
+bc250 benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
+bc250 benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
+bc250 benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
 ```
 
 `rag-cycle` checks that the answer model remains available while the dedicated
@@ -222,14 +222,14 @@ These commands are explicit experiments. They are not part of routine package
 revalidation unless a promoted setting is later exercised there.
 
 ```bash
-bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
-bc250-benchmark num-batch MODEL [MODEL ...]
+bc250 benchmark concurrency MAIN_MODEL EMBED_MODEL
+bc250 benchmark num-batch MODEL [MODEL ...]
 
-bc250-benchmark owui-translation --token-file FILE
-bc250-benchmark owui-rag MODEL --token-file FILE
-bc250-benchmark owui-embedding-batch --token-file FILE
-bc250-benchmark owui-chunk-min MODEL --token-file FILE
-sudo bc250-benchmark owui-system-context MODEL --token-file FILE
+bc250 benchmark owui-translation --token-file FILE
+bc250 benchmark owui-rag MODEL --token-file FILE
+bc250 benchmark owui-embedding-batch --token-file FILE
+bc250 benchmark owui-chunk-min MODEL --token-file FILE
+sudo bc250 benchmark owui-system-context MODEL --token-file FILE
 ```
 
 Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
@@ -242,7 +242,7 @@ different package-owned internal path: externally supplied exact-device evidence
 records the current `params.max_tokens=6144` candidate and expects outbound Ollama `options.num_predict=6144`, with no
 root-level Ollama `max_tokens`. The same adapter path was proven end-to-end at 4096 on the previous exact-device run; 6144 requires focused no-regression qualification after install. The raw outbound capture of the prior 4096 run is not retained in this source tree. Direct benchmark callers
 that require a hard generation cap likewise use native nested `options.num_predict`. See
-`docs/openwebui-settings.md` for the related reasoning-token and finish-reason metadata limitations.
+`docs/OPENWEBUI.md` for the related reasoning-token and finish-reason metadata limitations.
 
 `concurrency` records both request outcomes, latency, minimum `MemAvailable`, swap
 start/peak/end/delta and device-facing telemetry.
@@ -264,24 +264,29 @@ valid matching preset IDs. Only the sanitized active `preset_id -> base_model` m
 in benchmark metadata. Open WebUI must answer HTTP readiness before the product-path benchmark
 starts; the readiness allowance is bounded to five minutes for slow application restarts.
 
-## Revalidation harness v4.6
+## Revalidation harness v4.7
 
 ```bash
-sudo bc250-revalidate start
+sudo bc250 revalidate start
 # Explicit partial coverage only:
-sudo bc250-revalidate start --skip-owui
-sudo bc250-revalidate status
-sudo bc250-revalidate status --raw  # machine-readable key=value state
+sudo bc250 revalidate start --skip-owui
+sudo bc250 revalidate status
+sudo bc250 revalidate status --raw  # machine-readable key=value state
 ```
 
 Agent is an optional add-on. If the recommended Ornith Agent source/registration is absent, its
 qualification is reported as `coverage unavailable/skipped` and overall coverage becomes PARTIAL; this is
-not a GPU/runtime infrastructure failure and does not invalidate the core appliance. Install it explicitly
-with `sudo bc250-model apply agentic agentic-ornith15-9b-ornith-q5-k-m` when Agent coverage is desired.
+not a GPU/runtime infrastructure failure and does not invalidate the core appliance. A run that executes all
+required phases still reports `Run completion: completed`; completion and optional coverage are independent.
+Install the Agent explicitly with `sudo bc250 model apply agentic agentic-ornith15-9b-ornith-q5-k-m` when
+Agent coverage is desired.
 
 The Open WebUI translation phase finalizes direct API completions through `/api/chat/completed`
-before scoring so the package-owned translation `outlet()` integrity filter is part of the
-qualified product path on tagged Open WebUI releases.
+before scoring so the package-owned translation `outlet()` integrity filter is part of the qualified product
+path. Evidence keeps the raw-model translation result separate from the delivered product result: when a raw
+translation violates the modality/literal guard and the outlet withholds it, the product integrity control is
+PASS while the underlying raw-model quality failure remains recorded. Over-blocking a valid translation remains
+a product quality failure.
 
 The systemd-owned worker uses six phases:
 
@@ -302,7 +307,7 @@ quality and restoration separately. Worker liveness and the age of the last real
 progress event are also separate; a free-running pulse is never presented as proof
 of benchmark progress.
 
-Harness v4.6 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
+Harness v4.7 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
 deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
 snapshots remain at preflight, agent-mode transitions, final restoration and failures.
