@@ -11,13 +11,6 @@ archive = "cyan-skillfish-governor-{commit}.tar.gz"
 cargo_vendor = true
 vendor_archive = "cyan-skillfish-governor-vendor-{commit}.tar.xz"
 
-[[sources]]
-id = "unlock"
-label = "40-CU unlock tools"
-repository = "fduraibi/bc250-40cu-unlock"
-commit = "6c3969ddee40e894297869e6ca30537f274619cb"
-url = "https://github.com/fduraibi/bc250-40cu-unlock/archive/{commit}.tar.gz"
-archive = "bc250-40cu-unlock-{commit}.tar.gz"
 
 [[sources]]
 id = "live_manager"

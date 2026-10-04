@@ -1,0 +1,34 @@
+# BC-250 appliance-specific rpmlint policy.
+#
+# These filters cover deliberate policy choices or known false positives only.
+# Genuine packaging defects should be fixed in the package, not hidden here.
+
+Filters = [
+  # Private appliance state/cache/model directories are intentionally not 0755.
+  'E: non-standard-dir-perm /var/(?:lib/bc250-llm-server|cache/bc250-llm-server|backups/bc250-llm-server)(?:/[^ ]*)? (?:700|710|750)$',
+  'E: non-standard-dir-perm /var/lib/(?:ollama|open-webui)(?:/[^ ]*)? 750$',
+  'E: non-standard-dir-perm /srv/bc250-documents 750$',
+
+  # Package-created service/backup accounts intentionally own appliance state.
+  'W: non-standard-uid /var/(?:lib/bc250-llm-server|cache/bc250-llm-server|lib/ollama)(?:/[^ ]*)? ollama$',
+  'W: non-standard-gid /var/(?:lib/bc250-llm-server|cache/bc250-llm-server|lib/ollama)(?:/[^ ]*)? ollama$',
+  'W: non-standard-gid /var/backups/bc250-llm-server(?:/[^ ]*)? bc250-backup-export$',
+
+  # /var/backups is the package's deliberate persistent backup location.
+  'W: non-standard-dir-in-var backups$',
+
+  # Prepared source archives are local pinned inputs staged by the build system.
+  'W: invalid-url Source[0-3]: ',
+
+  # systemd is a proper product name; the bundled GPLv2 text is preserved verbatim.
+  "E: spelling-error \\('systemd',",
+  'E: incorrect-fsf-address /usr/share/licenses/bc250-llm-server/LICENSE$',
+
+  # Operator docs are shipped under /usr/share/doc rather than man pages.
+  'W: no-manual-page-for-binary (?:bc250|bc250-40cu|bc250-cu-live-manager|cyan-skillfish-governor-smu|cyan-skillfish-performance-mode|llm-run-diagnose)$',
+
+  # Scriptlet commands are intentionally narrow package-maintenance operations.
+  'W: dangerous-command-in-%preun rm$',
+  'W: dangerous-command-in-%pre rm$',
+  'W: dangerous-command-in-%post chmod$',
+]

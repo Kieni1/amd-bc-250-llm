@@ -1,33 +1,26 @@
 #!/usr/bin/env bash
-# Multicall entry point for the package's stable bc250-* command names.
+# Greenfield multicall entry point for the supported BC-250 product commands.
 set -Eeuo pipefail
 
-LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
-SHARE="${BC250_SHARE:-/usr/share/bc250-llm-server}"
-DOCDIR="${BC250_DOCDIR:-/usr/share/doc/bc250-llm-server}"
+# Package Python helpers live under immutable /usr. Never create runtime bytecode there.
+export PYTHONDONTWRITEBYTECODE=1
 
-# One table drives both installed aliases and command dispatch. Fields after
-# the command name form the executable argv prefix.
+LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
+
 ROUTES=(
-  "40cu|$LIBEXEC/40cu.sh"
   "agent-mode|$LIBEXEC/agent-mode.sh"
   "benchmark|$LIBEXEC/benchmark.sh"
   "revalidate|$LIBEXEC/revalidate.sh"
-  "check-temp|$LIBEXEC/check-temp.sh"
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
-  "cu-status|$LIBEXEC/cu-status.sh"
   "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install|$LIBEXEC/install.sh"
-  "install-ollama|$LIBEXEC/install-ollama.sh"
   "maintenance|$LIBEXEC/maintenance.sh"
-  "memory-profile|$LIBEXEC/memory-profile.sh"
   "model|$LIBEXEC/modelctl"
   "ocr|$LIBEXEC/ocr.sh"
   "rag|$LIBEXEC/rag"
-  "rag-import|$LIBEXEC/rag"
   "reset|$LIBEXEC/uninstall.sh"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "openwebui-setup|$LIBEXEC/openwebui-setup.py"
@@ -35,47 +28,34 @@ ROUTES=(
   "status|$LIBEXEC/status.sh"
   "support-bundle|$LIBEXEC/support-bundle.sh"
   "storage|$LIBEXEC/storage.py"
-  "swap-profile|$LIBEXEC/swap-profile.sh"
-  "uninstall|$LIBEXEC/uninstall.sh"
-  "reset-info|cat|$DOCDIR/UNINSTALL.md"
-  "uninstall-info|cat|$DOCDIR/UNINSTALL.md"
   "verify|$LIBEXEC/verify.sh"
-  "verify-lan|$LIBEXEC/verify-lan.sh"
 )
-
-if [[ "${1:-}" == --list-aliases ]]; then
-  for route in "${ROUTES[@]}"; do printf '%s\n' "${route%%|*}"; done
-  exit 0
-fi
-
-invoked="${0##*/}"
-if [[ "$invoked" == bc250 ]]; then
-  command="${1:-help}"
-  (($# == 0)) || shift
-else
-  command="${invoked#bc250-}"
-fi
 
 usage() {
   cat <<'USAGE'
 Usage: bc250 COMMAND [ARGUMENTS...]
 
-Models:
-  model, ocr, rag, rag-import, fetch-mtp
+Core appliance:
+  install, status, verify, support-bundle, storage, reset
 
-Operation:
-  status, verify, verify-lan, support-bundle, benchmark, revalidate, check-temp
-  install, install-ollama, maintenance, ollama-profile, openwebui-setup, storage
-  memory-profile, swap-profile, agent-mode, 40cu, cu-status, reset
+Models and product workflows:
+  model, rag, ocr, openwebui-setup, ollama-profile
 
-Optional workflows:
-  code, code-commit, gitea-review, compare-mtp, run-mtp
+Validation and maintenance:
+  benchmark, revalidate, maintenance, agent-mode
 
-Run `bc250 COMMAND --help` where supported. The bc250-COMMAND compatibility
-names are symlinks to this dispatcher.
+Optional specialist workflows:
+  code, code-commit, gitea-review, compare-mtp, fetch-mtp, run-mtp
+
+Run `bc250 COMMAND --help` where supported.
+CU setup uses two standalone commands:
+  sudo bc250-cu-live-manager
+  sudo bc250-40cu status
 USAGE
 }
 
+command="${1:-help}"
+(($# == 0)) || shift
 case "$command" in
   help|-h|--help) usage; exit 0 ;;
 esac

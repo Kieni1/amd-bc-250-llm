@@ -1,6 +1,5 @@
 %global governor_version 0.4.13
 %global governor_commit aaed42535622aee1a93df8b22860c409539f67f8
-%global unlock_commit 6c3969ddee40e894297869e6ca30537f274619cb
 %global live_manager_commit a929085d791f126ce76a60eb609610820fb08066
 %global source_date_epoch_from_changelog 1
 %global project_libexec %{_libexecdir}/bc250-llm-server
@@ -10,8 +9,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.12.2
-Release:        0.6%{?dist}
+Version:        0.13.1
+Release:        1.0%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -19,10 +18,8 @@ Source0:        %{name}-%{version}.tar.gz
 # filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.13
 Source1:        cyan-skillfish-governor-%{governor_commit}.tar.gz
 Source2:        cyan-skillfish-governor-vendor-%{governor_commit}.tar.xz
-# fduraibi/bc250-40cu-unlock, pinned Fedora helper revision
-Source3:        bc250-40cu-unlock-%{unlock_commit}.tar.gz
 # WinnieLV/bc250-cu-live-manager, pinned revision; upstream has no license file
-Source4:        bc250-cu-live-manager-%{live_manager_commit}.tar.gz
+Source3:        bc250-cu-live-manager-%{live_manager_commit}.tar.gz
 
 ExclusiveArch:  x86_64
 
@@ -42,13 +39,11 @@ Requires:       btrfs-progs
 Requires:       coreutils
 Requires:       curl
 Requires:       dbus
-Requires:       dracut
 Requires:       ethtool
 Requires:       findutils
 Requires:       firewalld
 Requires:       gawk
-Requires:       gcc
-Requires:       git
+Requires:       git-core
 Requires:       grubby
 Requires:       gzip
 Requires:       hostname
@@ -56,7 +51,6 @@ Requires:       iproute
 Requires:       jq
 Requires:       kmod
 Requires:       lm_sensors
-Requires:       make
 Requires:       mesa-vulkan-drivers
 Requires:       nginx
 Requires:       pciutils
@@ -75,7 +69,6 @@ Requires:       umr
 Requires:       vulkan-loader
 Requires:       vulkan-tools
 Requires:       xfsprogs
-Requires:       xz
 Requires:       zstd
 Requires:       zram-generator
 Requires(post):   systemd
@@ -83,27 +76,28 @@ Requires(preun):  systemd
 Requires(postun): systemd
 
 %description
-A testing-oriented Fedora integration package for using an AMD BC-250 as a
-small local LLM server. It installs the reviewed Cyan Skillfish SMU governor,
-Ollama Vulkan defaults, Open WebUI and Tika Quadlets, an HTTP reverse proxy,
-model and experiment templates, maintenance tools, benchmarks and separated
-production, task, embedding and exclusive coding-agent Ollama workflows. Open
-WebUI is initialized through its supported admin APIs; at operator request the package
-may save one verified administrator maintenance API key in its root-only secrets
-directory, while explicit protected token files remain supported overrides. The live
-CU manager and experimental 40-CU source helper
-are installed, but the RPM never changes CU routing automatically. The Ollama binary remains an upstream payload installed by the guided helper; the RPM owns the complete four-lane systemd topology. Model weights, users,
-operator-created Open WebUI state, HTTPS and CU changes remain operator-controlled.
+A Fedora integration package for running a local LLM appliance on AMD BC-250
+hardware. It installs the reviewed Cyan Skillfish SMU governor, local Ollama
+service lanes, Open WebUI and Tika Quadlets, an HTTP reverse proxy, product RAG
+and model-management workflows, maintenance tools, benchmarks and optional
+specialist workflows. Open WebUI is initialized through supported administrator
+APIs. At operator request, the package may save one verified administrator
+maintenance API key in its root-only secrets directory; explicit protected
+token files remain supported overrides. The pinned live CU manager is
+installed, but the RPM never changes CU routing automatically. The Ollama
+binary remains an upstream payload installed by the guided helper. The RPM owns
+the complete four-lane systemd topology. Model weights, users and
+operator-created Open WebUI state, HTTPS and CU changes remain
+operator-controlled.
 
 %prep
 %setup -q
 mkdir governor-src
 tar -xzf %{SOURCE1} -C governor-src --strip-components=1
 tar -xJf %{SOURCE2} -C governor-src
-mkdir unlock-src
-tar -xzf %{SOURCE3} -C unlock-src --strip-components=1
+cp -p governor-src/LICENSE governor-src/LICENSE.cyan-skillfish-governor
 mkdir live-manager-src
-tar -xzf %{SOURCE4} -C live-manager-src --strip-components=1
+tar -xzf %{SOURCE3} -C live-manager-src --strip-components=1
 patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch
 
 %build
@@ -135,13 +129,12 @@ python3 scripts/install-manifest.py \
   --define "modulesloaddir=%{_modulesloaddir}" \
   --define "modprobedir=%{_modprobedir}" \
   --define "dbusdir=%{_datadir}/dbus-1/system.d" \
-  --define "unlock_commit=%{unlock_commit}" \
   --define "live_manager_commit=%{live_manager_commit}"
 
 %pre
 # On upgrades with existing Open WebUI state, stop the currently running
 # service before the new Quadlet payload can become eligible through any
-# subsequent daemon-reload.  Keep boot enablement held until bc250-install
+# subsequent daemon-reload.  Keep boot enablement held until bc250 install
 # creates and verifies the stopped-state rollback snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
   # Always request a stop: is-active can transiently report activating/deactivating,
@@ -153,7 +146,7 @@ if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
     exit 1
   fi
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
-  echo "Open WebUI inactive and boot-held for migration safety. Run: sudo bc250-install"
+  echo "Open WebUI inactive and boot-held for migration safety. Run: sudo bc250 install"
 fi
 
 %post
@@ -165,12 +158,12 @@ if [ ! -s "$secret_env" ]; then
   python3 -c 'import secrets; print("WEBUI_SECRET_KEY=" + secrets.token_hex(32))' > "$secret_env"
 fi
 chmod 0600 "$secret_env"
-# The upgrade %pre scriptlet already stopped Open WebUI and removed its boot
+# The upgrade pre-install scriptlet already stopped Open WebUI and removed its boot
 # drop-in before the new Quadlet payload was installed.  Reassert the boot hold
 # defensively; guided convergence restores it only after the verified snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
-  echo "Open WebUI remains stopped and boot-held for migration safety. Run: sudo bc250-install"
+  echo "Open WebUI remains stopped and boot-held for migration safety. Run: sudo bc250 install"
 fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 
@@ -191,7 +184,7 @@ if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then
 fi
 printf '%b' "$bc250_amber"
 echo "Next step:"
-echo "  sudo bc250-install"
+echo "  sudo bc250 install"
 printf '%b' "$bc250_reset"
 
 %preun
@@ -222,7 +215,8 @@ EOF_POSTUN
 fi
 
 %files -f %{payload_filelist}
-%license licenses/LICENSE governor-src/LICENSE licenses/40CU-LICENSE-NOTICE
+%license licenses/LICENSE governor-src/LICENSE.cyan-skillfish-governor
+%ghost %dir %attr(0750,root,root) /srv/bc250-documents
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/secrets
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
@@ -261,11 +255,31 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Oct 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.0
+- Prevent package Python helpers from writing bytecode under immutable /usr and clean stale package-tree caches during guided install/upgrade convergence.
+- Make optional-model status semantic: intentionally absent/cached optional models report OPTIONAL without repair advice, while selected models with broken runtime state remain DRIFT.
+- Exclude retired/non-user-visible model registrations from active Open WebUI base-override desired state while retaining lifecycle cleanup through model purge-retired.
+- Promote the qualified 0.12.2 appliance line to the 0.13.1 release series without changing runtime/model/CU/RAG policy.
+
+* Sat Oct 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.8
+- Correct revalidation UX so completed runs remain COMPLETED when optional Agent coverage is PARTIAL; report diagnostics and coverage independently.
+- Distinguish raw Translate-Gemma quality defects from successful Open WebUI fail-closed withholding, so the product integrity guard is reported as PASS when it blocks unsafe output.
+- Simplify live-CU installer/status terminology around live routing, saved boot profile and boot-restore service; clarify optional Agent normal-mode verification and remove redundant post-install setup prompts.
+- Reduce the fresh-install dependency footprint safely by requiring `git-core` instead of the full `git` meta-package; retain Vulkan, UMR, Poppler and Hugging Face dependencies because they back active compute, live-CU, RAG and model-management product paths.
+- Keep runtime/model pins unchanged: Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, Advanced 6144 and Deep 2m.
+* Sat Oct 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.7
+- Polish the greenfield RPM: keep distinct project/governor license basenames, normalize prepared source permissions, represent the RAG document root in the file list, keep the internal importer non-executable, and add payload assertions plus configured CI rpmlint.
+- Remove the remaining pre-greenfield model-manager migration shim and stale command spellings from active scripts/tests/docs; keep the canonical `bc250 COMMAND` interface plus the deliberate standalone CU tools.
+- Re-audit the binary payload and source callers for removed aliases, replacement-module assets, installed engineering candidate screens and stale documentation paths; keep RAG as an active product workflow and EuroLLM graveyard-only.
+- Refresh operator documentation and terminal help for the final role-specific structured-output policy, translation limitation/guard decision, optional-Agent coverage semantics, live-manager-only CU workflow and product RAG lifecycle.
+- Keep runtime/model pins unchanged: Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, Advanced 6144 and Deep 2m.
 * Fri Oct 02 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.6
-- Add explicit Advanced Structured (`think=false`) while preserving normal Advanced reasoning; document Standard/Documents role-specific schema policy and leave Deep unchanged.
+- Add explicit Advanced Structured (`think=false`) while preserving normal Advanced reasoning; qualify Standard and Documents structured output with exact schema plus request `temperature=0.0`; leave Deep unchanged.
 - Keep Agent optional: absent Agent coverage is skipped/partial rather than core infrastructure failure; installed Agent runtime/topology failures remain infrastructure failures.
-- Document the accepted Translate-Gemma recommendation-strengthening limitation and add opt-in EuroLLM 9B Instruct 2512 Q4_K_M as an experimental translation challenger.
+- Retain Translate-Gemma after the EuroLLM challenger exposed a reproducible wrong-language regression; document the accepted recommendation-strengthening limitation, keep the fail-closed product guard, and move EuroLLM to the graveyard with no Round 2.
 - Add generation cold-load/deep-context/thermal/completeness summaries, compact installer completion guidance and graveyard-only Qwen3.6 35B retention.
+- Retire the archived replacement-AMDGPU 40-CU backend and its upstream source/build/cache surface; standardize operator CU setup on `bc250-cu-live-manager` with `bc250-40cu status` for verification.
+- Consolidate installed operator documentation into canonical guides and retire the obsolete optional GFX1013 compute-queue verifier/documentation path.
 * Sun Sep 27 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.5
 - Harden guided Open WebUI convergence so package-owned desired state is applied and verified before public/boot publication, preventing stale live policy after upgrades.
 - Raise the bounded Advanced candidate to max_tokens=6144 with think=true and the established sampler contract; preserve clean budget exhaustion as INCOMPLETE and repetition as a quality defect.
@@ -304,30 +318,30 @@ fi
 - Synchronize all models discovered on the normal main/task Ollama lanes into package-managed visible Open WebUI testing records with additive ordinary-user read access, while excluding embedding/agent lanes and failing safe on unavailable provider discovery.
 - Centralize qualified Qwen request policy in the existing Open WebUI model authority, expose effective nested parameters in diagnostics, and reuse those policies in production-mode generation benchmarks without repacking embedded chat templates.
 - Add bounded DE/FR translation integrity checks for high-confidence modality drift and preserved dates/amounts/identifiers; expand translation fixtures without changing the production translation model.
-- Improve operator evidence with current residency in bc250-status, exact installed NEVRA in revalidation v4.5, clearer reboot-not-checked wording, and timeout/self-verification hardening in bc250-support-bundle.
+- Improve operator evidence with current residency in bc250 status, exact installed NEVRA in revalidation v4.5, clearer reboot-not-checked wording, and timeout/self-verification hardening in bc250 support-bundle.
 - Keep proven topology, Deep keep_alive=0, TTM/40-CU policy, RAG architecture and Open WebUI 0.11.3 unchanged; defer model-only deployment and generic memory admission.
 
 * Wed Sep 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.5
 - Fix local RAG preparation to use Ollama chat output with separated native thinking, fail closed on truncated/empty/fenced/reasoning-contaminated final content, and score source fidelity only against validated final Markdown.
 - Preserve unique source identifiers during normalization, reject reasoning markers during working/active validation, and distinguish expected OCR/oversize deferrals from real preparation errors with clearer review/status UX.
-- Fix bc250-revalidate status --raw argument forwarding and advance the harness to v4.4 without changing its qualified phases/bundle semantics.
+- Fix bc250 revalidate status --raw argument forwarding and advance the harness to v4.4 without changing its qualified phases/bundle semantics.
 - Make healthy live 40-CU routing primary in installer/dashboard wording, clarify the optional persistent boot module, and make the initial kernel plan explicitly defer repository update evaluation to step 2.
 - Strengthen the GPT-OSS Deep system prompt to prefer fewer accurate facts over plausible list-filling without changing sampling, context, residency or model runtime policy.
 
 * Wed Sep 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.4
 - Promote device-qualified Ollama 0.34.2 with exact release-payload URL/SHA verification while preserving package-owned service topology.
-- Add the local bc250-rag DE/FR/bilingual preparation, human-review, activation and ingestion lifecycle while retaining the legacy rag-import compatibility route.
+- Add the local bc250 rag DE/FR/bilingual preparation, human-review, activation and ingestion lifecycle while retaining the then-current legacy importer compatibility route.
 - Remove obsolete historical kernel-version warnings, qualify IOMMU as outside the supported baseline rather than hardware-broken, and improve live TTM conflict diagnostics.
 - Normalize Markdown-escaped deterministic RAG markers and keep established Open WebUI/model/40-CU runtime policy otherwise unchanged.
 
 * Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.3
 - Improve converged installer UX by hiding the long optional-model catalogue until an operator explicitly chooses to review additional models.
-- Add a small redacted bc250-support-bundle command that reuses existing appliance authorities and emits manifest/checksum evidence without collecting user content or credentials.
+- Add a small redacted bc250 support-bundle command that reuses existing appliance authorities and emits manifest/checksum evidence without collecting user content or credentials.
 - Advance package revalidation to harness v4.3 with manifest/checksum bundle integrity, explicit expected inactive-agent raw evidence, clearer policy-aware diagnostics, and diagnostic counts in completion/status summaries.
-- Make bc250-status distinguish Open WebUI unit activity from HTTP readiness and query the active Ollama server version through its API; clarify successful verifier output when optional authenticated checks are skipped.
+- Make bc250 status distinguish Open WebUI unit activity from HTTP readiness and query the active Ollama server version through its API; clarify successful verifier output when optional authenticated checks are skipped.
 
 * Mon Sep 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.1-0.2
-- Fix bc250-revalidate package-version gating so it reads the package-owned installed VERSION authority instead of hard-coding the obsolete 0.11.3 target.
+- Fix bc250 revalidate package-version gating so it reads the package-owned installed VERSION authority instead of hard-coding the obsolete 0.11.3 target.
 - Install VERSION under the package share and fail closed if the revalidation target version is missing or malformed.
 - Keep the 0.12.1 Open WebUI behavior unchanged; this release bump is limited to revalidation compatibility and its focused regression coverage.
 - Keep Git-only development memory outside release validation, move pre-v1 patch notes under development/patchnotes, and remove duplicate documentation/version checks already owned by existing validation gates.
@@ -348,7 +362,7 @@ fi
 - Close 2.4 as a source-validated release; exact installed RPM/device acceptance remains a separate gate.
 
 * Sun Sep 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-2.3
-- Improve operations UX without changing appliance architecture: actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, topology-aware status summary, clearer agent transitions and an idempotent `bc250-agent-mode normal` convergence alias.
+- Improve operations UX without changing appliance architecture: actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, topology-aware status summary, clearer agent transitions and an idempotent `bc250 agent-mode normal` convergence alias.
 - Keep safe-power behavior unchanged while identifying protected local SSH/service ports in defer messages without exposing peer addresses.
 - Make verifier degradation output root-cause-aware by marking lane-dependent checks unavailable/skipped; expose skipped authenticated Open WebUI checks explicitly without counting them as pass/fail.
 - Make degraded status directly actionable with the normal convergence command, include skipped checks in verifier headline totals, and keep agent-mode transition guidance aligned with that public recovery path.
@@ -388,7 +402,7 @@ fi
 * Sat Sep 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-1.7
 - Correct operator topology reporting by deriving normal/degraded/stopped/agent from the existing agent-mode classifier instead of treating agent inactivity as proof of normal mode.
 - Enforce private non-empty regular-file permissions for explicit RAG/Open WebUI and Hugging Face token-file inputs.
-- Fail closed on outer Markdown fences in raw/structured bc250-code output contracts, while keeping review/document Markdown-capable.
+- Fail closed on outer Markdown fences in raw/structured bc250 code output contracts, while keeping review/document Markdown-capable.
 - Make installer completion distinguish core verification from Open WebUI applied/skipped/retry-required state; keep Open WebUI setup failures nonfatal.
 - Keep safe-power conservative on protected TCP activity while making the message truthful, and remove the upload-pruner dependency on an assumed 50-item Open WebUI page size.
 - Allow repository bootstrap help without root and simplify current-facing documentation.
@@ -443,19 +457,19 @@ fi
 - Keep MTP qualification fail-closed on completion integrity, kernel-journal capture, draft-acceptance evidence and severe GPU/kernel faults; move the reviewed external llama.cpp starting baseline to b10964/v0.4.1 for the Qwen3.8-capable funnel; no production model or runtime topology changes.
 
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.3
-- Restore state-rich installer model selection through compact shared model-state inspection while keeping bc250-model list catalog-only.
+- Restore state-rich installer model selection through compact shared model-state inspection while keeping bc250 model list catalog-only.
 - Tighten the package-owned Open WebUI tag-generation prompt so broad and specific tags share one array and exactly one raw JSON object is emitted.
 - Improve model status auditability with explicit online-check guidance plus source repository/revision/SHA output, and make bounded context-truncation diagnostics concise while preserving qualification policy.
 - Record the installed 0.11.3-0.2.fc44 v4.2 revalidation as historical device evidence for this new source release; production roles/topology and benchmark thresholds remain unchanged.
 
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.2
-- Fix the public bc250-fetch-mtp dispatcher for the 0.11.3 lifecycle grammar and make it an explicit opt-in path for disabled MTP experiments without changing generic convergence policy.
+- Fix the public bc250 fetch-mtp dispatcher for the 0.11.3 lifecycle grammar and make it an explicit opt-in path for disabled MTP experiments without changing generic convergence policy.
 - Keep MTP display indexes globally stable between category and combined views, and enforce one-model revision/checksum overrides before combined selections are split by category.
 - Make the MTP preparation/run workflow operationally coherent and document the remaining real-device llama.cpp qualification boundary; no MTP model is promoted or enabled by default.
 - Reconcile secondary lifecycle surfaces: use unprivileged catalog discovery in the installed-assets check and align current handover/model guidance with the 0.2 MTP route.
 
 * Fri Sep 18 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.3-0.1
-- Redesign bc250-model around explicit catalog/status/apply/refresh/unregister/remove lifecycle operations and a shared read-only model-state inspector.
+- Redesign bc250 model around explicit catalog/status/apply/refresh/unregister/remove lifecycle operations and a shared read-only model-state inspector.
 - Improve model-manager guidance for incomplete and legacy command forms while preserving strict source provenance, checksum and registration safety.
 - Migrate active package callers and current-facing documentation to the new lifecycle vocabulary; historical release/campaign evidence retains the commands it actually used.
 - Advance package revalidation to v4.2 for the 0.11.3 target, surface bounded context-truncation diagnostics, avoid duplicate GPT-OSS edge performance work, and use lightweight successful intermediate checkpoints while retaining full high-value snapshots.
@@ -556,7 +570,7 @@ fi
 * Sat Sep 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.15
 - Repair authenticated translation candidate testing through Open WebUI provider allow-lists while keeping complete provider credentials out of evidence, preserving HTTP failures, and verifying exact/effective restoration.
 - Accept the demonstrated valid French formal-office wording "confirmer avoir reçu" without weakening language, identifier, date, amount, or source-leakage requirements; add deterministic provider-transaction/redaction coverage and translation run provenance/manifests.
-- Add explicit package-retired model metadata plus safe `bc250-model cleanup-retired`, canonical model identity in storage output, schema-3 state identity, and recorded-success dedupe skipping while retaining the measured 16 MiB XFS dedupe strategy.
+- Add explicit package-retired model metadata plus safe `bc250 model purge-retired`, canonical model identity in storage output, schema-3 state identity, and recorded-success dedupe skipping while retaining the measured 16 MiB XFS dedupe strategy.
 - Make protected storage accounting fail visibly instead of returning false zeroes, improve source-prune/dedupe previews, and keep production model defaults, residency policy, harness-4.0 semantics, and quality thresholds unchanged.
 
 * Fri Sep 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.14
@@ -628,7 +642,7 @@ fi
 - Improve generation UMA reporting and multi-cause RAG diagnostics without treating VRAM/GTT counters as additive memory pools.
 
 * Sun Sep 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.11.0-1.3
-- Advance bc250-revalidate to harness v4.0: six package-qualification phases, one explicit quality/infrastructure RC path, machine-readable progress events, and separate run/infrastructure/quality/restoration outcomes.
+- Advance bc250 revalidate to harness v4.0: six package-qualification phases, one explicit quality/infrastructure RC path, machine-readable progress events, and separate run/infrastructure/quality/restoration outcomes.
 - Remove tuning and hardware A/B decisions from routine revalidation; it now exercises only promoted package defaults while preserving systemd ownership, exclusive agent restoration, snapshots and final bundles.
 - Replace heartbeat-as-progress UX with worker state, stage elapsed time and last real event age; add live complete SPI/WGP routing-table health to preflight without hard-coding a universal CU count.
 
@@ -695,11 +709,11 @@ fi
 - Restore source-tree model setup executability and clarify the packaged 4K embedding context cap.
 
 * Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.4.testing
-- Ship bc250-install from the RPM, reduce the external bootstrap, and make normal setup use one primary reboot with unified model selection.
+- Ship bc250 install from the RPM, reduce the external bootstrap, and make normal setup use one primary reboot with unified model selection.
 - Skip genuinely current Ollama registrations and warn on low model-storage headroom.
 - Add explicit verified XFS model dedupe/source-prune reporting plus obsolete 40-CU cache pruning; keep all destructive storage actions opt-in.
 - Keep RPM post-install integration small and move service/firewall/SELinux provisioning into the explicit installer.
-- Package bc250-revalidate as an opt-in reboot-safe benchmark harness; retain only final result bundles after automatic work-state cleanup.
+- Package bc250 revalidate as an opt-in reboot-safe benchmark harness; retain only final result bundles after automatic work-state cleanup.
 
 * Thu Sep 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.10.0-0.3.testing
 - Bound dedicated embedding Modelfiles to 4K context, matching the service policy and reducing avoidable UMA/GTT pressure before GPT-OSS coexistence revalidation.
@@ -831,8 +845,6 @@ fi
 - Normalize the operator-supplied Modelfiles and correct the pinned Jina GGUF digest
 
 * Mon Aug 24 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.9.4-0.1.testing
-- Detect optional dedicated GFX1013 compute queues without bundling the patch stack
-- Fail verification when a selected custom Mesa ICD lacks its matching patched kernel
 - Report the exact Ollama version and recent Vulkan or AMDGPU failure signatures
 - Document smoke testing for new Ollama Vulkan releases and kernel-bound patch rebuilds
 
