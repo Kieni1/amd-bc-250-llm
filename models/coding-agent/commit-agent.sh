@@ -6,7 +6,7 @@ umask 0077
 YES=0
 [[ "${1:-}" == "--yes" ]] && { YES=1; shift; }
 [[ $# -eq 0 ]] || {
-  echo "Usage: bc250-code-commit [--yes]" >&2
+  echo "Usage: bc250 code-commit [--yes]" >&2
   exit 2
 }
 
@@ -30,7 +30,7 @@ size="$(wc -c < "$diff_file")"
   exit 1
 }
 
-bc250-code commit "$diff_file" "$msg_file"
+bc250 code commit "$diff_file" "$msg_file"
 
 subject="$(sed -n 's/^SUBJECT:[[:space:]]*//p' "$msg_file" | head -1)"
 body="$(awk '

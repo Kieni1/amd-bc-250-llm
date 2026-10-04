@@ -6,7 +6,7 @@ umask 0077
 usage() {
   cat <<'EOF'
 Usage:
-  bc250-gitea-review OWNER/REPO PR_NUMBER [--post] [--output FILE]
+  bc250 gitea-review OWNER/REPO PR_NUMBER [--post] [--output FILE]
 
 Environment:
   GITEA_URL       Base URL, for example https://git.example.net
@@ -135,7 +135,7 @@ EOF
 cat "$diff" >> "$prompt"
 printf '\n--- END UNTRUSTED PR DIFF ---\n' >> "$prompt"
 
-bc250-code review "$prompt" "$review" \
+bc250 code review "$prompt" "$review" \
   "This is a pull-request review; prioritize specific actionable findings."
 
 if [[ "$output" == "-" ]]; then

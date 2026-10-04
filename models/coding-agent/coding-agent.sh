@@ -6,7 +6,7 @@ umask 0077
 usage() {
   cat <<'EOF'
 Usage:
-  bc250-code MODE INPUT [OUTPUT] [TASK...]
+  bc250 code MODE INPUT [OUTPUT] [TASK...]
 
 MODE:
   generate  Generate a complete file from the task and optional input
@@ -20,10 +20,10 @@ INPUT may be a file path or '-' for stdin. OUTPUT may be '-' or omitted for
 stdout. Add '--' before a task beginning with '-'.
 
 Examples:
-  bc250-code review app.py review.md
-  bc250-code refactor app.py app.refactored.py "Reduce duplication"
+  bc250 code review app.py review.md
+  bc250 code refactor app.py app.refactored.py "Reduce duplication"
   printf '%s\n' 'Create a small Flask health endpoint' |
-    bc250-code generate - health.py
+    bc250 code generate - health.py
 EOF
 }
 
@@ -66,7 +66,7 @@ done
 
 if ! curl -fsS --connect-timeout 2 --max-time 3 "${OLLAMA_URL}/api/tags" >/dev/null 2>&1; then
   echo "ERROR: exclusive coding-agent backend is not active at ${OLLAMA_URL}." >&2
-  echo "Enter agent mode first: sudo bc250-agent-mode enter" >&2
+  echo "Enter agent mode first: sudo bc250 agent-mode enter" >&2
   exit 1
 fi
 

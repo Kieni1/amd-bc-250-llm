@@ -3,10 +3,10 @@
 ## Setup
 
 ```bash
-sudo bc250-model apply agentic
+sudo bc250 model apply agentic
 
 # Current measured coding-helper starting point
-sudo bc250-model apply agentic agentic-ornith15-9b-ornith-q5-k-m
+sudo bc250 model apply agentic agentic-ornith15-9b-ornith-q5-k-m
 ```
 
 The package ships static `ollama-agent.service` on port `11436` with its own model
@@ -26,7 +26,7 @@ main/task/embedding lanes. Current choices are:
 - `agentic-gemma4-12b-fable5-tau2-q4-k-m` — retained 12B Gemma 4 comparison
   until the E4B challenger establishes whether another 12B round is useful.
 
-With no selection, `bc250-model apply agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
+With no selection, `bc250 model apply agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
 blocked from untrusted networks. Add `http://host.containers.internal:11436` to
 Open WebUI only when interactive agent access is wanted. Use this service
 exclusively rather than alongside a large main-model workload.
@@ -34,15 +34,15 @@ exclusively rather than alongside a large main-model workload.
 ## Local coding helper
 
 ```bash
-bc250-code review src/app.py review.md
-bc250-code refactor src/app.py src/app.refactored.py \
+bc250 code review src/app.py review.md
+bc250 code refactor src/app.py src/app.refactored.py \
   "Keep the public API stable"
 CODING_AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m \
-  bc250-code document src/app.py docs.md
+  bc250 code document src/app.py docs.md
 ```
 
 Modes are `generate`, `refactor`, `review`, `document`, `test` and `commit`.
-`bc250-code` uses Ollama `/api/chat` with `think:true` so native reasoning remains
+`bc250 code` uses Ollama `/api/chat` with `think:true` so native reasoning remains
 separate from the final file content. It writes only terminal non-empty
 `message.content`, refuses `done_reason=length` and literal reasoning markers, and
 rejects an outer Markdown code fence for the raw-output `generate`, `refactor`, `test` and
@@ -53,7 +53,7 @@ for a deliberate comparison. A truncation failure is evidence to adjust/test the
 budget, not permission to keep a partial file.
 
 Generated output is never applied automatically; review it and run the real test
-suite. `bc250-benchmark agent` checks Bash/Python syntax and small static semantic
+suite. `bc250 benchmark agent` checks Bash/Python syntax and small static semantic
 requirements without executing model-generated code, including raw-output
 format/reasoning contamination, space-safe Bash patterns, explicit Python range
 rejection and JSON key shapes. It records native thinking separately when the runtime
@@ -62,7 +62,7 @@ exposes it.
 ## Local commits and Gitea review
 
 ```bash
-bc250-code-commit
+bc250 code-commit
 
 mkdir -p ~/.config/bc250-coding-agent
 cp /usr/share/bc250-llm-server/examples/coding-agent/gitea.env.example \
@@ -70,9 +70,9 @@ cp /usr/share/bc250-llm-server/examples/coding-agent/gitea.env.example \
 chmod 0600 ~/.config/bc250-coding-agent/gitea.env
 $EDITOR ~/.config/bc250-coding-agent/gitea.env
 
-bc250-gitea-review OWNER/REPOSITORY 42
-bc250-gitea-review OWNER/REPOSITORY 42 --output review.md
-bc250-gitea-review OWNER/REPOSITORY 42 --post
+bc250 gitea-review OWNER/REPOSITORY 42
+bc250 gitea-review OWNER/REPOSITORY 42 --output review.md
+bc250 gitea-review OWNER/REPOSITORY 42 --post
 ```
 
 The commit helper never stages or pushes. Gitea posting shows the complete
