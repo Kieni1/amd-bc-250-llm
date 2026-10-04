@@ -77,7 +77,7 @@ installer exits, or installer verification is redesigned with equivalent protect
 
 **Decision:** Do not run one giant hardware/quality campaign after every source change.
 Use a shared source gate, then qualify only the subsystems affected by the change. Run
-full `bc250-revalidate` for meaningful release/milestone qualification or material
+full `bc250 revalidate` for meaningful release/milestone qualification or material
 runtime/topology changes. Open temporary specialist chats for active quality lanes rather
 than maintaining many permanently synchronized specialist handovers.
 
@@ -236,7 +236,7 @@ or evidence that directly addresses its recorded rejection/supersession reason.
 
 **Status:** ACTIVE
 
-**Decision:** `bc250-code` must keep native model reasoning separate from the final
+**Decision:** `bc250 code` must keep native model reasoning separate from the final
 product output. The package uses Ollama `/api/chat` with `think:true`, consumes only
 terminal non-empty `message.content`, rejects `done_reason=length` and literal reasoning
 markers in final content, and must not replace an existing destination file unless all of
@@ -339,11 +339,11 @@ path. Do not keep polishing the framework without hardware evidence.
 
 **Status:** ACTIVE
 
-**Decision:** `bc250-install` may use the shared model-state inspector to render its optional
+**Decision:** `bc250 install` may use the shared model-state inspector to render its optional
 ordinary-model picker, but install-time state discovery must not turn into an unbounded runtime
 probe or an accidental MTP acquisition path. Generic combined `apply all` / `refresh all`
 therefore never select the MTP category; disabled MTP preparation remains explicit through
-`bc250-fetch-mtp` / `bc250-model apply mtp ... --include-disabled`. The known-inactive agent
+`bc250 fetch-mtp` / `bc250 model apply mtp ... --include-disabled`. The known-inactive agent
 Ollama lane is skipped during registration discovery, and remaining local registration probes
 have a short timeout rather than being allowed to stall setup indefinitely. GGUF integrity is
 unchanged: matching schema-3 file identity may use the recorded verified SHA fast path, while
@@ -587,7 +587,7 @@ the documentation recommends mode 0600. Report the path/mode problem without pri
 contents.
 
 **Why:** A source review found that Open WebUI setup/verification enforced private token files while
-`bc250-rag-import` and `bc250-model --token-file` simply read them. The inconsistent implementation
+the RAG ingestion path and model-manager token-file path simply read them. The inconsistent implementation
 made the package's credential-hygiene promise weaker at exactly the operator boundary where a leaked
 API/HF token matters.
 
@@ -607,8 +607,8 @@ convergence and is never fetched implicitly.
 
 Before any MTP llama.cpp launch, snapshot every reachable package Ollama lane and drain all resident
 models so unified-memory headroom and performance are not contaminated. A direct operator
-`bc250-run-mtp` owns the temporary lifecycle and restores the exact pre-run residency set on exit,
-using each lane's configured/default keep-alive behavior. `bc250-compare-mtp` and specialist
+`bc250 run-mtp` owns the temporary lifecycle and restores the exact pre-run residency set on exit,
+using each lane's configured/default keep-alive behavior. `bc250 compare-mtp` and specialist
 qualification use `drain-only` isolation and intentionally leave Ollama cold afterward. Neither path
 changes normal/agent service topology. Restoration failure on the direct path is a command failure.
 
@@ -645,7 +645,7 @@ requires larger context with measured headroom.
 
 **Decision:** Treat either endpoint of an established connection on a protected port as activity,
 using the final two `ss` fields rather than fixed column numbers. The public
-`bc250-maintenance request-shutdown` path never exempts its caller: an interactive SSH session
+`bc250 maintenance request-shutdown` path never exempts its caller: an interactive SSH session
 therefore defers shutdown. The dedicated `bc250-power-control` forced-command identity preserves
 OpenSSH's `SSH_CONNECTION` tuple through its exact sudo rule and invokes the package-internal
 `request-shutdown-companion` path. Safe-power may ignore only that validated tuple; every second

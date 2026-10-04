@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "release": {
-    "version": "0.12.2",
-    "rpm_release": "0.6",
-    "nvr": "bc250-llm-server-0.12.2-0.6"
+    "version": "0.13.1",
+    "rpm_release": "1.0",
+    "nvr": "bc250-llm-server-0.13.1-1.0"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
@@ -61,7 +61,7 @@
         "config/openwebui/functions/*.py",
         "config/openwebui/models.json",
         "config/openwebui/prompts/*",
-        "docs/openwebui-settings.md",
+        "docs/OPENWEBUI.md",
         "tests/test_openwebui.py",
         "tests/test_translation_provider.py"
       ],
@@ -123,7 +123,7 @@
     },
     "runtime-cu-memory": {
       "status": "boundary_active",
-      "description": "CU routing, memory/swap profile, Ollama lane topology, governor and runtime state.",
+      "description": "Live CU routing/status, memory/swap profile, Ollama lane topology, governor and runtime state.",
       "paths": [
         "cmd/system/40cu*.sh",
         "cmd/system/agent-mode.sh",
@@ -141,13 +141,9 @@
         "config/containers/llm.network",
         "cmd/system/99-sensors.conf",
         "cmd/system/options-sensors.conf",
-        "cmd/system/GOVERNOR.md",
-        "cmd/system/kernel-cmdline.md",
-        "cmd/system/ollama-profiles/**",
-        "docs/CU-UNLOCK.md",
-        "docs/MEMORY.md",
-        "docs/GFX1013-COMPUTE-QUEUES.md",
-        "docs/SENSORS.md"
+        "docs/HARDWARE.md",
+        "docs/INSTALLATION.md",
+        "cmd/system/ollama-profiles/**"
       ],
       "focused_tests": [
         "tests.test_runtime",
@@ -159,6 +155,9 @@
         "configured BC250_WGP_MASKS versus live SPI layout",
         "memory hard floor and swap/zram policy",
         "normal versus agent lane ownership"
+      ],
+      "notes": [
+        "CU routing uses bc250-cu-live-manager on the stock AMDGPU path; the replacement-module backend is retired."
       ]
     },
     "verification-diagnostics": {
@@ -167,8 +166,8 @@
       "paths": [
         "cmd/monitoring/**",
         "tests/test_operations.py",
-        "docs/HARDENING.md",
-        "docs/DEPLOYMENT.md",
+        "docs/SECURITY.md",
+        "docs/INSTALLATION.md",
         "docs/HTTPS.md"
       ],
       "focused_tests": [
@@ -224,10 +223,10 @@
       "paths": [
         "README.md",
         "TLDR.md",
-        "docs/COMMANDS.md",
+        "docs/OPERATIONS.md",
         "docs/QUALITY-CHECKS.md",
         "docs/OLLAMA.md",
-        "docs/CHANGELOG.md",
+        "CHANGELOG.md",
         "development/DEVELOPMENT-SCOPE.json",
         "development/scope.py",
         "development/TESTING-STRATEGY.md",
@@ -235,8 +234,8 @@
         "development/handovers/DEVELOPMENT-WORKFLOW.md",
         "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
         "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
-        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.6.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md",
+        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.0.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-0.13.1-1.0.md",
         "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
         "development/handovers/README.md",
         "tests/test_documentation.py",
@@ -258,18 +257,16 @@
     },
     "maintenance-companion": {
       "status": "frozen",
-      "description": "Local maintenance timers, backups/restores, safe power, WOL/companion integration and their dedicated docs/tests.",
+      "description": "Local maintenance timers, backups/restores, safe power and WOL/companion integration; frozen after canonical bc250 dispatcher migration.",
       "paths": [
         "cmd/maintenance/**",
-        "docs/MAINTENANCE.md",
-        "docs/MAINTENANCE-CONTRACT.md",
         "examples/raspi-wol/**",
         "tests/test_maintenance.py"
       ],
       "focused_tests": [
         "tests.test_maintenance"
       ],
-      "baseline_sha256": "90bab86d302fe05fae6c0dea7d60a5b8852e34e9c48c1006aedb88ed46ee404f",
+      "baseline_sha256": "a7be66cff68088075e45bdd63963a76024fe08534212277efb0a625ba050018f",
       "thaw_if": [
         "maintenance/companion behavior is intentionally changed",
         "protected Open WebUI credential path/format changes",
@@ -281,12 +278,13 @@
         "cmd/openwebui/openwebui-setup.py",
         "cmd/system/install.sh",
         "config/containers/open-webui.container",
-        "config/systemd/ollama*.service"
+        "config/systemd/ollama*.service",
+        "docs/OPERATIONS.md"
       ]
     },
     "rag-tika": {
-      "status": "frozen",
-      "description": "RAG import helpers, embedding setup, Tika container and dedicated RAG tests/docs. Current Tika list-marker investigation is closed.",
+      "status": "active",
+      "description": "Product RAG/Documents lifecycle, ingestion, embedding lane, Tika extraction, examples and dedicated RAG qualification.",
       "paths": [
         "models/rag/**",
         "models/embedding/**",
@@ -304,7 +302,6 @@
         "tests.test_rag",
         "tests.test_rag_import"
       ],
-      "baseline_sha256": "8321bd28c3c98309107190e604e83ae6c327ae589ee4c6d364371f57afd56194",
       "thaw_if": [
         "embedding model or port 11437 contract changes",
         "Tika image/version/container behavior changes",
@@ -319,13 +316,13 @@
     },
     "mtp": {
       "status": "frozen",
-      "description": "Standalone llama.cpp MTP models and comparison helper; not part of current qualification focus.",
+      "description": "Standalone llama.cpp MTP models and comparison helpers; frozen after canonical bc250 dispatcher migration.",
       "paths": [
         "models/mtp/**",
         "models/experiments/compare-mtp.sh"
       ],
       "focused_tests": [],
-      "baseline_sha256": "78bfe564a1791b5dac0f06d787c771a8c027b64b470b014ca404b40eb17227b4",
+      "baseline_sha256": "79c3fbead84c08ca60a9a70636a04ff0c3f914e4a93153e37ab70f215bf122e4",
       "thaw_if": [
         "MTP is explicitly returned to active comparison",
         "generic model lifecycle begins managing MTP"
@@ -337,13 +334,13 @@
     },
     "coding-agent": {
       "status": "frozen",
-      "description": "Coding/Gitea agent workflow helpers; current agentic model catalog records remain in the active catalog component.",
+      "description": "Coding/Gitea agent workflow helpers; frozen after canonical bc250 dispatcher migration.",
       "paths": [
         "models/coding-agent/**",
         "examples/benchmark/agent-cases.json"
       ],
       "focused_tests": [],
-      "baseline_sha256": "72067580d7552cf37e638f5be79f505272b18c57da441a7da7c5bff479710b6a",
+      "baseline_sha256": "9aad662ca5857b00e6201e6b606f3f98e6c5a897c585e968655a909225b2bf98",
       "thaw_if": [
         "coding/Gitea agent workflow is explicitly resumed",
         "agent execution interface changes"
@@ -356,13 +353,13 @@
     },
     "ocr": {
       "status": "frozen",
-      "description": "Dedicated OCR helper workflow. OCR model records remain visible to the active model catalog but helper behavior is not current work.",
+      "description": "Dedicated OCR helper workflow; frozen after canonical bc250 dispatcher migration.",
       "paths": [
         "models/ocr/**",
         "examples/benchmark/ocr/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "55991c6374aaa2e8474721cca4769255ebd52057dd548fa1e9fac6cea0dd28fb",
+      "baseline_sha256": "b181edb11fafad3b078ff3851ff197bd2ac4fc6a78f1e0b7e2f997854e6aede3",
       "thaw_if": [
         "OCR workflow becomes a current device/product requirement"
       ],
@@ -373,8 +370,8 @@
       ]
     },
     "uninstall": {
-      "status": "frozen",
-      "description": "Package uninstall behavior and its dedicated source test.",
+      "status": "boundary_active",
+      "description": "Package reset/uninstall behavior; thawed for 0.12.2-0.6 because the retired replacement-module ownership and cleanup surface was removed.",
       "paths": [
         "uninstall.sh",
         "tests/test_uninstall.py",
@@ -383,7 +380,6 @@
       "focused_tests": [
         "tests.test_uninstall"
       ],
-      "baseline_sha256": "2529586ea1f2be1d810947141164986316b327415284b3250ed44f6891d57448",
       "thaw_if": [
         "installed path ownership changes materially",
         "service/config cleanup semantics change",
@@ -427,12 +423,12 @@
     },
     "graveyard-models": {
       "status": "archive_only",
-      "description": "Retired Modelfiles retained for provenance; active retirement state is owned by models/retired-models.json.",
+      "description": "Retired Modelfiles retained for provenance, including the closed EuroLLM challenger; active retirement state is owned by models/retired-models.json.",
       "paths": [
         "models/modelfiles-graveyard/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "2f6cdc671d0a432dfeac5b8816850b65159e3edb9461ed3056249a2f01135e97"
+      "baseline_sha256": "22ebca78262c46caeb569005cc1dd5eeb68900f6365aa6574c717d29388967fd"
     }
   }
 }
