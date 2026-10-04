@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Metadata-aware Open WebUI knowledge importer for the BC-250 document tree."""
 
 from __future__ import annotations
@@ -594,7 +593,7 @@ def sync(
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="bc250-rag-import",
+        prog="bc250 rag ingest",
         description="Validate and sync active Markdown documents into language/authority-separated Open WebUI knowledge bases.",
     )
     sub = p.add_subparsers(dest="command", required=True)

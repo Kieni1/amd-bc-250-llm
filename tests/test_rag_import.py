@@ -237,7 +237,7 @@ class RagImportTests(unittest.TestCase):
             root = Path(tmp)
             self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
             result = subprocess.run(
-                [str(SCRIPT), "plan", str(root)],
+                [sys.executable, str(SCRIPT), "plan", str(root)],
                 text=True,
                 capture_output=True,
                 check=False,
@@ -445,7 +445,6 @@ class RagImportTests(unittest.TestCase):
         self.assertIn("models/rag/rag_import.py\t{libexec}/rag_import.py", manifest)
         self.assertIn("models/rag/rag.py\t{libexec}/rag", manifest)
         self.assertIn('"rag|$LIBEXEC/rag"', dispatcher)
-        self.assertIn('"rag-import|$LIBEXEC/rag"', dispatcher)
         self.assertIn("d /srv/bc250-documents 0750 root root -", tmpfiles)
 
 
