@@ -1,351 +1,61 @@
 # AMD BC-250 LLM appliance — main integration handover
 
-## Purpose and authority
+Release target: `bc250-llm-server-0.13.1-1.0`  
+Current handover date: 2026-10-03
 
-## Routine loading rule
+## Purpose
 
-For ordinary current development, read `development/DEVELOPMENT-SCOPE.json` first. Do **not** load this
-entire historical handover unless the active change needs cross-stream history that is not captured by the
-current-work/release handovers. Frozen/archive-only domains should stay out of routine context while their
-baseline hashes remain unchanged.
+This is the primary continuity handover for the main engineering/integration chat.
 
-This is the durable state transfer for a fresh **main integration** chat. It should contain the
-current appliance contract, durable constraints, current evidence, important negative results and
-open work. Release-by-release chronology belongs in `docs/CHANGELOG.md`; detailed rationale belongs
-in `development/DECISIONS.md`; exact campaign evidence belongs in `development/model-runs/`.
+It records:
 
-When information disagrees, use this order:
+- the current source/package architecture;
+- what has been fixed and intentionally removed;
+- model/product decisions that are closed;
+- current validation boundaries;
+- remaining exact-device/release work;
+- rules for coordinating specialist chats without reopening completed campaigns.
 
-1. current user instruction;
-2. newest supplied source/package;
-3. real-device evidence from the exact installed revision;
-4. validation evidence for that revision;
-5. current decisions/handovers;
-6. older logs, chats, handovers and patches.
+## 1. Authority and evidence boundaries
 
-Do not relabel evidence from one NVR as qualification of another NVR.
-
----
-
-# 1. Current release and evidence state
-
-Current source release:
+Current source checkpoint:
 
 ```text
-VERSION       0.12.2
-RPM Release   0.6%{?dist}
-NVR           bc250-llm-server-0.12.2-0.6
-Ollama        0.34.4
-Open WebUI    0.11.4
-Tika          4.0.0-full / TIKA_SERVER_VERSION=4
-Governor      0.4.13
-Revalidation  v4.6
+bc250-llm-server-0.13.1-1.0 source tree
+derived from predecessor workbench:
+  amd-bc-250-llm-0.12.2-0.6-workbench-greenfield-clean-final.zip
+  SHA-256 399bc99b57e54528a94bfc3fc2a49e1959b8c8bbd767c6b29807b42ce654157c
 ```
 
-`0.12.2-0.6` is the current source/device candidate. Exact-installed `0.12.2-0.5` and the subsequent
-focused structured-output campaigns closed the behavioral questions without reopening broad runtime/model
-campaigns. The final 0.6 integration adds an explicit `Office - Advanced Structured` preset (`think=false`)
-while preserving normal Advanced (`think=true`), records the qualified Standard schema+temperature-0 policy,
-records Documents schema-only policy, and leaves Deep unchanged. Open WebUI 0.11.4 already provides the
-required parameter merge/translation path; no generic payload patch or prompt-text heuristic is introduced.
-
-Agent is an optional add-on, not an install prerequisite. If no Agent model is installed, revalidation reports
-optional coverage unavailable/skipped and may be PARTIAL without core infrastructure failure; installed Agent
-runtime/topology faults remain infrastructure failures. Production Translate-Gemma remains current with the
-known native `sollten -> doivent` strengthening documented as an accepted model limitation behind the existing
-fail-closed modality guard. EuroLLM 9B Instruct 2512 Q4_K_M is packaged only as an opt-in experimental
-translation challenger for one short modality comparison. The installer completion footer is the compact
-`OVERVIEW` plus amber `NEXT STEPS`; generation summaries now expose cold-load, deep-context, thermal and
-selected-lane completeness evidence. Qwen3.6 35B remains graveyard-only with no unqualified replacement
-promotion. Ollama 0.34.4, OWUI 0.11.4, Tika 4, governor 0.4.13, Advanced 6144 and Deep 2m remain unchanged.
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md` for the focused exact-device gate.
-
-Exact installed `0.12.1-0.4.fc44.x86_64` reached package convergence, authenticated verifier 54/0, healthy normal topology, Ollama 0.34.2, current Fedora kernel operation, packaged revalidation infrastructure/quality/restoration PASS and the first bounded RAG filesystem/security gate. Device testing then found two source blockers: the RAG agent path consumed native reasoning as document text and could falsely satisfy fidelity checks, while `bc250-revalidate status --raw` discarded its option. Those findings block 0.4 release acceptance but do not invalidate its broad runtime/model evidence. 0.5 therefore needs focused RAG-preparation/CLI/UX acceptance rather than replaying the completed broad model campaign. Exact-installed 2.4 remains historical broad operations evidence only.
-
-The consolidated exact-2.3 Open WebUI investigation also isolated three pinned-v0.11.3
-OpenAI-style adapter limitations: root `max_tokens` is not a reliable Ollama cap, reasoning-token
-usage can report zero despite reasoning content, and length termination can surface as
-`finish_reason=stop`. 2.4 documents that boundary and keeps package-owned hard caps on nested
-`options.num_predict`; it does not vendor-patch Open WebUI for an external API contract the appliance
-does not currently advertise.
-
-The release incorporates defects found during exact installed `0.11.3-1.7` support testing:
-
-- safe-power now inspects the final two `ss` endpoint fields, so local SSH/UI/Ollama activity is not
-  missed by a fixed-column parser;
-- public `request-shutdown` has no bypass and must defer on its own interactive SSH session;
-- the dedicated Pi forced-command path may exempt only its exact authenticated `SSH_CONNECTION`
-  tuple; any other protected TCP connection still defers;
-- the final `poweroff`/`suspend` request is non-blocking after all guards pass;
-- healthy live 40/40 CU operation returns success even when persistent boot activation is
-  intentionally disabled;
-- model-manager legacy guidance now points to `sudo bc250-model apply all all`, while omitted
-  destructive selection still never means all;
-- visible non-`.Modelfile` files in the operator overlay fail clearly instead of disappearing from
-  discovery;
-- unprivileged status reports protected state as protected/unavailable rather than zero or absent;
-- normal agent inactivity and maintenance configuration are described without misleading alarm;
-- upload-prune output uses useful B/KiB/MiB/GiB sizes while policy calculations remain byte-precise;
-- installer MTP inventory is read-only/non-indexed with explicit fetched-state wording;
-- `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` is bounded to 8K context after sustained 16K operation
-  reached the low-memory boundary. It keeps the same model identity and verified GGUF, so applying
-  the new definition does not require a source re-download.
-
-Exact installed `0.11.3-2.4.fc44.x86_64` is now the latest broad operations baseline. Operator-supplied
-acceptance through Batch 20 closed non-OWUI operations with clean package integrity, bounded storage/
-residue state, normal topology, live 40/40 routing and successful complete reconstruction after a
-supported `sudo reboot`. The separate final Open WebUI investigation also proved the ordinary-user
-ACL and Deep Reasoning memory defects and their narrow temporary mitigations on exact 2.4. Those
-results motivate 0.12.1-0.1 but do not qualify the new NVR.
-
-Current 0.12.2-0.6 evidence boundary:
+Current source validation:
 
 ```text
-release metadata                  0.12.2-0.6
-structured behavior               closed: Standard schema+temp0; Documents schema; Advanced explicit nothink preset; Deep unchanged
-Agent                              optional add-on; absent coverage is skipped/partial, not core infrastructure failure
-translation                        production limitation documented/guarded; EuroLLM packaged as opt-in challenger only
-benchmark                          cold-load/deep-context/thermal/completeness summaries integrated
-Qwen3.6 35B                        graveyard-only; no replacement promoted
-Deep/RAG/Tika/title-tag           unchanged/closed; do not replay solely for 0.6
-RPM/SRPM build gate               local/source gate here; exact-device install remains external
-exact-0.12.2-0.6 focused gate     install UX + structured product path + Agent optional semantics + optional EuroLLM screen + final revalidation
+511/511 deterministic tests PASS module-by-module
+development/scope.py check PASS
+scripts/validate.py / RPM preflight PASS
+bash syntax PASS
+Python compileall PASS
+JSON parse PASS
+make help / payload-contract dry-run PASS
+Ruff, ShellCheck, configured rpmlint execution and rpmbuild external in this artifact environment
 ```
 
-Exact installed `0.11.3-2.3.fc44.x86_64` targeted operations acceptance has now demonstrated:
+Do not transfer exact-device qualification across source revisions.
 
-```text
-rpm -V after convergence           PASS / clean
-swap runtime directory             root:root 0750
-status/verifier/recovery UX        PASS
-bc250-agent-mode normal            PASS / idempotent
-DRY_RUN/timer presentation         PASS
-Tika routine restart               PASS / no false failed result
-identity restore                   PASS with baseline FK=142, new FK=0
-supported sudo reboot              PASS / appliance reconstructed
-live CU routing                    40/40 healthy
-failed units                       0
-final authenticated bc250-verify   54 ok / 0 warn / 0 fail
-```
+The supplied 0.12.2-0.6 RPM build completed successfully with 495/495 tests. An initial 0.7 RPM build then exposed generic rpmlint findings: most were intentional hardened appliance permissions/ownerships, while seven were genuine packaging defects. The current 0.7 source fixes those seven defects and uses a narrow documented rpmlint policy for the intentional findings; no exact post-fix 0.7 RPM/device acceptance exists yet. The final 0.7 delta includes:
 
-One remaining installed-package source issue was found: the pinned upstream CU live manager still
-had a reachable interactive CPU-core-unlock branch that called `systemctl reboot`. 2.4 patches only
-that upstream call through the existing RPM-prep patch. The known-bad invocation should not be
-deliberately reproduced.
+- replacement-kernel 40-CU path removed;
+- public command surface reduced;
+- RAG promoted to product-relevant;
+- candidate-screen install footprint removed;
+- documentation hierarchy consolidated;
+- EuroLLM challenger moved to graveyard.
 
-Exact installed `0.11.3-2.2.fc44.x86_64` operations testing has now demonstrated:
+Therefore the final greenfield RPM needs one final exact build/install/device closure.
 
-```text
-bc250-install convergence          PASS
-live CU routing                    40/40 healthy
-persistent 40-CU boot activation   intentionally disabled
-active administrator SSH shutdown  DEFER PASS; session preserved
-normal -> agent -> normal           PASS
-deliberate degraded topology       detected; recovery PASS
-config/users backups + retention   PASS
-configuration restore              PASS
-automatic identity rollback        PASS
-production use-case suite          4/4 PASS
-task suite                         6/6 PASS
-bounded generation-edge infra      17/17 PASS
-individual/grouped service restart  PASS; failed units 0 after recovery
-external LAN isolation              PASS; internal app ports filtered externally
-reboot via sudo reboot              PASS; services/timers/firewall/40-CU reconstructed
-systemctl reboot path               DEVICE DEFECT; later boot became unusable after substantial startup
-final authenticated bc250-verify   54 ok / 0 warn / 0 fail
-```
+## 2. Runtime/service identity
 
-Identity restore itself exposed one validation defect rather than a rollback defect: the real DB
-already contained unrelated `foreign_key_check` rows while passing `integrity_check`, and the old
-validator rejected those unchanged baseline rows. The 2.3 release now compares canonical pre/post FK
-sets and fails only on newly introduced violations while keeping strict integrity checking. Its
-operator output now reports strict integrity, baseline/new FK counts and explicit rollback success
-without dumping unrelated baseline rows.
-
-This is strong operations evidence for 2.2, but it is not a full 2.2 whole-appliance revalidation.
-
-Newest full whole-appliance hardware evidence is exact installed
-`bc250-llm-server-0.11.3-1.7.fc44.x86_64`:
-
-```text
-installer/core verify     54 OK / 0 warn / 0 fail
-revalidation              infrastructure PASS
-quality                   8/8 PASS
-restoration               PASS
-coverage                  FULL
-Open WebUI desired state  unchanged / PASS
-```
-
-The GPT-OSS/Jina edge case passed policy with minimum MemAvailable **167 MiB**, below the 512 MiB
-tight-headroom diagnostic but above the unchanged 128 MiB hard floor. A prompt diagnostic observed
-`8662 -> 8320` tokens; this is not evidence of clean 16K real-prompt execution. See
-`development/model-runs/2026-09-20-installed-0.11.3-1.7-revalidation.md`.
-
-Exact-1.7 support/maintenance evidence additionally proved normal↔agent restoration, degraded-mode
-detection/recovery, verified local config/users backups and upload-prune dry-run. It exposed the
-safe-power and 40-CU return-code defects fixed in 1.8. Exact 2.2 has since proven those two
-boundaries plus backup retention, configuration restore, identity rollback and bounded production/task
-runtime health. Real idle S5/WOL, Pi forced-command shutdown and live pruning remain conditional
-follow-up work. See `development/model-runs/2026-09-20-installed-0.11.3-1.7-support-maintenance.md`
-and the exact-2.2 operations records:
-`development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-04-06.md` and
-`development/model-runs/2026-09-20-installed-0.11.3-2.2-operations-batches-07-09.md`, plus exact-2.3 targeted acceptance in
-`development/model-runs/2026-09-20-installed-0.11.3-2.3-operations-acceptance.md` and
-`development/model-runs/2026-09-20-installed-0.11.3-2.3-openwebui-investigation.md`, plus final exact-2.4 operator-supplied acceptance in
-`development/model-runs/2026-09-21-installed-0.11.3-2.4-operations-batches-19-20.md` and
-`development/model-runs/2026-09-21-installed-0.11.3-2.4-openwebui-final.md`.
-
-**Immediate evidence boundary:** exact installed 2.4 remains the historical broad non-OWUI operations baseline and source of the final OWUI defect/mitigation evidence; exact 1.7 remains the historical full whole-appliance revalidation campaign. Exact installed 0.12.1-0.4 now adds broad current-runtime evidence (Ollama 0.34.2, verifier-clean normal topology and packaged revalidation PASS) but is release-blocked by the RAG preparation and raw-status source defects. That 0.12.1-0.6 policy/observability gate was later completed; its exact-device findings are the baseline for the current 0.12.2 candidate.
-
----
-
-# 2. Product intent and engineering priorities
-
-The appliance is a private local office LLM appliance for one active user at a time:
-
-```text
-reliable office chat / documents / translation / RAG
-safe multi-lane resource use on ~16 GiB shared memory
-good interactive latency
-controlled electricity saving through shutdown + WOL
-repeatable package-owned configuration and recovery
-```
-
-Priority order:
-
-1. data integrity, safe shutdown, recovery and fail-closed destructive operations;
-2. availability and correct state restoration;
-3. runtime/model correctness and memory safety on 16 GiB UMA;
-4. real product-path correctness through Open WebUI;
-5. operator UX and diagnostics;
-6. maintainability/documentation;
-7. optional experiments and convenience.
-
-The project is pre-v1.0. Prefer a clean current contract over compatibility with obsolete
-development interfaces unless the current source intentionally keeps compatibility.
-
----
-
-# 3. Development and validation rules
-
-Detailed workflow: `development/handovers/DEVELOPMENT-WORKFLOW.md`.
-
-Ownership:
-
-```text
-GitHub       RPM/SRPM/package builds
-workstation  Ruff/developer linting configured by the user
-BC-250       hardware, services, Ollama/models, Open WebUI, power/WOL and qualification
-```
-
-Rules that must survive every new chat:
-
-- state exactly what ran and what did not;
-- never claim device qualification from a generic development environment;
-- never weaken evaluators, verifier thresholds, restoration, evidence integrity or secret hygiene to
-  obtain green output;
-- keep model-quality defects, evaluator defects, integration defects and operator/environment state
-  separate;
-- work one bounded hardware evidence batch at a time and restore state before changing lanes;
-- preserve verified GGUFs where practical; prefer re-registration, validated-source reuse and XFS
-  dedupe over deletion/redownload;
-- destructive omission never means all;
-- ambiguous backend/remote state must fail closed before local destruction;
-- main integration owns versioning, cross-stream policy and promotion decisions; specialist chats
-  return evidence rather than silently changing production policy.
-
----
-
-# 4. Durable BC-250 hardware facts
-
-## Board / CPU / GPU
-
-```text
-CPU family          Zen 2 / Oberon-derived
-normal CPU exposure 6 cores / 12 threads
-GPU                 Cyan Skillfish / gfx1013
-stock presentation  ~24 CUs / 12 WGPs
-physical GPU        up to 40 CUs / 20 WGPs
-physical memory     16 GB GDDR6 shared by CPU and GPU
-```
-
-The appliance does not depend on an 8-core CPU unlock. Treat CPU unlock as a separate hardware
-experiment.
-
-Do not describe the GPU as a normal desktop RDNA2 card when architecture precision matters. Use
-Cyan Skillfish / gfx1013, console-derived GFX10-family hardware with additional RDNA2-class features.
-
-## Unified memory
-
-The board has one physical 16 GB GDDR6 pool. Do not add system RAM + VRAM + GTT + Vulkan heaps as if
-they were independent physical capacities. Model fit is governed by the shared pool after kernel,
-userspace, services, weights, runtime overhead and KV/cache allocations.
-
-Current package memory policy on the qualified platform includes:
-
-```text
-TTM pages_limit/page_pool_size  4194304 (~16 GiB capacity view)
-zram                           2 GiB, priority 100
-disk swap                      16 GiB, priority 10
-vm.swappiness                  60
-hard MemAvailable floor        128 MiB
-tight-headroom diagnostic      512 MiB
-```
-
-The 512 MiB value is diagnostic, not a hard package abort threshold. Do not raise the 128 MiB hard
-floor merely to make a tight model pass.
-
-## CU / governor / thermal policy
-
-Real device evidence has shown a healthy **40/40 live routing table** while kernel/RADV numeric
-counters may still report 24. Judge live routing from the package table and compare any configured saved row masks with the live SPI masks. Investigate `D!` cells; `--` may be intentionally unselected and is not a fault by itself. Do not demand one universal CU number from every diagnostic layer.
-
-Live 40-CU routing is operator-controlled. Do not automatically enable persistent 40-CU boot
-activation merely because live routing is healthy.
-
-Current production governor policy is approximately:
-
-```text
-350–1850 MHz
-thermal throttle target 85 C
-```
-
-Do not import >2 GHz community settings without dedicated stability/thermal evidence.
-
----
-
-# 5. Runtime and service topology
-
-Normal appliance topology:
-
-```text
-11434  ollama.service            main / product lane
-11435  ollama-task.service       task lane
-11437  ollama-embedding.service  embedding lane
-11436  ollama-agent.service      exclusive agent lane; intentionally inactive in normal mode
-
-3000   Open WebUI internal
-80     nginx office-facing HTTP/readiness path
-Tika   private document extraction service
-```
-
-Normal mode means main/task/embedding active and agent inactive. Agent mode is exclusive: 11436
-active, normal Ollama lanes inactive. `bc250-agent-mode` is the single topology classifier:
-
-```text
-normal
-agent
-degraded
-stopped
-```
-
-Read-only status must not switch agent mode merely to inspect agent registration.
-
-Current Ollama lane policy is one loaded model and one parallel request per lane. Main is the
-interactive lane and should remain warm enough for usable office UX; task/embedding are separate so
-background work can coexist without serializing all product traffic.
-
-Runtime pins are authoritative in `config/runtime.env`. Current source candidate uses:
+Current pins:
 
 ```text
 Ollama       0.34.4
@@ -354,447 +64,716 @@ Tika         4.0.0-full
 Governor     0.4.13
 ```
 
-Open WebUI desired state is package-owned. A meaningful authenticated status compares providers,
-task/embedding/RAG settings, persisted local/offline application policy, upload limits/extensions,
-package Function source/metadata/activation, model-role mappings/filter attachments, model visibility
-and built-in-tool/capability policy. Arena is package-owned OFF. During pre-v1 testing the main and task
-providers are intentionally unrestricted and all models actually installed on 11434/11435 are selectable;
-package-owned raw production/task overrides are visible and labelled for comparison. Curated
-`bc250-office-*` roles remain the product contracts. Embedding 11437 and exclusive agent 11436 remain
-outside the normal chat selector. `Desired-state drift: none` is intended to be substantive, not cosmetic;
-unrelated operator-owned models/users/prompts/knowledge remain additive and untouched.
-
----
-
-# 6. Current production model map
-
-Canonical model inventory is `MODELS.md` plus the package catalogs.
-
-| Role | Current model |
-|---|---|
-| standard office | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
-| document/RAG answer | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
-| DE↔FR translation | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` |
-| higher-quality office | `prod-qwen35-9b-unsloth-q6-k` |
-| deep reasoning / memory-edge reference | `prod-gpt-oss20b-ggml-org-mxfp4` |
-| embeddings | `embed-jina-v5-small-retrieval-q4-k-m` |
-| compact task | `task-lfm25-1.2b-instruct-liquidai-q6-k` |
-| exclusive agent baseline | `agentic-ornith15-9b-ornith-q5-k-m` |
-
-Translation Open WebUI roles:
+Normal topology:
 
 ```text
-bc250-office-translation-de-fr -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
-bc250-office-translation-fr-de -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
+11434  ollama.service            main/product
+11435  ollama-task.service       task
+11436  ollama-agent.service      exclusive optional Agent; inactive in normal mode
+11437  ollama-embedding.service  embedding
+3000   Open WebUI private
+80     nginx office-facing HTTP
 ```
 
-Current tool/prompt ownership during testing:
+`OLLAMA_MAX_LOADED_MODELS=1` remains important.
 
-- Standard, Advanced and Deep use general model knowledge by default; package-owned metadata disables autonomous built-in Open WebUI knowledge/chat/search tools.
-- Documents is the dedicated retrieval role and keeps package-owned knowledge retrieval enabled while unrelated built-ins remain disabled.
-- Translation keeps built-in tools disabled; the OWUI direction wrapper owns translation direction and preserves legal/contractual modality.
-- Raw main/task models are visible for comparison, not promoted as stable product roles. Raw GPT-OSS shares the package Deep contract: verified task/embedding pre-eviction before admission and bounded `keep_alive=2m`.
+Normal mode expects main/task/embedding active and Agent inactive.
 
-Do not revive graveyard models because old logs or handovers mention them.
+## 3. Current curated roles
 
-## Durable role rationale
-
-- **Gemma E2B:** lightweight/high-throughput normal office role.
-- **Gemma E4B:** current production document/RAG answer model. Direct and authenticated Open WebUI
-  RAG were strong; the decisive advantage over Qwen 9B was sustained-residency memory margin, not a
-  claim that Qwen quality was poor.
-- **Translate-Gemma E4B:** production DE↔FR translator with explicit direction roles. Broad translator
-  discovery is closed unless integrated evidence demonstrates a model-level failure.
-- **Qwen3.5 9B:** responsive higher-quality office option; retained despite not being the long-lived
-  RAG default.
-- **GPT-OSS 20B:** deep-reasoning/reference model and worst credible production memory case. It is a
-  required coexistence edge for task/embedding safety.
-- **LFM2.5 1.2B task:** promoted because it has materially stronger task quality than the retired
-  Gemma 3 1B while successfully coexisting with warm GPT-OSS.
-- **Jina v5 small retrieval:** production embedding baseline; Qwen3 embedding remains a valid future
-  comparator only if a concrete RAG/licensing question requires it.
-- **Ornith 9B agent:** current baseline. Product-path claims must include actual `bc250-code` behavior,
-  not only the canonical 3-case benchmark.
-
-## Durable negative model results
-
-Keep these visible because they constrain current topology:
-
-- `exp-qwen38-4b-distill-empero-q6-k` improved isolated task quality but simultaneous residence with
-  warm GPT-OSS caused severe memory pressure and task-service OOM; do not retest it for the same
-  background-task role under the same memory envelope.
-- `exp-qwen3-4b-lmstudio-q6-k` had promising isolated task quality, but both exact-source staging and
-  a bounded task alias caused global OOM and killed warm GPT-OSS/other services; do not repeat the
-  same coexistence experiment without a material topology/resource change.
-- large 27B/35B office candidates can be useful quality/reference experiments but must not be
-  promoted from isolated quality or load success alone on this 16 GiB UMA platform.
-
-Detailed model decisions and retired catalogs belong in `MODELS.md` and `development/DECISIONS.md`.
-
----
-
-# 7. Current experimental / MTP state
-
-## Main-model experiments
-
-The current ISTA Qwen3.8 pair is intentionally role-split:
+Production/current roles:
 
 ```text
-exp-qwen38-27b-ista-gsq-rco-iq3-xxs  deployability/RAG-oriented, 8K, caller think=false
-exp-qwen38-27b-ista-gsq-rco-iq3-s    quality-first main experiment, 8K, caller think=true
+Office - Standard
+  -> prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
+
+Office - Documents / RAG
+  -> prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+
+Office - Translation DE -> FR
+Office - Translation FR -> DE
+  -> prod-translate-gemma4-sub-e4b-17s-q4-k-xl
+
+Office - General / Higher Quality
+  -> prod-qwen35-9b-unsloth-q6-k
+
+Office - Advanced Structured
+  -> same Qwen3.5 base
+  -> think=false
+
+Office - Deep Reasoning
+  -> prod-gpt-oss20b-ggml-org-mxfp4
+
+Embedding
+  -> embed-jina-v5-small-retrieval-q4-k-m
+
+Task
+  -> task-lfm25-1.2b-instruct-liquidai-q6-k
+
+Optional Agent
+  -> agentic-ornith15-9b-ornith-q5-k-m
 ```
 
-The XXS 8K change in 1.8 is a Modelfile/runtime-definition change only. Preserve and reuse the
-existing verified GGUF.
+Current Qwen3.8 large comparison profiles remain non-production experiments/testing-only where retained.
 
-The full active/retired experiment inventory is canonical in `MODELS.md`; do not duplicate it into
-new handovers.
+Retired/rejected candidates belong in the retired/graveyard catalog, not ordinary product selection.
 
-## MTP / speculative decoding
+## 4. Greenfield command architecture
 
-MTP is a **standalone opt-in external llama.cpp runtime**, not another always-on Ollama lane.
-It shares catalog/provenance management but not normal appliance convergence.
+The 0.12.2 greenfield cleanup intentionally removed the generated per-command compatibility alias forest.
 
-Current active MTP package policy:
+Canonical interface:
+
+```bash
+bc250 COMMAND [ARGUMENTS...]
+```
+
+Current command groups:
 
 ```text
-qwen3.5-9b-mtp                 primary fast,        ctx 16384 / draft 2
-qwen3.8-27b-ymq-xs-ti-mtp      primary general 27B, ctx 8192  / draft 1
-qwen3.8-27b-hauhaucs-mtp       specialist alternative, ctx 8192 / draft 2
+Core:
+  bc250 install
+  bc250 status
+  bc250 verify
+  bc250 support-bundle
+  bc250 storage
+  bc250 reset
+
+Product/model:
+  bc250 model
+  bc250 rag
+  bc250 ocr
+  bc250 openwebui-setup
+  bc250 ollama-profile
+
+Validation/maintenance:
+  bc250 benchmark
+  bc250 revalidate
+  bc250 maintenance
+  bc250 agent-mode
+
+Optional specialist:
+  bc250 code
+  bc250 code-commit
+  bc250 gitea-review
+  bc250 compare-mtp
+  bc250 fetch-mtp
+  bc250 run-mtp
 ```
 
-`qwen3.6-27b-mtp` is retired from active discovery as superseded but retains positive historical
-qualification in source-only `graveyard.toml`. `qwen3.6-35b-a3b-mtp` remains retired for the stock
-8K/full-GPU memory-fit failure. Use exact IDs for 27B MTP models; ambiguous 27B aliases are removed.
+Deliberate standalone public commands:
 
-Current workflow:
+```bash
+sudo bc250-cu-live-manager
+sudo bc250-40cu status
+llm-run-diagnose
+```
+
+Do not restore compatibility aliases merely because old documentation or scripts use names such as:
 
 ```text
-bc250-model list/status/path mtp
-sudo bc250-fetch-mtp MODEL_ID        explicit preparation only
-bc250-run-mtp                         direct operator use
-bc250-compare-mtp                     specialist comparison/qualification
+bc250 benchmark
+bc250 model
+bc250 storage
+bc250 revalidate
+bc250 openwebui-setup
+bc250 agent-mode
+bc250 maintenance
 ```
 
-Installer Stage 7 may show MTP state but never assigns normal selection indexes or fetches MTP.
-Generic `apply all` / `refresh all` does not acquire MTP.
+Update callers to the dispatcher instead.
 
-Residency policy:
+Private helpers now belong under `/usr/libexec/bc250-llm-server/`.
 
-- direct `bc250-run-mtp`: snapshot reachable Ollama residency → drain → run exact llama.cpp child →
-  restore the captured set; restoration failure must influence final success;
-- `bc250-compare-mtp`: drain-only specialist isolation and intentionally leave Ollama cold afterward.
-
-Broad MTP qualification is closed. The symmetric three-repeat YMQ depth-1 confirmation remains
-optional evidence only; do not reopen the campaign without a materially new product/runtime/hardware
-question.
-
----
-
-# 8. Model lifecycle and storage contract
-
-Current public model-manager grammar:
+Examples:
 
 ```text
-bc250-model list [CATEGORY]
-sudo bc250-model status [CATEGORY] [SELECTION] [--online]
-bc250-model path CATEGORY ID
-sudo bc250-model apply CATEGORY [SELECTION]
-sudo bc250-model refresh CATEGORY [SELECTION]
-sudo bc250-model unregister CATEGORY [SELECTION]
-sudo bc250-model remove CATEGORY [SELECTION]
-sudo bc250-model purge-retired
+install-ollama
+memory-profile
+swap-profile
+cu-status
+status helper
+verification helper
 ```
 
-Categories:
+The public/private split is intentional.
+
+## 5. Live-CU-only architecture
+
+The package no longer carries the archived replacement-AMDGPU module workflow.
+
+Removed product architecture:
 
 ```text
-production  experiments  task  agentic  embedding  mtp  all
+fduraibi/duggasco bc250-40cu-unlock source pin
+replacement amdgpu patch
+module build/prepare
+initramfs enable/disable/restore
+legacy mask/unmask/live-* command family
+kernel-patch license/package assets
 ```
 
-Important semantics:
+Current supported workflow:
 
-- category `all` means combined catalog, not select-everything;
-- `sudo bc250-model apply all all` is the explicit “apply every eligible normal model” form;
-- omitted destructive selection never means all;
-- `unregister` removes registration while retaining GGUF/state;
-- `remove` is source-destructive and must be explicit;
-- `refresh` deliberately re-fetches; do not use it in support testing when validated source reuse is
-  the goal;
-- verified source/provenance mismatch blocks unsafe reuse;
-- backend ambiguity must not trigger local deletion;
-- MTP remains outside generic Ollama convergence;
-- `/etc/bc250-llm-server/models.d/` is an operator overlay. Visible regular definitions must end in
-  `.Modelfile`; packaged definitions live under the installed share tree;
-- operator metadata should use canonical category `experiments`; singular historical `experimental`
-  remains readable where intentionally supported.
+```bash
+sudo bc250-cu-live-manager
+sudo bc250-40cu status
+```
 
-Storage policy:
+The live manager configures the actual WGP routing and can save/restore its table at boot.
 
-- preserve verified GGUFs for offline/local rebuilds;
-- Ollama may temporarily amplify storage during imports and later remove unreferenced blobs on normal
-  lifecycle events; do not manually delete blobs solely because onboarding looks large;
-- for byte-identical retained GGUF/live Ollama blobs on XFS, prefer package dedupe over deleting
-  retained sources;
-- arbitrary out-of-band same-name Ollama registration mutation is not fully proven/detected when
-  source/template state is unchanged; do not claim complete live-manifest drift detection.
+Internal status/installer/benchmark tooling may use the private CU status helper.
 
----
+Do not use kernel/RADV numeric CU counters as the sole active-routing authority. The BC-250 can have healthy 40/40 live routing while diagnostic topology counters differ.
 
-# 9. RAG / Open WebUI product contract
+One final exact-RPM fresh/upgrade test must prove the live-manager-only installation on the final source.
 
-Production RAG role:
+## 6. Hardware/memory policy
+
+BC-250 memory is shared UMA.
+
+Do not add reported CPU RAM + VRAM + GTT as independent physical pools.
+
+Current policy includes:
 
 ```text
-preset/model role   bc250-office-documents
-answer model        prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-embedding model     embed-jina-v5-small-retrieval-q4-k-m
-embedding lane      11437
-source documents    /srv/bc250-documents
+zram               2 GiB, priority 100
+disk swap          16 GiB, priority 10
+vm.swappiness      60
+
+hard safety floor  128 MiB MemAvailable
+tight diagnostic   512 MiB
 ```
 
-Durable RAG architecture:
+TTM settings remain part of the current hardware policy where present in the package.
+
+The 512 MiB boundary is diagnostic/qualification headroom, not an automatic product failure.
+
+## 7. Open WebUI convergence and authentication
+
+The convergence/publication contract remains fail-closed.
+
+Important boundaries:
+
+- Open WebUI service is generated through Quadlet.
+- Never `systemctl enable open-webui.service` directly.
+- Desired-state convergence and boot-link verification must succeed before nginx publication is considered complete.
+- Temporary signin/signup JWTs are convergence bootstrap credentials only.
+- Durable package maintenance auth is the verified Open WebUI API key:
 
 ```text
-operator-owned authoritative documents
-        ↓
-metadata/provenance validation
-        ↓
-language/authority separation
-        ↓
-Open WebUI Knowledge sync
-        ↓
-package-owned RAG role + embedding lane
+/var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
-The importer fails closed on escaping/symlinked sources and hash mismatches, uploads replacements
-before deleting stale remote content, and requires explicit prune for remote deletion. Token files
-must be regular, readable, non-empty and not group/world accessible.
-
-Current product conclusion: Gemma E4B is the RAG default for the 16 GiB appliance because it retained
-substantially more sustained-residency headroom than Qwen 9B while both were functionally strong.
-Do not restart a Gemma-vs-Qwen tournament without a new product question.
-
-The next RAG evidence is **real-office-document acceptance**, not synthetic model selection:
-actual PDFs/Tika extraction, messy documents, tables, multilingual/multi-source questions,
-OCR-derived text where relevant, upload/delete/re-import behavior, a long resident session and one
-deliberate unload/reload cycle.
-
----
-
-# 10. Agent / coding boundary
-
-Agent service is exclusive from normal Ollama lanes. Read-only status in normal mode may report agent
-registration unavailable/UNKNOWN because the agent API is intentionally stopped; status must not
-switch topology simply to inspect it.
-
-`bc250-code` uses the chat path with separated reasoning/final content. File-producing modes reject
-outer Markdown code fences rather than stripping them, reject reasoning contamination/incomplete
-terminal output and write atomically. Review/document modes may use Markdown.
-
-The current Ornith baseline has canonical agent benchmark evidence, but stronger coding-helper claims
-still require bounded real-device qualification of actual generate/refactor/test/commit workflows and
-normal-mode restoration afterward.
-
----
-
-# 11. Maintenance, backup and power contract
-
-The Pi is an availability/power companion first; backup export is secondary.
-
-Stable operator interfaces include:
+Expected protection:
 
 ```text
-sudo bc250-maintenance status
-sudo bc250-maintenance setup
-sudo bc250-maintenance run backup
-sudo bc250-maintenance run prune
-sudo bc250-maintenance request-shutdown
-sudo bc250-maintenance companion status|enable
-sudo bc250-maintenance backup-export status|enable
+parent 0700 root:root
+file   0600 root:root
+content real sk-... Open WebUI API key
 ```
 
-Local maintenance design:
+Do not put credential contents into evidence archives/logs.
 
-- verified config/users backups are independent of the Pi;
-- backup archives/checksums are private and verified;
-- restore requires Open WebUI stopped, verifies archive/database integrity and keeps rollback material;
-- pruning starts dry-run and preserves uncertain metadata rather than deleting ambiguously;
-- active maintenance jobs defer safe shutdown;
-- warm-up and automatic night power are optional and disabled unless explicitly configured/enabled;
-- WOL may be required before poweroff if policy says so.
+## 8. Open WebUI parameter-resolution conclusion
 
-Safe-power in 1.8:
+Source-level investigation is closed.
 
-- inspect both final TCP endpoints for configured protected ports;
-- interactive SSH therefore defers its own public `request-shutdown`;
-- the dedicated forced-command Pi identity has a separate internal request path that may exempt only
-  its exact authenticated SSH tuple;
-- any second SSH/UI/Ollama/protected connection still defers;
-- missing/failed TCP inspection fails safe by deferring;
-- final system power action is requested non-blocking only after all guards pass.
-
-Exact 2.2 has proven interactive SSH defer and the corrected healthy-live-40-CU return-code boundary.
-For 2.3, repeat active-SSH defer only as a regression smoke after installing the release. Before unattended
-automatic poweroff is enabled, additionally prove the configured companion path if used, idle allow,
-real S5/WOL and post-wake readiness/restoration.
-
----
-
-# 12. Revalidation and evidence discipline
-
-Whole-appliance revalidation is a milestone gate, not a substitute for every focused test. Current
-harness records infrastructure, quality, restoration and coverage separately. A legitimate quality
-miss must not be confused with an incomplete run or restoration failure.
-
-Evidence rules:
-
-- record exact installed NEVRA and run ID;
-- distinguish configured/allocated context from demonstrated prompt length;
-- preserve failure artifacts;
-- never archive secrets or unnecessary authenticated payloads;
-- restoration occurs before final health verification;
-- do not claim success when a restoration failure changes final appliance state;
-- historical startup AMDGPU/HPD warnings are not automatically new campaign faults; compare against
-  the campaign's bounded kernel/device-error window.
-
-Exact installed 1.7 remains the newest full whole-appliance revalidation campaign. Exact installed
-2.4 is the latest broad operations acceptance baseline: non-OWUI behavior is closed through Batch 20,
-including operational hygiene and supported reboot reconstruction. The final exact-2.4 OWUI
-investigation established two additional product defects (ordinary-user model authorization and
-Deep Reasoning residency pressure) plus the already-known two-view verifier defect, and proved the
-narrow mitigations before restoring temporary state.
-
-Exact installed 0.12.1-0.6 is now the immediate comparison baseline: its device infrastructure, resource-safety, restoration, ordinary-user lifecycle, RAG and serialized compare paths passed, while production translation recommendation modality remained unclean. The subsequent long-run model review adds two candidate-driving observations: Advanced `think=false` produced repeatable arithmetic errors, and Qwen3.6 35B / Qwen3.8 27B Unsloth 16K profiles repeatedly operated at excessively tight UMA headroom despite clean unload/recovery.
-
-# 13. Current open gaps and priority order
-
-## P0 — build and exact-0.12.2-0.6 focused qualification
-
-The current release requires only the final crossed boundaries:
+The installed OWUI path already supports the needed translation:
 
 ```text
-1. build/install exact 0.12.2-0.6; record rpm -V, pins, kernel and final normal topology;
-2. verify compact OVERVIEW/NEXT STEPS rendering with CU routing prominent;
-3. prove absent Agent => optional coverage unavailable/skipped (PARTIAL acceptable), not infrastructure failure; qualify/restoration only when Agent is installed;
-4. prove ordinary Advanced remains think=true and explicit Advanced Structured resolves to the same base/samplers/6144 with think=false;
-5. run one integrated structured product-path regression: Standard schema+temp0, Documents schema, Advanced Structured nothink, Deep unchanged, plus normal-chat controls;
-6. optionally run the short EuroLLM modality screen if fetched; do not reopen a broad translation tournament;
-7. one final full revalidation with Infrastructure/Restoration/Coverage/Quality reported separately and final CU/topology clean.
+workspace/model params
+  -> model_info.params
+  -> merge_model_params()
+  -> request params override correctly when injected into the same merge path
+  -> form_data["params"]
+  -> apply_model_params_to_body_ollama()
 ```
 
-Do not rerun the old Deep, RAG/Tika, MTP, title/tag or broad native long-run campaigns merely for closure. Do not add a generic memory scheduler or Tika list-marker rewrite.
-
-## P1 — real-office RAG acceptance
-
-Gemma E4B model selection is closed. Qualify actual office documents and long product-path residency.
-
-## P1/P2 — bounded general-assistant comparison
-
-The remaining meaningful main-lane question is whether GPT-OSS 20B buys enough deep-office quality
-over Qwen3.5 9B to justify its much tighter memory envelope. Use one bounded production-contract
-comparison rather than broad model discovery.
-
-## P2 — agent product-path evidence
-
-Exercise documented `bc250-code` modes and verify exclusive-mode restoration.
-
-## P2/P3 — optional MTP follow-up
-
-No broad campaign. Run only a targeted check if a future runtime/model/hardware change creates a
-new package decision; YMQ depth-1 repeat symmetry is optional, not a current gate.
-
-## P3 — secondary operations
-
-Backup export, dedupe performance and other convenience work after power/availability is qualified.
-
-# 14. Durable anti-repeat guardrails
-
-Do not repeat these disproven or unsafe directions without a material changed condition:
-
-1. Do not make the main lane ephemeral merely to fit a larger task model; cold-load UX and product
-   behavior matter.
-2. Do not promote the rejected Qwen3.8 4B Distill/Qwen3 4B task candidates under the same memory
-   topology; coexistence OOM evidence already exists.
-3. Do not revert the task default to Gemma 3 1B merely because it is familiar.
-4. Do not globally serialize embedding with main/task without evidence; dedicated 11437 is
-   intentional.
-5. Do not treat RAM/VRAM/GTT/Vulkan views as additive physical memory.
-6. Do not auto-enable 40 CUs or raise the governor ceiling from community anecdotes.
-7. Do not manually delete Ollama blobs or retained GGUFs when normal lifecycle/dedupe preserves local
-   rebuildability.
-8. Do not weaken quality, safety, completeness, restoration or secret checks to get a PASS.
-9. Do not let omitted destructive selection mean all.
-10. Do not allow backend ambiguity to cause local source deletion.
-11. Do not enable power-affecting maintenance before WOL/defer/allow/recovery are proven on the exact
-    installed release.
-12. Do not claim MTP success from tok/s alone; acceptance, quality, memory and stability matter.
-13. Do not reopen broad translation or RAG model tournaments that are already settled unless new
-    integrated evidence creates a concrete product question.
-
-Canonical detailed rationale belongs in `development/DECISIONS.md`.
-
----
-
-# 15. Known gaps that are still current
-
-- 0.12.2-0.6 needs the authoritative Fedora RPM/SRPM build plus the focused device gate in `RELEASE-TESTING-HANDOVER-0.12.2-0.6.md`; exact 0.12.2-0.5 provides the immediate completed-revalidation/CU evidence for unchanged boundaries but does not qualify the new completion/Agent/translation-finalization delta;
-- the new upstream patch/provenance gate still needs to run against the exact prepared source cache in
-  the authoritative build environment; the current source environment has no network-populated cache;
-- Pi forced-command shutdown, idle S5/WOL and live prune remain conditional acceptance work;
-- no-download unregister/re-apply support smoke still needs a corrected privileged file-existence
-  wrapper if that lifecycle boundary becomes relevant again;
-- real-office RAG behavior is substantially accepted on exact 2.4 for the tested PDF/DOCX/XLSX/PPTX
-  and lifecycle cases; further work should be driven by real office files rather than another generic
-  benchmark campaign;
-- actual `bc250-code` product workflows need broader bounded device evidence;
-- arbitrary same-name out-of-band Ollama registration drift is not fully detected/proven;
-- current XFS dedupe implementation still deserves a performance run only when storage optimization
-  becomes a real product priority;
-- exact 1.7 remains the newest full whole-appliance revalidation campaign; exact 2.4 is the latest
-  broad operations baseline but is not relabelled as that full campaign.
-
-# 16. Specialist-chat organization
-
-Keep these durable coordination documents:
+Effective precedence in the investigated path:
 
 ```text
-development/handovers/DEVELOPMENT-WORKFLOW.md
-development/handovers/MAIN-INTEGRATION-HANDOVER.md
-development/handovers/OPERATIONS-HANDOVER.md
+request/model params
+  >
+workspace/model params
+  >
+global defaults
 ```
 
-Use `SPECIALIST-TESTING-HANDOVER.md` for temporary bounded lanes. Specialists read the newest source,
-current decisions/validation docs and the lane-specific docs; they do not maintain a second full
-project bible.
+provided the value enters the correct model-parameter merge path.
 
-Useful specialist lanes only when there is an active question:
+`custom_params` is unpacked into effective parameters.
+
+Ollama mapping:
 
 ```text
-support / maintenance / power
-RAG / real documents
-benchmark operations
-general/main quality
-agent/coding
-translation requalification
-MTP targeted confirmation
+root:
+  think
+  format
+  keep_alive
+
+options:
+  max_tokens -> num_predict
+  temperature
+  top_p
+  top_k
+  min_p
+  repeat_penalty
+  ...
 ```
 
-Main integration owns final promotion, release metadata and cross-stream policy.
+OpenAI-style `response_format` maps separately to Ollama `format`; it does not itself define product thinking policy.
 
----
+No payload-translation patch is required.
 
-# 17. Fresh-main-chat instruction
+Product policy belongs in explicit request construction / curated presets, not generic payload translation.
 
-> Continue as the BC-250 main integration chat. Treat the newest source/package and exact installed
-> evidence as authoritative over handovers. Read `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
-> `development/VALIDATION-MATRIX.md`, `development/TESTING-STRATEGY.md`,
-> `development/DECISIONS.md`, `MODELS.md` and the relevant current docs. Current source target is
-> `0.12.2-0.6`; exact installed `0.12.2-0.5` is the immediate device/runtime comparison baseline for the narrow 0.6 delta,
-> while older 0.11.3 evidence remains historical support for closed operational areas. Do not call
-> 0.12.2 accepted before the crossed-boundary release gate in
-> `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md`. GitHub/Fedora owns RPM/SRPM builds,
-> the developer source environment owns deterministic/static validation, and BC-250 owns hardware/runtime
-> qualification. Preserve verified GGUFs, keep destructive operations explicit, fail closed on ambiguous
-> state, and qualify the changed installer-completion, Agent-prerequisite and translation/finalization
-> boundaries without replaying unrelated closed campaigns.
+## 9. Structured-output findings and final policy
+
+### Advanced
+
+Exact causal/native evidence:
+
+```text
+think=false exact-prompt campaign: 30/30
+think=true exact-prompt campaign:  27/30
+```
+
+Five-case native:
+
+```text
+think=false 25/25
+think=true  23/25
+```
+
+Production OWUI Advanced stress, effectively think=true:
+
+```text
+42/50 visible correct
+8/50 no-visible failures
+```
+
+All eight matched the heavy-reasoning/6144-ceiling pattern.
+
+Real OWUI authoritative nothink diagnostic:
+
+```text
+25/25 strict valid structured
+0 reasoning
+0 budget exhaustion
+0 invalid/schema
+0 infrastructure failure
+```
+
+Conclusion:
+
+```text
+Normal Advanced:
+  think=true
+  max_tokens=6144
+
+Strict Advanced machine-consumed structured:
+  explicit "Office - Advanced Structured"
+  think=false
+```
+
+Do not disable Advanced reasoning globally.
+
+### Standard
+
+Structured investigations localized the failure to formatting/temperature behavior, not a need to disable thinking.
+
+Final confirmation:
+
+```text
+exact schema format
+temperature=0.0
+normal/default thinking
+
+200/200 strict exact
+0 fenced
+0 semantic mismatch
+0 invalid
+reasoning present 200/200
+```
+
+### Documents
+
+Schema-enforced focused evidence:
+
+```text
+25/25 strict PASS
+```
+
+Final testing handover updated the policy to align with the robust Standard path:
+
+```text
+exact schema format
+temperature=0.0
+normal/default thinking
+```
+
+No larger Documents repetition campaign is required.
+
+### Deep
+
+Focused five-case qualification:
+
+```text
+25/25 strict PASS
+contract PASS
+adapter PASS
+ACL PASS
+no budget-exhaustion pattern
+```
+
+Deep has no explicit think override and remains unchanged.
+
+Deep residency policy remains its separate established contract:
+
+```text
+pre-evict competing task/embed lanes
+verify absence
+keep_alive=2m
+verify reuse
+verify expiry
+cold-reload task/embed
+restore normal mode
+```
+
+Do not introduce Deep `think=false`.
+
+## 10. Translation conclusion
+
+Current production model remains Translate-Gemma.
+
+Known raw-model defect:
+
+```text
+German:
+Die Belegungsvorschriften bei Neuvermietungen sollten beachtet werden.
+
+Observed French:
+Les règles d'occupation doivent être respectées lors de nouvelles locations.
+```
+
+This strengthens recommendation to obligation.
+
+The product guard must fail closed on recommendation/obligation strengthening and related protected modality.
+
+EuroLLM challenger Round 1:
+
+```text
+sollten -> devraient anchor     2/2
+ordinary office                 6/6
+muss nicht -> English output    0/2
+```
+
+That regression met the stop rule.
+
+Decision:
+
+```text
+keep Translate-Gemma
+accept/document raw-model limitation
+retain fail-closed product guard
+EuroLLM -> graveyard
+no Round 2
+```
+
+The reported production failure on `ist erforderlich` is likely an evaluator false negative; the cited French wording `est nécessaire` preserves required semantics.
+
+Do not reopen translation model selection merely to improve one anchor.
+
+## 11. RAG is now product-relevant
+
+RAG/Tika is ACTIVE, not frozen.
+
+Canonical product interface:
+
+```bash
+bc250 rag ...
+```
+
+The legacy public `the former public RAG importer` alias and plan/sync compatibility surface were removed.
+
+The importer engine remains internal because `bc250 rag ingest` uses it.
+
+Current architecture:
+
+```text
+Documents answer role:
+  prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+
+Embedding:
+  embed-jina-v5-small-retrieval-q4-k-m
+
+Extraction:
+  Tika 4.0.0-full
+```
+
+Historical model decision remains useful:
+
+- Gemma E4B is the production RAG answer default.
+- The larger Qwen alternative was not promoted for a 16 GiB long-lived RAG role because continuous residency/memory headroom was worse.
+- Arbitrary-document product acceptance still deserves final exact-source smoke on the final RPM.
+
+RAG qualification must cover the product command path, extraction, embedding lane, retrieval, answer behavior, cleanup and restoration.
+
+Do not revive the old broad RAG tournament.
+
+## 12. Agent is optional add-on coverage
+
+The package-default Agent is not a mandatory install baseline.
+
+Revalidation semantics:
+
+```text
+Agent not installed:
+  SKIPPED / PARTIAL / optional coverage unavailable
+  core revalidation can still pass
+
+Agent installed but broken:
+  real staged runtime/topology/infrastructure failure
+```
+
+Do not collapse missing optional model state into generic failure.
+
+## 13. Benchmark improvements integrated
+
+Generation benchmark reporting was improved based on the multi-device campaign.
+
+Current useful summary data includes:
+
+- cold request wall time;
+- actual `cold_load_s`;
+- decode mean/CV;
+- prefill;
+- selected deep-context lanes;
+- 4K/16K target vs actual prompt tokens;
+- thermal window count/mean/min/max/first/last/drift;
+- selected-lane completeness;
+- resident size;
+- MemAvailable/swap evidence;
+- runtime/GPU journal diagnostics.
+
+No synthetic board score or package-specific A/B/C board ranking was introduced.
+
+Historical hardware campaign conclusion:
+
+- all three tested devices were healthy 40/40;
+- one board was modestly faster, especially prefill;
+- no product/runtime defect was found;
+- board ranking is not package policy.
+
+Do not reopen the campaign simply to increase the denominator.
+
+## 14. Documentation cleanup
+
+The installed package documentation is now operator-oriented instead of mirroring repository paths.
+
+Canonical docs:
+
+```text
+README / TLDR / MODELS / CHANGELOG
+INSTALLATION
+HARDWARE
+OPERATIONS
+OPENWEBUI
+OLLAMA
+RAG
+QUALITY-CHECKS
+BENCHMARKING
+SECURITY
+HTTPS
+FILESTRUCTURE
+UNINSTALL
+```
+
+Merged/removed standalone docs include:
+
+```text
+COMMANDS
+MEMORY
+SENSORS
+GOVERNOR
+DEPLOYMENT
+MAINTENANCE
+MAINTENANCE-CONTRACT
+openwebui-settings
+benchmark README mirror
+kernel-cmdline standalone
+GFX1013-COMPUTE-QUEUES
+packaging README from installed docs
+```
+
+Unique operational content was folded into the canonical guides rather than discarded.
+
+The obsolete GFX1013 compute-queue verifier was removed with the document.
+
+## 15. Installed filesystem design
+
+The top-level Linux/FHS split is intentionally retained:
+
+```text
+/usr/bin/                       small public CLI
+/usr/libexec/bc250-llm-server/  private implementation
+/usr/share/bc250-llm-server/    immutable product assets
+/usr/share/doc/bc250-llm-server docs
+/etc/bc250-llm-server/          operator configuration
+/var/lib/bc250-llm-server/      persistent package state/models/secrets
+/var/cache/bc250-llm-server/    disposable cache
+/var/backups/bc250-llm-server/  package backups
+/var/lib/open-webui/            Open WebUI-owned state
+/srv/bc250-documents/           operator document area
+```
+
+The cleanup target was what lives inside those locations, not replacing normal Linux hierarchy with a custom tree.
+
+## 16. Candidate screens and engineering tooling
+
+Engineering model-selection/candidate screens remain in source where useful.
+
+They are no longer installed onto every production appliance.
+
+Production validation interfaces are:
+
+```text
+bc250 verify
+bc250 revalidate
+bc250 benchmark
+current package-specific focused harness when justified
+```
+
+Do not treat source-only candidate matrices as normal operator commands.
+
+## 17. Development scope
+
+Current active:
+
+```text
+installer-convergence
+openwebui-product
+benchmark-revalidation
+model-catalog-current
+rag-tika
+```
+
+Boundary-active:
+
+```text
+runtime-cu-memory
+verification-diagnostics
+packaging-source
+global-docs-coordination
+uninstall
+```
+
+Frozen:
+
+```text
+maintenance-companion
+mtp
+coding-agent
+ocr
+```
+
+Archive-only:
+
+```text
+historical-development
+quality-history
+graveyard-models
+```
+
+A greenfield change may deliberately remove compatibility surfaces, but it must update the scope contract/tests/docs rather than bypassing them.
+
+## 18. What is closed and should not be replayed
+
+Do not rerun without a new dependency:
+
+- Advanced think A/B campaigns;
+- Standard prompt/schema/four-arm/think/temperature campaigns;
+- Standard 200-request confirmation;
+- Deep structured baseline;
+- EuroLLM translation challenger;
+- broad translation model tournament;
+- multi-device board ranking;
+- Tika bullet-format investigation;
+- title/tag persistence investigation;
+- old Qwen3.6 35B work;
+- obsolete replacement-AMDGPU 40-CU path;
+- broad RAG model tournament;
+- old MTP broad campaign;
+- historical uninstall/power campaigns unless a current boundary changed.
+
+Preserve their conclusions; do not preserve their obsolete active instructions.
+
+## 18A. 0.12.2-0.7 RPM polish and debloat
+
+The 0.7 release is a packaging/UX cleanup over the greenfield 0.6 source.
+
+Integrated changes:
+
+- project and governor license files install under distinct basenames, eliminating the duplicate-license RPM warning;
+- the redundant explicit Ollama sysusers group declaration is removed; the user entry remains the single group/user authority;
+- `make rpm` now validates the actual built RPM payload, not only source intent;
+- CI installs and runs `rpmlint` after the RPM build in addition to Ruff and ShellCheck, using `packaging/rpmlint.toml` to filter only documented appliance policy/known false positives;
+- the first rpmlint run's genuine defects are fixed: the tmpfiles-managed RAG root is a ghost directory in the file list, prepared source archives normalize to 0644, the internal RAG importer has no executable shebang, spec comments avoid macro expansion, and the package description stays within rpmlint line limits;
+- the actual-RPM contract requires the canonical dispatcher, deliberate standalone CU tools, private Ollama installer helper, product RAG documentation and both license files;
+- the payload contract rejects regenerated per-route aliases, replacement-module assets, installed candidate-screen trees, stale installed-doc source mirrors and active EuroLLM payloads;
+- model-manager migration-hint code and stale command grammar were removed rather than retained as compatibility scaffolding;
+- active scripts/tests/current docs use only the canonical dispatcher grammar;
+- help text was shortened and rewritten around user tasks rather than implementation internals.
+
+The live-manager upstream licensing situation is intentionally unchanged; do not alter it as part of this release.
+
+
+## 18B. 0.12.2-0.8 exact-device UX/reporting corrections
+
+Exact 0.12.2-0.7 fresh installation proved the functional architecture: 53/53 core verification, Open WebUI convergence/authentication, 40/40 live CU routing with saved-profile reboot restoration, Infrastructure/Restoration PASS in revalidation, and PARTIAL coverage solely because the optional Agent add-on was absent. The same run reproduced the known raw Translate-Gemma recommendation-strengthening defect and demonstrated that the Open WebUI outlet correctly withheld it.
+
+0.8 fixes the presentation around those successful behaviors rather than changing the qualified runtime/model policy. Revalidation v4.7 keeps run completion independent from coverage/diagnostics; OWUI translation records raw model quality separately from delivered product integrity; installer/verifier CU terminology is reduced to live routing, saved boot profile and boot-restore service; normal Agent status is phrased as an inactive optional lane; completion guidance points to management/status rather than repeat initialization. A dependency audit changes only `git` to `git-core`; Mesa/Vulkan, UMR, Poppler and Hugging Face remain because active product paths consume them.
+
+The active verifier no longer carries the pre-greenfield patched-AMDGPU marker warning. Historical source records may describe that architecture, but current runtime code and installed docs do not support it.
+
+## 19. Remaining release work
+
+High-value next sequence:
+
+1. build exact final 0.13.1-1.0 RPM/SRPM in the normal Fedora/GitHub environment;
+2. fresh-install or deliberately upgrade that exact RPM on the BC-250;
+3. verify the canonical command surface and absence of removed aliases/assets;
+4. configure/verify 40/40 with the live-manager-only path and prove reboot restoration;
+5. verify installed documentation/layout;
+6. run `bc250 verify`;
+7. run `bc250 revalidate start`;
+8. accept Agent PARTIAL coverage if the optional add-on is absent;
+9. smoke product RAG/Tika/embed;
+10. verify Open WebUI convergence and curated presets;
+11. run focused structured-output product-path regression if the final request-construction path changed;
+12. final normal-topology/restoration check;
+13. freeze/tag only after exact installed-RPM evidence is clean.
+
+## 20. Main-chat decision rule
+
+Do not create more work merely because a topic has history.
+
+Ask:
+
+```text
+Did final source change the behavior?
+Does exact device evidence need renewal?
+Is this a current product surface?
+Is there an unresolved release decision?
+```
+
+If all are no, preserve the conclusion and move on.
+
+## 18C. 0.13.1-1.0 release hygiene
+
+Exact 0.12.2-0.8 is now the qualified device baseline. The pre-release investigation found no product failure and only three implementation issues: package Python imports could create unowned bytecode under immutable `/usr`; intentionally unselected optional models were mislabeled `MISSING`/`DRIFT` and given repair advice; and a retired Qwen3.6 native registration could incorrectly create Open WebUI active-override drift despite remaining hidden from ordinary users.
+
+0.13.1-1.0 fixes those findings without changing runtime/model/CU/RAG architecture. The canonical dispatcher disables Python bytecode writes, guided convergence removes stale package-tree bytecode in bounded BC-250 roots, optional model status now distinguishes OPTIONAL from genuine DRIFT, and retired/non-user-visible testing policies no longer become active Open WebUI desired-state overrides. Retired residue remains discoverable/removable through the model lifecycle.
+
+The release test is a narrow 0.8 -> 0.13.1 upgrade/layout/model-state delta. Do not replay the full 0.8 qualification unless that delta exposes a regression.

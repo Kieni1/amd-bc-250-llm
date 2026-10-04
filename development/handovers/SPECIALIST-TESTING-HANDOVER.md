@@ -1,104 +1,152 @@
-# BC-250 specialist testing handover template
+# BC-250 specialist testing handover — 0.13.1-1.0
 
-Use this for temporary support, RAG, translation, general-quality, agentic, benchmark-operations or
-MTP chats. Do not maintain a second full project state here; the newest source and main handover are
-authoritative.
+## Use this file to choose the right side chat
 
-## First instruction
+Do not open a specialist chat simply because an old handover exists.
 
-> Read the newest supplied source first, then `development/handovers/MAIN-INTEGRATION-HANDOVER.md`,
-> `development/TESTING-STRATEGY.md`, `development/VALIDATION-MATRIX.md`,
-> `development/DECISIONS.md`, `MODELS.md` and the lane-specific package docs. Work only on the assigned
-> lane. Use one bounded BC-250 batch at a time. Preserve verified GGUFs, restore state before changing
-> lanes, and never weaken quality/safety/restoration checks to make a run pass. Do not change
-> production defaults, release metadata or unrelated package policy without returning evidence to
-> main integration.
+Current specialist lanes:
 
-## Lane contract
+### 04 — exact RPM build / device closure
 
-Fill in at chat start:
+Open when:
 
-```text
-lane:
-source release:
-installed NEVRA:
-question being answered:
-starting topology/state:
-cheap/read-only gate:
-real integration gate:
-resource/coexistence gate:
-restoration requirement:
-stop rule:
-retest conditions from existing decisions:
-```
+- building/installing the final 0.13.1-1.0 RPM;
+- proving live-CU-only behavior;
+- running final verify/revalidate;
+- deciding release freeze/tag.
 
-## Current lane guidance
+This is the default next specialist lane.
 
-- **support / maintenance / power / Open WebUI operations:** read `docs/MAINTENANCE.md`,
-  `docs/MAINTENANCE-CONTRACT.md`, `docs/openwebui-settings.md`, `cmd/maintenance/maintenance.sh` and
-  `safe-power.sh`. Exact installed 2.4 is the latest broad operations baseline: package integrity,
-  topology/recovery, maintenance/backup/restore, storage hygiene, runtime soak, live 40/40 and a real
-  supported reboot reconstruction all passed. The final exact-2.4 OWUI investigation then proved
-  ordinary-user model ACL and Deep Reasoning residency defects plus the two-view verifier defect, with
-  narrow temporary mitigations. Current source 0.12.2-0.6 is the active narrow release candidate: Ollama 0.34.4, Open WebUI 0.11.4, migration-safe OWUI backup gating, Advanced `think=true` with `max_tokens=6144`, retired Qwen3.6 35B, profile-aligned Qwen3.8 experiments, protected OWUI maintenance authentication, saved-profile/live-layout CU semantics, and fail-closed pre-Deep eviction with `keep_alive=2m`. Use the dedicated 0.12.2 release-testing handover and requalify only the crossed boundaries. Keep the external OpenAI-style adapter outside the advertised product contract rather than
-  treating `/api/chat/completions` as a supported external compatibility contract. Do not deliberately
-  rerun the device-proven unreliable `sudo systemctl reboot` path or reopen model selection. Pi/S5/WOL,
-  live pruning and other destructive support checks remain conditional, not automatic release gates.
-  Evaluate operator UX as well as functionality.
-- **benchmark operations:** use `cmd/benchmark/README.md` and current benchmark source/tests. Prove
-  result completeness, resource telemetry and restoration on a known production control before a
-  large campaign.
-- **RAG / documents:** production answer role is Gemma E4B via `bc250-office-documents`; model
-  selection is closed for the current 16 GiB profile. The focused Tika DOCX list question is also closed:
-  genuine LibreOffice bullets serialize as `· item`, while heading/table/list content and retrieved facts
-  remain intact, so no package rewrite is indicated. Broader arbitrary-document/OCR lifecycle work is
-  optional product qualification rather than a blocker for the current 0.5 delta. Direct RAG work must
-  preserve starting residency and use non-empty embedding probes for embedding reload.
-- **translation:** production is Translate-Gemma E4B through explicit DE→FR / FR→DE roles. Broad
-  discovery is closed; run only integrated requalification or investigate a proven product-level
-  failure.
-- **general/main:** use existing production contracts. The meaningful bounded comparison is GPT-OSS
-  20B versus Qwen3.5 9B for deep-office quality versus memory cost; do not reopen broad 27B/35B
-  discovery without a concrete reason.
-- **agentic/coding:** use `models/coding-agent/README.md`. Agent mode is exclusive; verify normal-mode
-  restoration. File-producing/commit contracts reject outer Markdown fences, truncation/incomplete
-  final content and reasoning contamination. Product-path evidence must exercise actual documented
-  `bc250-code` modes, not only the canonical benchmark.
-- **MTP:** use `models/mtp/README.md`, `models/mtp/models.toml`, `bc250-fetch-mtp`, `bc250-run-mtp` and
-  `bc250-compare-mtp`. Broad qualification is closed. Active policy is Qwen3.5 9B 16K/d2 as primary
-  fast, YMQ Qwen3.8 27B 8K/d1 as primary general 27B, and HauhauCS Qwen3.8 27B 8K/d2 as specialist
-  alternative. Qwen3.6 27B is retired as superseded; 35B-A3B is retired for memory fit. Direct runs
-  drain/restore Ollama residency and comparison uses drain-only isolation. Reopen only for a materially
-  new runtime/model/hardware or product question.
+### 05 — integrated structured-output policy
 
-## Current 0.12.2-0.6 testing priority
+Open only when:
 
-Use `development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md`. Exact 0.12.2-0.5 narrowed the remaining work to installer completion/CU orientation, the package-default Agent prerequisite/attribution contract, and the DE->FR recommendation-modality/product-finalization path. Test those surfaces directly plus one final revalidation. Preserve the previous clean Deep/RAG/Tika/title-tag/topology evidence as comparison context; do not replay those closed campaigns unless a focused 0.6 result crosses their boundary.
+- final product request construction needs implementation/review;
+- final RPM changed the structured trigger path;
+- effective parameter evidence is needed.
 
-## Acceptance-harness evidence policy
+Do not use it to rerun model discovery.
 
-Acceptance harnesses must record device truth rather than aborting the whole evidence run on an ordinary product mismatch. Keep execution/observation/classification separate; a failed assertion is evidence and independent checks continue. A destructive or resource-sensitive subtest may skip only itself when its safety prerequisite is not met. Reserve a nonzero overall harness exit for an unsafe final appliance state or a mechanical harness error that invalidates the evidence run. Also distinguish mechanical field/string presence from human UX judgment; do not call string presence alone `UX PASS`.
+### 06 — RAG product qualification
 
-## Required specialist handoff
+Open when:
+
+- testing `bc250 rag`;
+- Tika/embedding/product retrieval behavior changes;
+- RAG exact-device product smoke is needed.
+
+RAG is ACTIVE.
+
+### 07 — greenfield appliance/API/layout
+
+Open when:
+
+- checking installed command/file footprint;
+- verifying removed aliases/assets;
+- checking libexec/public boundary;
+- evaluating upgrade residue;
+- checking installed docs.
+
+### 08 — optional Agent / specialist add-ons
+
+Open only for:
+
+- optional-Agent semantics;
+- intentional Agent installed coverage;
+- direct boundary changes to MTP/coding-agent/OCR.
+
+Do not make optional domains mandatory.
+
+## Closed specialist topics
+
+Do not create active chats for:
 
 ```text
-<LANE> -> MAIN INTEGRATION
-source / installed NEVRA:
-exact baseline and candidate(s):
-settings:
-commands actually run:
-quality/measurement result:
-resource result:
-real integration result:
-operator UX result:
-restoration result:
-observed facts:
-interpretation:
-decision:
-retest only if:
-evidence artifacts + SHA-256:
-recommended next action:
+Advanced 6144 diagnosis
+Advanced think A/B
+Standard structured discovery
+Documents extra denominator
+Deep structured discovery
+translation model tournament
+EuroLLM Round 2
+multi-device board ranking
+Tika bullet formatting
+title/tag anomaly
+Qwen3.6 35B
+kernel-patch 40-CU workflow
+broad RAG model tournament
 ```
 
-If a candidate loses the promotion case at an earlier gate, stop. Do not spend expensive
-coexistence/integration time merely to complete a matrix.
+Their conclusions are incorporated into current product policy.
+
+## Shared test rules
+
+Every specialist should:
+
+1. record exact source/NVR;
+2. state scope;
+3. distinguish source vs exact-device evidence;
+4. preserve raw evidence;
+5. classify harness defects separately;
+6. restore state;
+7. clean synthetic data;
+8. avoid secrets;
+9. avoid replaying closed campaigns;
+10. return a concise handover to main integration when a cross-stream decision is needed.
+
+## Model-output vs harness exit
+
+Model-quality findings generally remain evidence.
+
+Non-zero harness exit should be reserved for:
+
+- infrastructure/API failure;
+- safety condition;
+- harness/config failure;
+- cleanup failure;
+- restoration failure;
+- archive/evidence integrity failure;
+
+unless the specialist's explicit contract defines otherwise.
+
+## Evidence ownership
+
+Main integration owns:
+
+- production model/preset policy;
+- release acceptance;
+- version/release metadata;
+- cross-stream decisions.
+
+Specialists own:
+
+- bounded evidence;
+- narrowly justified implementation changes;
+- exact findings/limitations.
+
+Specialists should not independently promote a model or redefine release scope.
+
+## Stop rules
+
+Stop a specialist campaign when:
+
+- the pre-agreed decision rule is met;
+- the behavioral question is already answered;
+- a regression clearly rejects the challenger;
+- further repetitions would only increase denominator without changing policy;
+- the finding belongs to another current lane.
+
+EuroLLM is the current example: the Round 1 English-output regression met the stop rule; no Round 2.
+
+## Final-release routing
+
+If uncertain which specialist should own a release issue:
+
+```text
+build/install/runtime -> 04
+structured policy -> 05
+RAG/Tika/embed -> 06
+files/commands/layout -> 07
+optional Agent/specialist add-on -> 08
+cross-cutting decision -> main integration
+```
