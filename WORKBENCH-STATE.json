@@ -1,83 +1,90 @@
 {
   "schema": 1,
   "kind": "workbench-checkpoint",
-  "release_identity": "bc250-llm-server-0.12.2-0.6",
-  "predecessor_artifact": "amd-bc-250-llm-0.12.2-0.6-workbench-release-testing-fixes(2).zip",
-  "predecessor_sha256": "19b40a0901e0f79d50cc9d6d7681a6c495ccf9ed3640f97aa25033b32f52f198",
-  "batch": "0.12.2-0.6-final-integration",
+  "release_identity": "bc250-llm-server-0.13.1-1.0",
+  "predecessor_artifact": "amd-bc-250-llm-0.12.2-0.8-workbench-exact-device-ux-final.zip",
+  "predecessor_sha256": "30efed57c0769d0d62b99bc43dbfdbdee11b4b34873d19c62e3d0aa6365a0fbe",
+  "batch": "0.13.1-1.0-release-bytecode-model-state-hygiene-final",
   "changed_files": [
+    "CHANGELOG.md",
     "MODELS.md",
     "README.md",
-    "WORKBENCH-STATE.json",
-    "cmd/benchmark/README.md",
-    "cmd/benchmark/benchmark_common.py",
-    "cmd/benchmark/generation-benchmark.py",
-    "cmd/benchmark/revalidate.sh",
+    "TLDR.md",
+    "VERSION",
+    "cmd/openwebui/openwebui-setup.py",
     "cmd/system/install.sh",
     "config/openwebui/models.json",
+    "development/DEVELOPMENT-SCOPE.json",
     "development/TESTING-STRATEGY.md",
     "development/VALIDATION-MATRIX.md",
-    "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.6.md",
+    "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.0.md",
     "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
     "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
     "development/handovers/OPERATIONS-HANDOVER.md",
-    "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md",
-    "docs/CHANGELOG.md",
-    "docs/COMMANDS.md",
-    "docs/openwebui-settings.md",
-    "models/model-profiles.json",
-    "models/modelfiles/exp-eurollm9b-instruct-2512-mradermacher-q4-k-m.Modelfile",
+    "development/handovers/README.md",
+    "development/handovers/RELEASE-TESTING-HANDOVER-0.13.1-1.0.md",
+    "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
+    "docs/FILESTRUCTURE.md",
+    "docs/OLLAMA.md",
+    "docs/OPERATIONS.md",
+    "models/README.md",
+    "models/modelctl.py",
+    "models/modelfiles/prod-qwen35-9b-unsloth-q6-k.Modelfile",
+    "packaging/bc250",
     "packaging/bc250-llm-server.spec",
-    "tests/test_benchmark.py",
     "tests/test_catalog.py",
     "tests/test_install.py",
-    "tests/test_openwebui.py"
+    "tests/test_openwebui.py",
+    "tests/test_packaging.py"
   ],
   "completed": [
-    "Finalized explicit Office - Advanced Structured preset on the production Qwen3.5 9B base with the same Advanced samplers/max_tokens=6144 and only think=false; ordinary Advanced remains think=true",
-    "Recorded role-specific strict structured-output policy: Standard exact schema plus request temperature=0.0 with default thinking, Documents exact schema with normal policy, Advanced explicit Structured preset, Deep unchanged",
-    "Kept Open WebUI/Ollama payload translation generic; no payload.py policy fork and no prompt-text JSON heuristic",
-    "Returned Agent to optional add-on status: installer baseline excludes Ornith and revalidation classifies absence as optional coverage unavailable/skipped rather than core infrastructure failure",
-    "Documented production Translate-Gemma recommendation-strengthening as an accepted native-model limitation protected by the existing fail-closed modality guard rather than a 0.12.2-0.6 release blocker",
-    "Added opt-in Apache-2.0 exp-eurollm9b-instruct-2512-mradermacher-q4-k-m as a translation challenger only; no promotion is implied",
-    "Extended generation summaries with cold_load_s, 4K/16K target-vs-actual context aggregates, thermal mean/min/max/first/last/drift and selected-lane completeness checks",
-    "Reduced installer completion to compact OVERVIEW plus amber NEXT STEPS for CU routing, models, validation and benchmark entry points",
-    "Kept Qwen3.6 35B graveyard/retired-only and did not promote an unqualified replacement",
-    "Closed the request for extra Documents-only confirmation; focused 25/25 schema evidence is retained as sufficient pending integrated product-path regression",
-    "Refreshed current integration, operations, testing strategy, validation matrix, changelog and RPM changelog to the final 0.6 policy"
+    "Promoted the release identity from 0.12.2-0.8 to VERSION 0.13.1 / RPM Release 1.0 without changing runtime, model, CU, RAG or structured-output policy.",
+    "Used exact-device 0.12.2-0.8 as the qualified predecessor: upgrade/convergence PASS, bc250 verify 53/0/0/0, 40/40 live CU with exact saved-profile boot restore, Open WebUI desired state clean, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI PASS, ordinary-user/ACL/product journeys PASS and optional Agent correctly PARTIAL.",
+    "Set PYTHONDONTWRITEBYTECODE=1 in the canonical bc250 dispatcher so normal dispatcher-launched Python helpers do not create package-tree bytecode under immutable /usr.",
+    "Added bounded guided-convergence cleanup for stale __pycache__, *.pyc and *.pyo only below the package-owned libexec/share trees, leaving unrelated Python caches untouched.",
+    "Changed intentionally unselected optional models to semantic OPTIONAL states: not installed or source cached/not registered; no apply/refresh recommendation is emitted for those states.",
+    "Preserved genuine DRIFT for optional models whose runtime Modelfile/desired active state exists but registration/content is missing or inconsistent.",
+    "Excluded retired/non-user-visible testing policies from active Open WebUI base-model override desired state. Retired native registrations remain hidden from ordinary users and lifecycle-cleanable through bc250 model purge-retired.",
+    "Currentized user/operator documentation for the 0.13.1 release and removed two remaining greenfield documentation remnants: the obsolete /usr/bin/bc250-* stable-alias claim and install-manifest alias-record description.",
+    "Currentized the active development scope, testing strategy, validation matrix and release handovers for the narrow 0.8 -> 0.13.1 exact-upgrade delta."
   ],
   "validation": [
-    "development scope check: PASS; frozen/archive-only hashes restored and unchanged",
-    "changed-surface deterministic tests: 329/329 PASS (Open WebUI, installer, catalog, maintenance baseline, benchmark/revalidation)",
-    "remaining deterministic modules: 171/171 PASS; total module-by-module suite 500/500 PASS",
-    "python3 scripts/validate.py: PASS (RPM preflight)",
-    "bash syntax for installer/revalidation: PASS",
-    "Python compile for changed Python/tests: PASS",
-    "JSON parse for Open WebUI models, model profiles, retired models and development scope: PASS",
-    "project source tarball generation: PASS",
-    "Ruff executable unavailable locally; workstation/CI Ruff remains authoritative",
-    "binary RPM/SRPM build not executed in this sandbox: rpmbuild is unavailable and pinned upstream source fetch cannot resolve github.com; do not treat this as a package-build PASS"
+    "511/511 deterministic Python tests PASS across all 17 test modules, executed module-by-module.",
+    "python3 scripts/validate.py: RPM preflight PASS.",
+    "python3 development/scope.py check: PASS; frozen component hashes unchanged.",
+    "Focused bytecode/model-state/Open WebUI tests PASS; package cleanup regression proves unrelated filesystem caches are untouched.",
+    "Ruff, ShellCheck, configured rpmlint execution and rpmbuild remain external Fedora/GitHub/workstation gates and are not claimed as passed in this artifact environment."
   ],
+  "exact_device_baseline": {
+    "nvr": "bc250-llm-server-0.12.2-0.8.fc44.x86_64",
+    "qualification": "effectively closed / PASS",
+    "core_verification": "53 ok / 0 warn / 0 fail / 0 skipped",
+    "cu": "40/40 live routing; exact saved profile; boot restore enabled",
+    "openwebui": "desired state clean; ordinary-user ACL/product journeys PASS",
+    "revalidation": "Infrastructure PASS; Restoration PASS; Coverage PARTIAL only because optional Agent absent",
+    "rag": "direct and Open WebUI product paths PASS",
+    "layout_review": "only package-tree Python bytecode residue; attribution complete and fixed in 0.13.1 source"
+  },
   "current_scope": {
     "active": [
       "installer-convergence",
       "openwebui-product",
       "benchmark-revalidation",
-      "model-catalog-current"
+      "model-catalog-current",
+      "rag-tika"
     ],
     "boundary_active": [
       "runtime-cu-memory",
       "verification-diagnostics",
       "packaging-source",
-      "global-docs-coordination"
+      "global-docs-coordination",
+      "uninstall"
     ],
     "frozen": [
       "maintenance-companion",
-      "rag-tika",
       "mtp",
       "coding-agent",
-      "ocr",
-      "uninstall"
+      "ocr"
     ],
     "archive_only": [
       "historical-development",
@@ -86,13 +93,11 @@
     ]
   },
   "device_followup": [
-    "Build RPM/SRPM in the normal Fedora/GitHub package environment with pinned upstream sources, then install exact 0.12.2-0.6 and record rpm -V/runtime pins/kernel/final topology",
-    "Verify compact plain OVERVIEW plus amber NEXT STEPS and CU routing guidance on a real terminal",
-    "Verify Agent absence reports optional coverage unavailable/skipped (PARTIAL acceptable) without core infrastructure failure; if Agent is installed, qualify exclusive-lane runtime and normal-mode restoration",
-    "Run one integrated ordinary-user structured-output qualification: Standard schema+temperature0, Documents schema, Advanced normal think=true, Advanced Structured think=false, Deep unchanged, plus non-structured controls and effective-param evidence",
-    "Optionally fetch EuroLLM experimental challenger and run one short DE<->FR modality/ordinary-office comparison using the existing direct candidate screen; qualify further only if clearly better",
-    "Preserve production Translate-Gemma fail-closed modality guard; the native sollten->doivent limitation is documented/accepted if EuroLLM does not clearly win",
-    "Run one final whole-appliance revalidation with Infrastructure/Quality/Restoration/Coverage separated and final CU/topology clean",
-    "Do not reopen closed Deep/RAG/Tika/MTP/title-tag/broad model campaigns unless a current 0.6 boundary changes"
+    "Build exact 0.13.1-1.0 RPM/SRPM and require Ruff, ShellCheck, actual-RPM payload contract and configured rpmlint to pass.",
+    "Upgrade exact 0.12.2-0.8 with deliberately created known package-tree bytecode to exact 0.13.1-1.0, run sudo bc250 install, and prove stale bytecode is removed and not recreated.",
+    "Require rpm -V clean and zero unowned files below package-owned /usr after RAG, benchmark, model, Open WebUI, verify and diagnostic paths.",
+    "Verify optional absent/cached/applied/broken model states use OPTIONAL/CURRENT/DRIFT semantics with no repair advice for intentionally unselected state.",
+    "Create retired Qwen3.6 native residue; require Open WebUI desired state clean, ordinary-user visibility false, and purge-retired cleanup PASS.",
+    "Run bc250 verify and restore exact normal topology; do not repeat the full 0.8 campaign unless the bounded delta exposes a regression."
   ]
 }
