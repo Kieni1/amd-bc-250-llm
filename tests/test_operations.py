@@ -35,7 +35,7 @@ class StatusTests(unittest.TestCase):
         ):
             self.assertNotIn(mutation, source)
         for expected in (
-            "bc250-cu-status",
+            "cu-status.sh",
             "vm.swappiness",
             "zramctl",
             "ollama-task.service",
@@ -59,7 +59,7 @@ class StatusTests(unittest.TestCase):
         self.assertIn('Overall: HEALTHY', source)
         self.assertIn('Runtime mode: exclusive agent', source)
         self.assertIn('Overall: DEGRADED', source)
-        self.assertIn('Recovery: sudo bc250-agent-mode normal', source)
+        self.assertIn('Recovery: sudo bc250 agent-mode normal', source)
         self.assertIn('Overall: UNAVAILABLE', source)
         self.assertIn('Reason: optional needs-restarting helper unavailable', source)
 
@@ -131,9 +131,9 @@ ollama_version_line
         for expected in (
             "manifest.json",
             "SHA256SUMS.txt",
-            "bc250-status",
-            "bc250-verify --summary",
-            "bc250-maintenance status",
+            "bc250 status",
+            "bc250 verify --summary",
+            "bc250 maintenance status",
             "pstore-presence.txt",
             "memory.events",
             "BC250_SUPPORT_CAPTURE_TIMEOUT",
@@ -155,7 +155,7 @@ ollama_version_line
         end = source.index("\nollama_status() {", start)
         function = source[start:end]
         with tempfile.TemporaryDirectory() as tmp:
-            helper = Path(tmp) / "bc250-agent-mode"
+            helper = Path(tmp) / "bc250"
             helper.write_text(
                 "#!/usr/bin/env bash\nprintf 'ollama.service failed\nmode=%s\n' \"${TEST_MODE}\"\n",
                 encoding="utf-8",
@@ -179,43 +179,12 @@ ollama_version_line
         self.assertIn("stopped (normal and agent lanes inactive)", source)
 
 
-class CuHelperTests(unittest.TestCase):
-    def test_40cu_status_hint_returns_success_when_persistent_mode_is_disabled(self) -> None:
-        source = (ROOT / "cmd/system/40cu-module.sh").read_text(encoding="utf-8")
-        start = source.index("show_load_failure_hint() {")
-        end = source.index("\ndo_status() {", start)
-        function = source[start:end]
-        result = subprocess.run(
-            ["bash", "-c", function + "\nCONF40=/definitely/not/present; show_load_failure_hint"],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "")
-
-    def test_40cu_reboot_paths_use_bc250_compatible_reboot_invocation(self) -> None:
-        source = (ROOT / "cmd/system/40cu-module.sh").read_text(encoding="utf-8")
-        self.assertNotIn("systemctl reboot", source)
-        self.assertEqual(source.count("/usr/sbin/reboot"), 2)
-
-    def test_normal_mode_message_describes_agent_as_intentionally_inactive(self) -> None:
-        source = (ROOT / "cmd/system/agent-mode.sh").read_text(encoding="utf-8")
-        self.assertIn("Agent:     intentionally inactive", source)
-        self.assertIn("Return to normal mode with: sudo bc250-agent-mode normal", source)
-        self.assertIn("normal office roles may stay listed but are unavailable in agent mode", source)
-        self.assertNotIn("agent is stopped by unit conflicts", source)
-
 
 class VerifyTests(unittest.TestCase):
     def test_verify_reports_kernel_module_and_governor_compatibility(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         for expected in (
             'kernel="$(uname -r)"',
-            '"/usr/lib/modules/$kernel/build"',
-            "modinfo -n amdgpu",
-            "modinfo -F vermagic amdgpu",
-            "rebuild/reapply the 40-CU module",
             "cyan-skillfish-governor-smu --version",
             "toml_table_value gpu-usage fix-freq",
             "toml_table_value gpu-usage method",
@@ -225,10 +194,9 @@ class VerifyTests(unittest.TestCase):
             self.assertIn(expected, source)
         self.assertNotIn("6.15.0", source)
         self.assertNotIn("6.17.8", source)
+        self.assertNotIn("bc250_cc_write_mode", source)
+        self.assertNotIn("legacy patched AMDGPU module detected", source)
         runtime_sources = source + (ROOT / "install").read_text(encoding="utf-8")
-        runtime_sources += (ROOT / "cmd/system/40cu-module.sh").read_text(
-            encoding="utf-8"
-        )
         self.assertNotRegex(
             runtime_sources,
             r"\b[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.fc44(?:\.[A-Za-z0-9_]+)?\b",
@@ -242,34 +210,14 @@ class VerifyTests(unittest.TestCase):
         self.assertIn("Verification: %d ok / %d warn / %d fail / %d skipped", source)
         self.assertIn("optional/authenticated check was skipped", source)
 
-    def test_verify_treats_static_agent_unit_as_not_boot_enabled(self) -> None:
+    def test_verify_treats_static_agent_unit_as_normal_inactive_optional_lane(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn("UnitFileState", source)
         self.assertIn("enabled-runtime", source)
         self.assertNotIn("is-enabled --quiet ollama-agent.service", source)
+        self.assertIn("optional Agent lane is inactive in normal mode", source)
+        self.assertNotIn("ollama-agent.service is not enabled at boot", source)
 
-    def test_verify_detects_optional_compute_stack_and_vulkan_failures(self) -> None:
-        source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
-        for expected in (
-            "QUEUE_COMPUTE_BIT",
-            "QUEUE_GRAPHICS_BIT",
-            "/opt/bc250-gfx1013",
-            "bc250.gfx1013_v33=1",
-            "*/updates/amdgpu.ko*",
-            "ollama --version",
-            "ErrorDeviceLost",
-            "Not enough memory for command submission",
-            "ring comp_",
-            "journalctl -k -b",
-            "for port in 11434 11435 11436",
-            "expected container-bridge listener",
-            "--get-active-zones",
-            "--list-rich-rules",
-            "CPU topology",
-            "cpufreq driver",
-            "16 threads are active",
-        ):
-            self.assertIn(expected, source)
 
 
 class DiagnoseTests(unittest.TestCase):
@@ -285,19 +233,13 @@ class DiagnoseTests(unittest.TestCase):
 
 
 class RuntimeConvenienceTests(unittest.TestCase):
-    def test_temperature_watch_is_default_and_once_is_available(self) -> None:
-        source = (ROOT / "cmd/monitoring/check-temp.sh").read_text(encoding="utf-8")
-        self.assertIn('""|-w|--watch)', source)
-        self.assertIn("--once) show_temps", source)
-        result = subprocess.run(
-            [str(ROOT / "cmd/monitoring/check-temp.sh"), "--help"],
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("continuous watch is the default", result.stdout)
+    def test_temperature_helper_is_removed_in_favor_of_sensors(self) -> None:
+        self.assertFalse((ROOT / "cmd/monitoring/check-temp.sh").exists())
+        hardware = (ROOT / "docs/HARDWARE.md").read_text(encoding="utf-8")
+        self.assertIn("watch -n 1 sensors", hardware)
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertNotIn("check-temp", manifest)
+
 
     def test_mtp_runner_help_does_not_require_llamacpp(self) -> None:
         result = subprocess.run(
@@ -329,7 +271,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "sudo bc250-fetch-mtp qwen3.8-27b-ymq-xs-ti-mtp", result.stdout
+            "sudo bc250 fetch-mtp qwen3.8-27b-ymq-xs-ti-mtp", result.stdout
         )
         self.assertNotIn("set LLAMACPP", result.stdout)
 
@@ -395,10 +337,10 @@ class RuntimeConvenienceTests(unittest.TestCase):
             encoding="utf-8"
         )
         for expected in (
-            "bc250-benchmark generation",
-            "bc250-benchmark rag-cycle",
-            "bc250-benchmark concurrency",
-            "bc250-benchmark owui-system-context",
+            "bc250 benchmark generation",
+            "bc250 benchmark rag-cycle",
+            "bc250 benchmark concurrency",
+            "bc250 benchmark owui-system-context",
         ):
             self.assertIn(expected, wrapper)
         for legacy in ("embeddings|embedding", "agent|coding", "compare-models.sh"):
@@ -443,8 +385,8 @@ class RuntimeConvenienceTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("bc250-benchmark generation", result.stdout)
-        self.assertIn("bc250-benchmark agent", result.stdout)
+        self.assertIn("bc250 benchmark generation", result.stdout)
+        self.assertIn("bc250 benchmark agent", result.stdout)
         missing = subprocess.run(
             [str(ROOT / "cmd/benchmark/benchmark.sh")],
             text=True,
@@ -464,11 +406,11 @@ class RuntimeConvenienceTests(unittest.TestCase):
 
 
 class CuStatusTests(unittest.TestCase):
-    def test_cu_status_reports_stale_preparation_after_kernel_change(self) -> None:
+    def test_cu_status_has_no_legacy_kernel_module_state(self) -> None:
         source = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
-        self.assertIn("/var/lib/bc250-llm-server/40cu/prepared", source)
-        self.assertIn("stale: prepared for", source)
-        self.assertIn("sudo bc250-40cu prepare", source)
+        self.assertNotIn("40cu/prepared", source)
+        self.assertNotIn("bc250_cc_write_mode", source)
+        self.assertNotIn("Persistent patched-module activation", source)
 
     def test_cu_status_keeps_full_routing_table_without_fixed_count_success(self) -> None:
         status = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")

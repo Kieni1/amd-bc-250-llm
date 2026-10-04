@@ -17,21 +17,13 @@ class PackagingTests(unittest.TestCase):
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("file\t0644\tVERSION\t{share}/VERSION", manifest)
 
-    def test_standalone_quality_checks_are_packaged_but_not_wired_into_revalidation(self) -> None:
+    def test_candidate_quality_checks_are_source_only(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         revalidate = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        for entry in (
-            "quality-checks/README.md\t{share}/quality-checks/README.md",
-            "quality-checks/package/*.sh\t{share}/quality-checks/package/",
-            "quality-checks/main/*.sh\t{share}/quality-checks/main/",
-            "quality-checks/task/*.sh\t{share}/quality-checks/task/",
-            "quality-checks/translation/*.sh\t{share}/quality-checks/translation/",
-            "quality-checks/translation/owui-provider-config.py\t{share}/quality-checks/translation/owui-provider-config.py",
-            "quality-checks/translation/prompts/*.txt\t{share}/quality-checks/translation/prompts/",
-            "models/retired-models.json\t{share}/model-management/retired-models.json",
-        ):
-            self.assertIn(entry, manifest)
+        self.assertNotIn("quality-checks/", manifest)
         self.assertNotIn("quality-checks", revalidate)
+        self.assertIn("models/retired-models.json\t{share}/model-management/retired-models.json", manifest)
+        self.assertTrue((ROOT / "quality-checks/README.md").is_file())
 
     def test_install_manifest_rejects_sources_outside_source_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -127,19 +119,16 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("cmd/monitoring/status.sh\t{libexec}/status.sh", manifest)
         self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
-        result = subprocess.run(
-            [str(ROOT / "packaging/bc250"), "--list-aliases"],
-            text=True,
-            stdout=subprocess.PIPE,
-            check=True,
-        )
-        self.assertIn("model", result.stdout.splitlines())
-        self.assertIn("uninstall", result.stdout.splitlines())
-        self.assertIn("status", result.stdout.splitlines())
-        self.assertIn("support-bundle", result.stdout.splitlines())
-        self.assertNotIn("fetch-embeddings", result.stdout.splitlines())
-        self.assertIn("fetch-mtp", result.stdout.splitlines())
-        self.assertIn("ocr", result.stdout.splitlines())
+        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+        for route in ("model", "status", "support-bundle", "fetch-mtp", "ocr", "rag"):
+            self.assertRegex(dispatcher, rf'(?m)^  "{route}\|', route)
+        self.assertNotIn('--list-aliases', dispatcher)
+        self.assertNotIn('"uninstall|', dispatcher)
+        self.assertNotIn('"fetch-embeddings|', dispatcher)
+        self.assertNotIn("aliases\t", manifest)
+        self.assertIn("packaging/bc250\t{bindir}/bc250", manifest)
+        self.assertIn("cmd/system/40cu.sh\t{bindir}/bc250-40cu", manifest)
+        self.assertIn("live-manager-src/bc250-cu-live-manager.sh\t{bindir}/bc250-cu-live-manager", manifest)
         self.assertIn("models/ocr/bc250-ocr.sh\t{libexec}/ocr.sh", manifest)
         for entry in (
             "cmd/benchmark/benchmark.sh\t{libexec}/benchmark.sh",
@@ -158,6 +147,19 @@ class PackagingTests(unittest.TestCase):
             "MODELS.md\t{docdir}/MODELS.md",
         ):
             self.assertIn(entry, manifest)
+
+    def test_dispatcher_suppresses_python_bytecode_in_package_helpers(self) -> None:
+        dispatcher = ROOT / "packaging/bc250"
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            (libexec / "helper_module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            rag = libexec / "rag"
+            rag.write_text("#!/usr/bin/env python3\nimport helper_module\nprint(helper_module.VALUE)\n", encoding="utf-8")
+            rag.chmod(0o755)
+            result = subprocess.run([str(dispatcher), "rag"], env={**os.environ, "BC250_LIBEXEC": str(libexec)}, text=True, capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "1")
+            self.assertFalse((libexec / "__pycache__").exists())
 
     def test_fetch_mtp_dispatches_to_explicit_disabled_entry_apply(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -223,10 +225,10 @@ class PackagingTests(unittest.TestCase):
         post = spec[spec.index("%post\n"):spec.index("%preun")]
         self.assertIn("%tmpfiles_create", post)
         self.assertIn("WEBUI_SECRET_KEY", post)
-        self.assertIn("sudo bc250-install", post)
+        self.assertIn("sudo bc250 install", post)
         self.assertIn("\\033[1;33m", post)
         self.assertIn("printf '%b' \"$bc250_amber\"", post)
-        for forbidden in ("firewall-cmd", "setsebool", "dnf ", "bc250-model", "systemctl enable --now"):
+        for forbidden in ("firewall-cmd", "setsebool", "dnf ", "systemctl enable --now"):
             self.assertNotIn(forbidden, post)
 
     def test_package_standard_ollama_uses_runtime_authority(self) -> None:
@@ -576,13 +578,18 @@ class PackagingTests(unittest.TestCase):
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertIn("Requires:       util-linux-script", spec)
 
+    def test_git_cli_uses_minimal_git_core_runtime_dependency(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("Requires:       git-core", spec)
+        self.assertNotRegex(spec, r"(?m)^Requires:\s+git\s*$")
+
     def test_package_provides_its_own_ollama_account(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         sysusers = (ROOT / "packaging/bc250-llm-server.sysusers").read_text(
             encoding="utf-8"
         )
-        self.assertIn("g      ollama -", sysusers)
+        self.assertNotIn("g      ollama -", sysusers)
         self.assertIn('u      ollama -  "Runs Ollama"', sysusers)
         self.assertIn("g      bc250-backup-export -", sysusers)
         self.assertIn(
@@ -608,33 +615,24 @@ class PackagingTests(unittest.TestCase):
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertIn('return f"%config(noreplace) {destination}"', installer)
         self.assertNotIn("systemctl try-restart tika.service open-webui.service", spec)
-        self.assertIn("sudo bc250-install", spec)
+        self.assertIn("sudo bc250 install", spec)
         self.assertNotIn("legacy migration", spec.lower())
 
-    def test_40cu_helper_is_locally_integrated_and_initramfs_verified(self) -> None:
+    def test_live_cu_manager_is_the_only_packaged_cu_backend(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        helper = (ROOT / "cmd/system/40cu-module.sh").read_text(encoding="utf-8")
-        self.assertIn(
-            "cmd/system/40cu-module.sh\t{libexec}/40cu/bc250-enable-40cu-fedora.sh",
-            manifest,
-        )
-        self.assertNotIn("patches/40cu-fedora-helper.patch", spec)
-        self.assertIn("/var/cache/bc250-llm-server/40cu", helper)
-        self.assertIn('lsinitrd -k "$KVER" -f "$relative"', helper)
-        self.assertIn("Running driver:", helper)
-        self.assertIn("signature_enforcement_active", helper)
-        self.assertIn('metadata="$(modinfo "$1" 2>/dev/null)"', helper)
-        self.assertIn("prepared_module_ready()", helper)
-        self.assertIn('if ! prepared_module_ready "$target"; then', helper)
-        self.assertNotIn("do_enable() {\n  do_prepare", helper)
-
-    def test_gfx1013_compute_patch_stack_is_not_bundled(self) -> None:
         upstreams = (ROOT / "packaging/upstreams.toml").read_text(encoding="utf-8")
-        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        self.assertNotIn("bc250-gfx1013", upstreams + manifest)
-        self.assertNotRegex(spec, r"(?m)^Source[0-9]+:.*gfx1013")
+        wrapper = (ROOT / "cmd/system/40cu.sh").read_text(encoding="utf-8")
+        self.assertIn("live-manager-src/bc250-cu-live-manager.sh", manifest)
+        self.assertIn("cmd/system/cu-status.sh\t{libexec}/cu-status.sh", manifest)
+        self.assertIn("cmd/system/cu-status.sh\t{libexec}/cu-status.sh", manifest)
+        self.assertNotIn("unlock-src", manifest + spec)
+        self.assertNotIn("bc250-40cu-unlock", upstreams + spec)
+        self.assertFalse((ROOT / "cmd/system/40cu-module.sh").exists())
+        self.assertFalse((ROOT / "licenses/40CU-LICENSE-NOTICE").exists())
+        self.assertIn('case "${1:-}" in', wrapper)
+        self.assertNotIn("prepare)", wrapper)
+        self.assertNotIn("enable)", wrapper)
 
     def test_runtime_pins_match_container_and_ollama_helpers(self) -> None:
         values = {}
@@ -681,7 +679,9 @@ class PackagingTests(unittest.TestCase):
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         canonical = "ttm.pages_limit=4194304 ttm.page_pool_size=4194304"
         self.assertIn(f'FULL_MEMORY_ARGS="{canonical}"', profile)
-        self.assertIn("bc250-memory-profile ensure", installer)
+        self.assertIn('MEMORY_PROFILE="$LIBEXEC_DIR/memory-profile.sh"', installer)
+        self.assertIn('"$MEMORY_PROFILE" ensure', installer)
+        self.assertIn('MEMORY_PROFILE="$LIBEXEC_DIR/memory-profile.sh"', installer)
         self.assertNotIn("ttm.pages_limit=4194304", installer)
         self.assertNotIn("ttm.page_pool_size=4194304", installer)
         self.assertNotIn("amdgpu.gttsize=14750", installer)
@@ -690,6 +690,99 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("amdgpu.ppfeaturemask", profile)
         self.assertIn("legacy", profile.lower())
         self.assertNotIn("apply-safe", profile)
+
+
+    def test_license_payload_uses_distinct_basenames(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("cp -p governor-src/LICENSE governor-src/LICENSE.cyan-skillfish-governor", spec)
+        self.assertIn("%license licenses/LICENSE governor-src/LICENSE.cyan-skillfish-governor", spec)
+        self.assertNotIn("%license licenses/LICENSE governor-src/LICENSE\n", spec)
+
+    def test_sysusers_relies_on_user_entry_for_ollama_primary_group(self) -> None:
+        sysusers = (ROOT / "packaging/bc250-llm-server.sysusers").read_text(encoding="utf-8")
+        self.assertIn('u      ollama -  "Runs Ollama"', sysusers)
+        self.assertEqual(sum(1 for line in sysusers.splitlines() if line.split()[1:2] == ["ollama"]), 1)
+
+    def test_makefile_checks_actual_greenfield_rpm_payload(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("check-rpm-payload", makefile)
+        self.assertIn("/usr/bin/bc250-40cu", makefile)
+        self.assertIn("/usr/bin/bc250-cu-live-manager", makefile)
+        self.assertIn("grep '^/usr/bin/bc250-'", makefile)
+        self.assertIn("/quality-checks/", makefile)
+        self.assertIn("/usr/share/licenses/bc250-llm-server/LICENSE.cyan-skillfish-governor", makefile)
+        self.assertIn("ollama_group_provides", makefile)
+        self.assertIn("expected exactly one generated group(ollama) provide", makefile)
+
+    def test_ci_runs_configured_rpmlint_after_rpm_build(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        self.assertIn("rpmlint", workflow)
+        self.assertLess(
+            workflow.index("- name: Build RPMs"),
+            workflow.index("- name: Lint built RPMs"),
+        )
+        self.assertIn("LANG: C.UTF-8", workflow)
+        self.assertIn("LC_ALL: C.UTF-8", workflow)
+        self.assertIn(
+            "run: rpmlint -c packaging/rpmlint.toml dist/*.rpm",
+            workflow,
+        )
+
+    def test_rpmlint_policy_filters_only_intentional_appliance_findings(self) -> None:
+        import tomllib
+
+        config = tomllib.loads(
+            (ROOT / "packaging/rpmlint.toml").read_text(encoding="utf-8")
+        )
+        filters = "\n".join(config["Filters"])
+        for expected in (
+            "non-standard-dir-perm",
+            "/srv/bc250-documents 750",
+            "non-standard-uid",
+            "non-standard-gid",
+            "non-standard-dir-in-var backups",
+            "invalid-url Source[0-3]",
+            "spelling-error",
+            "incorrect-fsf-address",
+            "no-manual-page-for-binary",
+            "dangerous-command-in-%preun",
+            "dangerous-command-in-%pre",
+            "dangerous-command-in-%post",
+        ):
+            self.assertIn(expected, filters)
+        for genuine in (
+            "tmpfile-not-in-filelist",
+            "strange-permission",
+            "non-executable-script",
+            "macro-in-comment",
+            "description-line-too-long",
+        ):
+            self.assertNotIn(genuine, filters)
+
+    def test_tmpfiles_document_root_is_represented_as_ghost_directory(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn(
+            "%ghost %dir %attr(0750,root,root) /srv/bc250-documents",
+            spec,
+        )
+
+    def test_internal_rag_importer_is_not_packaged_as_an_executable_script(self) -> None:
+        source_path = ROOT / "models/rag/rag_import.py"
+        source = source_path.read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertFalse(source.startswith("#!"))
+        self.assertEqual(source_path.stat().st_mode & 0o111, 0)
+        self.assertIn(
+            "file\t0644\tmodels/rag/rag_import.py\t{libexec}/rag_import.py",
+            manifest,
+        )
+
+    def test_rpm_description_and_comments_avoid_known_rpmlint_defects(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        description = spec[spec.index("%description\n") : spec.index("\n%prep", spec.index("%description\n"))]
+        self.assertLessEqual(max(len(line) for line in description.splitlines()), 79)
+        self.assertNotRegex(spec, r"(?m)^#.*%pre\b")
+
 
 
 if __name__ == "__main__":
