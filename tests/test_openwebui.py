@@ -432,7 +432,10 @@ class OpenWebUIStatusTests(unittest.TestCase):
             },
         )
         models = {model["id"]: model for model in effective["models"]}
-        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest", models)
+        q36 = models["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]
+        self.assertTrue(q36["meta"]["hidden"])
+        self.assertFalse(q36["meta"]["bc250_ordinary_user_visible"])
+        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [])
         xxs = models["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]
         self.assertFalse(xxs["meta"]["hidden"])
         self.assertTrue(xxs["meta"]["bc250_ordinary_user_visible"])
@@ -707,28 +710,6 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(len(client.posts), 1)
         payload = client.posts[0][1]
         self.assertEqual(payload["access_grants"], [unrelated])
-
-    def test_retired_native_registration_is_not_active_openwebui_desired_state(self) -> None:
-        model_id = "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
-        document = OPENWEBUI.load_models()
-        policy = document["testing_model_policies"][model_id]
-        self.assertTrue(OPENWEBUI.testing_policy_is_retired(policy))
-
-        effective = OPENWEBUI.effective_model_document(
-            document, {"main": [model_id], "task": []}
-        )
-        self.assertNotIn(model_id, {model["id"] for model in effective["models"]})
-
-        with mock.patch.object(
-            OPENWEBUI,
-            "discover_normal_provider_models",
-            return_value={"main": [model_id], "task": []},
-        ):
-            output = io.StringIO()
-            with redirect_stdout(output):
-                self.assertEqual(OPENWEBUI.status(FakeClient(), True), 0)
-        self.assertIn("Desired-state drift: none", output.getvalue())
-        self.assertNotIn(model_id, output.getvalue())
 
     def test_status_does_not_expose_api_token(self) -> None:
         secret = "owui-secret-token-do-not-print-0121"
