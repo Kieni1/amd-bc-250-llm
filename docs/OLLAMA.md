@@ -1,13 +1,13 @@
 # Ollama
 
-The Ollama binary is installed from the pinned upstream release by the guided helper, while the RPM owns all four systemd lane definitions. Use the commands below for an explicit binary reinstall or runtime change.
+The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package candidate standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device acceptance of this runtime belongs to the 0.12.2-0.5 release gate; v0.34.2 remains the immediate qualified comparison baseline.
+Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; 0.13.1-1.0 keeps the pin unchanged.
 
 ## Install and verify
 
 ```bash
-sudo bc250-install-ollama
+sudo bc250 install
 ollama --version
 sudo systemctl status ollama.service --no-pager -l
 curl -fsS http://127.0.0.1:11434/api/version
@@ -24,12 +24,8 @@ ports 11434, 11435 and 11437 to report the exact package version. The exclusive 
 operator-entered. This deliberately avoids running upstream `install.sh`, which could create service state
 that supersedes the appliance-owned unit.
 
-A deliberate comparison runtime is still possible, but it must provide all three values explicitly so a
-moving/unverified payload cannot be installed accidentally:
+Non-package Ollama payload experiments are development/qualification work and are intentionally not exposed as an appliance command.
 
-```bash
-sudo env OLLAMA_VERSION=VERSION OLLAMA_PAYLOAD_URL=https://.../ollama-linux-amd64.tar.zst OLLAMA_PAYLOAD_SHA256=64_HEX_SHA256 bc250-install-ollama
-```
 
 The main service uses:
 
@@ -48,8 +44,8 @@ The package owns a fixed four-lane service topology. A completed normal applianc
 | embedding | 11437 | `10m` | yes | retrieval embeddings only |
 | agent | 11436 | `5m` | **no** | exclusive coding/agent work |
 
-`ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250-agent-mode enter` before coding work and
-`sudo bc250-agent-mode leave` afterwards. All lanes share the same BC-250 UMA
+`ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250 agent-mode enter` before coding work and
+`sudo bc250 agent-mode leave` afterwards. All lanes share the same BC-250 UMA
 pool; the separation controls lifecycle and eviction, not physical memory.
 The compact task model remains ephemeral while the main chat model stays warm. This is
 intentional: real-device testing showed that the retired task candidate
@@ -61,15 +57,15 @@ general comparison. GPT-OSS 20B with warm Jina remains the production memory-edg
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 
-## 0.34.4 candidate runtime notes
+## 0.34.4 qualified runtime notes
 
-Ollama 0.34.4 is the package-pinned candidate for 0.12.2-0.5. Exact v0.34.2 remains the immediate qualified BC-250 comparison baseline because it passed a clean-boot comparison against 0.34.0.
+Ollama 0.34.4 is the package-pinned runtime and is qualified on the exact-device 0.12.2-0.8 baseline. Ollama 0.34.2 remains useful only as the immediate historical comparison baseline from the original runtime-upgrade campaign.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
 transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The 0.12.2-0.5 device gate must re-run the focused Vulkan/UMA path because v0.34.4 changes the upstream runtime. It also records `/api/show` `thinking` metadata where available, but absence of that metadata is diagnostic rather than a hard non-reasoning result. Structured-output probes and a cheap large-library `/api/show` lookup regression are part of the candidate gate.
+The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.13.1-1.0 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
 
 The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
@@ -97,10 +93,10 @@ BC-250 comparison runs.
 ## Runtime profiles
 
 ```bash
-bc250-ollama-profile status
-sudo bc250-ollama-profile balanced
-sudo bc250-ollama-profile max-context
-sudo bc250-ollama-profile reset
+bc250 ollama-profile status
+sudo bc250 ollama-profile balanced
+sudo bc250 ollama-profile max-context
+sudo bc250 ollama-profile reset
 ```
 
 | Profile | Context | KV cache | Parallel/loaded models |
@@ -113,13 +109,13 @@ a possible quality cost. Service profiles do not modify individual Modelfiles.
 
 ## Benchmark API baseline
 
-`bc250-benchmark` targets the package-pinned Ollama **0.34.4** candidate request schema. Neutral generation
+`bc250 benchmark` targets the package-pinned Ollama **0.34.4** candidate request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
 lane; RAG-quality uses 11437 for vectors and 11434 for the answer model. Model
-allocation comes from `/api/ps`. The `bc250-benchmark agent` lane and `bc250-code`
-product helper use `/api/chat` on exclusive port 11436. `bc250-code` requests
+allocation comes from `/api/ps`. The `bc250 benchmark agent` lane and `bc250 code`
+product helper use `/api/chat` on exclusive port 11436. `bc250 code` requests
 `think:true`, consumes only final `message.content`, and fails closed on nonterminal or
 output-limit-truncated completion instead of writing a partial file.
 
@@ -139,17 +135,17 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.34.4** as the package-standard candidate runtime for this source. Exact-device promotion still requires the 0.12.2-0.5 release gate. Before moving beyond it, review
+Treat **0.34.4** as the package-standard qualified runtime for this release. Before changing that pin, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;
 2. the largest intended model;
 3. a representative long prompt; and
-4. `sudo bc250-verify` plus the kernel journal.
+4. `sudo bc250 verify` plus the kernel journal.
 
 ```bash
-sudo bc250-install-ollama
-sudo bc250-verify
+BC250_UPDATE_OLLAMA=1 sudo -E bc250 install
+sudo bc250 verify
 # Comparison/rollback payloads require explicit VERSION + URL + SHA-256; never follow a moving installer.
 ```
 

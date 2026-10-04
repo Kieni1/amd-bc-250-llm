@@ -1,6 +1,6 @@
-# Office documents and RAG pilot
+# Office documents and RAG
 
-This is the recommended **local, privacy-oriented pilot** for searchable German,
+This is the product-relevant **local, privacy-oriented RAG workflow** for searchable German,
 French and English office documents. It uses the package's existing Open WebUI
 and Tika, the main answer lane on `11434`, and the dedicated embedding lane on
 `11437`. The current package uses Apache Tika 4.0.0 for extraction and tells
@@ -33,20 +33,20 @@ For this non-commercial test branch, Jina v5 remains the default because it is
 already the package's retrieval recommendation:
 
 ```bash
-sudo bc250-model apply production prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-sudo bc250-model apply embedding embed-jina-v5-small-retrieval-q4-k-m
-bc250-model list
+sudo bc250 model apply production prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+sudo bc250 model apply embedding embed-jina-v5-small-retrieval-q4-k-m
+bc250 model list
 ```
 
 The packaged Jina Q4_K_M file is the upstream refresh that includes
 `pooling_type` GGUF metadata used by current Ollama to identify embedding models.
-If an existing test index was built with the older package GGUF, refresh the model with `sudo bc250-model refresh embedding embed-jina-v5-small-retrieval-q4-k-m` and **reindex** that Jina-backed Knowledge data.
+If an existing test index was built with the older package GGUF, refresh the model with `sudo bc250 model refresh embedding embed-jina-v5-small-retrieval-q4-k-m` and **reindex** that Jina-backed Knowledge data.
 
 Jina v5 uses `CC-BY-NC-4.0`. If the deployment later needs unrestricted
 commercial use, select the packaged Apache-2.0 Qwen alternative instead:
 
 ```bash
-sudo bc250-model apply embedding embed-qwen3-0.6b-q8-0
+sudo bc250 model apply embedding embed-qwen3-0.6b-q8-0
 ```
 
 Do not mix embedding models or prefix schemes inside one existing index. Changing
@@ -90,9 +90,9 @@ curl -fsS http://127.0.0.1:11437/api/embed \
 
 Both packaged embedding models use up to 1024 dimensions. This request loads the
 embedding model, so it is a deliberate operator test rather than part of
-`bc250-verify`.
+`bc250 verify`.
 
-Use `bc250-benchmark embeddings` to compare the packaged models on the same
+Use `bc250 benchmark embeddings` to compare the packaged models on the same
 DE/FR/EN retrieval fixture. It reports Recall@1/@3, MRR, cross-language retrieval
 and throughput and rejects inconsistent embedding dimensions; do not select an embedding model on tok/s alone.
 
@@ -129,7 +129,7 @@ chunks are desirable. These are starting points to measure, not fixed quality
 claims.
 
 Open WebUI persists many Admin settings in `webui.db`. The installer therefore
-offers `bc250-openwebui-setup init`, which applies the reviewed package-owned
+offers `bc250 openwebui-setup init`, which applies the reviewed package-owned
 provider/task/RAG state through supported APIs. The Quadlet remains the safe
 bootstrap baseline; later intentional operator overrides are not reset silently.
 
@@ -165,17 +165,17 @@ The package deliberately does not auto-tune these settings.
 Use the local quality lanes before and after a tuning experiment:
 
 ```bash
-bc250-benchmark embeddings
-bc250-benchmark rag-quality
-bc250-benchmark rag-quality --think true
-bc250-benchmark rag-quality --think false
-bc250-benchmark generation --profile compare \
+bc250 benchmark embeddings
+bc250 benchmark rag-quality
+bc250 benchmark rag-quality --think true
+bc250 benchmark rag-quality --think false
+bc250 benchmark generation --profile compare \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-bc250-benchmark owui-rag OWUI_RAG_MODEL \
+bc250 benchmark owui-rag OWUI_RAG_MODEL \
   --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
-sudo bc250-benchmark owui-embedding-batch --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
-sudo bc250-benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
-sudo bc250-benchmark owui-system-context OWUI_RAG_MODEL \
+sudo bc250 benchmark owui-embedding-batch --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250 benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250 benchmark owui-system-context OWUI_RAG_MODEL \
   --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
@@ -251,7 +251,7 @@ derived index, not the source of truth:
         └── superseded/
 ```
 
-`bc250-rag init` creates the collection. Public-source collections default to mode `0750`;
+`bc250 rag init` creates the collection. Public-source collections default to mode `0750`;
 confidential collections default to root-private mode `0700`. `sources/` contains immutable
 authoritative inputs, `working/` contains drafts needing review, `active/` contains the only Markdown
 eligible for ingestion, and `superseded/` retains previous revisions for audit. Never index both a
@@ -278,13 +278,13 @@ the authoritative German source.
 The supported first-pass workflow is one local command, not a separate conversion framework:
 
 ```bash
-sudo bc250-rag init public municipal-regulations
+sudo bc250 rag init public municipal-regulations
 # copy PDFs into the appropriate inbox lane
-sudo bc250-rag prepare-batch public municipal-regulations --dry-run
-sudo bc250-rag prepare-batch public municipal-regulations
-sudo bc250-rag review public municipal-regulations
-sudo bc250-rag validate public municipal-regulations --include-working
-sudo bc250-rag activate public municipal-regulations --all-ready
+sudo bc250 rag prepare-batch public municipal-regulations --dry-run
+sudo bc250 rag prepare-batch public municipal-regulations
+sudo bc250 rag review public municipal-regulations
+sudo bc250 rag validate public municipal-regulations --include-working
+sudo bc250 rag activate public municipal-regulations --all-ready
 ```
 
 `prepare-batch` uses local `pdfinfo`/`pdftotext` and the exclusive local agent lane on `127.0.0.1:11436`.
@@ -300,7 +300,7 @@ Inbox semantics:
 - `bilingual/`: produce separate DE and FR drafts sharing the source; do not index mixed-language output.
 
 The local transformation prompt preserves complete substantive wording, original legal numbering, dates,
-amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. This avoids growing `bc250-rag` into a fragile OCR/chunking engine.
+amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. This avoids growing `bc250 rag` into a fragile OCR/chunking engine.
 
 The review step is where the operator confirms titles, stable `document_family`, effective date or edition,
 authority role, and DE/FR counterpart. Review numbering covers only drafts that still need review, and the prompts make the effective-date-or-edition requirement explicit. For legal, financial or technical sources, visually compare representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an authoritative transformation until reviewed.
@@ -336,21 +336,20 @@ German Markdown counterpart. Preserve source article/paragraph identifiers exact
 legal numbering merely to make retrieval IDs unique. Extra package metadata may use `bc250_*` keys so the
 schema can evolve without accepting arbitrary YAML.
 
-`bc250-rag validate` verifies source-file confinement, SHA-256 provenance, review state, unique document IDs,
+`bc250 rag validate` verifies source-file confinement, SHA-256 provenance, review state, unique document IDs,
 and one active revision per document-family/language. `currentness-not-verified` is deliberately a warning,
 not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
 
 Inspect the complete ingestion plan without contacting Open WebUI:
 
 ```bash
-sudo bc250-rag plan /srv/bc250-documents
 ```
 
 Then sync only reviewed `active/*.md` files:
 
 ```bash
 sudo install -m 0600 -o root -g root /PATH/TO/KEY /etc/bc250-llm-server/rag-api-key
-sudo bc250-rag ingest --token-file /etc/bc250-llm-server/rag-api-key
+sudo bc250 rag ingest --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
 `ingest` validates the lifecycle schema before using the package-pinned Open WebUI incremental
@@ -358,8 +357,8 @@ knowledge API. Unchanged files are skipped and changed Markdown is uploaded befo
 removed. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
 credential must be a non-empty private regular file (normally `0600`); it is never stored in the corpus.
 
-`bc250-rag-import plan|sync` remains as a compatibility interface for existing pre-0.4 corpora. New work
-should use `bc250-rag`.
+The former compatibility interface is removed. All corpora use the `bc250 rag`
+lifecycle commands above.
 
 ### OCR workflow for scanned office documents
 
@@ -374,15 +373,15 @@ Current OCR test set:
 | `exp-glm-ocr-ggml-q8-0` | current fidelity leader on packaged office fixtures |
 | `exp-ovisocr2-abiray-q8-0` | faster page-to-Markdown/table alternative |
 
-Use `bc250-ocr` for reproducible ingestion tests rather than exposing OCR models
+Use `bc250 ocr` for reproducible ingestion tests rather than exposing OCR models
 as normal chat models:
 
 ```bash
-bc250-ocr list
-bc250-ocr test glm /PATH/TO/ONE-SCANNED-PAGE.png
+bc250 ocr list
+bc250 ocr test glm /PATH/TO/ONE-SCANNED-PAGE.png
 ```
 
-Use the engine names reported by `bc250-ocr list`. For the pilot, process page
+Use the engine names reported by `bc250 ocr list`. For the pilot, process page
 images individually, preserve page order, review the OCR output, and save the
 cleaned canonical Markdown under `active/` before indexing it. Do not index both
 the scan and its cleaned Markdown derivative.
@@ -393,12 +392,12 @@ extraction. Translation or interpretation belongs in the downstream LLM step.
 Preserve headings, paragraphs, tables, numbers, dates and reading order where the
 model supports them.
 
-For a comparable regression check, run `bc250-benchmark ocr`. It uses packaged
-DE/FR/mixed office-page fixtures with model-specific prompts and reports token precision/recall/F1, character similarity, exact-field/order scores and resource telemetry. Use `bc250-ocr test ENGINE REAL-PAGE.png` on a
+For a comparable regression check, run `bc250 benchmark ocr`. It uses packaged
+DE/FR/mixed office-page fixtures with model-specific prompts and reports token precision/recall/F1, character similarity, exact-field/order scores and resource telemetry. Use `bc250 ocr test ENGINE REAL-PAGE.png` on a
 representative scan corpus before choosing the production OCR path.
 
 Multimodal OCR GGUFs require their matching image/projector path where applicable;
-`bc250-ocr` should own those model-specific invocation details. Open WebUI can be
+`bc250 ocr` should own those model-specific invocation details. Open WebUI can be
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
@@ -451,7 +450,7 @@ hybrid search first.
 During indexing and questions:
 
 ```bash
-watch -n 2 bc250-status
+watch -n 2 bc250 status
 ```
 
 In another terminal:
@@ -469,7 +468,7 @@ curl -fsS http://127.0.0.1:11434/api/ps | jq
 After the pilot:
 
 ```bash
-sudo bc250-verify
+sudo bc250 verify
 sudo du -sh /var/lib/open-webui
 sudo du -sh /var/lib/open-webui/uploads \
   /var/lib/open-webui/vector_db 2>/dev/null
@@ -486,7 +485,7 @@ Inspect both pools when qualifying memory headroom:
 ```bash
 curl -fsS http://127.0.0.1:11434/api/ps | jq
 curl -fsS http://127.0.0.1:11437/api/ps | jq
-bc250-benchmark rag-cycle embed-jina-v5-small-retrieval-q4-k-m \
+bc250 benchmark rag-cycle embed-jina-v5-small-retrieval-q4-k-m \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 ```
 
@@ -516,7 +515,7 @@ latency and should earn its place through measured retrieval improvement.
 - Do not expose Tika or Ollama ports to untrusted networks.
 - Treat `/var/lib/open-webui/webui.db`, `/var/lib/open-webui/uploads/` and
   `/var/lib/open-webui/vector_db/` as confidential data.
-- `bc250-maintenance run backup` does **not** include uploads or vector data. Use
+- `bc250 maintenance run backup` does **not** include uploads or vector data. Use
   a stopped full `/var/lib/open-webui` snapshot on encrypted storage when the
   RAG corpus must be recoverable.
 
