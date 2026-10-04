@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Read-only, redacted BC-250 support evidence bundle.
 set -Eeuo pipefail
+CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
 umask 077
 
 BUNDLE_VERSION=2
@@ -10,7 +11,7 @@ CAPTURE_TIMEOUT=${BC250_SUPPORT_CAPTURE_TIMEOUT:-20}
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-support-bundle [--output-dir DIR]
+Usage: sudo bc250 support-bundle [--output-dir DIR]
 
 Create a timestamped, read-only support archive containing appliance state,
 health summaries and redacted diagnostics. The bundle intentionally excludes
@@ -38,9 +39,9 @@ command -v timeout >/dev/null 2>&1 || { echo "ERROR: timeout is required." >&2; 
 
 run_id="$(date +%Y%m%dT%H%M%S%z)-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 started="$(date --iso-8601=seconds)"
-work="$(mktemp -d /run/bc250-support-bundle.XXXXXX)"
+work="$(mktemp -d /run/bc250 support-bundle.XXXXXX)"
 evidence="$work/evidence"
-archive="$OUTPUT_DIR/${run_id}-bc250-support-bundle.tar.gz"
+archive="$OUTPUT_DIR/${run_id}-bc250 support-bundle.tar.gz"
 trap 'rm -rf "$work"' EXIT
 install -d -m 0700 "$evidence" "$OUTPUT_DIR"
 
@@ -72,11 +73,11 @@ capture_shell() {
 
 capture package.txt rpm -q bc250-llm-server
 capture package-verify.txt rpm -V bc250-llm-server
-capture status.txt bc250-status
-capture verify-summary.txt bc250-verify --summary
-capture topology.txt bc250-agent-mode status
-capture cu-routing.txt bc250-cu-status --summary
-capture maintenance.txt bc250-maintenance status
+capture status.txt bc250 status
+capture verify-summary.txt bc250 verify --summary
+capture topology.txt bc250 agent-mode status
+capture cu-routing.txt "$CU_STATUS" --summary
+capture maintenance.txt bc250 maintenance status
 capture failed-units.txt systemctl --failed --no-pager --full
 capture memory.txt free -h
 capture swap.txt swapon --show
