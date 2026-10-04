@@ -5,7 +5,7 @@ procedure is `docs/QUALITY-CHECKS.md` in the source tree and
 `/usr/share/doc/bc250-llm-server/docs/QUALITY-CHECKS.md` after installation. Keep
 workflow, promotion and evidence-policy prose there rather than duplicating it here.
 
-These scripts are intentionally separate from `bc250-revalidate`: they investigate
+These scripts are intentionally separate from `bc250 revalidate`: they investigate
 candidates and quality questions; they do not constitute final release qualification
 and they do not build RPMs.
 
