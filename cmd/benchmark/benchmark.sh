@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Public bc250-benchmark dispatcher. Canonical subcommands only.
+# Public bc250 benchmark dispatcher. Canonical subcommands only.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,22 +11,22 @@ OPENWEBUI="$SCRIPT_DIR/openwebui-benchmark.py"
 usage() {
   cat <<'EOF'
 Usage:
-  bc250-benchmark generation [MODEL ...]
-  bc250-benchmark embeddings [MODEL ...]
-  bc250-benchmark ocr [MODEL ...]
-  bc250-benchmark task [MODEL ...]
-  bc250-benchmark agent [MODEL ...]
-  bc250-benchmark usecase [MODEL ...]
-  bc250-benchmark translation [MODEL ...]
-  bc250-benchmark rag-cycle [EMBED_MODEL ANSWER_MODEL]
-  bc250-benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
-  bc250-benchmark concurrency MAIN_MODEL EMBED_MODEL
-  bc250-benchmark num-batch MODEL [MODEL ...]
-  bc250-benchmark owui-translation --token-file FILE
-  bc250-benchmark owui-rag MODEL --token-file FILE
-  bc250-benchmark owui-embedding-batch --token-file FILE
-  bc250-benchmark owui-chunk-min MODEL --token-file FILE
-  sudo bc250-benchmark owui-system-context MODEL --token-file FILE
+  bc250 benchmark generation [MODEL ...]
+  bc250 benchmark embeddings [MODEL ...]
+  bc250 benchmark ocr [MODEL ...]
+  bc250 benchmark task [MODEL ...]
+  bc250 benchmark agent [MODEL ...]
+  bc250 benchmark usecase [MODEL ...]
+  bc250 benchmark translation [MODEL ...]
+  bc250 benchmark rag-cycle [EMBED_MODEL ANSWER_MODEL]
+  bc250 benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
+  bc250 benchmark concurrency MAIN_MODEL EMBED_MODEL
+  bc250 benchmark num-batch MODEL [MODEL ...]
+  bc250 benchmark owui-translation --token-file FILE
+  bc250 benchmark owui-rag MODEL --token-file FILE
+  bc250 benchmark owui-embedding-batch --token-file FILE
+  bc250 benchmark owui-chunk-min MODEL --token-file FILE
+  sudo bc250 benchmark owui-system-context MODEL --token-file FILE
 
 Every invocation writes one isolated result directory containing meta.json,
 results.jsonl, summary.json, summary.txt, fixtures/, and an optional results.csv

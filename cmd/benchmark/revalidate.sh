@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.6
+# BC-250 package revalidation harness v4.7
 #
 # The target package version is read from the package-owned VERSION file; the RPM
 # release suffix is intentionally not hard-coded.
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.6
+HARNESS_VERSION=4.7
 PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
 TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
@@ -51,13 +51,17 @@ FAILURE_CONSOLE_FILE=$WORK/failure-console
 ERROR_CONTEXT=$WORK/error-context.txt
 SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
 
+LIBEXEC=${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}
+CU_STATUS="$LIBEXEC/cu-status.sh"
+MEMORY_PROFILE="$LIBEXEC/memory-profile.sh"
+
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.6 qualifies packaged defaults only. Candidate/tuning A/B work belongs
-# under explicit bc250-benchmark commands and is never selected by this worker.
+# Revalidation v4.7 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# under explicit bc250 benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
-# overrides; candidate selection belongs exclusively to bc250-benchmark.
+# overrides; candidate selection belongs exclusively to bc250 benchmark.
 readonly E2B_MODEL=prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 readonly E4B_MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 readonly TRANSLATION_ROLE_MODEL=prod-translate-gemma4-sub-e4b-17s-q4-k-xl
@@ -94,28 +98,29 @@ readonly EDGE_SEVERE_CONTEXT_TOKENS=4096
 usage() {
   cat <<'USAGE'
 Usage:
-  sudo bc250-revalidate start --owui-token-file FILE [--detach]
-  sudo bc250-revalidate start --skip-owui [--detach]
-  sudo bc250-revalidate status [--raw]
-  sudo bc250-revalidate abort
-  sudo bc250-revalidate cleanup
+  sudo bc250 revalidate start [--owui-token-file FILE] [--detach]
+  sudo bc250 revalidate start --skip-owui [--detach]
+  sudo bc250 revalidate status [--raw]
+  sudo bc250 revalidate abort
+  sudo bc250 revalidate cleanup
 
 Recommended authenticated start:
-  sudo bc250-revalidate start
+  sudo bc250 revalidate start
 
 `start` launches one systemd-owned qualification worker and follows a compact
 six-phase dashboard by default. Ctrl-C detaches from the display; it never kills
 the worker. Use --detach for immediate return.
 
 Revalidation answers one question only: does the configuration currently shipped
-by this package qualify on this BC-250? It does not choose configuration and does
-not run num_batch, embedding-batch, chunk-min, RAG_SYSTEM_CONTEXT, thinking-policy,
-kernel/governor, keepalive, or experimental-model A/B sweeps. Run those explicitly
-through bc250-benchmark or the appropriate hardware diagnostic workflow.
+by this package qualify on this BC-250? It does not choose or tune configuration.
+Generation/embedding batch sizes, chunk sizing, RAG system-context placement,
+thinking policy, kernel/governor settings, keepalive and experimental-model
+comparisons belong in explicit benchmarks or hardware diagnostics.
 
-Full package qualification requires a protected Open WebUI admin API-key file.
-Use --skip-owui only for an explicitly incomplete qualification run. The key is
-copied only to /run and is never bundled or persisted as package state.
+Full package qualification uses the protected package Open WebUI admin API key
+when available; --owui-token-file FILE overrides that path. Use --skip-owui only
+for an explicitly incomplete run. The key is copied only to /run and is never
+bundled or persisted as revalidation state.
 USAGE
 }
 
@@ -173,7 +178,7 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 # Revalidation sanitizes every benchmark invocation so systemd manager/default
 # environment cannot replace package-owned fixtures, lane endpoints, models, or
-# sampling/tuning policy. Standalone bc250-benchmark intentionally remains flexible.
+# sampling/tuning policy. Standalone bc250 benchmark intentionally remains flexible.
 qualification_benchmark() {
   env \
     -u OLLAMA_URL -u OLLAMA_HOST -u EMBEDDING_OLLAMA_URL \
@@ -317,7 +322,7 @@ model_registered() {
 
 
 agent_model_source_path() {
-  bc250-model path agentic "$AGENT_MODEL" 2>/dev/null | cut -f1 | head -1
+  bc250 model path agentic "$AGENT_MODEL" 2>/dev/null | cut -f1 | head -1
 }
 
 agent_model_source_ready() {
@@ -328,6 +333,16 @@ agent_model_source_ready() {
 
 mark_partial_coverage() {
   printf 'partial\n' > "$COVERAGE_STATE_FILE"
+}
+
+coverage_display() {
+  local coverage
+  coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
+  if [[ "$coverage" == partial ]] && awk -F '\t' '$4=="coverage" && $5=="skipped" && ($3=="agent" || $3=="agent-add-on") {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
+    printf 'partial (optional Agent not installed)\n'
+  else
+    printf '%s\n' "$coverage"
+  fi
 }
 
 load_target_version() {
@@ -371,7 +386,7 @@ EOFUNIT
 
 preflight() {
   local cmd missing=0 pkg pkg_version
-  for cmd in curl jq python3 rpm systemctl journalctl podman sensors vulkaninfo timeout flock tar lspci bc250-status bc250-verify bc250-benchmark bc250-agent-mode bc250-openwebui-setup bc250-cu-status; do
+  for cmd in curl jq python3 rpm systemctl journalctl podman sensors vulkaninfo timeout flock tar lspci bc250; do
     if ! command_exists "$cmd"; then
       echo "ERROR: missing required command: $cmd" >&2
       missing=1
@@ -592,11 +607,19 @@ dashboard_text() {
     printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
   fi
   printf 'Quality steps   %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
+  printf 'Coverage        %s\n' "$(coverage_display)"
   printf '\nRecent results\n'
   recent_step_results
   if ((q > 0 || incomplete > 0)) && [[ $phase == done || $phase == failed ]]; then
     printf '\nQuality failures\n'
     quality_cause_report
+  fi
+  if [[ $phase == done || $phase == failed ]]; then
+    local integrity_report
+    integrity_report="$(product_integrity_report)"
+    if [[ -n "$integrity_report" ]]; then
+      printf '\nProduct integrity controls\n%s\n' "$integrity_report"
+    fi
   fi
   if [[ $phase == done || $phase == failed ]] && awk -F '\t' '$4=="diagnostic" && $5=="info" {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
     printf '\nDiagnostics\n'
@@ -651,7 +674,7 @@ follow_run() {
   trap - INT
   if ((interrupted)); then
     echo "Detached. Worker continues in the background."
-    echo "Status: sudo bc250-revalidate status"
+    echo "Status: sudo bc250 revalidate status"
     return 0
   fi
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
@@ -661,7 +684,7 @@ follow_run() {
     printf 'Infrastructure: %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
     printf 'Quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
     printf 'Restoration:    %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
-    printf 'Coverage:       %s\n' "$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
+    printf 'Coverage:       %s\n' "$(coverage_display)"
     echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)"
     return 0
   fi
@@ -781,7 +804,7 @@ start_run() {
     echo "Coverage is partial: authenticated Open WebUI qualification was explicitly skipped."
   fi
   echo "The systemd worker qualifies packaged defaults only; this terminal only follows progress."
-  echo "Status: sudo bc250-revalidate status"
+  echo "Status: sudo bc250 revalidate status"
   echo "Final bundles: $REPORT_DIR"
   ((detach)) || follow_run
 }
@@ -818,21 +841,21 @@ snapshot() {
   } > "$dir/kernel-profile.txt" 2>&1
   capture_cmd "$dir/kernel-rpms.txt" rpm -q kernel-core mesa-vulkan-drivers vulkan-loader vulkan-tools
   command_exists grubby && capture_cmd "$dir/grubby-all.txt" grubby --info=ALL || true
-  command_exists bc250-memory-profile && capture_cmd "$dir/memory-profile.txt" bc250-memory-profile status || true
-  command_exists bc250-cu-status && capture_cmd "$dir/cu-status.txt" bc250-cu-status || true
+  [[ -x "$MEMORY_PROFILE" ]] && capture_cmd "$dir/memory-profile.txt" "$MEMORY_PROFILE" status || true
+  [[ -x "$CU_STATUS" ]] && capture_cmd "$dir/cu-status.txt" "$CU_STATUS" || true
   if [[ -r /etc/cyan-skillfish-governor-smu/config.toml ]]; then
     cp -a /etc/cyan-skillfish-governor-smu/config.toml "$dir/governor-config.toml"
   fi
   command_exists cyan-skillfish-performance-mode && capture_cmd "$dir/performance-mode.txt" cyan-skillfish-performance-mode --status || true
-  capture_cmd "$dir/bc250-status.txt" bc250-status
+  capture_cmd "$dir/status.txt" bc250 status
   if [[ -s $OWUI_TOKEN ]]; then
-    bc250-verify --owui-token-file "$OWUI_TOKEN" > "$dir/bc250-verify.txt" 2>&1 || echo "command_rc=$?" >> "$dir/bc250-verify.txt"
-    bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/openwebui-status-auth.txt" 2>&1 || echo "command_rc=$?" >> "$dir/openwebui-status-auth.txt"
+    bc250 verify --owui-token-file "$OWUI_TOKEN" > "$dir/verify.txt" 2>&1 || echo "command_rc=$?" >> "$dir/verify.txt"
+    bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/openwebui-status-auth.txt" 2>&1 || echo "command_rc=$?" >> "$dir/openwebui-status-auth.txt"
   else
-    capture_cmd "$dir/bc250-verify.txt" bc250-verify
-    capture_cmd "$dir/openwebui-status.txt" bc250-openwebui-setup status
+    capture_cmd "$dir/verify.txt" bc250 verify
+    capture_cmd "$dir/openwebui-status.txt" bc250 openwebui-setup status
   fi
-  capture_cmd "$dir/agent-mode.txt" bc250-agent-mode status
+  capture_cmd "$dir/agent-mode.txt" bc250 agent-mode status
   capture_cmd "$dir/systemctl.txt" systemctl --no-pager --full status ollama.service ollama-task.service ollama-embedding.service ollama-agent.service open-webui.service tika.service nginx.service
   if grep -Fxq 'mode=normal' "$dir/agent-mode.txt" 2>/dev/null \
       && [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]; then
@@ -884,7 +907,7 @@ checkpoint() {
       printf '%s=%s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
     done
   } > "$dir/checkpoint.txt" 2>&1
-  capture_cmd "$dir/bc250-status.txt" bc250-status
+  capture_cmd "$dir/status.txt" bc250 status
   for port in 11434 11435 11436 11437; do
     curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
   done
@@ -1046,7 +1069,7 @@ ensure_normal_mode() {
       return 1
     }
   done
-  bc250-agent-mode leave >/dev/null
+  bc250 agent-mode leave >/dev/null
   systemctl start tika.service open-webui.service nginx.service >/dev/null
   wait_api 11434 45 || return 1
   wait_api 11435 45 || return 1
@@ -1107,15 +1130,15 @@ health_gate() {
   local label="$1" out="$2" rc
   install -d -m 0700 "$(dirname "$out")"
   if [[ ${SKIP_OWUI:-0} -eq 1 ]]; then
-    if bc250-verify > "$out" 2>&1; then rc=0; else rc=$?; fi
+    if bc250 verify > "$out" 2>&1; then rc=0; else rc=$?; fi
   else
-    if bc250-verify --owui-token-file "$OWUI_TOKEN" > "$out" 2>&1; then rc=0; else rc=$?; fi
+    if bc250 verify --owui-token-file "$OWUI_TOKEN" > "$out" 2>&1; then rc=0; else rc=$?; fi
   fi
   if ((rc == 0)); then
-    record_event "$label" infra pass "bc250-verify health gate passed"
+    record_event "$label" infra pass "bc250 verify health gate passed"
     return 0
   fi
-  record_event "$label" infra infra-fail "bc250-verify health gate rc=$rc"
+  record_event "$label" infra infra-fail "bc250 verify health gate rc=$rc"
   echo "ERROR: appliance health gate failed ($label, rc=$rc); inspect $out" >&2
   return "$rc"
 }
@@ -1366,7 +1389,7 @@ check_recent_device_errors() {
 
 check_live_cu_routing() {
   local out="$RAW/preflight/cu-routing.txt" problems
-  bc250-cu-status --summary > "$out" 2>&1 || true
+  "$CU_STATUS" --summary > "$out" 2>&1 || true
   problems="$(sed -n 's/^[[:space:]]*Problem cells[[:space:]]*:[[:space:]]*//p' "$out" | head -1)"
   if ! [[ "$problems" =~ ^[0-9]+$ ]]; then
     echo "ERROR: live CU routing table could not be parsed; inspect $out" >&2
@@ -1410,7 +1433,7 @@ phase_preflight() {
     record_event "agent-add-on" coverage pass "optional Agent add-on is installed and can be qualified"
   else
     mark_partial_coverage
-    record_event "agent-add-on" coverage skipped "optional Agent add-on is not installed; Agent coverage unavailable/skipped (install explicitly with sudo bc250-model apply agentic $AGENT_MODEL)"
+    record_event "agent-add-on" coverage skipped "optional Agent add-on is not installed; Agent coverage unavailable/skipped (install explicitly with sudo bc250 model apply agentic $AGENT_MODEL)"
   fi
   if [[ ${SKIP_OWUI:-0} -eq 0 ]]; then
     local rc
@@ -1421,7 +1444,7 @@ phase_preflight() {
     fi
     record_event "openwebui-credential" infra pass "administrator credential valid"
     record_progress "checking authenticated Open WebUI desired state"
-    if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$RAW/preflight/package-drift.txt" 2>&1; then rc=0; else rc=$?; fi
+    if bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$RAW/preflight/package-drift.txt" 2>&1; then rc=0; else rc=$?; fi
     if ((rc != 0)); then
       record_event "openwebui-drift" infra infra-fail "package-owned desired state not current (rc=$rc)"
       echo "ERROR: packaged Open WebUI state cannot be qualified without first resolving drift/API error (rc=$rc)." >&2
@@ -1433,7 +1456,7 @@ phase_preflight() {
     record_event "openwebui-drift" coverage skipped "explicit --skip-owui"
   fi
   record_progress "running final preflight health gate"
-  health_gate "preflight-health" "$RAW/preflight/bc250-verify-gate.txt"
+  health_gate "preflight-health" "$RAW/preflight/verify-gate.txt"
   snapshot preflight/final
   write_phase_report preflight-results preflight
 }
@@ -1442,14 +1465,14 @@ phase_roles() {
   set_phase roles "qualifying promoted production roles"
   install -d -m 0700 "$RAW/roles"
   warm_embedding > "$RAW/roles/embed-warm.txt" 2>&1
-  run_step roles embeddings quality qualification_benchmark bc250-benchmark embeddings "$EMBED_MODEL" --ollama-url http://127.0.0.1:11437 --output-dir "$RAW/roles/embeddings/results"
-  run_step roles task quality qualification_benchmark bc250-benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
+  run_step roles embeddings quality qualification_benchmark bc250 benchmark embeddings "$EMBED_MODEL" --ollama-url http://127.0.0.1:11437 --output-dir "$RAW/roles/embeddings/results"
+  run_step roles task quality qualification_benchmark bc250 benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
   # Direct model/configuration sanity uses the promoted 2048-token production budget.
   # The authenticated OWUI phase separately proves the live role/filter product path.
-  run_step roles translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 TRANSLATION_THINK=auto bc250-benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
+  run_step roles translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 TRANSLATION_THINK=auto bc250 benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
   warm_embedding >/dev/null 2>&1 || true
-  run_step roles rag-quality quality qualification_benchmark bc250-benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
-  run_step roles usecase quality qualification_benchmark bc250-benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
+  run_step roles rag-quality quality qualification_benchmark bc250 benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
+  run_step roles usecase quality qualification_benchmark bc250 benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
   record_quality_diagnostics "$RAW/roles/production-usecase/results/results.jsonl" production-usecase
   checkpoint roles/final
   write_phase_report production-role-results roles
@@ -1463,20 +1486,20 @@ phase_edge() {
   jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key != $m))' "$policy" > "$generic_policy"
 
   warm_embedding >/dev/null 2>&1
-  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${EDGE_GENERIC_MODELS[@]}"
+  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250 benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${EDGE_GENERIC_MODELS[@]}"
   run_step edge production-sanity infra check_edge_generation_sanity     "$RAW/edge/production-generation/results/results.jsonl" "$generic_policy" "$RAW/edge/production-generation/sanity.json"
   record_edge_diagnostics "$RAW/edge/production-generation/sanity.json" production-generation
 
   api_ready 11434 || ensure_normal_mode
   warm_embedding >/dev/null 2>&1
   jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key == $m))' "$policy" > "$gpt_policy"
-  run_step edge gpt-oss-jina infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 PREFILL_SENTENCES=352 CTX_POINTS="352 704" NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250-benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/gpt-oss-jina/results" "$GPT_OSS_MODEL"
+  run_step edge gpt-oss-jina infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 PREFILL_SENTENCES=352 CTX_POINTS="352 704" NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250 benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/gpt-oss-jina/results" "$GPT_OSS_MODEL"
   run_step edge gpt-oss-sanity infra check_edge_generation_sanity     "$RAW/edge/gpt-oss-jina/results/results.jsonl" "$gpt_policy" "$RAW/edge/gpt-oss-jina/sanity.json"
   record_edge_diagnostics "$RAW/edge/gpt-oss-jina/sanity.json" gpt-oss-jina
   run_step edge jina-still-resident infra model_loaded 11437 "$EMBED_MODEL"
 
   api_ready 11434 || ensure_normal_mode
-  run_step edge main-embedding-concurrency infra qualification_benchmark bc250-benchmark concurrency "$E2B_MODEL" "$EMBED_MODEL" --main-url http://127.0.0.1:11434 --embed-url http://127.0.0.1:11437 --output-dir "$RAW/edge/main-embedding-concurrency/results"
+  run_step edge main-embedding-concurrency infra qualification_benchmark bc250 benchmark concurrency "$E2B_MODEL" "$EMBED_MODEL" --main-url http://127.0.0.1:11434 --embed-url http://127.0.0.1:11437 --output-dir "$RAW/edge/main-embedding-concurrency/results"
   run_step edge device-errors infra check_recent_device_errors "$RAW/edge/kernel-device-errors.txt"
   checkpoint edge/final
   write_phase_report resource-edge-results edge
@@ -1497,7 +1520,7 @@ check_agent_registration() {
     return 0
   fi
   echo "COVERAGE UNAVAILABLE: optional Agent model $AGENT_MODEL is not registered on 11436." >&2
-  echo "Install/reconcile it with: sudo bc250-model apply agentic $AGENT_MODEL" >&2
+  echo "Install/reconcile it with: sudo bc250 model apply agentic $AGENT_MODEL" >&2
   return 1
 }
 
@@ -1510,7 +1533,7 @@ phase_agent() {
     {
       echo "Optional Agent add-on qualification was not run."
       echo "Missing model source: $AGENT_MODEL"
-      echo "Remediation: sudo bc250-model apply agentic $AGENT_MODEL"
+      echo "Remediation: sudo bc250 model apply agentic $AGENT_MODEL"
       echo "This is optional coverage unavailable/skipped, not an Agent runtime/GPU failure."
     } > "$dir/prerequisite.txt"
     mark_partial_coverage
@@ -1520,14 +1543,14 @@ phase_agent() {
   fi
 
   run_step agent agent-service-definition infra systemctl cat ollama-agent.service
-  run_step agent enter-agent-mode infra bc250-agent-mode enter
+  run_step agent enter-agent-mode infra bc250 agent-mode enter
   run_step agent agent-api infra wait_api 11436 45
   run_step agent exclusive-topology infra check_agent_exclusive_topology
   if ! check_agent_registration > "$dir/agent-model-prerequisite.txt" 2>&1; then
     set_stage "optional Agent registration unavailable — coverage skipped"
     mark_partial_coverage
     record_event "agent" coverage skipped "optional Agent add-on is not registered; coverage unavailable; see $dir/agent-model-prerequisite.txt"
-    run_step agent leave-agent-mode infra bc250-agent-mode leave
+    run_step agent leave-agent-mode infra bc250 agent-mode leave
     run_step agent normal-main-restored infra wait_api 11434 45
     run_step agent normal-task-restored infra wait_api 11435 45
     run_step agent normal-embedding-restored infra wait_api 11437 45
@@ -1538,8 +1561,8 @@ phase_agent() {
   fi
   record_event "agent-add-on" coverage pass "optional Agent registration available on exclusive lane"
   snapshot agent/active
-  run_step agent agent quality qualification_benchmark bc250-benchmark agent "$AGENT_MODEL" --ollama-url http://127.0.0.1:11436 --output-dir "$RAW/agent/benchmark/results"
-  run_step agent leave-agent-mode infra bc250-agent-mode leave
+  run_step agent agent quality qualification_benchmark bc250 benchmark agent "$AGENT_MODEL" --ollama-url http://127.0.0.1:11436 --output-dir "$RAW/agent/benchmark/results"
+  run_step agent leave-agent-mode infra bc250 agent-mode leave
   run_step agent normal-main-restored infra wait_api 11434 45
   run_step agent normal-task-restored infra wait_api 11435 45
   run_step agent normal-embedding-restored infra wait_api 11437 45
@@ -1562,11 +1585,11 @@ phase_owui() {
     return 0
   fi
   validate_owui_token > "$dir/token-recheck.txt" 2>&1
-  if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-before.txt" 2>&1; then rc=0; else rc=$?; fi
+  if bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-before.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state drift/API failure rc=$rc" >&2; return "$rc"; }
-  run_step owui owui-translation quality qualification_benchmark bc250-benchmark owui-translation --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-translation/results"
-  run_step owui owui-rag quality qualification_benchmark bc250-benchmark owui-rag "$OWUI_RAG_MODEL" --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-rag/results"
-  if bc250-openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
+  run_step owui owui-translation quality qualification_benchmark bc250 benchmark owui-translation --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-translation/results"
+  run_step owui owui-rag quality qualification_benchmark bc250 benchmark owui-rag "$OWUI_RAG_MODEL" --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-rag/results"
+  if bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state changed during qualification rc=$rc" >&2; return "$rc"; }
   record_event "openwebui-state-unchanged" infra pass "package-owned settings unchanged"
   checkpoint owui/final
@@ -1662,6 +1685,49 @@ else:
 PY_CAUSES
 }
 
+product_integrity_report() {
+  python3 - "$RAW" <<'PY_INTEGRITY'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+guarded = []
+for path in sorted(root.rglob("results.jsonl")):
+    try:
+        rows = [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError):
+        continue
+    for row in rows:
+        if row.get("category") != "owui-translation":
+            continue
+        if row.get("product_guard") != "pass-withheld":
+            continue
+        guarded.append(
+            (
+                str(row.get("case_id") or "unknown"),
+                [str(value) for value in row.get("raw_failure_kinds") or []],
+            )
+        )
+
+if guarded:
+    print(
+        f"  owui-translation: PASS — {len(guarded)} unsafe translation"
+        f"{'s' if len(guarded) != 1 else ''} detected and withheld"
+    )
+    for case_id, failures in guarded:
+        causes = ", ".join(failures) or "quality-fail"
+        print(
+            f"    {case_id}: raw model quality-fail ({causes}); "
+            "delivery withheld"
+        )
+PY_INTEGRITY
+}
+
 diagnostic_count() {
   awk -F '\t' '$4=="diagnostic" && $5=="info" {count++} END {print count+0}' "$EVENTS" 2>/dev/null || echo 0
 }
@@ -1681,18 +1747,22 @@ create_summary() {
     printf 'Harness         %s\n' "$HARNESS_VERSION"
     printf 'Kernel          %s\n' "$(uname -r)"
     echo
-    if ((diagnostics > 0)); then
-      printf 'Run completion  %s — %d diagnostic(s)\n' "$run_state" "$diagnostics"
-    else
-      printf 'Run completion  %s\n' "$run_state"
-    fi
+    printf 'Run completion  %s\n' "$run_state"
     printf 'Infrastructure  %s\n' "$(tr '[:lower:]' '[:upper:]' < "$INFRA_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
     printf 'Quality         %s       %s pass / %s quality-fail / %s incomplete / %s skipped\n' "${quality^^}" "$p" "$q" "$incomplete" "$skipped"
     printf 'Restoration     %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
-    printf 'Coverage        %s\n' "${coverage^^}"
+    printf 'Coverage        %s\n' "$(coverage_display | tr '[:lower:]' '[:upper:]')"
+    ((diagnostics == 0)) || printf 'Diagnostics     %d informational\n' "$diagnostics"
     echo
     echo "Quality failures"
     quality_cause_report
+    local integrity_report
+    integrity_report="$(product_integrity_report)"
+    if [[ -n "$integrity_report" ]]; then
+      echo
+      echo "Product integrity controls"
+      printf '%s\n' "$integrity_report"
+    fi
     if awk -F '\t' '$4=="diagnostic" && $5=="info" {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
       echo
       echo "Diagnostics"
@@ -1796,7 +1866,7 @@ restore_all() {
   local rc=0
   # Restore appliance state only. The transient credential must remain available
   # through the final authenticated health gate/snapshot and failure evidence.
-  if command_exists bc250-agent-mode; then bc250-agent-mode leave >/dev/null 2>&1 || rc=1; fi
+  if command_exists bc250; then bc250 agent-mode leave >/dev/null 2>&1 || rc=1; fi
   return "$rc"
 }
 
@@ -1878,14 +1948,13 @@ phase_restore_report() {
     record_event "restoration" infra infra-fail "normal topology restoration failed"
     return 1
   fi
-  health_gate "final-health" "$RAW/restore/bc250-verify-gate.txt"
+  health_gate "final-health" "$RAW/restore/verify-gate.txt"
   snapshot final
   write_phase_report final-restored-state restore
-  if [[ $(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo full) == partial ]]; then
-    printf 'incomplete\n' > "$RUN_STATE_FILE"
-  else
-    printf 'completed\n' > "$RUN_STATE_FILE"
-  fi
+  # Run completion describes whether the qualification sequence itself finished.
+  # Optional coverage is reported independently and must not make a completed run
+  # look interrupted or incomplete.
+  printf 'completed\n' > "$RUN_STATE_FILE"
   printf 'pass\n' > "$INFRA_STATE_FILE"; printf '%s\n' "$(quality_state)" > "$QUALITY_STATE_FILE"
   printf 'done\n' > "$PHASE_FILE"
   record_event "revalidation-run-complete" infra pass "revalidation sequence completed; report pending"
@@ -1981,7 +2050,7 @@ status_run() {
   need_root
   local raw=0 phase stage service rid run_version worker position label stage_started last_event
   [[ "${1:-}" == status ]] && shift
-  while (($#)); do case "$1" in --raw) raw=1; shift ;; -h|--help) echo "Usage: sudo bc250-revalidate status [--raw]"; return 0 ;; *) echo "ERROR: unknown status option: $1" >&2; return 2 ;; esac; done
+  while (($#)); do case "$1" in --raw) raw=1; shift ;; -h|--help) echo "Usage: sudo bc250 revalidate status [--raw]"; return 0 ;; *) echo "ERROR: unknown status option: $1" >&2; return 2 ;; esac; done
   ((raw == 0)) || { status_raw; return; }
   rid="$(run_id)"; phase="$(cat "$PHASE_FILE" 2>/dev/null || echo none)"; stage="$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
   stage_started="$(cat "$STAGE_STARTED_FILE" 2>/dev/null || echo none)"; last_event="$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"
@@ -1998,15 +2067,12 @@ status_run() {
   printf '  ID             : %s\n' "$rid"; printf '  Harness        : %s\n' "$run_version"
   local diagnostics
   diagnostics="$(diagnostic_count)"
-  if ((diagnostics > 0)); then
-    printf '  State          : %s (%d diagnostic(s))\n' "$(effective_run_state)" "$diagnostics"
-  else
-    printf '  State          : %s\n' "$(effective_run_state)"
-  fi
+  printf '  State          : %s\n' "$(effective_run_state)"
   printf '  Infrastructure : %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
   printf '  Quality        : %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
   printf '  Restoration    : %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
-  printf '  Coverage       : %s\n' "$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
+  printf '  Coverage       : %s\n' "$(coverage_display)"
+  ((diagnostics == 0)) || printf '  Diagnostics    : %d informational\n' "$diagnostics"
   if [[ "$phase" != done && "$phase" != failed ]]; then
     printf '  Phase          : %s %s\n' "${position:-?}" "$label"; printf '  Stage          : %s\n' "$stage"
     printf '  Stage started  : %s\n' "$stage_started"; printf '  Last event     : %s (%s)\n' "$last_event" "$(event_age "$last_event")"
