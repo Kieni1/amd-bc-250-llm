@@ -1,13 +1,44 @@
 # Changelog
 
+## 0.13.1-1.0 - 2026-10-03
+
+- Promote the exact-device-qualified 0.12.2 appliance line to the 0.13.1 release series while keeping Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, current model roles, live-CU architecture, RAG policy and structured-output policy unchanged.
+- Set `PYTHONDONTWRITEBYTECODE=1` in the canonical `bc250` dispatcher so normal Python-backed product commands do not create unowned `__pycache__`/`*.pyc` files under package-owned `/usr`.
+- Add bounded install/upgrade convergence cleanup for stale `__pycache__`, `*.pyc` and `*.pyo` files under `/usr/libexec/bc250-llm-server` and `/usr/share/bc250-llm-server`; no unrelated filesystem trees are touched.
+- Replace misleading optional-model `MISSING`/false-`DRIFT` presentation with explicit `OPTIONAL` states for intentionally unselected models, suppress repair advice for those states, and preserve `DRIFT` when an explicitly selected model loses or diverges from runtime state.
+- Exclude retired/non-user-visible registrations such as retired Qwen3.6 35B from active Open WebUI base-model override desired-state accounting. Retired native residue remains hidden from ordinary users and discoverable/removable through `sudo bc250 model purge-retired --yes`.
+- Add regression coverage for bytecode hygiene, bounded cleanup, optional-model state transitions and retired-model Open WebUI accounting.
+
+## 0.12.2-0.8 - 2026-10-03
+
+- Correct revalidation result semantics after the exact 0.7 fresh-device run: a six-phase run that finishes successfully remains `COMPLETED` when optional Agent coverage is `PARTIAL`; diagnostics, coverage, infrastructure, quality and restoration are reported independently.
+- Separate raw translation quality from delivered-product integrity. The direct Translate-Gemma recommendation-strengthening defect remains visible, while an Open WebUI outlet that detects and withholds the unsafe translation is reported as a passing product integrity control instead of a second product quality failure.
+- Simplify live-CU operator UX to the actual live-only architecture: report live routing, saved boot profile and boot-restore service; remove misleading `live manager not-found`/performance-profile wording and the last active patched-module compatibility warning.
+- Clarify optional Agent verification as an inactive normal-mode lane, and make the installer completion block point to status/management commands rather than telling a fully configured operator to initialize Open WebUI or reinstall baseline models again.
+- Audit the exact 0.7 fresh-install dependency closure. Use Fedora `git-core` instead of the larger `git` meta-package; retain Mesa/Vulkan, `umr`, Poppler and Hugging Face dependencies because they back active inference/verification, live CU routing, product RAG/document handling and reviewed model downloads.
+- Remove a stale installed-doc reference to a 40-CU build cache, refresh quality/installation guidance with the exact-device findings, and keep runtime/model pins unchanged: Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, Advanced 6144 and Deep 2m.
+
+## 0.12.2-0.7 - 2026-10-03
+
+- Polish the greenfield RPM packaging: install the project and governor license files under distinct basenames, remove redundant Ollama sysusers group metadata, add actual-RPM payload assertions, and run CI `rpmlint` with a narrow documented appliance-policy filter. Normalize prepared SRPM source permissions, represent the tmpfiles-managed RAG document root in the file list, and keep the internal RAG importer non-executable.
+- Remove the remaining model-manager migration shim and stale pre-greenfield command spellings from active scripts, tests and current documentation. The public interface remains `bc250 COMMAND`, with `bc250-cu-live-manager`, `bc250-40cu status` and `llm-run-diagnose` as deliberate standalone tools.
+- Re-audit the package for removed replacement-AMDGPU assets, compatibility aliases, installed candidate screens, stale documentation paths and rejected EuroLLM experiment payloads. RAG remains a product workflow; engineering candidate screens remain source-only; EuroLLM remains graveyard-only.
+- Refresh help text and operator documentation around the live-manager-only CU workflow, product RAG lifecycle, optional-Agent coverage, role-specific structured-output policy and the accepted Translate-Gemma modality limitation with fail-closed product guarding.
+- Keep runtime/model pins unchanged: Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, Advanced 6144 and Deep 2m.
+
 ## 0.12.2-0.6 - 2026-10-02
 
-- Add the explicit `Office - Advanced Structured` Open WebUI preset on the production Qwen3.5 9B base. It preserves Advanced's 6144-token budget and sampler set but stores `think=false`; ordinary Advanced remains `think=true`. Standard strict structured output is qualified with exact schema `format` plus request `temperature=0.0` and no `think` override; Documents uses exact schema `format` with its normal reasoning policy; Deep is unchanged.
+- Consolidate the greenfield CLI around `bc250 COMMAND`: remove generated per-command `bc250-*` compatibility aliases, the former public RAG importer compatibility route, trivial model setup wrappers, the standalone temperature/LAN helpers and public memory/swap/Ollama-install/CU-status helpers. Keep `bc250-cu-live-manager` and `bc250-40cu status` as the deliberate CU interfaces; implementation helpers live under package libexec.
+- Promote RAG/Documents to a product-relevant active workflow under `bc250 rag`; keep the importer engine internal, remove legacy `plan`/`sync` compatibility subcommands, retain Tika/embedding/examples/benchmarks, and keep RAG qualification in the active development scope.
+- Stop installing engineering candidate-screen trees on production appliances while retaining current screens in the source repository. Move the rejected EuroLLM translation challenger fully to the source graveyard/retired catalog and remove its active experiment profile.
+- Reduce installed package clutter: remove one-line model setup wrappers, stale documentation/install directories and obsolete public helper aliases while preserving the established FHS split between `/usr/bin`, private `/usr/libexec/bc250-llm-server`, immutable `/usr/share/bc250-llm-server`, configuration under `/etc`, and persistent state under `/var/lib`.
+- Add the explicit `Office - Advanced Structured` Open WebUI preset on the production Qwen3.5 9B base. It preserves Advanced's 6144-token budget and sampler set but stores `think=false`; ordinary Advanced remains `think=true`. Standard and Documents strict structured output are qualified with exact schema `format` plus request `temperature=0.0` while preserving normal thinking; Deep is unchanged.
 - Keep Open WebUI/Ollama payload translation generic. Open WebUI 0.11.4 already merges correctly placed request/model params and promotes `think`, `format` and `keep_alive` to the Ollama root while mapping `max_tokens` to `options.num_predict`; no `payload.py` policy patch or prompt-text JSON heuristic is introduced.
 - Treat the package-default Ornith Agent as an optional add-on rather than a fresh-install prerequisite. Revalidation reports absent Agent coverage as `SKIPPED`/`PARTIAL` without failing core infrastructure; when Agent is installed its exclusive-lane runtime/topology checks remain authoritative infrastructure tests.
-- Preserve the production Translate-Gemma role and fail-closed modality guard while documenting the native DE→FR recommendation-strengthening limitation (`sollten` may become `doivent`) as accepted rather than release-blocking. Add opt-in Apache-2.0 `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` for one short modality comparison; no promotion is implied.
+- Preserve the production Translate-Gemma role and fail-closed modality guard while documenting the native DE→FR recommendation-strengthening limitation (`sollten` may become `doivent`) as accepted rather than release-blocking. Move Apache-2.0 `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` to the source graveyard as closed comparison evidence: Round 1 fixed the `sollten` anchor but reproducibly regressed German `muss nicht` to English output, so production Translate-Gemma remains selected and no Round 2 is planned.
 - Extend generation benchmark reporting with separate `cold_load_s`, 4K/16K target-vs-actual deep-context aggregates, thermal mean/min/max/first/last/drift summaries and selected-lane completeness checks. These remain measurement/coverage outputs, not synthetic device scores.
 - Finish the guided installer footer as a compact `OVERVIEW` plus amber `NEXT STEPS` with CU routing, models, validation and benchmark entry points. Retain Qwen3.6 35B only in the graveyard/retired catalog; no unqualified replacement is promoted.
+- Consolidate installed documentation into canonical operator guides (`INSTALLATION`, `HARDWARE`, `OPERATIONS`, `OPENWEBUI`, `BENCHMARKING`, `SECURITY`), promote the changelog and HTTPS example to first-class locations, keep packaging guidance source-only, and retire the obsolete optional GFX1013 compute-queue verifier/documentation path.
 - Target RPM release `0.12.2-0.6`; Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, Advanced 6144 and Deep 2m remain unchanged.
 
 ## 0.12.2-0.5 - 2026-09-27
@@ -27,7 +58,7 @@
 - Bound Advanced reasoning generation at `max_tokens=4096`; externally supplied exact-device evidence reports OWUI adapter propagation to Ollama `options.num_predict=4096` with no root-level `max_tokens`. The raw outbound capture is not retained in source, so release qualification keeps this as a no-regression check.
 - Retire Qwen3.6 35B from the active candidate set, keep Qwen3.8 Unsloth pressure-heavy/admin-only, and align ISTA IQ3_S as the `think=true` quality/reasoning profile while IQ3_XXS remains the deployability profile.
 - Restore migration-safe RPM `%pre` behavior: always request `open-webui.service` stop when persistent state exists, prove `ActiveState=inactive`, and fail closed before the new Quadlet can become restart-eligible.
-- Add transaction-final `sudo bc250-install` guidance, verifier-derived final PASS/WARN/FAIL state, an explicit setup summary/reboot state, accurate optional-component terminology, optional-model drift counts, and clearer root/VG growth planning.
+- Add transaction-final `sudo bc250 install` guidance, verifier-derived final PASS/WARN/FAIL state, an explicit setup summary/reboot state, accurate optional-component terminology, optional-model drift counts, and clearer root/VG growth planning.
 - Make CU health saved-profile/live-layout based instead of universally requiring 40/40: parse `BC250_WGP_MASKS`, compare all four configured row masks with live SPI masks, treat `--` as intentionally unselected, keep `D!` as a separate inconsistency, distinguish live/saved/boot/persistent states, and label RADV CU count diagnostic-only.
 - Add the optional root-only Open WebUI maintenance credential (`0700` secrets directory, `0600` key), atomic no-overwrite creation, live authentication before `CONFIGURED`, automatic package-consumer discovery and explicit-token override.
 - Add fail-closed pre-Deep task/embedding eviction through package-owned model-residency APIs and set Deep bounded idle residency to exactly `2m`; preserve four lanes, `OLLAMA_MAX_LOADED_MODELS=1`, and no generic scheduler.
@@ -35,7 +66,7 @@
 
 ## 0.12.2-0.3 - 2026-09-26
 
-- Close the Open WebUI migration restart race by stopping an active OWUI service and removing its boot-enablement drop-in in RPM `%pre`, before the new Quadlet payload or any subsequent daemon-reload can make Open WebUI 0.11.4 restart-eligible. Guided `bc250-install` still creates/verifies the stopped-state rollback snapshot before re-enabling and starting OWUI.
+- Close the Open WebUI migration restart race by stopping an active OWUI service and removing its boot-enablement drop-in in RPM `%pre`, before the new Quadlet payload or any subsequent daemon-reload can make Open WebUI 0.11.4 restart-eligible. Guided `bc250 install` still creates/verifies the stopped-state rollback snapshot before re-enabling and starting OWUI.
 - Make translation modality integrity clause-local rather than document-global, so recommendation/obligation and permission/obligation swaps across adjacent clauses are withheld.
 - Treat single-separator three-decimal forms such as `1,234` / `1.234` as numerically ambiguous and require the complete interpretation set to survive translation; collapsing either form to `1234` now fails closed for percentages and currencies.
 - Use neutral translation-integrity withholding wording for modality and literal/numeric failures, and make both direct and Open WebUI translation qualification reuse the runtime literal-integrity authority.
@@ -67,15 +98,15 @@
 - Make the pre-v1 model-visibility policy real for ordinary users: discover the current main (`11434`) and task (`11435`) Ollama inventories, create/update package-managed visible testing records with additive `user:*:read` access, remove only stale package-managed discovery records from successfully inspected lanes, and continue excluding embedding/agent lanes from normal chat selection.
 - Keep Qwen embedded templates unchanged. Store qualified Qwen3.5/Qwen3.6/Qwen3.8 request defaults and qualification metadata in the existing `config/openwebui/models.json` authority; Open WebUI and production-mode generation benchmarks consume the same request policy, while request-level `think` remains outside Modelfiles. Open WebUI setup now fails closed when package model definitions put request-specific values outside `params.custom_params` (or testing-policy `custom_params`), including previously unknown direct parameters, so misplaced variables cannot silently stop propagating.
 - Add bounded translation integrity protection after DE↔FR generation: fail closed for high-confidence recommendation/obligation or permission/obligation drift, lost explicit prohibition, and missing source currency/percentage/identifier values. Date semantics remain qualification coverage rather than a runtime literal check. Currency and percentage preservation compares normalized numeric values so locale-equivalent formatting or currency-code order does not create a false withholding. Expand focused regressions instead of changing the model.
-- Improve diagnostics and support UX: `bc250-status` reports `/api/ps` residency per active lane and says reboot recommendation was `not checked` when the optional helper is absent; revalidation v4.5 reports exact installed NEVRA separately from target version; support-bundle captures are bounded by timeout and the produced archive/checksum set is reopened and verified before success.
+- Improve diagnostics and support UX: `bc250 status` reports `/api/ps` residency per active lane and says reboot recommendation was `not checked` when the optional helper is absent; revalidation v4.5 reports exact installed NEVRA separately from target version; support-bundle captures are bounded by timeout and the produced archive/checksum set is reopened and verified before success.
 - Report administrator-owned multi-model-chat state when Open WebUI exposes it, without reconverging administrator permissions. Keep the tested serialized compare behavior, `OLLAMA_MAX_LOADED_MODELS=1`, Deep `keep_alive=0`, normal topology, TTM thresholds, live 40-CU policy, RAG architecture and production model choices unchanged.
 - Keep Qwen3.6 35B and Qwen3.8 variants experimental according to device evidence; do not adopt froggeric template repacking, do not promote IQ3_XXS after its arithmetic failure, and defer the optional two-host/model-only profile to a dedicated future release because networking/security/backup ownership would widen the product boundary.
 
 ## 0.12.1-0.5 - 2026-09-23
 
-- Repair `bc250-rag prepare-batch` around native-reasoning models: use `/api/chat` with separated thinking, consume only terminal non-empty `message.content`, reject truncation/reasoning markers/outer fences, and run fidelity checks only on validated final Markdown. Preserve unique alphanumeric source identifiers and reject obvious reasoning contamination in `working/` or `active/` validation.
+- Repair `bc250 rag prepare-batch` around native-reasoning models: use `/api/chat` with separated thinking, consume only terminal non-empty `message.content`, reject truncation/reasoning markers/outer fences, and run fidelity checks only on validated final Markdown. Preserve unique alphanumeric source identifiers and reject obvious reasoning contamination in `working/` or `active/` validation.
 - Improve RAG lifecycle UX without weakening the human gate: expected scan/oversize cases are `DEFERRED` rather than generic failures, summaries separate prepared/deferred/failed counts, review numbering covers pending drafts only, metadata prompts expose the date-or-edition requirement, idempotent init reports converged state, status names `working awaiting review`, and missing/invalid collection diagnostics are explicit.
-- Fix `bc250-revalidate status --raw` so the documented machine-readable key/value contract is actually forwarded; advance the command to harness v4.4 while leaving the already-qualified revalidation phases and evidence-bundle format unchanged.
+- Fix `bc250 revalidate status --raw` so the documented machine-readable key/value contract is actually forwarded; advance the command to harness v4.4 while leaving the already-qualified revalidation phases and evidence-bundle format unchanged.
 - Make live 40-CU health the primary installer/operator state and optional persistent boot-module state secondary; label `active_cu_number` as non-authoritative for live routing and make the initial kernel plan say repository update evaluation occurs in step 2.
 - Harden the GPT-OSS Deep system instruction against factual list-filling: when reliable recall is insufficient, return fewer items and state uncertainty instead of inventing plausible names. No sampling, context, residency, role or runtime-policy change is introduced.
 - Align Open WebUI role/tool policy and model visibility for pre-v1 testing: Standard, Advanced, Deep and Translation answer without autonomous built-in knowledge/chat tools; Documents keeps knowledge retrieval as its dedicated product path; all models installed on the normal main/task Ollama providers are selectable for comparison; raw GPT-OSS retains `keep_alive=0`; translation prompts preserve legal/contractual modality.
@@ -84,8 +115,8 @@
 ## 0.12.1-0.4 - 2026-09-23
 
 - Promote exact-device-qualified Ollama 0.34.2 to the package runtime baseline using the exact Linux payload URL and SHA-256 instead of executing upstream install logic; preserve package-owned main/task/embedding/agent systemd topology and verify the three normal lanes report 0.34.2 after installation.
-- Add the `bc250-rag` lifecycle command for local German/French/bilingual corpus bootstrap: three inbox lanes, local agent-assisted text-native PDF normalization into `working/`, interactive metadata review, provenance validation, explicit activation/supersession, status and safe incremental Open WebUI ingestion. Automation never promotes generated drafts directly to `active/`; scanned and over-limit documents are deliberately deferred to OCR/manual split review.
-- Expand RAG metadata with document-family, authority-role, review and translation linkage while retaining the existing `bc250-rag-import plan|sync` compatibility interface. Normalize simple Markdown-escaped synthetic RAG markers so presentation escapes do not create false retrieval failures.
+- Add the `bc250 rag` lifecycle command for local German/French/bilingual corpus bootstrap: three inbox lanes, local agent-assisted text-native PDF normalization into `working/`, interactive metadata review, provenance validation, explicit activation/supersession, status and safe incremental Open WebUI ingestion. Automation never promotes generated drafts directly to `active/`; scanned and over-limit documents are deliberately deferred to OCR/manual split review.
+- Expand RAG metadata with document-family, authority-role, review and translation linkage while retaining the then-existing RAG importer plan/sync compatibility workflow. Normalize simple Markdown-escaped synthetic RAG markers so presentation escapes do not create false retrieval failures.
 - Remove historical kernel-version warning ranges and follow Fedora's current supported kernel. Correct IOMMU diagnostics from a categorical hardware-failure claim to an outside-qualified-baseline notice, and add focused hints for conflicting tmpfiles/modprobe settings when live TTM limits differ from the required 4194304/4194304 profile.
 - Keep production Open WebUI 0.11.3, Jina embedding, Deep `keep_alive=0`, current model policy and the proven 40-CU path unchanged; stock-AMDGPU/live-manager-only 40-CU remains a separate device experiment.
 
@@ -93,15 +124,15 @@
 
 - Keep the proven 0.12.1 model/runtime policy unchanged while improving operator-facing diagnostics and evidence collection.
 - Hide the large optional-model catalogue on a converged installer run until the operator explicitly chooses to review/install additional models; noninteractive explicit selections remain supported.
-- Add `bc250-support-bundle`, a root-only read-only redacted support archive with package/status/verifier/topology/CU/maintenance/resource evidence, `manifest.json`, and `SHA256SUMS.txt`; it intentionally excludes OWUI credentials, prompts/chats, uploaded document contents, database rows, identity SQL and backup contents.
-- Advance `bc250-revalidate` to harness v4.3: final bundles include manifest/checksum evidence, raw combined systemd snapshots explain the expected inactive agent lane in normal mode, accepted context truncation uses policy-aware wording, and completed runs surface diagnostic counts alongside PASS state.
-- Improve `bc250-status` by querying `/api/version` on the active Ollama lane and reporting Open WebUI HTTP readiness separately from unit activity.
+- Add `bc250 support-bundle`, a root-only read-only redacted support archive with package/status/verifier/topology/CU/maintenance/resource evidence, `manifest.json`, and `SHA256SUMS.txt`; it intentionally excludes OWUI credentials, prompts/chats, uploaded document contents, database rows, identity SQL and backup contents.
+- Advance `bc250 revalidate` to harness v4.3: final bundles include manifest/checksum evidence, raw combined systemd snapshots explain the expected inactive agent lane in normal mode, accepted context truncation uses policy-aware wording, and completed runs surface diagnostic counts alongside PASS state.
+- Improve `bc250 status` by querying `/api/version` on the active Ollama lane and reporting Open WebUI HTTP readiness separately from unit activity.
 - Clarify verifier completion when optional/authenticated checks are skipped instead of ending with an unqualified success sentence.
 - Defer multi-model/compare policy changes, backup redesign, generic memory admission, RAG lifecycle tooling and broader security hardening until separate evidence justifies them.
 
 ## 0.12.1-0.2 - 2026-09-21
 
-- Fix `bc250-revalidate` on 0.12.1 packages: the harness now reads the installed package-owned `VERSION` file instead of retaining the obsolete hard-coded `0.11.3` target.
+- Fix `bc250 revalidate` on 0.12.1 packages: the harness now reads the installed package-owned `VERSION` file instead of retaining the obsolete hard-coded `0.11.3` target.
 - Install the package `VERSION` authority under `/usr/share/bc250-llm-server/VERSION` and reject missing or malformed version metadata before qualification starts.
 - Keep the 0.12.1 Open WebUI ACL, Deep Reasoning residency, verifier, provenance and runtime behavior unchanged from 0.12.1-0.1.
 - Keep Git-only `development/` memory outside deterministic release validation, move pre-v1 patch notes under `development/patchnotes/`, and remove duplicate documentation/version assertions that repeated existing release gates.
@@ -124,15 +155,15 @@
 - Bring persisted upload policy into authenticated apply/status ownership (`FILE_MAX_SIZE=128`, `FILE_MAX_COUNT=20`, package extension allowlist) and compare extension lists order-independently to avoid false drift.
 - Preserve the existing Open WebUI provider/preset/task/RAG/translation architecture; do not add an Arena allowlist, model-order/default layer, extra provider/service or general configuration framework.
 - Document pinned Open WebUI v0.11.3 OpenAI-style adapter limitations instead of carrying a BC-250-specific container fork: root `max_tokens` is not a reliable Ollama cap, reasoning-token accounting can be zero despite reasoning content, and length termination can surface as `finish_reason=stop`; package-owned hard caps use nested `options.num_predict`.
-- Clarify exclusive-agent UX: Open WebUI remains reachable and may still list normal office roles while their backends are intentionally unavailable; restore them with `sudo bc250-agent-mode normal`.
+- Clarify exclusive-agent UX: Open WebUI remains reachable and may still list normal office roles while their backends are intentionally unavailable; restore them with `sudo bc250 agent-mode normal`.
 - Close 2.4 as a source-validated release; exact installed 2.4 RPM/device acceptance remains a separate external gate.
 
 ## 0.11.3-2.3 - 2026-09-20
 
-- Improve operations UX with actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, clearer agent transitions, an idempotent `bc250-agent-mode normal` convergence alias, and a topology-aware `bc250-status` summary.
+- Improve operations UX with actionable operator-overlay recovery guidance, separate local-maintenance and Pi/companion installer decisions, clearer agent transitions, an idempotent `bc250 agent-mode normal` convergence alias, and a topology-aware `bc250 status` summary.
 - Preserve safe-power decision semantics while making local protected-port defer messages useful without exposing peer addresses.
 - Make verifier degradation reporting distinguish root service failures from dependent unavailable checks; report skipped authenticated Open WebUI verification explicitly without turning optional credentials into failures.
-- Make degraded status directly actionable with `sudo bc250-agent-mode normal`, include skipped checks in verifier headline totals, and use the same normal-convergence command in agent-mode guidance.
+- Make degraded status directly actionable with `sudo bc250 agent-mode normal`, include skipped checks in verifier headline totals, and use the same normal-convergence command in agent-mode guidance.
 - Align swap runtime directory creation with the existing package/tmpfiles `0750 root:root` contract to remove intentional RPM verification drift after convergence.
 - Clarify scheduled timer history and DRY_RUN prune counters while retaining current-invocation maintenance logs, private backups and fail-safe behavior.
 - Make selective identity restore summarize strict integrity, baseline/new foreign-key state and rollback outcome without dumping unrelated pre-existing violations.
@@ -146,7 +177,7 @@
 - Turn the completed MTP campaign into a small package policy without another framework: the existing MTP TOML catalog now carries `role` and `recommendation` metadata, and normal list output shows the policy alongside the existing disabled/download-only state.
 - Set `qwen3.5-9b-mtp` to 16K/draft 2 as the primary fast model, `qwen3.8-27b-ymq-xs-ti-mtp` to 8K/draft 1 as the primary general 27B, and retain HauhauCS Qwen3.8 27B at 8K/draft 2 as the specialist alternative.
 - Retire `qwen3.6-27b-mtp` from active MTP discovery because the optimized Qwen3.8 choices now provide better package-facing throughput/headroom/completion efficiency; preserve its exact historical definition in the source-only graveyard. The 35B-A3B stock-envelope failure remains retired.
-- Remove ambiguous 27B convenience aliases from `bc250-run-mtp` instead of silently retargeting them after the preferred 27B changed. The unambiguous `qwen35-9b` alias remains for interactive use; recorded evidence should use exact IDs.
+- Remove ambiguous 27B convenience aliases from `bc250 run-mtp` instead of silently retargeting them after the preferred 27B changed. The unambiguous `qwen35-9b` alias remains for interactive use; recorded evidence should use exact IDs.
 - Record the corrected final RAG scoring: Gemma E4B 94/96 overall versus Qwen 9B 93/96 under the fixed retrieval campaign, with Gemma remaining `bc250-office-documents`. The 27B IQ3_XXS 5/5 result stays explicitly partial-before-resource-abort and does not reopen the production RAG decision.
 - Keep qualification machinery bounded: no recommendation engine, benchmark-result ingestion, second catalog, automatic promotion/retirement, new RAG residency harness or universal 512 MiB policy is introduced.
 - Make repeated local RPM regeneration cheaper without changing package semantics: `scripts/ci-local.sh` defaults to Podman `--pull=missing`, accepts `BC250_BUILD_IMAGE` / `BC250_BUILD_PULL_POLICY`, and skips `dnf install` when a prebuilt builder already contains the required packages. `make clean` remains the normal way to preserve verified upstream source caches.
@@ -175,9 +206,9 @@
 
 ## 0.11.3-1.7 - 2026-09-19
 
-- Fix `bc250-status` mode derivation: the summary now reuses `bc250-agent-mode status` semantics and can report normal, degraded, stopped or exclusive agent mode instead of calling every agent-inactive state normal.
+- Fix `bc250 status` mode derivation: the summary now reuses `bc250 agent-mode status` semantics and can report normal, degraded, stopped or exclusive agent mode instead of calling every agent-inactive state normal.
 - Enforce the package credential-file boundary consistently: RAG `--token-file` and Hugging Face model-manager `--token-file` inputs must be non-empty regular files with no group/world access. Environment-provided credentials remain separate ephemeral inputs.
-- Make `bc250-code` fail closed when `generate`, `refactor`, `test` or `commit` returns an outer Markdown code fence; `review` and `document` still allow Markdown. Atomic output replacement remains unchanged.
+- Make `bc250 code` fail closed when `generate`, `refactor`, `test` or `commit` returns an outer Markdown code fence; `review` and `document` still allow Markdown. Atomic output replacement remains unchanged.
 - Make guided-installer completion distinguish core verification from package-owned Open WebUI state (`APPLIED + VERIFIED`, `SKIPPED`, `RETRY REQUIRED`) without turning recoverable Open WebUI setup problems into fatal install failures.
 - Preserve conservative safe-power behavior for protected TCP activity on either endpoint, but describe that policy accurately. Remove upload-pruning dependence on an assumed 50-item Open WebUI page size by using zero-record/advertised-total/no-new-ID termination.
 - Let top-level `./install --help` work without root, slim the README daily path, mark superseded model tables as historical, and explain intentionally unavailable agent registration state in normal mode.
@@ -212,7 +243,7 @@
 - Record historical exact-0.11.3-0.4 MTP Phase-1 evidence: Qwen3.5 9B, Qwen3.6 27B and HauhauCS Qwen3.8 27B pass same-target baseline-vs-MTP qualification with deterministic parity; the Qwen3.6 35B-A3B stock 8K/full-GPU baseline does not safely fit and should not be rerun unchanged.
 - Move the failed Qwen3.6 35B-A3B MTP candidate out of the active catalog into a source-only MTP graveyard. Historical evidence is retained, but routine list/fetch/run/compare no longer exposes a candidate with no current safe retest path.
 - Remove the brittle installer unit simulation that expected a mocked package install to create real `/usr/bin` assets; retain a host-independent static boundary check for backup-export SSH preparation instead.
-- Keep packaged MTP draft defaults unchanged while corrected Phase-2 optimization continues. The first depth sweep repeated defaults and is noise-floor evidence only; the corrected canary proves the override path works, and `bc250-compare-mtp` now records/verifies requested versus effective draft depth before accepting MTP evidence.
+- Keep packaged MTP draft defaults unchanged while corrected Phase-2 optimization continues. The first depth sweep repeated defaults and is noise-floor evidence only; the corrected canary proves the override path works, and `bc250 compare-mtp` now records/verifies requested versus effective draft depth before accepting MTP evidence.
 
 - Record the completed BC-250 RAG finalist campaign. `bc250-office-documents` / Gemma E4B remains the production document/RAG default on the current 16 GiB profile: both finalists passed short authenticated Open WebUI RAG, but Gemma completed 42/42 continuous-residency turns with about 2.7 GiB MemAvailable remaining while Qwen 9B reached the campaign's 512 MiB safety floor after only a few resident subruns. Qwen remains the separate higher-quality general-office option; this is a sustained-memory-margin decision, not a semantic-quality rejection.
 - Make RAG residency restoration preserve the starting model **set** while allowing each Ollama service's configured/default keep-alive policy to apply; stop forcing a synthetic 30-minute lifetime when reloading pre-existing models.
@@ -257,16 +288,16 @@
 
 ## 0.11.3-0.4 - 2026-09-18
 
-- Harden the experimental MTP lane before its first BC-250 hardware campaign: `bc250-run-mtp` now verifies protected manager state/SHA, refuses an occupied port or stale llama-server, enforces a launch-memory floor, validates runtime flags/access, and launches the external server as the `ollama` service user rather than root.
-- Replace unrelated Ollama-vs-MTP timing with a controlled same-target comparison: `bc250-compare-mtp ID` runs the same GGUF sequentially through the same llama.cpp build/settings with MTP disabled and enabled, then records throughput, draft acceptance, memory/swap, runtime/model identity, server logs and kernel/GPU-fault evidence.
+- Harden the experimental MTP lane before its first BC-250 hardware campaign: `bc250 run-mtp` now verifies protected manager state/SHA, refuses an occupied port or stale llama-server, enforces a launch-memory floor, validates runtime flags/access, and launches the external server as the `ollama` service user rather than root.
+- Replace unrelated Ollama-vs-MTP timing with a controlled same-target comparison: `bc250 compare-mtp ID` runs the same GGUF sequentially through the same llama.cpp build/settings with MTP disabled and enabled, then records throughput, draft acceptance, memory/swap, runtime/model identity, server logs and kernel/GPU-fault evidence.
 - Expand the disabled download-only MTP catalog to a bounded first-campaign set: Qwen3.5 9B, retained Qwen3.6 27B control, HauhauCS Qwen3.8 27B IQ2_M, and Qwen3.6 35B-A3B. MTP remains outside generic convergence and has no Ollama Modelfiles.
 - Refine the install-time model pass after a real 0.11.3-0.4 installer smoke: honor catalog suppression, summarize fully current required models, keep current picker rows compact, skip the intentionally inactive agent registration probe, bound other local Ollama registration probes, and keep MTP out of the generic picker/combined `apply all` path entirely. GGUF provenance/SHA behavior is unchanged.
 - Keep MTP qualification fail-closed on completion integrity, server survival, kernel-journal capture, severe GPU/kernel faults and draft-acceptance evidence; move the reviewed external llama.cpp starting baseline to `b10964` / v0.4.1 now that Qwen3.8 is in the funnel. No production model, Open WebUI role, normal Ollama topology, quality threshold, CU/governor policy or revalidation acceptance rule changes.
 
 ## 0.11.3-0.3 - 2026-09-18
 
-- Restore the install-time model picker to state-rich output by consuming compact shared model-state inspection instead of turning `bc250-model list` back into a runtime/protected-state operation.
-- Improve `bc250-model status` UX: `Upstream: not checked` now points to `--online`, while `--verbose` shows catalog source repository, revision and verified local SHA-256 when available.
+- Restore the install-time model picker to state-rich output by consuming compact shared model-state inspection instead of turning `bc250 model list` back into a runtime/protected-state operation.
+- Improve `bc250 model status` UX: `Upstream: not checked` now points to `--online`, while `--verbose` shows catalog source repository, revision and verified local SHA-256 when available.
 - Tighten the package-owned Open WebUI tag-generation prompt after repeated real-device `tags-de` double-JSON failures: broad and specific tags must share one `tags` array and the task must emit exactly one raw JSON object with no prose/Markdown. The strict evaluator and 128-token budget are unchanged.
 - Make non-severe GPT-OSS/Jina context diagnostics concise and policy-explicit (`previous -> current prompt tokens`, PASS/not-severe) without changing the severe-truncation threshold or qualification outcome.
 - Record installed `bc250-llm-server-0.11.3-0.2.fc44.x86_64` revalidation v4.2 as historical device evidence: installer verification 54/0/0, infrastructure/restoration/full coverage PASS, task 5/6 on `tags-de`, and the bounded GPT-OSS/Jina context diagnostic surfaced as intended.
@@ -274,35 +305,35 @@
 
 ## 0.11.3-0.2 - 2026-09-18
 
-- Repair the `bc250-fetch-mtp` public route after the model-manager grammar rewrite: it now explicitly dispatches to `apply mtp --include-disabled`, so packaged disabled MTP candidates can be downloaded for bounded testing without editing the catalog or making them part of generic convergence.
+- Repair the `bc250 fetch-mtp` public route after the model-manager grammar rewrite: it now explicitly dispatches to `apply mtp --include-disabled`, so packaged disabled MTP candidates can be downloaded for bounded testing without editing the catalog or making them part of generic convergence.
 - Preserve stable global model indexes for the separate MTP TOML catalog, matching the documented selection contract between category and combined views.
 - Enforce `--revision` / `--sha256` as true one-model overrides before an `all` selection is split into per-category operations.
 - Improve MTP operator flow and evidence guidance: exact fetch/status/run commands, missing-source recovery guidance, explicit download-only removal semantics, and current real-device qualification requirements are documented. MTP remains experimental, disabled by default and unqualified on BC-250 until the external llama.cpp campaign runs.
-- Reconcile secondary lifecycle surfaces: package asset discovery now uses unprivileged `bc250-model list`, current handovers agree on Release 0.2, and README/TLDR/model/specialist guidance exposes the explicit disabled-MTP preparation route.
+- Reconcile secondary lifecycle surfaces: package asset discovery now uses unprivileged `bc250 model list`, current handovers agree on Release 0.2, and README/TLDR/model/specialist guidance exposes the explicit disabled-MTP preparation route.
 - Keep the deterministic source gate host-independent by removing the jq-backed edge-diagnostic integration case from unit coverage; the RPM still requires `jq`, and that shell/runtime path is qualified on the installed BC-250 instead.
 - Keep production model roles, Open WebUI policy, Ollama topology, revalidation v4.2 semantics, governor/CU policy and quality thresholds unchanged.
 
 ## 0.11.3-0.1 - 2026-09-18
 
-- Redesign `bc250-model` around explicit catalog/state/lifecycle operations: `list`, `status`, `path`, `apply`, `refresh`, `unregister`, `remove`, and `purge-retired`; keep legacy forms as actionable migration errors rather than aliases.
+- Redesign `bc250 model` around explicit catalog/state/lifecycle operations: `list`, `status`, `path`, `apply`, `refresh`, `unregister`, `remove`, and `purge-retired`; keep legacy forms as actionable migration errors rather than aliases.
 - Make one shared model-state inspector authoritative for source/provenance validity, runtime Modelfile drift, registration state and optional moving-revision update checks; `apply` consumes the same state that `status` exposes.
 - Separate reconciliation from deliberate source refetch: `apply` reuses verified GGUFs and repairs registration/Modelfile drift, while `refresh` explicitly fetches source bytes again. `unregister` keeps manager-owned GGUF/state; `remove` deletes it only after registration removal succeeds.
 - Migrate active installer/model wrappers/current quality harnesses and current-facing documentation to the new command contract. Preserve historical campaign/changelog command syntax as historical evidence.
-- Advance `bc250-revalidate` to harness v4.2 for the 0.11.3 package target: surface non-severe context truncation as an informational diagnostic, keep the dedicated GPT-OSS/Jina stage as the deep GPT-OSS resource check instead of repeating GPT-OSS in the generic edge sweep, and replace successful intermediate full snapshots with lightweight checkpoints while retaining full preflight/agent/final/failure evidence.
+- Advance `bc250 revalidate` to harness v4.2 for the 0.11.3 package target: surface non-severe context truncation as an informational diagnostic, keep the dedicated GPT-OSS/Jina stage as the deep GPT-OSS resource check instead of repeating GPT-OSS in the generic edge sweep, and replace successful intermediate full snapshots with lightweight checkpoints while retaining full preflight/agent/final/failure evidence.
 - Keep runtime topology, model definitions, Open WebUI role policy, quality thresholds and the 0.11.2-0.6 coding-agent/task behavior unchanged in this model-manager rewrite.
 
 ## 0.11.2-0.6 - 2026-09-18
 
-- Preserve genuine task quality failures without cascading parse failures into misleading language/relevance causes; canonical benchmark summaries and `bc250-revalidate status` now identify failed case IDs and point at their canonical `results.jsonl` evidence.
+- Preserve genuine task quality failures without cascading parse failures into misleading language/relevance causes; canonical benchmark summaries and `bc250 revalidate status` now identify failed case IDs and point at their canonical `results.jsonl` evidence.
 - Tighten agent static qualification: literal reasoning markers are a format failure, while NUL-safe `xargs -0 -r -n1 basename` is accepted as valid basename extraction and omission of `-r` remains an empty-directory robustness failure.
-- Move `bc250-code` from raw `/api/generate` response extraction to `/api/chat` with `think:true`; write only `message.content`, require terminal completion, refuse `done_reason=length`, reject reasoning-marker contamination, preserve exact final-content bytes, and retain atomic file replacement. `CODING_AGENT_NUM_PREDICT` is an explicit positive-integer override; the default remains 3072 pending real-device route/budget qualification.
+- Move `bc250 code` from raw `/api/generate` response extraction to `/api/chat` with `think:true`; write only `message.content`, require terminal completion, refuse `done_reason=length`, reject reasoning-marker contamination, preserve exact final-content bytes, and retain atomic file replacement. `CODING_AGENT_NUM_PREDICT` is an explicit positive-integer override; the default remains 3072 pending real-device route/budget qualification.
 - Add `agentic-qwen35-4b-khazarai-q6-k` and `agentic-gemma4-e4b-sol-fable-q4-k-m` as opt-in compact challengers. Ornith remains the coding/agent baseline; no candidate is promoted or retired by this release.
 - Record the installed `0.11.2-0.5.fc44` full revalidation: infrastructure/restoration/full coverage passed, Open WebUI translation passed, agent passed 3/3, and task remained a real 5/6 quality result because `tags-de` emitted two JSON objects.
-- Keep coding-helper source validation host-independent: remove the redundant fake-runtime subprocess case that accidentally required runner `jq`; retain direct contract assertions and packaged shell-syntax validation. Runtime `bc250-code` still requires `jq` as declared by the RPM.
+- Keep coding-helper source validation host-independent: remove the redundant fake-runtime subprocess case that accidentally required runner `jq`; retain direct contract assertions and packaged shell-syntax validation. Runtime `bc250 code` still requires `jq` as declared by the RPM.
 
 ## 0.11.2-0.5 - 2026-09-18
 
-- Fix the installed `bc250-revalidate` `owui-translation` stage: benchmark fixtures now resolve through the package share tree (`/usr/share/bc250-llm-server/benchmark`) instead of deriving a source-only `/usr/examples/...` path from the installed libexec location.
+- Fix the installed `bc250 revalidate` `owui-translation` stage: benchmark fixtures now resolve through the package share tree (`/usr/share/bc250-llm-server/benchmark`) instead of deriving a source-only `/usr/examples/...` path from the installed libexec location.
 - Move package-resource selection into `benchmark_common.py` and reuse it for category fixtures, Open WebUI translation fixtures and the package-owned Open WebUI desired state. Explicit `BC250_BENCH_FIXTURES` / `BC250_SHARE` overrides stay authoritative, while source-tree runs prefer their own checkout instead of an older installed RPM.
 - Add focused regression coverage for source/install/override resource resolution and for the Open WebUI translation command consuming the shared resolver.
 - Carry forward the GitHub validation fixes from the 0.4 follow-up: installer tests provide a hermetic `jq` test double instead of depending on the CI image, and `tests/test_openwebui.py` has Ruff-compliant import ordering.
@@ -310,10 +341,10 @@
 
 ## 0.11.2-0.4 - 2026-09-18
 
-- Make active package-owned Open WebUI roles operationally complete by ensuring all of their base models during `bc250-install`; optional selection now means experiments/rollback/agent/other extras rather than models required by active UI roles.
-- Advance `bc250-revalidate` to harness v4.1: pin direct Translate-Gemma qualification to the promoted 2048-token budget, add an authenticated canonical `owui-translation` screen through the actual DE→FR / FR→DE role IDs, and show canonical quality-failure causes in the completed dashboard.
+- Make active package-owned Open WebUI roles operationally complete by ensuring all of their base models during `bc250 install`; optional selection now means experiments/rollback/agent/other extras rather than models required by active UI roles.
+- Advance `bc250 revalidate` to harness v4.1: pin direct Translate-Gemma qualification to the promoted 2048-token budget, add an authenticated canonical `owui-translation` screen through the actual DE→FR / FR→DE role IDs, and show canonical quality-failure causes in the completed dashboard.
 - Fix the French task-title semantic fixture to recognize `réglementaire`/`reglementaire`, matching the useful live `Traduction réglementaire` result instead of reporting a false relevance failure.
-- Add `bc250-openwebui-setup status --verbose` for human-readable verified role/task/RAG/Function state and make `bc250-verify` require every active Open WebUI role base model to be registered on the main lane.
+- Add `bc250 openwebui-setup status --verbose` for human-readable verified role/task/RAG/Function state and make `bc250 verify` require every active Open WebUI role base model to be registered on the main lane.
 - Record the real installed `0.11.2-0.3` revalidation baseline and authenticated production translation smoke; keep the production model, Stage-2E prompt/filter, Ollama/KV/CU/governor and power policy unchanged.
 
 ## 0.11.2-0.3 - 2026-09-18
@@ -343,13 +374,13 @@
 - Add one reviewed non-global Open WebUI Filter Function to apply only the tested DE→FR / FR→DE wrapper, reconcile it through supported Functions APIs, and extend desired-state status checks to detect function/preset drift without synchronizing away unrelated operator Functions.
 - Fix translation numeric-value parsing so one-decimal locale equivalents such as `8.1` and `8,1` compare as the same value, while retaining Stage-2E's known protected-format and trailing-line caveats rather than weakening acceptance semantics.
 - Harden task-model qualification around a one-round cheap screen, a dedicated warm-main tiny survival gate and a post-OOM appliance recovery check. Keep LFM2.5 1.2B Q6_K as the production task model; record Qwen3 4B as quality-promising but unsafe for the concurrent task role after both exact-source and bounded 4K staging caused global OOM/main-model loss.
-- Bring German/French translation qualification in line with the current campaign: add `bc250-benchmark translation --think auto|true|false`, record richer reasoning/runtime provenance, require an empty main lane for generic foreground direct screens, and retain the eight-case canonical suite as a screening gate rather than promoting any challenger before harder-corpus/product-path work.
+- Bring German/French translation qualification in line with the current campaign: add `bc250 benchmark translation --think auto|true|false`, record richer reasoning/runtime provenance, require an empty main lane for generic foreground direct screens, and retain the eight-case canonical suite as a screening gate rather than promoting any challenger before harder-corpus/product-path work.
 - Retain dated task/translation campaign evidence in `MODELS.md` and Git-only development records rather than modifying runtime Modelfiles for measurement notes. Update operator/development guidance, print evidence archive SHA-256 without creating `.sha256` sidecars, normalize archive ownership, and keep production model/prompt/topology defaults unchanged.
 - Fix the new post-OOM task recovery gate so it reloads/warm-checks GPT-OSS by default and distinguishes historical experiment faults from new faults during recovery; redact only the harness's expected local HOME prefix before direct-translation privacy scanning so normal benchmark path output does not suppress valid evidence archives.
 
 ## 0.11.1-0.10 - 2026-09-14
 
-- Make `bc250-compare-mtp` return nonzero when either backend fails completion integrity, including a missing terminal state, a pathological repeated reserved/unused-token run, or no usable completion content/reasoning.
+- Make `bc250 compare-mtp` return nonzero when either backend fails completion integrity, including a missing terminal state, a pathological repeated reserved/unused-token run, or no usable completion content/reasoning.
 - Align MTP reserved-token corruption detection with the generation benchmark so isolated reserved tokens do not count as a pathological run. Missing draft-acceptance counters remain valid inference but are explicitly insufficient for MTP qualification.
 - Replace the MTP comparison source-string regression with a focused fake-backend behavior test covering valid completion, reasoning-only completion, absent acceptance telemetry, missing terminal markers, repeated reserved-token corruption and empty output.
 
@@ -368,7 +399,7 @@
 
 ## 0.11.1-0.7 - 2026-09-13
 
-- Fix `bc250-maintenance contract` after the installed-documentation hierarchy change by resolving the contract from `docs/MAINTENANCE-CONTRACT.md` under the package doc directory.
+- Fix `bc250 maintenance contract` after the installed-documentation hierarchy change by resolving the contract from `docs/OPERATIONS.md` under the package doc directory.
 - Improve the interactive maintenance/Pi installer flow: clearly separate local BC-250 maintenance from optional Raspberry Pi access/export, use an explicit numbered power-action choice, show the detected WOL interface and address before accepting it, and explain that the setup is safe to rerun.
 - Re-prompt locally for invalid yes/no answers, pruning limits, warm-up values, power time/action and network-interface input instead of terminating the entire maintenance setup after earlier sections have already been applied. An IP address entered where a Linux interface name is required now gets a targeted explanation.
 - Keep production topology, model defaults, maintenance policy defaults, retention, firewall exposure and quality thresholds unchanged.
@@ -382,17 +413,17 @@
 ## 0.11.1-0.5 - 2026-09-13
 
 - Fix the optional backup-export permission regression: config/users backup producers now preserve the package-owned `0750 root:bc250-backup-export` directory contract when the reserved group exists, while retaining a private `0700` fallback for source-tree/direct execution without that package group. Published artifacts remain `0640` only after the export account is explicitly enabled; rollback backups remain private.
-- Reconcile current-facing documentation with the package: core verification is shown before optional maintenance/Pi setup, the retired `exp-qwen38-4b-distill-empero-q6-k` task candidate is no longer described as active, Open WebUI backup wording reflects scheduled verified config/users backups, and the full `bc250-revalidate` lifecycle is documented.
+- Reconcile current-facing documentation with the package: core verification is shown before optional maintenance/Pi setup, the retired `exp-qwen38-4b-distill-empero-q6-k` task candidate is no longer described as active, Open WebUI backup wording reflects scheduled verified config/users backups, and the full `bc250 revalidate` lifecycle is documented.
 - Preserve repository-relative documentation paths under `/usr/share/doc/bc250-llm-server/` so one link layout works in Git and on the appliance; add staged-installed-document link regression coverage and keep Git-only `development/` bookkeeping out of the binary RPM payload.
 - Consolidate `docs/RPM-LAYOUT.md` into `docs/FILESTRUCTURE.md` and `docs/REPACKAGING.md` into `packaging/README.md`; reduce source-subtree quality/experiment READMEs to maintainer guidance while retaining detailed operator/model rationale in their canonical documents.
 - Add a small development-memory convention with durable decision records and model-run templates, including explicit retest conditions, so rejected experiments are not repeated merely because current-facing docs are shortened.
 
 ## 0.11.1-0.4 - 2026-09-12
 
-- Define maintenance contract version 1 for an external Raspberry Pi companion: office readiness is HTTP :80, Wake-on-LAN is the morning-start mechanism, and `sudo bc250-maintenance request-shutdown` is the stable remote-safe-power interface. The BC-250, not the Pi, remains responsible for deciding whether active SSH/UI/Ollama/maintenance work permits shutdown.
-- Add `bc250-maintenance companion status|enable` to prepare a dedicated forced-command power-control account and ensure only the existing office HTTP service plus restricted SSH :22 are available; internal Open WebUI/Ollama ports remain outside the companion contract.
+- Define maintenance contract version 1 for an external Raspberry Pi companion: office readiness is HTTP :80, Wake-on-LAN is the morning-start mechanism, and `sudo bc250 maintenance request-shutdown` is the stable remote-safe-power interface. The BC-250, not the Pi, remains responsible for deciding whether active SSH/UI/Ollama/maintenance work permits shutdown.
+- Add `bc250 maintenance companion status|enable` to prepare a dedicated forced-command power-control account and ensure only the existing office HTTP service plus restricted SSH :22 are available; internal Open WebUI/Ollama ports remain outside the companion contract.
 - Add optional `backup-export status|enable` using Fedora `/usr/bin/rrsync` (`rsync-rrsync`) with separate config/users key scopes. Reserve a dormant export group for stable directory permissions and publish new artifacts `0640` only after the export account is explicitly enabled; rollback backups and maintenance secrets remain private.
-- Add the maintenance/Pi step to full interactive `bc250-install`, including explicit prompts for WOL/power policy, restricted Pi access and optional `rsync-rrsync`. Non-interactive and `--models-only` installs do not silently enable remote maintenance or backup export.
+- Add the maintenance/Pi step to full interactive `bc250 install`, including explicit prompts for WOL/power policy, restricted Pi access and optional `rsync-rrsync`. Non-interactive and `--models-only` installs do not silently enable remote maintenance or backup export.
 - Keep backup secondary to office availability/power savings: no Open WebUI API key is required by the Pi, no push-to-Pi credential is introduced, and no new application port is exposed.
 
 ## 0.11.1-0.3 - 2026-09-12
@@ -423,7 +454,7 @@
 
 - Fix the Translate-Gemma Open WebUI screening showstopper by temporarily extending only an existing restricted main-provider allow-list, preserving unrestricted providers, honoring `prefix_id`, capturing HTTP failures, and restoring both preset and provider policy with effective-model verification. Full provider configuration remains root-only under `/run`; evidence contains redacted snapshots and is scanned for both the admin token and provider credentials.
 - Accept the observed valid French formal-office wording `confirmer avoir reçu` while retaining all language, source-leakage, reference, date and numeric-preservation gates. Translation direct/OWUI screens now record stronger runtime/model provenance and machine-readable run manifests; a broader corpus remains required before promotion.
-- Add a first-class package retirement catalog and `bc250-model cleanup-retired`, keeping source graveyard Modelfiles out of normal discovery while safely distinguishing retired package registrations from arbitrary unmanaged models.
+- Add a first-class package retirement catalog and `bc250 model purge-retired`, keeping source graveyard Modelfiles out of normal discovery while safely distinguishing retired package registrations from arbitrary unmanaged models.
 - Correct storage accounting for protected roots, add canonical model/lane names to dedupe/prune output, record model identity in schema-3 sidecars, and skip only previously recorded unchanged dedupe pairs. Legacy/unrecorded pairs are reported without claiming physical reclaimability.
 - Preserve current production defaults, warm-main/task/embedding residency policy, exclusive agent topology, 16 MiB XFS dedupe ranges, harness-4.0 semantics and quality thresholds.
 
@@ -431,7 +462,7 @@
 
 - Harden translation candidate evidence before more real-device comparison: direct screening now uses a 1024-token default, model-appropriate Hunyuan/Translate-Gemma prompt contracts, numeric-value preservation, and correct `rc=3` propagation; authenticated Open WebUI screening adds request/resource telemetry, selected stable-field preset-delta checks, restoration verification, and credential scanning.
 - Make compact task candidate screens compare baseline and challenger on the same dedicated task Ollama runtime, record the effective title/tag/query budgets and `keep_alive=0` contract, preserve `rc=3`, reject unknown pre-existing temporary task registrations, and clean the task-lane candidate on exit.
-- Harden support operations: automatic upload pruning preserves files with unknown timestamps or sizes, agent-mode transitions verify the promised exclusive service topology, and `bc250-model cleanup` accepts the same explicit `--host`/`--destination` overrides as installation.
+- Harden support operations: automatic upload pruning preserves files with unknown timestamps or sizes, agent-mode transitions verify the promised exclusive service topology, and the then-current model cleanup workflow accepts the same explicit `--host`/`--destination` overrides as installation.
 - Move three clearly exhausted comparison definitions (Granite 4.2 8B, Ling 3.0 Tiny, and Defiant-Fable Qwen3.5 9B) into the source-only graveyard and synchronize the active experiment/catalog documentation. Production models, residency policy, harness-4.0 semantics, and quality thresholds are unchanged.
 
 ## 0.11.0-1.13 - 2026-09-10
@@ -487,7 +518,7 @@
 - Standardize benchmark metadata around package identity, kernel, benchmark version, runtime endpoints/versions, model names/digests, fixture hashes and effective options.
 - Split the mixed workflow implementation into `runtime-benchmark.py` for Ollama/coexistence and `openwebui-benchmark.py` for Open WebUI RAG/tuning/restoration.
 - Remove stale revalidation compatibility/reboot-era helpers and polish active-run/final wording without changing harness-v4 restoration ownership.
-- Treat `bc250-benchmark rag-quality --think true|false` as the canonical thinking-policy comparison; routine revalidation continues to test only the packaged policy.
+- Treat `bc250 benchmark rag-quality --think true|false` as the canonical thinking-policy comparison; routine revalidation continues to test only the packaged policy.
 
 ## 0.11.0-1.5 - 2026-09-06
 
@@ -495,21 +526,21 @@
 - Canonical benchmark records distinguish `measurement` from `qualification`; quality summaries derive only from qualification cases.
 - Phase 3 now enforces conservative gross-regression gates for decode, residency, context, memory, temperature, device errors, and GPT-OSS/Jina coexistence.
 - Full revalidation requires a protected Open WebUI token file validated before run-state creation; `--skip-owui` is an explicit incomplete-coverage mode.
-- Final reports aggregate canonical benchmark failure causes, and preflight/final `bc250-verify` checks are hard health gates.
+- Final reports aggregate canonical benchmark failure causes, and preflight/final `bc250 verify` checks are hard health gates.
 - Open WebUI mutation benchmarks verify configuration readback and temporary knowledge/file cleanup; cleanup/restoration failure is infrastructure failure.
 - RAG answer-model residency loss is classified as an infrastructure/coexistence failure rather than a quality failure.
 
 ## 0.11.0-1.4 - 2026-09-06
 
 - Complete the Round-2 benchmark-result migration for generation, OCR, RAG, coexistence and Open WebUI tuning workflows using one canonical per-run result directory.
-- Remove legacy `bc250-benchmark` aliases and the implicit commandless generation mode; explicit canonical subcommands are now required.
+- Remove legacy `bc250 benchmark` aliases and the implicit commandless generation mode; explicit canonical subcommands are now required.
 - Remove the private revalidation tuning helper. `num-batch`, concurrency and Open WebUI tuning are explicit benchmark workflows, while harness v4 continues to qualify only packaged defaults.
 - Make `results.jsonl`, `summary.json`, `summary.txt`, `meta.json` and copied fixtures the canonical evidence set; CSV remains a category export where useful.
 - Improve BC-250 UMA generation summaries with resident size, minimum `MemAvailable`, swap start/peak/end/delta and diagnostic thermal/context warnings.
 
 ## 0.11.0-1.3 - 2026-09-06
 
-- Advance `bc250-revalidate` to harness v4.0 and make routine revalidation qualification-only: six phases cover preflight, production roles, resource edge, exclusive agent mode, packaged Open WebUI RAG, and final restoration/reporting.
+- Advance `bc250 revalidate` to harness v4.0 and make routine revalidation qualification-only: six phases cover preflight, production roles, resource edge, exclusive agent mode, packaged Open WebUI RAG, and final restoration/reporting.
 - Remove routine configuration-decision sweeps and hardware A/B controls from revalidation. `num_batch`, embedding-batch, chunk-min, `RAG_SYSTEM_CONTEXT`, thinking-policy, keepalive, kernel/governor, and experimental-model comparisons belong to explicit benchmark/diagnostic workflows.
 - Route benchmark/helper execution through one explicit quality-vs-infrastructure status path: quality `rc=3` remains nonfatal, while other helper/benchmark failures propagate to the worker and restoration.
 - Replace the stage-transition heartbeat with a TSV event stream, stage-start timestamp, worker state and last real event age; final status separately reports run state, infrastructure, quality and restoration.
@@ -533,7 +564,7 @@
 
 ## 0.11.0-1.0 - 2026-09-06
 
-- Start the pre-1.0 benchmark/revalidation cleanup around the three-command boundary: `bc250-verify` checks current health, `bc250-benchmark` discovers candidates, and `bc250-revalidate` qualifies packaged defaults.
+- Start the pre-1.0 benchmark/revalidation cleanup around the three-command boundary: `bc250 verify` checks current health, `bc250 benchmark` discovers candidates, and `bc250 revalidate` qualifies packaged defaults.
 - Add a small common benchmark result envelope (`outcome`, `failure_kinds`, `diagnostics`, `checks`, `metrics`) and adjacent JSON/text summaries without removing the established CSV and JSONL interfaces.
 - Fix demonstrated evaluator defects: task relevance now gates parsed task content, translation requires meaningful target-language output with consistent normalization, production use-case acceptance no longer rejects valid intermediate weekday reasoning, and agent results separate raw format, syntax and requirements.
 - Canonicalize OCR markup for text-fidelity scoring while keeping table/reading-order structure separate; add embedding hard-case and target-margin diagnostics.
@@ -543,31 +574,31 @@
 ## 0.10.0-1.3 - 2026-09-06
 
 - Make repeated installs quieter and more idempotent: reuse one transient Hugging Face authentication decision across normal and agent model groups, suppress the second full model catalog after selection, disable unsupported Xet advisories, avoid no-op Ollama re-enable/restart churn, and restart private Podman services only when configuration changed or the live path is unhealthy.
-- Correct 40-CU status semantics: live SPI/WGP routing is the availability signal, while kernel/RADV numeric CU counters are labeled diagnostic; `bc250-40cu status` and `bc250-status` now surface the live routed-CU summary instead of implying that the kernel counter is the active total.
+- Correct 40-CU status semantics: live SPI/WGP routing is the availability signal, while kernel/RADV numeric CU counters are labeled diagnostic; `bc250-40cu status` and `bc250 status` now surface the live routed-CU summary instead of implying that the kernel counter is the active total.
 - Align status wording with the verifier for expected BC-250 cpufreq/cpuidle behavior and normal inactive agent mode, and make an unavailable `needs-restarting` helper an explicit unchecked state rather than a pseudo-result.
-- Add compact `bc250-verify --summary` output for installer use and remove the duplicated memory/CU/parity report from routine installation; detailed `bc250-verify` and `llm-run-diagnose` remain explicit troubleshooting commands.
-- Accept `--owui-token-file` as an alias for `--token-file` in `bc250-openwebui-setup` so credential-file naming is consistent across installer, verifier, revalidation and Open WebUI helpers.
+- Add compact `bc250 verify --summary` output for installer use and remove the duplicated memory/CU/parity report from routine installation; detailed `bc250 verify` and `llm-run-diagnose` remain explicit troubleshooting commands.
+- Accept `--owui-token-file` as an alias for `--token-file` in `bc250 openwebui-setup` so credential-file naming is consistent across installer, verifier, revalidation and Open WebUI helpers.
 
 ## 0.10.0-1.2 - 2026-09-05
 
 - Refine the guided installer UX: lazy Hugging Face authentication only when model bytes are actually needed, a defaultable protected Open WebUI administrator API-key-file choice without re-entering the detected path, clearer persistent-vs-live 40-CU wording, live-manager service detection, and a concise successful-completion command summary.
-- Advance `bc250-revalidate` to v3.9 with a compact foreground dashboard showing elapsed time, numbered application phase, stage, heartbeat age and recent benchmark outcomes while the systemd worker remains authoritative; make `status` human-readable by default with `--raw` for scripts, distinguish the installed harness from the harness that produced the recorded run, and keep routine agent qualification pinned to the package-default Qwen model so catalog additions cannot silently widen or change the run.
+- Advance `bc250 revalidate` to v3.9 with a compact foreground dashboard showing elapsed time, numbered application phase, stage, heartbeat age and recent benchmark outcomes while the systemd worker remains authoritative; make `status` human-readable by default with `--raw` for scripts, distinguish the installed harness from the harness that produced the recorded run, and keep routine agent qualification pinned to the package-default Qwen model so catalog additions cannot silently widen or change the run.
 - Make revalidation startup quieter by suppressing the transient systemd enable message and replacing duplicate filesystem tables with one storage-headroom line.
-- Add `bc250-verify --owui-token-file FILE`, report model registration by normal lane, and classify absent standard CPU cpufreq interfaces as informational when the package SMU governor is healthy instead of producing two non-actionable warnings.
+- Add `bc250 verify --owui-token-file FILE`, report model registration by normal lane, and classify absent standard CPU cpufreq interfaces as informational when the package SMU governor is healthy instead of producing two non-actionable warnings.
 - Add `agentic-gemma4-12b-fable5-tau2-q4-k-m`, `exp-gpt-oss20b-unsloth-ud-q4-k-xl`, and `exp-qwen38-4b-empero-q6-k` as opt-in comparison Modelfiles. Experimental catalog growth remains non-blocking for routine package/revalidation runs and production roles are unchanged.
 
 ## 0.10.0-1.1 - 2026-09-05
 
 - Recreate the Tika and Open WebUI Quadlets after installer firewall/Quadlet reconciliation and skip firewalld reloads when the HTTP policy is already current, preventing stale Podman DNS/host-gateway state after updates.
-- Add `bc250-install --owui-token-file FILE`; Open WebUI setup now offers token-file choice 3, suggests an existing protected `/root/owui-test.key`, and reuses the transient authenticated token for final desired-state verification without persisting it.
-- Split `bc250-verify` container-path diagnostics into private Tika DNS, Tika HTTP, `host.containers.internal` DNS and per-lane Ollama connectivity checks.
-- Advance `bc250-revalidate` to v3.8 with an early Open WebUI private-network preflight before model benchmarks, clearer helper failure output, and a live foreground phase/stage indicator; `--detach` retains immediate-return behavior.
+- Add `bc250 install --owui-token-file FILE`; Open WebUI setup now offers token-file choice 3, suggests an existing protected `/root/owui-test.key`, and reuses the transient authenticated token for final desired-state verification without persisting it.
+- Split `bc250 verify` container-path diagnostics into private Tika DNS, Tika HTTP, `host.containers.internal` DNS and per-lane Ollama connectivity checks.
+- Advance `bc250 revalidate` to v3.8 with an early Open WebUI private-network preflight before model benchmarks, clearer helper failure output, and a live foreground phase/stage indicator; `--detach` retains immediate-return behavior.
 - Keep the static `llm-run-diagnose --no-load` report model-neutral instead of selecting an arbitrary installed experiment.
 - Reduce update noise by avoiding redundant kernel-devel reconciliation when 40-CU is already prepared and suppressing the redundant full model catalog during baseline task/embedding reconciliation before the single optional selection.
 
 ## 0.10.0-1.0 - 2026-09-05
 
-- Stabilize `bc250-revalidate` v3.7 so child benchmark/sampler failures cannot invoke global recovery, successful workers do not delete/reload their own active systemd unit, and bundles retain the harness journal plus shell error context.
+- Stabilize `bc250 revalidate` v3.7 so child benchmark/sampler failures cannot invoke global recovery, successful workers do not delete/reload their own active systemd unit, and bundles retain the harness journal plus shell error context.
 - Use the package-facing `bc250-office-documents` Open WebUI workspace model for authenticated chunk/system-context experiments; record helper outcomes and skip tuning when package-owned OWUI state is drifted.
 - Increase the direct `rag-quality` answer budget to 1024 tokens by default, classify retrieval/answer/citation/thinking-budget exhaustion separately, and add a diagnostic default-vs-`think=false` A/B without changing the production preset.
 - Keep noninteractive generic generation benchmarks production-scoped unless experimental models are explicitly named or `BENCH_INCLUDE_EXPERIMENTS=1` is set.
@@ -581,9 +612,9 @@
 
 - Preflight custom Ollama service overrides before invoking the pinned upstream installer; reject upstream-looking units with operator additions.
 - Remove installer-history/package-baseline/network-before-state bookkeeping under the pre-1.0 greenfield contract.
-- Add `ensure` semantics to memory and swap helpers and delegate those decisions from `bc250-install`.
+- Add `ensure` semantics to memory and swap helpers and delegate those decisions from `bc250 install`.
 - Move persisted Open WebUI providers/task/embedding/RAG settings into one package-owned `desired-state.json` consumed by the supported API helper.
-- Simplify normal/agent mode switching around the four static package units and add `bc250-reset` as the preferred full-appliance reset command.
+- Simplify normal/agent mode switching around the four static package units and add `bc250 reset` as the preferred full-appliance reset command.
 - Correct remaining command privilege/RAG benchmark wording and simplify XFS dedupe restoration so failures propagate without a blind exception catch.
 - Refresh source pins without changing the release: Ollama 0.33.3, Apache Tika 4.0.0-full with the Open WebUI Tika-4 API contract, and the current CU live-manager revision; Open WebUI and the governor remain current.
 
@@ -596,21 +627,21 @@
 
 ## 0.10.0-0.5.testing - 2026-09-03
 
-- Correct `bc250-revalidate` so benchmark acceptance status `3` remains nonfatal while unexpected benchmark failures propagate to worker recovery; re-establish normal Ollama after the `num_batch` sweep.
+- Correct `bc250 revalidate` so benchmark acceptance status `3` remains nonfatal while unexpected benchmark failures propagate to worker recovery; re-establish normal Ollama after the `num_batch` sweep.
 - Report the full live CU routing dashboard and classify routed/problem cells without requiring a universal `40/40` count.
 - Require successful service quiescing for XFS dedupe and surface restoration failures instead of ignoring them.
-- Make `bc250-install` the single owner of Fedora update policy, expand its setup-plan summary, restore source-tree model-setup executability, and clarify the 4K embedding cap comments.
+- Make `bc250 install` the single owner of Fedora update policy, expand its setup-plan summary, restore source-tree model-setup executability, and clarify the 4K embedding cap comments.
 
 ## 0.10.0-0.4.testing - 2026-09-03
 
 Finish the installer/storage pass without widening the runtime architecture. The
 repository-root `install` is now a small bootstrap: update Fedora, install the
-selected RPM, then hand off to the RPM-owned `bc250-install`. RPM `%post` is
+selected RPM, then hand off to the RPM-owned `bc250 install`. RPM `%post` is
 limited to package integration and the persistent Open WebUI signing secret;
 service, firewall and SELinux provisioning happens only in the explicit guided
 installer.
 
-`bc250-install` shows the current setup plan, avoids no-op root-LV growth and
+`bc250 install` shows the current setup plan, avoids no-op root-LV growth and
 package/model work where practical, combines Fedora/kernel and TTM preparation
 before one primary reboot, and asks for models once using global indexes, names,
 ranges, `recommended`, `production` or `all`. A second reboot is requested only
@@ -619,7 +650,7 @@ AMDGPU module is not yet running.
 
 Model registration now skips only when the validated source, rendered Modelfile
 and correct Ollama-instance registration are all current. Large downloads report
-filesystem headroom. New `bc250-storage` tooling reports GGUF/Ollama duplication,
+filesystem headroom. New `bc250 storage` tooling reports GGUF/Ollama duplication,
 performs explicitly confirmed XFS `FIDEDUPERANGE` sharing on verified pairs,
 optionally prunes fully verified offline GGUF source copies, and removes 40-CU
 cache trees only for kernels no longer installed. The real XFS experiment
@@ -627,7 +658,7 @@ recovered about 46 GiB while retaining both logical GGUF and Ollama paths, so
 reflink dedupe is now a supported explicit operation rather than a feasibility
 question.
 
-Add `bc250-revalidate` as the packaged, opt-in whole-appliance revalidation
+Add `bc250 revalidate` as the packaged, opt-in whole-appliance revalidation
 harness. It uses package-native state paths, keeps phase reports inside the final
 bundle, recovers the main Ollama service between destructive long-prefill
 candidates when needed, and removes transient worker/unit state after a final
@@ -700,7 +731,7 @@ GPT-OSS 20B remains the expected memory-edge production case and should be
 re-benchmarked with the dedicated embedding lane after deployment.
 
 Upgrade the digest-pinned Open WebUI baseline to v0.11.3. Add
-`bc250-openwebui-setup init|apply|status`, which uses supported Open WebUI admin
+`bc250 openwebui-setup init|apply|status`, which uses supported Open WebUI admin
 APIs to persist the package-owned main/task provider configuration, task model,
 dedicated embedding endpoint, reviewed RAG baseline and additive model presets.
 Fresh interactive installs can create or sign in the administrator and apply the
@@ -714,8 +745,7 @@ firewalld/nginx as the actual security boundary. Verification understands normal
 versus exclusive-agent mode, checks the embedding model on 11437 and can perform
 an authenticated desired-state comparison only when `OWUI_API_KEY` is supplied.
 The package deliberately leaves `RAG_SYSTEM_CONTEXT=false` for a later real-corpus
-A/B test. Fedora Mesa 26.2+, the external GFX1013 compute-queue stack, ROCm,
-2000-MHz operation and model pruning stay documented as future evaluation items
+A/B test. Fedora Mesa 26.2+, ROCm, 2000-MHz operation and model pruning stay documented as future evaluation items
 rather than being mixed into this release. No pre-v1 Open WebUI database backup
 automation is added.
 
@@ -773,16 +803,16 @@ Make the BC-250 fresh-machine profile explicitly set `amdgpu.gttsize=14750`,
 kept because it is the project-tested profile, while external BC-250 guidance is
 documented alongside it.
 
-Add `bc250-model cleanup --keep-gguf` so Ollama registration/unreferenced blob data
+Add the model unregister workflow so Ollama registration/unreferenced blob data
 can be removed while the local GGUF/state is retained for reuse. Remove
-the redundant production/experiment/embedding `bc250-fetch-*` aliases (MTP keeps
+the redundant per-model production/experiment/embedding fetch aliases (MTP keeps
 its distinct fetch workflow), retire the `apply-safe` memory alias, centralize
 runtime pins in `config/runtime.env`, and stop testing an arbitrary total model
 count. The operator-selected Modelfile catalog itself remains unchanged.
 
 Post-audit corrections make the production roles executable rather than merely
 documented: restore LFM2.5 as a dedicated implicit DE↔FR translator; add
-`bc250-maintenance model-baseline` to store request-level `think=false` for the
+`bc250 maintenance model-baseline` to store request-level `think=false` for the
 production Qwen3.5 base model in Open WebUI without replacing Ollama's native
 renderer/parser; and explicitly disable follow-up, autocomplete, web-search-query
 and retrieval-query task generation while keeping titles/tags enabled. Paginate
@@ -795,8 +825,8 @@ Final installer/model-manager hardening makes the guided `install` script
 self-contained when copied beside the RPM, skips the RPM transaction when the
 exact package NEVRA is already installed, and lets the RPM post script detect the
 official `/usr/local/bin/ollama`. Model administration now exposes only canonical
-categories plus `all`; `sudo bc250-model cleanup all --keep-gguf` applies the
-retained-source cleanup across every catalog, while `sudo bc250-model list`
+categories plus `all`; the then-current all-category unregister workflow applies the
+retained-source cleanup across every catalog, while `sudo bc250 model list`
 reports protected retained GGUFs accurately. Static `--no-load` diagnostics no
 longer warn about the deliberately absent resident model, and unpinned Mesa
 version differences are reported as reference information rather than package
@@ -896,7 +926,7 @@ vendor archive with local SHA-256 sidecars; `sources-check` now verifies them.
 
 Remove the dead sensor logger and obsolete `install-cu-manager` /
 `pull-embedding-model` compatibility commands. Rename the narrow speed-only
-experiment helper to `bc250-compare-mtp`. CI now runs on pushes and pull requests
+experiment helper to `bc250 compare-mtp`. CI now runs on pushes and pull requests
 and adds Fedora Ruff/ShellCheck before the RPM build. Follow-up hardening catches
 malformed Open WebUI sync response types cleanly, rejects tab-indented RAG metadata,
 keeps install-manifest sources inside the source tree, and excludes Ruff/Python caches
@@ -925,7 +955,7 @@ deferred.
 
 ## 0.9.7-0.3.testing - 2026-08-30
 
-Add a compact `bc250-benchmark agent` lane for the isolated port-11436 service.
+Add a compact `bc250 benchmark agent` lane for the isolated port-11436 service.
 The deterministic fixtures validate Bash/Python syntax and required structured
 output without executing model-generated code. This keeps coding correctness
 visible without adding a separate benchmark framework or dependency.
@@ -940,7 +970,7 @@ policy and intentionally flexible model revisions.
 
 ## 0.9.7-0.2.testing - 2026-08-30
 
-Refactor `bc250-benchmark` into a thin dispatcher with stdlib-only Python suites
+Refactor `bc250 benchmark` into a thin dispatcher with stdlib-only Python suites
 for generation, embeddings, OCR and the isolated Open WebUI task model. Generation
 now separates a neutral cross-model mode from production Modelfile behavior, uses
 model-family `think` policies compatible with Ollama 0.32.15, records response
@@ -969,13 +999,13 @@ official installer helper now requests that version unless an operator deliberat
 sets `OLLAMA_VERSION`. Verification and diagnostics warn, rather than fail, when a
 different Ollama runtime is being compared.
 
-Overhaul `bc250-benchmark` around useful BC-250/office measurements instead of a
+Overhaul `bc250 benchmark` around useful BC-250/office measurements instead of a
 single generation tok/s figure. The default `moderate` profile now separates cold
 model-switch latency, warm latency, loaded decode throughput, document-prefill
 throughput, context-capacity/truncation behavior, loaded Ollama allocation and host
 memory/swap headroom. `conservative` is a shorter lower-context pass. Optional
 embedding benchmarking uses `/api/embed` with a multilingual office batch; OCR
-remains a real-page quality test through `bc250-ocr`. Dedicated task/agent stores
+remains a real-page quality test through `bc250 ocr`. Dedicated task/agent stores
 can be measured by pointing `OLLAMA_URL` at ports 11435/11436.
 
 Make the fresh-install RAG baseline **moderate** at 1500-token chunks, 200 overlap
@@ -986,12 +1016,12 @@ distinguishes reindexing from source re-upload/re-sync.
 
 `modelctl.py` removes redundant temporary `hf.co/...` OCR registrations after a
 friendly packaged alias is created, while retaining safe status handling if cleanup
-cannot occur. `bc250-rag-import --prune` can also clear the final stale remote file
+cannot occur. the RAG ingestion prune mode can also clear the final stale remote file
 when a generated Originals/Français lane has become locally empty.
 
 ## 0.9.6-0.6.testing - 2026-08-26
 
-Add `bc250-rag-import` for the operator-owned `/srv/bc250-documents` tree. It
+Add the original RAG importer for the operator-owned `/srv/bc250-documents` tree. It
 validates active Markdown front matter and source-PDF SHA-256 provenance, then
 incrementally syncs each collection into separate Originals and Français Open
 WebUI knowledge bases while keeping public/confidential boundaries distinct.
@@ -1011,7 +1041,7 @@ business data. Fresh installs now start with deterministic 1000/100 token
 chunking, Top K 5, Markdown-header splitting, vector-only search, sequential
 Ollama embeddings and Jina `Query:` / `Document:` prefixes.
 
-`bc250-verify` reports the Open WebUI embedding/extraction defaults and checks
+`bc250 verify` reports the Open WebUI embedding/extraction defaults and checks
 that the configured embedding model is registered with main Ollama without
 running an embedding request. The installer points operators to the new RAG
 guide after an embedding selection. Documentation covers Open WebUI v0.11.0's
@@ -1021,7 +1051,7 @@ backups. A blank pilot evaluation TSV is packaged; no real documents are.
 
 ## 0.9.6-0.4.testing - 2026-08-25
 
-Correct `bc250-ocr install/show` alias validation so an unknown OCR model exits
+Correct `bc250 ocr install/show` alias validation so an unknown OCR model exits
 with status 2 before invoking the model manager or Ollama. Rename the GLM OCR
 experiment to `exp-glm-ocr-ggml-q8-0` so its testing name reflects the actual
 `ggml-org` source. Existing registrations under the old experimental name are
@@ -1030,14 +1060,14 @@ left untouched and may appear as unmanaged until the operator removes them.
 MTP now explicitly adds `--no-cache-idle-slots` when supported alongside
 `--cache-ram 0`. CPU power-state diagnostics ignore an unexpanded sysfs CPU
 glob on systems where that interface is absent. Multi-command documentation
-uses `bc250-check-temp --once` so the default continuous watcher does not block
+uses `former temperature helper --once` so the default continuous watcher does not block
 following commands. Chandra keeps the currently published dotted upstream GGUF
 filename `chandra-ocr-2.Q4_K_M.gguf`.
 
 ## 0.9.6-0.3.testing - 2026-08-25
 
 Add four compact experimental office OCR definitions (GLM-OCR, dots.ocr,
-OvisOCR2 and Chandra OCR 2) plus `bc250-ocr`, a thin list/install/show/test
+OvisOCR2 and Chandra OCR 2) plus `bc250 ocr`, a thin list/install/show/test
 wrapper over the shared model manager and main Ollama instance. GLM uses a 16K
 context; Chandra remains a Q4_K_M compatibility probe pending real BC-250 image
 testing.
@@ -1062,7 +1092,7 @@ provides `util-linux-script`; `/usr/bin/script` is required only when a selected
 model download needs visible progress. Guided MTP selection explicitly lists
 and opts into its disabled download-only entries.
 
-`bc250-status` again warns when root free space falls below `MIN_FREE_GB`. Model
+`bc250 status` again warns when root free space falls below `MIN_FREE_GB`. Model
 listing reports known registrations on the wrong Ollama instance, firewall
 verification checks every active zone plus accepting rich rules, and cache
 cleanup documentation states that journal vacuuming is system-wide.
@@ -1080,9 +1110,9 @@ metadata changes and rebuilds the Ollama registration; `--refresh` remains the
 explicit way to fetch new bytes. Model discovery, validation and Ollama host
 selection share fewer code paths without renaming or removing packaged models.
 
-`bc250-status` now combines per-instance model storage, Hugging Face cache,
+`bc250 status` now combines per-instance model storage, Hugging Face cache,
 Podman, journal, memory pressure, zram, disk swap and swappiness visibility.
-`bc250-maintenance clean-cache` is an explicitly confirmed rebuildable-cache
+`bc250 maintenance clean-cache` is an explicitly confirmed rebuildable-cache
 cleanup that retains GGUFs, Ollama models and Open WebUI data. Verification
 checks the internal Ollama listener shape/firewall policy, CU status reports
 stale kernel preparation, and deterministic validation cross-checks upstream
@@ -1090,7 +1120,7 @@ pins against the RPM spec.
 
 ## 0.9.5-0.3.testing - 2026-08-24
 
-The optional maintenance stack now has one `bc250-maintenance` command for a
+The optional maintenance stack now has one `bc250 maintenance` command for a
 fast backup-only baseline, guided office scheduling, storage/backup status,
 manual runs and clean schedule disabling. Local backups persist across missed
 timer events and are serialized with idle I/O priority.
@@ -1133,14 +1163,6 @@ testing.
 
 ## 0.9.4-testing - 2026-08-24
 
-`bc250-verify` now reports dedicated Vulkan compute queue families and detects
-the optional external GFX1013 kernel/Mesa patch stack without packaging it. A
-custom `/opt/bc250-gfx1013` Mesa ICD selected without the project's patched
-boot marker and matching kernel-specific `updates/amdgpu.ko` is a failure. The
-documentation keeps this experimental module workflow separate from the
-package's existing 40-CU replacement helper and requires a rebuild after every
-kernel update.
-
 The verifier now prints the exact Ollama version and scans recent Ollama and
 kernel journal entries for `ErrorDeviceLost`, command-submission memory errors
 and AMDGPU compute-ring timeouts. Ollama Vulkan updates are documented as
@@ -1179,7 +1201,7 @@ and `method = "busy-flag"`. Operators should enable `fix-freq` only for the
 eight-core GPU-frequency reporting problem; the optional `kernel` usage method
 still requires a separately patched compatible kernel.
 
-`bc250-verify` now reports the running kernel, matching kernel-devel/build tree,
+`bc250 verify` now reports the running kernel, matching kernel-devel/build tree,
 AMDGPU module path and vermagic, installed governor version and effective
 `fix-freq`/usage-method settings. A kernel/module mismatch produces an explicit
 warning to rebuild and reapply the 40-CU module after a Fedora kernel update.
@@ -1188,7 +1210,7 @@ configuration remains unchanged.
 
 ## 0.9.1-testing - 2026-07-23
 
-This operational update adds `bc250-status`, a concise read-only overview of
+This operational update adds `bc250 status`, a concise read-only overview of
 the kernel, live CU report, governor, all three Ollama instances, web services,
 memory, swap, storage and sensors. The existing verifier remains the detailed
 pass/fail tool.
@@ -1242,7 +1264,7 @@ live model-download progress and integrates default-off 40-CU preparation.
 
 ### Uninstall
 
-- Added `sudo bc250-uninstall`, guarded by a destructive confirmation phrase.
+- Added `sudo former uninstall alias`, guarded by a destructive confirmation phrase.
 - The purge removes package-owned configuration, all appliance model/UI/cache/
   backup data, isolated Ollama instances, official Ollama installed by this
   setup, containers, network, profiles and generated services.
@@ -1323,7 +1345,7 @@ pre-production BC-250 appliance.
 
 ### Changed
 
-- `bc250-model install` now validates `HF_TOKEN` with `hf auth whoami` using the
+- The model acquisition workflow now validates `HF_TOKEN` with `hf auth whoami` using the
   `ollama` account.
 - If no valid token is available and a TTY exists, the installer offers:
   `[P]ersist`, `[T]his run only` and `[S]kip`.
@@ -1334,7 +1356,7 @@ pre-production BC-250 appliance.
 - Added a low-space cleanup prompt. The default threshold is 30 GiB, or a higher
   explicit/catalog minimum if one is configured; it can be overridden with
   `--cleanup-threshold-bytes` or `BC250_CLEANUP_FREE_BYTES`.
-- Added `bc250-model cleanup` for explicit cleanup of enabled production and
+- Added explicit model cleanup for enabled production and
   experiment Ollama models.
 - Cleanup removes the Ollama registration, source GGUF and adjacent
   `.bc250.json` state file, then disables the installed TOML catalog entry when
