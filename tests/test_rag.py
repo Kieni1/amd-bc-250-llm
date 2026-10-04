@@ -61,14 +61,19 @@ class RagBaselineTests(unittest.TestCase):
             self.assertIn(name, model_names)
             self.assertIn(name, guide)
         for command in (
-            "bc250-model",
-            "bc250-ocr",
-            "bc250-rag",
-            "bc250-rag-import",
-            "bc250-status",
-            "bc250-verify",
+            "bc250 model",
+            "bc250 ocr",
+            "bc250 rag",
+            "bc250 status",
+            "bc250 verify",
         ):
             self.assertIn(command, guide)
+        self.assertIn("bc250 rag ingest", guide)
+        for lifecycle in (
+            "init", "prepare-batch", "review", "validate", "activate",
+            "supersede", "status", "ingest",
+        ):
+            self.assertIn(lifecycle, guide)
 
     def test_package_contains_no_office_document_payloads(self) -> None:
         forbidden = {

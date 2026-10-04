@@ -195,8 +195,10 @@ def enter_agent_if_needed(url: str) -> bool:
         return False
     if os.geteuid() != 0:
         die("the agent lane is inactive; rerun prepare-batch with sudo so BC-250 can enter exclusive agent mode")
-    command = shutil.which("bc250-agent-mode") or "/usr/libexec/bc250-llm-server/agent-mode.sh"
-    result = subprocess.run([command, "enter"], text=True, check=False)
+    command = shutil.which("bc250")
+    if not command:
+        die("bc250 dispatcher is required to enter exclusive agent mode")
+    result = subprocess.run([command, "agent-mode", "enter"], text=True, check=False)
     if result.returncode != 0 or not agent_ready(url):
         die("exclusive agent mode did not become ready on port 11436")
     return True
@@ -205,10 +207,13 @@ def enter_agent_if_needed(url: str) -> bool:
 def restore_normal_if_needed(switched: bool) -> None:
     if not switched:
         return
-    command = shutil.which("bc250-agent-mode") or "/usr/libexec/bc250-llm-server/agent-mode.sh"
-    result = subprocess.run([command, "normal"], text=True, check=False)
+    command = shutil.which("bc250")
+    if not command:
+        print("WARNING: bc250 dispatcher is unavailable; normal Ollama topology could not be restored automatically", file=sys.stderr)
+        return
+    result = subprocess.run([command, "agent-mode", "normal"], text=True, check=False)
     if result.returncode != 0:
-        print("WARNING: automatic restoration of normal Ollama topology failed; run sudo bc250-agent-mode normal", file=sys.stderr)
+        print("WARNING: automatic restoration of normal Ollama topology failed; run sudo bc250 agent-mode normal", file=sys.stderr)
 
 
 def normalize_prompt(text: str, language: str, bilingual: bool) -> str:
@@ -425,7 +430,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     for lane in INBOX_LANES:
         print(f"  {base / 'inbox' / lane}")
     print("\nPlace source PDFs in german/, french/ or bilingual/, then run:")
-    print(f"  sudo bc250-rag prepare-batch {args.scope} {args.collection}")
+    print(f"  sudo bc250 rag prepare-batch {args.scope} {args.collection}")
 
 
 def cmd_prepare(args: argparse.Namespace) -> None:
@@ -446,7 +451,7 @@ def cmd_prepare(args: argparse.Namespace) -> None:
     try:
         available = agent_models(args.agent_url)
         if args.model.removesuffix(":latest") not in available:
-            die(f"agent model is not registered on :11436: {args.model}; install it with sudo bc250-model apply agentic {args.model}")
+            die(f"agent model is not registered on :11436: {args.model}; install it with sudo bc250 model apply agentic {args.model}")
         prepared_files = 0
         drafts = 0
         deferred = 0
@@ -472,7 +477,7 @@ def cmd_prepare(args: argparse.Namespace) -> None:
         print(f"  failed:           {failed}")
         print(f"  working folder:   {base / 'working'}")
         print("\nAutomation stops here by design. Review metadata/content before activation.")
-        print(f"Next: sudo bc250-rag review {args.scope} {args.collection}")
+        print(f"Next: sudo bc250 rag review {args.scope} {args.collection}")
     finally:
         restore_normal_if_needed(switched)
 
@@ -711,7 +716,7 @@ def cmd_activate(args: argparse.Namespace) -> None:
         meta = importer.front_matter(path)
         if bool_value(meta.get("review_required", True)):
             if args.files:
-                die(f"{path.name}: review_required=true; run bc250-rag review first")
+                die(f"{path.name}: review_required=true; run bc250 rag review first")
             continue
         ready.append((path, meta))
     if not ready:
@@ -837,17 +842,17 @@ def cmd_ingest(args: argparse.Namespace) -> None:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="bc250-rag",
+        prog="bc250 rag",
         description="Prepare, review, validate, activate and ingest the local BC-250 RAG corpus. Automation never promotes working drafts to active without human approval.",
     )
     p.add_argument("--root", type=Path, default=DEFAULT_ROOT, help=f"corpus root (default: {DEFAULT_ROOT})")
     sub = p.add_subparsers(dest="command", required=True)
 
-    init = sub.add_parser("init", help="create one public/confidential collection and its three batch inbox lanes")
+    init = sub.add_parser("init", help="create one collection in the selected public/confidential scope with three language inboxes")
     init.add_argument("scope", choices=importer.SCOPES)
     init.add_argument("collection")
 
-    prep = sub.add_parser("prepare-batch", help="locally extract and agent-normalize PDFs from german/french/bilingual inboxes into working/")
+    prep = sub.add_parser("prepare-batch", help="extract and locally normalize PDFs from the German/French/bilingual inboxes into working/")
     prep.add_argument("scope", choices=importer.SCOPES)
     prep.add_argument("collection")
     prep.add_argument("--model", default=DEFAULT_AGENT_MODEL)
@@ -887,25 +892,13 @@ def parser() -> argparse.ArgumentParser:
     ingest.add_argument("--prune", action="store_true")
     ingest.add_argument("--timeout", type=int, default=600)
 
-    # Compatibility commands for the existing bc250-rag-import interface.
-    plan = sub.add_parser("plan", help="legacy compatibility: print the existing importer plan")
-    plan.add_argument("legacy_root", nargs="?", type=Path)
-    sync = sub.add_parser("sync", help="legacy compatibility: sync using the existing importer contract")
-    sync.add_argument("legacy_root", nargs="?", type=Path)
-    sync.add_argument("--url", default=importer.DEFAULT_URL)
-    sync.add_argument("--token-file")
-    sync.add_argument("--prune", action="store_true")
-    sync.add_argument("--timeout", type=int, default=600)
     return p
 
 
-def run_ingest(args: argparse.Namespace, *, plan_only: bool = False) -> None:
-    root = (getattr(args, "legacy_root", None) or args.root).resolve()
+def run_ingest(args: argparse.Namespace) -> None:
+    root = args.root.resolve()
     docs, warnings = importer.discover(root)
-    if plan_only:
-        importer.print_plan(root, docs, warnings)
-    else:
-        importer.sync(root, docs, warnings, args)
+    importer.sync(root, docs, warnings, args)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -924,10 +917,6 @@ def main(argv: list[str] | None = None) -> int:
             commands[args.command](args)
         elif args.command == "ingest":
             cmd_ingest(args)
-        elif args.command == "plan":
-            run_ingest(args, plan_only=True)
-        elif args.command == "sync":
-            run_ingest(args)
         return 0
     except (OSError, TypeError, ValueError, RuntimeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
