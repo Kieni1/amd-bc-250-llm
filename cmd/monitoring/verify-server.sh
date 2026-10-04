@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
+CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
 
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
@@ -24,7 +25,7 @@ SECTION_FAIL=0
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-verify [--summary] [--owui-token-file FILE]
+Usage: sudo bc250 verify [--summary] [--owui-token-file FILE]
 
 Runs local appliance verification. --summary keeps the same checks but prints a
 compact section-level result. With --owui-token-file, the protected Open WebUI
@@ -132,28 +133,6 @@ fi
 section "Platform"
 kernel="$(uname -r)"
 info "running kernel: $kernel"
-if [[ -e "/usr/lib/modules/$kernel/build" ]]; then
-  ok "matching kernel-devel/build tree is present"
-else
-  warn "matching kernel-devel/build tree is missing for $kernel"
-fi
-if command -v modinfo >/dev/null 2>&1; then
-  amdgpu_path="$(modinfo -n amdgpu 2>/dev/null || true)"
-  amdgpu_vermagic="$(modinfo -F vermagic amdgpu 2>/dev/null | awk 'NR == 1 {print $1}' || true)"
-  amdgpu_metadata="$(modinfo amdgpu 2>/dev/null || true)"
-  info "amdgpu module: ${amdgpu_path:-unknown}"
-  info "amdgpu vermagic: ${amdgpu_vermagic:-unknown}"
-  if grep -q 'bc250_cc_write_mode' <<< "$amdgpu_metadata"; then
-    info "amdgpu type: CU-routing-capable modified module"
-  else
-    info "amdgpu type: stock or unrecognized"
-  fi
-  if [[ -n "$amdgpu_vermagic" && "$amdgpu_vermagic" != "$kernel" ]]; then
-    warn "amdgpu was built for a different kernel; rebuild/reapply the 40-CU module"
-  fi
-else
-  warn "modinfo is unavailable; AMDGPU kernel compatibility was not checked"
-fi
 if command -v rpm >/dev/null 2>&1; then
   mesa="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' mesa-vulkan-drivers 2>/dev/null || true)"
   [[ -n "$mesa" ]] && info "Mesa: $mesa" || warn "mesa-vulkan-drivers package not found"
@@ -252,75 +231,6 @@ else
 fi
 grep -qE '(^| )nomodeset( |$)' <<< "$cmdline" && bad "nomodeset is still active and prevents normal GPU acceleration" || ok "nomodeset is not active"
 
-section "GFX1013 compute queues"
-gfx1013_root=/opt/bc250-gfx1013
-gfx1013_marker=bc250.gfx1013_v33=1
-dedicated_compute_queues=0
-if command -v vulkaninfo >/dev/null 2>&1; then
-  queue_flags="$(vulkaninfo 2>/dev/null | \
-    awk '/queueFlags[[:space:]]*=/ {print}' || true)"
-  dedicated_compute_queues="$(awk '
-    /QUEUE_COMPUTE_BIT/ && !/QUEUE_GRAPHICS_BIT/ {count++}
-    END {print count + 0}
-  ' <<< "$queue_flags")"
-  if ((dedicated_compute_queues > 0)); then
-    info "dedicated Vulkan compute queue families: $dedicated_compute_queues"
-  else
-    info "dedicated Vulkan compute queue: not exposed"
-  fi
-else
-  warn "vulkaninfo is unavailable; dedicated compute queues were not checked"
-fi
-
-gfx1013_mesa_installed=0
-gfx1013_mesa_selected=0
-gfx1013_kernel_active=0
-gfx1013_selector="${VK_DRIVER_FILES:-}"$'\n'"${VK_ICD_FILENAMES:-}"
-gfx1013_selector+=$'\n'"$(systemctl show ollama.service -p Environment --value 2>/dev/null || true)"
-ollama_main_pid="$(systemctl show ollama.service -p MainPID --value 2>/dev/null || true)"
-if [[ "$ollama_main_pid" =~ ^[1-9][0-9]*$ && -r "/proc/$ollama_main_pid/environ" ]]; then
-  gfx1013_selector+=$'\n'"$(tr '\0' '\n' < "/proc/$ollama_main_pid/environ" 2>/dev/null || true)"
-fi
-[[ -d "$gfx1013_root" ]] && gfx1013_mesa_installed=1
-grep -qF "$gfx1013_root" <<< "$gfx1013_selector" && gfx1013_mesa_selected=1
-grep -qw "$gfx1013_marker" <<< "$cmdline" && gfx1013_kernel_active=1
-
-gfx1013_module_active=0
-if ((gfx1013_kernel_active)) && [[ -d /sys/module/amdgpu ]] && \
-   [[ "${amdgpu_path:-}" == */updates/amdgpu.ko* ]] && \
-   [[ "${amdgpu_vermagic:-}" == "$kernel" ]]; then
-  gfx1013_module_active=1
-fi
-
-if ((gfx1013_mesa_installed)); then
-  info "optional GFX1013 Mesa tree: $gfx1013_root"
-else
-  info "optional GFX1013 Mesa tree: not installed"
-fi
-if ((gfx1013_mesa_selected)); then
-  info "custom GFX1013 Mesa ICD is selected by this environment or Ollama"
-  if ((!gfx1013_kernel_active)); then
-    bad "custom GFX1013 Mesa is selected without the patched boot marker; disable the custom ICD"
-  elif ((!gfx1013_module_active)); then
-    bad "GFX1013 patched boot is marked active, but the matching updates/amdgpu module was not verified"
-  else
-    ok "custom GFX1013 Mesa and matching patched AMDGPU are active"
-  fi
-elif ((gfx1013_mesa_installed)); then
-  if ((gfx1013_kernel_active && gfx1013_module_active)); then
-    info "GFX1013 patched kernel is active; custom Mesa is not selected for this verifier or Ollama"
-  else
-    info "GFX1013 files are installed but not selected; patched boot is not active"
-  fi
-fi
-if ((dedicated_compute_queues > 0)); then
-  if ((gfx1013_mesa_selected && gfx1013_module_active)); then
-    ok "dedicated compute queue is exposed by the verified paired patch stack"
-  else
-    warn "dedicated compute queue is exposed without a fully verified GFX1013 Mesa/kernel pair"
-  fi
-fi
-
 while read -r fs size used avail pct mount; do
   [[ "$fs" == Filesystem ]] && continue
   info "$mount: $avail available ($pct used)"
@@ -354,11 +264,11 @@ else
 fi
 
 section "Compute units"
-if command -v bc250-cu-status >/dev/null 2>&1; then
+if [[ -x "$CU_STATUS" ]]; then
   if ((SUMMARY)); then
-    cu_output="$(bc250-cu-status --summary 2>&1 || true)"
+    cu_output="$("$CU_STATUS" --summary 2>&1 || true)"
   else
-    cu_output="$(bc250-cu-status 2>&1 || true)"
+    cu_output="$("$CU_STATUS" 2>&1 || true)"
   fi
 else
   if ((SUMMARY)); then
@@ -502,9 +412,11 @@ fi
 
 agent_unit_state="$(systemctl show -p UnitFileState --value ollama-agent.service 2>/dev/null || true)"
 if [[ $agent_unit_state == enabled || $agent_unit_state == enabled-runtime ]]; then
-  warn "ollama-agent.service is enabled at boot; agent mode is intended to be exclusive and operator-entered"
+  warn "optional Agent lane is enabled at boot; Agent mode is intended to be exclusive and operator-entered"
+elif ((agent_active == 0)); then
+  ok "optional Agent lane is inactive in normal mode (unit ${agent_unit_state:-unknown})"
 else
-  ok "ollama-agent.service is not enabled at boot (${agent_unit_state:-unknown})"
+  info "optional Agent lane is active by operator request (unit ${agent_unit_state:-unknown})"
 fi
 if id -nG ollama 2>/dev/null | grep -qw render && \
    id -nG ollama 2>/dev/null | grep -qw video; then
@@ -640,9 +552,9 @@ else
 fi
 [[ -n "$rag_extraction_engine" ]] && info "Package extraction engine: $rag_extraction_engine" || \
   warn "package Open WebUI desired state does not define an extraction engine"
-if command -v bc250-openwebui-setup >/dev/null 2>&1; then
+if command -v bc250 >/dev/null 2>&1; then
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
-    owui_drift="$(bc250-openwebui-setup status 2>&1)"
+    owui_drift="$(bc250 openwebui-setup status 2>&1)"
     owui_rc=$?
     if ((owui_rc == 0)); then
       ok "authenticated Open WebUI package-owned desired-state check passed"
@@ -657,7 +569,7 @@ if command -v bc250-openwebui-setup >/dev/null 2>&1; then
     skipped "authenticated Open WebUI desired-state check (no API token supplied)"
   fi
 else
-  warn "bc250-openwebui-setup is not installed; live Open WebUI drift was not checked"
+  warn "bc250 openwebui-setup is not installed; live Open WebUI drift was not checked"
 fi
 info "Open WebUI database settings can override bootstrap environment defaults after first launch"
 
