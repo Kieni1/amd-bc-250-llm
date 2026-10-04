@@ -15,9 +15,7 @@ The routine test surface is defined by `development/DEVELOPMENT-SCOPE.json`. Bef
 5. do not rerun **frozen** component suites when their baseline hash is unchanged;
 6. do not load **archive_only** evidence unless a specific provenance question requires it.
 
-Current frozen domains are maintenance/companion, RAG/Tika, MTP, coding-agent, OCR and uninstall.
-This does not delete or de-scope them from the product. It freezes their current source until deliberately
-thawed. The full deterministic/package gate still applies at a release milestone.
+Current frozen domains are maintenance/companion, MTP, coding-agent and OCR. RAG/Tika is product-relevant and active; uninstall is a boundary-active lifecycle surface. Frozen domains remain available but their source is held until deliberately thawed. The full deterministic/package gate still applies at a release milestone.
 
 This scope layer is specifically intended to avoid repeatedly paying for closed investigations such as the
 current Tika serialization work and for unrelated optional subsystems such as maintenance while Advanced,
@@ -29,9 +27,9 @@ Use the right tool for the question:
 
 | Question | Primary tool |
 |---|---|
-| Is the appliance healthy right now? | `bc250-verify` |
-| Which model/setting behaves better? | `bc250-benchmark ...` |
-| Does the package configuration qualify as a whole? | `bc250-revalidate` |
+| Is the appliance healthy right now? | `bc250 verify` |
+| Which model/setting behaves better? | `bc250 benchmark ...` |
+| Does the package configuration qualify as a whole? | `bc250 revalidate` |
 
 Do not use a benchmark win as proof of appliance health. Do not use a healthy verifier
 as proof of model quality. Do not run whole-appliance revalidation merely to compare
@@ -61,13 +59,8 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.12.2-0.6 source preserves the core-verification boundary and the established 0.5 convergence/auth/runtime contracts while narrowing release work to installer completion/CU orientation, the default Agent prerequisite, and translation recommendation/finalization behavior. Open WebUI desired state remains one existing subsystem rather than gaining another policy
-framework. During pre-v1 testing, authenticated setup discovers the live 11434/11435 inventories and maintains
-only package-marked testing records without treating an unavailable lane as empty. Raw production/task
-models and ordinary-size experiments remain ordinary-user comparison surfaces, but resource evidence
-retires Qwen3.6 35B from active candidates, keeps Qwen3.8 27B Unsloth and ISTA IQ3_S admin/testing-only, and leaves IQ3_XXS as the ordinary-user deployability comparison. The package owns removal only of its own wildcard read grant
-on those managed records and preserves unrelated administrator grants. Embedding/agent lanes remain excluded.
-Post-install guidance is now a plain `OVERVIEW` plus amber `NEXT STEPS`: CU routing, model reconciliation and validation are the compact operator actions; it must not become a second full command reference.
+The current 0.13.1-1.0 source promotes the exact-device-qualified 0.12.2-0.8 appliance baseline without changing runtime/model/CU/RAG policy. Its release delta is deliberately narrow: immutable-`/usr` Python bytecode hygiene, semantic optional-model status, and retired-model Open WebUI desired-state accounting. Configured rpmlint remains a CI build gate, RAG/Tika remains active product scope, Agent remains optional, and the dependency contract remains unchanged from the qualified predecessor. The next device question is the bounded exact-upgrade delta, not another model-discovery campaign.
+
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
 MemAvailable hard floor unchanged; below 512 MiB may be surfaced as tight headroom. Likewise, an
@@ -115,17 +108,11 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## Current 0.12.2-0.6 qualification boundary
+## Current 0.13.1-1.0 qualification boundary
 
-0.12.2-0.6 is a narrow crossed-boundary candidate. Use
-`development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.6.md` for the authoritative next device
-sequence. Source checks must prove the compact completion block, optional-Agent coverage attribution,
-role-specific structured-output policy, experimental EuroLLM catalog entry and generation-summary
-completeness. Device testing must prove the integrated structured product path and normal controls,
-optional-Agent skip semantics (or exclusive-lane restoration when installed), and final topology/CU/
-restoration. The native Translate-Gemma `sollten -> doivent` limitation is documented/guarded rather
-than a release blocker; EuroLLM gets at most one short challenger screen. Do not reopen unchanged
-Deep/RAG/Tika/MTP/title-tag campaigns solely for this release.
+Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
+
+The pre-0.13.1 investigation attributed those writes to dispatcher-launched RAG/benchmark Python imports and proved `PYTHONDONTWRITEBYTECODE=1` prevents them. It also proved optional absent/cached models were semantically healthy despite `MISSING`/false `DRIFT` labels, and that retired Qwen3.6 native residue remained hidden from ordinary users but incorrectly entered Open WebUI active override accounting. 0.13.1-1.0 fixes only those findings. Exact-device testing should therefore perform the 0.8 -> 0.13.1 upgrade residue/model-state delta and stop if it passes.
 
 ## 6. Recommended current work order
 
@@ -146,7 +133,7 @@ the wrong fixed `ss` columns. It also exposed healthy live 40/40 status/verify r
 persistent boot activation was intentionally disabled. Release 1.8 fixed those source defects and added an exact forced-companion SSH exception rather
 than a broad SSH bypass; 2.1 carries that implementation forward unchanged.
 
-Exact 2.3 has now passed the targeted operations acceptance introduced by the 2.3 release: clean `rpm -V`, swap 0750 convergence, topology-aware status/verifier UX, `bc250-agent-mode normal`, degraded recovery, DRY_RUN/timer output, Tika restart semantics, baseline-aware identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. Preserve this as exact-2.3 evidence.
+Exact 2.3 has now passed the targeted operations acceptance introduced by the 2.3 release: clean `rpm -V`, swap 0750 convergence, topology-aware status/verifier UX, `bc250 agent-mode normal`, degraded recovery, DRY_RUN/timer output, Tika restart semantics, baseline-aware identity restore, supported reboot reconstruction, live 40/40 and final authenticated 54/0/0. Preserve this as exact-2.3 evidence.
 
 A separate exact-2.3 authenticated Open WebUI investigation found the application path healthy: HTTP readiness, task routing, Standard/Higher Quality/Deep Reasoning roles, translation 8/8 and bounded RAG 3/3 all passed. It also found three product-state ownership gaps addressed in the historical 2.4 source: Arena persistence, explicit ownership of implementation-model visibility, and persisted local/offline/upload policy in apply/status. Exact 0.12.1-0.6 then qualified the ordinary-user lifecycle, curated roles, raw testing-surface visibility, RAG and multi-model compare on OWUI 0.11.3. Current 0.12.2 keeps discovered normal main/task testing records, retires Qwen3.6 35B, keeps Qwen3.8 Unsloth and ISTA IQ3_S admin/testing-only, and leaves ISTA IQ3_XXS as the ordinary-user deployability comparison; it also crosses to OWUI 0.11.4 and therefore requires the bounded stored-record, browser-journey, ACL, reasoning-persistence and effective-request checks in the release handover rather than inheriting the 0.11.3 result.
 
@@ -154,7 +141,7 @@ The distinct `sudo systemctl reboot` invocation is device-proven unreliable on t
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.6 includes the package-owned production roles and identifies the 0.12.2 candidate
+The current harness v4.7 includes the package-owned production roles and identifies the 0.12.2 candidate
 and remains the milestone whole-appliance gate.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
@@ -215,7 +202,7 @@ choice under current evidence.
 Next translation sequence:
 
 1. install the production translation model with
-   `sudo bc250-model apply production prod-translate-gemma4-sub-e4b-17s-q4-k-xl`,
+   `sudo bc250 model apply production prod-translate-gemma4-sub-e4b-17s-q4-k-xl`,
    then apply the source-owned `bc250-office-translation-de-fr` and
    `bc250-office-translation-fr-de` desired state;
 2. verify the exact system prompt, non-global direction Filter, `max_tokens=2048`, and
@@ -301,7 +288,7 @@ Candidate qualification follows this funnel:
 
 ```text
 load / resource / backend-aware completion integrity
--> tiny semantic sanity (`bc250-benchmark usecase`)
+-> tiny semantic sanity (`bc250 benchmark usecase`)
 -> optional 4K/16K context performance where useful
 -> gfx1013/runtime stability
 -> optional sustained thermal/CU testing for finalists
@@ -334,8 +321,8 @@ verify full restoration after leaving.
 
 Keep two test layers separate:
 
-1. `bc250-benchmark agent` — safe static shape/syntax/contract evidence;
-2. actual `bc250-code` workflows on disposable inputs — review, refactor, tests,
+1. `bc250 benchmark agent` — safe static shape/syntax/contract evidence;
+2. actual `bc250 code` workflows on disposable inputs — review, refactor, tests,
    documentation, structured config work and commit-message generation.
 
 The product helper must consume final content separately from native reasoning and fail
@@ -353,7 +340,7 @@ agent.
 For the next comparative funnel, use Ornith as baseline, then Qwable 9B, Qwen3.5 4B
 Q6_K and Gemma 4 E4B Q4_K_M, followed by the baseline again. Reject cheaply on
 completion integrity/static semantics before promoting candidates into broader real
-`bc250-code` workflows. Only revisit Gemma 4 12B if the E4B comparison leaves that
+`bc250 code` workflows. Only revisit Gemma 4 12B if the E4B comparison leaves that
 question open.
 
 ### Lane G — MTP / speculative decoding
@@ -374,13 +361,13 @@ failure remains retired unchanged.
 
 Do not run another broad MTP campaign for this release. A three-repeat YMQ depth-1 confirmation is
 optional only if future policy demands symmetric confirmation for every default promotion.
-`bc250-compare-mtp` remains the same-target evidence harness and `bc250-run-mtp [--no-mtp] ID` the
+`bc250 compare-mtp` remains the same-target evidence harness and `bc250 run-mtp [--no-mtp] ID` the
 manual diagnostic path. Direct runs restore captured Ollama residency; comparison uses drain-only
 isolation. Add framework only if new hardware evidence exposes a concrete lifecycle/measurement gap.
 
 ## 7. Routine revalidation vs specialist campaigns
 
-Run full `bc250-revalidate` when:
+Run full `bc250 revalidate` when:
 
 - preparing a meaningful release candidate;
 - runtime/service topology changed;
@@ -414,11 +401,11 @@ not repeat a disproven experiment without a material reason.
 The current release closes several source-review boundary defects without changing appliance
 topology or model defaults. Deterministic source coverage must preserve these contracts:
 
-- `bc250-status` obtains `normal|degraded|stopped|agent` from the existing agent-mode classifier;
+- `bc250 status` obtains `normal|degraded|stopped|agent` from the existing agent-mode classifier;
   agent inactivity alone must never imply a healthy normal topology.
 - Explicit Open WebUI/Hugging Face token files are private credential files: regular, non-empty and
   not group/world accessible. Environment-provided tokens remain separate ephemeral inputs.
-- `bc250-code` file-producing/structured modes reject an outer Markdown fence rather than silently
+- `bc250 code` file-producing/structured modes reject an outer Markdown fence rather than silently
   stripping it or atomically writing fenced source.
 - Installer completion reports Open WebUI baseline state independently from core verification;
   skipped/retry-required application setup remains nonfatal but visible.

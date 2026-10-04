@@ -8,7 +8,7 @@ package callers and operator documentation are expected to follow.
 
 ## State model
 
-`bc250-model` treats one model as three related package states:
+`bc250 model` treats one model as three related package states:
 
 1. **Catalog definition** — packaged or operator Modelfile / MTP catalog entry.
 2. **Manager-owned source state** — local GGUF plus `.bc250.json` provenance
@@ -23,15 +23,15 @@ own path/provenance guesses.
 ## Public commands
 
 ```text
-bc250-model list [CATEGORY]
-sudo bc250-model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
-bc250-model path CATEGORY ID
+bc250 model list [CATEGORY]
+sudo bc250 model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
+bc250 model path CATEGORY ID
 
-sudo bc250-model apply CATEGORY [SELECTION]
-sudo bc250-model refresh CATEGORY [SELECTION]
-sudo bc250-model unregister CATEGORY [SELECTION]
-sudo bc250-model remove CATEGORY [SELECTION]
-sudo bc250-model purge-retired
+sudo bc250 model apply CATEGORY [SELECTION]
+sudo bc250 model refresh CATEGORY [SELECTION]
+sudo bc250 model unregister CATEGORY [SELECTION]
+sudo bc250 model remove CATEGORY [SELECTION]
+sudo bc250 model purge-retired
 ```
 
 Categories remain:
@@ -105,8 +105,8 @@ retaining the catalog definition. A missing selection never means implicit
 Packaged MTP entries may remain `enabled = false` so they are hidden from ordinary combined
 status views. More importantly, combined `apply all` / `refresh all` never select the MTP category,
 even with `--include-disabled`; this keeps installer/generic convergence incapable of acquiring
-experimental llama.cpp artifacts. `bc250-fetch-mtp [SELECTION]` is the explicit operator opt-in
-and dispatches to `apply mtp --include-disabled`; no catalog edit is required just to download a
+experimental llama.cpp artifacts. `bc250 fetch-mtp [SELECTION]` is the explicit operator opt-in
+and dispatches to `bc250 model apply mtp --include-disabled`; no catalog edit is required just to download a
 candidate for a bounded llama.cpp experiment. MTP remains download-only,
 so it supports source `status/apply/refresh/remove/path` but not `unregister`.
 
@@ -115,20 +115,8 @@ so it supports source `status/apply/refresh/remove/path` but not `unregister`.
 Purges only models explicitly present in the package retired-model catalog,
 retaining the existing misplaced-registration and fail-closed protections.
 
-## Deliberate compatibility break
+## Greenfield command contract
 
-The old grammar is not retained as an alternate API:
-
-```text
-install             -> apply
-install --refresh   -> refresh
-cleanup --keep-gguf -> unregister
-cleanup             -> remove
-cleanup-retired     -> purge-retired
-resolve              -> path
-```
-
-Common legacy/mistyped forms receive a targeted migration hint instead of raw
-`argparse` output. Current package callers and public documentation are migrated to the
-new grammar; old command forms remain only in explicit migration tests/hints or
-historical evidence.
+Only the current command grammar above is supported. Current package callers, tests and
+documentation must use it directly; removed pre-greenfield command forms are historical evidence,
+not migration API.
