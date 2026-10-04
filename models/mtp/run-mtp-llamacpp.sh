@@ -83,7 +83,7 @@ DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
 [[ -s "$GGUF" ]] || {
   echo "ERROR: missing $GGUF." >&2
   echo "Fetch this exact experiment first with:" >&2
-  echo "  sudo bc250-fetch-mtp $choice" >&2
+  echo "  sudo bc250 fetch-mtp $choice" >&2
   exit 1
 }
 [[ -x "$LLAMACPP" ]] || { echo "ERROR: set LLAMACPP to an executable llama-server." >&2; exit 1; }
@@ -252,7 +252,7 @@ status_output="$(sudo "$MANAGER" status mtp "$choice" --include-disabled --sourc
 printf '%s\n' "$status_output"
 grep -Eq '^  Status:[[:space:]]+CURRENT$' <<< "$status_output" || {
   echo "ERROR: $choice is not CURRENT; reconcile it before runtime testing." >&2
-  echo "Run: sudo bc250-model status mtp $choice --include-disabled --verbose" >&2
+  echo "Run: sudo bc250 model status mtp $choice --include-disabled --verbose" >&2
   exit 1
 }
 source_sha="$(sed -n 's/^  Source SHA-256:[[:space:]]*//p' <<< "$status_output" | head -n1)"

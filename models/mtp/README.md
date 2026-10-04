@@ -5,9 +5,9 @@ role models and remain deliberately excluded from normal `apply all` / installer
 BC-250 qualification now defines their package-facing roles and defaults without turning MTP into a
 persistent production lane.
 
-The packaged entries are intentionally `enabled = false`. Ordinary `bc250-model list mtp` and
+The packaged entries are intentionally `enabled = false`. Ordinary `bc250 model list mtp` and
 `apply mtp` therefore do not select them accidentally. Combined `apply all` / `refresh all` excludes
-the MTP category entirely, even when `--include-disabled` is supplied. `bc250-fetch-mtp` is the
+the MTP category entirely, even when `--include-disabled` is supplied. `bc250 fetch-mtp` is the
 explicit opt-in workflow and deliberately exposes those disabled experiment definitions. MTP entries
 intentionally have no Ollama Modelfile.
 
@@ -23,9 +23,9 @@ qwen3.8-27b-hauhaucs-mtp   alternative / specialist ctx 8192 draft 2
 ```
 
 `role` and `recommendation` are package-policy metadata in the existing MTP catalog. They are
-displayed by `bc250-model list mtp --all`; they do not make an entry enabled, production-resident,
+displayed by `bc250 model list mtp --all`; they do not make an entry enabled, production-resident,
 or part of generic convergence. Context and draft defaults remain runtime metadata consumed by the
-existing `bc250-model path` / `bc250-run-mtp` path. No separate recommendation database or automatic
+existing `bc250 model path` / `bc250 run-mtp` path. No separate recommendation database or automatic
 promotion mechanism exists.
 
 Qwen3.5 depth 2 is the final package default: confirmation-grade 1.7 testing kept short-output
@@ -53,22 +53,22 @@ model, runtime or hardware question.
 ## Prepare one experiment
 
 ```bash
-bc250-model list mtp --all
-sudo bc250-fetch-mtp qwen3.5-9b-mtp
-sudo bc250-model status mtp qwen3.5-9b-mtp --include-disabled --verbose
+bc250 model list mtp --all
+sudo bc250 fetch-mtp qwen3.5-9b-mtp
+sudo bc250 model status mtp qwen3.5-9b-mtp --include-disabled --verbose
 ```
 
-With no selection, `sudo bc250-fetch-mtp` shows the disabled candidates and prompts for
+With no selection, `sudo bc250 fetch-mtp` shows the disabled candidates and prompts for
 one. Long-lived scripts and recorded evidence should use the exact ID rather than a
 displayed index or convenience alias.
 
-`bc250-fetch-mtp` is equivalent to an explicit lifecycle apply of the MTP catalog with
+`bc250 fetch-mtp` is equivalent to an explicit lifecycle apply of the MTP catalog with
 disabled entries exposed. Advanced/operator testing can use the underlying form directly:
 
 ```bash
-sudo bc250-model apply mtp qwen3.5-9b-mtp --include-disabled
-sudo bc250-model refresh mtp qwen3.5-9b-mtp --include-disabled
-sudo bc250-model remove mtp qwen3.5-9b-mtp
+sudo bc250 model apply mtp qwen3.5-9b-mtp --include-disabled
+sudo bc250 model refresh mtp qwen3.5-9b-mtp --include-disabled
+sudo bc250 model remove mtp qwen3.5-9b-mtp
 ```
 
 MTP has no Ollama registration, so `unregister mtp` is intentionally rejected. `remove`
@@ -85,7 +85,7 @@ The RPM does not provide llama.cpp. The reviewed baseline is release `b10964`
 when its CLI supports the required MTP, cache, context, GPU-offload and flash-attention
 options. Every qualification run must capture the exact executable/build and flags.
 
-`bc250-run-mtp` now performs a bounded fail-fast preflight before launch:
+`bc250 run-mtp` now performs a bounded fail-fast preflight before launch:
 
 - resolves the exact MTP catalog entry and refuses a missing source;
 - snapshots every reachable package Ollama lane (`11434`-`11437`) and drains all resident models
@@ -97,7 +97,7 @@ options. Every qualification run must capture the exact executable/build and fla
 - verifies the `ollama` service user can execute the external runtime and read the GGUF;
 - launches `llama-server` as `ollama`, never as root.
 
-A direct operator `bc250-run-mtp` owns this temporary lifecycle: after llama.cpp exits it restores the
+A direct operator `bc250 run-mtp` owns this temporary lifecycle: after llama.cpp exits it restores the
 exact pre-run Ollama residency set and lets each lane's configured keep-alive policy apply. The
 comparison/qualification harness sets `BC250_MTP_RESIDENCY_POLICY=drain-only`; those isolated runs
 intentionally do **not** rewarm Ollama afterward. Neither path stops/reconfigures Ollama services or
@@ -107,14 +107,14 @@ Manual launch remains useful for diagnosis:
 
 ```bash
 LLAMACPP=/opt/llama.cpp/build/bin/llama-server \
-bc250-run-mtp qwen3.5-9b-mtp
+bc250 run-mtp qwen3.5-9b-mtp
 ```
 
 For a controlled non-speculative baseline of the exact same target/settings:
 
 ```bash
 LLAMACPP=/opt/llama.cpp/build/bin/llama-server \
-bc250-run-mtp --no-mtp qwen3.5-9b-mtp
+bc250 run-mtp --no-mtp qwen3.5-9b-mtp
 ```
 
 Exact IDs are preferred. Only the unambiguous `qwen35-9b` convenience alias remains for interactive
@@ -136,7 +136,7 @@ against an unrelated Ollama model:
 
 ```bash
 LLAMACPP=/opt/llama.cpp/build/bin/llama-server \
-bc250-compare-mtp qwen3.5-9b-mtp
+bc250 compare-mtp qwen3.5-9b-mtp
 ```
 
 It runs the **same target GGUF** sequentially with the same llama.cpp build, context,

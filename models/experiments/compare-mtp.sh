@@ -68,7 +68,7 @@ else
 fi
 [[ -s "$GGUF" ]] || {
   echo "ERROR: missing $GGUF." >&2
-  echo "Fetch it first: sudo bc250-fetch-mtp $choice" >&2
+  echo "Fetch it first: sudo bc250 fetch-mtp $choice" >&2
   exit 1
 }
 
