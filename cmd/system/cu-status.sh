@@ -8,7 +8,7 @@ case "${1:-}" in
   "") ;;
   --summary) SUMMARY=1 ;;
   -h|--help)
-    echo "Usage: bc250-cu-status [--summary]"
+    echo "Usage: cu-status.sh [--summary]  # internal package helper"
     exit 0
     ;;
   *) echo "ERROR: unknown argument: $1" >&2; exit 2 ;;
@@ -80,24 +80,7 @@ read_param() {
 echo "BC-250 CU status"
 running_kernel="$(uname -r)"
 echo "  Running kernel          : $running_kernel"
-prepared_file=/var/lib/bc250-llm-server/40cu/prepared
-if [[ -r "$prepared_file" ]]; then
-  prepared_kernel="$(sed -n 's/^kernel=//p' "$prepared_file" | head -1)"
-  [[ "$prepared_kernel" == "$running_kernel" ]] && prepared_state="ready for running kernel" || \
-    prepared_state="stale: prepared for ${prepared_kernel:-unknown}; rerun sudo bc250-40cu prepare"
-  echo "  CU-routing-capable module : $prepared_state"
-elif ((EUID != 0)) && [[ -d /var/lib/bc250-llm-server ]] && [[ ! -x /var/lib/bc250-llm-server ]]; then
-  echo "  CU-routing-capable module : protected; run with sudo for package state"
-else
-  echo "  CU-routing-capable module : not prepared"
-fi
 echo "  Kernel diagnostic active_cu_number : $(read_param /sys/module/amdgpu/parameters/active_cu_number) (not live-routing authority)"
-echo "  Kernel cc_write_mode    : $(read_param /sys/module/amdgpu/parameters/bc250_cc_write_mode)"
-if grep -qo 'amdgpu.bc250_cc_write_mode=[^ ]*' /proc/cmdline 2>/dev/null; then
-  echo "  Boot parameter          : $(grep -o 'amdgpu.bc250_cc_write_mode=[^ ]*' /proc/cmdline | head -1)"
-else
-  echo "  Boot parameter          : not present"
-fi
 saved_profile_state="not configured"
 saved_masks=""
 saved_cus=""
@@ -121,12 +104,6 @@ if systemctl is-enabled --quiet bc250-cu-live-manager.service 2>/dev/null; then
 else
   echo "  Restore profile at boot : not enabled"
 fi
-if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-  echo "  Persistent patched-module activation : configured"
-else
-  echo "  Persistent patched-module activation : not configured (optional)"
-fi
-
 if [[ -x "$manager" ]]; then
   echo "  Live routing manager    : $manager"
   if [[ ${EUID} -ne 0 ]]; then

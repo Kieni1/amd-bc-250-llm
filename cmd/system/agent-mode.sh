@@ -7,7 +7,7 @@ AGENT_UNIT=ollama-agent.service
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-agent-mode enter|leave|normal|status
+Usage: sudo bc250 agent-mode enter|leave|normal|status
 
 enter   Start exclusive agent mode; systemd conflicts stop normal lanes.
 leave   Leave exclusive agent mode and restore normal topology.
@@ -71,7 +71,7 @@ enter_agent() {
     echo "Agent API: 127.0.0.1:11436"
     echo "Normal main/task/embedding lanes are temporarily stopped."
     echo "Open WebUI remains reachable; normal office roles may stay listed but are unavailable in agent mode."
-    echo "Return to normal mode with: sudo bc250-agent-mode normal"
+    echo "Return to normal mode with: sudo bc250 agent-mode normal"
     return 0
   fi
   systemctl status "$AGENT_UNIT" --no-pager -l || true
