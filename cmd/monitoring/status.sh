@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Concise, read-only appliance status. Use bc250-verify for pass/fail checks.
+# Concise, read-only appliance status. Use bc250 verify for pass/fail checks.
 set -uo pipefail
+CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
 
 section() {
   printf '\n=== %s ===\n' "$1"
@@ -38,16 +39,16 @@ service_status() {
 }
 
 runtime_mode() {
-  # Reuse bc250-agent-mode as the single topology classifier rather than
+  # Reuse bc250 agent-mode as the single topology classifier rather than
   # guessing from whether the agent unit alone happens to be active.
-  local helper="" output mode
-  if command -v bc250-agent-mode >/dev/null 2>&1; then
-    helper="$(command -v bc250-agent-mode)"
+  local output mode
+  if command -v bc250 >/dev/null 2>&1; then
+    output="$(bc250 agent-mode status 2>/dev/null || true)"
   elif [[ -x /usr/libexec/bc250-llm-server/agent-mode.sh ]]; then
-    helper=/usr/libexec/bc250-llm-server/agent-mode.sh
+    output="$(/usr/libexec/bc250-llm-server/agent-mode.sh status 2>/dev/null || true)"
+  else
+    printf 'unknown'; return
   fi
-  [[ -n "$helper" ]] || { printf 'unknown'; return; }
-  output="$("$helper" status 2>/dev/null || true)"
   mode="$(awk -F= '$1 == "mode" {print $2; exit}' <<< "$output")"
   case "$mode" in
     normal|degraded|stopped|agent) printf '%s' "$mode" ;;
@@ -85,7 +86,7 @@ topology_summary() {
         echo "Overall: DEGRADED — unexpected runtime topology"
       fi
       echo "Runtime mode: degraded"
-      echo "Recovery: sudo bc250-agent-mode normal"
+      echo "Recovery: sudo bc250 agent-mode normal"
       ;;
     stopped)
       echo "Overall: UNAVAILABLE — normal runtime lanes are not operational"
@@ -172,14 +173,14 @@ openwebui_readiness() {
 
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
   cat <<'USAGE'
-Usage: bc250-status
+Usage: bc250 status
 
 Print a concise, read-only summary of the BC-250 appliance. Run with sudo for
-complete live-CU and storage information. Use bc250-verify for pass/fail checks.
+complete live-CU and storage information. Use bc250 verify for pass/fail checks.
 USAGE
   exit 0
 elif (($#)); then
-  echo "ERROR: bc250-status does not accept arguments." >&2
+  echo "ERROR: bc250 status does not accept arguments." >&2
   exit 2
 fi
 
@@ -230,14 +231,14 @@ fi
 
 section "Compute and governor"
 cu_helper=""
-if command -v bc250-cu-status >/dev/null 2>&1; then
-  cu_helper="$(command -v bc250-cu-status)"
+if [[ -x "$CU_STATUS" ]]; then
+  cu_helper="$CU_STATUS"
 elif [[ -x /usr/libexec/bc250-llm-server/cu-status.sh ]]; then
   cu_helper=/usr/libexec/bc250-llm-server/cu-status.sh
 fi
 if [[ -n "$cu_helper" ]]; then
   cu_report="$("$cu_helper" --summary 2>&1 || true)"
-  cu_summary="$(grep -E 'Prepared module state|Live routed CUs|Live routing status|Kernel diagnostic active_cu_number|RADV report' \
+  cu_summary="$(grep -E 'Live routed CUs|Live routing status|Kernel diagnostic active_cu_number|RADV report' \
     <<< "$cu_report" || true)"
   [[ -n "$cu_summary" ]] && printf '%s\n' "$cu_summary" || echo "  CU status could not be summarized"
 else
@@ -342,4 +343,4 @@ else
 fi
 
 echo
-echo "For full pass/fail validation run: sudo bc250-verify"
+echo "For full pass/fail validation run: sudo bc250 verify"

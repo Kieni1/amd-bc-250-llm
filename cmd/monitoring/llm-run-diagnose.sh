@@ -25,6 +25,7 @@
 # ===========================================================================
 
 set -uo pipefail
+CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
 runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
 if [[ ! -r "$runtime_env" ]]; then runtime_env="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/runtime.env"; fi
 if [[ -r "$runtime_env" ]]; then # shellcheck disable=SC1090
@@ -113,8 +114,8 @@ m=$(active $cardg/pp_dpm_mclk); f=$(active $cardg/pp_dpm_fclk); s=$(active $card
 # ---------------------------------------------------------------------------
 sec "4. CU ROUTING"
 exp "Compare any configured saved WGP mask with the live SPI layout; -- is intentionally unselected, D! is inconsistent. Numeric kernel/RADV CU counts are diagnostic only."
-if have bc250-cu-status; then
-  cu_status=$(bc250-cu-status 2>&1 || true)
+if [[ -x "$CU_STATUS" ]]; then
+  cu_status=$("$CU_STATUS" 2>&1 || true)
   printf '%s\n' "$cu_status" | sed 's/^/  /'
   cu_problems="$(sed -n 's/^[[:space:]]*Problem cells[[:space:]]*:[[:space:]]*//p' <<<"$cu_status" | head -1)"
   if [[ "$cu_problems" =~ ^[0-9]+$ ]] && ((cu_problems > 0)); then
@@ -129,7 +130,7 @@ if have bc250-cu-status; then
     wn "live routing table/profile comparison could not be qualified"
   fi
 else
-  wn "bc250-cu-status is not installed"
+  wn "CU status helper is not installed"
 fi
 if have dmesg && dmesg 2>/dev/null | grep -qi 'amdgpu.*disable_cu'; then
   wn "amdgpu.disable_cu present - some CUs masked (fine only if this board has dead WGPs)"
