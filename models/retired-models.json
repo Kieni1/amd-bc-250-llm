@@ -140,6 +140,13 @@
       "ollama_host": "127.0.0.1:11434",
       "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen36-35b-a3b-unsloth-ud-iq3-s/Qwen3.6-35B-A3B-UD-IQ3_S.gguf",
       "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
+    },
+    {
+      "name": "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m",
+      "category": "experiments",
+      "ollama_host": "127.0.0.1:11434",
+      "source": "/var/lib/bc250-llm-server/gguf/experiments/exp-eurollm9b-instruct-2512-mradermacher-q4-k-m/EuroLLM-9B-Instruct-2512.Q4_K_M.gguf",
+      "runtime_modelfile": "/var/lib/bc250-llm-server/modelfiles/experiments/exp-eurollm9b-instruct-2512-mradermacher-q4-k-m.Modelfile"
     }
   ]
 }

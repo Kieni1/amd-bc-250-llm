@@ -12,7 +12,7 @@
 #   sollten -> doivent limitation. This is an opt-in experiment, not a promotion.
 #
 # Test with:
-#   sudo bc250-model apply experiments exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
+#   sudo bc250 model apply experiments exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
 #   quality-checks/translation/10-direct-candidate-screen.sh \
 #     exp-eurollm9b-instruct-2512-mradermacher-q4-k-m 1
 
