@@ -48,7 +48,7 @@ DEFAULT_OWUI_URL = "http://127.0.0.1:3000"
 DEFAULT_MAIN_URL = "http://127.0.0.1:11434"
 DEFAULT_EMBED_URL = "http://127.0.0.1:11437"
 SYSCTX_DROPIN = Path(
-    "/etc/containers/systemd/open-webui.container.d/95-bc250-benchmark.conf"
+    "/etc/containers/systemd/open-webui.container.d/95-bc250-owui-benchmark.conf"
 )
 
 
@@ -603,6 +603,13 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
     return not failures, failures
 
 
+def translation_withheld(content: str) -> bool:
+    """Return whether the product integrity outlet intentionally withheld output."""
+    return content.strip().startswith(
+        "Translation withheld: BC-250 detected a possible translation integrity mismatch"
+    )
+
+
 def usage_row(result: dict[str, Any]) -> dict[str, Any]:
     usage = result.get("usage") if isinstance(result, dict) else {}
     if not isinstance(usage, dict):
@@ -806,7 +813,32 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                 client, role, str(case["input"])
             )
             wall = time.monotonic() - started
-            ok, failure_kinds = owui_translation_checks(content, case)
+            raw_content = response_text(result)
+            raw_ok, raw_failure_kinds = owui_translation_checks(raw_content, case)
+            final_ok, final_failure_kinds = owui_translation_checks(content, case)
+            withheld = translation_withheld(content)
+
+            if withheld and not raw_ok:
+                # The raw model produced a protected integrity failure and the
+                # product outlet blocked delivery. That is a product-path PASS,
+                # while the raw-model defect remains explicit evidence.
+                ok = True
+                failure_kinds: list[str] = []
+                guard_outcome = "pass-withheld"
+                delivered_translation = False
+            elif withheld:
+                # Withholding a translation that already satisfies the benchmark
+                # contract is an over-blocking product defect.
+                ok = False
+                failure_kinds = ["guard-false-positive"]
+                guard_outcome = "quality-fail-overblocked"
+                delivered_translation = False
+            else:
+                ok = final_ok
+                failure_kinds = final_failure_kinds
+                guard_outcome = "not-triggered"
+                delivered_translation = True
+
             failures += int(not ok)
             append_result(
                 paths.results_jsonl,
@@ -822,18 +854,27 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                         "modality": "modality" not in failure_kinds,
                         "preservation": "preservation" not in failure_kinds,
                         "source_leakage": "source-leakage" not in failure_kinds,
+                        "product_integrity_guard": guard_outcome != "quality-fail-overblocked",
                     },
                     metrics={"wall_s": wall, **usage_row(result)},
                     source_language=case["source_language"],
                     target_language=case["target_language"],
                     response=content,
-                    raw_response=response_text(result),
+                    raw_response=raw_content,
+                    raw_translation_outcome="pass" if raw_ok else "quality-fail",
+                    raw_failure_kinds=raw_failure_kinds,
+                    product_guard=guard_outcome,
+                    delivered_translation=delivered_translation,
                     outlet_finalized=True,
                     completed_message_id=str(completed.get("id") or result.get("id") or ""),
                     role=role,
                 ),
             )
-            print(f"  {case['id']}: role={role} pass={ok} wall={wall:.2f}s")
+            print(
+                f"  {case['id']}: role={role} pass={ok} "
+                f"raw={'pass' if raw_ok else 'quality-fail'} "
+                f"guard={guard_outcome} wall={wall:.2f}s"
+            )
     except Failure as exc:
         append_result(
             paths.results_jsonl,
@@ -1294,7 +1335,7 @@ def add_owui(parser: argparse.ArgumentParser) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250-benchmark",
+        prog="bc250 benchmark",
         description="Explicit Open WebUI RAG/tuning benchmarks with restoration.",
     )
     sub = parser.add_subparsers(dest="command", required=True)

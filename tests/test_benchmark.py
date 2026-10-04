@@ -171,6 +171,86 @@ class BenchmarkResourceResolutionTests(unittest.TestCase):
         )
 
 
+    def test_owui_translation_guarded_raw_modality_failure_is_product_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixture = root / "translation-office.json"
+            fixture.write_text(
+                json.dumps(
+                    [
+                        {
+                            "id": "de-fr-recommendation-modality",
+                            "source_language": "de",
+                            "target_language": "fr",
+                            "input": "Die Regeln sollten beachtet werden.",
+                            "required_any": ["devraient"],
+                            "forbidden": ["doivent"],
+                            "preserve": [],
+                            "numeric_values": [],
+                            "min_words": 3,
+                        }
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output = root / "results"
+            args = SimpleNamespace(
+                output_dir=str(output),
+                url="http://127.0.0.1:3000",
+                timeout=1.0,
+                token_file=str(root / "unused-token"),
+            )
+            raw = {
+                "id": "raw-message",
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": "Les règles doivent être respectées.",
+                        }
+                    }
+                ],
+            }
+            completed = {"id": "completed-message"}
+            final = (
+                "Translation withheld: BC-250 detected a possible translation "
+                "integrity mismatch (clause 1: recommendation strengthened to "
+                "obligation (sollte -> doit)). Please review or retry the translation."
+            )
+
+            with (
+                patch.object(
+                    openwebui_workflow,
+                    "benchmark_fixture_path",
+                    return_value=fixture,
+                ),
+                patch.object(openwebui_workflow, "owui_client", return_value=object()),
+                patch.object(
+                    openwebui_workflow,
+                    "finalized_plain_chat",
+                    return_value=(raw, completed, final),
+                ),
+                patch.object(openwebui_workflow, "simple_meta"),
+                patch.object(openwebui_workflow, "finish"),
+            ):
+                self.assertEqual(openwebui_workflow.cmd_owui_translation(args), 0)
+
+            rows = [
+                json.loads(line)
+                for line in (output / "results.jsonl").read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertEqual(len(rows), 1)
+            row = rows[0]
+            self.assertEqual(row["outcome"], "pass")
+            self.assertEqual(row["raw_translation_outcome"], "quality-fail")
+            self.assertIn("modality", row["raw_failure_kinds"])
+            self.assertEqual(row["product_guard"], "pass-withheld")
+            self.assertFalse(row["delivered_translation"])
+            self.assertTrue(row["checks"]["product_integrity_guard"])
+
+
 
 class GenerationPolicyTests(unittest.TestCase):
     def test_neutral_generate_overrides_system_without_raw_mode(self) -> None:
@@ -1109,7 +1189,7 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertEqual(category.task_language_hint(value, "de"), "other")
 
     def test_translation_cli_exposes_explicit_think_policy(self) -> None:
-        with patch.object(sys, "argv", ["bc250-benchmark", "translation", "--think", "false", "prod-test"]), \
+        with patch.object(sys, "argv", ["bc250", "translation", "--think", "false", "prod-test"]), \
              patch.object(category, "benchmark_translation", return_value=0) as run:
             self.assertEqual(category.main(), 0)
         args = run.call_args.args[0]
@@ -1909,7 +1989,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.6", source)
+        self.assertIn("HARNESS_VERSION=4.7", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -1937,7 +2017,7 @@ class TelemetryTests(unittest.TestCase):
         self.assertIn("mark_partial_coverage", preflight)
         self.assertIn("This is optional coverage unavailable/skipped, not an Agent runtime/GPU failure.", agent)
         self.assertIn('record_event "agent" coverage skipped', agent)
-        self.assertIn("sudo bc250-model apply agentic $AGENT_MODEL", agent)
+        self.assertIn("sudo bc250 model apply agentic $AGENT_MODEL", agent)
         self.assertIn("agent-model-prerequisite.txt", agent)
         self.assertNotIn('model_registered 11436 "$AGENT_MODEL" || {', agent)
 
@@ -2725,7 +2805,7 @@ phase_roles
             output = "\n".join(lines[1:])
             self.assertIn(
                 "translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 "
-                "TRANSLATION_THINK=auto bc250-benchmark translation "
+                "TRANSLATION_THINK=auto bc250 benchmark translation "
                 "prod-translate-gemma4-sub-e4b-17s-q4-k-xl --ollama-url http://127.0.0.1:11434",
                 output,
             )
@@ -2883,7 +2963,7 @@ phase_roles
                     sys,
                     "argv",
                     [
-                        "bc250-benchmark",
+                        "bc250",
                         "task",
                         "test-model",
                         "--output-dir",
@@ -2905,7 +2985,7 @@ phase_roles
                     sys,
                     "argv",
                     [
-                        "bc250-benchmark generation",
+                        "bc250 benchmark generation",
                         "test-model",
                         "--profile",
                         "edge",
@@ -2932,7 +3012,7 @@ phase_roles
                     sys,
                     "argv",
                     [
-                        "bc250-benchmark",
+                        "bc250",
                         "num-batch",
                         "test-model",
                         "--output-dir",
@@ -2959,7 +3039,7 @@ phase_roles
                     sys,
                     "argv",
                     [
-                        "bc250-benchmark",
+                        "bc250",
                         "owui-embedding-batch",
                         "--token-file",
                         str(token),
@@ -3079,7 +3159,7 @@ phase_roles
                 self.assertFalse(check["temperature_telemetry_present"])
                 self.assertIsNone(check["temp_max_c"])
 
-    def test_partial_revalidation_completion_and_status_surface_coverage(self) -> None:
+    def test_partial_coverage_does_not_make_completed_run_incomplete(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)
             source = ROOT / "cmd/benchmark/revalidate.sh"
@@ -3114,14 +3194,14 @@ printf 'done\n' > "$PHASE_FILE"
 printf 'complete\n' > "$STAGE_FILE"
 printf '2026-09-07T00:00:00+02:00\n' > "$LAST_EVENT_FILE"
 printf '2026-09-07T00:00:00+02:00\n' > "$STAGE_STARTED_FILE"
-printf 'incomplete\n' > "$RUN_STATE_FILE"
+printf 'completed\n' > "$RUN_STATE_FILE"
 printf 'pass\n' > "$INFRA_STATE_FILE"
 printf 'pass\n' > "$QUALITY_STATE_FILE"
 printf 'pass\n' > "$RESTORATION_STATE_FILE"
 printf 'partial\n' > "$COVERAGE_STATE_FILE"
 printf 'run-1\n' > "$RUN_ID_FILE"
-printf '4.0\n' > "$RUN_HARNESS_VERSION_FILE"
-: > "$EVENTS"
+printf '4.7\n' > "$RUN_HARNESS_VERSION_FILE"
+printf '2026-09-07T00:00:01+02:00\tagent\tagent-add-on\tcoverage\tskipped\toptional Agent not installed\n' > "$EVENTS"
 systemctl() {{ echo inactive; }}
 follow_run
 printf '%s\n' '---STATUS---'
@@ -3133,20 +3213,31 @@ status_run --raw
                 ["bash", "-c", script], text=True, capture_output=True, check=True
             )
             output = completed.stdout.lower()
-            self.assertIn("run completion: incomplete", output)
-            self.assertIn("coverage:       partial", output)
-            self.assertIn("coverage       : partial", output)
+            self.assertIn("run completion: completed", output)
+            self.assertIn(
+                "coverage:       partial (optional agent not installed)", output
+            )
+            self.assertIn(
+                "coverage       : partial (optional agent not installed)", output
+            )
             self.assertIn("coverage=partial", output)
+            self.assertNotIn("run completion: incomplete", output)
             source_text = source.read_text(encoding="utf-8")
             self.assertIn('status) status_run "${@:2}" ;;', source_text)
+            restore = source_text[
+                source_text.index("phase_restore_report() {"):
+                source_text.index("run_qualification_sequence() {")
+            ]
+            self.assertIn('printf \'completed\\n\' > "$RUN_STATE_FILE"', restore)
+            self.assertNotIn("coverage_state", restore)
 
     def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         main = source[source.index("main() {"):]
-        self.assertIn('echo "  sudo bc250-revalidate start"', main)
+        self.assertIn('echo "  sudo bc250 revalidate start"', main)
         self.assertNotIn("completion_owui_token", main)
-        self.assertNotIn("sudo bc250-revalidate start --owui-token-file FILE", main)
-        self.assertNotIn('echo "  Revalidation (partial): sudo bc250-revalidate start --skip-owui"', main)
+        self.assertNotIn("sudo bc250 revalidate start --owui-token-file FILE", main)
+        self.assertNotIn('echo "  Revalidation (partial): sudo bc250 revalidate start --skip-owui"', main)
 
     def test_edge_policy_documents_conservative_threshold_rationale(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
@@ -3311,7 +3402,9 @@ status_run --raw
         self.assertIn("Quality", summary)
         self.assertIn("Restoration", summary)
         self.assertNotIn("PASSED", summary)
-        self.assertIn("diagnostic(s)", summary)
+        self.assertIn("Diagnostics", summary)
+        self.assertIn("informational", summary)
+        self.assertNotIn("diagnostic(s)", summary)
         bundle = source[source.index("create_bundle_manifest() {"):source.index("restore_all() {")]
         self.assertIn('"checksum_file": "SHA256SUMS.txt"', bundle)
         self.assertIn('"final_result": result', bundle)
@@ -3323,9 +3416,9 @@ status_run --raw
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         self.assertNotIn("owui-test-helper.py", source)
         self.assertNotIn("write_helper()", source)
-        self.assertIn("bc250-benchmark concurrency", source)
-        self.assertIn("bc250-benchmark owui-translation", source)
-        self.assertIn("bc250-benchmark owui-rag", source)
+        self.assertIn("bc250 benchmark concurrency", source)
+        self.assertIn("bc250 benchmark owui-translation", source)
+        self.assertIn("bc250 benchmark owui-rag", source)
 
     def test_round2b_workflows_use_common_results_and_explicit_restoration(self) -> None:
         runtime_source = (ROOT / "cmd/benchmark/runtime-benchmark.py").read_text(encoding="utf-8")
@@ -3749,7 +3842,7 @@ cleanup_failed_launch
     def test_revalidation_uses_complete_live_cu_routing_health(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         block = source[source.index("check_live_cu_routing() {"):source.index("phase_preflight() {")]
-        self.assertIn("bc250-cu-status --summary", block)
+        self.assertIn('"$CU_STATUS" --summary', block)
         self.assertIn("Routing profile match   : exact", block)
         self.assertIn("Routing profile match   : not configured", block)
         self.assertIn("unexpected D!", block)

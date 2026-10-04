@@ -420,7 +420,7 @@ def add_output(parser: argparse.ArgumentParser) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250-benchmark",
+        prog="bc250 benchmark",
         description="Explicit BC-250 Ollama runtime/coexistence benchmarks.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
