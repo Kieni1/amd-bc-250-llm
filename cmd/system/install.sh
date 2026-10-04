@@ -4,6 +4,12 @@ set -Eeuo pipefail
 umask 0022
 
 readonly SCRIPT_PATH="$(readlink -f -- "${BASH_SOURCE[0]}")"
+readonly LIBEXEC_DIR="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
+readonly PACKAGE_SHARE_DIR="${BC250_SHARE:-/usr/share/bc250-llm-server}"
+readonly MEMORY_PROFILE="$LIBEXEC_DIR/memory-profile.sh"
+readonly SWAP_PROFILE="$LIBEXEC_DIR/swap-profile.sh"
+readonly CU_STATUS="$LIBEXEC_DIR/cu-status.sh"
+readonly INSTALL_OLLAMA="$LIBEXEC_DIR/install-ollama.sh"
 readonly ORIGINAL_ARGS=("$@")
 readonly LOG_FILE="${BC250_INSTALL_LOG:-/var/log/bc250-llm-install.log}"
 runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
@@ -28,17 +34,16 @@ OWUI_UPGRADE_BACKUP=""
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-install [--models-only] [--owui-token-file FILE]
+Usage: sudo bc250 install [--models-only] [--owui-token-file FILE]
 
-Before 1.0 this is a pre-1.0 greenfield appliance setup. Apply or resume the packaged BC-250 setup. The command checks current
-state, avoids completed work where practical, applies the TTM/swap baseline,
-prepares optional 40-CU support for the exact running kernel, offers one unified
-model selection, configures Open WebUI, verifies the core appliance result, then
-offers local-maintenance setup and, separately, default-No optional Pi/companion setup after core verification.
+Apply or resume BC-250 appliance setup. The command checks current state, skips
+completed work where practical, applies the memory/swap baseline, leaves CU routing
+under operator control through the live manager, reconciles models and Open WebUI,
+and verifies the core appliance. Optional maintenance and Pi/companion setup are
+offered only after core verification and default to No.
 
-A normal update has one primary reboot after Fedora/kernel + memory setup. A
-second reboot is requested only when persistent 40-CU mode is already configured
-and a newly prepared replacement module is not yet running.
+A normal update has one primary reboot after Fedora/kernel and memory setup. Live CU
+routing does not require a replacement AMDGPU module or another package-managed reboot.
 
 Use --models-only to reconcile runtime topology, models and Open WebUI without system/kernel setup.
 Use --owui-token-file FILE to apply/verify Open WebUI with an existing protected admin API-key file.
@@ -89,6 +94,19 @@ validate_owui_token_file() {
 
 cleanup_sensitive_runtime() {
   rm -f "$OWUI_VERIFY_TOKEN_FILE" "$HF_SESSION_FILE"
+}
+
+cleanup_package_python_bytecode() {
+  # 0.12.2 could leave unowned Python caches under package-owned /usr trees.
+  # Keep cleanup strictly bounded to BC-250 immutable payload roots.
+  local root cache
+  for root in "$LIBEXEC_DIR" "$PACKAGE_SHARE_DIR"; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' cache; do
+      rm -rf -- "$cache"
+    done < <(find "$root" -type d -name __pycache__ -print0 2>/dev/null)
+    find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete 2>/dev/null || true
+  done
 }
 
 owui_token_candidate() {
@@ -189,7 +207,7 @@ yes_no_default_yes() {
 
 rerun_command() {
   local command
-  printf -v command '%q ' sudo bc250-install "${ORIGINAL_ARGS[@]}"
+  printf -v command '%q ' sudo bc250 install "${ORIGINAL_ARGS[@]}"
   printf '%s\n' "$command"
 }
 
@@ -239,13 +257,13 @@ pending_kernel() {
 request_primary_reboot_if_needed() {
   local kernel=""
   kernel="$(pending_kernel || true)"
-  if [[ -z "$kernel" ]] && bc250-memory-profile status --quiet >/dev/null 2>&1; then
+  if [[ -z "$kernel" ]] && "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1; then
     return 0
   fi
   echo
   echo "One primary reboot is required before kernel-specific setup."
   [[ -z "$kernel" ]] || echo "  pending kernel: $kernel (running $(uname -r))"
-  bc250-memory-profile status --quiet >/dev/null 2>&1 || echo "  TTM profile: configured, not active"
+  "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || echo "  TTM profile: configured, not active"
   echo "  sudo reboot"
   printf '  '; rerun_command
   echo "Transcript: $LOG_FILE"
@@ -290,49 +308,22 @@ step_3_install_ollama() {
   hash -r
   remove_fedora_ollama
   echo "Reconciling package-qualified Ollama ${requested} with the package-owned service topology."
-  BC250_ASSUME_YES=1 OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" bc250-install-ollama
+  BC250_ASSUME_YES=1 OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" "$INSTALL_OLLAMA"
   hash -r
 }
 
 step_4_memory_and_swap() {
   heading "4. ENSURE MEMORY AND SWAP PROFILES"
   rpm -q zram-generator >/dev/null 2>&1 || dnf install -y zram-generator
-  bc250-memory-profile ensure
-  bc250-swap-profile ensure
+  "$MEMORY_PROFILE" ensure
+  "$SWAP_PROFILE" ensure
 }
 
-step_5_prepare_40cu() {
-  heading "5. PREPARE OPTIONAL 40-CU SUPPORT"
-  local kernel prepared_file=/var/lib/bc250-llm-server/40cu/prepared
-  local live_manager=bc250-cu-live-manager.service live_state="" live_enable="" live_summary="" live_routed="" live_health=""
-  kernel="$(uname -r)"
-  if [[ -r "$prepared_file" ]] && grep -Fxq "kernel=$kernel" "$prepared_file"; then
-    echo "40-CU build is already prepared for $kernel; skipping build-prerequisite reconciliation."
-  elif rpm -q "kernel-devel-$kernel" >/dev/null 2>&1; then
-    echo "Build files for the exact running kernel are already installed: $kernel"
-  else
-    echo "Installing build files for the exact running kernel: $kernel"
-    dnf install -y "kernel-devel-$kernel"
-  fi
-  if systemctl cat "$live_manager" >/dev/null 2>&1; then
-    live_state="$(systemctl is-active "$live_manager" 2>/dev/null || true)"
-    live_enable="$(systemctl is-enabled "$live_manager" 2>/dev/null || true)"
-    echo "Live CU manager service is already installed (${live_enable:-unknown}; ${live_state:-unknown})."
-  fi
-  bc250-40cu prepare
-  if systemctl is-active --quiet "$live_manager" 2>/dev/null && command -v bc250-cu-status >/dev/null 2>&1; then
-    live_summary="$(bc250-cu-status --summary 2>/dev/null || true)"
-    live_routed="$(sed -n 's/^[[:space:]]*Live routed CUs[[:space:]]*:[[:space:]]*//p' <<< "$live_summary" | head -1)"
-    live_health="$(sed -n 's/^[[:space:]]*Live routing status[[:space:]]*:[[:space:]]*//p' <<< "$live_summary" | head -1)"
-    [[ -n "$live_routed" ]] && echo "Live CU routing: $live_routed${live_health:+; $live_health}."
-  fi
-  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]] && \
-     [[ ! -r /sys/module/amdgpu/parameters/bc250_cc_write_mode ]]; then
-    echo "The prepared persistent AMDGPU module needs one activation reboot."
-    echo "  sudo reboot"
-    printf '  '; rerun_command
-    exit 12
-  fi
+step_5_check_cu_routing() {
+  heading "5. CHECK OPTIONAL LIVE CU ROUTING"
+  print_40cu_completion_status
+  echo "Optional configuration:"
+  echo "  sudo bc250-cu-live-manager"
 }
 
 step_6_runtime_topology() {
@@ -353,7 +344,7 @@ step_6_runtime_topology() {
   done
   systemctl enable ollama.service ollama-task.service ollama-embedding.service
   systemctl disable ollama-agent.service >/dev/null 2>&1 || true
-  bc250-agent-mode leave
+  bc250 agent-mode leave
 }
 
 step_7_models() {
@@ -382,12 +373,12 @@ step_7_models() {
 ' | sed 's/^/  - /'
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
     BC250_MODELCTL_CURRENT_SUMMARY=1 \
-    bc250-model apply all "$required_csv"
+    bc250 model apply all "$required_csv"
 
   echo
   echo "Required package baseline models are current."
   echo "Additional Ollama models are optional and are not listed on a converged install."
-  echo "MTP remains a separate opt-in workflow: sudo bc250-fetch-mtp MODEL_ID"
+  echo "MTP remains a separate opt-in workflow: sudo bc250 fetch-mtp MODEL_ID"
   local selection="${BC250_MODEL_SELECTION:-}" review=""
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
     read -r -p "Review optional models or reconcile optional-model drift now? [y/N]: " review
@@ -396,7 +387,7 @@ step_7_models() {
         echo
         echo "Checking optional Ollama model registrations in parallel; standalone MTP artifacts are checked separately. This may take several minutes. Please wait..."
         local optional_status current_count drift_count deferred_count
-        optional_status="$(bc250-model status all --compact 2>&1 || true)"
+        optional_status="$(bc250 model status all --compact 2>&1 || true)"
         current_count="$(grep -c '\[CURRENT\]' <<< "$optional_status" || true)"
         drift_count="$(grep -Eci 'registration (missing|unavailable)|registration drift|DRIFT' <<< "$optional_status" || true)"
         deferred_count="$(grep -ci 'deferred' <<< "$optional_status" || true)"
@@ -406,9 +397,9 @@ step_7_models() {
         echo
         echo "Standalone MTP models (llama.cpp; read-only, not selectable here):"
         if ! BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
-            bc250-model status mtp --include-disabled --compact \
+            bc250 model status mtp --include-disabled --compact \
             | sed -E '/^MTP models:$/d; s/^([[:space:]]*)[0-9]+\) /\1- /'; then
-          echo "  MTP inventory unavailable; inspect later with: bc250-model status mtp --include-disabled --compact"
+          echo "  MTP inventory unavailable; inspect later with: bc250 model status mtp --include-disabled --compact"
         fi
         read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
         ;;
@@ -424,7 +415,7 @@ step_7_models() {
   fi
   [[ -n "$selection" ]] || { echo "Skipping additional models; required package baseline models are installed."; return 0; }
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
-    bc250-model apply all "$selection"
+    bc250 model apply all "$selection"
   echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
 }
 
@@ -463,13 +454,13 @@ publish_openwebui_after_convergence() {
     return 1
   }
   echo "Verifying package-owned Open WebUI desired state before publishing the service."
-  if ! bc250-openwebui-setup apply --token-file "$token_file" >/dev/null; then
+  if ! bc250 openwebui-setup apply --token-file "$token_file" >/dev/null; then
     echo "ERROR: Open WebUI desired-state apply failed; public/boot publication remains held." >&2
     hold_open_webui_publication
     systemctl stop open-webui.service >/dev/null 2>&1 || true
     return 1
   fi
-  if ! bc250-openwebui-setup status --token-file "$token_file" >/dev/null; then
+  if ! bc250 openwebui-setup status --token-file "$token_file" >/dev/null; then
     echo "ERROR: Open WebUI desired-state verification failed; public/boot publication remains held." >&2
     hold_open_webui_publication
     systemctl stop open-webui.service >/dev/null 2>&1 || true
@@ -594,16 +585,12 @@ step_8_application_services() {
 
 show_plan() {
   heading "BC-250 SETUP PLAN"
-  local kernel="" memory="active" swap="pending" cu="prepare for $(uname -r)" ollama="install/update" reboot="no"
+  local kernel="" memory="active" swap="pending" cu="operator-controlled live routing" ollama="install/update" reboot="no"
   kernel="$(pending_kernel || true)"
-  bc250-memory-profile status --quiet >/dev/null 2>&1 || memory="configure/pending reboot"
-  bc250-swap-profile status --quiet >/dev/null 2>&1 && swap="configured"
+  "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || memory="configure/pending reboot"
+  "$SWAP_PROFILE" status --quiet >/dev/null 2>&1 && swap="configured"
   if [[ -x /usr/local/bin/ollama ]] && [[ "$(ollama_version /usr/local/bin/ollama)" == "$BC250_OLLAMA_VERSION" ]]; then
     ollama="current ($BC250_OLLAMA_VERSION)"
-  fi
-  if [[ -r /var/lib/bc250-llm-server/40cu/prepared ]] &&
-      grep -Fxq "kernel=$(uname -r)" /var/lib/bc250-llm-server/40cu/prepared; then
-    cu="prepared for running kernel"
   fi
   [[ -z "$kernel" && "$memory" == active ]] || reboot="yes: kernel/TTM activation"
   printf '  root grow             check/apply if needed\n'
@@ -650,14 +637,14 @@ step_9_open_webui() {
   heading "9. CONFIGURE OPEN WEBUI"
   OWUI_SETUP_STATE="retry-required"
   local publish_token=""
-  command -v bc250-openwebui-setup >/dev/null 2>&1 || {
+  command -v bc250 >/dev/null 2>&1 || {
     echo "Open WebUI setup helper is unavailable; application configuration requires a retry."
-    echo "Retry with: sudo bc250-install --models-only"
+    echo "Retry with: sudo bc250 install --models-only"
     return 0
   }
   if ! wait_for_open_webui; then
     echo "Open WebUI is not reachable on 127.0.0.1:3000; package convergence remains held."
-    echo "Retry with: sudo bc250-install --models-only"
+    echo "Retry with: sudo bc250 install --models-only"
     return 0
   fi
 
@@ -673,7 +660,7 @@ step_9_open_webui() {
   if [[ -n "$OWUI_TOKEN_FILE" ]]; then
     validate_owui_token_file "$OWUI_TOKEN_FILE"
     echo "Applying the package-owned Open WebUI baseline with the supplied administrator API key file."
-    if ! bc250-openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+    if ! bc250 openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
       hold_open_webui_publication
       systemctl stop open-webui.service >/dev/null 2>&1 || true
@@ -690,7 +677,7 @@ step_9_open_webui() {
 
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
     echo "Applying the package-owned Open WebUI baseline with OWUI_API_KEY from the environment."
-    if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+    if ! bc250 openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
       hold_open_webui_publication
       systemctl stop open-webui.service >/dev/null 2>&1 || true
@@ -708,7 +695,7 @@ step_9_open_webui() {
     hold_open_webui_publication
     echo "Non-interactive install: Open WebUI administrator setup was not attempted; public/boot publication remains held."
     echo "Run later in an interactive terminal:"
-    echo "  sudo bc250-install --models-only"
+    echo "  sudo bc250 install --models-only"
     return 0
   fi
 
@@ -723,20 +710,20 @@ step_9_open_webui() {
         echo "NOTE: $candidate exists but is not a protected readable Open WebUI API key file; it will not be suggested." >&2
       fi
     fi
-    if ! bc250-openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+    if ! bc250 openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup was not completed; public/boot publication remains held." >&2
-      echo "Retry with: sudo bc250-install --models-only" >&2
+      echo "Retry with: sudo bc250 install --models-only" >&2
       return 0
     fi
     if ! publish_openwebui_after_convergence "$OWUI_VERIFY_TOKEN_FILE"; then
-      echo "Retry with: sudo bc250-install --models-only" >&2
+      echo "Retry with: sudo bc250 install --models-only" >&2
       return 0
     fi
     OWUI_SETUP_STATE="applied"
   else
     OWUI_SETUP_STATE="skipped"
     hold_open_webui_publication
-    echo "Skipped. Open WebUI public/boot publication remains held. Run later with: sudo bc250-install --models-only"
+    echo "Skipped. Open WebUI public/boot publication remains held. Run later with: sudo bc250 install --models-only"
   fi
 }
 
@@ -755,7 +742,7 @@ maybe_save_default_owui_token() {
   fi
   echo "No protected BC-250 Open WebUI administrator API key is configured."
   if yes_no_default_yes "Create/save one now for maintenance, verification and revalidation?"; then
-    if ! bc250-openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE" >/dev/null; then
+    if ! bc250 openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE" >/dev/null; then
       echo "ERROR: could not create/save and verify the protected Open WebUI maintenance API key." >&2
       return 1
     fi
@@ -770,10 +757,10 @@ print_openwebui_completion_status() {
       echo "Open WebUI baseline: APPLIED + VERIFIED"
       ;;
     skipped)
-      echo "Open WebUI baseline: NOT REQUESTED (run sudo bc250-install --models-only when ready)"
+      echo "Open WebUI baseline: NOT REQUESTED (run sudo bc250 install --models-only when ready)"
       ;;
     retry-required)
-      echo "Open WebUI baseline: RETRY REQUIRED (run sudo bc250-install --models-only)"
+      echo "Open WebUI baseline: RETRY REQUIRED (run sudo bc250 install --models-only)"
       ;;
     *)
       echo "Open WebUI baseline: NOT CHECKED"
@@ -810,7 +797,7 @@ verify_local_maintenance_setup() {
     echo "ERROR: maintenance configuration must be root-owned mode 0600 (found uid=${owner:-?} mode=${mode:-?})." >&2
     return 1
   }
-  bc250-maintenance status >/dev/null
+  bc250 maintenance status >/dev/null
   for unit in owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer; do
     if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
       systemctl is-active --quiet "$unit" || {
@@ -837,7 +824,7 @@ verify_pi_companion_setup() {
     return 1
   }
   command -v visudo >/dev/null 2>&1 && visudo -cf /etc/sudoers.d/bc250-power-control >/dev/null
-  bc250-maintenance companion status >/dev/null
+  bc250 maintenance companion status >/dev/null
 }
 
 verify_backup_export_setup() {
@@ -848,27 +835,27 @@ verify_backup_export_setup() {
     echo "ERROR: backup-export directories are missing." >&2
     return 1
   }
-  bc250-maintenance backup-export status >/dev/null
+  bc250 maintenance backup-export status >/dev/null
 }
 
 step_11_maintenance() {
   heading "11. OPTIONAL LOCAL MAINTENANCE"
-  command -v bc250-maintenance >/dev/null 2>&1 || {
+  command -v bc250 >/dev/null 2>&1 || {
     echo "Maintenance helper unavailable; skipping optional setup."
     return 0
   }
   if ! input_is_interactive || [[ "${BC250_ASSUME_YES:-0}" == 1 ]]; then
     echo "Non-interactive install: optional local maintenance and Pi/companion setup were not changed."
-    echo "Run later with: sudo bc250-maintenance setup"
-    echo "                sudo bc250-maintenance companion enable"
-    echo "                sudo bc250-maintenance backup-export enable"
+    echo "Run later with: sudo bc250 maintenance setup"
+    echo "                sudo bc250 maintenance companion enable"
+    echo "                sudo bc250 maintenance backup-export enable"
     return 0
   fi
 
   local local_state="NOT CONFIGURED (optional)" companion_state="NOT CONFIGURED (optional)" export_state="NOT CONFIGURED (optional)"
   if [[ -f /etc/bc250-llm-server/maintenance.env ]]; then
     if yes_no "Review or change existing local BC-250 maintenance settings now?"; then
-      bc250-maintenance setup
+      bc250 maintenance setup
       verify_local_maintenance_setup
       local_state=CONFIGURED
     else
@@ -876,7 +863,7 @@ step_11_maintenance() {
       local_state=UNCHANGED
     fi
   elif yes_no "Configure local BC-250 maintenance now?"; then
-    bc250-maintenance setup
+    bc250 maintenance setup
     verify_local_maintenance_setup
     local_state=CONFIGURED
   else
@@ -893,7 +880,7 @@ step_11_maintenance() {
       local ssh_rc=0
       ensure_optional_ssh_server "restricted Pi maintenance access" || ssh_rc=$?
       if ((ssh_rc == 0)); then
-        bc250-maintenance companion enable
+        bc250 maintenance companion enable
         verify_pi_companion_setup
         companion_state=CONFIGURED
       elif ((ssh_rc == 1)); then
@@ -917,7 +904,7 @@ step_11_maintenance() {
         local export_ssh_rc=0
         ensure_optional_ssh_server "read-only backup export" || export_ssh_rc=$?
         if ((export_ssh_rc == 0)); then
-          bc250-maintenance backup-export enable
+          bc250 maintenance backup-export enable
           verify_backup_export_setup
           export_state=CONFIGURED
         elif ((export_ssh_rc == 1)); then
@@ -960,9 +947,9 @@ step_10_verify() {
   heading "10. VERIFY INSTALLATION"
   local verify_status=0 output summary_line warns fails
   if [[ -s "$OWUI_VERIFY_TOKEN_FILE" ]]; then
-    output="$(bc250-verify --summary --owui-token-file "$OWUI_VERIFY_TOKEN_FILE" 2>&1)" || verify_status=$?
+    output="$(bc250 verify --summary --owui-token-file "$OWUI_VERIFY_TOKEN_FILE" 2>&1)" || verify_status=$?
   else
-    output="$(bc250-verify --summary 2>&1)" || verify_status=$?
+    output="$(bc250 verify --summary 2>&1)" || verify_status=$?
   fi
   printf '%s
 ' "$output"
@@ -971,19 +958,19 @@ step_10_verify() {
   fails="$(sed -n 's/^Verification: [0-9][0-9]* ok \/ [0-9][0-9]* warn \/ \([0-9][0-9]*\) fail.*/\1/p' <<< "$summary_line")"
   if ((verify_status != 0)) || [[ "${fails:-0}" != 0 ]]; then
     CORE_VERIFICATION_STATE="FAIL"
-    echo "ERROR: installation verification reported failures; run sudo bc250-verify for the detailed report." >&2
+    echo "ERROR: installation verification reported failures; run sudo bc250 verify for the detailed report." >&2
     return 1
   elif [[ "${warns:-0}" != 0 ]]; then
     CORE_VERIFICATION_STATE="WARN — review ${warns} item(s) above"
   else
     CORE_VERIFICATION_STATE="PASS"
   fi
-  echo "Detailed diagnostics remain available with: sudo bc250-verify"
+  echo "Detailed diagnostics remain available with: sudo bc250 verify"
 }
 
 run_models_only() {
-  command -v bc250-model >/dev/null 2>&1 || {
-    echo "ERROR: bc250-model is unavailable; install the binary RPM first." >&2
+  command -v bc250 >/dev/null 2>&1 || {
+    echo "ERROR: bc250 model is unavailable; install the binary RPM first." >&2
     exit 1
   }
   step_6_runtime_topology
@@ -999,22 +986,24 @@ run_models_only() {
 }
 
 print_40cu_completion_status() {
-  local manager=bc250-cu-live-manager.service summary routed health enabled active
-  enabled="$(systemctl is-enabled "$manager" 2>/dev/null || true)"
-  active="$(systemctl is-active "$manager" 2>/dev/null || true)"
-  summary="$(bc250-cu-status --summary 2>/dev/null || true)"
+  local indent="${1:-}" manager=bc250-cu-live-manager.service summary routed profile boot_restore
+  summary="$("$CU_STATUS" --summary 2>/dev/null || true)"
   routed="$(sed -n 's/^[[:space:]]*Live routed CUs[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
-  health="$(sed -n 's/^[[:space:]]*Live routing status[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
-  if [[ -n "$routed" ]]; then
-    echo "CU live routing: $routed${health:+; $health} (live manager ${enabled:-unknown}; ${active:-unknown})"
+  profile="$(sed -n 's/^[[:space:]]*Configured live profile[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
+  [[ -n "$routed" ]] || routed="status unavailable"
+  [[ -n "$profile" ]] || profile="NOT CONFIGURED (optional)"
+
+  if systemctl is-enabled --quiet "$manager" 2>/dev/null; then
+    boot_restore="ENABLED"
+  elif systemctl cat "$manager" >/dev/null 2>&1; then
+    boot_restore="DISABLED"
   else
-    echo "CU live routing: status unavailable (live manager ${enabled:-unknown}; ${active:-unknown})"
+    boot_restore="NOT CONFIGURED"
   fi
-  if [[ -f /etc/modprobe.d/bc250-40cu.conf ]]; then
-    echo "Persistent boot module: enabled/configured"
-  else
-    echo "Persistent boot module: disabled (optional; not required for healthy live routing)"
-  fi
+
+  printf '%sCU live routing       : %s\n' "$indent" "$routed"
+  printf '%sSaved boot profile    : %s\n' "$indent" "$profile"
+  printf '%sBoot restore service  : %s\n' "$indent" "$boot_restore"
 }
 
 
@@ -1023,8 +1012,8 @@ print_setup_summary() {
   curl -fsS --max-time 3 http://127.0.0.1:3000/ >/dev/null 2>&1 && owui_state="READY"
   curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && ollama_state="READY"
   [[ -n "$(pending_kernel || true)" ]] && reboot_state="YES"
-  bc250-memory-profile status --quiet >/dev/null 2>&1 || reboot_state="YES"
-  if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250-openwebui-setup status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
+  "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || reboot_state="YES"
+  if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250 openwebui-setup status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
   echo
   echo "BC-250 SETUP SUMMARY"
   echo
@@ -1056,21 +1045,7 @@ print_setup_summary() {
   fi
   printf '  Ollama                  : %s
 ' "$ollama_state"
-  local cu_summary cu_profile="not available" cu_match="not checked" cu_enhancement="NOT CONFIGURED (optional)"
-  cu_summary="$(bc250-cu-status --summary 2>/dev/null || true)"
-  cu_profile="$(sed -n 's/^[[:space:]]*Configured live profile[[:space:]]*:[[:space:]]*//p' <<< "$cu_summary" | head -1)"
-  cu_match="$(sed -n 's/^[[:space:]]*Routing profile match[[:space:]]*:[[:space:]]*//p' <<< "$cu_summary" | head -1)"
-  [[ -n "$cu_profile" ]] || cu_profile="not available"
-  [[ -n "$cu_match" ]] || cu_match="not checked"
-  if [[ -r /etc/bc250-cu-live-manager.conf ]] || systemctl is-enabled --quiet bc250-cu-live-manager.service 2>/dev/null; then
-    cu_enhancement="CONFIGURED"
-  fi
-  printf '  CU performance profile  : %s
-' "$cu_profile"
-  printf '  CU profile consistency  : %s
-' "$cu_match"
-  printf '  CU performance enhancement : %s
-' "$cu_enhancement"
+  print_40cu_completion_status "  "
   printf '  Reboot required         : %s
 ' "$reboot_state"
   printf '  Quality revalidation    : NOT RUN
@@ -1087,13 +1062,12 @@ print_setup_summary() {
 ' "$COMPANION_STATE"
   printf '    Backup export         : %s
 ' "$BACKUP_EXPORT_STATE"
-  echo
-  print_40cu_completion_status
 }
 
 main() {
   parse_arguments "$@"
   require_root
+  cleanup_package_python_bytecode
   capture_input_mode
   start_transcript
   trap cleanup_sensitive_runtime EXIT
@@ -1108,7 +1082,7 @@ main() {
   step_3_install_ollama
   step_4_memory_and_swap
   request_primary_reboot_if_needed
-  step_5_prepare_40cu
+  step_5_check_cu_routing
   step_6_runtime_topology
   step_7_models
   step_8_application_services
@@ -1132,13 +1106,15 @@ main() {
   echo
   echo "OVERVIEW"
   echo
-  echo "Further setup"
-  echo "  Open WebUI:    sudo bc250-openwebui-setup init"
-  echo "  Maintenance:   sudo bc250-maintenance --help"
+  echo "Administration"
+  echo "  Open WebUI:    sudo bc250 openwebui-setup status"
+  echo "  Models:        sudo bc250 model status"
+  echo "  RAG:           bc250 rag --help"
+  echo "  Maintenance:   sudo bc250 maintenance --help"
   echo "  Documentation: /usr/share/doc/bc250-llm-server/"
   echo
   echo "Storage"
-  echo "  sudo bc250-storage -h"
+  echo "  sudo bc250 storage -h"
   echo
   local completion_amber="" completion_reset=""
   if [[ -t 1 && ${TERM:-dumb} != dumb ]]; then
@@ -1148,19 +1124,16 @@ main() {
   printf '%s' "$completion_amber"
   echo "NEXT STEPS"
   echo
-  echo "CU routing"
-  echo "  sudo bc250-cu-live-manager menu"
-  echo
-  echo "Models"
-  echo "  sudo bc250-install --models-only"
+  echo "CU routing (optional)"
+  echo "  sudo bc250-cu-live-manager"
   echo
   echo "Validation"
-  echo "  sudo bc250-verify"
-  echo "  sudo bc250-revalidate start"
+  echo "  sudo bc250 verify"
+  echo "  sudo bc250 revalidate start"
   echo "  sudo bc250-40cu status"
   echo
   echo "Benchmark"
-  echo "  bc250-benchmark --help"
+  echo "  bc250 benchmark --help"
   printf '%s' "$completion_reset"
   ((verify_rc == 0)) || return "$verify_rc"
   [[ "$OWUI_SETUP_STATE" != "retry-required" ]] || return 2

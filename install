@@ -26,4 +26,4 @@ rpm_file="$(find_rpm)"
 echo "Installing $rpm_file"
 dnf install -y --setopt=install_weak_deps=False --exclude=ollama "$rpm_file"
 hash -r
-exec bc250-install
+exec bc250 install

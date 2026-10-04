@@ -73,8 +73,8 @@ class InstallerTests(unittest.TestCase):
         source = BOOTSTRAP.read_text()
         self.assertNotIn("dnf upgrade", source)
         self.assertIn("--setopt=install_weak_deps=False --exclude=ollama", source)
-        self.assertIn("exec bc250-install", source)
-        self.assertNotIn("bc250-memory-profile", source)
+        self.assertIn("exec bc250 install", source)
+        self.assertIn("exec bc250 install", source)
         self.assertLess(len(source.splitlines()), 50)
         self.assertLess(source.index("--help"), source.index("EUID"))
 
@@ -85,7 +85,24 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn('BC250_OLLAMA_VERSION="0.34.0"', source)
         result = subprocess.run(["bash", str(INSTALLER), "--help"], text=True, stdout=subprocess.PIPE, check=False)
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("sudo bc250-install", result.stdout)
+        self.assertIn("sudo bc250 install", result.stdout)
+
+    def test_installer_cleans_stale_package_python_bytecode_in_bounded_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            libexec = root / "libexec"; share = root / "share"; outside = root / "outside"
+            for base in (libexec, share, outside):
+                (base / "__pycache__").mkdir(parents=True)
+                (base / "__pycache__/module.cpython-314.pyc").write_bytes(b"cache")
+                (base / "module.pyo").write_bytes(b"cache")
+            env = {**os.environ, "BC250_LIBEXEC": str(libexec), "BC250_SHARE": str(share)}
+            result = subprocess.run(["bash", "-c", 'source "$1"; cleanup_package_python_bytecode', "installer-bytecode-test", str(INSTALLER)], env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            for base in (libexec, share):
+                self.assertFalse((base / "__pycache__").exists())
+                self.assertFalse((base / "module.pyo").exists())
+            self.assertTrue((outside / "__pycache__/module.cpython-314.pyc").exists())
+            self.assertTrue((outside / "module.pyo").exists())
 
     def test_official_ollama_install_keeps_conflict_guard(self) -> None:
         source = INSTALLER.read_text()
@@ -125,52 +142,48 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('rm -f -- "$etc_unit"', helper)
 
     def test_installer_update_ollama_flag_reaches_pinned_helper(self) -> None:
-        result = source_probe(r'''
-remove_fedora_ollama() { :; }
-bc250-install-ollama() { printf 'reinstall=%s\n' "${OLLAMA_REINSTALL:-unset}"; }
-BC250_UPDATE_OLLAMA=1
-step_3_install_ollama
-''')
-        self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("reinstall=1", result.stdout)
+        source = INSTALLER.read_text()
+        self.assertIn('INSTALL_OLLAMA="$LIBEXEC_DIR/install-ollama.sh"', source)
+        self.assertIn('OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" "$INSTALL_OLLAMA"', source)
+        self.assertIn('INSTALL_OLLAMA="$LIBEXEC_DIR/install-ollama.sh"', source)
+
 
     def test_command_reference_marks_critical_mutations_with_sudo(self) -> None:
-        commands = (ROOT / "docs/COMMANDS.md").read_text()
+        commands = (ROOT / "docs/OPERATIONS.md").read_text()
         for example in (
-            "sudo bc250-memory-profile ensure",
-            "sudo bc250-swap-profile ensure",
-            "sudo bc250-ollama-profile balanced",
+            "sudo bc250 install",
+            "sudo bc250 install",
+            "sudo bc250 ollama-profile balanced",
             "sudo bc250-40cu status",
-            "sudo bc250-40cu verify",
-            "sudo bc250-40cu prepare",
-            "sudo bc250-agent-mode enter",
-            "sudo bc250-storage dedupe",
-            "sudo bc250-maintenance status",
-            "sudo bc250-reset [--yes]",
+            "sudo bc250-cu-live-manager",
+            "sudo bc250 agent-mode enter",
+            "sudo bc250 storage dedupe",
+            "sudo bc250 maintenance status",
+            "sudo bc250 reset [--yes]",
         ):
             self.assertIn(example, commands)
-        self.assertIn("bc250-agent-mode status", commands)
-        self.assertIn("bc250-storage status", commands)
+        self.assertIn("bc250 agent-mode status", commands)
+        self.assertIn("bc250 storage status", commands)
 
     def test_one_unified_model_selection_is_used_after_required_active_roles(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn("bc250-model status all --compact", source)
-        self.assertNotIn("bc250-model status all --include-disabled --compact", source)
+        self.assertIn("bc250 model status all --compact", source)
+        self.assertNotIn("bc250 model status all --include-disabled --compact", source)
         self.assertIn("BC250_MODEL_SELECTION", source)
         self.assertIn("select(.is_active == true)", source)
         self.assertIn(".task.TASK_MODEL", source)
         self.assertIn(".embedding.RAG_EMBEDDING_MODEL", source)
         self.assertNotIn("PACKAGE_DEFAULT_AGENT_MODEL", source)
         self.assertIn("Optional Agent models remain add-ons and are not downloaded by the baseline installer.", source)
-        self.assertIn('bc250-model apply all "$required_csv"', source)
-        self.assertIn('bc250-model apply all "$selection"', source)
-        self.assertNotIn('bc250-model apply all "$selection" --include-disabled', source)
+        self.assertIn('bc250 model apply all "$required_csv"', source)
+        self.assertIn('bc250 model apply all "$selection"', source)
+        self.assertNotIn('bc250 model apply all "$selection" --include-disabled', source)
         self.assertIn('BC250_MODELCTL_CURRENT_SUMMARY=1', source)
         self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
-        self.assertIn('bc250-model status mtp --include-disabled --compact', source)
-        self.assertIn('sudo bc250-fetch-mtp MODEL_ID', source)
+        self.assertIn('bc250 model status mtp --include-disabled --compact', source)
+        self.assertIn('sudo bc250 fetch-mtp MODEL_ID', source)
         self.assertIn('Review optional models or reconcile optional-model drift now? [y/N]:', source)
-        self.assertNotIn('bc250-model apply mtp', source)
+        self.assertNotIn('bc250 model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
 
@@ -179,7 +192,7 @@ step_3_install_ollama
 input_is_interactive() { return 1; }
 require_progress_terminal() { :; }
 prepare_hf_authentication() { :; }
-bc250-model() { printf 'model:%s\n' "$*"; }
+bc250() { local cmd="$1"; shift; [[ "$cmd" == model ]] || return 64; printf 'model:%s\n' "$*"; }
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
@@ -204,7 +217,7 @@ step_7_models
 input_is_interactive() { return 1; }
 require_progress_terminal() { :; }
 prepare_hf_authentication() { :; }
-bc250-model() { printf 'model:%s\\n' "$*"; }
+bc250() { local cmd="$1"; shift; [[ "$cmd" == model ]] || return 64; printf 'model:%s\\n' "$*"; }
 BC250_MODEL_SELECTION='recommended,19-20'
 step_7_models
 ''')
@@ -232,7 +245,9 @@ read() {
     printf -v "$target" '%s' ''
   fi
 }
-bc250-model() {
+bc250() {
+  local cmd="$1"; shift
+  [[ "$cmd" == model ]] || return 64
   if [[ "$1 $2" == "status mtp" ]]; then
     printf 'MTP models:\n  33) qwen3.5-9b-mtp [FETCHED, VERIFIED]\n'
   else
@@ -262,7 +277,7 @@ input_is_interactive && exit 9 || exit 0
         source = INSTALLER.read_text()
         block = source[source.index("step_7_models() {"):source.index("step_8_application_services() {")]
         self.assertIn("require_progress_terminal", block)
-        self.assertLess(block.index("require_progress_terminal"), block.index("bc250-model apply all"))
+        self.assertLess(block.index("require_progress_terminal"), block.index("bc250 model apply all"))
 
     def test_runtime_topology_is_established_before_model_registration(self) -> None:
         source = INSTALLER.read_text()
@@ -282,13 +297,13 @@ input_is_interactive && exit 9 || exit 0
             ["bash", str(INSTALLER), "--help"],
             text=True, stdout=subprocess.PIPE, check=False,
         ).stdout
-        self.assertIn("verifies the core appliance result, then", help_text)
+        self.assertIn("verifies the core appliance", help_text)
         topology = source[source.index("step_6_runtime_topology() {"):source.index("step_7_models() {")]
         self.assertIn("ollama.service ollama-task.service ollama-embedding.service ollama-agent.service", topology)
         self.assertIn("systemctl enable ollama.service ollama-task.service ollama-embedding.service", topology)
         self.assertIn('FragmentPath --value "$unit"', topology)
         self.assertIn('/usr/lib/systemd/system/$unit', topology)
-        self.assertIn("bc250-agent-mode leave", topology)
+        self.assertIn("bc250 agent-mode leave", topology)
 
     def test_agent_mode_switches_static_topology_and_restores_normal(self) -> None:
         script = ROOT / "cmd/system/agent-mode.sh"
@@ -382,7 +397,7 @@ input_is_interactive && exit 9 || exit 0
         self.assertIn("enter|leave|normal|status", source)
         self.assertIn("leave|normal) need_root; leave_agent", source)
         self.assertIn("Normal runtime topology restored.", source)
-        self.assertIn("Return to normal mode with: sudo bc250-agent-mode normal", source)
+        self.assertIn("Return to normal mode with: sudo bc250 agent-mode normal", source)
 
     def test_agent_mode_rejects_nonexclusive_service_state(self) -> None:
         script = ROOT / "cmd/system/agent-mode.sh"
@@ -461,8 +476,7 @@ systemctl() {
   esac
   return 0
 }
-bc250-agent-mode() { printf 'mode:%s\n' "$*" >> "$BC250_TEST_LOG"; }
-bc250-model() { printf 'model:%s\n' "$*" >> "$BC250_TEST_LOG"; }
+bc250() { local cmd="$1"; shift; case "$cmd" in agent-mode) printf 'mode:%s\n' "$*" >> "$BC250_TEST_LOG" ;; model) printf 'model:%s\n' "$*" >> "$BC250_TEST_LOG" ;; *) return 64 ;; esac; }
 firewall-cmd() { printf 'firewall:%s\n' "$*" >> "$BC250_TEST_LOG"; }
 setsebool() { :; }
 require_progress_terminal() { :; }
@@ -508,23 +522,19 @@ step_8_application_services
     def test_primary_reboot_happens_after_update_ollama_and_memory(self) -> None:
         source = INSTALLER.read_text()
         main = source[source.index("main() {"):]
-        order = [main.index(name) for name in ("step_2_update_fedora", "step_3_install_ollama", "step_4_memory_and_swap", "request_primary_reboot_if_needed", "step_5_prepare_40cu")]
+        order = [main.index(name) for name in ("step_2_update_fedora", "step_3_install_ollama", "step_4_memory_and_swap", "request_primary_reboot_if_needed", "step_5_check_cu_routing")]
         self.assertEqual(order, sorted(order))
 
-    def test_40cu_prepare_targets_running_kernel_and_second_reboot_is_conditional(self) -> None:
+    def test_cu_setup_uses_live_manager_without_kernel_module_build(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn('kernel="$(uname -r)"', source)
-        self.assertIn('dnf install -y "kernel-devel-$kernel"', source)
-        self.assertIn("bc250-40cu prepare", source)
-        self.assertIn("/etc/modprobe.d/bc250-40cu.conf", source)
-        self.assertIn("/sys/module/amdgpu/parameters/bc250_cc_write_mode", source)
-        self.assertNotIn("bc250-40cu enable", source)
-        self.assertIn("Persistent boot activation: disabled (optional).", (ROOT / "cmd/system/40cu-module.sh").read_text())
-        self.assertNotIn("Enable persistent 40-CU boot activation when ready", (ROOT / "cmd/system/40cu-module.sh").read_text())
-        self.assertIn("CU live routing:", source)
-        self.assertIn("CU performance profile", source)
-        self.assertIn("CU profile consistency", source)
-        self.assertIn("Persistent boot module: disabled (optional; not required for healthy live routing)", source)
+        self.assertIn("step_5_check_cu_routing", source)
+        self.assertIn("Optional configuration:", source)
+        self.assertIn("sudo bc250-cu-live-manager", source)
+        self.assertIn("CU live routing", source)
+        self.assertNotIn("bc250-40cu prepare", source)
+        self.assertNotIn("kernel-devel-$kernel", source)
+        self.assertNotIn("bc250_cc_write_mode", source)
+        self.assertNotIn("Persistent boot module", source)
 
     def test_root_growth_skips_lvm_when_no_free_extents(self) -> None:
         source = INSTALLER.read_text()
@@ -535,14 +545,14 @@ step_8_application_services
         source = INSTALLER.read_text()
         for legacy in ("fresh-package", "packages-added.txt", "firewall-http-before", "selinux-httpd-before", "PACKAGE_BASELINE"):
             self.assertNotIn(legacy, source)
-        self.assertIn("bc250-memory-profile ensure", source)
-        self.assertIn("bc250-swap-profile ensure", source)
+        self.assertIn('"$MEMORY_PROFILE" ensure', source)
+        self.assertIn('"$SWAP_PROFILE" ensure', source)
 
     def test_installer_uses_compact_verifier_without_duplicate_parity_report(self) -> None:
         source = INSTALLER.read_text()
         block = source[source.index("step_10_verify() {"):source.index("run_models_only() {")]
-        self.assertIn("bc250-verify --summary", block)
-        self.assertIn("Detailed diagnostics remain available with: sudo bc250-verify", block)
+        self.assertIn("bc250 verify --summary", block)
+        self.assertIn("Detailed diagnostics remain available with: sudo bc250 verify", block)
         self.assertNotIn("llm-run-diagnose --no-load", block)
 
     def test_full_installer_separates_local_maintenance_from_pi_setup(self) -> None:
@@ -557,9 +567,9 @@ step_8_application_services
         self.assertIn("Configure local BC-250 maintenance now?", block)
         self.assertIn("Review or change existing local BC-250 maintenance settings now?", block)
         self.assertIn("Configure Raspberry Pi / companion integration now?", block)
-        self.assertLess(block.index("bc250-maintenance setup"), block.index("Configure Raspberry Pi / companion integration now?"))
-        self.assertIn("bc250-maintenance companion enable", block)
-        self.assertIn("bc250-maintenance backup-export enable", block)
+        self.assertLess(block.index("bc250 maintenance setup"), block.index("Configure Raspberry Pi / companion integration now?"))
+        self.assertIn("bc250 maintenance companion enable", block)
+        self.assertIn("bc250 maintenance backup-export enable", block)
         self.assertIn('ensure_optional_ssh_server "read-only backup export"', block)
         self.assertIn("dnf install -y rsync-rrsync", block)
         self.assertIn("Optional setup verification", block)
@@ -575,27 +585,31 @@ step_8_application_services
         main = source[source.index("main() {"):]
         for heading in (
             'echo "OVERVIEW"',
-            'echo "Further setup"',
+            'echo "Administration"',
             'echo "Storage"',
             'echo "NEXT STEPS"',
-            'echo "CU routing"',
-            'echo "Models"',
+            'echo "CU routing (optional)"',
             'echo "Validation"',
             'echo "Benchmark"',
         ):
             self.assertIn(heading, main)
         for item in (
-            "sudo bc250-openwebui-setup init",
-            "sudo bc250-maintenance --help",
-            "sudo bc250-storage -h",
-            "sudo bc250-cu-live-manager menu",
-            "sudo bc250-install --models-only",
-            "sudo bc250-verify",
-            "sudo bc250-revalidate start",
+            "sudo bc250 openwebui-setup status",
+            "sudo bc250 model status",
+            "bc250 rag --help",
+            "sudo bc250 maintenance --help",
+            "sudo bc250 storage -h",
+            "sudo bc250-cu-live-manager",
+            "sudo bc250 verify",
+            "sudo bc250 revalidate start",
             "sudo bc250-40cu status",
-            "bc250-benchmark --help",
+            "bc250 benchmark --help",
         ):
             self.assertIn(item, main)
+        self.assertNotIn('echo "Further setup"', main)
+        self.assertNotIn('echo "Models"', main)
+        self.assertNotIn('echo "  Open WebUI:    sudo bc250 openwebui-setup init"', main)
+        self.assertNotIn('echo "  sudo bc250 install --models-only"', main)
         self.assertIn("completion_amber=$'\\033[1;33m'", main)
         self.assertLess(main.index('echo "OVERVIEW"'), main.index("completion_amber=$'\\033[1;33m'"))
         self.assertLess(main.index("completion_amber=$'\\033[1;33m'"), main.index('echo "NEXT STEPS"'))
@@ -621,13 +635,27 @@ step_8_application_services
         self.assertNotIn("Installation and verification completed successfully.", source)
         self.assertIn('/root/owui-test.key', source)
         self.assertIn("Checking optional Ollama model registrations in parallel", source)
+        for current_label in (
+            "CU live routing",
+            "Saved boot profile",
+            "Boot restore service",
+        ):
+            self.assertIn(current_label, source)
+        for obsolete_label in (
+            "CU performance profile",
+            "CU profile consistency",
+            "CU performance enhancement",
+            "Live CU manager service is not installed",
+            "live manager not-found",
+        ):
+            self.assertNotIn(obsolete_label, source)
 
     def test_optional_local_and_pi_setup_can_both_be_skipped(self) -> None:
         result = source_probe(r"""
 input_is_interactive() { return 0; }
 yes_no() { return 1; }
 yes_no_default_yes() { return 1; }
-bc250-maintenance() { printf 'UNEXPECTED:%s\n' "$*"; return 99; }
+bc250() { printf 'UNEXPECTED:%s\n' "$*"; return 99; }
 step_11_maintenance
 """)
         self.assertEqual(result.returncode, 0, result.stdout)
@@ -637,7 +665,7 @@ step_11_maintenance
 
     def test_models_only_resume_is_public(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn("sudo bc250-install [--models-only]", source)
+        self.assertIn("sudo bc250 install [--models-only]", source)
         self.assertIn('if [[ "$INSTALL_MODE" == models ]]; then', source)
         self.assertIn("run_models_only", source)
 
@@ -647,7 +675,7 @@ step_11_maintenance
         helper = source[source.index("maybe_save_default_owui_token() {"):source.index("print_openwebui_completion_status() {")]
         self.assertIn('[[ "$OWUI_SETUP_STATE" == "applied" ]] || return 0', helper)
         self.assertIn("systemctl is-active --quiet open-webui.service", helper)
-        self.assertIn('bc250-openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE"', helper)
+        self.assertIn('bc250 openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE"', helper)
         models_only = source[source.index("run_models_only() {"):source.index("print_40cu_completion_status() {")]
         self.assertLess(models_only.index("step_9_open_webui"), models_only.index("maybe_save_default_owui_token"))
 
@@ -663,8 +691,8 @@ step_11_maintenance
         self.assertNotIn("enable_open_webui_boot", step8)
         self.assertNotIn("systemctl enable --now nginx.service", step8)
         publish = source[source.index("publish_openwebui_after_convergence() {"):source.index("application_network_healthy() {")]
-        self.assertLess(publish.index("bc250-openwebui-setup apply"), publish.index("bc250-openwebui-setup status"))
-        self.assertLess(publish.index("bc250-openwebui-setup status"), publish.index("enable_open_webui_boot"))
+        self.assertLess(publish.index("bc250 openwebui-setup apply"), publish.index("bc250 openwebui-setup status"))
+        self.assertLess(publish.index("bc250 openwebui-setup status"), publish.index("enable_open_webui_boot"))
         self.assertLess(publish.index("enable_open_webui_boot"), publish.index("systemctl enable --now nginx.service"))
         self.assertIn("if ! enable_open_webui_boot; then", publish)
         self.assertNotIn("systemctl enable open-webui.service", publish)
