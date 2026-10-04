@@ -129,22 +129,6 @@ class StorageTests(unittest.TestCase):
         self.assertIn("live_pairs = [pair for pair in all_pairs if blob_referenced(pair[1])]", source)
         self.assertIn("unreferenced source-hash blobs", source)
 
-    def test_stale_40cu_cache_means_removed_kernel_only(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            cache = Path(temporary) / "cache"; modules = Path(temporary) / "modules"
-            (cache / "current").mkdir(parents=True); (cache / "old").mkdir()
-            (modules / "current").mkdir(parents=True)
-            original = storage.Path
-            def mapped(*parts):
-                path = original(*parts)
-                if str(path).startswith("/usr/lib/modules"):
-                    suffix = path.relative_to("/usr/lib/modules")
-                    return modules / suffix
-                return path
-            with patch.object(storage, "CU_CACHE", cache), patch.object(storage, "Path", side_effect=mapped):
-                stale = storage.stale_cu_caches()
-            self.assertEqual([path.name for path in stale], ["old"])
-
     def test_dedupe_requires_explicit_confirmation_by_default(self) -> None:
         source = (ROOT / "cmd/system/storage.py").read_text()
         self.assertIn("Type DEDUPLICATE", source)

@@ -15,7 +15,6 @@ from pathlib import Path
 
 GGUF = Path(os.environ.get("BC250_GGUF_ROOT", "/var/lib/bc250-llm-server/gguf"))
 OLLAMA = Path(os.environ.get("BC250_OLLAMA_ROOT", "/var/lib/bc250-llm-server/ollama"))
-CU_CACHE = Path(os.environ.get("BC250_40CU_CACHE", "/var/cache/bc250-llm-server/40cu"))
 INSTALLED_MODEL_DIR = Path("/usr/share/bc250-llm-server/model-management/modelfiles")
 OPERATOR_MODEL_DIR = Path("/etc/bc250-llm-server/models.d")
 RETIRED_CATALOG = Path("/usr/share/bc250-llm-server/model-management/retired-models.json")
@@ -103,11 +102,6 @@ def blob_referenced(blob: Path) -> bool:
                 continue
     return False
 
-
-def stale_cu_caches() -> list[Path]:
-    if not CU_CACHE.is_dir():
-        return []
-    return [p for p in CU_CACHE.iterdir() if p.is_dir() and not Path("/usr/lib/modules", p.name).is_dir()]
 
 
 def parse_modelfile_identity(path: Path) -> tuple[str, Path] | None:
@@ -215,7 +209,7 @@ def status() -> int:
         print("  pending dedupe:        unavailable")
         print("  potential reclaimable: unavailable")
         print("Detailed storage accounting requires elevated privileges.")
-        print("Run: sudo bc250-storage status")
+        print("Run: sudo bc250 storage status")
         return 1
     pairs = state_pairs()
     live_pairs = [pair for pair in pairs if blob_referenced(pair[1])]
@@ -233,10 +227,6 @@ def status() -> int:
     print(f"  unrecorded logical data:{human(sum(src.stat().st_size for src, *_ in pending))}")
     print(f"  unreferenced source-hash blobs:{len(transient_pairs):5d}")
     print(f"  unreferenced logical data:{human(sum(src.stat().st_size for src, *_ in transient_pairs))}")
-    stale = stale_cu_caches()
-    print(f"  stale 40-CU caches:    {len(stale):9d}")
-    for path in stale:
-        print(f"    {path.name}")
     print("Note: logical byte totals include reflink-shared extents; df reports physical free capacity.")
     if transient_pairs:
         print("Unreferenced source-hash blobs are not dedupe targets; normal Ollama startup pruning can remove them.")
@@ -390,27 +380,32 @@ def prune_sources(yes: bool) -> int:
     return 0
 
 
-def prune_40cu(yes: bool) -> int:
-    require_root()
-    stale = stale_cu_caches()
-    if not stale:
-        print("No 40-CU cache for removed kernels found."); return 0
-    for path in stale: print(f"  {path}")
-    if not yes and input("Type PRUNE-40CU to remove only the listed obsolete-kernel caches: ") != "PRUNE-40CU":
-        print("Cancelled."); return 0
-    for path in stale: shutil.rmtree(path)
-    print(f"Removed {len(stale)} obsolete 40-CU cache tree(s).")
-    return 0
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="bc250-storage")
+    parser = argparse.ArgumentParser(
+        prog="bc250 storage",
+        description="Inspect and safely reduce package-owned model storage.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("status")
-    for name in ("dedupe", "prune-sources", "prune-40cu"):
-        child = sub.add_parser(name); child.add_argument("--yes", action="store_true")
+    sub.add_parser(
+        "status",
+        help="show package-owned model/source usage and reclaimable space",
+    )
+    dedupe_parser = sub.add_parser(
+        "dedupe",
+        help="share verified identical XFS extents while keeping both logical files",
+    )
+    dedupe_parser.add_argument(
+        "--yes", action="store_true", help="apply without the confirmation prompt"
+    )
+    prune_parser = sub.add_parser(
+        "prune-sources",
+        help="remove verified offline GGUF source copies after Ollama registration",
+    )
+    prune_parser.add_argument(
+        "--yes", action="store_true", help="apply without the confirmation prompt"
+    )
     args = parser.parse_args()
-    return {"status": status, "dedupe": lambda: dedupe(args.yes), "prune-sources": lambda: prune_sources(args.yes), "prune-40cu": lambda: prune_40cu(args.yes)}[args.command]()
+    return {"status": status, "dedupe": lambda: dedupe(args.yes), "prune-sources": lambda: prune_sources(args.yes)}[args.command]()
 
 
 if __name__ == "__main__":
