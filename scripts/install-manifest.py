@@ -7,7 +7,6 @@ import argparse
 import glob
 import os
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -42,7 +41,7 @@ def load_manifest(path: Path) -> list[tuple[int, str, str, str, str]]:
                 f"{path}:{line_number}: expected four tab-separated fields"
             )
         kind, mode, source, destination = (field.strip() for field in fields)
-        if kind not in {"file", "config", "dir", "ghost", "text", "aliases"}:
+        if kind not in {"file", "config", "dir", "ghost", "text"}:
             raise ManifestError(f"{path}:{line_number}: unknown entry type {kind!r}")
         try:
             int(mode, 8)
@@ -123,7 +122,7 @@ def main() -> int:
     if args.check:
         for line_number, kind, _mode, source, destination in entries:
             expand(destination, definitions, line_number)
-            if kind in {"file", "config", "aliases"}:
+            if kind in {"file", "config"}:
                 source_matches(
                     args.source_root,
                     expand(source, definitions, line_number),
@@ -166,27 +165,6 @@ def main() -> int:
             continue
 
         sources = source_matches(args.source_root, source_value, line_number)
-        if kind == "aliases":
-            if len(sources) != 1:
-                raise ManifestError(
-                    f"manifest line {line_number}: aliases requires one dispatcher"
-                )
-            result = subprocess.run(
-                [str(sources[0]), "--list-aliases"],
-                check=True,
-                stdout=subprocess.PIPE,
-                text=True,
-            )
-            target.mkdir(parents=True, exist_ok=True)
-            for alias in result.stdout.splitlines():
-                if not alias or "/" in alias:
-                    raise ManifestError(f"invalid dispatcher alias: {alias!r}")
-                alias_destination = f"{destination.rstrip('/')}/bc250-{alias}"
-                alias_target = build_path(buildroot, alias_destination)
-                alias_target.unlink(missing_ok=True)
-                alias_target.symlink_to("bc250")
-                record("file", mode, alias_destination)
-            continue
 
         destination_is_directory = destination.endswith("/") or len(sources) > 1
         if len(sources) > 1 and not destination.endswith("/"):
@@ -217,6 +195,6 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
-    except (ManifestError, OSError, subprocess.CalledProcessError) as error:
+    except (ManifestError, OSError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         raise SystemExit(1)

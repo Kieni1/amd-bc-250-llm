@@ -103,8 +103,13 @@ def checksum_path(path: Path) -> Path:
     return path.with_name(f"{path.name}.sha256")
 
 
+def normalize_source_mode(path: Path) -> None:
+    path.chmod(0o644)
+
+
 def write_checksum(path: Path) -> None:
     checksum_path(path).write_text(f"{sha256(path)}  {path.name}\n", encoding="utf-8")
+    normalize_source_mode(checksum_path(path))
 
 
 def verify_checksum(path: Path) -> bool:
@@ -125,6 +130,8 @@ def verify_checksum(path: Path) -> bool:
 
 def download(source: dict, archive: Path, *, force: bool) -> None:
     if not force and verify_checksum(archive):
+        normalize_source_mode(archive)
+        normalize_source_mode(checksum_path(archive))
         print(f"Using verified cache {display_path(archive)}")
         return
     curl = shutil.which("curl")
@@ -159,6 +166,7 @@ def download(source: dict, archive: Path, *, force: bool) -> None:
         if temporary.stat().st_size == 0:
             raise SourceError(f"download produced an empty archive: {archive.name}")
         os.replace(temporary, archive)
+        normalize_source_mode(archive)
         write_checksum(archive)
         print(f"Fetched and checksummed {display_path(archive)}")
     finally:
@@ -168,6 +176,8 @@ def download(source: dict, archive: Path, *, force: bool) -> None:
 def prepare_cargo_vendor(source: dict, archive: Path, *, force: bool) -> Path:
     vendor = SOURCE_DIR / expand(source["vendor_archive"], source)
     if not force and verify_checksum(vendor):
+        normalize_source_mode(vendor)
+        normalize_source_mode(checksum_path(vendor))
         print(f"Using verified cache {display_path(vendor)}")
         return vendor
 
@@ -216,6 +226,7 @@ def prepare_cargo_vendor(source: dict, archive: Path, *, force: bool) -> Path:
             check=True,
         )
         os.replace(temporary, vendor)
+        normalize_source_mode(vendor)
         write_checksum(vendor)
     finally:
         temporary.unlink(missing_ok=True)
@@ -278,6 +289,8 @@ def main() -> int:
             )
         for path in source_files(selected):
             verify_checksum(path)
+            normalize_source_mode(path)
+            normalize_source_mode(checksum_path(path))
         print(f"Source cache verified: {len(source_files(selected))} file(s)")
         return 0
 
