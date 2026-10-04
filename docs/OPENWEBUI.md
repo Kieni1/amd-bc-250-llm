@@ -1,4 +1,4 @@
-# Open WebUI settings
+# Open WebUI
 
 Package candidate baseline: **Open WebUI v0.11.4** with **Ollama v0.34.4** and **Apache Tika v4.0.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
@@ -10,7 +10,7 @@ The package uses two layers deliberately:
 2. `/usr/share/bc250-llm-server/openwebui/desired-state.json` is the single
    package authority for persisted providers/task/embedding/RAG settings and the
    small local/offline application-policy subset owned by the appliance;
-   `bc250-openwebui-setup` applies it through supported administrator APIs.
+   `bc250 openwebui-setup` applies it through supported administrator APIs.
 
 The package never edits `webui.db` directly and does not store the administrator
 password or the temporary API/session token used for setup. It does persist a
@@ -29,13 +29,13 @@ Unattended installation never waits for credentials.
 Manual equivalents:
 
 ```bash
-sudo bc250-openwebui-setup init
-sudo bc250-openwebui-setup init --token-file FILE
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup apply
-bc250-openwebui-setup status
-sudo bc250-openwebui-setup status --verbose
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250-openwebui-setup status
-sudo bc250-openwebui-setup save-key --token-file FILE
+sudo bc250 openwebui-setup init
+sudo bc250 openwebui-setup init --token-file FILE
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup apply
+bc250 openwebui-setup status
+sudo bc250 openwebui-setup status --verbose
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup status
+sudo bc250 openwebui-setup save-key --token-file FILE
 ```
 
 `init` offers administrator sign-in/create or protected API-key-file authentication.
@@ -93,7 +93,7 @@ set. Existing unrelated grants are retained, including historical grants on inac
 The current pre-v1 testing policy keeps raw production/task implementations and ordinary-size
 experiments visible, while pressure-heavy large experimental profiles can be package-marked
 admin/testing-only. Provider allowlists alone are not treated as proof of the ordinary-user selector. On authenticated
-apply/status, `bc250-openwebui-setup` also discovers the actual `11434`/`11435` Ollama inventories and
+apply/status, `bc250 openwebui-setup` also discovers the actual `11434`/`11435` Ollama inventories and
 creates or updates lightweight package-managed testing records. Ordinary-user-visible records receive
 additive `user:*:read` access; package-managed records explicitly marked admin/testing-only do not. When a
 previously public package-managed discovery record becomes admin/testing-only, convergence may remove only
@@ -122,14 +122,14 @@ work.
 Agent/coding mode is exclusive. Use:
 
 ```bash
-sudo bc250-agent-mode enter
+sudo bc250 agent-mode enter
 # coding/agent work
-sudo bc250-agent-mode leave
+sudo bc250 agent-mode leave
 ```
 
 Entering agent mode stops main/task/embedding; leaving restores normal mode. Open WebUI itself
 remains reachable, and its persisted catalogue may continue to list normal office roles while those
-backends are intentionally unavailable. Return with `sudo bc250-agent-mode normal`; do not dynamically
+backends are intentionally unavailable. Return with `sudo bc250 agent-mode normal`; do not dynamically
 rewrite Open WebUI provider/model state merely to mirror the temporary exclusive topology.
 This is intentional on the BC-250 unified-memory pool.
 
@@ -177,7 +177,7 @@ explicitly adopted and tested.
 
 ## Package model presets
 
-`bc250-openwebui-setup` imports package-owned workspace presets:
+`bc250 openwebui-setup` imports package-owned workspace presets:
 
 | Preset | Base model | State |
 |---|---|---|
@@ -204,7 +204,7 @@ integrity check. Package qualification follows direct `/api/chat/completions` wi
 `/api/chat/completed` before scoring the final assistant message, because tagged Open WebUI releases
 do not rewrite the direct completion HTTP response with outlet-filter changes.
 
-`bc250-install` now ensures the base model behind every active package-owned Open WebUI
+`bc250 install` now ensures the base model behind every active package-owned Open WebUI
 role before applying desired state, including the production Translate-Gemma role. Manual
 model installation is therefore needed only for experiments/rollback paths or deliberate
 operator changes.
@@ -212,12 +212,12 @@ operator changes.
 To inspect the live verified contract, an explicit protected token file still overrides the package default:
 
 ```bash
-sudo bc250-openwebui-setup status --verbose
+sudo bc250 openwebui-setup status --verbose
 ```
 
 The package may store a verified administrator maintenance API key at
 `/var/lib/bc250-llm-server/secrets/openwebui-admin.key` inside a root-owned `0700` secrets directory;
-the key file is root-owned `0600`. `bc250-openwebui-setup`, `bc250-verify` and `bc250-revalidate` use this
+the key file is root-owned `0600`. `bc250 openwebui-setup`, `bc250 verify` and `bc250 revalidate` use this
 default automatically when no explicit token file is supplied. Existing keys are never silently overwritten,
 and token contents must not be printed or collected in support/revalidation evidence.
 
@@ -236,7 +236,7 @@ For other strict structured workflows, use explicit request parameters rather th
 
 - Standard: exact JSON schema as `params.format` plus request `temperature=0.0`; do not override `think`.
   The final focused campaign produced 200/200 strict exact outputs with this policy.
-- Documents: exact JSON schema as `params.format`; leave the model's thinking/sampling policy otherwise unchanged.
+- Documents: exact JSON schema as `params.format` plus request `temperature=0.0`; leave the model's thinking policy otherwise unchanged.
   The focused campaign produced 25/25 strict outputs and no larger confirmation is required for this release.
 - Advanced Structured: use the explicit preset above; a schema may additionally be supplied as `params.format` when
   the caller has one.
@@ -292,15 +292,15 @@ Open WebUI enforces **128 MiB per file**. nginx has a larger **256 MiB reverse-p
 application limit.
 
 See [`RAG.md`](RAG.md) for ingestion and retrieval acceptance testing. Explicit
-setting comparisons use `bc250-benchmark owui-embedding-batch`,
-`bc250-benchmark owui-chunk-min` and the root-only
-`bc250-benchmark owui-system-context`; routine revalidation tests only the packaged
+setting comparisons use `bc250 benchmark owui-embedding-batch`,
+`bc250 benchmark owui-chunk-min` and the root-only
+`bc250 benchmark owui-system-context`; routine revalidation tests only the packaged
 values and does not choose among candidates.
 
 ## Local/offline application baseline
 
 The Quadlet keeps authentication enabled and supplies conservative bootstrap
-defaults. `bc250-openwebui-setup` also owns the persisted values for Arena,
+defaults. `bc250 openwebui-setup` also owns the persisted values for Arena,
 cloud OpenAI access, community sharing, direct browser connections, code
 execution/interpreter and memories so a later database-side admin change is
 visible as drift and is reconverged on apply. Arena is disabled rather than
@@ -327,17 +327,17 @@ networks.
 Open WebUI persists many settings in its database. The packaged JSON plus the
 supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
-The package provides two distinct backup classes. Scheduled `bc250-maintenance` config and
+The package provides two distinct backup classes. Scheduled `bc250 maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
 Open WebUI version migration with an existing database, RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and
-xattrs; the supported restore sequence is documented in [`MAINTENANCE.md`](MAINTENANCE.md).
+xattrs; the supported restore sequence is documented in [`OPERATIONS.md`](OPERATIONS.md).
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
 upload/extraction, embedding/retrieval, the seven active package presets and an
-authenticated `bc250-openwebui-setup status` before changing the pin.
+authenticated `bc250 openwebui-setup status` before changing the pin.
 
 ## Deferred candidates
 
