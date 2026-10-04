@@ -72,7 +72,7 @@ cp "$PROMPT_FILE" "$OUT/setup/candidate-system.txt"
 cp "$PROVIDER_HELPER" "$OUT/setup/owui-provider-config.py"
 
 need() { command -v "$1" >/dev/null 2>&1 || { printf 'ERROR: required command unavailable: %s\n' "$1" >&2; exit 1; }; }
-for cmd in bc250-model curl flock jq ollama python3 rpm systemctl journalctl tar sha256sum; do need "$cmd"; done
+for cmd in bc250 curl flock jq ollama python3 rpm systemctl journalctl tar sha256sum; do need "$cmd"; done
 sudo -v
 sudo test -r "$TOKEN_FILE" && sudo test -s "$TOKEN_FILE" || { printf 'ERROR: token file unavailable: %s\n' "$TOKEN_FILE" >&2; exit 1; }
 
@@ -430,7 +430,7 @@ capture_provenance() {
     cp "$PROVIDER_HELPER" "$OUT/setup/owui-provider-config.py"
     local category resolved sidecar
     category=experiments; [[ "$INSTALL_EXPERIMENT" == 0 ]] && category=production
-    resolved="$(bc250-model path "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
+    resolved="$(bc250 model path "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
     if [[ -n "$resolved" ]]; then
         printf '%s\n' "$resolved" > "$OUT/setup/candidate-source-path.txt"
         sidecar="${resolved}.bc250.json"
@@ -572,7 +572,7 @@ ORIGINAL_SAVED=1
 save_original_ollama_config || exit 20
 
 if [[ "$INSTALL_EXPERIMENT" == 1 ]]; then
-    sudo bc250-model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
+    sudo bc250 model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
     prepare_candidate_provider || exit 20
 else
     printf 'production reference: using existing registered model %s\n' "$CANDIDATE" | tee "$OUT/setup/candidate-apply.txt"

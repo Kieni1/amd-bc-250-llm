@@ -46,7 +46,7 @@ cp "$0" "$OUT/translation-direct-candidate-screen.sh" 2>/dev/null || true
 need() {
     command -v "$1" >/dev/null 2>&1 || { printf 'ERROR: required command unavailable: %s\n' "$1" >&2; exit 1; }
 }
-for cmd in bc250-benchmark bc250-model curl jq ollama python3 rpm systemctl journalctl tar sha256sum flock awk grep; do need "$cmd"; done
+for cmd in bc250 curl jq ollama python3 rpm systemctl journalctl tar sha256sum flock awk grep; do need "$cmd"; done
 sudo -v
 
 unload_main() {
@@ -103,7 +103,7 @@ run_round() {
     read -r start_mem start_swap < <(sample_resource)
     printf '\n===== direct translation / %s / round %s / think=%s =====\n' "$CANDIDATE" "$n" "$THINK_POLICY"
     set +e
-    bc250-benchmark translation "$CANDIDATE" --think "$THINK_POLICY" --ollama-url "$MAIN_URL" --output-dir "$dir" \
+    bc250 benchmark translation "$CANDIDATE" --think "$THINK_POLICY" --ollama-url "$MAIN_URL" --output-dir "$dir" \
         2>&1 | tee "$OUT/runs/${n}.console.txt"
     rc="${PIPESTATUS[0]}"
     set -e
@@ -134,7 +134,7 @@ capture_provenance() {
         > "$OUT/setup/candidate-ollama-show.json" 2>&1 || true
     local category resolved sidecar
     category=experiments; [[ "$INSTALL_EXPERIMENT" == 0 ]] && category=production
-    resolved="$(bc250-model path "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
+    resolved="$(bc250 model path "$category" "$CANDIDATE" 2>/dev/null | cut -f1 || true)"
     if [[ -n "$resolved" ]]; then
         printf '%s\n' "$resolved" > "$OUT/setup/candidate-source-path.txt"
         sidecar="${resolved}.bc250.json"
@@ -330,7 +330,7 @@ MAIN_LANE_CLEANUP_ALLOWED=1
 cp /usr/libexec/bc250-llm-server/category-benchmark.py "$OUT/setup/category-benchmark.py"
 cp /usr/share/bc250-llm-server/benchmark/translation-office.json "$OUT/setup/translation-office.json"
 if [[ "$INSTALL_EXPERIMENT" == 1 ]]; then
-    sudo bc250-model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
+    sudo bc250 model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
 else
     printf 'production reference: using existing registered model %s\n' "$CANDIDATE" | tee "$OUT/setup/candidate-apply.txt"
 fi

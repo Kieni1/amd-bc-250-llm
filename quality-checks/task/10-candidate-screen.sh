@@ -50,7 +50,7 @@ need() {
         exit 1
     }
 }
-for cmd in bc250-benchmark bc250-model curl jq ollama python3 rpm systemctl journalctl tar sha256sum; do
+for cmd in bc250 curl jq ollama python3 rpm systemctl journalctl tar sha256sum; do
     need "$cmd"
 done
 OLLAMA_BIN="$(command -v ollama)"
@@ -89,7 +89,7 @@ register_candidate_on_task() {
         printf 'ERROR: packaged candidate Modelfile unavailable: %s\n' "$modelfile" >&2
         return 1
     }
-    # bc250-model applies experimental GGUFs in the package experiment store and
+    # bc250 model applies experimental GGUFs in the package experiment store and
     # registers them on main Ollama. Mirror only the Ollama registration into the
     # task service so quality/resource evidence uses the same q8 KV-cache, 4096
     # context and keep-alive policy as the deployment target.
@@ -129,7 +129,7 @@ run_one() {
     unload_host "$url" "$host"
     printf '\n===== round %s / %s / %s =====\n' "$round" "$label" "$model"
     set +e
-    bc250-benchmark task "$model" --ollama-url "$url" --output-dir "$dir" \
+    bc250 benchmark task "$model" --ollama-url "$url" --output-dir "$dir" \
         2>&1 | tee "$OUT/runs/${round}-${label}.console.txt"
     rc="${PIPESTATUS[0]}"
     set -e
@@ -248,7 +248,7 @@ capture_state "$OUT/setup/state-before"
 cp /usr/libexec/bc250-llm-server/category-benchmark.py "$OUT/setup/category-benchmark.py"
 cp /usr/share/bc250-llm-server/benchmark/task-cases.json "$OUT/setup/task-cases.json"
 
-sudo bc250-model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
+sudo bc250 model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
 model_present "$MAIN_URL" "$CANDIDATE" || { echo 'ERROR: candidate is not registered on main Ollama.' >&2; exit 1; }
 model_present "$TASK_URL" "$BASELINE" || { echo 'ERROR: packaged task baseline is not registered.' >&2; exit 1; }
 register_candidate_on_task
