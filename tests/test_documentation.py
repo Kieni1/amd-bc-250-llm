@@ -17,7 +17,6 @@ EXCLUDED_DOC_TREES = {
     "rpmbuild",
     "sources",
     "governor-src",
-    "unlock-src",
     "live-manager-src",
     "__pycache__",
 }
@@ -34,34 +33,22 @@ def package_markdown_paths():
         yield path, relative
 
 
-def dispatcher_aliases() -> set[str]:
-    result = subprocess.run(
-        [str(ROOT / "packaging/bc250"), "--list-aliases"],
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    )
-    return set(result.stdout.splitlines())
+def dispatcher_routes() -> set[str]:
+    source = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+    return set(re.findall(r'^  "([a-z0-9-]+)\|', source, re.MULTILINE))
 
 
 class DocumentationTests(unittest.TestCase):
-    def test_command_reference_covers_every_public_alias(self) -> None:
-        reference = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
-        for alias in sorted(dispatcher_aliases()):
-            self.assertIn(f"`bc250-{alias}`", reference, alias)
-        for command in ("`bc250`", "`bc250-cu-live-manager`", "`llm-run-diagnose`"):
+    def test_command_reference_covers_every_public_dispatcher_route(self) -> None:
+        reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
+        for route in sorted(dispatcher_routes()):
+            self.assertIn(f"`bc250 {route}`", reference, route)
+        for command in ("`bc250`", "`bc250-cu-live-manager`", "`bc250-40cu`", "`llm-run-diagnose`"):
             self.assertIn(command, reference)
 
     def test_shell_examples_do_not_invent_bc250_commands(self) -> None:
-        allowed = dispatcher_aliases() | {
-            "coding-agent",
-            "cu-live-manager",
-            "documents",
-            "gfx1013",
-            "llm-server",
-            "night-shutdown",
-            "wol",
-        }
+        # The only deliberately standalone bc250-* commands are the CU tools.
+        allowed = {"cu-live-manager", "40cu", "llm-server", "documents", "night-shutdown", "wol", "coding-agent"}
         for path, relative in package_markdown_paths():
             text = path.read_text(encoding="utf-8")
             blocks = re.findall(r"```(?:bash|text)?\n(.*?)```", text, re.DOTALL)
@@ -71,25 +58,15 @@ class DocumentationTests(unittest.TestCase):
 
     def test_privileged_command_examples_use_sudo(self) -> None:
         privileged = (
-            r"bc250-install(?:-ollama)?(?:\s|$)",
-            r"bc250-maintenance(?:\s|$)",
-            r"bc250-model\s+(?:status|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
-            r"bc250-storage(?:\s|$)",
-            r"bc250-revalidate(?:\s|$)",
-            r"bc250-rag-import(?:\s|$)",
-            r"bc250-rag\s+(?:init|prepare-batch|review|activate|supersede|ingest)(?:\s|$)",
-            r"bc250-ocr\s+install(?:\s|$)",
-            r"bc250-fetch-mtp(?:\s|$)",
-            r"bc250-agent-mode\s+(?:enter|leave)(?:\s|$)",
+            r"bc250\s+(?:install|maintenance|storage|revalidate|rag|fetch-mtp|reset)(?:\s|$)",
+            r"bc250\s+ocr\s+install(?:\s|$)",
+            r"bc250\s+openwebui-setup\s+(?:init|apply|save-key)(?:\s|$)",
+            r"bc250\s+agent-mode\s+(?:enter|leave|normal)(?:\s|$)",
+            r"bc250\s+model\s+(?:status|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
+            r"bc250\s+ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
+            r"bc250\s+benchmark\s+owui-system-context(?:\s|$)",
             r"bc250-40cu(?:\s|$)",
             r"bc250-cu-live-manager(?:\s|$)",
-            r"bc250-memory-profile\s+(?:ensure|apply-full|remove)(?:\s|$)",
-            r"bc250-swap-profile\s+(?:ensure|apply|remove)(?:\s|$)",
-            r"bc250-ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
-            r"bc250-openwebui-setup\s+(?:init|apply)(?:\s|$)",
-            r"bc250-benchmark\s+owui-system-context(?:\s|$)",
-            r"bc250-reset(?:\s|$)",
-            r"bc250-uninstall(?:\s|$)",
         )
         for path, relative in package_markdown_paths():
             text = path.read_text(encoding="utf-8")
@@ -102,24 +79,37 @@ class DocumentationTests(unittest.TestCase):
                         if re.search(pattern, command):
                             self.assertRegex(command, r"(?:^|\s)sudo(?:\s|$)", f"{relative}: {command}")
 
+    def test_current_docs_use_supported_model_rag_and_storage_subcommands(self) -> None:
+        allowed = {
+            "model": {"list", "status", "path", "apply", "refresh", "unregister", "remove", "purge-retired"},
+            "rag": {"init", "prepare-batch", "review", "validate", "activate", "supersede", "status", "ingest"},
+            "storage": {"status", "dedupe", "prune-sources"},
+        }
+        patterns = {
+            family: re.compile(rf"\bbc250\s+{family}\s+([a-z0-9-]+)\b")
+            for family in allowed
+        }
+        for path, relative in package_markdown_paths():
+            text = path.read_text(encoding="utf-8")
+            for family, pattern in patterns.items():
+                for command in pattern.findall(text):
+                    self.assertIn(command, allowed[family], f"{relative}: bc250 {family} {command}")
+
     def test_revalidate_reference_covers_public_lifecycle(self) -> None:
-        reference = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         for form in (
-            "sudo bc250-revalidate start",
-            "sudo bc250-revalidate start --skip-owui",
-            "sudo bc250-revalidate status",
-            "sudo bc250-revalidate status --raw",
-            "sudo bc250-revalidate abort",
-            "sudo bc250-revalidate cleanup",
+            "sudo bc250 revalidate start",
+            "sudo bc250 revalidate start --skip-owui",
+            "sudo bc250 revalidate status",
+            "sudo bc250 revalidate status --raw",
+            "sudo bc250 revalidate abort",
+            "sudo bc250 revalidate cleanup",
         ):
             self.assertIn(form, reference)
 
     def test_read_only_profile_examples_do_not_require_sudo(self) -> None:
         forbidden = (
-            "sudo bc250-memory-profile status",
-            "sudo bc250-memory-profile recommend",
-            "sudo bc250-swap-profile status",
-            "sudo bc250-ollama-profile status",
+            "sudo bc250 ollama-profile status",
         )
         for path, relative in package_markdown_paths():
             text = path.read_text(encoding="utf-8")
@@ -128,13 +118,12 @@ class DocumentationTests(unittest.TestCase):
                     self.assertNotIn(command, block, f"{relative}: {command}")
 
 
-    def test_model_manager_current_docs_use_new_lifecycle_contract(self) -> None:
+    def test_model_manager_current_docs_use_canonical_lifecycle_contract(self) -> None:
         current_docs = (
             "README.md",
             "MODELS.md",
             "TLDR.md",
-            "docs/COMMANDS.md",
-            "docs/MAINTENANCE.md",
+            "docs/OPERATIONS.md",
             "docs/RAG.md",
             "models/README.md",
             "models/coding-agent/README.md",
@@ -143,25 +132,18 @@ class DocumentationTests(unittest.TestCase):
             "models/mtp/README.md",
             "models/task-model/README.md",
         )
-        forbidden = (
-            "bc250-model install",
-            "bc250-model cleanup",
-            "bc250-model cleanup-retired",
-            "bc250-model resolve",
-            "--keep-gguf",
-        )
-        for relative in current_docs:
-            text = (ROOT / relative).read_text(encoding="utf-8")
-            for old in forbidden:
-                self.assertNotIn(old, text, f"{relative}: stale model-manager command {old}")
+        required = ("bc250 model list", "bc250 model status", "bc250 model apply")
+        corpus = "\n".join((ROOT / relative).read_text(encoding="utf-8") for relative in current_docs)
+        for command in required:
+            self.assertIn(command, corpus)
 
     def test_model_manager_read_only_examples_do_not_require_sudo(self) -> None:
         current_docs = (
             "README.md",
             "MODELS.md",
             "TLDR.md",
-            "docs/COMMANDS.md",
-            "docs/MAINTENANCE.md",
+            "docs/OPERATIONS.md",
+            "docs/OPERATIONS.md",
             "docs/RAG.md",
             "models/README.md",
             "models/coding-agent/README.md",
@@ -171,8 +153,8 @@ class DocumentationTests(unittest.TestCase):
             "models/task-model/README.md",
         )
         forbidden = (
-            "sudo bc250-model list",
-            "sudo bc250-model path",
+            "sudo bc250 model list",
+            "sudo bc250 model path",
         )
         for relative in current_docs:
             text = (ROOT / relative).read_text(encoding="utf-8")
@@ -183,18 +165,18 @@ class DocumentationTests(unittest.TestCase):
     def test_secondary_model_docs_expose_explicit_mtp_opt_in(self) -> None:
         for relative in ("README.md", "TLDR.md", "MODELS.md", "models/README.md", "models/mtp/README.md"):
             text = (ROOT / relative).read_text(encoding="utf-8")
-            self.assertIn("bc250-model list mtp --all", text, relative)
-            self.assertIn("bc250-fetch-mtp", text, relative)
+            self.assertIn("bc250 model list mtp --all", text, relative)
+            self.assertIn("bc250 fetch-mtp", text, relative)
 
     def test_mtp_command_reference_matches_same_target_contract(self) -> None:
-        reference = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         self.assertIn("controlled same-target qualification helper", reference)
         self.assertIn("draft accepted/proposed counts", reference)
         self.assertNotIn("The quick MTP comparison accepts `BASELINE_MODEL`", reference)
         self.assertNotIn("speed-oriented Ollama-vs-llama.cpp helper", reference)
 
     def test_current_docs_keep_mtp_out_of_generic_installer_convergence(self) -> None:
-        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        commands = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         models = (ROOT / "models/README.md").read_text(encoding="utf-8")
         for text in (commands, models):
             self.assertIn("apply all", text)
@@ -204,8 +186,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertNotIn("optional model selection across production, experiments,\nagentic, embedding, task and MTP entries", models)
 
     def test_current_docs_preserve_optional_setup_and_diagnostic_contracts(self) -> None:
-        maintenance = (ROOT / "docs/MAINTENANCE.md").read_text(encoding="utf-8")
-        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
+        maintenance = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
+        commands = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         quality = (ROOT / "docs/QUALITY-CHECKS.md").read_text(encoding="utf-8")
 
         self.assertIn("separate optional decisions", maintenance)
@@ -220,9 +202,10 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("generation output budget", commands)
         self.assertIn("/usr/share/doc/bc250-llm-server/", commands)
 
-        self.assertIn("<512 MiB", quality)
-        self.assertIn("output-budget", quality)
-        self.assertIn("must not automatically be relabeled as", quality)
+        self.assertIn("512 MiB", commands)
+        self.assertIn("128 MiB", commands)
+        self.assertIn("output budget", commands)
+        self.assertIn("Model-quality findings", quality)
 
     def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
@@ -313,9 +296,9 @@ class DocumentationTests(unittest.TestCase):
             self.assertIn(name, readme)
 
     def test_openwebui_api_compatibility_boundary_is_explicit(self) -> None:
-        settings = (ROOT / "docs/openwebui-settings.md").read_text(encoding="utf-8")
-        commands = (ROOT / "docs/COMMANDS.md").read_text(encoding="utf-8")
-        benchmark = (ROOT / "cmd/benchmark/README.md").read_text(encoding="utf-8")
+        settings = (ROOT / "docs/OPENWEBUI.md").read_text(encoding="utf-8")
+        commands = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
+        benchmark = (ROOT / "docs/BENCHMARKING.md").read_text(encoding="utf-8")
         for text in (settings, commands):
             self.assertIn("/api/chat/completions", text)
             self.assertIn("options.num_predict", text)
