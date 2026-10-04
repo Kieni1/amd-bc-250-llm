@@ -54,7 +54,7 @@ need() {
         exit 1
     }
 }
-for cmd in bc250-benchmark bc250-model curl jq ollama python3 rpm systemctl journalctl tar sha256sum; do
+for cmd in bc250 curl jq ollama python3 rpm systemctl journalctl tar sha256sum; do
     need "$cmd"
 done
 sudo -v
@@ -148,7 +148,7 @@ install_candidate() {
         return 0
     fi
     printf '\n=== apply %s ===\n' "$model"
-    sudo env BC250_HF_ANONYMOUS=1 bc250-model apply experiments "$model" \
+    sudo env BC250_HF_ANONYMOUS=1 bc250 model apply experiments "$model" \
         2>&1 | tee "$OUT/setup/${model}.apply.txt"
     model_present "$MAIN_URL" "$model" || {
         printf 'ERROR: candidate did not appear after apply: %s\n' "$model" >&2
@@ -166,9 +166,9 @@ cleanup_candidate() {
 
     unload_normal_lanes || true
     if [[ "$KEEP_GGUF" == 1 ]]; then
-        sudo bc250-model unregister experiments "$model" --yes
+        sudo bc250 model unregister experiments "$model" --yes
     else
-        sudo bc250-model remove experiments "$model" --yes
+        sudo bc250 model remove experiments "$model" --yes
     fi
     CLEANED["$model"]=1
 }
@@ -186,7 +186,7 @@ run_generation() {
         REQUEST_TIMEOUT="$REQUEST_TIMEOUT" \
         KEEP_ALIVE='10m' \
         BOARD_NOTE='BC-250 main-model candidate matrix; task/embedding services active, resident companion models unloaded' \
-        bc250-benchmark generation \
+        bc250 benchmark generation \
             --profile "$profile" \
             --mode neutral \
             --think omit \
