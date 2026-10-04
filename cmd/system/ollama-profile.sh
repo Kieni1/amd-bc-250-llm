@@ -7,7 +7,7 @@ OVERRIDE_FILE="$OVERRIDE_DIR/60-bc250-runtime-profile.conf"
 
 usage() {
   cat <<'USAGE'
-Usage: bc250-ollama-profile COMMAND
+Usage: bc250 ollama-profile COMMAND
 
 Commands:
   status        Show the effective Ollama runtime profile

@@ -14,7 +14,7 @@ FSTAB_END="# END bc250-llm-server swap"
 
 usage() {
   cat <<'USAGE'
-Usage: bc250-swap-profile COMMAND
+Usage: swap-profile.sh COMMAND  # internal package helper
 
 Commands:
   status   Show zram and disk swap
@@ -135,7 +135,7 @@ ensure_swappiness() {
     chmod 0600 "$SWAPPINESS_STATE"
   fi
   install -d -m0755 "$(dirname "$SWAPPINESS_CONF")"
-  printf '# Managed by bc250-swap-profile.\nvm.swappiness = %s\n' "$SWAPPINESS" > "$SWAPPINESS_CONF"
+  printf '# Managed by bc250-llm-server.\nvm.swappiness = %s\n' "$SWAPPINESS" > "$SWAPPINESS_CONF"
   sysctl --write "vm.swappiness=$SWAPPINESS" >/dev/null
 }
 

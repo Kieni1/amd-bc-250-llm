@@ -7,7 +7,7 @@ LEGACY_ARG_PREFIXES="amdgpu.gttsize= amdgpu.ppfeaturemask="
 
 usage() {
   cat <<'USAGE'
-Usage: bc250-memory-profile COMMAND [--quiet]
+Usage: memory-profile.sh COMMAND [--quiet]  # internal package helper
 
 Commands:
   status       Show/verify the active BC-250 TTM profile
