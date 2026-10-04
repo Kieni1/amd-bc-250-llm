@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
     container:
       image: fedora:44
 
@@ -19,7 +22,7 @@ jobs:
         run: |
           dnf install -y \
             bash cargo curl findutils gcc git gzip make \
-            libdrm-devel patch python3 rpm-build ruff rust ShellCheck \
+            libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck \
             systemd systemd-rpm-macros tar xz
 
       - name: Check out repository
@@ -36,10 +39,13 @@ jobs:
             fi
           done < <(find . -type f \
             -not -path './sources/*' -not -path './build/*' \
-            -not -path './governor-src/*' -not -path './unlock-src/*' -not -path './live-manager-src/*')
+            -not -path './governor-src/*' -not -path './live-manager-src/*')
 
       - name: Build RPMs
         run: make rpm
+
+      - name: Lint built RPMs
+        run: rpmlint -c packaging/rpmlint.toml dist/*.rpm
 
       - name: Upload binary RPM
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
