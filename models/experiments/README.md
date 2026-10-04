@@ -8,9 +8,9 @@ maintain a second status table here.
 ## Operator entry points
 
 ```bash
-bc250-model list experiments
-sudo bc250-model apply experiments
-bc250-benchmark
+bc250 model list experiments
+sudo bc250 model apply experiments
+bc250 benchmark
 ```
 
 Normal discovery comes from `models/modelfiles/exp-*.Modelfile`. Candidates that no
@@ -52,4 +52,4 @@ source tree and call it a restorable backup.
 
 MTP/draft heads are a separate download-only llama.cpp workflow; see
 [`../mtp/README.md`](../mtp/README.md). OCR behavior and measured status are described
-in `MODELS.md`; use `bc250-ocr list` for the installed engines.
+in `MODELS.md`; use `bc250 ocr list` for the installed engines.

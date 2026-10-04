@@ -22,7 +22,7 @@ Main, task and embedding stores are deliberately separate. The main lane keeps i
 selected chat model warm for 20 minutes, the compact task lane unloads after each
 request, and the embedding lane keeps the small retrieval model warm for 10 minutes.
 This preserves interactive chat latency while keeping background task residency small.
-Agent/coding is **exclusive**: `bc250-agent-mode enter` stops main/task/embedding and
+Agent/coding is **exclusive**: `bc250 agent-mode enter` stops main/task/embedding and
 starts only 11436; `leave` restores normal mode.
 
 During pre-v1 comparison testing Open WebUI discovers models installed on the normal main (`11434`)
@@ -33,9 +33,9 @@ Qwen3.6 35B is retired after repeated 8K pressure failures; Qwen3.8 27B Unsloth 
 ISTA IQ3_XXS remains the ordinary-user deployability comparison. Embedding and exclusive agent lanes
 remain outside the normal chat selector.
 
-MTP is different from the agent lane: it shares catalog/provenance handling with `bc250-model`, but
+MTP is different from the agent lane: it shares catalog/provenance handling with `bc250 model`, but
 its runtime is a standalone opt-in external llama.cpp server rather than an Ollama service lane.
-Direct `bc250-run-mtp` operation snapshots and drains any resident Ollama models first, then restores
+Direct `bc250 run-mtp` operation snapshots and drains any resident Ollama models first, then restores
 the exact pre-run residency set when the standalone server exits. Qualification/comparison runs
 intentionally leave Ollama cold so residency cannot contaminate performance/resource evidence.
 
@@ -43,38 +43,42 @@ The package owns all four Ollama service definitions statically. Normal mode req
 
 ## Inspect, apply, refresh and remove
 
-`bc250-model` separates catalog discovery, state inspection and lifecycle actions:
+`bc250 model` separates catalog discovery, state inspection and lifecycle actions:
 
 ```bash
-bc250-model list
-bc250-model list production
-bc250-model list experiments
-bc250-model list task
-bc250-model list agentic
-bc250-model list embedding
-bc250-model list mtp --all
+bc250 model list
+bc250 model list production
+bc250 model list experiments
+bc250 model list task
+bc250 model list agentic
+bc250 model list embedding
+bc250 model list mtp --all
 # MTP stays opt-in even though it shares the lifecycle manager:
-sudo bc250-fetch-mtp qwen3.5-9b-mtp
+sudo bc250 fetch-mtp qwen3.5-9b-mtp
 
 # Generic installer / apply-all convergence never selects MTP.
-sudo bc250-model status agentic MODEL
-sudo bc250-model status agentic MODEL --online
+sudo bc250 model status agentic MODEL
+sudo bc250 model status agentic MODEL --online
 
-sudo bc250-model apply production MODEL
-sudo bc250-model apply experiments MODEL
-sudo bc250-model apply embedding MODEL
-sudo bc250-model apply task MODEL
-sudo bc250-model apply agentic MODEL
+sudo bc250 model apply production MODEL
+sudo bc250 model apply experiments MODEL
+sudo bc250 model apply embedding MODEL
+sudo bc250 model apply task MODEL
+sudo bc250 model apply agentic MODEL
 
-sudo bc250-model refresh experiments MODEL
-sudo bc250-model unregister experiments MODEL
-sudo bc250-model remove experiments MODEL
-sudo bc250-model purge-retired
+sudo bc250 model refresh experiments MODEL
+sudo bc250 model unregister experiments MODEL
+sudo bc250 model remove experiments MODEL
+sudo bc250 model purge-retired
 ```
 
 `list` is catalog-only and does not require root. `status` is the read-only runtime
 inspection command: it reports source/provenance validity, current-definition and
 runtime-Modelfile drift, registration state and a recommended reconciliation action.
+Intentionally unselected optional models are reported as `OPTIONAL — not installed` or
+`OPTIONAL — source cached, not registered`. Cached source bytes alone do not create desired
+active state and do not trigger an apply/refresh recommendation. `DRIFT` is reserved for a
+selected/desired runtime definition whose registration or content is actually missing or inconsistent.
 `--online` additionally checks moving upstream revisions without mutating local state.
 In normal mode the agent Ollama API is intentionally stopped, so full read-only
 `status agentic MODEL` may report registration as unavailable/UNKNOWN. That is not a reason
@@ -90,7 +94,7 @@ retirement catalog.
 
 Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer names
 in scripts. The category `all` means the combined catalog; it does not itself select every
-model. Use `sudo bc250-model apply all all` only when you deliberately mean every eligible
+model. Use `sudo bc250 model apply all all` only when you deliberately mean every eligible
 non-MTP model. A moving source revision such as `latest` or `main` is allowed on purpose:
 this package is a model-testing tool. The recorded digest identifies the exact artifact currently
 installed; it is not a permanent product pin for moving `latest`/`main` sources. `status --online` can
@@ -104,8 +108,8 @@ sudo install -m0644 \
   /usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example \
   /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
 sudoedit /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
-sudo bc250-model status experiments exp-example-source-q4-k-m
-sudo bc250-model apply experiments exp-example-source-q4-k-m
+sudo bc250 model status experiments exp-example-source-q4-k-m
+sudo bc250 model apply experiments exp-example-source-q4-k-m
 ```
 
 A same-name operator Modelfile overrides the packaged definition. The operator directory is
@@ -124,18 +128,18 @@ Use the package lifecycle commands rather than deleting source GGUFs or Ollama b
 hand. To remove only the registration while keeping a verified source for quick reuse:
 
 ```bash
-sudo bc250-model unregister production MODEL
-sudo bc250-model apply production MODEL
+sudo bc250 model unregister production MODEL
+sudo bc250 model apply production MODEL
 ```
 
 To remove registration plus manager-owned source/state:
 
 ```bash
-sudo bc250-model remove production MODEL
+sudo bc250 model remove production MODEL
 ```
 
 Local GGUF models can occupy both source storage and imported Ollama storage;
-`sudo bc250-storage status` reports verified duplication and `dedupe` can share identical
+`sudo bc250 storage status` reports verified duplication and `dedupe` can share identical
 XFS extents without deleting either path. `prune-sources` remains a separate, explicit
 hash-verified storage action. Remote OCR registrations remain Ollama-managed.
 
@@ -147,8 +151,8 @@ review Markdown before it enters the active document library. Translation remain
 separate step.
 
 For the full Modelfile metadata/storage contract see [`models/README.md`](models/README.md).
-For deployed role presets see [`docs/openwebui-settings.md`](docs/openwebui-settings.md),
-and for exact command syntax see [`docs/COMMANDS.md`](docs/COMMANDS.md).
+For deployed role presets see [`docs/OPENWEBUI.md`](docs/OPENWEBUI.md),
+and for exact command syntax see [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## 2026-08-31 benchmark status
 
@@ -259,9 +263,7 @@ A focused exact-device regression also showed that German recommendation `sollte
 strengthened by the native Translate-Gemma generation into French obligation `doivent`.
 The package keeps the clause-local modality integrity guard fail-closed for this class of
 strengthening, but the underlying model behavior is accepted as a documented limitation
-rather than a release blocker. `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` is packaged
-only as an opt-in Apache-2.0 translation challenger for a short modality comparison; it is
-not promoted unless it wins the production path on-device. The numeric evaluator correctly
+rather than a release blocker. The EuroLLM 9B challenger fixed the `sollten -> devraient` anchor in Round 1 but reproducibly emitted English for German `muss nicht`; it is therefore retired to the source graveyard and no Round 2 is planned. The numeric evaluator correctly
 treats locale-equivalent values such as `8.1` and `8,1` as equal without claiming
 byte-for-byte formatting preservation.
 
@@ -304,9 +306,9 @@ The source-only graveyard is for models with no current routine promotion path. 
 Modelfiles are not packaged or discovered. Their canonical manager-owned identities are
 mirrored in `models/retired-models.json` so stale installed registrations remain
 distinguishable from operator-created unmanaged models and can be removed safely with
-`bc250-model purge-retired`.
+`bc250 model purge-retired`.
 
-The graveyard currently contains 19 definitions. Important recent role changes are:
+The graveyard currently contains 21 definitions. Important recent role changes are:
 
 | Model | Why it is retired from routine discovery |
 |---|---|
@@ -315,6 +317,7 @@ The graveyard currently contains 19 definitions. Important recent role changes a
 | `exp-translate-gemma4-sub-e4b-17s-q4-k-xl` | experimental identity retired after the same selected weights were promoted under the production name |
 | `exp-hunyuan-mt-7b-mungert-q4-k-m` | translation-only challenger behind Translate-Gemma with reproducible CHF preservation weakness |
 | `exp-ministral3-8b-unsloth-ud-q5-k-xl` | translation-only finalist superseded when Stage-2E selected Translate-Gemma |
+| `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` | translation challenger retired after Round 1 reproducibly returned English for German `muss nicht` despite fixing the modality anchor |
 | `exp-qwen38-4b-distill-empero-q6-k` | task quality was promising but simultaneous warm-main residency OOM-killed the task service |
 | `task-lfm25-2.6b-liquidai-q6-k` | superseded by the smaller promoted LFM2.5 1.2B task model |
 
@@ -329,13 +332,13 @@ experiments keep their separate lanes.
 Use the role-specific lanes before changing defaults:
 
 ```bash
-bc250-benchmark usecase
-bc250-benchmark translation
-bc250-benchmark rag-quality
-bc250-benchmark embeddings
-bc250-benchmark ocr
-bc250-benchmark task
-bc250-benchmark agent
+bc250 benchmark usecase
+bc250 benchmark translation
+bc250 benchmark rag-quality
+bc250 benchmark embeddings
+bc250 benchmark ocr
+bc250 benchmark task
+bc250 benchmark agent
 ```
 
 ## Active experiment catalog
@@ -348,7 +351,6 @@ separately below.
 ```text
 exp-gemma4-12b-google-qat-q4-0
 exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
-exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
 exp-glm-ocr-ggml-q8-0
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
@@ -370,7 +372,7 @@ exp-tir-qwen35-9b-nonthinking-v2-q6-k
 
 `agentic-ornith15-9b-ornith-q5-k-m` remains the package-default Agent when that add-on is
 explicitly installed, but Agent is not part of the core appliance install baseline. Starting with
-`0.12.2-0.6`, full revalidation reports the Agent phase as optional coverage unavailable/skipped
+Current revalidation reports the Agent phase as optional coverage unavailable/skipped
 when no Agent model is installed; that does not fail the core appliance. If Agent is present,
 revalidation still qualifies its exclusive lane and runtime/topology faults remain real
 infrastructure failures.
@@ -404,7 +406,6 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m` | opt-in Apache-2.0 translation challenger for a short DE↔FR modality comparison against production Translate-Gemma; no promotion implied |
 | `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in graveyard/history |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-s` | admin/testing-only 8K quality/reasoning profile; `think=true`; mechanically strong but memory-tight |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |
@@ -432,7 +433,7 @@ from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cac
 runtime and the OS. Draft/MTP heads are not standalone Ollama role models and stay in the dedicated MTP
 workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from combined
 `apply all` / `refresh all` convergence regardless of their enabled flag; explicit
-`bc250-fetch-mtp` / `apply mtp` remains the preparation boundary.
+`bc250 fetch-mtp` / `apply mtp` remains the preparation boundary.
 
 The completed MTP campaign now has a small package-facing policy in the existing MTP catalog:
 
@@ -449,8 +450,8 @@ Its historical passing result is preserved in the source-only MTP graveyard. The
 
 The MTP `role` / `recommendation` fields are presentation/policy metadata only: all active entries
 remain disabled/download-only and excluded from installer or `apply all` convergence.
-`bc250-fetch-mtp [SELECTION]` remains the explicit preparation boundary. `bc250-compare-mtp ID`
-remains the same-target qualification path and `bc250-run-mtp ID` the manual runtime/debug path.
+`bc250 fetch-mtp [SELECTION]` remains the explicit preparation boundary. `bc250 compare-mtp ID`
+remains the same-target qualification path and `bc250 run-mtp ID` the manual runtime/debug path.
 Use exact IDs for 27B models; the ambiguous 27B convenience aliases were removed rather than
 silently retargeted after the package preference changed.
 
