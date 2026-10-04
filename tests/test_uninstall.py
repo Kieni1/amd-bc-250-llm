@@ -19,7 +19,7 @@ class ResetTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("PURGE-BC250-LLM", result.stdout)
-        self.assertIn("bc250-reset", result.stdout)
+        self.assertIn("bc250 reset", result.stdout)
 
     def test_greenfield_reset_has_bounded_destructive_targets(self) -> None:
         source = RESET.read_text(encoding="utf-8")
@@ -39,19 +39,17 @@ class ResetTests(unittest.TestCase):
             self.assertIn(path, source)
         self.assertIn("/srv/bc250-documents", source)
 
-    def test_40cu_restore_requires_a_verified_stock_backup(self) -> None:
+    def test_reset_removes_live_cu_manager_state_without_kernel_module_rewrites(self) -> None:
         source = RESET.read_text(encoding="utf-8")
-        self.assertIn("module_has_unlock", source)
-        self.assertIn("no verifiable stock AMDGPU backup", source)
-        self.assertIn("depmod -a", source)
-        self.assertIn("dracut --force --kver", source)
-        self.assertIn("/etc/modprobe.d/bc250-40cu.conf", source)
         self.assertIn("bc250-cu-live-manager.service", source)
+        self.assertIn("/etc/bc250-cu-live-manager.conf", source)
+        self.assertNotIn("bc250_cc_write_mode", source)
+        self.assertNotIn("dracut --force --kver", source)
 
     def test_reset_delegates_component_profiles_and_declares_network_ownership(self) -> None:
         source = RESET.read_text(encoding="utf-8")
-        self.assertIn("bc250-memory-profile remove", source)
-        self.assertIn("bc250-swap-profile remove", source)
+        self.assertIn('"$MEMORY_PROFILE" remove', source)
+        self.assertIn('"$SWAP_PROFILE" remove', source)
         self.assertIn("--remove-service=http", source)
         self.assertIn("setsebool -P httpd_can_network_connect 0", source)
         self.assertIn("Fedora upgrades and filesystem growth were not reversed", source)
