@@ -2084,6 +2084,17 @@ def status_source_text(inspection: ModelInspection) -> str:
 def displayed_status_text(inspection: ModelInspection) -> str:
     if inspection.overall_status != "OPTIONAL":
         return inspection.overall_status
+    if inspection.registration_status == "unavailable":
+        if inspection.source_status == "current":
+            return "OPTIONAL — source cached, registration unavailable"
+        if inspection.source_status == "drift":
+            return (
+                "OPTIONAL — source cached, registration unavailable "
+                "(source needs refresh before use)"
+            )
+        if inspection.source_status == "unavailable":
+            return "OPTIONAL — source and registration state unavailable"
+        return "OPTIONAL — registration unavailable"
     if inspection.source_status == "current":
         return "OPTIONAL — source cached, not registered"
     if inspection.source_status == "drift":
@@ -2131,6 +2142,10 @@ def compact_inspection_details(inspection: ModelInspection) -> list[str]:
     if inspection.overall_status == "CURRENT":
         return ["CURRENT"]
     if inspection.overall_status == "OPTIONAL":
+        if inspection.registration_status == "unavailable":
+            if inspection.source_status in {"current", "drift"}:
+                return ["OPTIONAL", "source cached, registration unavailable"]
+            return ["OPTIONAL", "registration unavailable"]
         if inspection.source_status in {"current", "drift"}:
             return ["OPTIONAL", "source cached, not registered"]
         return ["OPTIONAL", "not installed"]
