@@ -10,13 +10,6 @@ The RPM also contains or refers to separately licensed components:
   `aaed42535622aee1a93df8b22860c409539f67f8`, under the MIT License. The
   project is based on `Magnap/cyan-skillfish-governor`; its upstream license is
   retained in the RPM.
-- The main RPM's **BC-250 40-CU unlock** payload contains the upstream patch
-  and a Fedora integration helper derived from
-  `fduraibi/bc250-40cu-unlock`, pinned to commit
-  `6c3969ddee40e894297869e6ca30537f274619cb`. It is based on
-  `duggasco/bc250-40cu-unlock` and declares GPL-2.0-only. Installing the RPM
-  alone does not apply the patch or enable additional CUs; the separate guided
-  installer prepares a default-off module.
 - **Ollama**, Open WebUI, Apache Tika, Podman, nginx, Mesa and other runtime
   components retain their own licenses. Ollama is installed separately by the
   operator. Container images and dependency packages are not relicensed here.
