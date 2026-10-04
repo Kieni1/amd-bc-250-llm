@@ -104,6 +104,45 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue((outside / "__pycache__/module.cpython-314.pyc").exists())
             self.assertTrue((outside / "module.pyo").exists())
 
+    def test_installer_bytecode_cleanup_fails_closed_when_scan_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            libexec = root / "libexec"
+            share = root / "share"
+            fake_bin = root / "bin"
+            libexec.mkdir(); share.mkdir(); fake_bin.mkdir()
+            fake_find = fake_bin / "find"
+            fake_find.write_text(
+                "#!/usr/bin/env bash\necho 'simulated find failure' >&2\nexit 1\n",
+                encoding="utf-8",
+            )
+            fake_find.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ.get('PATH', '')}",
+                "BC250_LIBEXEC": str(libexec),
+                "BC250_SHARE": str(share),
+            }
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    'source "$1"; cleanup_package_python_bytecode',
+                    "installer-bytecode-failure-test",
+                    str(INSTALLER),
+                ],
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn(
+                "ERROR: failed to remove stale Python cache directories",
+                result.stdout,
+            )
+
     def test_official_ollama_install_keeps_conflict_guard(self) -> None:
         source = INSTALLER.read_text()
         self.assertIn("rpm -e --test ollama", source)

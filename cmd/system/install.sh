@@ -98,14 +98,27 @@ cleanup_sensitive_runtime() {
 
 cleanup_package_python_bytecode() {
   # 0.12.2 could leave unowned Python caches under package-owned /usr trees.
-  # Keep cleanup strictly bounded to BC-250 immutable payload roots.
-  local root cache
+  # Keep cleanup strictly bounded to BC-250 immutable payload roots and fail
+  # closed if those roots cannot be scanned or converged.
+  local root residue
   for root in "$LIBEXEC_DIR" "$PACKAGE_SHARE_DIR"; do
     [[ -d "$root" ]] || continue
-    while IFS= read -r -d '' cache; do
-      rm -rf -- "$cache"
-    done < <(find "$root" -type d -name __pycache__ -print0 2>/dev/null)
-    find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete 2>/dev/null || true
+    if ! find "$root" -type d -name __pycache__ -prune -exec rm -rf -- {} +; then
+      echo "ERROR: failed to remove stale Python cache directories under $root" >&2
+      return 1
+    fi
+    if ! find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete; then
+      echo "ERROR: failed to remove stale Python bytecode under $root" >&2
+      return 1
+    fi
+    if ! residue="$(find "$root" \( -type d -name __pycache__ -o -type f \( -name '*.pyc' -o -name '*.pyo' \) \) -print -quit)"; then
+      echo "ERROR: failed to verify Python bytecode cleanup under $root" >&2
+      return 1
+    fi
+    if [[ -n "$residue" ]]; then
+      echo "ERROR: stale Python bytecode remains after cleanup: $residue" >&2
+      return 1
+    fi
   done
 }
 
@@ -1067,10 +1080,10 @@ print_setup_summary() {
 main() {
   parse_arguments "$@"
   require_root
-  cleanup_package_python_bytecode
   capture_input_mode
   start_transcript
   trap cleanup_sensitive_runtime EXIT
+  cleanup_package_python_bytecode
   [[ -z "$OWUI_TOKEN_FILE" ]] || validate_owui_token_file "$OWUI_TOKEN_FILE"
   if [[ "$INSTALL_MODE" == models ]]; then
     run_models_only
