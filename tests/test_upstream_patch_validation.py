@@ -36,7 +36,7 @@ class UpstreamPatchContractTests(unittest.TestCase):
                     root, "a929085d791f126ce76a60eb609610820fb08066"
                 )
 
-    def test_patched_semantics_reject_old_reboot_path(self):
+    def test_live_manager_rpm_patch_rejects_upstream_reboot_path(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "bc250-cu-live-manager.sh"
             path.write_text(

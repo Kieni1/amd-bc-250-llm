@@ -18,12 +18,12 @@ def load_prepare_sources():
 
 
 class SourceManifestTests(unittest.TestCase):
-    def test_manifest_describes_four_rpm_inputs_with_local_cache_integrity(
+    def test_manifest_describes_three_rpm_inputs_with_local_cache_integrity(
         self,
     ) -> None:
         prepare = load_prepare_sources()
         sources = prepare.load_sources()
-        self.assertEqual(len(prepare.source_files(sources)), 4)
+        self.assertEqual(len(prepare.source_files(sources)), 3)
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         for source in sources:
             self.assertIn("repository", source)
@@ -56,6 +56,28 @@ class SourceManifestTests(unittest.TestCase):
                     archive,
                     force=False,
                 )
+
+
+    def test_verified_source_cache_is_normalized_for_srpm_packaging(self) -> None:
+        prepare = load_prepare_sources()
+        with tempfile.TemporaryDirectory() as temporary:
+            archive = Path(temporary) / "cached.tar.gz"
+            archive.write_bytes(b"cached")
+            archive.chmod(0o600)
+            prepare.write_checksum(archive)
+            prepare.checksum_path(archive).chmod(0o600)
+
+            prepare.download(
+                {"url": "https://invalid.example/{commit}", "commit": "a" * 40},
+                archive,
+                force=False,
+            )
+
+            self.assertEqual(archive.stat().st_mode & 0o777, 0o644)
+            self.assertEqual(
+                prepare.checksum_path(archive).stat().st_mode & 0o777,
+                0o644,
+            )
 
 
 if __name__ == "__main__":

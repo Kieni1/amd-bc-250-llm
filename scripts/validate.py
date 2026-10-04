@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import glob
+import json
 import os
 import re
 import subprocess
@@ -25,12 +26,11 @@ EXCLUDED_TREES = {
     "rpmbuild",
     "sources",
     "governor-src",
-    "unlock-src",
     "live-manager-src",
     "__pycache__",
     "development",
 }
-EXTERNAL_BUILD_TREES = ("governor-src/", "unlock-src/", "live-manager-src/")
+EXTERNAL_BUILD_TREES = ("governor-src/", "live-manager-src/")
 FAILURES: list[str] = []
 
 
@@ -65,7 +65,6 @@ def check_required_inputs() -> None:
         "cmd/monitoring/status.sh",
         "cmd/monitoring/support-bundle.sh",
         "cmd/maintenance/maintenance.sh",
-        "cmd/system/40cu-module.sh",
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "models/mtp/models.toml",
         "examples/benchmark/agent-cases.json",
@@ -73,14 +72,18 @@ def check_required_inputs() -> None:
         "examples/benchmark/rag-quality-office.json",
         "examples/benchmark/ocr/manifest.json",
         "docs/FILESTRUCTURE.md",
+        "docs/INSTALLATION.md",
+        "docs/HARDWARE.md",
+        "docs/OPERATIONS.md",
+        "docs/OPENWEBUI.md",
+        "docs/BENCHMARKING.md",
+        "docs/SECURITY.md",
         "docs/RAG.md",
-        "docs/GFX1013-COMPUTE-QUEUES.md",
         "scripts/check-upstream-patches.py",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",
         "licenses/LICENSE",
-        "licenses/40CU-LICENSE-NOTICE",
     )
     for relative in required:
         if not (ROOT / relative).is_file():
@@ -90,7 +93,6 @@ def check_required_inputs() -> None:
         "uninstall.sh",
         "packaging/bc250",
         "models/modelctl.py",
-        "cmd/system/40cu-module.sh",
         "cmd/monitoring/status.sh",
         "cmd/monitoring/support-bundle.sh",
         "cmd/maintenance/maintenance.sh",
@@ -211,6 +213,8 @@ def check_version() -> None:
         fail("spec Release or top changelog entry is malformed")
     elif changelog_match.group(1) != f"{version}-{release_match.group(1)}":
         fail("top changelog entry does not match Version-Release")
+    if re.search(r"(?m)^Requires:\s+git\s*$", spec):
+        fail("runtime dependency must use git-core instead of the larger git meta-package")
 
 
 def check_configuration() -> None:
@@ -289,83 +293,45 @@ def check_repository_safety() -> None:
 
 
 def check_dispatcher_and_runtime_contracts() -> None:
-    result = subprocess.run(
-        [str(ROOT / "packaging/bc250"), "--list-aliases"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    aliases = result.stdout.splitlines()
+    dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+    routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
-        "40cu",
-        "agent-mode",
-        "benchmark",
-        "check-temp",
-        "code",
-        "code-commit",
-        "compare-mtp",
-        "cu-status",
-        "fetch-mtp",
-        "gitea-review",
-        "install",
-        "install-ollama",
-        "maintenance",
-        "memory-profile",
-        "model",
-        "ocr",
-        "rag",
-        "rag-import",
-        "reset",
-        "reset-info",
-        "revalidate",
-        "ollama-profile",
-        "openwebui-setup",
-        "run-mtp",
-        "status",
-        "support-bundle",
-        "storage",
-        "swap-profile",
-        "uninstall",
-        "uninstall-info",
-        "verify",
-        "verify-lan",
+        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp",
+        "fetch-mtp", "gitea-review", "install", "maintenance", "model", "ocr",
+        "rag", "reset", "revalidate", "ollama-profile", "openwebui-setup",
+        "run-mtp", "status", "support-bundle", "storage", "verify",
     }
-    if result.returncode != 0:
-        fail(f"dispatcher alias listing failed: {result.stderr.strip()}")
-    elif len(aliases) != len(set(aliases)) or set(aliases) != required:
-        fail("dispatcher command set differs from the supported interface")
+    if routes != required:
+        fail(f"dispatcher command set differs from the supported interface: {sorted(routes)}")
 
     checks = {
         "install": (
             "dnf install -y",
             "--exclude=ollama",
-            "exec bc250-install",
+            "exec bc250 install",
         ),
         "cmd/system/install.sh": (
             'source "$runtime_env"',
             'requested="$BC250_OLLAMA_VERSION"',
             "rpm -e --test ollama",
-            "bc250-memory-profile ensure",
-            "bc250-swap-profile ensure",
+            '"$MEMORY_PROFILE" ensure',
+            '"$SWAP_PROFILE" ensure',
             "BC250_MODEL_SELECTION",
             "BC250_MODELCTL_CURRENT_SUMMARY=1",
-            "bc250-model status all --compact",
+            "bc250 model status all --compact",
             "MTP remains a separate opt-in workflow",
-            "bc250-model apply all",
+            "bc250 model apply all",
             "request_primary_reboot_if_needed",
         ),
         "cmd/system/storage.py": (
             "reflink=1",
             "dedupe -q",
             "PRUNE-SOURCES",
-            "PRUNE-40CU",
         ),
         "uninstall.sh": (
             "PURGE-BC250-LLM",
-            "bc250-memory-profile remove",
-            "bc250-swap-profile remove",
-            "bc250_cc_write_mode",
-            "dracut --force --kver",
+            '"$MEMORY_PROFILE" remove',
+            '"$SWAP_PROFILE" remove',
             "dnf remove -y bc250-llm-server.x86_64",
             "/var/lib/bc250-llm-server",
             "/var/lib/open-webui",
@@ -410,10 +376,11 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "Requires:       zram-generator",
             "Requires:       util-linux-script",
             "Requires:       xfsprogs",
+            "Requires:       git-core",
             "%posttrans",
             "BC-250 LLM appliance package installed.",
             "BC-250 LLM appliance package upgraded.",
-            "sudo bc250-install",
+            "sudo bc250 install",
         ),
     }
     for relative, snippets in checks.items():
@@ -464,6 +431,77 @@ def check_dispatcher_and_runtime_contracts() -> None:
         fail("GitHub Actions must use full reviewed commit IDs")
 
 
+
+def check_greenfield_command_surface() -> None:
+    """Reject pre-greenfield public command spellings in active source and package docs."""
+    dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+    routes = sorted(set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE)))
+    removed = (
+        "rag" + "-import",
+        "un" + "install",
+        "check" + "-temp",
+        "verify" + "-lan",
+        "memory" + "-profile",
+        "swap" + "-profile",
+        "cu" + "-status",
+        "install" + "-ollama",
+        "reset" + "-info",
+        "uninstall" + "-info",
+    )
+    names = routes + list(removed)
+    prefixed_pattern = re.compile(
+        r"\bbc250-(?:" + "|".join(re.escape(name) for name in names) + r")\b(?=[\s`'\"),;:]|$)"
+    )
+    removed_model_verbs = ("install", "cleanup", "cleanup" + "-retired", "resolve")
+    model_pattern = re.compile(
+        r"\bbc250\s+model\s+(?:"
+        + "|".join(re.escape(name) for name in removed_model_verbs)
+        + r")\b"
+    )
+    removed_rag_compat = "rag" + "-import"
+    rag_import_pattern = re.compile(r"\bbc250\s+" + re.escape(removed_rag_compat) + r"\b")
+    rag_verb_pattern = re.compile(r"\bbc250\s+rag\s+(?:plan|sync)\b")
+    archive_prefixes = (
+        Path("quality-checks/history"),
+    )
+
+    scope = json.loads((ROOT / "development/DEVELOPMENT-SCOPE.json").read_text(encoding="utf-8"))
+    current_development_files: set[Path] = {
+        ROOT / "development/DEVELOPMENT-SCOPE.json",
+        ROOT / "development/README.md",
+    }
+    for component in scope.get("components", {}).values():
+        if component.get("status") not in {"active", "boundary_active"}:
+            continue
+        for item in component.get("paths", []):
+            if not item.startswith("development/") or any(char in item for char in "*?["):
+                continue
+            current_development_files.add(ROOT / item)
+    candidates = list(included_files()) + [
+        (path.relative_to(ROOT), path)
+        for path in sorted(current_development_files)
+        if path.is_file()
+    ]
+    for relative, path in candidates:
+        if relative == Path("scripts/validate.py"):
+            continue
+        if any(relative.is_relative_to(prefix) for prefix in archive_prefixes):
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        for pattern, description in (
+            (prefixed_pattern, "pre-greenfield public command spelling"),
+            (model_pattern, "removed model-manager command grammar"),
+            (rag_import_pattern, "removed RAG importer command grammar"),
+            (rag_verb_pattern, "removed RAG compatibility subcommand"),
+        ):
+            match = pattern.search(text)
+            if match:
+                fail(f"{relative}: {description} remains: {match.group(0)}")
+
+
 def check_manifest_sources() -> None:
     try:
         lines = MANIFEST.read_text(encoding="utf-8").splitlines()
@@ -478,7 +516,7 @@ def check_manifest_sources() -> None:
             fail(f"install manifest line {number}: expected four tab-separated fields")
             continue
         kind, mode, source, _destination = fields
-        if kind not in {"dir", "file", "config", "ghost", "text", "aliases"}:
+        if kind not in {"dir", "file", "config", "ghost", "text"}:
             fail(f"install manifest line {number}: unsupported type {kind!r}")
         if re.fullmatch(r"0[0-7]{3}", mode) is None:
             fail(f"install manifest line {number}: invalid mode {mode!r}")
@@ -542,8 +580,8 @@ def check_upstream_manifest() -> None:
     )
     if result.returncode != 0:
         fail(f"cannot read upstream source manifest: {result.stderr.strip()}")
-    elif len(result.stdout.split()) != 4:
-        fail("upstream manifest must produce the four RPM source inputs")
+    elif len(result.stdout.split()) != 3:
+        fail("upstream manifest must produce the three RPM source inputs")
 
 
 def main() -> int:
@@ -555,6 +593,7 @@ def main() -> int:
     check_layout_and_docs()
     check_repository_safety()
     check_dispatcher_and_runtime_contracts()
+    check_greenfield_command_surface()
     check_manifest_sources()
     check_development_scope()
     check_upstream_manifest()
