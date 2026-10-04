@@ -12,13 +12,13 @@ qualification belongs on the real BC-250.
 | `bc250-llm-server.spec` | Fedora 44 RPM recipe and scriptlets |
 | `install-manifest.tsv` | Binary-payload paths, modes and ownership |
 | `upstreams.toml` | Pinned third-party revisions and archive names |
-| `bc250` | Multicall dispatcher and stable command aliases |
+| `bc250` | Canonical multicall dispatcher for the public command surface |
 | `bc250-llm-server.sysusers` | Package-owned users/groups |
 | `bc250-llm-server.tmpfiles` | Persistent directory declarations |
 | `90-bc250-llm-server.preset` | Default service enablement |
 
 Repository groups are `cmd/` for host commands and units, `config/` for shipped
-configuration, `models/` for Modelfiles/workflows, `quality-checks/` for real-device
+configuration, `models/` for Modelfiles/workflows, `quality-checks/` for source-only engineering real-device
 candidate screens, `examples/` for operator-adapted integrations, and `development/`
 for Git-only engineering memory. `development/` is deliberately absent from the
 binary install manifest.
@@ -32,11 +32,16 @@ instead of creating a general packaging language.
 The normal release build runs through GitHub. `make validate` is the deterministic
 repository check and can be run wherever its required tools are present. The `make rpm`
 target describes the Fedora/GitHub build step; a successful source edit must not be
-reported as an RPM build unless that build actually ran. CI/build environments may
-also provide Ruff, ShellCheck and rpmlint; none are runtime dependencies.
+reported as an RPM build unless that build actually ran. GitHub CI runs Ruff, ShellCheck and rpmlint; none are runtime dependencies.
+`rpmlint` uses `packaging/rpmlint.toml`, which filters only documented appliance
+policy choices and known false positives; unfiltered findings remain build failures.
 
 GitHub writes binary/source RPMs and checksums under `dist/`; the `*.x86_64.rpm` is
 the installable package and the `*.src.rpm` is rebuild input.
+
+### Runtime dependency footprint
+
+Keep dependency cleanup evidence-driven. The package requires `git-core` rather than Fedora's larger `git` meta-package because the appliance needs the Git CLI but not the documentation/meta dependency closure. The larger Mesa/Vulkan, `umr`, Poppler and Hugging Face closures remain intentional: they back active inference/verification, live CU routing, product RAG/document handling and model downloads. If fresh-install footprint needs a larger reduction, treat that as an architectural/package-splitting project rather than deleting runtime requirements without feature qualification.
 
 ## External source cache
 
@@ -45,10 +50,10 @@ URLs and archive names. `make validate` checks full commit formatting and alignm
 with the spec source macros; maintainers still review the actual upstream source and
 license before changing a pin.
 
-`scripts/prepare-sources.py` stages the governor, offline Cargo vendor tree, 40-CU
-source and live-manager source from the reusable `sources/` cache. The first prepared
+`scripts/prepare-sources.py` stages the governor, offline Cargo vendor tree and live-manager source from the reusable `sources/` cache. The first prepared
 HTTPS fetch records a local `.sha256` sidecar; reuse and `make sources-check` verify
-current bytes before they are copied into the RPM build tree. RPM scriptlets never
+current bytes before they are copied into the RPM build tree. Prepared archives and
+checksum sidecars are normalized to mode `0644` so SRPM source permissions are stable. RPM scriptlets never
 fetch third-party source.
 
 For the carried live-manager patch, `scripts/check-upstream-patches.py` is part of both
@@ -89,13 +94,12 @@ rebuild artifact.
 
 - RPM scriptlets are integration only: no appliance provisioning, model downloads,
   kernel builds, firewall/SELinux changes or reboots.
-- The repository bootstrap installs the selected RPM and hands off; `bc250-install`
+- The repository bootstrap installs the selected RPM and hands off; `bc250 install`
   owns Fedora update/provisioning policy.
-- The guided installer may prepare a default-off module for the running kernel;
-  activation remains `sudo bc250-40cu enable`.
+- CU routing uses the pinned live manager; the package no longer builds or installs a replacement AMDGPU module.
 - Model weights are downloaded only after operator selection.
-- Ordinary RPM removal preserves state; `bc250-reset` is the separately confirmed
-  greenfield appliance reset (`bc250-uninstall` remains an alias).
+- Ordinary RPM removal preserves state; `bc250 reset` is the separately confirmed
+  greenfield appliance reset.
 - Pre-1.0 setup keeps no package-baseline/network-before-state database. Reset removes
   only declared appliance-owned state and never uses unbounded autoremove.
 - Operator-editable configuration uses `%config(noreplace)` or lives outside RPM
@@ -108,7 +112,7 @@ rebuild artifact.
 - Keep the top spec changelog entry aligned with the resulting Version-Release.
 - Review pinned revisions, licenses, source-RPM contents and the binary payload.
 - Run only checks available in the editing environment and report them exactly.
-- Build through GitHub/Fedora, then inspect build/lint results and run `rpmlint` when available in that build environment.
+- Build through GitHub/Fedora and require Ruff, ShellCheck, RPM payload-contract checks and `rpmlint` to pass.
 - On the BC-250 test clean install or upgrade as appropriate, guided reboot/resume,
   models, affected runtime features and both removal paths.
 - Confirm scriptlets still do not enable CUs, replace AMDGPU, change memory/swap or
