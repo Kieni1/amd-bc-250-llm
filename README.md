@@ -1,10 +1,10 @@
 # BC-250 local LLM server
 
 Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
-package provides a Vulkan-oriented Ollama stack, Open WebUI, model management,
-hardware profiles, diagnostics and optional BC-250 tools.
+package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
+hardware profiles, diagnostics and optional specialist tools.
 
-Current source candidate: `bc250-llm-server-0.12.2-0.5` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.13.1-1.0` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -21,25 +21,22 @@ sudo ./install
 ```
 
 Before 1.0 this remains a greenfield/test-appliance workflow. The bootstrap installs the selected RPM, then hands off to the packaged
-`bc250-install`, which owns Fedora update policy. After that, reruns use:
+`bc250 install`, which owns Fedora update policy. After that, reruns use:
 
 ```bash
-sudo bc250-install
-sudo bc250-install --models-only   # model/Open WebUI reconciliation
+sudo bc250 install
+sudo bc250 install --models-only   # model/Open WebUI reconciliation
 ```
 
-When an RPM upgrade changes the pinned Open WebUI image and an existing database is present, RPM `%pre` unconditionally requests Open WebUI stop, proves `ActiveState=inactive`, and holds boot enablement before the new Quadlet can become restart-eligible. Run `sudo bc250-install` to create/verify the rollback snapshot and perform the guided migration; see [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md).
+When an RPM upgrade changes the pinned Open WebUI image and an existing database is present, RPM `%pre` unconditionally requests Open WebUI stop, proves `ActiveState=inactive`, and holds boot enablement before the new Quadlet can become restart-eligible. Run `sudo bc250 install` to create/verify the rollback snapshot and perform the guided migration; see [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
-Because the 0.x line is greenfield, the RPM owns all four Ollama lane units.
-`bc250-install-ollama` rejects a custom `/etc/systemd/system/ollama.service`, downloads
-the exact package-qualified upstream Linux payload, verifies its SHA-256, and leaves all
-service topology under RPM ownership. Reruns reconcile observable appliance state rather
-than an installer-history database.
+Because the 0.x line is greenfield, the RPM owns all four Ollama lane units. `bc250 install`
+reconciles the exact package-qualified upstream Ollama payload and keeps service topology under
+RPM ownership. Reruns reconcile observable appliance state rather than an installer-history database.
 
 The packaged installer shows the setup plan, avoids no-op root-LV growth, keeps
 the reviewed official Ollama/TTM/swap baseline, and combines kernel update plus
-TTM activation into one primary reboot. After reboot it prepares 40-CU support
-for the exact running kernel, establishes the static main/task/embedding normal
+TTM activation into one primary reboot. After reboot it establishes the static main/task/embedding normal
 mode, installs every model required by the active package-owned Open WebUI roles
 plus the task and Jina embedding baselines, then presents one global prompt only for experiments,
 Agent add-ons, rollback/reference and other optional models. Ornith remains the recommended Agent
@@ -48,8 +45,7 @@ desired state, then offers local BC-250 maintenance and Raspberry Pi/companion i
 as two separate optional setup decisions after core appliance verification. Both top-level choices remain optional/default-No; Pi/companion setup
 remains separate. Selected optional setup is verified before the installer
 finishes. Pi integration keeps HTTP :80 as the office endpoint and uses only restricted
-SSH :22; it does not expose internal Open WebUI/Ollama ports. A second reboot is requested only if persistent 40-CU mode was already configured
-and its newly prepared replacement module is not yet loaded.
+SSH :22; it does not expose internal Open WebUI/Ollama ports. CU routing is configured separately with the live manager and does not require a patched kernel module.
 
 The optional-model prompt accepts global indexes, ranges, exact names, `recommended`,
 `production` or `all`; Enter skips optional extras only. Active package-owned role bases
@@ -60,25 +56,23 @@ embedding 11437 and exclusive agent 11436.
 The reviewed fresh-machine memory profile uses only
 `ttm.pages_limit=4194304 ttm.page_pool_size=4194304`; the older explicit
 `amdgpu.gttsize` and full `amdgpu.ppfeaturemask` settings are not defaults.
-40-CU preparation remains dynamically bound to `uname -r`.
+CU expansion uses the packaged live WGP manager on the stock Fedora AMDGPU path; no replacement kernel module is built.
 
 ## First checks
 
 ```bash
-sudo bc250-status
-sudo bc250-verify
-sudo bc250-support-bundle   # redacted support evidence archive
-bc250-verify-lan SERVER_IP
+sudo bc250 status
+sudo bc250 verify
+sudo bc250 support-bundle   # redacted support evidence archive
 ```
 
 Storage visibility and explicit reclamation:
 
 ```bash
-sudo bc250-storage status          # protected accounting requires sudo
-sudo bc250-model purge-retired     # preview/purge package-retired model data
-sudo bc250-storage dedupe          # confirmed XFS extent sharing
-sudo bc250-storage prune-sources   # optional verified offline-source removal
-sudo bc250-storage prune-40cu      # removed-kernel build caches only
+sudo bc250 storage status          # protected accounting requires sudo
+sudo bc250 model purge-retired     # preview/purge package-retired model data
+sudo bc250 storage dedupe          # confirmed XFS extent sharing
+sudo bc250 storage prune-sources   # optional verified offline-source removal
 ```
 
 Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
@@ -86,16 +80,16 @@ create/sign in the administrator and apply the package-owned Open WebUI baseline
 Persisted providers, task, embedding, RAG and local/offline application policy come
 from the single packaged `openwebui/desired-state.json` through supported APIs.
 During the pre-v1 testing phase the normal main/task Open WebUI providers remain available for
-comparison, and `bc250-openwebui-setup` synchronizes their discovered Ollama inventories into
+comparison, and `bc250 openwebui-setup` synchronizes their discovered Ollama inventories into
 package-managed testing records. Curated Office roles remain the recommended product paths. Raw
 production/task models and ordinary-size experiments remain visible for comparison, while the
 Qwen3.6 35B is retired from active candidates; Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only, while IQ3_XXS remains the ordinary-user deployability comparison. Only the package-owned wildcard grant
 on package-managed discovery records may be removed when this visibility policy changes; unrelated
 administrator-created records and grants are preserved.
 Agent `11436` and embedding `11437` remain separate from the chat selector by topology. Arena is
-package-converged off; use `sudo bc250-openwebui-setup init` later
+package-converged off; use `sudo bc250 openwebui-setup init` later
 if that step was skipped. The default endpoint is unencrypted HTTP; see
-[`docs/HARDENING.md`](docs/HARDENING.md) before using a less trusted network.
+[`docs/SECURITY.md`](docs/SECURITY.md) before using a less trusted network.
 
 ## Recommended starting models
 
@@ -118,20 +112,19 @@ separate higher-quality general-office option; this RAG decision is about sustai
 not a semantic-quality failure.
 
 The packaged comparison catalog retains active measured challengers, including
-`exp-granite42-3b-ibm-q6-k`, the opt-in `exp-eurollm9b-instruct-2512-mradermacher-q4-k-m`
-translation-modality challenger, the distinct Qwen3.8 27B quality/deployability profiles,
+`exp-granite42-3b-ibm-q6-k`, the distinct Qwen3.8 27B quality/deployability profiles,
 and the compact `agentic-qwen35-4b-khazarai-q6-k` /
 `agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
 kept only in the source graveyard and are not
 exposed through normal model discovery. The installed retirement catalog lets
-`sudo bc250-model status` identify stale package-retired registrations and
-`sudo bc250-model purge-retired` remove only those explicitly catalogued models.
-Experimental models are never silent replacements for the defaults above. During `bc250-install`,
+`sudo bc250 model status` identify stale package-retired registrations and
+`sudo bc250 model purge-retired` remove only those explicitly catalogued models.
+Experimental models are never silent replacements for the defaults above. During `bc250 install`,
 required role models are converged first; entries that are already fully current are summarized rather
 than printed model-by-model. The optional picker shows compact runtime state for ordinary Ollama
 catalog entries only. Download-only MTP candidates never participate in that generic picker or
-`apply all`; discover them with `bc250-model list mtp --all` and prepare one explicitly with
-`bc250-fetch-mtp`.
+`apply all`; discover them with `bc250 model list mtp --all` and prepare one explicitly with
+`bc250 fetch-mtp`.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
@@ -148,24 +141,24 @@ review every model's current license before use.
 ## Daily commands
 
 ```bash
-sudo bc250-status
-sudo bc250-verify
-sudo bc250-model status production
-sudo bc250-openwebui-setup status
-sudo bc250-maintenance status
-bc250-agent-mode status
+sudo bc250 status
+sudo bc250 verify
+sudo bc250 model status production
+sudo bc250 openwebui-setup status
+sudo bc250 maintenance status
+bc250 agent-mode status
 
 # Enter/leave the exclusive coding lane only when needed:
-sudo bc250-agent-mode enter
-sudo bc250-agent-mode leave   # or: sudo bc250-agent-mode normal
+sudo bc250 agent-mode enter
+sudo bc250 agent-mode leave   # or: sudo bc250 agent-mode normal
 ```
 
 Keep experiments, MTP qualification, benchmark suites, destructive model lifecycle actions,
 reset and maintenance internals out of the normal daily path. Their complete syntax remains in
-[`docs/COMMANDS.md`](docs/COMMANDS.md); model policy and MTP opt-in details are in
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md); model policy and MTP opt-in details are in
 [`MODELS.md`](MODELS.md), and Raspberry Pi/WOL/safe-power operations are in
-[`docs/MAINTENANCE.md`](docs/MAINTENANCE.md) and
-[`docs/MAINTENANCE-CONTRACT.md`](docs/MAINTENANCE-CONTRACT.md).
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md) and
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Components
 
@@ -178,19 +171,19 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG lifecycle | Local DE/FR/bilingual batch preparation, human review, provenance validation and Open WebUI sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
-| CU tools | Default-off replacement-module helper and live WGP manager |
+| CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for source candidate 0.12.2-0.5. The preceding 0.34.2 payload
-passed BC-250 clean-boot generation, UMA-memory, embedding, Deep-to-task and Documents/RAG
-qualification; exact-device acceptance of 0.34.4 remains part of the 0.12.2-0.5 release gate.
+Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.0. Exact-device 0.12.2-0.8 qualification
+passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
+whole-appliance revalidation with this runtime; 0.13.1 does not change the Ollama pin.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in
-[`docs/MAINTENANCE.md`](docs/MAINTENANCE.md). See [`docs/OLLAMA.md`](docs/OLLAMA.md)
+[`docs/OPERATIONS.md`](docs/OPERATIONS.md). See [`docs/OLLAMA.md`](docs/OLLAMA.md)
 for Ollama upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.
-Coding/agent mode uses `11436` exclusively and stops the normal lanes. `bc250-code`
+Coding/agent mode uses `11436` exclusively and stops the normal lanes. `bc250 code`
 uses the chat API so native thinking is separated from final content and refuses to
 write nonterminal, output-limit-truncated or reasoning-contaminated results. Keep all
 unauthenticated Ollama APIs blocked from untrusted networks.
@@ -214,23 +207,26 @@ Repository groups:
 - `cmd/`: host commands, services and timers;
 - `config/`: shipped governor, nginx and container configuration;
 - `models/`: Modelfiles and specialized model workflows;
-- `quality-checks/`: standalone real-device candidate screens and evidence helpers;
+- `quality-checks/`: source-only engineering candidate screens and evidence helpers (not installed on appliances);
 - `packaging/` and `scripts/`: RPM policy and build tooling;
 - `docs/`: operator references.
 
 ## Documentation
 
-- [`TLDR.md`](TLDR.md): short installation and operations sheet.
-- [`docs/COMMANDS.md`](docs/COMMANDS.md): complete public command reference.
-- [`MODELS.md`](MODELS.md): operator model roles, swapping, overrides and cleanup.
-- [`docs/QUALITY-CHECKS.md`](docs/QUALITY-CHECKS.md): standalone candidate-quality screens, evidence bundles and separation from release qualification.
-- [`models/README.md`](models/README.md): detailed Modelfile discovery/storage contract.
-- [`docs/CU-UNLOCK.md`](docs/CU-UNLOCK.md): CU commands, testing and recovery.
-- [`docs/RAG.md`](docs/RAG.md): German/French/English office-document and knowledge-base pilot.
-- [`docs/MAINTENANCE.md`](docs/MAINTENANCE.md): backups, retention and power.
-- [`docs/openwebui-settings.md`](docs/openwebui-settings.md): current UI connections and model roles.
-- [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): package, configuration and state paths.
-- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md): services, ports and persistent data.
+- [`TLDR.md`](TLDR.md): shortest common-path setup and operations sheet.
+- [`MODELS.md`](MODELS.md): curated model roles, selection policy and lifecycle guidance.
+- [`CHANGELOG.md`](CHANGELOG.md): release history.
+- [`docs/INSTALLATION.md`](docs/INSTALLATION.md): installation, deployment, services and kernel command line.
+- [`docs/HARDWARE.md`](docs/HARDWARE.md): memory, sensors, governor and live CU routing.
+- [`docs/OPERATIONS.md`](docs/OPERATIONS.md): complete command reference, maintenance and companion contract.
+- [`docs/OPENWEBUI.md`](docs/OPENWEBUI.md): Open WebUI setup, desired state, roles and API boundary.
+- [`docs/OLLAMA.md`](docs/OLLAMA.md): Ollama runtime topology, profiles and safe updates.
+- [`docs/RAG.md`](docs/RAG.md): office-document/RAG lifecycle and retrieval policy.
+- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation.
+- [`docs/QUALITY-CHECKS.md`](docs/QUALITY-CHECKS.md): candidate-quality screens and evidence semantics.
+- [`docs/SECURITY.md`](docs/SECURITY.md): hardening, network exposure and secret handling.
+- [`docs/HTTPS.md`](docs/HTTPS.md): TLS publication example and checklist.
+- [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): installed package, configuration and state paths.
 - [`docs/UNINSTALL.md`](docs/UNINSTALL.md): RPM removal versus greenfield appliance reset.
 
 ## Acknowledgements
@@ -241,12 +237,8 @@ thanks to:
 - [filippor](https://github.com/filippor/cyan-skillfish-governor) and
   [Magnap](https://github.com/Magnap/cyan-skillfish-governor) for the Cyan
   Skillfish governor;
-- [fduraibi](https://github.com/fduraibi/bc250-40cu-unlock) and
-  [duggasco](https://github.com/duggasco/bc250-40cu-unlock) for 40-CU research;
 - [WinnieLV](https://github.com/WinnieLV/bc250-cu-live-manager) for live CU
   routing;
-- [DryhoppedIPA](https://github.com/DryhoppedIPA/bc250-gfx1013-fix) for the
-  experimental paired GFX1013 kernel/RADV work;
 - [ElektricM's BC-250 documentation](https://elektricm.github.io/amd-bc250-docs/),
   [redbeard1083's toolkit](https://github.com/redbeard1083/bc250-toolkit) and
   [the SteamOS toolkit references](https://github.com/rpf16rj/bc250-steamos-real-toolkit)
