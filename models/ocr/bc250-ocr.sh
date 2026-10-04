@@ -10,10 +10,10 @@ ENDPOINT="${OLLAMA_URL:-${OLLAMA_HOST:-http://127.0.0.1:11434}}"
 usage() {
   cat <<'EOF_USAGE'
 Usage:
-  bc250-ocr list
-  sudo bc250-ocr install glm|ovis
-  bc250-ocr show glm|ovis
-  bc250-ocr test glm|ovis IMAGE
+  bc250 ocr list
+  sudo bc250 ocr install glm|ovis
+  bc250 ocr show glm|ovis
+  bc250 ocr test glm|ovis IMAGE
 
 OCR is experimental. Test real German/French/English office pages before use.
 EOF_USAGE
