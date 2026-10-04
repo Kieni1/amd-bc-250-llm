@@ -7,7 +7,7 @@ CONFIG="${BC250_MAINTENANCE_CONFIG:-/etc/bc250-llm-server/maintenance.env}"
 EXAMPLE="${BC250_MAINTENANCE_EXAMPLE:-/usr/share/bc250-llm-server/examples/maintenance.env.example}"
 POWER_DROPIN_DIR="${BC250_POWER_DROPIN_DIR:-/etc/systemd/system/bc250-night-shutdown.timer.d}"
 POWER_DROPIN="$POWER_DROPIN_DIR/schedule.conf"
-CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/docs/MAINTENANCE-CONTRACT.md}"
+CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/docs/OPERATIONS.md}"
 ACCESS_HELPER="${BC250_MAINTENANCE_ACCESS_HELPER:-/usr/libexec/bc250-llm-server/maintenance-companion.sh}"
 SAFE_POWER_HELPER="${BC250_SAFE_POWER_HELPER:-/usr/libexec/bc250-llm-server/safe-power.sh}"
 POWER_CONTROL_USER="${BC250_POWER_CONTROL_USER:-bc250-power-control}"
@@ -18,15 +18,15 @@ ALL_TIMERS=("${BACKUP_TIMERS[@]}" "${OPTIONAL_TIMERS[@]}")
 
 usage() {
   cat <<'USAGE'
-Usage: sudo bc250-maintenance setup [--defaults]
-       sudo bc250-maintenance status
-       sudo bc250-maintenance contract
-       sudo bc250-maintenance companion status|enable
-       sudo bc250-maintenance backup-export status|enable
-       sudo bc250-maintenance request-shutdown
-       sudo bc250-maintenance run backup|prune|all
-       sudo bc250-maintenance clean-cache
-       sudo bc250-maintenance disable
+Usage: sudo bc250 maintenance setup [--defaults]
+       sudo bc250 maintenance status
+       sudo bc250 maintenance contract
+       sudo bc250 maintenance companion status|enable
+       sudo bc250 maintenance backup-export status|enable
+       sudo bc250 maintenance request-shutdown
+       sudo bc250 maintenance run backup|prune|all
+       sudo bc250 maintenance clean-cache
+       sudo bc250 maintenance disable
 
 Set up and inspect privacy-conscious maintenance for the local office appliance.
 
@@ -34,7 +34,7 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
                     model warm-up and after-hours power saving.
   setup --defaults  Fast safe baseline: enable only verified local backups.
   status            Read-only schedule and backup overview. The API key is
-                    never printed; bc250-status shows appliance storage.
+                    never printed; bc250 status shows appliance storage.
   contract          Print the BC-250/Pi maintenance interface contract.
   companion         Inspect or prepare restricted Pi maintenance access over
                     SSH for safe shutdown requests. HTTP remains the office UI.
@@ -442,7 +442,7 @@ show_status() {
     return 1
   fi
   [[ -r "$CONFIG" ]] || {
-    echo "Maintenance is not initialized. Run: sudo bc250-maintenance setup --defaults"
+    echo "Maintenance is not initialized. Run: sudo bc250 maintenance setup --defaults"
     return 0
   }
   [[ "$(get_setting OWUI_API_KEY '')" != REPLACE_WITH_ADMIN_API_KEY && -n "$(get_setting OWUI_API_KEY '')" ]] && api_state=configured
@@ -475,7 +475,7 @@ show_status() {
   fi
 
   echo
-  echo "Storage overview: sudo bc250-status"
+  echo "Storage overview: sudo bc250 status"
 
   echo
   echo "Backups"
@@ -539,7 +539,11 @@ show_contract() {
     echo "ERROR: maintenance contract is missing: $CONTRACT_DOC" >&2
     return 1
   }
-  cat "$CONTRACT_DOC"
+  if grep -q '<!-- BEGIN BC250_MAINTENANCE_CONTRACT -->' "$CONTRACT_DOC" 2>/dev/null; then
+    sed -n '/<!-- BEGIN BC250_MAINTENANCE_CONTRACT -->/,/<!-- END BC250_MAINTENANCE_CONTRACT -->/p' "$CONTRACT_DOC" | sed '/<!-- BEGIN BC250_MAINTENANCE_CONTRACT -->/d; /<!-- END BC250_MAINTENANCE_CONTRACT -->/d'
+  else
+    cat "$CONTRACT_DOC"
+  fi
 }
 
 run_access() {

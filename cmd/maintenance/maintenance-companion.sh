@@ -88,7 +88,7 @@ companion_enable() {
   ensure_account "$POWER_USER" "$POWER_USER" "$POWER_HOME"
   {
     printf 'Defaults:%s env_keep += "SSH_CONNECTION"\n' "$POWER_USER"
-    printf '%s\n' "$POWER_USER ALL=(root) NOPASSWD: /usr/bin/bc250-maintenance request-shutdown-companion"
+    printf '%s\n' "$POWER_USER ALL=(root) NOPASSWD: /usr/bin/bc250 maintenance request-shutdown-companion"
   } > "$sudoers"
   chmod 0440 "$sudoers"
   command -v visudo >/dev/null 2>&1 && visudo -cf "$sudoers" >/dev/null
@@ -99,7 +99,7 @@ Add the Pi power-control public key to:
   $POWER_HOME/.ssh/authorized_keys
 
 Use exactly:
-  restrict,command="/usr/bin/sudo /usr/bin/bc250-maintenance request-shutdown-companion" ssh-ed25519 AAAA... pi-power-control
+  restrict,command="/usr/bin/sudo /usr/bin/bc250 maintenance request-shutdown-companion" ssh-ed25519 AAAA... pi-power-control
 
 Network policy:
   HTTP 80 = office UI/readiness

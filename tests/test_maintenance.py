@@ -37,7 +37,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_companion_contract_uses_safe_shutdown_and_only_office_network_paths(self) -> None:
         maintenance = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
         companion = (ROOT / "cmd/maintenance/maintenance-companion.sh").read_text(encoding="utf-8")
-        contract = (ROOT / "docs/MAINTENANCE-CONTRACT.md").read_text(encoding="utf-8")
+        contract = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         self.assertIn("request-shutdown", maintenance)
         self.assertIn("bc250-night-shutdown.service", maintenance)
         self.assertIn("--add-service=\"$service\"", companion)
@@ -152,7 +152,7 @@ class MaintenanceTests(unittest.TestCase):
         maintenance = (ROOT / "cmd/maintenance/maintenance.sh").read_text(encoding="utf-8")
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn(
-            "/usr/share/doc/bc250-llm-server/docs/MAINTENANCE-CONTRACT.md",
+            "/usr/share/doc/bc250-llm-server/docs/OPERATIONS.md",
             maintenance,
         )
         self.assertIn("docs/*.md\t{docdir}/docs/", manifest)
