@@ -38,7 +38,7 @@ If Ornith or another Agent add-on is explicitly installed, revalidation must qua
 Confirm through the ordinary-user browser-shaped production path:
 
 - Standard structured: exact schema in `params.format`, request `temperature=0.0`, no `think` override;
-- Documents structured: exact schema in `params.format`, normal/default reasoning policy;
+- Documents structured: exact schema in `params.format`, request `temperature=0.0`, normal/default thinking;
 - Advanced normal: stored/effective `think=true`;
 - Advanced Structured: same Qwen3.5 base/samplers/6144 ceiling with stored/effective `think=false`;
 - Deep: unchanged.
@@ -51,13 +51,13 @@ No additional Documents-only sampling is required before this integrated product
 
 Production Translate-Gemma remains current. The known native DE->FR `sollten -> doivent` strengthening is documented as an accepted model limitation; the package modality guard must continue to fail closed rather than silently expose a strengthened obligation.
 
-Optional one-shot challenger:
+Closed challenger evidence:
 
 ```text
 exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
 ```
 
-If fetched, use the existing direct candidate screen for a short modality-focused DE<->FR comparison (recommendation, obligation, permission, prohibition, negation and the exact known sentence) plus a few ordinary office translations. A clearly better result earns a separate promotion qualification; otherwise stop and retain Translate-Gemma. Do not broaden the tournament.
+Round 1 is sufficient. EuroLLM fixed the `sollten -> devraient` anchor (2/2) but reproducibly emitted English for German `muss nicht` (0/2); ordinary office cases were 6/6 for both models. Do not run Round 2. Retain Translate-Gemma and the fail-closed modality guard.
 
 ## 5. Benchmark contract
 
@@ -65,6 +65,6 @@ Confirm generated summaries expose separate cold-load time, 4K/16K target-vs-act
 
 ## 6. Final whole-appliance check
 
-Run one final `sudo bc250-revalidate start` and preserve the evidence archive. Record Infrastructure, Quality, Restoration and Coverage independently, plus minimum MemAvailable/swap/OOM diagnostics, CU configured/live profile match, final topology, `rpm -V` and bounded kernel/device-error window.
+Run one final `sudo bc250 revalidate start` and preserve the evidence archive. Record Infrastructure, Quality, Restoration and Coverage independently, plus minimum MemAvailable/swap/OOM diagnostics, CU configured/live profile match, final topology, `rpm -V` and bounded kernel/device-error window.
 
 Do not rerun closed Deep architecture, Tika list rendering, title/tag persistence, RAG/MTP/OCR/coding-agent/maintenance/uninstall campaigns unless this release actually crosses one of those boundaries.

@@ -22,7 +22,7 @@ This handover supersedes earlier 0.6 drafts that treated Ornith as a mandatory i
 Use role-specific explicit policy, not prompt heuristics:
 
 - **Standard:** strict structured requests supply the exact JSON schema as request `params.format` and `temperature=0.0`; do not override `think`. Final focused evidence was 200/200 strict exact.
-- **Documents:** strict structured requests supply the exact JSON schema as request `params.format`; leave the normal reasoning policy unchanged. Focused evidence was 25/25 and no larger confirmation is required.
+- **Documents:** strict structured requests supply the exact JSON schema as request `params.format` and `temperature=0.0`; leave normal thinking unchanged. Focused evidence was 25/25 and no larger confirmation is required.
 - **Advanced:** normal `Office - Advanced` remains `think=true`; new explicit `Office - Advanced Structured` uses the same Qwen3.5 9B base, same 6144-token budget and same samplers with only `think=false`.
 - **Deep:** unchanged; do not introduce `think=false`.
 
@@ -32,13 +32,13 @@ Open WebUI 0.11.4 already performs the required parameter merge/translation. Do 
 
 Production remains `prod-translate-gemma4-sub-e4b-17s-q4-k-xl`. The native model can strengthen German recommendation `sollten` into French obligation `doivent`; keep the package's clause-local modality guard fail-closed. This underlying model limitation is now documented and accepted rather than release-blocking.
 
-Add one opt-in experimental challenger only:
+The EuroLLM challenger is closed and moved to the source graveyard:
 
 ```text
 exp-eurollm9b-instruct-2512-mradermacher-q4-k-m
 ```
 
-It is not promoted. On-device follow-up is a short DE<->FR modality comparison using the existing direct candidate screen. If EuroLLM is clearly better without ordinary translation regressions it may earn a separate qualification; otherwise retain Translate-Gemma and close the candidate check.
+Round 1 is sufficient: EuroLLM fixed `sollten -> devraient` (2/2) but reproducibly regressed German `muss nicht` to English output (0/2). Retain Translate-Gemma; no Round 2 is justified and EuroLLM is not part of the active catalog.
 
 ### Agent
 
@@ -63,28 +63,28 @@ Keep the completion footer compact:
 OVERVIEW
 
 Further setup
-  Open WebUI:    sudo bc250-openwebui-setup init
-  Maintenance:   sudo bc250-maintenance --help
+  Open WebUI:    sudo bc250 openwebui-setup init
+  Maintenance:   sudo bc250 maintenance --help
   Documentation: /usr/share/doc/bc250-llm-server/
 
 Storage
-  sudo bc250-storage -h
+  sudo bc250 storage -h
 
 NEXT STEPS
 
 CU routing
-  sudo bc250-cu-live-manager menu
+  sudo bc250-cu-live-manager
 
 Models
-  sudo bc250-install --models-only
+  sudo bc250 install --models-only
 
 Validation
-  sudo bc250-verify
-  sudo bc250-revalidate start
+  sudo bc250 verify
+  sudo bc250 revalidate start
   sudo bc250-40cu status
 
 Benchmark
-  bc250-benchmark --help
+  bc250 benchmark --help
 ```
 
 `NEXT STEPS` remains amber/yellow.
@@ -101,8 +101,8 @@ After source/RPM build, only focused release confirmation is justified:
 2. verify compact completion rendering and CU guidance on a real terminal;
 3. verify Agent absence yields explicit optional coverage skip/partial, not infrastructure failure; if Agent is installed, verify normal exclusive-mode qualification/restoration;
 4. verify the new Advanced Structured preset is visible to an ordinary user, maps to the expected Qwen3.5 base and effective `think=false`; prove normal Advanced remains `think=true`;
-5. integrated strict-structured regression: Standard schema+temp0, Documents schema, Advanced Structured `think=false`, Deep unchanged, with type-sensitive exact JSON validation and controls for ordinary non-structured chat;
-6. run one short EuroLLM modality comparison only if the experimental model is fetched; do not turn it into another broad translation tournament;
+5. integrated strict-structured regression: Standard schema+temp0, Documents schema+temp0, Advanced Structured `think=false`, Deep unchanged, with type-sensitive exact JSON validation and controls for ordinary non-structured chat;
+6. do not continue EuroLLM qualification; Round 1 found a reproducible language regression and production Translate-Gemma remains selected;
 7. run one final whole-appliance revalidation and preserve cleanup/restoration/CU evidence.
 
 Do not replay closed Deep/RAG/Tika/MTP/title-tag or broad native model campaigns merely for closure.
