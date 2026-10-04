@@ -3,7 +3,7 @@
 ## Setup and verify
 
 ```bash
-sudo bc250-model apply task task-lfm25-1.2b-instruct-liquidai-q6-k
+sudo bc250 model apply task task-lfm25-1.2b-instruct-liquidai-q6-k
 
 curl -fsS http://127.0.0.1:11435/api/chat \
   -H 'Content-Type: application/json' \
@@ -14,7 +14,7 @@ OLLAMA_HOST=127.0.0.1:11435 ollama ps
 
 The package ships `ollama-task.service` statically on port `11435` with a separate
 model store. It is part of required normal mode. With no selection,
-`bc250-model apply task` lists task Modelfiles and prompts. The service uses
+`bc250 model apply task` lists task Modelfiles and prompts. The service uses
 `OLLAMA_KEEP_ALIVE=0`; the final command should show no resident task model.
 
 Current packaged task model:
@@ -27,7 +27,7 @@ The default LFM Modelfile deliberately omits a fixed `SYSTEM` prompt. A generic
 SYSTEM was tested and caused task-shape contamination (for example title responses
 that also emitted tags/search-query fields). Open WebUI therefore owns the exact
 title/tag/retrieval-query prompt templates in `openwebui/desired-state.json`. The
-direct `bc250-benchmark task` path reads those same templates so direct and live
+direct `bc250 benchmark task` path reads those same templates so direct and live
 qualification cannot silently drift to different prompt contracts again.
 
 Keep port `11435` blocked from untrusted networks. The package adds
