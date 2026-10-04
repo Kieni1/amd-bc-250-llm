@@ -265,6 +265,18 @@ def discover_normal_provider_models() -> dict[str, list[str]]:
     return {lane: list(models) for lane, models in discovered.items()}
 
 
+def testing_policy_is_retired(policy: dict[str, Any] | None) -> bool:
+    if not isinstance(policy, dict):
+        return False
+    qualification = policy.get("qualification")
+    if not isinstance(qualification, dict):
+        return False
+    return any(
+        str(qualification.get(key) or "").strip().lower() == "retired"
+        for key in ("production", "deployment")
+    )
+
+
 def auto_visible_model_record(
     model_id: str, lane: str, policy: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -323,7 +335,12 @@ def effective_model_document(
         for model_id in lanes.get(lane, []):
             if model_id in known:
                 continue
-            models.append(auto_visible_model_record(model_id, lane, policies.get(model_id)))
+            policy = policies.get(model_id)
+            if testing_policy_is_retired(policy):
+                # Retired native registrations are lifecycle residue, not active
+                # Open WebUI desired state. `bc250 model purge-retired` owns cleanup.
+                continue
+            models.append(auto_visible_model_record(model_id, lane, policy))
             known.add(model_id)
     return {"models": models}
 

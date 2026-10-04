@@ -163,7 +163,7 @@
       "base_model_id": "prod-qwen35-9b-unsloth-q6-k:latest",
       "name": "Office - General / Higher Quality",
       "meta": {
-        "description": "Higher-quality general office model. Uses reasoning-enabled Qwen3.5 with a bounded 6144-token generation ceiling for the current 0.12.2-0.5 source.",
+        "description": "Higher-quality general office model. Uses reasoning-enabled Qwen3.5 with a bounded 6144-token generation ceiling for the qualified product policy.",
         "tags": [
           {
             "name": "BC250"

@@ -432,14 +432,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             },
         )
         models = {model["id"]: model for model in effective["models"]}
-        q36 = models["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]
-        self.assertTrue(q36["meta"]["hidden"])
-        self.assertFalse(q36["meta"]["bc250_ordinary_user_visible"])
-        self.assertEqual(q36["meta"]["bc250_lane"], "main")
-        self.assertIn({"name": OPENWEBUI.AUTO_VISIBLE_TAG}, q36["meta"]["tags"])
-        self.assertEqual(q36["params"]["custom_params"]["think"], False)
-        self.assertEqual(q36["params"]["custom_params"]["temperature"], 0.7)
-        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [])
+        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest", models)
         xxs = models["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]
         self.assertFalse(xxs["meta"]["hidden"])
         self.assertTrue(xxs["meta"]["bc250_ordinary_user_visible"])
@@ -715,25 +708,27 @@ class OpenWebUIStatusTests(unittest.TestCase):
         payload = client.posts[0][1]
         self.assertEqual(payload["access_grants"], [unrelated])
 
-    def test_status_rejects_stale_public_read_on_private_testing_model(self) -> None:
+    def test_retired_native_registration_is_not_active_openwebui_desired_state(self) -> None:
+        model_id = "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
         document = OPENWEBUI.load_models()
+        policy = document["testing_model_policies"][model_id]
+        self.assertTrue(OPENWEBUI.testing_policy_is_retired(policy))
+
         effective = OPENWEBUI.effective_model_document(
-            document, {"main": ["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"], "task": []}
+            document, {"main": [model_id], "task": []}
         )
-        q36 = next(
-            model for model in effective["models"]
-            if model["id"] == "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
-        )
-        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [])
-        live = copy.deepcopy(q36)
-        live["access_grants"] = [copy.deepcopy(REQUIRED_READ)]
-        responses = status_responses()
-        responses["/api/v1/models/base"].append(live)
-        with mock.patch.object(OPENWEBUI, "discover_normal_provider_models", return_value={"main": [q36["id"]], "task": []}):
+        self.assertNotIn(model_id, {model["id"] for model in effective["models"]})
+
+        with mock.patch.object(
+            OPENWEBUI,
+            "discover_normal_provider_models",
+            return_value={"main": [model_id], "task": []},
+        ):
             output = io.StringIO()
             with redirect_stdout(output):
-                self.assertEqual(OPENWEBUI.status(FakeClient(responses), True), 2)
-        self.assertIn("package public read grant must be absent", output.getvalue())
+                self.assertEqual(OPENWEBUI.status(FakeClient(), True), 0)
+        self.assertIn("Desired-state drift: none", output.getvalue())
+        self.assertNotIn(model_id, output.getvalue())
 
     def test_status_does_not_expose_api_token(self) -> None:
         secret = "owui-secret-token-do-not-print-0121"
@@ -744,7 +739,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             fake = FakeClient()
             stdout = io.StringIO()
             stderr = io.StringIO()
-            argv = ["bc250-openwebui-setup", "status", "--token-file", str(token_path)]
+            argv = ["bc250", "status", "--token-file", str(token_path)]
             with (
                 mock.patch.object(sys, "argv", argv),
                 mock.patch.object(OPENWEBUI, "Client", return_value=fake),
