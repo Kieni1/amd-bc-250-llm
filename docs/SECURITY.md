@@ -1,4 +1,4 @@
-# Hardening the testing deployment
+# Security and hardening
 
 The default profile is for a trusted LAN. Choose the controls below before the
 host enters a shared, guest, routed or otherwise untrusted network.
@@ -29,7 +29,7 @@ sudo firewall-cmd --zone="$ZONE" --list-all
 
 ## Raspberry Pi maintenance access
 
-`sudo bc250-maintenance companion enable` deliberately keeps the office web path
+`sudo bc250 maintenance companion enable` deliberately keeps the office web path
 on HTTP :80 and ensures SSH :22 is available for a forced-command maintenance
 key. It does not open Open WebUI :3000 or Ollama :11434-:11437. Treat SSH :22
 as an administrative surface: keep password authentication policy appropriate for
@@ -40,24 +40,24 @@ restriction.
 
 The Pi should use the package-generated forced-command key, which invokes the
 internal `request-shutdown-companion` path and exempts only that authenticated
-control SSH connection. Human operators use `sudo bc250-maintenance request-shutdown`,
+control SSH connection. Human operators use `sudo bc250 maintenance request-shutdown`,
 and their SSH session remains protected activity. Do not grant the Pi raw
 `systemctl poweroff`, because that bypasses the package's active-session and
-maintenance checks. See [`MAINTENANCE-CONTRACT.md`](MAINTENANCE-CONTRACT.md).
+maintenance checks. See [`OPERATIONS.md`](OPERATIONS.md).
 
 ## Check Ollama exposure
 
 ```bash
 sudo systemctl is-active firewalld
 sudo firewall-cmd --list-all
-bc250-verify-lan SERVER_IP
+curl -f http://SERVER_IP/
 ```
 
 Ollama ports `11434`–`11437` have no authentication and must remain blocked
 from untrusted networks. The wildcard host listeners are intentional so the
 rootful Open WebUI container can use `host.containers.internal`; firewalld is
-the LAN boundary. `bc250-verify` warns about unexpected listener shapes or an
-inactive/incorrect firewall, and `bc250-verify-lan` checks exposure from a
+the LAN boundary. `bc250 verify` warns about unexpected listener shapes or an
+inactive/incorrect firewall, and a remote `curl -f http://SERVER_IP/` check validates reachability from a
 second LAN machine.
 
 ## Confidential documents and knowledge bases
@@ -83,7 +83,7 @@ sudo systemctl stop open-webui.service tika.service nginx.service
 sudo systemctl disable --now ollama.service ollama-task.service ollama-embedding.service ollama-agent.service
 ```
 
-For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250-agent-mode leave`; use `enter` only for exclusive coding tests. Rerun `sudo bc250-install` to restore Open WebUI boot enablement after deliberately removing its Quadlet drop-in.
+For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250 agent-mode leave`; use `enter` only for exclusive coding tests. Rerun `sudo bc250 install` to restore Open WebUI boot enablement after deliberately removing its Quadlet drop-in.
 
 
 ## Package-owned Open WebUI Function
@@ -94,7 +94,7 @@ direction wrapper to the current text user message. Open WebUI Functions execute
 inside the application server, so treat any Function as executable server code. The
 package-owned filter is intentionally tiny: it performs no network, filesystem, process,
 credential or tool access and is attached only to the two production translation presets.
-`bc250-openwebui-setup apply` restores its reviewed source and active/non-global state;
+`bc250 openwebui-setup apply` restores its reviewed source and active/non-global state;
 `status` reports drift. Do not mark it global or replace it with unreviewed community
 code on a confidential appliance.
 
@@ -103,6 +103,6 @@ code on a confidential appliance.
 Open WebUI is configured with `OFFLINE_MODE=true` and `HF_HUB_OFFLINE=1`, with
 automatic embedding/reranking/Whisper model updates disabled. This reduces
 application-initiated outbound traffic but is not a network isolation boundary.
-Keep firewalld/nginx policy authoritative. `bc250-openwebui-setup` uses a
+Keep firewalld/nginx policy authoritative. `bc250 openwebui-setup` uses a
 temporary administrator credential only when explicitly run and does not store it.
 Agent/coding mode is exclusive and the agent service remains disabled at boot.
