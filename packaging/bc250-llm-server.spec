@@ -258,7 +258,7 @@ fi
 * Sat Oct 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.0
 - Prevent package Python helpers from writing bytecode under immutable /usr and clean stale package-tree caches during guided install/upgrade convergence.
 - Make optional-model status semantic: intentionally absent/cached optional models report OPTIONAL without repair advice, while selected models with broken runtime state remain DRIFT.
-- Exclude retired/non-user-visible model registrations from active Open WebUI base-override desired state while retaining lifecycle cleanup through model purge-retired.
+- Keep source-graveyard Modelfiles inert and outside active discovery/package installation; manually registered historical models follow normal Open WebUI testing-policy visibility, while explicit model purge-retired cleanup remains available.
 - Promote the qualified 0.12.2 appliance line to the 0.13.1 release series without changing runtime/model/CU/RAG policy.
 
 * Sat Oct 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.12.2-0.8

@@ -4,7 +4,7 @@
   "release_identity": "bc250-llm-server-0.13.1-1.0",
   "predecessor_artifact": "amd-bc-250-llm-0.12.2-0.8-workbench-exact-device-ux-final.zip",
   "predecessor_sha256": "30efed57c0769d0d62b99bc43dbfdbdee11b4b34873d19c62e3d0aa6365a0fbe",
-  "batch": "0.13.1-1.0-release-bytecode-model-state-hygiene-final",
+  "batch": "0.13.1-1.0-release-bytecode-model-state-hygiene-final-logic-fixes",
   "changed_files": [
     "CHANGELOG.md",
     "MODELS.md",
@@ -44,15 +44,15 @@
     "Added bounded guided-convergence cleanup for stale __pycache__, *.pyc and *.pyo only below the package-owned libexec/share trees, leaving unrelated Python caches untouched.",
     "Changed intentionally unselected optional models to semantic OPTIONAL states: not installed or source cached/not registered; no apply/refresh recommendation is emitted for those states.",
     "Preserved genuine DRIFT for optional models whose runtime Modelfile/desired active state exists but registration/content is missing or inconsistent.",
-    "Excluded retired/non-user-visible testing policies from active Open WebUI base-model override desired state. Retired native registrations remain hidden from ordinary users and lifecycle-cleanable through bc250 model purge-retired.",
+    "Clarified source-graveyard semantics: archived Modelfiles are inert and excluded from active discovery/package installation, while manually registered historical models follow normal Open WebUI testing-policy visibility; explicit bc250 model purge-retired cleanup remains available.",
     "Currentized user/operator documentation for the 0.13.1 release and removed two remaining greenfield documentation remnants: the obsolete /usr/bin/bc250-* stable-alias claim and install-manifest alias-record description.",
     "Currentized the active development scope, testing strategy, validation matrix and release handovers for the narrow 0.8 -> 0.13.1 exact-upgrade delta."
   ],
   "validation": [
-    "511/511 deterministic Python tests PASS across all 17 test modules, executed module-by-module.",
+    "511/511 deterministic Python tests PASS on the original release-final baseline before this focused logic patch.",
     "python3 scripts/validate.py: RPM preflight PASS.",
     "python3 development/scope.py check: PASS; frozen component hashes unchanged.",
-    "Focused bytecode/model-state/Open WebUI tests PASS; package cleanup regression proves unrelated filesystem caches are untouched.",
+    "Focused patched bytecode/model-state/Open WebUI suite PASS: 140 tests plus 101 subtests; RPM preflight PASS on the patched tree.",
     "Ruff, ShellCheck, configured rpmlint execution and rpmbuild remain external Fedora/GitHub/workstation gates and are not claimed as passed in this artifact environment."
   ],
   "exact_device_baseline": {
@@ -97,7 +97,7 @@
     "Upgrade exact 0.12.2-0.8 with deliberately created known package-tree bytecode to exact 0.13.1-1.0, run sudo bc250 install, and prove stale bytecode is removed and not recreated.",
     "Require rpm -V clean and zero unowned files below package-owned /usr after RAG, benchmark, model, Open WebUI, verify and diagnostic paths.",
     "Verify optional absent/cached/applied/broken model states use OPTIONAL/CURRENT/DRIFT semantics with no repair advice for intentionally unselected state.",
-    "Create retired Qwen3.6 native residue; require Open WebUI desired state clean, ordinary-user visibility false, and purge-retired cleanup PASS.",
+    "Manually register the historical Qwen3.6 profile; require policy-driven admin/testing-only Open WebUI visibility, clean desired-state convergence, and explicit purge-retired cleanup PASS.",
     "Run bc250 verify and restore exact normal topology; do not repeat the full 0.8 campaign unless the bounded delta exposes a regression."
   ]
 }

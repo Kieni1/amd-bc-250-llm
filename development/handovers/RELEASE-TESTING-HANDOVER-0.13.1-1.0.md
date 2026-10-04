@@ -60,19 +60,20 @@ selected optional + registration removed     -> DRIFT + repair guidance
 
 No apply/refresh recommendation is allowed for intentionally unselected optional state.
 
-## Retired-model/Open WebUI gate
+## Historical-model/Open WebUI gate
 
-Create the known zero-copy retired Qwen3.6 native registration.
+Create the known zero-copy historical Qwen3.6 native registration manually.
 Require:
 
 ```text
-retired model not promoted to active catalog
-ordinary role=user /api/models visibility remains false
-Open WebUI desired-state status remains clean
-bc250 model purge-retired --yes detects/removes residue
+source graveyard remains absent from active model discovery/package installation
+manually registered model is represented through normal testing-policy handling
+ordinary role=user /api/models visibility remains false for this admin/testing-only profile
+Open WebUI desired-state status converges cleanly
+bc250 model purge-retired --yes detects/removes the registration when explicitly requested
 ```
 
-A retired registration is lifecycle residue, not a missing current base-model override.
+Graveyard membership is archive metadata only; it is not inferred as runtime state.
 
 ## Regression smoke
 

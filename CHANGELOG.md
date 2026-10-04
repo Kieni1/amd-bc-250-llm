@@ -6,8 +6,8 @@
 - Set `PYTHONDONTWRITEBYTECODE=1` in the canonical `bc250` dispatcher so normal Python-backed product commands do not create unowned `__pycache__`/`*.pyc` files under package-owned `/usr`.
 - Add bounded install/upgrade convergence cleanup for stale `__pycache__`, `*.pyc` and `*.pyo` files under `/usr/libexec/bc250-llm-server` and `/usr/share/bc250-llm-server`; no unrelated filesystem trees are touched.
 - Replace misleading optional-model `MISSING`/false-`DRIFT` presentation with explicit `OPTIONAL` states for intentionally unselected models, suppress repair advice for those states, and preserve `DRIFT` when an explicitly selected model loses or diverges from runtime state.
-- Exclude retired/non-user-visible registrations such as retired Qwen3.6 35B from active Open WebUI base-model override desired-state accounting. Retired native residue remains hidden from ordinary users and discoverable/removable through `sudo bc250 model purge-retired --yes`.
-- Add regression coverage for bytecode hygiene, bounded cleanup, optional-model state transitions and retired-model Open WebUI accounting.
+- Treat source-graveyard Modelfiles as inert archive content: they are excluded from active model discovery and package installation, but a model that an operator manually registers is handled by normal Open WebUI testing-policy visibility rather than by graveyard/retirement inference. Explicit `sudo bc250 model purge-retired --yes` cleanup remains available.
+- Add regression coverage for bytecode hygiene, bounded cleanup, optional-model state transitions and graveyard isolation without coupling tests to specific archived model identities.
 
 ## 0.12.2-0.8 - 2026-10-03
 

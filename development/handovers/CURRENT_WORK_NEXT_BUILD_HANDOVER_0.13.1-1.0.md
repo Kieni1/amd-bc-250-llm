@@ -16,9 +16,9 @@ Open WebUI desired state, revalidation infrastructure/restoration, direct and OW
 journeys, multi-turn/task and Advanced/Deep qualification. Agent remained correctly optional/PARTIAL.
 
 The only package-layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
-The pre-release investigation then reproduced and attributed that behavior, qualified optional-model state transitions,
-and proved that retired native Qwen3.6 residue was hidden from ordinary users but incorrectly affected Open WebUI
-desired-state accounting.
+The pre-release investigation then reproduced and attributed that behavior and qualified optional-model state transitions.
+A follow-up retirement review clarified that source-graveyard membership is archive metadata only: historical models are
+not active/discoverable from that directory, but an operator may manually register one for testing.
 
 ## 0.13.1-1.0 implementation delta
 
@@ -33,8 +33,9 @@ Implemented changes:
    `OPTIONAL — source cached, not registered` instead of `MISSING`/false `DRIFT`.
 4. Optional unselected models receive no `apply`/`refresh` recommendation.
 5. A selected optional model with a runtime Modelfile but missing/inconsistent registration remains genuine `DRIFT`.
-6. Retired/non-user-visible testing policies are excluded from active Open WebUI base-override desired state.
-   Native retired residue remains lifecycle evidence and is cleaned with `sudo bc250 model purge-retired --yes`.
+6. Source-graveyard Modelfiles remain outside active discovery/package installation and are not used to infer runtime state.
+   If an operator manually registers a historical model, Open WebUI applies its normal testing policy/visibility; explicit
+   cleanup remains available with `sudo bc250 model purge-retired --yes`.
 
 ## Closed decisions preserved
 
@@ -63,8 +64,8 @@ After building the exact `0.13.1-1.0` RPM:
    `bc250 verify` and `llm-run-diagnose --no-load`.
 6. Require `rpm -V` clean, zero unowned files below package-owned `/usr`, and no new `*.pyc`/`__pycache__`.
 7. Verify optional absent/cached/applied/broken states have the new semantics.
-8. Create a zero-copy retired Qwen3.6 native registration and prove Open WebUI desired-state status remains clean,
-   ordinary-user visibility remains false, and `purge-retired` removes the residue.
+8. Create a zero-copy historical Qwen3.6 native registration and prove Open WebUI converges it according to its
+   testing policy (admin/testing-only for this profile), then prove `purge-retired` can explicitly remove it.
 9. Run `bc250 verify`; require the established 53/0/0/0 baseline unless a platform-only diagnostic changed.
 10. Restore exact normal topology/state.
 

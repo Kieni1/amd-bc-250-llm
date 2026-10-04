@@ -576,7 +576,7 @@
       "ordinary_user_visible": true
     },
     "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest": {
-      "description": "Retired Qwen3.6 35B profile retained only to keep stale registrations admin/testing-only during cleanup.",
+      "description": "Historical Qwen3.6 35B profile; if manually registered for testing, keep it admin/testing-only.",
       "tags": [
         "qwen3.6",
         "retired",

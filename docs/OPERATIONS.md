@@ -174,10 +174,11 @@ with `--host` or `--destination`, pass the same override to `unregister`/`remove
 package retirement catalog, previews canonical identity/registration/source state, and
 fails closed on unavailable or misplaced registration state. It never selects arbitrary
 unmanaged operator models.
-Retired/non-user-visible native registrations are lifecycle residue, not active Open WebUI
-base-model desired state. They remain hidden from ordinary users and can be reported or removed
-through the model lifecycle without making an otherwise converged Open WebUI baseline appear
-misconfigured.
+The source Modelfile graveyard is archive-only and is not part of active model discovery or
+package installation. A historical model that an operator manually registers is treated as an
+installed native model; Open WebUI applies any matching testing policy (including its visibility)
+rather than inferring runtime state from graveyard membership. `purge-retired` remains an explicit
+operator cleanup command, not automatic convergence.
 
 #### Apply / refresh options
 
