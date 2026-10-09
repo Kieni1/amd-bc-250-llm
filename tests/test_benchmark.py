@@ -1937,8 +1937,8 @@ class TelemetryTests(unittest.TestCase):
         self.assertIn("readonly EDGE_MIN_MEM_AVAILABLE_MIB=128", source)
         self.assertIn("readonly EDGE_TIGHT_MEM_AVAILABLE_MIB=512", source)
         self.assertIn('"kind": "resource-headroom"', source)
-        self.assertIn("resource headroom tight: MemAvailable minimum", source)
-        self.assertIn("hard floor ${hard} MiB); policy=PASS", source)
+        self.assertIn("resource pressure: MemAvailable minimum", source)
+        self.assertIn("hard failure floor ${hard} MiB; result=PASS", source)
 
     def test_revalidation_surfaces_passed_output_budget_diagnostics(self) -> None:
         source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
@@ -2331,7 +2331,7 @@ dashboard_text
             )
             self.assertIn("[RUNNING ", completed.stdout)
             self.assertIn("Infrastructure  PASS so far", completed.stdout)
-            self.assertIn("Quality steps", completed.stdout)
+            self.assertIn("Quality suites", completed.stdout)
             self.assertIn(
                 "Ctrl-C detaches; the worker continues under systemd.",
                 completed.stdout,
@@ -2369,7 +2369,7 @@ dashboard_text
             self.assertIn("Infrastructure  PASS", completed.stdout)
             self.assertNotIn("Infrastructure  PASS so far", completed.stdout)
             self.assertNotIn("worker continues under systemd", completed.stdout)
-            self.assertIn("Quality steps", completed.stdout)
+            self.assertIn("Quality suites", completed.stdout)
 
     def test_revalidation_failed_dashboard_preserves_original_phase_and_stage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -606,7 +606,7 @@ dashboard_text() {
   else
     printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
   fi
-  printf 'Quality steps   %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
+  printf 'Quality suites  %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
   printf 'Coverage        %s\n' "$(coverage_display)"
   printf '\nRecent results\n'
   recent_step_results
@@ -682,7 +682,10 @@ follow_run() {
     echo "Revalidation run completed."
     printf 'Run completion: %s\n' "$(effective_run_state)"
     printf 'Infrastructure: %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
-    printf 'Quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+    printf 'Quality evidence: %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+    if [[ -n "$(product_integrity_report)" ]]; then
+      printf 'Product integrity: pass\n'
+    fi
     printf 'Restoration:    %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
     printf 'Coverage:       %s\n' "$(coverage_display)"
     echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)"
@@ -1360,7 +1363,7 @@ record_edge_diagnostics() {
   done < <(jq -r '.diagnostics[]? | select(.kind == "context-truncation") | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
   while IFS=$'\t' read -r model mem hard tight; do
     [[ -n $model ]] || continue
-    record_event "$label" diagnostic info "$model: resource headroom tight: MemAvailable minimum ${mem} MiB (< ${tight} MiB diagnostic threshold; hard floor ${hard} MiB); policy=PASS"
+    record_event "$label" diagnostic info "$model: resource pressure: MemAvailable minimum ${mem} MiB; diagnostic threshold ${tight} MiB; hard failure floor ${hard} MiB; result=PASS (tight headroom, no hard-floor violation)"
   done < <(jq -r '.diagnostics[]? | select(.kind == "resource-headroom") | [.model, (.mem_available_min_mib|floor|tostring), (.hard_floor_mib|floor|tostring), (.tight_threshold_mib|floor|tostring)] | @tsv' "$sanity_json")
 }
 
@@ -1771,12 +1774,14 @@ create_summary() {
       diagnostic_report
     fi
     echo
-    echo "Result root"
+    echo "Evidence in this bundle"
+    echo "  results/"
+    echo "Original working directory"
     echo "  $RAW"
     echo
     echo "Policy"
     echo "  Revalidation qualifies packaged defaults only; tuning/model/hardware A/B comparisons belong to explicit benchmark/diagnostic workflows."
-    echo "  The complete live SPI/WGP routing table is the CU authority; numeric kernel/RADV counters are diagnostic only."
+    echo "  Live SPI-routed CUs are the appliance CU-capacity signal; routing-table consistency remains the diagnostic authority for D! cells."
     echo "  BC-250 resource headroom is interpreted through residency, MemAvailable and swap context; VRAM/GTT are not additive pools."
   } > "$out"
 }
@@ -2071,7 +2076,10 @@ status_run() {
   diagnostics="$(diagnostic_count)"
   printf '  State          : %s\n' "$(effective_run_state)"
   printf '  Infrastructure : %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
-  printf '  Quality        : %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  printf '  Quality evidence: %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  if [[ -n "$(product_integrity_report)" ]]; then
+    printf '  Product integrity: pass\n'
+  fi
   printf '  Restoration    : %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
   printf '  Coverage       : %s\n' "$(coverage_display)"
   ((diagnostics == 0)) || printf '  Diagnostics    : %d informational\n' "$diagnostics"
