@@ -1,11 +1,11 @@
-# BC-250 current work / next-build handover — 0.13.1-1.2
+# BC-250 current work / next-build handover — 0.13.1-1.3
 
 ## Identity
 
 ```text
 VERSION       0.13.1
 RPM Release   1.2
-NVR target    bc250-llm-server-0.13.1-1.2
+NVR target    bc250-llm-server-0.13.1-1.3
 ```
 
 ## Qualified baseline and optimization closures
@@ -32,7 +32,7 @@ production TOP_K  4      PROMOTE
 
 The q4_0 rejection is Advanced/Qwen quality instability at the existing 6144-token production ceiling, not memory/OOM failure. Clean 6144-token hidden-reasoning exhaustion with no visible answer remains INCOMPLETE; repetition at that ceiling remains a genuine quality defect.
 
-## 0.13.1-1.2 implementation delta
+## 0.13.1-1.3 implementation delta
 
 This release does not reopen model identities, context limits, lane topology, keepalive, Deep admission, flash attention, parallelism or GPU offload.
 
@@ -112,3 +112,9 @@ Ruff binary unavailable locally; the user-supplied Ruff run's final SIM103 and I
 ```
 
 Ruff itself remains mandatory in the normal workstation/CI build gate before the RPM is accepted.
+
+## 0.13.1-1.3 corrective/build-quality delta
+
+The exact 0.13.1-1.2 device upgrade completed with `bc250 verify` 54/0/0/0, Open WebUI desired state clean, active zram/disk swap healthy, live SPI routing at 40/40 on that board, and revalidation infrastructure/restoration PASS. The mixed quality state remained the known raw DE→FR recommendation-strengthening defect while the product guard withheld the unsafe output.
+
+1.3 does not reopen runtime/model optimization. It improves operator output and build determinism: live SPI-routed CUs are the only operator-facing CU-capacity value; Source0 is UTC/mode/cache independent; the normal RPM build runs the complete deterministic suite once in `%check`; Cargo is explicitly offline; stale build outputs cannot be selected; and release/manual CI rebuilds the generated SRPM from a clean temporary RPM topdir.

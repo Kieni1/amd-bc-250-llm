@@ -1,4 +1,4 @@
-# BC-250 release testing handover — 0.13.1-1.2
+# BC-250 release testing handover — 0.13.1-1.3
 
 ## Purpose
 
@@ -21,7 +21,7 @@ Source0 recursively contains no `.pytest_cache`, `.ruff_cache`, `__pycache__`, `
 Target:
 
 ```text
-bc250-llm-server-0.13.1-1.2.fc44.x86_64
+bc250-llm-server-0.13.1-1.3.fc44.x86_64
 ```
 
 ## Frozen runtime decisions
@@ -141,3 +141,7 @@ Require:
 - `swapon` query success with no entries is a known-empty active-swap set;
 - `swapon` query failure is reported as unavailable/unknown, not `no active swap`;
 - destructive resize/removal still refuses mutation on active-state query failure or `swapoff` failure.
+
+## 0.13.1-1.3 focused delta gate
+
+Do not replay Sidechats 15–19. Build qualification should prove Source0 reproducibility across timezone/mode/cache perturbations, Ruff/ShellCheck, actual RPM payload, rpmlint, and the generated-SRPM self-contained rebuild gate. Device qualification should focus on installer wording/state transitions, live SPI-routed CU reporting, bounded TOP_K=4 product smoke, readiness/firewall/swap checks, then one final whole-appliance revalidation and `rpm -V`.
