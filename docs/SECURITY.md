@@ -57,8 +57,11 @@ Ollama ports `11434`–`11437` have no authentication and must remain blocked
 from untrusted networks. The wildcard host listeners are intentional so the
 rootful Open WebUI container can use `host.containers.internal`; firewalld is
 the LAN boundary. `bc250 verify` warns about unexpected listener shapes or an
-inactive/incorrect firewall, and a remote `curl -f http://SERVER_IP/` check validates reachability from a
-second LAN machine.
+inactive/incorrect firewall and checks protected internal TCP ports against direct port entries,
+covering ranges, active custom firewalld service definitions and accepting rich rules. If an active
+zone or referenced service definition cannot be inspected, verification fails closed instead of
+claiming the LAN boundary is clean. A remote `curl -f http://SERVER_IP/` check still validates intended
+HTTP reachability from a second LAN machine.
 
 ## Confidential documents and knowledge bases
 
