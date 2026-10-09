@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.2`.
+Current release source: `bc250-llm-server-0.13.1-1.3`.
 
 ## Install
 

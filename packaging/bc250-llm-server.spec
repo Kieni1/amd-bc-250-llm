@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.2%{?dist}
+Release:        1.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -103,7 +103,7 @@ patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch
 %build
 pushd governor-src
 export CYAN_SKILLFISH_GOVERNOR_VERSION=%{governor_version}
-cargo build --release --frozen
+cargo build --release --frozen --offline
 popd
 
 %check
@@ -255,6 +255,10 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.3
+- Polish installer/revalidation/CU output around exact 1.2 device evidence without changing qualified runtime defaults.
+- Make Source0 timezone/mode/cache independent, run the full deterministic suite once per normal RPM build, clean stale build outputs, force Cargo offline and add a release-only SRPM self-contained rebuild check.
+- Keep live SPI-routed CUs as the operator-facing CU-capacity signal and treat missing live routing as potential unlock headroom rather than surfacing irrelevant kernel/RADV counters.
 * Fri Oct 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.2
 - Keep runtime-state.sh as a sourced 0644 library without a shebang and reject non-executable shebang payloads during manifest validation, preventing rpmlint non-executable-script failures.
 - Remove unnecessary global locale forcing from Fedora CI; retain explicit C locale only for commands whose ordering/parsing depends on it.

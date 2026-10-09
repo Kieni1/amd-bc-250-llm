@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.1-1.3 - 2026-10-09
+
+- Polish installer/status/revalidation UX from exact 1.2 device output: make pre-update reboot state explicitly pending, distinguish optional/unavailable model registration from selected drift, clarify conservative Open WebUI migration snapshots, remove duplicate credential wording, simplify completion commands, and make revalidation quality/product-integrity/resource-pressure wording easier to interpret.
+- Make live SPI-routed CUs the operator-facing CU-capacity value and stop presenting kernel/RADV counters as meaningful capacity signals; when live routing cannot be detected, point operators to the live routing manager because additional CUs may be unlockable.
+- Make Source0 reproducible across host timezone and irrelevant checkout-mode differences, exclude the complete local `sources/` cache, and ignore generated source-cache checksum sidecars.
+- Refactor RPM validation so the normal build performs cheap preflight before `rpmbuild` and the complete deterministic suite once in `%check`; clean disposable RPM outputs before each build and require unambiguous current-artifact selection.
+- Force the vendored Cargo build offline and add a release-only generated-SRPM self-contained rebuild gate from a clean temporary RPM topdir.
+- Keep Ruff/rpmlint authoritative for their own generic rules instead of duplicating selected linter behavior in custom source validation/tests; retain package-specific invariants and high-value behavioral regressions.
+
 ## 0.13.1-1.2 - 2026-10-09
 
 - Tighten semantic-equivalence acceptance so date/time/invoice normalization can satisfy only standalone semantic values; compound required phrases still require their surrounding semantics.
