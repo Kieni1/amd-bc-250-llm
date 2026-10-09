@@ -306,7 +306,7 @@ done | paste -sd, -)"
 if [[ -n "$missing_idle" ]]; then
   info "online CPUs without cpuidle states: $missing_idle"
   [[ "$threads" == 16 ]] && warn "16 threads are active but some CPUs lack C-states; check idle power/correctness" || \
-    info "C-state availability is incomplete"
+    info "cpuidle/C-state telemetry is not exposed for all online CPUs on this platform; no action required"
 else
   ok "all online CPUs expose cpuidle states"
 fi
