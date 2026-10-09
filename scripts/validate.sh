@@ -4,6 +4,18 @@ set -Eeuo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+mode="${1:-all}"
+case "$mode" in
+  all|--preflight) ;;
+  -h|--help)
+    echo "Usage: scripts/validate.sh [--preflight]"
+    echo "  default       run source preflight plus deterministic tests"
+    echo "  --preflight   run cheap source/structure checks only"
+    exit 0
+    ;;
+  *) echo "ERROR: unknown validation mode: $mode" >&2; exit 2 ;;
+esac
+
 shell_file_list="$(mktemp)"
 trap 'rm -f -- "$shell_file_list"' EXIT
 find "$ROOT" \
@@ -19,6 +31,11 @@ for file in "${shell_files[@]}"; do
 done
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate.py
+
+if [[ "$mode" == "--preflight" ]]; then
+  echo "Repository preflight passed."
+  exit 0
+fi
 
 # Isolate test modules so module-level mocks, environment changes, and cleanup
 # cannot leak into later modules. A generous per-module timeout keeps a broken

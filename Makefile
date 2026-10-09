@@ -5,17 +5,19 @@ TOPDIR := $(CURDIR)/rpmbuild
 DISTDIR := $(CURDIR)/dist
 UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 
-.PHONY: help sources sources-check source-tar rpm-tree srpm rpm check-rpm-payload validate clean clean-sources distclean
+.PHONY: help sources sources-check source-tar preflight validate prepare-rpm-output rpm-tree srpm rpm check-rpm-payload check-srpm-rebuild clean clean-sources distclean
 
 help:
 	@printf '%s\n' \
 	  'make sources    Download pinned governor and live-manager sources' \
 	  'make sources-check  Verify the local source cache and SHA-256 sidecars' \
-	  'make validate   Run deterministic RPM preflight checks' \
+	  'make preflight  Run cheap source/structure checks' \
+	  'make validate   Run preflight plus deterministic tests' \
 	  'make source-tar Create the project source archive' \
 	  'make srpm       Build the source RPM' \
 	  'make rpm        Build binary and source RPMs' \
 	  'make check-rpm-payload  Verify the built greenfield RPM file surface' \
+	  'make check-srpm-rebuild  Rebuild the generated SRPM from a clean temporary topdir' \
 	  'make clean      Remove disposable build output; keep downloaded sources' \
 	  'make clean-sources  Remove the reusable third-party source cache'
 
@@ -30,10 +32,18 @@ sources-check:
 source-tar:
 	./scripts/make-source-tarball.sh
 
+preflight:
+	./scripts/validate.sh --preflight
+
 validate:
 	./scripts/validate.sh
 
-rpm-tree: sources source-tar validate
+prepare-rpm-output:
+	rm -rf $(TOPDIR)
+	mkdir -p $(DISTDIR)
+	rm -f $(DISTDIR)/*.rpm $(DISTDIR)/*.src.rpm $(DISTDIR)/SHA256SUMS
+
+rpm-tree: prepare-rpm-output sources source-tar preflight
 	mkdir -p $(TOPDIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} $(DISTDIR)
 	cp build/$(NAME)-$(VERSION).tar.gz $(TOPDIR)/SOURCES/
 	cp $(UPSTREAM_SOURCES) $(TOPDIR)/SOURCES/
@@ -53,9 +63,13 @@ rpm: rpm-tree
 
 check-rpm-payload:
 	@set -Eeuo pipefail; \
-	main_rpm="$$(find '$(DISTDIR)' -maxdepth 1 -type f -name '$(NAME)-$(VERSION)-*.x86_64.rpm' \
-	  ! -name '*-debuginfo-*' ! -name '*-debugsource-*' -print -quit)"; \
-	[[ -n "$$main_rpm" ]] || { echo 'ERROR: main binary RPM not found in $(DISTDIR).' >&2; exit 1; }; \
+	mapfile -t main_rpms < <(find '$(DISTDIR)' -maxdepth 1 -type f -name '$(NAME)-$(VERSION)-*.x86_64.rpm' \
+	  ! -name '*-debuginfo-*' ! -name '*-debugsource-*' -print | sort); \
+	[[ "$${#main_rpms[@]}" -eq 1 ]] || { \
+	  echo "ERROR: expected exactly one current main binary RPM in $(DISTDIR), found $${#main_rpms[@]}." >&2; \
+	  printf '  %s\n' "$${main_rpms[@]:-}" >&2; exit 1; \
+	}; \
+	main_rpm="$${main_rpms[0]}"; \
 	payload="$$(mktemp)"; trap 'rm -f "$$payload"' EXIT; \
 	rpm -qpl "$$main_rpm" > "$$payload"; \
 	for path in \
@@ -81,6 +95,15 @@ check-rpm-payload:
 	  exit 1; \
 	fi; \
 	echo "RPM payload contract passed: $$(basename "$$main_rpm")"
+
+check-srpm-rebuild:
+	@set -Eeuo pipefail; \
+	mapfile -t srpms < <(find '$(DISTDIR)' -maxdepth 1 -type f -name '$(NAME)-$(VERSION)-*.src.rpm' -print | sort); \
+	[[ "$${#srpms[@]}" -eq 1 ]] || { echo "ERROR: expected exactly one current SRPM, found $${#srpms[@]}." >&2; exit 1; }; \
+	top="$$(mktemp -d)"; trap 'rm -rf "$$top"' EXIT; \
+	mkdir -p "$$top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}; \
+	CARGO_NET_OFFLINE=true rpmbuild --define "_topdir $$top" --rebuild "$${srpms[0]}"; \
+	echo "SRPM self-contained rebuild passed: $$(basename "$${srpms[0]}")"
 
 clean:
 	rm -rf build dist rpmbuild
