@@ -53,7 +53,7 @@
   },
   "rag": {
     "RAG_TEMPLATE": "Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>",
-    "TOP_K": 8,
+    "TOP_K": 4,
     "ENABLE_RAG_HYBRID_SEARCH": false,
     "RELEVANCE_THRESHOLD": 0,
     "CONTENT_EXTRACTION_ENGINE": "tika",

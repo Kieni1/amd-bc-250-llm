@@ -111,7 +111,7 @@ The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 | Chunk min-size target | `0` (disabled) | `0` |
 | Chunk size | `1500` | `1000` |
 | Chunk overlap | `200` | `100` |
-| Top K | `8` | `5` |
+| Top K | `4` | `5` |
 | Relevance threshold | `0` | `0` |
 | Hybrid search | Off initially | Off initially |
 | Embedding batch size | `1` | `1` |
@@ -120,7 +120,7 @@ The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 | Retrieval-query generation | Off for baseline | Off for baseline |
 | Reranker | None | None |
 
-The **moderate** 1500/200/Top-K-8 profile is the package standard for the 32K
+The **moderate** 1500/200/Top-K-4 profile is the package standard for the 32K
 document model: it gives each retrieval hit more surrounding office-document
 context while keeping the injected context well below the model window. The
 **conservative** 1000/100/Top-K-5 profile is useful when testing a larger model,
@@ -193,8 +193,12 @@ mapping in its metadata and waits for real Open WebUI HTTP readiness before begi
 `rag-quality` keeps retrieval, factual/abstention acceptance, output language and citation
 as separate checks. The evaluator uses boundary-aware deterministic matching rather than
 naïve substrings or an LLM judge; fixtures can enumerate semantic alternatives and numeric
-equivalence explicitly. Short numeric/identifier answers may be recorded as
-`language_measurable=false` / `language_not_measurable=true` without becoming a language failure. Its canonical summary also
+equivalence explicitly. Grouped citations are parsed by member source identity, and the known
+`INV-YYYY-NNNN` / `Invoice YYYY-NNNN` office identifier forms compare semantically. A clean
+hidden-reasoning output-budget exhaustion with no visible answer is `INCOMPLETE`/retry when no
+independent retrieval or semantic defect exists; repetition remains a quality failure. Short
+numeric/identifier answers may be recorded as `language_measurable=false` /
+`language_not_measurable=true` without becoming a language failure. Its canonical summary also
 checks the exact expected case set so missing, duplicate or unexpected rows are structural
 failures rather than misleading quality results.
 

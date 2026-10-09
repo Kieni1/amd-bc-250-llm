@@ -277,7 +277,7 @@ model and 128-token tag budget are unchanged.
 The dedicated embedding lane uses Jina on `11437`, a 10-minute Ollama keepalive,
 batch size 1 and asynchronous embedding disabled. The reviewed retrieval baseline
 remains token splitting, 1500-token chunks, 200-token overlap, Markdown-header
-splitting, Top K 8, hybrid search off and Tika extraction. Open WebUI is explicitly
+splitting, Top K 4, hybrid search off and Tika extraction. Open WebUI is explicitly
 set to `TIKA_SERVER_VERSION=4` so it uses the Tika 4 API; smoke-test representative
 office/PDF extraction after this major Tika refresh. Exact-device testing with genuine LibreOffice-authored DOCX files confirms that Tika 4 serializes real Word bullets as middle-dot-prefixed lines (`· item`) while preserving heading structure, table Markdown, list ordering and list/table facts through Open WebUI extraction and Documents retrieval. Treat this as a Tika 4 Markdown serialization characteristic; no package-side list-marker rewrite is applied.
 
