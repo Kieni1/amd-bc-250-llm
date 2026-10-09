@@ -2,6 +2,12 @@
 # Concise, read-only appliance status. Use bc250 verify for pass/fail checks.
 set -uo pipefail
 CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
+RUNTIME_STATE="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/runtime-state.sh"
+if [[ ! -r "$RUNTIME_STATE" ]]; then
+  RUNTIME_STATE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/runtime-state.sh"
+fi
+# shellcheck disable=SC1090
+source "$RUNTIME_STATE"
 
 section() {
   printf '\n=== %s ===\n' "$1"
@@ -159,16 +165,24 @@ ollama_version_line() {
 }
 
 openwebui_readiness() {
-  local state
+  local state listener_code backend=unavailable frontdoor=unavailable listener=unavailable
   state="$(unit_state open-webui.service)"
+  listener_code="$(curl --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 1 --max-time 3 \
+      http://127.0.0.1:80/ 2>/dev/null || true)"
+  [[ "$listener_code" =~ ^[1-5][0-9][0-9]$ ]] && listener=ready
   if curl --fail --silent --output /dev/null --connect-timeout 1 --max-time 3 \
-      http://127.0.0.1:3000/ 2>/dev/null; then
-    printf 'ready'
+      http://127.0.0.1:3000/api/version 2>/dev/null; then
+    backend=ready
   elif [[ "$state" == active ]]; then
-    printf 'active-not-ready'
-  else
-    printf 'unavailable'
+    backend=active-not-ready
   fi
+  if curl --fail --silent --output /dev/null --connect-timeout 1 --max-time 3 \
+      http://127.0.0.1:80/api/version 2>/dev/null; then
+    frontdoor=ready
+  elif [[ "$listener" == ready ]]; then
+    frontdoor="listener-only (${listener_code})"
+  fi
+  printf 'listener=%s; backend=%s; front-door=%s' "$listener" "$backend" "$frontdoor"
 }
 
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
@@ -290,15 +304,26 @@ printf '  %-38s %s\n' 'Open WebUI application readiness' "$(openwebui_readiness)
 section "Memory and swap"
 free -h 2>/dev/null | sed 's/^/  /' || true
 printf '  vm.swappiness: %s\n' "$(sysctl -n vm.swappiness 2>/dev/null || printf 'unknown')"
-if zramctl --noheadings 2>/dev/null | grep -q .; then
-  zramctl 2>/dev/null | sed 's/^/  /'
+if active_swap_names="$(bc250_active_swap_names)"; then
+  active_zram_names="$(awk '$1 ~ /^\/dev\/zram[0-9]+$/ {print $1}' <<< "$active_swap_names")"
+  if [[ -n "$active_zram_names" ]]; then
+    zramctl 2>/dev/null | sed 's/^/  /' || true
+  else
+    initialized_zram="$(zramctl --noheadings --output NAME 2>/dev/null | awk '$1 ~ /^\/dev\/zram[0-9]+$/ {print $1}' | paste -sd, -)"
+    if [[ -n "$initialized_zram" ]]; then
+      echo "  zram present but not active as swap: $initialized_zram"
+    else
+      echo "  No active zram swap"
+    fi
+  fi
+  if [[ -n "$active_swap_names" ]]; then
+    swapon --show 2>/dev/null | sed 's/^/  /'
+  else
+    echo "  No active swap"
+  fi
 else
-  echo "  No active zram device"
-fi
-if swapon --show --noheadings 2>/dev/null | grep -q .; then
-  swapon --show 2>/dev/null | sed 's/^/  /'
-else
-  echo "  No active swap"
+  echo "  Active swap state unavailable"
+  echo "  zram activity cannot be verified"
 fi
 [[ -r /proc/pressure/memory ]] && sed 's/^/  memory PSI: /' /proc/pressure/memory
 

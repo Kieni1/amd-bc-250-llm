@@ -18,6 +18,7 @@ import statistics
 import subprocess
 import threading
 import time
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
@@ -31,6 +32,44 @@ TEMP_THRESHOLDS = (80.0, 83.0, 85.0)
 RESULT_SCHEMA_VERSION = 1
 VALID_OUTCOMES = {"pass", "quality-fail", "infra-fail", "skipped", "incomplete"}
 VALID_RESULT_TYPES = {"measurement", "qualification"}
+
+
+def citation_identifiers(text: str) -> set[str]:
+    """Return exact source ids from standalone or comma-grouped [id] citations.
+
+    The RAG evaluators must treat ``[a, b]`` as citing both ``a`` and ``b``
+    without falling back to substring matching that can confuse similarly named
+    sources.
+    """
+    identifiers: set[str] = set()
+    for match in re.finditer(r"\[([^\[\]\r\n]+)\]", text):
+        for raw in match.group(1).split(","):
+            value = raw.strip().casefold()
+            if value:
+                identifiers.add(value)
+    return identifiers
+
+
+def citation_has_source(text: str, source: str) -> bool:
+    return source.strip().casefold() in citation_identifiers(text)
+
+
+def semantic_invoice_identifiers(text: str) -> set[tuple[str, str]]:
+    """Extract narrowly equivalent ``INV-YYYY-NNNN`` / ``Invoice YYYY-NNNN`` ids."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return {
+        (match.group(1), match.group(2))
+        for match in re.finditer(
+            r"(?<!\w)(?:inv(?:oice)?)\s*[-:#]?\s*(\d{4})\s*[-/]\s*(\d{4})(?!\w)",
+            folded,
+        )
+    }
+
+
+def semantic_identifier_equivalent(text: str, expected: str) -> bool:
+    """Accept only explicitly supported semantic identifier renderings."""
+    wanted = semantic_invoice_identifiers(expected)
+    return bool(wanted) and wanted.issubset(semantic_invoice_identifiers(text))
 
 
 PACKAGE_NAME = "bc250-llm-server"
@@ -267,6 +306,59 @@ def fixture_metadata(*sources: Path) -> list[dict[str, str]]:
     return items
 
 
+def _memory_psi_snapshot() -> dict[str, dict[str, float | int]]:
+    path = Path("/proc/pressure/memory")
+    result: dict[str, dict[str, float | int]] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return result
+    for line in lines:
+        parts = line.split()
+        if not parts:
+            continue
+        values: dict[str, float | int] = {}
+        for item in parts[1:]:
+            key, sep, raw = item.partition("=")
+            if not sep:
+                continue
+            try:
+                values[key] = int(raw) if key == "total" else float(raw)
+            except ValueError:
+                continue
+        result[parts[0]] = values
+    return result
+
+
+def _local_ollama_residency_snapshot() -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for lane, port in (("main", 11434), ("task", 11435), ("agent", 11436), ("embedding", 11437)):
+        url = f"http://127.0.0.1:{port}/api/ps"
+        try:
+            with request.urlopen(url, timeout=1.0) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            models = payload.get("models") if isinstance(payload, dict) else []
+            result[lane] = [
+                str(row.get("name") or row.get("model"))
+                for row in (models if isinstance(models, list) else [])
+                if isinstance(row, dict) and (row.get("name") or row.get("model"))
+            ]
+        except (OSError, error.URLError, json.JSONDecodeError, TimeoutError):
+            result[lane] = None
+    return result
+
+
+def benchmark_starting_state() -> dict[str, Any]:
+    """Capture pre-workload resource state so state-dependent effects remain attributable."""
+    mem_available, swap_used = read_meminfo()
+    return {
+        "mem_available_mib": mem_available,
+        "swap_used_mib": swap_used,
+        "memory_psi": _memory_psi_snapshot(),
+        "ollama_residency": _local_ollama_residency_snapshot(),
+    }
+
+
 def benchmark_metadata(
     category: str,
     *,
@@ -291,6 +383,7 @@ def benchmark_metadata(
         "fixtures": fixtures or [],
         "options": options or {},
         "runtimes": runtimes or [],
+        "starting_state": benchmark_starting_state(),
     }
     data.update(extra)
     return data
