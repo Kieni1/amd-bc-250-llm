@@ -82,6 +82,7 @@ file	0644	examples/benchmark/ocr/invoice-mixed.png	{share}/benchmark/ocr/invoice
 file	0644	examples/benchmark/ocr/invoice-mixed-rotated.png	{share}/benchmark/ocr/invoice-mixed-rotated.png
 file	0644	examples/benchmark/ocr/office-fr-scan.png	{share}/benchmark/ocr/office-fr-scan.png
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
+file	0644	cmd/monitoring/runtime-state.sh	{libexec}/runtime-state.sh
 file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
 file	0755	cmd/monitoring/support-bundle.sh	{libexec}/support-bundle.sh
 file	0755	cmd/system/40cu.sh	{bindir}/bc250-40cu

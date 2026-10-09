@@ -4,7 +4,7 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.13.1-1.0` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.13.1-1.2` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -156,8 +156,7 @@ sudo bc250 agent-mode leave   # or: sudo bc250 agent-mode normal
 Keep experiments, MTP qualification, benchmark suites, destructive model lifecycle actions,
 reset and maintenance internals out of the normal daily path. Their complete syntax remains in
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md); model policy and MTP opt-in details are in
-[`MODELS.md`](MODELS.md), and Raspberry Pi/WOL/safe-power operations are in
-[`docs/OPERATIONS.md`](docs/OPERATIONS.md) and
+[`MODELS.md`](MODELS.md), and Raspberry Pi/WOL/safe-power operations are also in
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md).
 
 ## Components
@@ -173,7 +172,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.0. Exact-device 0.12.2-0.8 qualification
+Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.2. Exact-device 0.12.2-0.8 qualification
 passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
 whole-appliance revalidation with this runtime; 0.13.1 does not change the Ollama pin.
 Runtime updates remain deliberately pinned rather than following upstream automatically.

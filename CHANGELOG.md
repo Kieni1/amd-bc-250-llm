@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.13.1-1.2 - 2026-10-09
+
+- Tighten semantic-equivalence acceptance so date/time/invoice normalization can satisfy only standalone semantic values; compound required phrases still require their surrounding semantics.
+- Broaden firewalld HTTP publication verification to recognize direct TCP/80, ranges containing 80, custom active services, and accepting rich rules while keeping unknown service inspection conservative.
+- Distinguish unreadable active-swap inspection from a known-empty swap set in status/verification; destructive swap resize/removal remains fail-closed.
+- Clear the reported Ruff findings without suppressions: normalize one-line/semicolon statement style, return the final semantic identifier condition directly (`SIM103`), and restore import ordering in `tests/test_packaging.py` (`I001`), without changing runtime behavior.
+
+## 0.13.1-1.1 - 2026-10-08
+
+- Close the Sidechat 15–19 optimization program without changing the qualified residency/lane/context/runtime defaults: keep 32K main context, q8_0 KV, parallel=1, flash attention, automatic num_batch, current full GPU offload, current keep-alive values, Deep pre-eviction and production model identities.
+- Promote the independently qualified Documents/RAG retrieval breadth from Top-K 8 to `TOP_K=4`; reject the combined q4_0+TOP_K=4 candidate because Advanced/Qwen became unstable at the existing 6144-token reasoning ceiling under q4_0.
+- Extend semantic optional-model status to the inactive Qwen embedding alternative and keep operator-added registrations informational rather than default-package drift.
+- Harden benchmark/evaluator semantics: normalize unambiguous office date/time renderings and invoice identifiers, parse grouped citation membership, use required numeric-value membership instead of a last-number heuristic, preserve clean reasoning-budget exhaustion as INCOMPLETE and repetition as a quality defect, and keep task result/persistence authoritative over fleeting residency sampling.
+- Distinguish nginx listener, Open WebUI backend and usable front-door readiness; HTTP 502/listener-only state is not ready. Verify zram through the active swap set rather than device existence alone, and parse actual failed systemd units.
+- Add explicit non-interactive generation benchmark controls and capture starting MemAvailable, SwapUsed, memory PSI and per-lane Ollama residency in benchmark metadata; revalidation snapshots/checkpoints now retain memory PSI evidence.
+- Correct generic CU documentation to require the highest routing profile proven stable on the individual board rather than treating 40/40 as a universal health target.
+- Run deterministic repository tests module-by-module in the release validator so module-level mocks/environment changes cannot leak across the suite and slow/failing modules are identified directly.
+- Keep Source0/workbench packaging clean after developer validation: recursively exclude pytest/Ruff caches plus `__pycache__`, `*.pyc` and `*.pyo` so developer metadata/bytecode cannot leak into release source archives.
+- Harden destructive swap lifecycle operations: if the managed disk swap is active and `swapoff` fails, refuse resize/removal rather than unlinking or replacing the backing file.
+- Harden firewall verification so protected internal TCP ports are detected when exposed through numeric ranges, active custom firewalld services, or accepting rich rules—not only exact port tokens.
+
 ## 0.13.1-1.0 - 2026-10-03
 
 - Promote the exact-device-qualified 0.12.2 appliance line to the 0.13.1 release series while keeping Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13, current model roles, live-CU architecture, RAG policy and structured-output policy unchanged.

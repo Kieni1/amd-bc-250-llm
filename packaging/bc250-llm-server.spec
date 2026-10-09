@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.0%{?dist}
+Release:        1.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -255,6 +255,19 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.2
+- Restrict date/time/invoice semantic-equivalence substitution to standalone required values so compound acceptance phrases cannot pass from a matching embedded token alone.
+- Recognize HTTP publication through TCP/80 direct ports, ranges, custom firewalld services and accepting rich rules while retaining conservative unknown-state handling.
+- Distinguish unavailable swap-state inspection from a proven empty active-swap set in read-only status/verification; keep destructive swap changes fail-closed.
+- Resolve the reported Ruff findings without suppressions, including one-line/semicolon style, SIM103 in semantic acceptance and I001 import ordering in packaging tests, without changing package behavior.
+* Thu Oct 08 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.1
+- Keep the closed Sidechat 15–19 runtime defaults: 32K/q8_0, parallel=1, flash attention, automatic num_batch, existing keep-alive/Deep admission and production model identities.
+- Promote Open WebUI/Documents RAG TOP_K=4 while rejecting q4_0 after integrated Advanced/Qwen instability at the 6144-token production ceiling.
+- Improve optional-model semantics, semantic date/time/invoice/citation/numeric evaluators, front-door readiness, active-swap zram/failed-unit verification, non-interactive benchmark controls and starting swap/PSI/residency evidence.
+- Keep board-specific CU routing semantics and treat 40/40 as a qualified per-board result rather than a universal requirement.
+- Run deterministic repository tests module-by-module so module-level state cannot leak across the suite and any slow/failing module is identified directly.
+- Exclude pytest/Ruff/Python cache artifacts from reproducible Source0 generation after developer validation.
+- Fail closed on managed disk-swap deactivation before destructive resize/removal, detect internal-port exposure through firewalld ranges/custom services/rich rules, and recursively exclude pytest/Ruff plus pyc/pyo caches from Source0.
 * Sat Oct 03 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.0
 - Prevent package Python helpers from writing bytecode under immutable /usr and clean stale package-tree caches during guided install/upgrade convergence.
 - Make optional-model status semantic: intentionally absent/cached optional models report OPTIONAL without repair advice, while selected models with broken runtime state remain DRIFT.
