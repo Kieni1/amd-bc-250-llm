@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; 0.13.1-1.0 keeps the pin unchanged.
+Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; 0.13.1-1.2 keeps the pin unchanged.
 
 ## Install and verify
 
@@ -65,7 +65,7 @@ transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regres
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.13.1-1.0 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
+The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.13.1-1.2 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
 
 The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
@@ -104,8 +104,7 @@ sudo bc250 ollama-profile reset
 | Balanced | 32,768 | q8_0 | 1 / 1 |
 | Max context | 65,536 | q4_0 | 1 / 1 |
 
-Both enable flash attention. The max-context profile reduces KV-cache memory at
-a possible quality cost. Service profiles do not modify individual Modelfiles.
+Both enable flash attention. `balanced` is the production default. `max-context` remains an explicit operator profile for 65,536-token experiments/needs; its q4_0 KV setting was **not** promoted to the production default after integrated acceptance found Advanced/Qwen instability at the 6,144-token reasoning ceiling. Service profiles do not modify individual Modelfiles.
 
 ## Benchmark API baseline
 

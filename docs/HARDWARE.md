@@ -171,7 +171,7 @@ Configure and save the board-specific routing profile:
 sudo bc250-cu-live-manager
 ```
 
-Use the interactive table to select the stable 40-CU profile and enable boot restore.
+Use the interactive table to select and save the highest CU-routing profile proven stable on this individual BC-250, then enable boot restore. A 40/40 profile is valid only on boards where it has been qualified; deliberately unselected `--` cells are allowed, while `D!` indicates an inconsistency.
 Then verify the saved and live masks:
 
 ```bash
