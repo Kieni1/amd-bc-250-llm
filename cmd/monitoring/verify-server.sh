@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -uo pipefail
 CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
+RUNTIME_STATE="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/runtime-state.sh"
+if [[ ! -r "$RUNTIME_STATE" ]]; then
+  RUNTIME_STATE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/runtime-state.sh"
+fi
+# shellcheck disable=SC1090
+source "$RUNTIME_STATE"
 
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
@@ -126,6 +132,127 @@ toml_table_value() {
   ' "$file"
 }
 
+INTERNAL_FIREWALL_PORTS=(11434 11435 11436 11437 3000 9998)
+
+firewall_port_spec_exposes_tcp_port() {
+  local token="$1" target="$2" span proto start end
+  [[ "$token" == */* ]] || return 1
+  span="${token%/*}"
+  proto="${token##*/}"
+  [[ "$proto" == tcp ]] || return 1
+  if [[ "$span" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+    start="${BASH_REMATCH[1]}"
+    end="${BASH_REMATCH[2]}"
+  elif [[ "$span" =~ ^[0-9]+$ ]]; then
+    start="$span"
+    end="$span"
+  else
+    return 1
+  fi
+  ((start <= end)) || return 1
+  ((target >= start && target <= end))
+}
+
+firewall_port_list_exposes_tcp_port() {
+  local specs="$1" target="$2" token
+  local -a parsed=()
+  read -r -a parsed <<< "$specs"
+  for token in "${parsed[@]}"; do
+    firewall_port_spec_exposes_tcp_port "$token" "$target" && return 0
+  done
+  return 1
+}
+
+firewall_port_spec_exposes_internal() {
+  local token="$1" protected
+  for protected in "${INTERNAL_FIREWALL_PORTS[@]}"; do
+    firewall_port_spec_exposes_tcp_port "$token" "$protected" && return 0
+  done
+  return 1
+}
+
+firewall_port_list_exposes_internal() {
+  local token
+  local -a specs=()
+  read -r -a specs <<< "$1"
+  for token in "${specs[@]}"; do
+    firewall_port_spec_exposes_internal "$token" && return 0
+  done
+  return 1
+}
+
+firewalld_service_ports() {
+  local service="$1" info
+  if ! info="$(firewall-cmd --info-service="$service" 2>/dev/null)"; then
+    return 2
+  fi
+  sed -n 's/^[[:space:]]*ports:[[:space:]]*//p' <<< "$info" | paste -sd' ' -
+}
+
+firewalld_service_exposes_tcp_port() {
+  local service="$1" target="$2" ports
+  if ! ports="$(firewalld_service_ports "$service")"; then
+    return 2
+  fi
+  [[ -n "$ports" ]] && firewall_port_list_exposes_tcp_port "$ports" "$target"
+}
+
+firewalld_service_exposes_internal() {
+  local service="$1" ports
+  if ! ports="$(firewalld_service_ports "$service")"; then
+    return 2
+  fi
+  [[ -n "$ports" ]] && firewall_port_list_exposes_internal "$ports"
+}
+
+firewall_rich_rules_expose_tcp_port() {
+  local rich="$1" target="$2" rule service port proto service_state
+  while IFS= read -r rule; do
+    [[ "$rule" =~ (^|[[:space:]])accept($|[[:space:]]) ]] || continue
+    service="$(sed -n 's/.*service name="\([^"]*\)".*/\1/p' <<< "$rule")"
+    if [[ -n "$service" ]]; then
+      if [[ "$service" == http && "$target" == 80 ]]; then
+        return 0
+      fi
+      if firewalld_service_exposes_tcp_port "$service" "$target"; then
+        return 0
+      else
+        service_state=$?
+        ((service_state == 2)) && return 2
+      fi
+    fi
+    port="$(sed -n 's/.*port port="\([^"]*\)".*/\1/p' <<< "$rule")"
+    proto="$(sed -n 's/.*protocol="\([^"]*\)".*/\1/p' <<< "$rule")"
+    if [[ -n "$port" && -n "$proto" ]] && \
+       firewall_port_spec_exposes_tcp_port "$port/$proto" "$target"; then
+      return 0
+    fi
+  done <<< "$rich"
+  return 1
+}
+
+firewall_rich_rules_expose_internal() {
+  local rich="$1" rule service port proto service_state
+  while IFS= read -r rule; do
+    [[ "$rule" =~ (^|[[:space:]])accept($|[[:space:]]) ]] || continue
+    service="$(sed -n 's/.*service name="\([^"]*\)".*/\1/p' <<< "$rule")"
+    if [[ -n "$service" ]]; then
+      if firewalld_service_exposes_internal "$service"; then
+        return 0
+      else
+        service_state=$?
+        ((service_state == 2)) && return 2
+      fi
+    fi
+    port="$(sed -n 's/.*port port="\([^"]*\)".*/\1/p' <<< "$rule")"
+    proto="$(sed -n 's/.*protocol="\([^"]*\)".*/\1/p' <<< "$rule")"
+    if [[ -n "$port" && -n "$proto" ]] && firewall_port_spec_exposes_internal "$port/$proto"; then
+      return 0
+    fi
+  done <<< "$rich"
+  return 1
+}
+
 if [[ ${EUID} -ne 0 ]]; then
   warn "not running as root; Podman, journal and live-CU checks may be incomplete"
 fi
@@ -242,25 +369,66 @@ section "Swap and zram"
 swappiness="$(sysctl -n vm.swappiness 2>/dev/null || true)"
 [[ -n "$swappiness" ]] && info "vm.swappiness: $swappiness" || \
   warn "vm.swappiness is not readable"
-if swapon --show --noheadings 2>/dev/null | grep -q .; then
-  ((SUMMARY)) || swapon --show 2>/dev/null | sed 's/^/  /'
-  ok "swap is active"
+swap_state_readable=1
+if swap_names="$(bc250_active_swap_names)"; then
+  if [[ -n "$swap_names" ]]; then
+    ((SUMMARY)) || swapon --show 2>/dev/null | sed 's/^/  /'
+    ok "swap is active"
+  else
+    warn "no swap is active"
+  fi
 else
-  warn "no swap is active"
+  swap_state_readable=0
+  swap_names=""
+  warn "active swap state could not be determined"
 fi
-if zramctl --noheadings 2>/dev/null | grep -q .; then
-  ((SUMMARY)) || zramctl 2>/dev/null | sed 's/^/  /'
-  zram_size="$(zramctl --bytes --noheadings --output DISKSIZE 2>/dev/null | awk '{s+=$1} END{print s+0}')"
-  ((zram_size > 4*1024*1024*1024)) && \
-    warn "zram exceeds 4 GiB and competes with the unified model-memory pool" || \
-    ok "zram size is compatible with a dedicated LLM profile"
-else
-  info "no active zram device"
+active_zram_names=""
+if ((swap_state_readable)); then
+  active_zram_names="$(awk '$1 ~ /^\/dev\/zram[0-9]+$/ {print $1}' <<< "$swap_names")"
 fi
-if swapon --show --noheadings --output NAME 2>/dev/null | grep -qv '^/dev/zram'; then
-  ok "disk-backed swap safety margin is active"
+if [[ -n "$active_zram_names" ]]; then
+  ((SUMMARY)) || {
+    echo "  Active zram swap device(s):"
+    sed 's/^/    /' <<< "$active_zram_names"
+    zramctl 2>/dev/null | sed 's/^/  /' || true
+  }
+  if command -v zramctl >/dev/null 2>&1; then
+    zram_size=0
+    while IFS= read -r zram_device; do
+      [[ -n "$zram_device" ]] || continue
+      device_size="$(zramctl --bytes --noheadings --output DISKSIZE "$zram_device" 2>/dev/null | awk 'NR==1 {print $1+0}')"
+      zram_size=$((zram_size + ${device_size:-0}))
+    done <<< "$active_zram_names"
+    ((zram_size > 4*1024*1024*1024)) && \
+      warn "active zram swap exceeds 4 GiB and competes with the unified model-memory pool" || \
+      ok "active zram swap size is compatible with the dedicated LLM profile"
+  else
+    warn "zram swap is active but zramctl is unavailable for size verification"
+  fi
+elif ((swap_state_readable)); then
+  initialized_zram="$(zramctl --noheadings --output NAME 2>/dev/null | awk '$1 ~ /^\/dev\/zram[0-9]+$/ {print $1}' | paste -sd, -)"
+  if [[ -r /etc/systemd/zram-generator.conf.d/90-bc250-llm-server.conf ]]; then
+    if [[ -n "$initialized_zram" ]]; then
+      warn "package-managed zram profile is configured and ${initialized_zram} exists, but no zram device is active as swap"
+    else
+      warn "package-managed zram profile is configured but no zram device is active as swap"
+    fi
+  elif [[ -n "$initialized_zram" ]]; then
+    info "zram device(s) exist but are not active as swap: $initialized_zram"
+  else
+    info "no active zram swap (no package-managed zram profile configured)"
+  fi
 else
-  warn "no disk-backed swap safety margin is active"
+  warn "zram swap activity is unverified because active swap state is unavailable"
+fi
+if ((swap_state_readable)); then
+  if grep -Ev '^/dev/zram[0-9]+$' <<< "$swap_names" | grep -q .; then
+    ok "disk-backed swap safety margin is active"
+  else
+    warn "no disk-backed swap safety margin is active"
+  fi
+else
+  warn "disk-backed swap safety margin is unverified because active swap state is unavailable"
 fi
 
 section "Compute units"
@@ -424,6 +592,15 @@ if id -nG ollama 2>/dev/null | grep -qw render && \
 else
   bad "ollama lacks render/video access"
 fi
+failed_units="$(bc250_failed_systemd_units)"
+failed_units_rc=$?
+if ((failed_units_rc != 0)); then
+  warn "systemd failed-unit state could not be inspected"
+elif [[ -n "$failed_units" ]]; then
+  bad "systemd has failed units: $(paste -sd, - <<< "$failed_units")"
+else
+  ok "systemd has no failed units"
+fi
 
 section "Ollama"
 ollama_api_version="$(curl -fsS "$OLLAMA_URL/api/version" 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)"
@@ -574,8 +751,8 @@ fi
 info "Open WebUI database settings can override bootstrap environment defaults after first launch"
 
 section "Local endpoints"
-curl -fsS http://127.0.0.1:3000/ >/dev/null && ok "Open WebUI loopback endpoint reachable" || bad "Open WebUI unavailable"
-curl -fsS http://127.0.0.1/ >/dev/null && ok "nginx HTTP endpoint reachable" || bad "nginx HTTP endpoint unavailable"
+curl -fsS http://127.0.0.1:3000/api/version >/dev/null && ok "Open WebUI backend ready" || bad "Open WebUI backend unavailable/not ready"
+curl -fsS http://127.0.0.1/api/version >/dev/null && ok "Open WebUI front door usable through nginx" || bad "Open WebUI front door unavailable/not usable (listener-only/502 is not ready)"
 
 container_http() {
   local url="$1"
@@ -660,21 +837,90 @@ if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewa
   mapfile -t active_zones < <(firewall-cmd --get-active-zones 2>/dev/null | awk '/^[^[:space:]]/{print $1}')
   ((${#active_zones[@]})) || active_zones+=("$(firewall-cmd --get-default-zone 2>/dev/null)")
   http_open=0
+  http_unverified=0
   internal_open=0
   for zone in "${active_zones[@]}"; do
-    services="$(firewall-cmd --zone="$zone" --list-services 2>/dev/null || true)"
-    ports="$(firewall-cmd --zone="$zone" --list-ports 2>/dev/null || true)"
-    rich="$(firewall-cmd --zone="$zone" --list-rich-rules 2>/dev/null || true)"
-    grep -qw http <<< "$services" && http_open=1
-    grep -Eq 'service name="http".*accept' <<< "$rich" && http_open=1
-    if grep -Eq '(^|[^0-9])(11434|11435|11436|11437|3000|9998)(/|[^0-9]|$)' <<< "$ports" ||
-       grep -E 'port port="(11434|11435|11436|11437|3000|9998)(-[0-9]+)?"' <<< "$rich" | grep -qE '(^| )accept( |$)'; then
-      bad "internal port explicitly allowed in active firewalld zone $zone"
+    if ! services="$(firewall-cmd --zone="$zone" --list-services 2>/dev/null)" ||
+       ! ports="$(firewall-cmd --zone="$zone" --list-ports 2>/dev/null)" ||
+       ! rich="$(firewall-cmd --zone="$zone" --list-rich-rules 2>/dev/null)"; then
+      bad "cannot inspect active firewalld zone $zone; firewall publication/isolation is unverified"
+      http_unverified=1
+      internal_open=1
+      continue
+    fi
+
+    zone_http_open=""
+    zone_http_unknown=""
+    if grep -qw http <<< "$services" || firewall_port_list_exposes_tcp_port "$ports" 80; then
+      zone_http_open="direct service/port/range"
+    else
+      for service in $services; do
+        [[ "$service" == http ]] && continue
+        if firewalld_service_exposes_tcp_port "$service" 80; then
+          zone_http_open="service $service"
+          break
+        else
+          service_state=$?
+          if ((service_state == 2)); then
+            zone_http_unknown="cannot inspect service $service"
+            break
+          fi
+        fi
+      done
+    fi
+    if [[ -z "$zone_http_open" && -z "$zone_http_unknown" ]]; then
+      if firewall_rich_rules_expose_tcp_port "$rich" 80; then
+        zone_http_open="rich rule"
+      else
+        rich_state=$?
+        ((rich_state == 2)) && zone_http_unknown="cannot inspect service referenced by rich rule"
+      fi
+    fi
+    [[ -n "$zone_http_open" ]] && http_open=1
+    [[ -n "$zone_http_unknown" ]] && http_unverified=1
+
+    zone_internal_reason=""
+    zone_internal_unknown=""
+    if firewall_port_list_exposes_internal "$ports"; then
+      zone_internal_reason="direct port/range"
+    else
+      for service in $services; do
+        if firewalld_service_exposes_internal "$service"; then
+          zone_internal_reason="service $service"
+          break
+        else
+          service_state=$?
+          if ((service_state == 2)); then
+            zone_internal_unknown="cannot inspect service $service"
+            break
+          fi
+        fi
+      done
+    fi
+    if [[ -z "$zone_internal_reason" && -z "$zone_internal_unknown" ]]; then
+      if firewall_rich_rules_expose_internal "$rich"; then
+        zone_internal_reason="rich rule"
+      else
+        rich_state=$?
+        ((rich_state == 2)) && zone_internal_unknown="cannot inspect service referenced by rich rule"
+      fi
+    fi
+    if [[ -n "$zone_internal_unknown" ]]; then
+      bad "cannot verify internal-port isolation in active firewalld zone $zone ($zone_internal_unknown)"
+      internal_open=1
+    elif [[ -n "$zone_internal_reason" ]]; then
+      bad "internal port exposed in active firewalld zone $zone ($zone_internal_reason)"
       internal_open=1
     fi
   done
-  ((http_open)) && ok "HTTP allowed in an active firewalld zone" || bad "HTTP not allowed in any active firewalld zone"
-  ((internal_open)) || ok "no internal port explicitly allowed in active firewalld zones"
+  if ((http_open)); then
+    ok "HTTP allowed in an active firewalld zone"
+  elif ((http_unverified)); then
+    bad "HTTP publication could not be verified in active firewalld zones"
+  else
+    bad "HTTP not allowed in any active firewalld zone"
+  fi
+  ((internal_open)) || ok "no internal port exposed in active firewalld zones"
 else
   bad "firewalld inactive; Ollama may be exposed through its all-interface listener"
 fi

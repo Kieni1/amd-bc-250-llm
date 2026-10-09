@@ -648,8 +648,10 @@ class StateTests(unittest.TestCase):
             runtime_root = base / "modelfiles" / "experiments"
             source = source_root / "retired.gguf"
             runtime = runtime_root / "retired.Modelfile"
-            source.parent.mkdir(parents=True); runtime.parent.mkdir(parents=True)
-            source.write_bytes(b"weights"); modelctl.state_path(source).write_text("{}")
+            source.parent.mkdir(parents=True)
+            runtime.parent.mkdir(parents=True)
+            source.write_bytes(b"weights")
+            modelctl.state_path(source).write_text("{}")
             runtime.write_text("FROM retired.gguf\n")
             catalog = base / "retired-models.json"
             catalog.write_text(json.dumps({"schema": 1, "models": [{
@@ -688,8 +690,10 @@ class StateTests(unittest.TestCase):
             runtime_root = base / "modelfiles" / "experiments"
             source = source_root / "retired.gguf"
             runtime = runtime_root / "retired.Modelfile"
-            source.parent.mkdir(parents=True); runtime.parent.mkdir(parents=True)
-            source.write_bytes(b"weights"); modelctl.state_path(source).write_text("{}")
+            source.parent.mkdir(parents=True)
+            runtime.parent.mkdir(parents=True)
+            source.write_bytes(b"weights")
+            modelctl.state_path(source).write_text("{}")
             runtime.write_text("FROM retired.gguf\n")
             catalog = base / "retired-models.json"
             catalog.write_text(json.dumps({"schema": 1, "models": [{
