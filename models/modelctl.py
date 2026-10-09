@@ -37,6 +37,9 @@ RETIRED_CATALOG = INSTALLED_SHARE / "retired-models.json"
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
 OPTIONAL_CATEGORIES = frozenset({"experiments", "agentic"})
+OPTIONAL_MODEL_NAMES = frozenset({
+    "embed-qwen3-0.6b-q8-0",
+})
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 MTP_RECOMMENDATIONS = {"primary", "alternative"}
 RECOMMENDED_MODELS = {
@@ -655,7 +658,8 @@ def load_retired_models() -> list[dict]:
         if not all(isinstance(item.get(key), str) and item[key] for key in required):
             raise ModelError(f"incomplete retired-model entry in {path}")
         category = modelfile_category(item["category"])
-        source = Path(item["source"]); runtime = Path(item["runtime_modelfile"])
+        source = Path(item["source"])
+        runtime = Path(item["runtime_modelfile"])
         source_root = Path(CATEGORY_DEFAULTS[category]["destination"])
         runtime_root = Path(CATEGORY_DEFAULTS[category]["modelfile_destination"])
         if not source.is_absolute() or not source.is_relative_to(source_root):
@@ -664,13 +668,15 @@ def load_retired_models() -> list[dict]:
             raise ModelError(f"retired runtime Modelfile is outside manager-owned storage: {runtime}")
         if item["ollama_host"] != CATEGORY_DEFAULTS[category]["ollama_host"]:
             raise ModelError(f"retired model host/category mismatch: {item['name']}")
-        normalized = dict(item); normalized["category"] = category
+        normalized = dict(item)
+        normalized["category"] = category
         result.append(normalized)
     return result
 
 
 def retired_present(item: dict, registrations: dict[str, set[str] | None]) -> bool:
-    source = Path(item["source"]); runtime = Path(item["runtime_modelfile"])
+    source = Path(item["source"])
+    runtime = Path(item["runtime_modelfile"])
     registered = any(
         names is not None and item["name"] in names
         for names in registrations.values()
@@ -691,7 +697,8 @@ def purge_retired(*, yes: bool) -> int:
     print("Retired package-managed models:")
     total = 0
     for index, item in enumerate(present, 1):
-        source = Path(item["source"]); size = source.stat().st_size if source.is_file() else 0
+        source = Path(item["source"])
+        size = source.stat().st_size if source.is_file() else 0
         total += size
         names = registrations.get(item["ollama_host"])
         other_hosts = [
@@ -715,8 +722,10 @@ def purge_retired(*, yes: bool) -> int:
     failures: list[str] = []
     removed = 0
     for item in present:
-        name = item["name"]; host = item["ollama_host"]
-        source = Path(item["source"]); runtime = Path(item["runtime_modelfile"])
+        name = item["name"]
+        host = item["ollama_host"]
+        source = Path(item["source"])
+        runtime = Path(item["runtime_modelfile"])
         print(f"\n>>> purging retired {name}")
         names = registrations.get(host)
         misplaced_hosts = [
@@ -731,22 +740,30 @@ def purge_retired(*, yes: bool) -> int:
                 + "; local data retained",
                 file=sys.stderr,
             )
-            failures.append(name); continue
+            failures.append(name)
+            continue
         if names is None:
             print("    ERROR: expected Ollama registration state unavailable; local data retained", file=sys.stderr)
-            failures.append(name); continue
+            failures.append(name)
+            continue
         if name in names:
             if not ollama_bin:
                 print("    ERROR: ollama executable unavailable; local data retained", file=sys.stderr)
-                failures.append(name); continue
-            result = run_as_ollama([ollama_bin, "rm", name], {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host})
+                failures.append(name)
+                continue
+            result = run_as_ollama(
+                [ollama_bin, "rm", name],
+                {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
+            )
             if result.returncode != 0:
                 print("    ERROR: registration removal failed; local data retained", file=sys.stderr)
-                failures.append(name); continue
+                failures.append(name)
+                continue
             print(f"    removed Ollama registration from {host}")
         for path in (runtime, source, state_path(source)):
             if path.exists():
-                path.unlink(); print(f"    removed {path}")
+                path.unlink()
+                print(f"    removed {path}")
         try:
             source.parent.rmdir()
         except OSError:
@@ -1048,7 +1065,10 @@ def inspect_model_state(
 
     statuses = {source_status, modelfile_status, registration_status}
     optional_unselected = (
-        model.get("category") in OPTIONAL_CATEGORIES
+        (
+            model.get("category") in OPTIONAL_CATEGORIES
+            or model.get("name") in OPTIONAL_MODEL_NAMES
+        )
         and modelfile_status == "missing"
         and registration_status in {"missing", "unavailable"}
     )
@@ -2565,7 +2585,7 @@ def main(argv: list[str] | None = None) -> int:
                     )
                 else:
                     print(
-                        f"To select every eligible model explicitly: "
+                        "To select every eligible model explicitly: "
                         f"sudo bc250 model {args.command} all all"
                     )
         selected = selected_models_for_catalog(
