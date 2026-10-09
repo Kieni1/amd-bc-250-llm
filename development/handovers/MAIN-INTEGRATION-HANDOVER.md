@@ -1,6 +1,6 @@
 # AMD BC-250 LLM appliance — main integration handover
 
-Release target: `bc250-llm-server-0.13.1-1.2`  
+Release target: `bc250-llm-server-0.13.1-1.3`  
 Current handover date: 2026-10-09
 
 ## Purpose
@@ -21,7 +21,7 @@ It records:
 Current source/release target:
 
 ```text
-bc250-llm-server-0.13.1-1.2
+bc250-llm-server-0.13.1-1.3
 original 1.0 predecessor workbench:
   amd-bc-250-llm-0.13.1-1.0-workbench-release-final.zip
   SHA-256 04f53c980b29a28dc6988f7c39f339f3f4df8d99be01cb4638ea5639c9daa5c8
@@ -47,7 +47,7 @@ Ruff binary, ShellCheck, configured rpmlint and rpmbuild are external/unavailabl
 ```
 
 Exact-device authority remains the installed and qualified `0.13.1-1.0.fc44` baseline until
-an exact `0.13.1-1.2.fc44` RPM is built and installed. Do not transfer exact-device qualification
+an exact `0.13.1-1.3.fc44` RPM is built and installed. Do not transfer exact-device qualification
 across source revisions.
 
 The closed optimization result carried through 1.1 into 1.2 is deliberately narrow:
@@ -754,7 +754,7 @@ Exact 0.12.2-0.7 fresh installation proved the functional architecture: 53/53 co
 
 The active verifier no longer carries the pre-greenfield patched-AMDGPU marker warning. Historical source records may describe that architecture, but current runtime code and installed docs do not support it.
 
-## 18C. 0.13.1-1.2 release integration
+## 18C. 0.13.1-1.3 release integration
 
 `0.13.1-1.0` is the qualified optimization baseline. Its bytecode-hygiene and semantic
 optional-model work remain protected in 1.2; bounded package-tree bytecode cleanup is fail-closed,
@@ -780,7 +780,7 @@ exposes a regression.
 
 High-value next sequence:
 
-1. build the exact reviewed `0.13.1-1.2` RPM/SRPM in the normal Fedora/GitHub environment;
+1. build the exact reviewed `0.13.1-1.3` RPM/SRPM in the normal Fedora/GitHub environment;
 2. require Ruff, ShellCheck, configured rpmlint and actual-RPM payload/build gates there;
 3. deliberately upgrade the qualified exact `0.13.1-1.0.fc44` appliance to that exact 1.2 RPM;
 4. prove installed effective production state is `q8_0` + `TOP_K=4` with the other closed runtime defaults unchanged;

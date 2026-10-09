@@ -1,4 +1,4 @@
-# BC-250 operations boundary handover — 0.13.1-1.2
+# BC-250 operations boundary handover — 0.13.1-1.3
 
 ## Status
 
@@ -132,6 +132,6 @@ Final exact RPM closure should confirm that existing maintenance status commands
 
 Exact 0.12.2-0.7 fresh installation proved the smaller public API, live-CU-only package footprint, 53/53 core verification and 40/40 saved-profile reboot restoration. 0.8 keeps the topology unchanged and corrects operator semantics: completed revalidation remains completed with optional PARTIAL Agent coverage, successful translation withholding is a product-integrity PASS, CU state uses live-routing/profile/boot-restore terminology, and optional Agent is described as inactive in normal mode.
 
-## 0.13.1-1.2 operations note
+## 0.13.1-1.3 operations note
 
 The release adds no new service topology or maintenance behavior. Normal dispatcher-launched Python helpers must not write bytecode under package-owned `/usr`; guided install/upgrade convergence removes stale BC-250 package-tree bytecode left by older releases. Optional models are not maintenance failures merely because they are absent/cached, and retired model residue is lifecycle cleanup rather than Open WebUI configuration drift.

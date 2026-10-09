@@ -1,6 +1,6 @@
 # BC-250 main integration — working rules and operating instructions
 
-Current release target: `bc250-llm-server-0.13.1-1.2`
+Current release target: `bc250-llm-server-0.13.1-1.3`
 
 These rules are intentionally currentized for the greenfield-clean package.
 
@@ -419,7 +419,7 @@ Do not conflate execution completion, optional coverage, diagnostics, model qual
 Treat exact 0.12.2-0.8 as the qualified predecessor. For 0.13.1, keep `/usr` immutable during normal runtime, treat intentionally unselected optional models as OPTIONAL rather than broken, preserve DRIFT for selected models whose desired runtime state is unmet, and keep graveyard source assets inert while allowing an operator-manually registered historical model to follow its normal Open WebUI testing-policy visibility. Cleanup of retired registrations remains explicit through `bc250 model purge-retired`. Do not broaden the release into model/CU/RAG/dependency discovery.
 
 
-## 27. 0.13.1-1.2 Sidechat integration rule
+## 27. 0.13.1-1.3 Sidechat integration rule
 
 The Sidechat 15–19 optimization program is closed. Production remains 32K/q8_0,
 parallel=1, flash attention enabled, automatic `num_batch`, current full offload and
