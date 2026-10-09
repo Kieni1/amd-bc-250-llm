@@ -501,16 +501,18 @@ class CuStatusTests(unittest.TestCase):
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         diagnose = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
         self.assertIn("Live routing dashboard", status)
-        self.assertIn("Kernel diagnostic active_cu_number", status)
-        self.assertIn("not live-routing authority", status)
+        self.assertIn("Live SPI-routed CUs", status)
+        self.assertNotIn("Kernel diagnostic active_cu_number", status)
+        self.assertNotIn("RADV-reported CU count", status)
         main_status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
-        self.assertIn("Kernel diagnostic active_cu_number", main_status)
+        self.assertIn("Live SPI-routed CUs", main_status)
+        self.assertNotIn("Kernel diagnostic active_cu_number", main_status)
         self.assertIn('value == "S+"', status)
         self.assertIn('value == "D!"', status)
         self.assertIn("Routing profile match", verify)
         self.assertIn("configured saved profile", verify)
         self.assertIn("BC250_WGP_MASKS", status)
-        self.assertIn("Configured live profile", status)
+        self.assertIn("Saved boot profile", status)
         self.assertIn("Live routing profile", status)
         self.assertIn('[[ "$live_masks" == "$saved_masks" ]]', status)
         self.assertNotIn("modified 40-CU module", verify)
@@ -521,7 +523,7 @@ class CuStatusTests(unittest.TestCase):
     def test_cu_routing_cell_parser_classifies_dashboard_states(self) -> None:
         source = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
         start = source.index("routing_cells() {")
-        end = source.index("\nread_param() {", start)
+        end = source.index("\nsaved_mask_csv() {", start)
         functions = source[start:end]
         sample = (
             "| SE0.SH0 | D+ | D+ | D+ | -- | -- | 0x07 | 0x0 | 6/10 |\n"

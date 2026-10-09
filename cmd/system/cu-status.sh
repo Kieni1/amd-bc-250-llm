@@ -72,32 +72,22 @@ saved_mask_csv() {
   sed -n 's/^BC250_WGP_MASKS=//p' "$conf" | head -1
 }
 
-read_param() {
-  local path="$1"
-  [[ -r "$path" ]] && cat "$path" || printf 'not exposed'
-}
-
 echo "BC-250 CU status"
 running_kernel="$(uname -r)"
 echo "  Running kernel          : $running_kernel"
-echo "  Kernel diagnostic active_cu_number : $(read_param /sys/module/amdgpu/parameters/active_cu_number) (not live-routing authority)"
 saved_profile_state="not configured"
 saved_masks=""
-saved_cus=""
 if saved_raw="$(saved_mask_csv 2>/dev/null)"; then
   if saved_normalized="$(normalize_mask_csv "$saved_raw" 2>/dev/null)"; then
-    read -r saved_masks saved_cus <<< "$saved_normalized"
+    read -r saved_masks _ <<< "$saved_normalized"
     saved_profile_state="configured"
-    echo "  Saved live profile      : $saved_masks"
-    echo "  Configured live profile : ${saved_cus}/40"
+    echo "  Saved boot profile      : configured ($saved_masks)"
   else
     saved_profile_state="invalid"
-    echo "  Saved live profile      : invalid (/etc/bc250-cu-live-manager.conf)"
-    echo "  Configured live profile : invalid"
+    echo "  Saved boot profile      : invalid (/etc/bc250-cu-live-manager.conf)"
   fi
 else
-  echo "  Saved live profile      : not configured"
-  echo "  Configured live profile : NOT CONFIGURED (optional)"
+  echo "  Saved boot profile      : not configured (optional)"
 fi
 if systemctl is-enabled --quiet bc250-cu-live-manager.service 2>/dev/null; then
   echo "  Restore profile at boot : enabled"
@@ -107,23 +97,27 @@ fi
 if [[ -x "$manager" ]]; then
   echo "  Live routing manager    : $manager"
   if [[ ${EUID} -ne 0 ]]; then
-    echo "  Live routing manager    : installed; run with sudo for register access"
+    echo "  Live SPI-routed CUs     : not checked — run sudo bc250-40cu status"
+    echo "  Live routing manager    : installed; root access required for routing registers"
   else
     output="$(timeout 30 "$manager" status 2>&1 || true)"
     if ((SUMMARY == 0)); then
       echo "  Live routing dashboard:"
-      printf '%s\n' "$output" | sed 's/^/    /'
+      printf '%s\n' "$output" | grep -vE '^[[:space:]]*amdgpu[[:space:]]*:.*active_cu_number' | sed 's/^/    /'
     fi
     cells="$(routing_cells <<< "$output")"
     live_raw="$(routing_mask_csv <<< "$output")"
     live_masks=""
-    live_cus=""
-    if [[ -n "$live_raw" ]] && live_normalized="$(normalize_mask_csv "$live_raw" 2>/dev/null)"; then
-      read -r live_masks live_cus <<< "$live_normalized"
-      echo "  Live routing profile    : ${live_cus}/40 ($live_masks)"
+        if [[ -n "$live_raw" ]] && live_normalized="$(normalize_mask_csv "$live_raw" 2>/dev/null)"; then
+      read -r live_masks _ <<< "$live_normalized"
+      echo "  Live routing profile    : $live_masks"
     fi
     routed_cus="$(sed -n 's/.*CUs active & routed[[:space:]]*:[[:space:]]*//p' <<< "$output" | tail -1)"
-    [[ -n "$routed_cus" ]] && echo "  Live routed CUs         : $routed_cus"
+    if [[ -n "$routed_cus" ]]; then
+      echo "  Live SPI-routed CUs     : $routed_cus"
+    else
+      echo "  Live SPI-routed CUs     : not detected — additional CUs may be unlockable"
+    fi
     if [[ -n "$cells" ]]; then
       read -r spi driver driver_off off <<< "$cells"
       problems=$driver_off
@@ -159,15 +153,11 @@ if [[ -x "$manager" ]]; then
     fi
   fi
 else
+  echo "  Live SPI-routed CUs     : unavailable — live routing manager not installed"
   echo "  Live routing manager    : not installed"
 fi
 
-if command -v vulkaninfo >/dev/null 2>&1; then
-  num_cu="$(RADV_DEBUG=info vulkaninfo --summary 2>&1 | grep -m1 -E 'num_cu[[:space:]]*=' | sed 's/^[[:space:]]*//' || true)"
-  [[ -n "$num_cu" ]] && echo "  RADV-reported CU count   : ${num_cu#*=} (diagnostic only; not live-routing authority)" || echo "  RADV-reported CU count   : not exposed (diagnostic only; not live-routing authority)"
-fi
-
 if ((SUMMARY == 0)); then
-  echo "Note: D+/S+ are active/routed, -- is intentionally disabled/not selected, and D! is unexpected/inconsistent."
-  echo "Stable CU count/layout varies by device; kernel/RADV counts are diagnostic only."
+  echo "Note: Live SPI-routed CUs are the appliance CU-capacity signal; D! indicates an inconsistent routing cell."
+  echo "If no live SPI-routed count is detected, additional CUs may be unlockable with: sudo bc250-cu-live-manager"
 fi

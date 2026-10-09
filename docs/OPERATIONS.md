@@ -349,7 +349,7 @@ sudo bc250-40cu status
 ```
 
 The live manager owns board-specific WGP selection, saved masks and boot restore. The
-`bc250-40cu` wrapper intentionally exposes only `status`; kernel/RADV CU counts are
+`bc250-40cu` wrapper intentionally exposes only `status`; live SPI-routed CU count is
 diagnostic and are not the live-routing authority. The package no longer builds or
 installs a replacement AMDGPU module.
 

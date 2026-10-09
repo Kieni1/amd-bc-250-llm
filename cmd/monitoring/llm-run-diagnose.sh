@@ -113,7 +113,7 @@ m=$(active $cardg/pp_dpm_mclk); f=$(active $cardg/pp_dpm_fclk); s=$(active $card
 
 # ---------------------------------------------------------------------------
 sec "4. CU ROUTING"
-exp "Compare any configured saved WGP mask with the live SPI layout; -- is intentionally unselected, D! is inconsistent. Numeric kernel/RADV CU counts are diagnostic only."
+exp "Use live SPI-routed CUs as the CU-capacity signal; compare saved/live routing only for persistence and treat D! as inconsistent."
 if [[ -x "$CU_STATUS" ]]; then
   cu_status=$("$CU_STATUS" 2>&1 || true)
   printf '%s\n' "$cu_status" | sed 's/^/  /'

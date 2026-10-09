@@ -179,7 +179,7 @@ sudo bc250-40cu status
 ```
 
 `bc250-40cu status` is a thin public verification command. Package diagnostics use the
-same internal live-routing status helper. Kernel/RADV CU counters remain diagnostic only;
+same internal live-routing status helper. Live SPI-routed CUs are the operator-facing CU-capacity value;
 the saved/live WGP mask match is the operational authority.
 
 ### Boot behavior
