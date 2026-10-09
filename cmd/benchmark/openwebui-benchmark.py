@@ -37,6 +37,8 @@ from benchmark_common import (
     normalize_words,
     prepare_result_dir,
     result_record,
+    semantic_identifier_equivalent,
+    semantic_invoice_identifiers,
     translation_literal_integrity_mismatch,
     translation_numeric_values,
     write_benchmark_metadata,
@@ -1028,6 +1030,15 @@ def cmd_owui_embedding_batch(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def expected_answer_term_present(text: str, expected: str) -> bool:
+    """Match benchmark answer terms with only proven semantic equivalences."""
+    # Invoice identifiers need semantic identity, not substring matching: an
+    # answer containing INV-2026-04410 must not satisfy INV-2026-0441.
+    if semantic_invoice_identifiers(expected):
+        return semantic_identifier_equivalent(text, expected)
+    return expected.casefold() in text.casefold()
+
+
 def chunk_cases() -> list[tuple[str, list[str]]]:
     return [
         (
@@ -1097,7 +1108,7 @@ def cmd_owui_chunk_min(args: argparse.Namespace) -> int:
                     wall = time.monotonic() - started
                     text = response_text(result)
                     answer_ok = all(
-                        needle.casefold() in text.casefold() for needle in required
+                        expected_answer_term_present(text, needle) for needle in required
                     )
                     citation_ok = bool(source_meta(result))
                     ok = answer_ok and citation_ok
