@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.7
+# BC-250 package revalidation harness v4.8
 #
 # The target package version is read from the package-owned VERSION file; the RPM
 # release suffix is intentionally not hard-coded.
@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.7
+HARNESS_VERSION=4.8
 PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
 TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
@@ -57,7 +57,7 @@ MEMORY_PROFILE="$LIBEXEC/memory-profile.sh"
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.7 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.8 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250 benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -889,6 +889,7 @@ EOF_SHOW
   podman inspect open-webui --format '{{.ImageName}}' > "$dir/openwebui-container-image.txt" 2>&1 || true
   capture_cmd "$dir/free.txt" free -h
   capture_cmd "$dir/swapon.txt" swapon --show
+  [[ -r /proc/pressure/memory ]] && capture_cmd "$dir/memory-pressure.txt" cat /proc/pressure/memory || true
   capture_cmd "$dir/sensors.txt" sensors
   capture_cmd "$dir/vulkan.txt" vulkaninfo --summary
   journalctl -b --no-pager -n 1200 -u ollama.service -u ollama-task.service -u ollama-embedding.service -u ollama-agent.service -u open-webui.service > "$dir/services-journal.txt" 2>&1 || true
@@ -913,6 +914,7 @@ checkpoint() {
   done
   capture_cmd "$dir/free.txt" free -h
   capture_cmd "$dir/swapon.txt" swapon --show
+  [[ -r /proc/pressure/memory ]] && capture_cmd "$dir/memory-pressure.txt" cat /proc/pressure/memory || true
 }
 
 write_phase_report() {
