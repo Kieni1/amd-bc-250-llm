@@ -19,5 +19,20 @@ for file in "${shell_files[@]}"; do
 done
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate.py
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+
+# Isolate test modules so module-level mocks, environment changes, and cleanup
+# cannot leak into later modules. A generous per-module timeout keeps a broken
+# subprocess test from hanging validation indefinitely while still leaving the
+# exact module visible in CI logs.
+test_module_timeout="${BC250_TEST_MODULE_TIMEOUT:-120}"
+[[ "$test_module_timeout" =~ ^[1-9][0-9]*$ ]] || {
+  echo "BC250_TEST_MODULE_TIMEOUT must be a positive integer (seconds)." >&2
+  exit 2
+}
+for test_file in "$ROOT"/tests/test_*.py; do
+  echo "==> $(basename -- "$test_file")"
+  PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=5s "${test_module_timeout}s" \
+    python3 -m unittest "$test_file"
+done
+
 echo "Repository validation passed."
