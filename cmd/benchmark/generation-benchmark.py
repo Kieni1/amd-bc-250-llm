@@ -649,7 +649,7 @@ def budget_diagnostics(
     return diagnostics
 
 
-def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
+def select_models(client: OllamaClient, explicit: list[str], *, interactive: bool = True) -> list[str]:
     if explicit:
         return explicit
     names = [str(row.get("name") or row.get("model") or "") for row in client.tags()]
@@ -661,7 +661,7 @@ def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
     ]
     if not names:
         raise BenchmarkError("no generation models found")
-    if not sys.stdin.isatty():
+    if not interactive or not sys.stdin.isatty():
         # Automation/revalidation should never expand just because an operator added
         # more experimental models. Noninteractive discovery therefore benchmarks
         # production registrations only unless the caller names models explicitly or
@@ -708,12 +708,12 @@ def select_models(client: OllamaClient, explicit: list[str]) -> list[str]:
 
 
 def bool_setting(
-    name: str, default: bool, *, interactive_prompt: str | None = None
+    name: str, default: bool, *, interactive_prompt: str | None = None, interactive: bool = True
 ) -> bool:
     raw = os.environ.get(name)
     if raw is not None:
         return raw.casefold() in {"1", "true", "yes", "y", "on"}
-    if interactive_prompt and sys.stdin.isatty():
+    if interactive and interactive_prompt and sys.stdin.isatty():
         suffix = "[Y/n]" if default else "[y/N]"
         answer = input(f"{interactive_prompt} {suffix}: ").strip().casefold()
         if not answer:
@@ -779,6 +779,16 @@ def main() -> int:
         action="store_true",
         help="skip best-effort kernel GPU-error capture",
     )
+    context_group = parser.add_mutually_exclusive_group()
+    context_group.add_argument("--context", dest="run_context_cli", action="store_true", help="run the context-capacity curve")
+    context_group.add_argument("--no-context", dest="run_context_cli", action="store_false", help="skip the context-capacity curve")
+    parser.set_defaults(run_context_cli=None)
+    thermal_group = parser.add_mutually_exclusive_group()
+    thermal_group.add_argument("--thermal", dest="run_thermal_cli", action="store_true", help="run the sustained thermal lane")
+    thermal_group.add_argument("--no-thermal", dest="run_thermal_cli", action="store_false", help="skip the sustained thermal lane")
+    parser.set_defaults(run_thermal_cli=None)
+    parser.add_argument("--board-note", default=None, help="record board/cooling/governor context without prompting")
+    parser.add_argument("--non-interactive", action="store_true", help="disable every optional prompt; use explicit CLI/environment controls")
     args = parser.parse_args()
     if args.sustained_seconds < 0:
         parser.error("--sustained-seconds must be non-negative")
@@ -856,15 +866,26 @@ def main() -> int:
     keep_alive = os.environ.get("KEEP_ALIVE", "30m")
     early_fraction = float(os.environ.get("EARLY_EOS_FRACTION", "0.10"))
     run_latency = bool_setting("RUN_LATENCY", True)
-    run_context = bool_setting(
-        "RUN_CONTEXT",
-        profile == "compare",
-        interactive_prompt="Run context-capacity curve too?",
+    interactive = not args.non_interactive
+    run_context = (
+        args.run_context_cli
+        if args.run_context_cli is not None
+        else bool_setting(
+            "RUN_CONTEXT",
+            profile == "compare",
+            interactive_prompt="Run context-capacity curve too?",
+            interactive=interactive,
+        )
     )
-    run_thermal = bool_setting(
-        "RUN_THERMAL",
-        profile == "thermal",
-        interactive_prompt="Run sustained-load thermal test too?",
+    run_thermal = (
+        args.run_thermal_cli
+        if args.run_thermal_cli is not None
+        else bool_setting(
+            "RUN_THERMAL",
+            profile == "thermal",
+            interactive_prompt="Run sustained-load thermal test too?",
+            interactive=interactive,
+        )
     ) or args.sustained_seconds > 0
     run_warm_prefix = bool_setting("RUN_WARM_PREFIX", False)
     thermal_windows = int(os.environ.get("THROTTLE_WINDOWS", "3"))
@@ -881,9 +902,9 @@ def main() -> int:
             f"WARNING: Ollama {version} differs from package standard {STANDARD_OLLAMA_VERSION}",
             file=sys.stderr,
         )
-    models = select_models(client, args.models)
-    board_note = os.environ.get("BOARD_NOTE", "")
-    if not board_note and sys.stdin.isatty():
+    models = select_models(client, args.models, interactive=interactive)
+    board_note = args.board_note if args.board_note is not None else os.environ.get("BOARD_NOTE", "")
+    if not board_note and interactive and sys.stdin.isatty():
         board_note = input(
             "Board/cooling/governor note for this run [optional]: "
         ).strip()
@@ -939,7 +960,7 @@ def main() -> int:
         )
     meta = benchmark_metadata(
         "generation",
-        benchmark_version="8.1",
+        benchmark_version="8.2",
         models=model_metadata,
         fixtures=fixture_metadata(prompt_fixture),
         options={

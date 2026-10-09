@@ -200,9 +200,14 @@ thinking/output sizes and multi-cause failure information. Language evidence exp
 `language_ok` and `language_measurable`; short numeric/identifier answers can therefore pass
 without being misreported as a positive language match. Acceptance matching is boundary-aware
 for dates/numbers/IDs/currency and fixtures may declare explicit `required_any_groups` and
-case-scoped `numeric_values`; grading remains deterministic. Use `numeric_values` when the
-number itself is sufficient, and combine it with `required`/`required_any_groups` when a unit
-or qualifier is mandatory instead of adding a second unit-policy schema.
+case-scoped `numeric_values`; grading remains deterministic. Grouped bracket citations are parsed
+by member source ID, so a required source may appear alongside another source without becoming a
+false negative. The known office invoice forms `INV-YYYY-NNNN` and `Invoice YYYY-NNNN` are treated
+as the same unambiguous identifier. Clean hidden-reasoning budget exhaustion with no visible answer
+is `INCOMPLETE`/retry when no independent retrieval or semantic defect exists; repetition remains a
+quality failure. Use `numeric_values` when the number itself is sufficient, and combine it with
+`required`/`required_any_groups` when a unit or qualifier is mandatory instead of adding a second
+unit-policy schema.
 Canonical summaries also verify that every expected RAG case appears exactly once, so a
 partial result stream cannot be mistaken for a complete quality run. `rag-quality` snapshots the
 starting main/embedding Ollama residency set, restores and verifies that set on every exit path,
@@ -264,7 +269,7 @@ valid matching preset IDs. Only the sanitized active `preset_id -> base_model` m
 in benchmark metadata. Open WebUI must answer HTTP readiness before the product-path benchmark
 starts; the readiness allowance is bounded to five minutes for slow application restarts.
 
-## Revalidation harness v4.7
+## Revalidation harness v4.8
 
 ```bash
 sudo bc250 revalidate start
