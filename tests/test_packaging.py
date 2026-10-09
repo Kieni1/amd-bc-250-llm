@@ -5,6 +5,7 @@ import os
 import re
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,9 +14,31 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class PackagingTests(unittest.TestCase):
+    def test_release_identity_is_consistent_for_0_13_1_1_2(self) -> None:
+        version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        state = json.loads((ROOT / "WORKBENCH-STATE.json").read_text(encoding="utf-8"))
+        spec_version = re.search(r"^Version:\s*(\S+)", spec, re.MULTILINE)
+        spec_release = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
+        self.assertIsNotNone(spec_version)
+        self.assertIsNotNone(spec_release)
+        self.assertEqual(version, "0.13.1")
+        self.assertEqual(spec_version.group(1), version)
+        self.assertEqual(spec_release.group(1), "1.2")
+        self.assertEqual(state["release_identity"], "bc250-llm-server-0.13.1-1.2")
+        self.assertIn("bc250-llm-server-0.13.1-1.2", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("bc250-llm-server-0.13.1-1.2", (ROOT / "TLDR.md").read_text(encoding="utf-8"))
+
     def test_package_version_authority_is_installed_for_revalidation(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("file\t0644\tVERSION\t{share}/VERSION", manifest)
+
+    def test_runtime_state_helper_is_packaged_as_private_read_only_library(self) -> None:
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertIn(
+            "file\t0644\tcmd/monitoring/runtime-state.sh\t{libexec}/runtime-state.sh",
+            manifest,
+        )
 
     def test_candidate_quality_checks_are_source_only(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
@@ -101,13 +124,54 @@ class PackagingTests(unittest.TestCase):
         self.assertGreaterEqual(len(old_starts), 4)
         self.assertEqual(old_starts, sorted(old_starts))
 
-    def test_source_tarball_excludes_python_and_ruff_caches(self) -> None:
+    def test_source_tarball_excludes_python_test_and_ruff_caches(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
-        self.assertIn("--exclude='./.ruff_cache'", source)
-        self.assertIn("--exclude='*/__pycache__'", source)
-        self.assertIn("--exclude='*.pyc'", source)
-        self.assertIn(".ruff_cache/", gitignore)
+        for expected in (
+            "--exclude='*/.ruff_cache'",
+            "--exclude='*/.pytest_cache'",
+            "--exclude='*/__pycache__'",
+            "--exclude='*.pyc'",
+            "--exclude='*.pyo'",
+        ):
+            self.assertIn(expected, source)
+        for expected in (".ruff_cache/", ".pytest_cache/", "__pycache__/", "*.pyc", "*.pyo"):
+            self.assertIn(expected, gitignore)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "project"
+            (project / "scripts").mkdir(parents=True)
+            (project / "packaging").mkdir()
+            (project / "nested/.pytest_cache").mkdir(parents=True)
+            (project / "nested/.ruff_cache").mkdir(parents=True)
+            (project / "nested/__pycache__").mkdir(parents=True)
+            (project / "scripts/make-source-tarball.sh").write_text(source, encoding="utf-8")
+            (project / "VERSION").write_text("0.13.1\n", encoding="utf-8")
+            (project / "packaging/bc250-llm-server.spec").write_text(
+                "%changelog\n* Thu Oct 08 2026 Test <test@example.invalid> - 0.13.1-1.1\n",
+                encoding="utf-8",
+            )
+            (project / "nested/.pytest_cache/state").write_text("cache", encoding="utf-8")
+            (project / "nested/.ruff_cache/state").write_text("cache", encoding="utf-8")
+            (project / "nested/__pycache__/module.pyc").write_bytes(b"cache")
+            (project / "nested/module.pyc").write_bytes(b"cache")
+            (project / "nested/module.pyo").write_bytes(b"cache")
+            (project / "nested/keep.txt").write_text("keep\n", encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(project / "scripts/make-source-tarball.sh")],
+                cwd=project,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            archive = project / "build/bc250-llm-server-0.13.1.tar.gz"
+            with tarfile.open(archive, "r:gz") as tar:
+                names = tar.getnames()
+        self.assertTrue(any(name.endswith("nested/keep.txt") for name in names))
+        forbidden = ("/.pytest_cache/", "/.ruff_cache/", "/__pycache__/", ".pyc", ".pyo")
+        for name in names:
+            self.assertFalse(any(token in name for token in forbidden), name)
 
     def test_model_package_and_public_dispatcher_are_installed(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
@@ -210,7 +274,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(desired["rag"]["TEXT_SPLITTER"], "token")
         self.assertEqual(desired["rag"]["CHUNK_SIZE"], 1500)
         self.assertEqual(desired["rag"]["CHUNK_OVERLAP"], 200)
-        self.assertEqual(desired["rag"]["TOP_K"], 8)
+        self.assertEqual(desired["rag"]["TOP_K"], 4)
         self.assertFalse(desired["task"]["ENABLE_RETRIEVAL_QUERY_GENERATION"])
         self.assertTrue(desired["task"]["ENABLE_TITLE_GENERATION"])
         self.assertTrue(desired["task"]["ENABLE_TAGS_GENERATION"])
@@ -765,6 +829,14 @@ class PackagingTests(unittest.TestCase):
             "%ghost %dir %attr(0750,root,root) /srv/bc250-documents",
             spec,
         )
+
+    def test_repository_validation_runs_test_modules_in_isolation(self) -> None:
+        validate = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
+        self.assertIn('for test_file in "$ROOT"/tests/test_*.py', validate)
+        self.assertIn('python3 -m unittest "$test_file"', validate)
+        self.assertNotIn("python3 -m unittest discover -s tests -v", validate)
+        self.assertIn('BC250_TEST_MODULE_TIMEOUT:-120', validate)
+        self.assertIn('timeout --kill-after=5s "${test_module_timeout}s"', validate)
 
     def test_internal_rag_importer_is_not_packaged_as_an_executable_script(self) -> None:
         source_path = ROOT / "models/rag/rag_import.py"

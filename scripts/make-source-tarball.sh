@@ -28,8 +28,10 @@ mkdir -p "$stage"
     --exclude='./sources/*.tar.xz' \
     --exclude='./vendor' \
     --exclude='*/__pycache__' \
-    --exclude='./.ruff_cache' \
+    --exclude='*/.ruff_cache' \
+    --exclude='*/.pytest_cache' \
     --exclude='*.pyc' \
+    --exclude='*.pyo' \
     --exclude='./.git' \
     -cf - .
 ) | tar -xf - -C "$stage"
