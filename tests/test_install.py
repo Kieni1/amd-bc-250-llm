@@ -225,7 +225,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
         self.assertIn('bc250 model status mtp --include-disabled --compact', source)
         self.assertIn('sudo bc250 fetch-mtp MODEL_ID', source)
-        self.assertIn('Review optional models or reconcile optional-model drift now? [y/N]:', source)
+        self.assertIn('Review optional models or repair any selected optional-model drift now? [y/N]:', source)
         self.assertNotIn('bc250 model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -300,7 +300,7 @@ bc250() {
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("Optional Ollama models", result.stdout)
+        self.assertIn("Model catalog/status", result.stdout)
         self.assertIn("Standalone MTP models", result.stdout)
         self.assertIn("  - qwen3.5-9b-mtp", result.stdout)
         self.assertIn("[FETCHED, VERIFIED]", result.stdout)
@@ -573,7 +573,7 @@ step_8_application_services
         self.assertIn("step_5_check_cu_routing", source)
         self.assertIn("Optional configuration:", source)
         self.assertIn("sudo bc250-cu-live-manager", source)
-        self.assertIn("CU live routing", source)
+        self.assertIn("Live SPI-routed CUs", source)
         self.assertNotIn("bc250-40cu prepare", source)
         self.assertNotIn("kernel-devel-$kernel", source)
         self.assertNotIn("bc250_cc_write_mode", source)
@@ -632,7 +632,8 @@ step_8_application_services
             'echo "Storage"',
             'echo "NEXT STEPS"',
             'echo "CU routing (optional)"',
-            'echo "Validation"',
+            'echo "Status / validation"',
+            'echo "Full quality revalidation"',
             'echo "Benchmark"',
         ):
             self.assertIn(heading, main)
@@ -641,9 +642,9 @@ step_8_application_services
             "sudo bc250 model status",
             "bc250 rag --help",
             "sudo bc250 maintenance --help",
-            "sudo bc250 storage -h",
+            "sudo bc250 storage --help",
             "sudo bc250-cu-live-manager",
-            "sudo bc250 verify",
+            "sudo bc250 status",
             "sudo bc250 revalidate start",
             "sudo bc250-40cu status",
             "bc250 benchmark --help",
@@ -687,7 +688,7 @@ step_8_application_services
         self.assertIn('/root/owui-test.key', source)
         self.assertIn("Checking optional Ollama model registrations in parallel", source)
         for current_label in (
-            "CU live routing",
+            "Live SPI-routed CUs",
             "Saved boot profile",
             "Boot restore service",
         ):

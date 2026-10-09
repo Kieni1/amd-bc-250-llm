@@ -277,6 +277,7 @@ request_primary_reboot_if_needed() {
   echo "One primary reboot is required before kernel-specific setup."
   [[ -z "$kernel" ]] || echo "  pending kernel: $kernel (running $(uname -r))"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || echo "  TTM profile: configured, not active"
+  echo "  Open WebUI remains held for migration safety until setup completes after reboot."
   echo "  sudo reboot"
   printf '  '; rerun_command
   echo "Transcript: $LOG_FILE"
@@ -394,18 +395,21 @@ step_7_models() {
   echo "MTP remains a separate opt-in workflow: sudo bc250 fetch-mtp MODEL_ID"
   local selection="${BC250_MODEL_SELECTION:-}" review=""
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
-    read -r -p "Review optional models or reconcile optional-model drift now? [y/N]: " review
+    read -r -p "Review optional models or repair any selected optional-model drift now? [y/N]: " review
     case "${review,,}" in
       y|yes)
         echo
         echo "Checking optional Ollama model registrations in parallel; standalone MTP artifacts are checked separately. This may take several minutes. Please wait..."
-        local optional_status current_count drift_count deferred_count
+        local optional_status current_count optional_count unavailable_count drift_count deferred_count
         optional_status="$(bc250 model status all --compact 2>&1 || true)"
         current_count="$(grep -c '\[CURRENT\]' <<< "$optional_status" || true)"
-        drift_count="$(grep -Eci 'registration (missing|unavailable)|registration drift|DRIFT' <<< "$optional_status" || true)"
+        optional_count="$(grep -c '\[OPTIONAL' <<< "$optional_status" || true)"
+        unavailable_count="$(grep -ci '\[OPTIONAL, registration unavailable\]' <<< "$optional_status" || true)"
+        drift_count="$(grep -c '\[DRIFT' <<< "$optional_status" || true)"
         deferred_count="$(grep -ci 'deferred' <<< "$optional_status" || true)"
-        echo "Optional-model status: current=${current_count:-0} registration drift=${drift_count:-0} deferred=${deferred_count:-0}"
-        echo "Optional Ollama models:"
+        echo "Model status: current=${current_count:-0} optional=${optional_count:-0} selected drift=${drift_count:-0} deferred=${deferred_count:-0}"
+        ((unavailable_count == 0)) || echo "  optional registration unavailable=${unavailable_count}"
+        echo "Model catalog/status:"
         printf '%s\n' "$optional_status"
         echo
         echo "Standalone MTP models (llama.cpp; read-only, not selectable here):"
@@ -547,7 +551,12 @@ prepare_openwebui_migration_backup() {
     echo "ERROR: Open WebUI upgrade backup helper is unavailable: $helper" >&2
     return 1
   }
-  echo "Existing Open WebUI data requires a pre-migration rollback snapshot (${current:-unknown} -> $BC250_OPEN_WEBUI_VERSION)."
+  if [[ -n "$current" ]]; then
+    echo "Existing Open WebUI data requires a pre-migration rollback snapshot ($current -> $BC250_OPEN_WEBUI_VERSION)."
+  else
+    echo "Existing Open WebUI data detected; previous version could not be determined."
+    echo "Creating a conservative rollback snapshot before convergence to $BC250_OPEN_WEBUI_VERSION."
+  fi
   systemctl stop open-webui.service
   output="$("$helper" "${current:-unknown}" "$BC250_OPEN_WEBUI_VERSION")" || return
   printf '%s\n' "$output"
@@ -604,7 +613,7 @@ step_8_application_services() {
 
 show_plan() {
   heading "BC-250 SETUP PLAN"
-  local kernel="" memory="active" swap="pending" cu="operator-controlled live routing" ollama="install/update" reboot="no"
+  local kernel="" memory="active" swap="pending" cu="operator-controlled live routing" ollama="install/update" reboot="pending Fedora update check"
   kernel="$(pending_kernel || true)"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || memory="configure/pending reboot"
   "$SWAP_PROFILE" status --quiet >/dev/null 2>&1 && swap="configured"
@@ -682,14 +691,13 @@ step_9_open_webui() {
   if [[ -z "$OWUI_TOKEN_FILE" && -s "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
     if validate_owui_token_file "$DEFAULT_OWUI_TOKEN_FILE" 2>/dev/null; then
       OWUI_TOKEN_FILE="$DEFAULT_OWUI_TOKEN_FILE"
-      echo "Using protected BC-250 Open WebUI administrator API key: $DEFAULT_OWUI_TOKEN_FILE"
     else
       echo "NOTE: legacy/non-API-key package credential detected; sign in once to replace it with a durable Open WebUI API key." >&2
     fi
   fi
   if [[ -n "$OWUI_TOKEN_FILE" ]]; then
     validate_owui_token_file "$OWUI_TOKEN_FILE"
-    echo "Applying the package-owned Open WebUI baseline with the supplied administrator API key file."
+    echo "Applying the package-owned Open WebUI baseline through the protected administrator API."
     if ! bc250 openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
       hold_open_webui_publication
@@ -1018,8 +1026,8 @@ run_models_only() {
 print_40cu_completion_status() {
   local indent="${1:-}" manager=bc250-cu-live-manager.service summary routed profile boot_restore
   summary="$("$CU_STATUS" --summary 2>/dev/null || true)"
-  routed="$(sed -n 's/^[[:space:]]*Live routed CUs[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
-  profile="$(sed -n 's/^[[:space:]]*Configured live profile[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
+  routed="$(sed -n 's/^[[:space:]]*Live SPI-routed CUs[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
+  profile="$(sed -n 's/^[[:space:]]*Saved boot profile[[:space:]]*:[[:space:]]*//p' <<< "$summary" | head -1)"
   [[ -n "$routed" ]] || routed="status unavailable"
   [[ -n "$profile" ]] || profile="NOT CONFIGURED (optional)"
 
@@ -1031,7 +1039,7 @@ print_40cu_completion_status() {
     boot_restore="NOT CONFIGURED"
   fi
 
-  printf '%sCU live routing       : %s\n' "$indent" "$routed"
+  printf '%sLive SPI-routed CUs   : %s\n' "$indent" "$routed"
   printf '%sSaved boot profile    : %s\n' "$indent" "$profile"
   printf '%sBoot restore service  : %s\n' "$indent" "$boot_restore"
 }
@@ -1072,7 +1080,7 @@ print_setup_summary() {
   [[ -n "$owui_host" ]] || owui_host="$(hostname -f 2>/dev/null || hostname 2>/dev/null || true)"
   [[ -n "$owui_host" ]] || owui_host="127.0.0.1"
   if systemctl is-active --quiet nginx.service 2>/dev/null; then
-    printf '  Open WebUI URL          : http://%s:80\n' "$owui_host"
+    printf '  Open WebUI URL          : http://%s/\n' "$owui_host"
   else
     printf '  Open WebUI URL          : HELD until package baseline converges\n'
   fi
@@ -1147,7 +1155,7 @@ main() {
   echo "  Documentation: /usr/share/doc/bc250-llm-server/"
   echo
   echo "Storage"
-  echo "  sudo bc250 storage -h"
+  echo "  sudo bc250 storage --help"
   echo
   local completion_amber="" completion_reset=""
   if [[ -t 1 && ${TERM:-dumb} != dumb ]]; then
@@ -1160,10 +1168,12 @@ main() {
   echo "CU routing (optional)"
   echo "  sudo bc250-cu-live-manager"
   echo
-  echo "Validation"
-  echo "  sudo bc250 verify"
-  echo "  sudo bc250 revalidate start"
+  echo "Status / validation"
+  echo "  sudo bc250 status"
   echo "  sudo bc250-40cu status"
+  echo
+  echo "Full quality revalidation"
+  echo "  sudo bc250 revalidate start"
   echo
   echo "Benchmark"
   echo "  bc250 benchmark --help"
