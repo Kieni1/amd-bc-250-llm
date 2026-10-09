@@ -174,11 +174,10 @@ with `--host` or `--destination`, pass the same override to `unregister`/`remove
 package retirement catalog, previews canonical identity/registration/source state, and
 fails closed on unavailable or misplaced registration state. It never selects arbitrary
 unmanaged operator models.
-The source Modelfile graveyard is archive-only and is not part of active model discovery or
-package installation. A historical model that an operator manually registers is treated as an
-installed native model; Open WebUI applies any matching testing policy (including its visibility)
-rather than inferring runtime state from graveyard membership. `purge-retired` remains an explicit
-operator cleanup command, not automatic convergence.
+Retired/non-user-visible native registrations are lifecycle residue, not active Open WebUI
+base-model desired state. They remain hidden from ordinary users and can be reported or removed
+through the model lifecycle without making an otherwise converged Open WebUI baseline appear
+misconfigured.
 
 #### Apply / refresh options
 
@@ -326,7 +325,12 @@ free -h
 swapon --show
 ```
 
-The package defaults to 2 GiB zram plus a 16 GiB disk swap safety margin. The main Ollama runtime remains explicitly selectable:
+The package defaults to 2 GiB zram plus a 16 GiB disk swap safety margin. `bc250 verify`
+checks the active swap set, so an initialized `/dev/zramN` that is absent from `swapon --show`
+is reported as not active swap. Verification also parses the actual failed-systemd-unit rows
+rather than treating the command exit code as proof that no units failed. Package-managed disk-swap
+resize/removal is fail-closed: if active-swap state cannot be read or an active swap file cannot be
+deactivated, the helper refuses to unlink or replace its backing file. The main Ollama runtime remains explicitly selectable:
 
 ```bash
 bc250 ollama-profile status
@@ -394,7 +398,7 @@ the archived checksum set again. It intentionally excludes OWUI credentials, pro
 uploaded document contents, database rows, identity SQL and backup contents. Use `--output-dir DIR`
 when the archive should be written elsewhere.
 
-`bc250 revalidate` harness v4.7 is the root-only systemd-backed package
+`bc250 revalidate` harness v4.8 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250 revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly partial Open WebUI coverage
@@ -405,7 +409,7 @@ state and the age of the last real progress event rather than treating a periodi
 heartbeat as progress. Run completion is independent from coverage: if all required
 phases finish normally, the run is `completed` even when the optional Agent is not
 installed and coverage is PARTIAL.
-Harness v4.7 also surfaces non-failing observations under a separate `Diagnostics`
+Harness v4.8 also surfaces non-failing observations under a separate `Diagnostics`
 section. This includes non-severe context truncation, a MemAvailable minimum below the
 512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
 floor, and accepted use cases that reach their generation output budget. These diagnostics

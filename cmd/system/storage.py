@@ -302,7 +302,8 @@ def dedupe_pair(alias: Path, blob: Path, size: int) -> int:
 
 
 def dedupe(yes: bool) -> int:
-    require_root(); xfs_ready()
+    require_root()
+    xfs_ready()
     all_pairs = state_pairs()
     live_pairs = [pair for pair in all_pairs if blob_referenced(pair[1])]
     pairs = [
@@ -321,7 +322,8 @@ def dedupe(yes: bool) -> int:
     for index, (source, blob, _checksum, _state_path, state) in enumerate(pairs, 1):
         print(f"  {index:2d}) {source_label(source, state, names)} [{blob.parents[1].name}]")
     if not yes and input("Type DEDUPLICATE to share identical XFS extents: ") != "DEDUPLICATE":
-        print("Cancelled."); return 0
+        print("Cancelled.")
+        return 0
     before = shutil.disk_usage(GGUF).free
     active = quiesce_services()
     try:
@@ -330,7 +332,8 @@ def dedupe(yes: bool) -> int:
             for index, (source, blob, checksum, state_path, state) in enumerate(pairs, 1):
                 if source.stat().st_size != blob.stat().st_size or not source_checksum_valid(source, checksum, state):
                     raise RuntimeError(f"source/blob state changed for {source_label(source, state, names)}")
-                alias.unlink(missing_ok=True); alias.symlink_to(source)
+                alias.unlink(missing_ok=True)
+                alias.symlink_to(source)
                 size = source.stat().st_size
                 ranges = (size + DEDUPE_CHUNK_BYTES - 1) // DEDUPE_CHUNK_BYTES
                 label = source_label(source, state, names)
@@ -366,7 +369,8 @@ def prune_sources(yes: bool) -> int:
         print(f"  {index:2d}) {source_label(source, state, names)} [{blob.parents[1].name}] {human(source.stat().st_size)}")
     print(f"Offline GGUF source data selected: {human(total)}")
     if not yes and input("Type PRUNE-SOURCES to remove these offline GGUF source copies: ") != "PRUNE-SOURCES":
-        print("Cancelled."); return 0
+        print("Cancelled.")
+        return 0
     removed = 0
     for source, (blob, checksum, state) in candidates.items():
         if not source_checksum_valid(source, checksum, state) or digest(blob) != checksum:

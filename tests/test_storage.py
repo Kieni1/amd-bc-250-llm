@@ -17,14 +17,18 @@ spec.loader.exec_module(storage)
 class StorageTests(unittest.TestCase):
     def test_state_pairs_keep_multiple_ollama_lanes_for_one_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            base = Path(temporary); gguf = base / "gguf"; ollama = base / "ollama"
-            source = gguf / "embedding" / "model.gguf"; source.parent.mkdir(parents=True)
+            base = Path(temporary)
+            gguf = base / "gguf"
+            ollama = base / "ollama"
+            source = gguf / "embedding" / "model.gguf"
+            source.parent.mkdir(parents=True)
             source.write_bytes(b"same")
             checksum = storage.digest(source)
             source.with_name(source.name + ".bc250.json").write_text(json.dumps({"sha256": checksum}))
             for lane in ("main", "embedding"):
                 blob = ollama / lane / "blobs" / f"sha256-{checksum}"
-                blob.parent.mkdir(parents=True); blob.write_bytes(b"same")
+                blob.parent.mkdir(parents=True)
+                blob.write_bytes(b"same")
             with patch.object(storage, "GGUF", gguf), patch.object(storage, "OLLAMA", ollama):
                 pairs = storage.state_pairs()
             self.assertEqual(len(pairs), 2)
@@ -56,8 +60,11 @@ class StorageTests(unittest.TestCase):
     def test_recorded_dedupe_pair_is_not_pending(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
-            source = base / "source.gguf"; blob = base / "main" / "blobs" / ("sha256-" + "a" * 64)
-            source.write_bytes(b"same"); blob.parent.mkdir(parents=True); blob.write_bytes(b"same")
+            source = base / "source.gguf"
+            blob = base / "main" / "blobs" / ("sha256-" + "a" * 64)
+            source.write_bytes(b"same")
+            blob.parent.mkdir(parents=True)
+            blob.write_bytes(b"same")
             state = {"dedupe": {storage.dedupe_key(blob): {"source": storage.stat_signature(source), "blob": storage.stat_signature(blob)}}}
             self.assertTrue(storage.dedupe_record_matches(source, blob, state))
 
@@ -141,7 +148,8 @@ class StorageTests(unittest.TestCase):
             lane = Path(temporary) / "main"
             checksum = "a" * 64
             blob = lane / "blobs" / f"sha256-{checksum}"
-            blob.parent.mkdir(parents=True); blob.write_bytes(b"same")
+            blob.parent.mkdir(parents=True)
+            blob.write_bytes(b"same")
             self.assertFalse(storage.blob_referenced(blob))
             manifest = lane / "manifests" / "registry.ollama.ai" / "library" / "model" / "latest"
             manifest.parent.mkdir(parents=True)

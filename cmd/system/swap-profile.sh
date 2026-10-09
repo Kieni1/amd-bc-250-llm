@@ -118,6 +118,32 @@ create_swapfile() {
   fi
 }
 
+managed_swap_is_active() {
+  local active_names
+  if ! active_names="$(swapon --show=NAME --noheadings 2>/dev/null)"; then
+    return 2
+  fi
+  grep -Fxq "$SWAP_FILE" <<< "$active_names"
+}
+
+deactivate_managed_swap() {
+  local state
+  if managed_swap_is_active; then
+    if ! swapoff "$SWAP_FILE"; then
+      echo "ERROR: cannot deactivate package swap; refusing destructive swap-file changes." >&2
+      return 1
+    fi
+    return 0
+  else
+    state=$?
+  fi
+  if ((state == 1)); then
+    return 0
+  fi
+  echo "ERROR: cannot determine active swap state; refusing destructive swap-file changes." >&2
+  return 1
+}
+
 ensure_capacity() {
   local available_kib required_kib
   available_kib="$(df --output=avail -k "$SWAP_DIR" 2>/dev/null | tail -1 || df --output=avail -k /var | tail -1)"
@@ -148,12 +174,21 @@ ensure_profile() {
   [[ -f "$SWAP_FILE" ]] && actual_bytes="$(stat -c '%s' "$SWAP_FILE" 2>/dev/null || echo 0)"
   if [[ "$actual_bytes" != "$wanted_bytes" ]]; then
     ensure_capacity
-    swapoff "$SWAP_FILE" 2>/dev/null || true
+    deactivate_managed_swap || return 1
     rm -f "$SWAP_FILE"
     create_swapfile
   fi
   write_fstab_block
-  if ! swapon --show=NAME --noheadings 2>/dev/null | grep -Fxq "$SWAP_FILE"; then
+  local active_state=0
+  if managed_swap_is_active; then
+    active_state=1
+  else
+    case $? in
+      1) active_state=0 ;;
+      *) echo "ERROR: cannot determine active swap state; refusing swap-file reconciliation." >&2; return 1 ;;
+    esac
+  fi
+  if ((active_state == 0)); then
     if ! swapon "$SWAP_FILE"; then
       echo "Existing swap file is invalid; recreating it." >&2
       ensure_capacity
@@ -172,7 +207,7 @@ remove_profile() {
   require_root
   local previous_swappiness=""
   [[ -r "$SWAPPINESS_STATE" ]] && previous_swappiness="$(head -n 1 "$SWAPPINESS_STATE")"
-  swapoff "$SWAP_FILE" 2>/dev/null || true
+  deactivate_managed_swap || return 1
   remove_fstab_block
   rm -f "$SWAP_FILE" "$ZRAM_CONF" "$SWAPPINESS_CONF" "$SWAPPINESS_STATE"
   if [[ "$previous_swappiness" =~ ^[0-9]+$ && "$previous_swappiness" -le 200 ]]; then
