@@ -44,6 +44,10 @@ jobs:
       - name: Lint built RPMs
         run: rpmlint -c packaging/rpmlint.toml dist/*.rpm
 
+      - name: Rebuild generated SRPM from clean topdir
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        run: make check-srpm-rebuild
+
       - name: Upload binary RPM
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
