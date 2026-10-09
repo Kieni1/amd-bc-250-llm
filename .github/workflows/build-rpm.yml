@@ -11,9 +11,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      LANG: C.UTF-8
-      LC_ALL: C.UTF-8
     container:
       image: fedora:44
 

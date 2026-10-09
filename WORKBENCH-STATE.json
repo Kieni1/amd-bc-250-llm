@@ -6,6 +6,7 @@
   "predecessor_sha256": "9ff0cc1ee37171c602e1cdd37d718a7c09a4ef3fe0a8b2cfe4e03cdd9f3e6e5f",
   "batch": "0.13.1-1.2-corrective-hardening-final",
   "changed_files": [
+    ".github/workflows/build-rpm.yml",
     ".gitignore",
     "CHANGELOG.md",
     "README.md",
@@ -49,6 +50,7 @@
     "models/modelctl.py",
     "packaging/bc250-llm-server.spec",
     "packaging/install-manifest.tsv",
+    "scripts/install-manifest.py",
     "scripts/make-source-tarball.sh",
     "scripts/validate.sh",
     "tests/test_benchmark.py",
@@ -84,16 +86,21 @@
     "Tightened semantic-equivalence acceptance so date/time/invoice normalization can satisfy only standalone required semantic values; compound requirements retain their surrounding textual contract.",
     "Broadened firewalld HTTP publication verification to recognize direct TCP/80, ranges containing 80, custom active services and accepting rich rules while preserving conservative unknown-state handling.",
     "Distinguished unreadable active-swap inspection from a known-empty active-swap set in status/verification while preserving fail-closed destructive swap management.",
-    "Resolved the reported Ruff findings without suppressions: earlier E701/E702 one-line/semicolon style, final SIM103 semantic-return simplification and I001 import ordering in tests/test_packaging.py."
+    "Resolved the reported Ruff findings without suppressions: earlier E701/E702 one-line/semicolon style, final SIM103 semantic-return simplification and I001 import ordering in tests/test_packaging.py.",
+    "Kept cmd/monitoring/runtime-state.sh as a private sourced 0644 library and removed its shebang so rpmlint does not classify it as a non-executable script.",
+    "Added install-manifest validation that rejects non-executable file/config payloads carrying a shebang, catching this rpmlint class before RPM build.",
+    "Removed unnecessary workflow-wide LANG/LC_ALL forcing from the Fedora build job; commands that require deterministic C-locale parsing continue to set it locally."
   ],
   "validation": [
-    "542/542 deterministic unittest cases PASS across all 17 test modules in isolated module runs.",
+    "543/543 deterministic unittest cases PASS across all 17 test modules after the CI packaging correction; the SIGINT subprocess regression also passes on immediate standalone/full-module rerun.",
     "Focused semantic-equivalence, firewalld HTTP publication, unavailable swap-state, destructive swap safety and carried Sidechat regression tests PASS.",
     "python3 scripts/validate.py: RPM preflight PASS.",
     "python3 development/scope.py check: PASS; frozen/archive component hashes unchanged.",
     "59 shell sources pass bash -n; 35 Python sources AST-parse; 15 JSON and 5 TOML files parse.",
     "VERSION/spec/state/current docs agree on 0.13.1-1.2.",
-    "Ruff binary is unavailable in this artifact environment. The user-supplied Ruff run reported only SIM103 in category-benchmark.py and I001 in tests/test_packaging.py after the earlier style cleanup; both findings are corrected here without suppressions. A workstation/CI Ruff rerun remains the external confirmation gate. ShellCheck, configured rpmlint and actual rpmbuild also remain external."
+    "Ruff binary is unavailable in this artifact environment. The user-supplied Ruff run reported only SIM103 in category-benchmark.py and I001 in tests/test_packaging.py after the earlier style cleanup; both findings are corrected here without suppressions. A workstation/CI Ruff rerun remains the external confirmation gate. ShellCheck, configured rpmlint and actual rpmbuild also remain external.",
+    "packaging/install-manifest.tsv contains no non-executable file/config payload with a shebang; runtime-state.sh remains mode 0644 and source-only.",
+    "GitHub workflow no longer sets global LANG/LC_ALL; no project source references en_US.UTF-8."
   ],
   "exact_device_baseline": {
     "nvr": "bc250-llm-server-0.13.1-1.0.fc44.x86_64",

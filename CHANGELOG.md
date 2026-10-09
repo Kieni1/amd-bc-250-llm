@@ -6,6 +6,8 @@
 - Broaden firewalld HTTP publication verification to recognize direct TCP/80, ranges containing 80, custom active services, and accepting rich rules while keeping unknown service inspection conservative.
 - Distinguish unreadable active-swap inspection from a known-empty swap set in status/verification; destructive swap resize/removal remains fail-closed.
 - Clear the reported Ruff findings without suppressions: normalize one-line/semicolon statement style, return the final semantic identifier condition directly (`SIM103`), and restore import ordering in `tests/test_packaging.py` (`I001`), without changing runtime behavior.
+- Keep the shared runtime-state helper as a private sourced `0644` shell library without a shebang, preventing rpmlint `non-executable-script` failures; install-manifest validation now rejects future non-executable payloads that carry script shebangs.
+- Stop forcing a global UTF-8 locale in the Fedora CI job; package checks use explicit locale settings only where command semantics actually require them.
 
 ## 0.13.1-1.1 - 2026-10-08
 

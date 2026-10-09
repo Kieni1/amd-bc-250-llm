@@ -39,6 +39,37 @@ class PackagingTests(unittest.TestCase):
             "file\t0644\tcmd/monitoring/runtime-state.sh\t{libexec}/runtime-state.sh",
             manifest,
         )
+        helper = (ROOT / "cmd/monitoring/runtime-state.sh").read_text(encoding="utf-8")
+        self.assertFalse(helper.startswith("#!"))
+
+    def test_install_manifest_rejects_non_executable_shebang_payloads(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            source_root = base / "source"
+            source_root.mkdir()
+            helper = source_root / "helper.sh"
+            helper.write_text("#!/usr/bin/env bash\necho test\n", encoding="utf-8")
+            manifest = base / "manifest.tsv"
+            manifest.write_text(
+                "file\t0644\thelper.sh\t/usr/libexec/test/helper.sh\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(ROOT / "scripts/install-manifest.py"),
+                    "--manifest",
+                    str(manifest),
+                    "--source-root",
+                    str(source_root),
+                    "--check",
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("non-executable source has a shebang", result.stderr)
 
     def test_candidate_quality_checks_are_source_only(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
@@ -785,8 +816,6 @@ class PackagingTests(unittest.TestCase):
             workflow.index("- name: Build RPMs"),
             workflow.index("- name: Lint built RPMs"),
         )
-        self.assertIn("LANG: C.UTF-8", workflow)
-        self.assertIn("LC_ALL: C.UTF-8", workflow)
         self.assertIn(
             "run: rpmlint -c packaging/rpmlint.toml dist/*.rpm",
             workflow,

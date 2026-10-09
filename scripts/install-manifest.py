@@ -107,6 +107,21 @@ def source_matches(source_root: Path, pattern: str, line_number: int) -> list[Pa
     return matches
 
 
+def validate_source_modes(
+    paths: list[Path], mode: str, line_number: int
+) -> None:
+    """Reject script-like payloads that are installed without execute bits."""
+    if int(mode, 8) & 0o111:
+        return
+    for path in paths:
+        with path.open("rb") as source_file:
+            first_line = source_file.readline(256)
+        if first_line.startswith(b"#!"):
+            raise ManifestError(
+                f"manifest line {line_number}: non-executable source has a shebang: {path}"
+            )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", required=True, type=Path)
@@ -120,14 +135,15 @@ def main() -> int:
     definitions = parse_defines(args.define)
     entries = load_manifest(args.manifest)
     if args.check:
-        for line_number, kind, _mode, source, destination in entries:
+        for line_number, kind, mode, source, destination in entries:
             expand(destination, definitions, line_number)
             if kind in {"file", "config"}:
-                source_matches(
+                paths = source_matches(
                     args.source_root,
                     expand(source, definitions, line_number),
                     line_number,
                 )
+                validate_source_modes(paths, mode, line_number)
         print(f"Install manifest valid: {len(entries)} entries")
         return 0
     if args.buildroot is None or args.filelist is None:
@@ -165,6 +181,7 @@ def main() -> int:
             continue
 
         sources = source_matches(args.source_root, source_value, line_number)
+        validate_source_modes(sources, mode, line_number)
 
         destination_is_directory = destination.endswith("/") or len(sources) > 1
         if len(sources) > 1 and not destination.endswith("/"):

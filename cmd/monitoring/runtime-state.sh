@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # Shared read-only runtime-state helpers for BC-250 monitoring commands.
 # This file is sourced by verify/status tooling and intentionally performs no
 # actions when loaded.

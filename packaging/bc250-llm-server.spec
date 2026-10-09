@@ -256,6 +256,8 @@ fi
 
 %changelog
 * Fri Oct 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.2
+- Keep runtime-state.sh as a sourced 0644 library without a shebang and reject non-executable shebang payloads during manifest validation, preventing rpmlint non-executable-script failures.
+- Remove unnecessary global locale forcing from Fedora CI; retain explicit C locale only for commands whose ordering/parsing depends on it.
 - Restrict date/time/invoice semantic-equivalence substitution to standalone required values so compound acceptance phrases cannot pass from a matching embedded token alone.
 - Recognize HTTP publication through TCP/80 direct ports, ranges, custom firewalld services and accepting rich rules while retaining conservative unknown-state handling.
 - Distinguish unavailable swap-state inspection from a proven empty active-swap set in read-only status/verification; keep destructive swap changes fail-closed.
