@@ -59,7 +59,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.13.1-1.0 source promotes the exact-device-qualified 0.12.2-0.8 appliance baseline without changing runtime/model/CU/RAG policy. Its release delta is deliberately narrow: immutable-`/usr` Python bytecode hygiene, semantic optional-model status, and retired-model Open WebUI desired-state accounting. Configured rpmlint remains a CI build gate, RAG/Tika remains active product scope, Agent remains optional, and the dependency contract remains unchanged from the qualified predecessor. The next device question is the bounded exact-upgrade delta, not another model-discovery campaign.
+The current 0.13.1-1.2 source builds on the exact-device-qualified 0.13.1-1.0 optimization baseline and the closed Sidechat 15–19 program. Runtime/model/CU defaults remain frozen at 32K, q8_0 KV, parallel=1, flash attention on, current keep-alive/Deep admission policy and the current production model identities. Sidechat 19 rejected the combined q4_0 + TOP_K=4 arm because Advanced/Qwen became unstable under q4_0, while TOP_K=4 itself passed RAG/product acceptance and is promoted alone. The release also carries evaluator/readiness/benchmark-evidence/model-status fixes identified by Sidechats 15–19. Configured rpmlint remains a CI build gate, Agent remains optional, and broad model/runtime discovery stays closed.
 
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
@@ -108,11 +108,24 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## Current 0.13.1-1.0 qualification boundary
+## Closed optimization-program lessons carried into 0.13.1-1.2
+
+- Sidechat 15: keep current residency/keepalive/swappiness/Deep pre-eviction defaults.
+- Sidechat 16: keep 32K and production output ceilings; q4_0 was candidate-only.
+- Sidechat 17: keep parallel=1, flash attention, automatic num_batch, full GPU offload and governor policy.
+- Sidechat 18/19: promote RAG TOP_K=4, reject q4_0 after integrated Advanced instability.
+- Performance evidence must record starting SwapUsed, memory PSI, MemAvailable and resident model set.
+- Clean 6144-token reasoning exhaustion with no visible answer is INCOMPLETE; repetition at that ceiling is a quality failure.
+- Task title/tag persistence is authoritative; missing a short-lived task residency sample is not itself failure.
+- Semantic evaluators should normalize unambiguous dates/times/invoice identifiers, parse grouped citation membership, and use required numeric membership rather than relying on one surface form or the last number in an explanation.
+- RAG hidden-reasoning exhaustion with empty visible output is INCOMPLETE/retry only when no independent retrieval/semantic defect exists; repetition remains a quality failure.
+- Verification must distinguish a configured/initialized zram device from a `/dev/zramN` that is actually active swap, and must parse actual failed systemd unit rows.
+
+## Current 0.13.1-1.2 qualification boundary
 
 Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
 
-The pre-0.13.1 investigation attributed those writes to dispatcher-launched RAG/benchmark Python imports and proved `PYTHONDONTWRITEBYTECODE=1` prevents them. It also proved optional absent/cached models were semantically healthy despite `MISSING`/false `DRIFT` labels. The follow-up retirement review clarified the intended boundary: source-graveyard membership is archive metadata, not runtime state. 0.13.1-1.0 therefore keeps graveyard files outside active discovery/package installation while allowing manually registered historical models to follow normal Open WebUI testing-policy visibility. Exact-device testing should perform only this bounded 0.8 -> 0.13.1 upgrade/model-state delta and stop if it passes.
+The pre-0.13.1 investigation attributed those writes to dispatcher-launched RAG/benchmark Python imports and proved `PYTHONDONTWRITEBYTECODE=1` prevents them. It also proved optional absent/cached models were semantically healthy despite `MISSING`/false `DRIFT` labels, and that graveyard source content must stay inert while an operator-manually registered historical model still follows normal Open WebUI testing-policy visibility. Those hygiene/model-state fixes shipped in the final 0.13.1-1.0 logic checkpoint and remain protected in 1.2. The 1.1 delta was the closed Sidechat 15–19 RAG/tooling/readiness/verification work described above; the 1.2 corrective delta narrows semantic substitution and hardens HTTP/swap diagnostics without changing qualified defaults; exact-device testing should therefore upgrade the exact 1.0 baseline to 1.2 and exercise only that bounded delta unless it exposes a regression.
 
 ## 6. Recommended current work order
 
@@ -141,8 +154,7 @@ The distinct `sudo systemctl reboot` invocation is device-proven unreliable on t
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.7 includes the package-owned production roles and identifies the 0.12.2 candidate
-and remains the milestone whole-appliance gate.
+The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.2 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
 acceptance should be one bounded real-office corpus pass (real PDFs/Tika/OCR, tables, multilingual

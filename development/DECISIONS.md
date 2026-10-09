@@ -822,3 +822,15 @@ the better deployability profile.
 **Boundary:** This does not alter production Gemma E2B/E4B, GPT-OSS Deep, lane architecture,
 `OLLAMA_MAX_LOADED_MODELS=1`, or the no-generic-scheduler decision. Model/runtime acceptance remains
 part of the new exact-device 0.12.2 campaign.
+
+## DEC-031 — Keep q8_0 KV and promote RAG TOP_K=4 after integrated acceptance
+
+**Status:** ACTIVE — Sidechats 15–19 closed.
+
+**Decision:** Keep the production main-lane KV cache at `q8_0` and promote the packaged Open WebUI/Documents RAG retrieval breadth from `TOP_K=8` to `TOP_K=4`. Keep 32K main context, `OLLAMA_NUM_PARALLEL=1`, flash attention enabled, automatic `num_batch`, current full GPU offload, current keep-alive values, Deep pre-eviction and current production model identities.
+
+**Why:** Sidechat 16 found q4_0 promising in isolated context/KV measurements and Sidechat 18 found TOP_K=4 independently valid. Sidechat 19 then rejected the combined candidate because Advanced/Qwen repeatedly exhausted the full 6144-token reasoning budget with no visible answer under q4_0, including one repetition defect. The failures were not explained by memory/OOM/GPU/kernel safety. TOP_K=4 itself continued to pass direct/OWUI RAG and balanced A/B quality, so it is promoted alone.
+
+**Evaluator/tooling consequences:** preserve clean empty-visible reasoning exhaustion as `INCOMPLETE`, repetition at the same ceiling as quality failure; normalize unambiguous date/time surface forms; compare required numeric values by semantic membership rather than a last-number heuristic; do not fail persisted task title/tag results solely because the ephemeral task model escaped residency sampling; record starting swap/PSI/residency state in performance evidence.
+
+**Retest only if:** Ollama/Qwen request construction, model identity, KV implementation, Advanced reasoning policy, Documents retrieval contract or RAG retrieval policy changes materially. Do not rerun the closed q4_0 discovery campaign merely because a new RPM is built.
