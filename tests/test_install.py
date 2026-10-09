@@ -90,7 +90,9 @@ class InstallerTests(unittest.TestCase):
     def test_installer_cleans_stale_package_python_bytecode_in_bounded_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            libexec = root / "libexec"; share = root / "share"; outside = root / "outside"
+            libexec = root / "libexec"
+            share = root / "share"
+            outside = root / "outside"
             for base in (libexec, share, outside):
                 (base / "__pycache__").mkdir(parents=True)
                 (base / "__pycache__/module.cpython-314.pyc").write_bytes(b"cache")
@@ -110,7 +112,9 @@ class InstallerTests(unittest.TestCase):
             libexec = root / "libexec"
             share = root / "share"
             fake_bin = root / "bin"
-            libexec.mkdir(); share.mkdir(); fake_bin.mkdir()
+            libexec.mkdir()
+            share.mkdir()
+            fake_bin.mkdir()
             fake_find = fake_bin / "find"
             fake_find.write_text(
                 "#!/usr/bin/env bash\necho 'simulated find failure' >&2\nexit 1\n",
@@ -654,6 +658,14 @@ step_8_application_services
         self.assertLess(main.index("completion_amber=$'\\033[1;33m'"), main.index('echo "NEXT STEPS"'))
         self.assertNotIn('echo "Validation / benchmark"', main)
         self.assertNotIn('echo "Models / runtime lanes"', main)
+
+    def test_installer_distinguishes_backend_from_usable_front_door(self) -> None:
+        source = INSTALLER.read_text()
+        self.assertIn("wait_for_openwebui_front_door()", source)
+        self.assertIn("127.0.0.1:3000/api/version", source)
+        self.assertIn("127.0.0.1:80/api/version", source)
+        self.assertIn("HTTP 502/other proxy errors are not readiness", source)
+        self.assertIn('owui_state="FRONT DOOR READY"', source)
 
     def test_installer_final_summary_reports_openwebui_completion_state(self) -> None:
         source = INSTALLER.read_text()

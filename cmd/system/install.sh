@@ -491,7 +491,13 @@ publish_openwebui_after_convergence() {
     systemctl stop open-webui.service >/dev/null 2>&1 || true
     return 1
   fi
-  echo "Open WebUI desired state verified; boot and HTTP publication enabled."
+  if ! wait_for_openwebui_front_door; then
+    echo "ERROR: nginx is listening but the Open WebUI front door is not yet usable; HTTP 502/other proxy errors are not readiness." >&2
+    hold_open_webui_publication
+    systemctl stop open-webui.service >/dev/null 2>&1 || true
+    return 1
+  fi
+  echo "Open WebUI desired state verified; backend and usable HTTP front door are ready."
 }
 
 
@@ -640,7 +646,18 @@ show_plan() {
 wait_for_open_webui() {
   local attempt
   for attempt in {1..60}; do
-    curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/ >/dev/null 2>&1 && return 0
+    curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+wait_for_openwebui_front_door() {
+  local attempt code
+  for attempt in {1..30}; do
+    code="$(curl --silent --output /dev/null --write-out '%{http_code}' --connect-timeout 2 --max-time 3 \
+      http://127.0.0.1:80/api/version 2>/dev/null || true)"
+    [[ "$code" =~ ^2[0-9][0-9]$ ]] && return 0
     sleep 1
   done
   return 1
@@ -1022,7 +1039,10 @@ print_40cu_completion_status() {
 
 print_setup_summary() {
   local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED"
-  curl -fsS --max-time 3 http://127.0.0.1:3000/ >/dev/null 2>&1 && owui_state="READY"
+  curl -fsS --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && owui_state="BACKEND READY"
+  if [[ "$owui_state" == "BACKEND READY" ]] && curl -fsS --max-time 3 http://127.0.0.1:80/api/version >/dev/null 2>&1; then
+    owui_state="FRONT DOOR READY"
+  fi
   curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && ollama_state="READY"
   [[ -n "$(pending_kernel || true)" ]] && reboot_state="YES"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || reboot_state="YES"
@@ -1080,10 +1100,10 @@ print_setup_summary() {
 main() {
   parse_arguments "$@"
   require_root
+  cleanup_package_python_bytecode
   capture_input_mode
   start_transcript
   trap cleanup_sensitive_runtime EXIT
-  cleanup_package_python_bytecode
   [[ -z "$OWUI_TOKEN_FILE" ]] || validate_owui_token_file "$OWUI_TOKEN_FILE"
   if [[ "$INSTALL_MODE" == models ]]; then
     run_models_only
