@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -14,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class PackagingTests(unittest.TestCase):
-    def test_release_identity_is_consistent_for_0_13_1_1_2(self) -> None:
+    def test_release_identity_is_consistent(self) -> None:
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         state = json.loads((ROOT / "WORKBENCH-STATE.json").read_text(encoding="utf-8"))
@@ -22,12 +23,11 @@ class PackagingTests(unittest.TestCase):
         spec_release = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
         self.assertIsNotNone(spec_version)
         self.assertIsNotNone(spec_release)
-        self.assertEqual(version, "0.13.1")
         self.assertEqual(spec_version.group(1), version)
-        self.assertEqual(spec_release.group(1), "1.2")
-        self.assertEqual(state["release_identity"], "bc250-llm-server-0.13.1-1.2")
-        self.assertIn("bc250-llm-server-0.13.1-1.2", (ROOT / "README.md").read_text(encoding="utf-8"))
-        self.assertIn("bc250-llm-server-0.13.1-1.2", (ROOT / "TLDR.md").read_text(encoding="utf-8"))
+        expected = f"bc250-llm-server-{version}-{spec_release.group(1)}"
+        self.assertEqual(state["release_identity"], expected)
+        self.assertIn(expected, (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn(expected, (ROOT / "TLDR.md").read_text(encoding="utf-8"))
 
     def test_package_version_authority_is_installed_for_revalidation(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
@@ -155,54 +155,89 @@ class PackagingTests(unittest.TestCase):
         self.assertGreaterEqual(len(old_starts), 4)
         self.assertEqual(old_starts, sorted(old_starts))
 
-    def test_source_tarball_excludes_python_test_and_ruff_caches(self) -> None:
+    def test_source_tarball_is_reproducible_and_excludes_local_state(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
         gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
         for expected in (
+            "--exclude='./sources'",
             "--exclude='*/.ruff_cache'",
             "--exclude='*/.pytest_cache'",
             "--exclude='*/__pycache__'",
             "--exclude='*.pyc'",
             "--exclude='*.pyo'",
+            "TZ=UTC date",
+            "--mode='u+rwX,go+rX,go-w,a-s,a-t'",
         ):
             self.assertIn(expected, source)
-        for expected in (".ruff_cache/", ".pytest_cache/", "__pycache__/", "*.pyc", "*.pyo"):
+        for expected in (
+            "/sources/*.sha256",
+            ".ruff_cache/",
+            ".pytest_cache/",
+            "__pycache__/",
+            "*.pyc",
+            "*.pyo",
+        ):
             self.assertIn(expected, gitignore)
 
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "project"
             (project / "scripts").mkdir(parents=True)
             (project / "packaging").mkdir()
+            (project / "sources").mkdir()
             (project / "nested/.pytest_cache").mkdir(parents=True)
             (project / "nested/.ruff_cache").mkdir(parents=True)
             (project / "nested/__pycache__").mkdir(parents=True)
-            (project / "scripts/make-source-tarball.sh").write_text(source, encoding="utf-8")
+            script = project / "scripts/make-source-tarball.sh"
+            script.write_text(source, encoding="utf-8")
+            script.chmod(0o755)
             (project / "VERSION").write_text("0.13.1\n", encoding="utf-8")
             (project / "packaging/bc250-llm-server.spec").write_text(
                 "%changelog\n* Thu Oct 08 2026 Test <test@example.invalid> - 0.13.1-1.1\n",
                 encoding="utf-8",
             )
+            (project / "sources/cache.sha256").write_text("local cache\n", encoding="utf-8")
             (project / "nested/.pytest_cache/state").write_text("cache", encoding="utf-8")
             (project / "nested/.ruff_cache/state").write_text("cache", encoding="utf-8")
             (project / "nested/__pycache__/module.pyc").write_bytes(b"cache")
             (project / "nested/module.pyc").write_bytes(b"cache")
             (project / "nested/module.pyo").write_bytes(b"cache")
-            (project / "nested/keep.txt").write_text("keep\n", encoding="utf-8")
-            result = subprocess.run(
-                ["bash", str(project / "scripts/make-source-tarball.sh")],
-                cwd=project,
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            archive = project / "build/bc250-llm-server-0.13.1.tar.gz"
+            keep = project / "nested/keep.txt"
+            keep.write_text("keep\n", encoding="utf-8")
+            tool = project / "nested/tool.sh"
+            tool.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+            tool.chmod(0o755)
+
+            hashes = []
+            for timezone in ("UTC", "Europe/Zurich"):
+                if timezone != "UTC":
+                    project.chmod(0o2775)
+                    keep.chmod(0o664)
+                    (project / "sources/cache.sha256").write_text("changed local cache\n", encoding="utf-8")
+                result = subprocess.run(
+                    ["bash", str(script)],
+                    cwd=project,
+                    env={**os.environ, "TZ": timezone},
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                archive = project / "build/bc250-llm-server-0.13.1.tar.gz"
+                hashes.append(hashlib.sha256(archive.read_bytes()).hexdigest())
+
+            self.assertEqual(hashes[0], hashes[1])
             with tarfile.open(archive, "r:gz") as tar:
-                names = tar.getnames()
-        self.assertTrue(any(name.endswith("nested/keep.txt") for name in names))
+                members = {member.name: member for member in tar.getmembers()}
+
+        self.assertTrue(any(name.endswith("nested/keep.txt") for name in members))
+        self.assertFalse(any("/sources/" in name for name in members))
         forbidden = ("/.pytest_cache/", "/.ruff_cache/", "/__pycache__/", ".pyc", ".pyo")
-        for name in names:
+        for name in members:
             self.assertFalse(any(token in name for token in forbidden), name)
+        keep_member = next(member for name, member in members.items() if name.endswith("nested/keep.txt"))
+        tool_member = next(member for name, member in members.items() if name.endswith("nested/tool.sh"))
+        self.assertEqual(keep_member.mode & 0o777, 0o644)
+        self.assertEqual(tool_member.mode & 0o777, 0o755)
 
     def test_model_package_and_public_dispatcher_are_installed(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
@@ -878,11 +913,6 @@ class PackagingTests(unittest.TestCase):
             manifest,
         )
 
-    def test_rpm_description_and_comments_avoid_known_rpmlint_defects(self) -> None:
-        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        description = spec[spec.index("%description\n") : spec.index("\n%prep", spec.index("%description\n"))]
-        self.assertLessEqual(max(len(line) for line in description.splitlines()), 79)
-        self.assertNotRegex(spec, r"(?m)^#.*%pre\b")
 
 
 

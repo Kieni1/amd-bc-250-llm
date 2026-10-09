@@ -9,7 +9,7 @@ OUT_DIR="$ROOT/build"
 OUT="$OUT_DIR/${NAME}-${VERSION}.tar.gz"
 if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
   changelog_date="$(awk '/^%changelog/{seen=1; next} seen && /^\*/ {print $2, $3, $4, $5; exit}' "$ROOT/packaging/bc250-llm-server.spec")"
-  SOURCE_DATE_EPOCH="$(date --date="$changelog_date" +%s)"
+  SOURCE_DATE_EPOCH="$(LC_ALL=C TZ=UTC date --date="$changelog_date 00:00:00 UTC" +%s)"
 fi
 
 mkdir -p "$OUT_DIR"
@@ -24,8 +24,7 @@ mkdir -p "$stage"
     --exclude='./build' \
     --exclude='./dist' \
     --exclude='./rpmbuild' \
-    --exclude='./sources/*.tar.gz' \
-    --exclude='./sources/*.tar.xz' \
+    --exclude='./sources' \
     --exclude='./vendor' \
     --exclude='*/__pycache__' \
     --exclude='*/.ruff_cache' \
@@ -40,6 +39,7 @@ find "$stage" -print0 | xargs -0 touch --date="@${SOURCE_DATE_EPOCH}"
 tar --sort=name \
   --mtime="@${SOURCE_DATE_EPOCH}" \
   --owner=0 --group=0 --numeric-owner \
+  --mode='u+rwX,go+rX,go-w,a-s,a-t' \
   -czf "$OUT" -C "$tmp" "${NAME}-${VERSION}"
 
 echo "Created $OUT"
