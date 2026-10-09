@@ -1,4 +1,4 @@
-# BC-250 specialist testing handover — 0.13.1-1.0
+# BC-250 specialist testing handover — 0.13.1-1.2
 
 ## Use this file to choose the right side chat
 
@@ -10,7 +10,7 @@ Current specialist lanes:
 
 Open when:
 
-- building/installing the final 0.13.1-1.0 RPM;
+- building/installing the final 0.13.1-1.2 RPM;
 - proving live-CU-only behavior;
 - running final verify/revalidate;
 - deciding release freeze/tag.

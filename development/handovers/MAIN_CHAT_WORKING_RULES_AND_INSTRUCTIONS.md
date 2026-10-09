@@ -1,6 +1,6 @@
 # BC-250 main integration — working rules and operating instructions
 
-Current release target: `bc250-llm-server-0.13.1-1.0`
+Current release target: `bc250-llm-server-0.13.1-1.2`
 
 These rules are intentionally currentized for the greenfield-clean package.
 
@@ -33,7 +33,7 @@ Compatibility has to justify its maintenance cost.
 Current examples of deliberate removals:
 
 - public per-command `bc250-*` alias forest;
-- legacy `the former public RAG importer`;
+- legacy public RAG importer alias;
 - old RAG plan/sync compatibility commands;
 - replacement-AMDGPU 40-CU module/patch workflow;
 - trivial model setup wrappers;
@@ -416,4 +416,24 @@ Do not conflate execution completion, optional coverage, diagnostics, model qual
 
 ## 26. 0.13.1 release hygiene rule
 
-Treat exact 0.12.2-0.8 as the qualified predecessor. For 0.13.1, keep `/usr` immutable during normal runtime, treat intentionally unselected optional models as OPTIONAL rather than broken, preserve DRIFT for selected models whose desired runtime state is unmet, and treat source-graveyard membership as archive metadata rather than runtime state. A historical model manually registered by an operator follows normal Open WebUI testing-policy visibility; cleanup remains explicit through `bc250 model purge-retired`. Do not broaden the release into model/CU/RAG/dependency discovery.
+Treat exact 0.12.2-0.8 as the qualified predecessor. For 0.13.1, keep `/usr` immutable during normal runtime, treat intentionally unselected optional models as OPTIONAL rather than broken, preserve DRIFT for selected models whose desired runtime state is unmet, and keep graveyard source assets inert while allowing an operator-manually registered historical model to follow its normal Open WebUI testing-policy visibility. Cleanup of retired registrations remains explicit through `bc250 model purge-retired`. Do not broaden the release into model/CU/RAG/dependency discovery.
+
+
+## 27. 0.13.1-1.2 Sidechat integration rule
+
+The Sidechat 15–19 optimization program is closed. Production remains 32K/q8_0,
+parallel=1, flash attention enabled, automatic `num_batch`, current full offload and
+existing keep-alives/Deep admission; only Documents/Open WebUI `TOP_K=4` is promoted.
+Do not reintroduce q4_0 as a default.
+
+Package evaluators must preserve the validated distinctions: grouped citations are
+member-aware; `INV-YYYY-NNNN` and `Invoice YYYY-NNNN` are equivalent office identifiers;
+semantic date/time and required numeric-value matching avoid literal/last-number false
+negatives; clean hidden-reasoning budget exhaustion with empty visible output is
+INCOMPLETE/retry when no independent defect exists; repetition remains a quality defect;
+and task persistence is authoritative over a missed transient residency sample.
+
+Verification must inspect the active swap set for zram and actual failed-systemd-unit
+rows. An initialized zram device is not healthy swap merely because `zramctl` can see it.
+Exact 1.2 device qualification starts only after the exact 1.2 RPM is built; until then,
+exact 1.0 device evidence remains the installed baseline rather than silently transferring.

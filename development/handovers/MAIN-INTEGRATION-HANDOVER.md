@@ -1,7 +1,7 @@
 # AMD BC-250 LLM appliance — main integration handover
 
-Release target: `bc250-llm-server-0.13.1-1.0`  
-Current handover date: 2026-10-03
+Release target: `bc250-llm-server-0.13.1-1.2`  
+Current handover date: 2026-10-09
 
 ## Purpose
 
@@ -18,40 +18,57 @@ It records:
 
 ## 1. Authority and evidence boundaries
 
-Current source checkpoint:
+Current source/release target:
 
 ```text
-bc250-llm-server-0.13.1-1.0 source tree
-derived from predecessor workbench:
-  amd-bc-250-llm-0.12.2-0.6-workbench-greenfield-clean-final.zip
-  SHA-256 399bc99b57e54528a94bfc3fc2a49e1959b8c8bbd767c6b29807b42ce654157c
+bc250-llm-server-0.13.1-1.2
+original 1.0 predecessor workbench:
+  amd-bc-250-llm-0.13.1-1.0-workbench-release-final.zip
+  SHA-256 04f53c980b29a28dc6988f7c39f339f3f4df8d99be01cb4638ea5639c9daa5c8
+later 1.0 logic-fix checkpoint reviewed for regression protection:
+  SHA-256 317064145fcc1fb1d6540f15f52e9d6f8dcf38c86fdb236d8ad1bb7c19916e06
 ```
 
-Current source validation:
+The later 1.0 checkpoint is not treated as a separate product release. Its hygiene/status
+corrections are preserved where they represent correctness properties, while the accepted
+Sidechat 15–19 results define the 1.1 functional delta.
+
+Current source validation for this reviewed 1.2 tree:
 
 ```text
-511/511 deterministic tests PASS module-by-module
-development/scope.py check PASS
-scripts/validate.py / RPM preflight PASS
-bash syntax PASS
-Python compileall PASS
-JSON parse PASS
-make help / payload-contract dry-run PASS
-Ruff, ShellCheck, configured rpmlint execution and rpmbuild external in this artifact environment
+542 deterministic unittest cases PASS across all 17 test modules
+focused changed-surface behavioral suites PASS
+python3 development/scope.py check PASS
+python3 scripts/validate.py / RPM preflight PASS
+59 shell sources bash -n PASS
+35 Python sources AST-parse PASS
+15 JSON + 5 TOML files parse PASS
+Ruff binary, ShellCheck, configured rpmlint and rpmbuild are external/unavailable in this artifact environment; the user-supplied Ruff run's final SIM103/I001 findings plus earlier one-line/semicolon violations were corrected locally without suppressions
 ```
 
-Do not transfer exact-device qualification across source revisions.
+Exact-device authority remains the installed and qualified `0.13.1-1.0.fc44` baseline until
+an exact `0.13.1-1.2.fc44` RPM is built and installed. Do not transfer exact-device qualification
+across source revisions.
 
-The supplied 0.12.2-0.6 RPM build completed successfully with 495/495 tests. An initial 0.7 RPM build then exposed generic rpmlint findings: most were intentional hardened appliance permissions/ownerships, while seven were genuine packaging defects. The current 0.7 source fixes those seven defects and uses a narrow documented rpmlint policy for the intentional findings; no exact post-fix 0.7 RPM/device acceptance exists yet. The final 0.7 delta includes:
+The closed optimization result carried through 1.1 into 1.2 is deliberately narrow:
 
-- replacement-kernel 40-CU path removed;
-- public command surface reduced;
-- RAG promoted to product-relevant;
-- candidate-screen install footprint removed;
-- documentation hierarchy consolidated;
-- EuroLLM challenger moved to graveyard.
+```text
+production KV     q8_0   KEEP
+production TOP_K  4      PROMOTE
+context           32768  KEEP
+parallel          1      KEEP
+flash attention   enabled KEEP
+```
 
-Therefore the final greenfield RPM needs one final exact build/install/device closure.
+Sidechat 19 rejected q4_0 because the combined candidate produced repeated Advanced/Qwen
+6144-token empty-visible reasoning exhaustion including a repetition defect. TOP_K=4 itself
+remained qualified. Tooling fixes discovered during Sidechats 15–19 were integrated in 1.1 and remain carried in 1.2: semantic date/time/invoice/numeric evaluation, grouped citation membership, clean
+reasoning-budget exhaustion as INCOMPLETE/retry, task-result persistence over transient
+residency sampling, three-stage front-door readiness, non-interactive benchmark controls,
+starting memory/swap/PSI/residency evidence, active-swap zram verification and actual failed-unit
+parsing.
+
+The 1.2 corrective delta is intentionally small: semantic date/time/invoice substitution is limited to standalone required values, positive HTTP publication recognizes direct/range/custom-service forms of TCP/80, unreadable swap inspection is reported as unknown rather than empty, and Ruff-default one-line statement violations are removed without suppressions. Runtime/model/RAG defaults remain unchanged from 1.1.
 
 ## 2. Runtime/service identity
 
@@ -737,23 +754,43 @@ Exact 0.12.2-0.7 fresh installation proved the functional architecture: 53/53 co
 
 The active verifier no longer carries the pre-greenfield patched-AMDGPU marker warning. Historical source records may describe that architecture, but current runtime code and installed docs do not support it.
 
+## 18C. 0.13.1-1.2 release integration
+
+`0.13.1-1.0` is the qualified optimization baseline. Its bytecode-hygiene and semantic
+optional-model work remain protected in 1.2; bounded package-tree bytecode cleanup is fail-closed,
+an unavailable registration query is not mislabeled as a proven unregistered model, and graveyard source content remains inert without suppressing normal testing-policy visibility for an operator-manually registered historical model.
+
+The 1.1 functional change was the closed Sidechat 15–19 integration and remains unchanged in 1.2. Production keeps q8_0,
+32K context, parallel=1, flash attention, automatic num_batch, existing keep-alives, Deep
+pre-eviction and the production model identities. Documents/Open WebUI RAG promotes only
+`TOP_K=4`.
+
+The release also incorporates the validated tooling fixes: grouped citation membership,
+`INV-YYYY-NNNN` / `Invoice YYYY-NNNN` equivalence, semantic office date/time and numeric-value
+matching, clean hidden-reasoning exhaustion as INCOMPLETE/retry, repetition as a quality defect,
+task persistence independent of fleeting residency sampling, front-door readiness that rejects
+listener-only 502 state, active-swap zram verification, actual failed-systemd-unit parsing,
+non-interactive generation controls, and starting memory/swap/PSI/residency evidence.
+
+The release test is therefore an exact 1.0 -> 1.2 focused delta plus final whole-appliance
+persistence/restoration checks. Do not replay the completed discovery campaigns unless the delta
+exposes a regression.
+
 ## 19. Remaining release work
 
 High-value next sequence:
 
-1. build exact final 0.13.1-1.0 RPM/SRPM in the normal Fedora/GitHub environment;
-2. fresh-install or deliberately upgrade that exact RPM on the BC-250;
-3. verify the canonical command surface and absence of removed aliases/assets;
-4. configure/verify 40/40 with the live-manager-only path and prove reboot restoration;
-5. verify installed documentation/layout;
-6. run `bc250 verify`;
-7. run `bc250 revalidate start`;
-8. accept Agent PARTIAL coverage if the optional add-on is absent;
-9. smoke product RAG/Tika/embed;
-10. verify Open WebUI convergence and curated presets;
-11. run focused structured-output product-path regression if the final request-construction path changed;
-12. final normal-topology/restoration check;
-13. freeze/tag only after exact installed-RPM evidence is clean.
+1. build the exact reviewed `0.13.1-1.2` RPM/SRPM in the normal Fedora/GitHub environment;
+2. require Ruff, ShellCheck, configured rpmlint and actual-RPM payload/build gates there;
+3. deliberately upgrade the qualified exact `0.13.1-1.0.fc44` appliance to that exact 1.2 RPM;
+4. prove installed effective production state is `q8_0` + `TOP_K=4` with the other closed runtime defaults unchanged;
+5. run the focused 1.2 corrective delta: optional/default model semantics, grouped citation and invoice/date/time/numeric evaluators, RAG reasoning-INCOMPLETE behavior, front-door readiness, active-zram-swap and failed-unit verification, non-interactive benchmark/start-state evidence;
+6. smoke Documents/RAG direct + Open WebUI and one normal q8_0 Advanced Structured path without reopening q4_0 discovery;
+7. verify canonical command/layout/docs, normal topology, Open WebUI desired state and board-specific CU saved/live consistency;
+8. prove restart/reboot persistence, `rpm -V` cleanliness, no new unowned package-tree `/usr` state, preserved operator-added registrations and expected residency/restoration;
+9. freeze/tag only after the exact installed-RPM evidence is clean.
+
+Do not replay Sidechats 15–19, model-selection campaigns or unrelated optional specialist domains unless this bounded delta exposes a real regression.
 
 ## 20. Main-chat decision rule
 
@@ -769,11 +806,3 @@ Is there an unresolved release decision?
 ```
 
 If all are no, preserve the conclusion and move on.
-
-## 18C. 0.13.1-1.0 release hygiene
-
-Exact 0.12.2-0.8 is now the qualified device baseline. The pre-release investigation found no product failure and two implementation issues: package Python imports could create unowned bytecode under immutable `/usr`, and intentionally unselected optional models were mislabeled `MISSING`/`DRIFT` and given repair advice. A follow-up review clarified that source-graveyard membership must remain archive metadata only, not a runtime/Open WebUI state signal.
-
-0.13.1-1.0 fixes those findings without changing runtime/model/CU/RAG architecture. The canonical dispatcher disables Python bytecode writes, guided convergence removes stale package-tree bytecode in bounded BC-250 roots, and optional model status now distinguishes OPTIONAL from genuine DRIFT. Graveyard Modelfiles stay outside active discovery/package installation; if an operator manually registers a historical model, normal Open WebUI testing-policy visibility applies. Explicit `purge-retired` cleanup remains available.
-
-The release test is a narrow 0.8 -> 0.13.1 upgrade/layout/model-state delta. Do not replay the full 0.8 qualification unless that delta exposes a regression.
