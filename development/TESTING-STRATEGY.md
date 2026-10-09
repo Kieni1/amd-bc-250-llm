@@ -59,7 +59,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.13.1-1.2 source builds on the exact-device-qualified 0.13.1-1.0 optimization baseline and the closed Sidechat 15–19 program. Runtime/model/CU defaults remain frozen at 32K, q8_0 KV, parallel=1, flash attention on, current keep-alive/Deep admission policy and the current production model identities. Sidechat 19 rejected the combined q4_0 + TOP_K=4 arm because Advanced/Qwen became unstable under q4_0, while TOP_K=4 itself passed RAG/product acceptance and is promoted alone. The release also carries evaluator/readiness/benchmark-evidence/model-status fixes identified by Sidechats 15–19. Configured rpmlint remains a CI build gate, Agent remains optional, and broad model/runtime discovery stays closed.
+The current 0.13.1-1.3 source builds on the exact-device-qualified 0.13.1-1.0 optimization baseline and the closed Sidechat 15–19 program. Runtime/model/CU defaults remain frozen at 32K, q8_0 KV, parallel=1, flash attention on, current keep-alive/Deep admission policy and the current production model identities. Sidechat 19 rejected the combined q4_0 + TOP_K=4 arm because Advanced/Qwen became unstable under q4_0, while TOP_K=4 itself passed RAG/product acceptance and is promoted alone. The release also carries evaluator/readiness/benchmark-evidence/model-status fixes identified by Sidechats 15–19. Configured rpmlint remains a CI build gate, Agent remains optional, and broad model/runtime discovery stays closed.
 
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
@@ -108,7 +108,7 @@ The next batch should depend on the previous result. In particular, do not provi
 five-stage destructive machine plan up front. Use read-only baseline evidence before
 state changes. Restore state before moving to another lane.
 
-## Closed optimization-program lessons carried into 0.13.1-1.2
+## Closed optimization-program lessons carried into 0.13.1-1.3
 
 - Sidechat 15: keep current residency/keepalive/swappiness/Deep pre-eviction defaults.
 - Sidechat 16: keep 32K and production output ceilings; q4_0 was candidate-only.
@@ -121,7 +121,7 @@ state changes. Restore state before moving to another lane.
 - RAG hidden-reasoning exhaustion with empty visible output is INCOMPLETE/retry only when no independent retrieval/semantic defect exists; repetition remains a quality failure.
 - Verification must distinguish a configured/initialized zram device from a `/dev/zramN` that is actually active swap, and must parse actual failed systemd unit rows.
 
-## Current 0.13.1-1.2 qualification boundary
+## Current 0.13.1-1.3 qualification boundary
 
 Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
 
@@ -154,7 +154,7 @@ The distinct `sudo systemctl reboot` invocation is device-proven unreliable on t
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.2 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
+The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.3 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
 acceptance should be one bounded real-office corpus pass (real PDFs/Tika/OCR, tables, multilingual
@@ -454,3 +454,7 @@ The current 2.2 source owns the next hardware qualification; 1.8 remains the sou
 these fixes were introduced. First prove public SSH defer and healthy 40-CU return-code behavior.
 Companion-only exemption, second-SSH defer and real idle S5/WOL are conditional acceptance gates
 before unattended power behavior is enabled, not automatic gates for every RPM.
+
+## 0.13.1-1.3 build/test rationalization
+
+The normal RPM path performs cheap package-specific preflight before `rpmbuild`; `%check` owns the complete deterministic suite so the same expensive suite is not run twice for one RPM build. Ruff, ShellCheck, rpmlint and actual package build remain authoritative for their own domains. Release/manual CI additionally rebuilds the generated SRPM from a clean temporary RPM topdir. Source0 must be independent of host timezone, irrelevant checkout modes and local `sources/` cache state.
