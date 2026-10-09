@@ -30,6 +30,7 @@ from benchmark_common import (
     append_result,
     benchmark_fixture_root,
     benchmark_metadata,
+    citation_has_source,
     copy_fixtures,
     cosine,
     finalize_active_infrastructure_failure,
@@ -41,6 +42,7 @@ from benchmark_common import (
     request_policy_for_model,
     resolve_package_resource,
     result_record,
+    semantic_identifier_equivalent,
     translation_direction_wrappers,
     translation_literal_integrity_mismatch,
     translation_numeric_values,
@@ -122,7 +124,7 @@ def write_meta(
     effective_options.update(options or {})
     data = benchmark_metadata(
         category,
-        benchmark_version="8.0",
+        benchmark_version="8.1",
         models=[model_meta(client, model) for model in models],
         fixtures=fixture_metadata(fixture),
         options=effective_options,
@@ -258,8 +260,10 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                         ranked_ids = [doc_id for _score, doc_id in scored]
                         rank = ranked_ids.index(query_item["target"]) + 1
                         ranks.append(rank)
-                        if query_item.get("kind") == "cross": cross_ranks.append(rank)
-                        if query_item.get("hard"): hard_ranks.append(rank)
+                        if query_item.get("kind") == "cross":
+                            cross_ranks.append(rank)
+                        if query_item.get("hard"):
+                            hard_ranks.append(rank)
                         target_score = next(score for score, doc_id in scored if doc_id == query_item["target"])
                         competitor = max(score for score, doc_id in scored if doc_id != query_item["target"])
                         margin = target_score - competitor
@@ -356,7 +360,8 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                                 timestamp=iso_now(),
                             ),
                         )
-                writer.writerow(row); handle.flush()
+                writer.writerow(row)
+                handle.flush()
                 print(
                     f"  quality: R@1={row['recall_at_1']:.3f} "
                     f"R@3={row['recall_at_3']:.3f} MRR={row['mrr']:.3f} "
@@ -371,8 +376,10 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
                     f"MemAvailable-min={fmt(telemetry.get('mem_available_min_mib'), 'MiB')}"
                 )
             finally:
-                try: client.ensure_unloaded(model)
-                except BenchmarkError as exc: print(f"WARNING: {exc}", file=sys.stderr)
+                try:
+                    client.ensure_unloaded(model)
+                except BenchmarkError as exc:
+                    print(f"WARNING: {exc}", file=sys.stderr)
     _sj, summary_txt = write_result_summary(jsonl_path, category="embeddings")
     print_result_paths(paths, summary_txt)
     return 3 if quality_failed else 0
@@ -1274,14 +1281,19 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                     passed += int(accepted)
                     done_reason = str(response.get("done_reason") or "")
                     failures: list[str] = []
-                    if not content.strip(): failures.append("empty-output")
-                    if not result["format_ok"] and content.strip(): failures.append("format-contract")
-                    if not result["syntax_ok"] and content.strip(): failures.append("syntax")
-                    if not result["requirements_ok"] and content.strip(): failures.append("requirements")
+                    if not content.strip():
+                        failures.append("empty-output")
+                    if not result["format_ok"] and content.strip():
+                        failures.append("format-contract")
+                    if not result["syntax_ok"] and content.strip():
+                        failures.append("syntax")
+                    if not result["requirements_ok"] and content.strip():
+                        failures.append("requirements")
                     diagnostics: list[str] = []
                     if done_reason == "length":
                         diagnostics.append("output-budget")
-                        if not content.strip() and thinking.strip(): diagnostics.append("thinking-budget")
+                        if not content.strip() and thinking.strip():
+                            diagnostics.append("thinking-budget")
                     error = "; ".join(result["problems"])
                     row = {
                         "timestamp": iso_now(), "model": model, "case_id": case["id"], "validator": case["validator"],
@@ -1672,6 +1684,107 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
 
 
 
+_MONTH_NUMBERS = {
+    "january": 1, "janvier": 1, "januar": 1,
+    "february": 2, "fevrier": 2, "février": 2, "februar": 2,
+    "march": 3, "mars": 3, "maerz": 3, "märz": 3,
+    "april": 4, "avril": 4,
+    "may": 5, "mai": 5,
+    "june": 6, "juin": 6, "juni": 6,
+    "july": 7, "juillet": 7, "juli": 7,
+    "august": 8, "aout": 8, "août": 8,
+    "september": 9, "septembre": 9,
+    "october": 10, "octobre": 10, "oktober": 10,
+    "november": 11, "novembre": 11,
+    "december": 12, "decembre": 12, "décembre": 12, "dezember": 12,
+}
+
+
+def _semantic_dates(text: str) -> set[tuple[int, int, int]]:
+    """Extract unambiguous office-date values across common DE/EN/FR renderings."""
+    values: set[tuple[int, int, int]] = set()
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    for match in re.finditer(r"(?<!\d)(\d{1,2})\.(\d{1,2})\.(\d{4})(?!\d)", folded):
+        day, month, year = map(int, match.groups())
+        if 1 <= day <= 31 and 1 <= month <= 12:
+            values.add((year, month, day))
+    month_words = "|".join(sorted((re.escape(name) for name in _MONTH_NUMBERS), key=len, reverse=True))
+    for match in re.finditer(
+        rf"(?<!\d)(\d{{1,2}})\.?\s+({month_words})\s+(\d{{4}})(?!\d)",
+        folded,
+    ):
+        day = int(match.group(1))
+        month = _MONTH_NUMBERS[match.group(2)]
+        year = int(match.group(3))
+        if 1 <= day <= 31:
+            values.add((year, month, day))
+    return values
+
+
+def _semantic_times(text: str) -> set[tuple[int, int]]:
+    """Extract unambiguous 24-hour and AM/PM times for acceptance checks."""
+    values: set[tuple[int, int]] = set()
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    for match in re.finditer(r"(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)", folded):
+        values.add((int(match.group(1)), int(match.group(2))))
+    for match in re.finditer(r"(?<!\d)(1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)\b", folded):
+        hour = int(match.group(1))
+        minute = int(match.group(2) or 0)
+        period = match.group(3)[0]
+        if period == "a":
+            hour = 0 if hour == 12 else hour
+        else:
+            hour = 12 if hour == 12 else hour + 12
+        values.add((hour, minute))
+    return values
+
+
+def _is_standalone_semantic_date(term: str) -> bool:
+    folded = unicodedata.normalize("NFKC", term).casefold().strip()
+    if re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}", folded):
+        return True
+    month_words = "|".join(
+        sorted((re.escape(name) for name in _MONTH_NUMBERS), key=len, reverse=True)
+    )
+    return re.fullmatch(
+        rf"\d{{1,2}}\.?\s+(?:{month_words})\s+\d{{4}}",
+        folded,
+    ) is not None
+
+
+def _is_standalone_semantic_time(term: str) -> bool:
+    folded = unicodedata.normalize("NFKC", term).casefold().strip()
+    if re.fullmatch(r"(?:[01]?\d|2[0-3]):[0-5]\d", folded):
+        return True
+    return re.fullmatch(
+        r"(?:1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*(?:a\.?m\.?|p\.?m\.?)",
+        folded,
+    ) is not None
+
+
+def _is_standalone_semantic_invoice(term: str) -> bool:
+    folded = unicodedata.normalize("NFKC", term).casefold().strip()
+    return re.fullmatch(
+        r"(?:inv(?:oice)?)\s*[-:#]?\s*\d{4}\s*[-/]\s*\d{4}",
+        folded,
+    ) is not None
+
+
+def _semantic_acceptance_equivalent(text: str, term: str) -> bool:
+    if _is_standalone_semantic_date(term):
+        expected_dates = _semantic_dates(term)
+        if expected_dates and expected_dates.issubset(_semantic_dates(text)):
+            return True
+    if _is_standalone_semantic_time(term):
+        expected_times = _semantic_times(term)
+        if expected_times and expected_times.issubset(_semantic_times(text)):
+            return True
+    return bool(
+        _is_standalone_semantic_invoice(term)
+        and semantic_identifier_equivalent(text, term)
+    )
+
+
 def _bounded_acceptance_match(text: str, term: str) -> bool:
     """Match a normalized acceptance term without colliding inside larger tokens.
 
@@ -1692,10 +1805,15 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
         str(term)
         for term in case.get("required", [])
         if not _bounded_acceptance_match(text, str(term))
+        and not _semantic_acceptance_equivalent(text, str(term))
     ]
 
     choices = [str(term) for term in case.get("required_any", [])]
-    if choices and not any(_bounded_acceptance_match(text, term) for term in choices):
+    if choices and not any(
+        _bounded_acceptance_match(text, term)
+        or _semantic_acceptance_equivalent(text, term)
+        for term in choices
+    ):
         missing.append("one of: " + " | ".join(choices))
 
     for raw_group in case.get("required_any_groups", []):
@@ -1703,7 +1821,11 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
             missing.append("invalid required_any_groups entry")
             continue
         group = [str(term) for term in raw_group]
-        if not any(_bounded_acceptance_match(text, term) for term in group):
+        if not any(
+            _bounded_acceptance_match(text, term)
+            or _semantic_acceptance_equivalent(text, term)
+            for term in group
+        ):
             missing.append("one of: " + " | ".join(group))
 
     observed_numbers = numeric_values(text)
@@ -1808,7 +1930,7 @@ def rag_case_evaluation(
     missing_citations = [
         source
         for source in required_sources
-        if f"[{source}]".casefold() not in content.casefold()
+        if not citation_has_source(content, source)
     ] if citation_required else []
     citation_ok: bool | None = (not missing_citations) if citation_required else None
     problems.extend(f"missing source [{source}]" for source in missing_citations)
@@ -2672,6 +2794,43 @@ def benchmark_rag_cycle(args: argparse.Namespace) -> int:
     print_result_paths(paths, summary_txt)
     return exit_rc
 
+def _rag_quality_outcome(
+    *,
+    ok: bool,
+    failure_kinds: list[str],
+    content: str,
+    thinking: str,
+    done_reason: str,
+) -> tuple[str, list[str], list[str]]:
+    """Classify reasoning exhaustion without converting it into semantic failure.
+
+    Retrieval failure is independent of generation and therefore remains a real
+    quality failure. Empty-visible exhaustion with otherwise-valid retrieval is
+    incomplete/retry. Repetitive exhausted reasoning remains a quality defect.
+    """
+    exhaustion, repetition_detail = _reasoning_exhaustion(
+        content, thinking, done_reason
+    )
+    diagnostics: list[str] = []
+    if done_reason == "length":
+        diagnostics.append("output-budget")
+    if exhaustion == "repetition":
+        diagnostics.extend(["thinking-budget", "visible-answer-empty", "repetition-loop"])
+        if repetition_detail:
+            diagnostics.append(repetition_detail)
+        # Empty visible output makes fact/language/citation/abstention failures
+        # derivative of the exhausted generation. Preserve only independent
+        # retrieval defects alongside the genuine repetition signal.
+        failures = [kind for kind in failure_kinds if kind == "retrieval"]
+        failures.append("repetition")
+        return "quality-fail", failures, diagnostics
+    if exhaustion == "incomplete":
+        diagnostics.extend(["thinking-budget", "visible-answer-empty"])
+        if "retrieval" not in failure_kinds:
+            return "incomplete", [], diagnostics
+    return ("pass" if ok else "quality-fail"), failure_kinds, diagnostics
+
+
 def benchmark_rag_quality(args: argparse.Namespace) -> int:
     answer_client = OllamaClient(args.ollama_url, args.timeout)
     embed_url = args.embedding_ollama_url
@@ -2708,7 +2867,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
     if answer_model.removesuffix(":latest") not in answer_available:
         raise BenchmarkError(f"RAG-quality answer model is not registered on {args.ollama_url}: {answer_model}")
 
-    top_k = int(os.environ.get("RAG_QUALITY_TOP_K", str(spec.get("top_k", 8))))
+    top_k = int(os.environ.get("RAG_QUALITY_TOP_K", str(spec.get("top_k", 4))))
     default_num_predict = int(os.environ.get("RAG_QUALITY_NUM_PREDICT", "1024"))
     think_policy = args.think
     if top_k < 1:
@@ -2846,9 +3005,6 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                 problems = list(evaluation["problems"])
                 ok = bool(evaluation["overall_ok"])
                 done_reason = str(response.get("done_reason") or "")
-                thinking_exhausted = (
-                    not content.strip() and bool(thinking.strip()) and done_reason == "length"
-                )
                 failure_kinds: list[str] = []
                 if retrieval_ok is False:
                     failure_kinds.append("retrieval")
@@ -2861,12 +3017,14 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                     failure_kinds.append("language")
                 if citation_ok is False:
                     failure_kinds.append("citation")
-                diagnostics: list[str] = []
-                if thinking_exhausted:
-                    diagnostics.extend(["thinking-budget", "output-budget"])
-                elif done_reason == "length":
-                    diagnostics.append("output-budget")
-                passed += int(ok)
+                outcome, failure_kinds, diagnostics = _rag_quality_outcome(
+                    ok=ok,
+                    failure_kinds=failure_kinds,
+                    content=content,
+                    thinking=thinking,
+                    done_reason=done_reason,
+                )
+                passed += int(outcome == "pass")
                 row = {
                     "timestamp": iso_now(),
                     "case_id": case["id"],
@@ -2897,7 +3055,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                     "source_cited": "" if evaluation["citation_ok"] is None else int(source_cited),
                     "abstention_ok": "" if abstention_ok is None else int(abstention_ok),
                     "overall_ok": int(ok),
-                    "passed": int(ok),
+                    "passed": int(outcome == "pass"),
                     "failure_kinds": ";".join(failure_kinds),
                     "num_predict": num_predict,
                     "think_policy": think_policy,
@@ -2924,7 +3082,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                         model=answer_model,
                         case_id=case["id"],
                         result_type="qualification",
-                        outcome="pass" if ok else "quality-fail",
+                        outcome=outcome,
                         failure_kinds=failure_kinds,
                         diagnostics=diagnostics,
                         checks={
@@ -2994,7 +3152,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
                     f"  {case['id']}: rank={target_rank if target_rank is not None else 'n/a'} "
                     f"retrieval={retrieval_ok} "
                     f"fact={fact_ok} language={evaluation['language_status']}/{language_ok} "
-                    f"citation={citation_ok} abstention={abstention_ok} pass={ok} "
+                    f"citation={citation_ok} abstention={abstention_ok} outcome={outcome} "
                     f"failures={','.join(failure_kinds) or 'none'} think={think_policy}"
                 )
         try:
@@ -3005,11 +3163,20 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
             jsonl_path, category="rag-quality", expected_case_ids=case_ids
         )
         summary = json.loads(summary_json.read_text(encoding="utf-8"))
-        print(f"\nRAG quality acceptance: {passed}/{len(cases)} passed")
+        incomplete_count = int(summary.get("qualification_counts", {}).get("incomplete", 0))
+        quality_fail_count = int(summary.get("qualification_counts", {}).get("quality-fail", 0))
+        print(
+            f"\nRAG quality acceptance: {passed}/{len(cases)} passed; "
+            f"{incomplete_count} incomplete"
+        )
         print_result_paths(paths, summary_txt)
         if summary.get("structure") == "fail":
             return 2
-        return 0 if passed == len(cases) else 3
+        if quality_fail_count:
+            return 3
+        if incomplete_count:
+            return 4
+        return 0
     finally:
         restoration_errors: list[str] = []
         restored_answer: list[str] | None = None

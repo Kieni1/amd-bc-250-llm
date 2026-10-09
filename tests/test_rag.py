@@ -24,7 +24,7 @@ class RagBaselineTests(unittest.TestCase):
         self.assertEqual(rag["CHUNK_SIZE"], 1500)
         self.assertEqual(rag["CHUNK_OVERLAP"], 200)
         self.assertTrue(rag["ENABLE_MARKDOWN_HEADER_TEXT_SPLITTER"])
-        self.assertEqual(rag["TOP_K"], 8)
+        self.assertEqual(rag["TOP_K"], 4)
         self.assertEqual(rag["RELEVANCE_THRESHOLD"], 0)
         self.assertFalse(rag["ENABLE_RAG_HYBRID_SEARCH"])
         self.assertEqual(rag["CHUNK_MIN_SIZE_TARGET"], 0)

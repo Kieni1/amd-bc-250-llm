@@ -941,6 +941,44 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             with self.subTest(text=text, case=case):
                 self.assertEqual(category._acceptance_ok(text, case)[0], expected)
 
+    def test_acceptance_normalizes_semantically_equivalent_office_dates_and_times(self) -> None:
+        date_case = {"required": ["4. September 2026"]}
+        for rendered in ("04.09.2026", "4 September 2026", "4. September 2026"):
+            with self.subTest(rendered=rendered):
+                self.assertTrue(category._acceptance_ok(f"Versand am {rendered}.", date_case)[0])
+        time_case = {"required": ["10:00"]}
+        for rendered in ("10:00", "10 AM", "10 a.m."):
+            with self.subTest(rendered=rendered):
+                self.assertTrue(category._acceptance_ok(f"Meeting at {rendered}.", time_case)[0])
+
+    def test_semantic_equivalence_only_satisfies_standalone_requirements(self) -> None:
+        standalone_cases = (
+            ({"required": ["4 September 2026"]}, "Versand am 04.09.2026."),
+            ({"required": ["10:00"]}, "Meeting at 10 AM."),
+            ({"required": ["INV-2026-0441"]}, "Invoice 2026-0441 is due."),
+        )
+        for case, text in standalone_cases:
+            with self.subTest(case=case, text=text):
+                self.assertTrue(category._acceptance_ok(text, case)[0])
+
+        compound_cases = (
+            ({"required": ["deadline 4 September 2026"]}, "4 September 2026"),
+            ({"required": ["meeting at 10:00"]}, "10 AM"),
+            ({"required": ["approved invoice INV-2026-0441"]}, "Invoice 2026-0441"),
+        )
+        for case, text in compound_cases:
+            with self.subTest(case=case, text=text):
+                self.assertFalse(category._acceptance_ok(text, case)[0])
+
+        unrelated_cases = (
+            ({"required": ["4 September 2026"]}, "5 September 2026"),
+            ({"required": ["10:00"]}, "11 AM"),
+            ({"required": ["INV-2026-0441"]}, "Invoice 2026-0442"),
+        )
+        for case, text in unrelated_cases:
+            with self.subTest(case=case, text=text):
+                self.assertFalse(category._acceptance_ok(text, case)[0])
+
     def test_acceptance_supports_explicit_alternatives_and_numeric_values(self) -> None:
         case = {
             "required_any_groups": [
@@ -961,6 +999,102 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         )
         self.assertFalse(ok)
         self.assertIn("missing numeric value 9", problems)
+
+    def test_acceptance_numeric_membership_does_not_select_later_explanatory_number(self) -> None:
+        case = {"numeric_values": ["110"]}
+        text = "110. The explanation later mentions an alternative value of 125, but the answer remains 110."
+        self.assertTrue(category._acceptance_ok(text, case)[0])
+
+    def test_acceptance_normalizes_proven_invoice_identifier_equivalence(self) -> None:
+        case = {"required": ["INV-2026-0441"]}
+        self.assertTrue(
+            category._acceptance_ok(
+                "Invoice 2026-0441 is due within 30 days.", case
+            )[0]
+        )
+        self.assertFalse(
+            category._acceptance_ok(
+                "Invoice 2026-0447 is due within 30 days.", case
+            )[0]
+        )
+
+    def test_grouped_rag_citation_counts_exact_members_without_prefix_collision(self) -> None:
+        case = {
+            "id": "grouped-citation",
+            "target": "alpine-ops",
+            "required_sources": ["alpine-ops"],
+            "required": ["42"],
+            "language": "en",
+        }
+        grouped = category.rag_case_evaluation(
+            "The answer is 42 [alpine-ops, alpine-ops-neighbor].",
+            case,
+            ranked_ids=["alpine-ops", "alpine-ops-neighbor"],
+            top_k=2,
+        )
+        self.assertTrue(grouped["citation_ok"])
+        prefix_only = category.rag_case_evaluation(
+            "The answer is 42 [alpine-ops-neighbor].",
+            case,
+            ranked_ids=["alpine-ops", "alpine-ops-neighbor"],
+            top_k=2,
+        )
+        self.assertFalse(prefix_only["citation_ok"])
+
+    def test_rag_reasoning_exhaustion_is_incomplete_but_repetition_is_quality_fail(self) -> None:
+        outcome, failures, diagnostics = category._rag_quality_outcome(
+            ok=False,
+            failure_kinds=["fact", "citation"],
+            content="",
+            thinking="reasoning is still progressing",
+            done_reason="length",
+        )
+        self.assertEqual(outcome, "incomplete")
+        self.assertEqual(failures, [])
+        self.assertIn("thinking-budget", diagnostics)
+        repetitive = "\n".join(["recheck the same premise"] * 30)
+        outcome, failures, diagnostics = category._rag_quality_outcome(
+            ok=False,
+            failure_kinds=["fact", "citation"],
+            content="",
+            thinking=repetitive,
+            done_reason="length",
+        )
+        self.assertEqual(outcome, "quality-fail")
+        self.assertIn("repetition", failures)
+        self.assertIn("repetition-loop", diagnostics)
+
+    def test_rag_reasoning_exhaustion_does_not_hide_retrieval_failure(self) -> None:
+        outcome, failures, _diagnostics = category._rag_quality_outcome(
+            ok=False,
+            failure_kinds=["retrieval", "fact", "citation"],
+            content="",
+            thinking="reasoning is still progressing",
+            done_reason="length",
+        )
+        self.assertEqual(outcome, "quality-fail")
+        self.assertIn("retrieval", failures)
+
+    def test_owui_chunk_accepts_invoice_abbreviation_equivalence_only_for_same_id(self) -> None:
+        self.assertTrue(
+            openwebui_workflow.expected_answer_term_present(
+                "Invoice 2026-0441 is due within 30 days.", "INV-2026-0441"
+            )
+        )
+        self.assertFalse(
+            openwebui_workflow.expected_answer_term_present(
+                "Invoice 2026-0447 is due within 30 days.", "INV-2026-0441"
+            )
+        )
+        self.assertFalse(
+            openwebui_workflow.expected_answer_term_present(
+                "Invoice 2026-04410 is due within 30 days.", "INV-2026-0441"
+            )
+        )
+
+    def test_semantic_alternatives_apply_to_required_any_groups(self) -> None:
+        case = {"required_any_groups": [["10:00", "11:00"]]}
+        self.assertTrue(category._acceptance_ok("Meeting at 10 AM.", case)[0])
 
     def test_rag_language_status_handles_match_other_and_not_measurable(self) -> None:
         self.assertEqual(
@@ -1989,7 +2123,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.7", source)
+        self.assertIn("HARNESS_VERSION=4.8", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -3488,6 +3622,17 @@ status_run --raw
             self.assertEqual(meta["options"]["request_timeout_s"], 321.0)
             self.assertEqual(meta["options"]["repeats"], 2)
             self.assertEqual(meta["models"][0]["runtime_url"], "http://127.0.0.1:11437")
+            self.assertIn("starting_state", meta)
+            self.assertIn("swap_used_mib", meta["starting_state"])
+            self.assertIn("memory_psi", meta["starting_state"])
+            self.assertIn("ollama_residency", meta["starting_state"])
+
+    def test_generation_cli_supports_noninteractive_explicit_controls(self) -> None:
+        source = (BENCH / "generation-benchmark.py").read_text(encoding="utf-8")
+        for flag in ("--context", "--no-context", "--thermal", "--no-thermal", "--board-note", "--non-interactive"):
+            self.assertIn(flag, source)
+        self.assertIn("interactive = not args.non_interactive", source)
+        self.assertIn("select_models(client, args.models, interactive=interactive)", source)
 
     def test_generation_metadata_lists_resolved_environment_controls(self) -> None:
         source = (BENCH / "generation-benchmark.py").read_text(encoding="utf-8")
@@ -3757,6 +3902,10 @@ status_run --raw
             meta = json.loads(meta_path.read_text())
             self.assertEqual(seen, ["http://127.0.0.1:11437"])
             self.assertEqual(meta["models"][0]["runtime_url"], "http://127.0.0.1:11437")
+            self.assertIn("starting_state", meta)
+            self.assertIn("swap_used_mib", meta["starting_state"])
+            self.assertIn("memory_psi", meta["starting_state"])
+            self.assertIn("ollama_residency", meta["starting_state"])
 
     def test_revalidation_quality_step_names_match_canonical_categories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
