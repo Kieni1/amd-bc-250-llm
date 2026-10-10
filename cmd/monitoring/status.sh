@@ -207,12 +207,12 @@ printf '  Kernel:       %s\n' "$(uname -r)"
 printf '  Command line: %s\n' "$(cat /proc/cmdline 2>/dev/null || printf 'unavailable')"
 if command -v needs-restarting >/dev/null 2>&1; then
   if needs-restarting -r >/dev/null 2>&1; then
-    echo "  Reboot:       not requested by installed packages"
+    echo "  OS/package restart check: PASS (no restart requested)"
   else
-    echo "  Reboot:       recommended after package/kernel updates"
+    echo "  OS/package restart check: RECOMMENDED after package/kernel updates"
   fi
 else
-  echo "  Reboot recommendation: not checked"
+  echo "  OS/package restart check: UNKNOWN"
   echo "  Reason: optional needs-restarting helper unavailable"
 fi
 

@@ -1,10 +1,17 @@
 # type<TAB>mode<TAB>source-or-value<TAB>installed path
 dir	0755	-	{libexec}
 dir	0755	-	{libexec}/coding-agent
+dir	0755	-	{libexec}/qualification
 dir	0755	-	{share}
 file	0644	VERSION	{share}/VERSION
 file	0644	config/runtime.env	{share}/runtime.env
 dir	0755	-	{share}/cu-live-manager
+dir	0755	-	{share}/gfx1013
+dir	0755	-	{share}/gfx1013/upstream
+dir	0755	-	{share}/gfx1013/upstream/patches
+dir	0755	-	{share}/gfx1013/upstream/patches/kernel
+dir	0755	-	{share}/gfx1013/upstream/patches/kernel/v33
+dir	0755	-	{share}/gfx1013/upstream/patches/mesa
 dir	0755	-	{share}/examples
 dir	0755	-	{share}/examples/coding-agent
 dir	0755	-	{share}/examples/raspi-wol
@@ -66,6 +73,9 @@ file	0755	cmd/benchmark/runtime-benchmark.py	{libexec}/runtime-benchmark.py
 file	0755	cmd/benchmark/openwebui-benchmark.py	{libexec}/openwebui-benchmark.py
 file	0755	cmd/benchmark/benchmark_common.py	{libexec}/benchmark_common.py
 file	0755	cmd/benchmark/revalidate.sh	{libexec}/revalidate.sh
+file	0644	cmd/qualification/resilience_common.py	{libexec}/qualification/resilience_common.py
+file	0755	cmd/qualification/package_gate_capture.py	{libexec}/qualification/package_gate_capture.py
+file	0755	cmd/qualification/resilience_manager.py	{libexec}/qualification/resilience_manager.py
 dir	0755	-	{share}/benchmark
 dir	0755	-	{share}/benchmark/ocr
 file	0644	examples/benchmark/embedding-office.json	{share}/benchmark/embedding-office.json
@@ -87,6 +97,7 @@ file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
 file	0755	cmd/monitoring/support-bundle.sh	{libexec}/support-bundle.sh
 file	0755	cmd/system/40cu.sh	{bindir}/bc250-40cu
 file	0755	cmd/system/cu-status.sh	{libexec}/cu-status.sh
+file	0755	cmd/system/gfx1013.sh	{libexec}/gfx1013.sh
 file	0755	cmd/system/install.sh	{libexec}/install.sh
 file	0755	cmd/system/install-ollama.sh	{libexec}/install-ollama.sh
 file	0755	cmd/system/storage.py	{libexec}/storage.py
@@ -102,6 +113,18 @@ file	0755	models/coding-agent/commit-agent.sh	{libexec}/coding-agent/commit-agen
 file	0755	models/coding-agent/gitea-review.sh	{libexec}/coding-agent/gitea-review.sh
 
 file	0755	packaging/bc250	{bindir}/bc250
+file	0644	gfx1013/upstream/VERSION	{share}/gfx1013/upstream/VERSION
+file	0644	gfx1013/upstream/SOURCE-REVISION	{share}/gfx1013/upstream/SOURCE-REVISION
+file	0644	gfx1013/upstream/PACKAGE-PROFILE-VERSION	{share}/gfx1013/upstream/PACKAGE-PROFILE-VERSION
+file	0644	gfx1013/upstream/MESA-SOURCE	{share}/gfx1013/upstream/MESA-SOURCE
+file	0644	gfx1013/upstream/LICENSE	{share}/gfx1013/upstream/LICENSE
+file	0644	gfx1013/upstream/UPSTREAM-NOTICE.md	{share}/gfx1013/upstream/UPSTREAM-NOTICE.md
+file	0644	gfx1013/upstream/PATCH-SHA256SUMS	{share}/gfx1013/upstream/PATCH-SHA256SUMS
+file	0644	gfx1013/upstream/SOURCE-SHA256SUMS	{share}/gfx1013/upstream/SOURCE-SHA256SUMS
+file	0644	gfx1013/upstream/patches/kernel/v33/*.patch	{share}/gfx1013/upstream/patches/kernel/v33/
+file	0644	gfx1013/upstream/patches/mesa/*.patch	{share}/gfx1013/upstream/patches/mesa/
+file	0644	gfx1013/upstream/patches/mesa/series	{share}/gfx1013/upstream/patches/mesa/series
+
 file	0755	live-manager-src/bc250-cu-live-manager.sh	{bindir}/bc250-cu-live-manager
 file	0644	live-manager-src/README.md	{share}/cu-live-manager/README-upstream.md
 text	0644	{live_manager_commit}	{share}/cu-live-manager/SOURCE-REVISION

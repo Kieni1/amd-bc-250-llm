@@ -221,9 +221,9 @@ def check_dispatcher_and_runtime_contracts() -> None:
     routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
         "agent-mode", "benchmark", "code", "code-commit", "compare-mtp",
-        "fetch-mtp", "gitea-review", "install", "maintenance", "model", "ocr",
-        "rag", "reset", "revalidate", "ollama-profile", "openwebui-setup",
-        "run-mtp", "status", "support-bundle", "storage", "verify",
+        "fetch-mtp", "gfx1013", "gitea-review", "install", "maintenance", "model", "ocr",
+        "package-gate", "rag", "reset", "resilience", "revalidate", "ollama-profile",
+        "openwebui-setup", "run-mtp", "status", "support-bundle", "storage", "verify",
     }
     if routes != required:
         fail(f"dispatcher command set differs from the supported interface: {sorted(routes)}")
@@ -246,6 +246,15 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "MTP remains a separate opt-in workflow",
             "bc250 model apply all",
             "request_primary_reboot_if_needed",
+        ),
+        "cmd/system/gfx1013.sh": (
+            "PACKAGE_PROFILE=v0.2.1-alpha",
+            "PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9",
+            "SOURCE-SHA256SUMS",
+            "PATCH-SHA256SUMS",
+            "grub2-set-default",
+            "VK_DRIVER_FILES",
+            "prepare_cleanup_on_exit",
         ),
         "cmd/system/storage.py": (
             "reflink=1",
@@ -372,7 +381,11 @@ def check_greenfield_command_surface() -> None:
         "reset" + "-info",
         "uninstall" + "-info",
     )
-    names = routes + list(removed)
+    # gfx1013 is also the deliberate package artifact namespace
+    # (/opt/bc250-gfx1013, BLS variant, state paths), so a blind prefixed-token
+    # ban would reject valid internal paths. The public dispatcher still owns
+    # the command spelling `bc250 gfx1013`.
+    names = [name for name in routes if name != "gfx1013"] + list(removed)
     prefixed_pattern = re.compile(
         r"\bbc250-(?:" + "|".join(re.escape(name) for name in names) + r")\b(?=[\s`'\"),;:]|$)"
     )

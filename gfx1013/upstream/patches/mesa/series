@@ -1,0 +1,3 @@
+# BC-250 LLM package profile v0.2.1-alpha.
+# Pinned upstream 0.2.0-alpha compute queue patch only.
+0001-gfx1013-compute-queue-fix.patch

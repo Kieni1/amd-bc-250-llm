@@ -6,8 +6,8 @@ Wants=network-online.target
 
 [Container]
 ContainerName=tika
-# 4.0.0-full, pinned OCI index digest.
-Image=docker.io/apache/tika@sha256:80072bb73dd320a9de9709beb0b16d14dd6d2680376f8d31e498f55b633ba593
+# 4.1.0-full, pinned OCI index digest.
+Image=docker.io/apache/tika@sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7
 Network=llm.network
 NetworkAlias=tika
 Memory=1g

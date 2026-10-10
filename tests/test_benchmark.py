@@ -1937,8 +1937,8 @@ class TelemetryTests(unittest.TestCase):
         self.assertIn("readonly EDGE_MIN_MEM_AVAILABLE_MIB=128", source)
         self.assertIn("readonly EDGE_TIGHT_MEM_AVAILABLE_MIB=512", source)
         self.assertIn('"kind": "resource-headroom"', source)
-        self.assertIn("resource pressure: MemAvailable minimum", source)
-        self.assertIn("hard failure floor ${hard} MiB; result=PASS", source)
+        self.assertIn("qualification: PASS; diagnostic headroom: TIGHT; MemAvailable minimum", source)
+        self.assertIn("hard failure floor ${hard} MiB", source)
 
     def test_revalidation_surfaces_passed_output_budget_diagnostics(self) -> None:
         source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")

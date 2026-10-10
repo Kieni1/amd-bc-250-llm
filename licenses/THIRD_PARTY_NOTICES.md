@@ -10,6 +10,11 @@ The RPM also contains or refers to separately licensed components:
   `aaed42535622aee1a93df8b22860c409539f67f8`, under the MIT License. The
   project is based on `Magnap/cyan-skillfish-governor`; its upstream license is
   retained in the RPM.
+- **bc250-gfx1013-fix** patch material is pinned to DryhoppedIPA commit
+  `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9` (`0.2.0-alpha`). Original
+  installer/documentation material is MIT; kernel patches modify Linux and are
+  GPL-2.0-only; Mesa/RADV patch material follows Mesa's MIT licensing. The RPM
+  profile uses only the three V33 kernel patches and Mesa compute patch 0001.
 - **Ollama**, Open WebUI, Apache Tika, Podman, nginx, Mesa and other runtime
   components retain their own licenses. Ollama is installed separately by the
   operator. Container images and dependency packages are not relicensed here.

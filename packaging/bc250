@@ -11,10 +11,12 @@ ROUTES=(
   "agent-mode|$LIBEXEC/agent-mode.sh"
   "benchmark|$LIBEXEC/benchmark.sh"
   "revalidate|$LIBEXEC/revalidate.sh"
+  "resilience|$LIBEXEC/qualification/resilience_manager.py"
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
   "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
+  "gfx1013|$LIBEXEC/gfx1013.sh"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install|$LIBEXEC/install.sh"
   "maintenance|$LIBEXEC/maintenance.sh"
@@ -24,6 +26,7 @@ ROUTES=(
   "reset|$LIBEXEC/uninstall.sh"
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "openwebui-setup|$LIBEXEC/openwebui-setup.py"
+  "package-gate|$LIBEXEC/qualification/package_gate_capture.py"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "status|$LIBEXEC/status.sh"
   "support-bundle|$LIBEXEC/support-bundle.sh"
@@ -42,7 +45,7 @@ Models and product workflows:
   model, rag, ocr, openwebui-setup, ollama-profile
 
 Validation and maintenance:
-  benchmark, revalidate, maintenance, agent-mode
+  benchmark, revalidate, package-gate, resilience, maintenance, agent-mode, gfx1013
 
 Optional specialist workflows:
   code, code-commit, gitea-review, compare-mtp, fetch-mtp, run-mtp

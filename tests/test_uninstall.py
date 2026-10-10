@@ -46,6 +46,14 @@ class ResetTests(unittest.TestCase):
         self.assertNotIn("bc250_cc_write_mode", source)
         self.assertNotIn("dracut --force --kver", source)
 
+    def test_reset_restores_gfx1013_before_any_destructive_reset_work(self) -> None:
+        source = RESET.read_text(encoding="utf-8")
+        self.assertIn('"$GFX1013" disable --reset', source)
+        self.assertIn("reset is fail-closed", source)
+        self.assertLess(source.index("restore_gfx1013_stock_boot"), source.index("stop_services"))
+        main = source[source.index("main() {"):]
+        self.assertLess(main.index("restore_gfx1013_stock_boot"), main.index("stop_services"))
+
     def test_reset_delegates_component_profiles_and_declares_network_ownership(self) -> None:
         source = RESET.read_text(encoding="utf-8")
         self.assertIn('"$MEMORY_PROFILE" remove', source)

@@ -250,7 +250,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        for route in ("model", "status", "support-bundle", "fetch-mtp", "ocr", "rag"):
+        for route in ("model", "status", "support-bundle", "fetch-mtp", "gfx1013", "ocr", "rag", "package-gate", "resilience"):
             self.assertRegex(dispatcher, rf'(?m)^  "{route}\|', route)
         self.assertNotIn('--list-aliases', dispatcher)
         self.assertNotIn('"uninstall|', dispatcher)
@@ -783,12 +783,12 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.4")
         self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.4")
-        self.assertEqual(values["BC250_TIKA_VERSION"], "4.0.0-full")
+        self.assertEqual(values["BC250_TIKA_VERSION"], "4.1.0-full")
         self.assertEqual(values["BC250_GOVERNOR_VERSION"], "0.4.13")
         self.assertEqual(values["BC250_GOVERNOR_COMMIT"], "aaed42535622aee1a93df8b22860c409539f67f8")
         self.assertEqual(
             values["BC250_TIKA_IMAGE_DIGEST"],
-            "sha256:80072bb73dd320a9de9709beb0b16d14dd6d2680376f8d31e498f55b633ba593",
+            "sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7",
         )
         self.assertIn(f'# v{values["BC250_OPEN_WEBUI_VERSION"]}, pinned OCI index digest.', quadlet)
         self.assertIn(values["BC250_OPEN_WEBUI_IMAGE_DIGEST"], quadlet)

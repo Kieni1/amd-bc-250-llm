@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.3%{?dist}
+Release:        1.5%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -45,6 +45,7 @@ Requires:       firewalld
 Requires:       gawk
 Requires:       git-core
 Requires:       grubby
+Requires:       grub2-tools-minimal
 Requires:       gzip
 Requires:       hostname
 Requires:       iproute
@@ -88,7 +89,7 @@ installed, but the RPM never changes CU routing automatically. The Ollama
 binary remains an upstream payload installed by the guided helper. The RPM owns
 the complete four-lane systemd topology. Model weights, users and
 operator-created Open WebUI state, HTTPS and CU changes remain
-operator-controlled.
+operator-controlled. Experimental GFX1013 compute-queue support is package-owned, opt-in and default-off.
 
 %prep
 %setup -q
@@ -189,6 +190,15 @@ printf '%b' "$bc250_reset"
 
 %preun
 if [ "$1" -eq 0 ]; then
+  # Final erase is fail-closed for the opt-in GFX1013 profile. The helper
+  # restores and verifies the stock saved + next boot path before removing any
+  # patched boot/private-RADV artifact. Refuse erase if that proof cannot be made.
+  if [ -x %{project_libexec}/gfx1013.sh ]; then
+    %{project_libexec}/gfx1013.sh disable --package-erase || {
+      echo "ERROR: refusing package erase because the stock GFX1013 boot rollback could not be verified." >&2
+      exit 1
+    }
+  fi
   systemctl stop open-webui.service tika.service \
     ollama.service ollama-task.service ollama-embedding.service ollama-agent.service \
     >/dev/null 2>&1 || :
@@ -221,6 +231,9 @@ fi
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/secrets
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/package-gates
+%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/gfx1013
+%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/resilience
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation/results
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server/gguf
@@ -255,6 +268,14 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Oct 10 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.5
+- Add default-off package profile v0.2.1-alpha for exact-kernel GFX1013 compute queues, pinned to DryhoppedIPA 0.2.0-alpha commit d3e6dc062c34d2523db0abe5741d1f5b0dea00d9 with package source/patch SHA-256 manifests.
+- Keep stock saved/default boot authoritative through prepare; promote only after a verified patched boot and private-RADV/Ollama smoke, with RADV scoped to ollama.service.
+- Make GFX1013 disable, factory reset and final RPM erase fail closed until stock saved + next boot are restored and verified.
+* Sat Oct 10 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.4
+- Add package-owned package-gate capture and resilience campaign management with durable lane/barrier state, controlled interruption, transactional managed-swap refresh and strict resume identity checks.
+- Refresh Apache Tika to digest-pinned 4.1.0-full and add a bounded package-gate Tika reachability/version/extraction smoke without reopening broad RAG/model qualification.
+- Clarify revalidation quality/product-integrity/headroom reporting and reboot/restart wording while preserving the qualified runtime/model defaults and all 1.3 build reproducibility gates.
 * Fri Oct 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.3
 - Polish installer/revalidation/CU output around exact 1.2 device evidence without changing qualified runtime defaults.
 - Make Source0 timezone/mode/cache independent, run the full deterministic suite once per normal RPM build, clean stale build outputs, force Cargo offline and add a release-only SRPM self-contained rebuild check.

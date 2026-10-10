@@ -78,6 +78,10 @@ check-rpm-payload:
 	  /usr/bin/bc250-cu-live-manager \
 	  /usr/bin/llm-run-diagnose \
 	  /usr/libexec/bc250-llm-server/install-ollama.sh \
+	  /usr/libexec/bc250-llm-server/gfx1013.sh \
+	  /usr/share/bc250-llm-server/gfx1013/upstream/PATCH-SHA256SUMS \
+	  /usr/share/bc250-llm-server/gfx1013/upstream/SOURCE-SHA256SUMS \
+	  /usr/share/doc/bc250-llm-server/docs/GFX1013.md \
 	  /usr/share/doc/bc250-llm-server/docs/RAG.md \
 	  /usr/share/licenses/bc250-llm-server/LICENSE \
 	  /usr/share/licenses/bc250-llm-server/LICENSE.cyan-skillfish-governor \

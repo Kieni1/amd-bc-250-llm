@@ -4,7 +4,7 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.13.1-1.3` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.0.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.13.1-1.5` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -65,6 +65,17 @@ sudo bc250 status
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
 ```
+
+Release qualification adds `sudo bc250 package-gate capture` and the durable
+`sudo bc250 resilience ...` manager. See [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md)
+for the closed gate format, Tika 4.1 bounded smoke, interruption semantics and
+post-reboot Lane 26 resume rules.
+
+Experimental GFX1013 compute-queue support is package-owned but default-off.
+Use `bc250 gfx1013 status`, then `sudo bc250 gfx1013 prepare`; only a successful
+marked patched boot can be promoted with `sudo bc250 gfx1013 enable`. Private
+RADV is scoped to `ollama.service`, and reset/RPM erase fail closed until the
+stock boot path is restored. See [`docs/GFX1013.md`](docs/GFX1013.md).
 
 Storage visibility and explicit reclamation:
 
@@ -165,14 +176,14 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 |---|---|
 | Cyan Skillfish governor v0.4.13 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
 | Ollama v0.34.4 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.11.4 and Tika v4.0.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
+| Open WebUI v0.11.4 and Tika v4.1.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | RAG lifecycle | Local DE/FR/bilingual batch preparation, human review, provenance validation and Open WebUI sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.3. Exact-device 0.12.2-0.8 qualification
+Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.5. Exact-device 0.12.2-0.8 qualification
 passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
 whole-appliance revalidation with this runtime; 0.13.1 does not change the Ollama pin.
 Runtime updates remain deliberately pinned rather than following upstream automatically.

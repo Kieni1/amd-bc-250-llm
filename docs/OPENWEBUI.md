@@ -1,6 +1,6 @@
 # Open WebUI
 
-Package candidate baseline: **Open WebUI v0.11.4** with **Ollama v0.34.4** and **Apache Tika v4.0.0-full**. Runtime pins
+Package candidate baseline: **Open WebUI v0.11.4** with **Ollama v0.34.4** and **Apache Tika v4.1.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:

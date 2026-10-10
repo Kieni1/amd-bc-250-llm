@@ -649,7 +649,7 @@ show_plan() {
   printf '  core verification     run before optional power/remote-maintenance setup\n'
   printf '  local maintenance      optional guided setup after core verification\n'
   printf '  Pi / companion         separate optional, default-No guided setup\n'
-  printf '  reboot required       %s\n' "$reboot"
+  printf '  BC-250 configuration reboot  %s\n' "$reboot"
 }
 
 wait_for_open_webui() {
@@ -1046,7 +1046,7 @@ print_40cu_completion_status() {
 
 
 print_setup_summary() {
-  local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED"
+  local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED" restart_state="UNKNOWN"
   curl -fsS --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && owui_state="BACKEND READY"
   if [[ "$owui_state" == "BACKEND READY" ]] && curl -fsS --max-time 3 http://127.0.0.1:80/api/version >/dev/null 2>&1; then
     owui_state="FRONT DOOR READY"
@@ -1054,6 +1054,9 @@ print_setup_summary() {
   curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && ollama_state="READY"
   [[ -n "$(pending_kernel || true)" ]] && reboot_state="YES"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || reboot_state="YES"
+  if command -v needs-restarting >/dev/null 2>&1; then
+    if needs-restarting -r >/dev/null 2>&1; then restart_state="PASS"; else restart_state="RECOMMENDED"; fi
+  fi
   if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250 openwebui-setup status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
   echo
   echo "BC-250 SETUP SUMMARY"
@@ -1087,9 +1090,11 @@ print_setup_summary() {
   printf '  Ollama                  : %s
 ' "$ollama_state"
   print_40cu_completion_status "  "
-  printf '  Reboot required         : %s
+  printf '  BC-250 configuration reboot : %s
 ' "$reboot_state"
-  printf '  Quality revalidation    : NOT RUN
+  printf '  OS/package restart check     : %s
+' "$restart_state"
+  printf '  Quality revalidation         : NOT RUN
 '
   echo
   echo "  Authenticated maintenance:"

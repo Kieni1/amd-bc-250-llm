@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.13.1-1.5 - 2026-10-10
+
+- Add the default-off `bc250 gfx1013 {status|prepare|enable|disable}` lifecycle as package profile `v0.2.1-alpha`, pinned to `DryhoppedIPA/bc250-gfx1013-fix` `0.2.0-alpha` commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`.
+- Carry package-owned patch and full-source SHA-256 manifests; select only the three V33 kernel fixes plus Mesa/RADV compute patch 0001, leaving mesh/task, 40-CU, FSR, tuning and unrelated toolkit changes outside this profile.
+- Make `prepare` exact-kernel and transactional: verify the matching Fedora kernel SRPM, patch dry-runs, module SHA/vermagic/symbol-version ABI, pinned Mesa source, byte-for-byte stock module restoration and unchanged stock initramfs before staging a dedicated patched initramfs/BLS entry.
+- Keep the exact stock BLS entry as the saved/default boot during preparation and stage the patched entry for one boot only; promotion is allowed only from the marked patched boot after private-RADV loader and Ollama restart checks pass.
+- Scope private RADV exclusively to `ollama.service`; do not install global Vulkan environment overrides and refuse coexistence with a separate upstream GFX1013 environment generator/state.
+- Make disable, factory reset and final RPM erase fail closed: stock saved + next boot must be restored and verified before the Ollama override, patched boot artifacts, private RADV or lifecycle state can be removed.
+
+## 0.13.1-1.4 - 2026-10-10
+
+- Add a package-owned authoritative package-gate capture workflow that derives PASS from exact candidate/installed RPM identity, package verification, restoration/topology, bounded Tika/RAG smoke, safety/secret checks, and a closed SHA256SUMS manifest; there is no operator result override.
+- Add the package-owned resilience manager with separate lane and inter-lane barrier state, transactional exact managed-swap refresh, controlled SIGINT/SIGTERM restoration/evidence sealing, early resume identity revalidation, controlled evidence-gap handling, terminal DEFECT/SAFETY semantics, and Lane-26-only post-reboot retry behavior.
+- Refresh the package-owned Apache Tika service to immutable `4.1.0-full` digest `sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7` and bound qualification to service/API reachability, deterministic extraction, one RAG ingest/retrieve smoke, and cleanup.
+- Clarify qualification reporting: distinguish BC-250 configuration reboot from OS/package restart state, headline mixed-quality completion without converting it to infrastructure failure, keep infrastructure/quality/product-integrity/restoration/coverage separate, and label sub-512 MiB-but-above-floor memory as PASS with tight diagnostic headroom.
+- Preserve the 1.3 reproducible-build contract (UTC Source0 epoch, normalized archive modes, full `sources/` exclusion, ignored checksum sidecars, one authoritative deterministic `%check`, clean outputs, offline Cargo and clean SRPM rebuild gate) without weakening `%check`.
+- Keep generation/resilience campaigns bounded and leave GFX1013, richer telemetry, fan-control, undervolt, power-cap and broad model-selection work out of this release.
+
 ## 0.13.1-1.3 - 2026-10-09
 
 - Polish installer/status/revalidation UX from exact 1.2 device output: make pre-update reboot state explicitly pending, distinguish optional/unavailable model registration from selected drift, clarify conservative Open WebUI migration snapshots, remove duplicate credential wording, simplify completion commands, and make revalidation quality/product-integrity/resource-pressure wording easier to interpret.

@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.3`.
+Current release source: `bc250-llm-server-0.13.1-1.5` (Tika 4.1.0-full; qualification hardening).
 
 ## Install
 
@@ -192,3 +192,16 @@ checks when an Open WebUI key is supplied, and stores final bundles under
 `/var/lib/bc250-llm-server/revalidation/results/`. See `docs/BENCHMARKING.md`
 (installed at the same relative path under `/usr/share/doc/bc250-llm-server/`) for
 result directories, tuning commands, RAG qualification and thermal profiles.
+
+## Experimental GFX1013 (opt-in)
+
+```bash
+bc250 gfx1013 status
+sudo bc250 gfx1013 prepare
+# reboot the staged one-shot patched entry
+sudo bc250 gfx1013 enable
+# rollback:
+sudo bc250 gfx1013 disable
+```
+
+See `docs/GFX1013.md`; stock boot remains default until successful patched-boot activation.

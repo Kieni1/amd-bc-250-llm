@@ -8,6 +8,7 @@ FAILURES=0
 LIBEXEC_DIR="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
 MEMORY_PROFILE="$LIBEXEC_DIR/memory-profile.sh"
 SWAP_PROFILE="$LIBEXEC_DIR/swap-profile.sh"
+GFX1013="$LIBEXEC_DIR/gfx1013.sh"
 declare -a CONTAINER_IMAGES=()
 
 heading() { printf '\n===== %s =====\n' "$1"; }
@@ -69,8 +70,30 @@ WARNING
   [[ "$answer" == PURGE-BC250-LLM ]] || { echo "Cancelled."; exit 0; }
 }
 
+gfx1013_risk_present() {
+  [[ -e /var/lib/bc250-llm-server/gfx1013/active.env || \
+     -e /etc/systemd/system/ollama.service.d/70-bc250-gfx1013.conf || \
+     -d /opt/bc250-gfx1013 ]] && return 0
+  find /boot/loader/entries -maxdepth 1 -type f -name '*-bc250-gfx1013-v33.conf' -print -quit 2>/dev/null | grep -q .
+}
+
+restore_gfx1013_stock_boot() {
+  heading "1. RESTORE OPTIONAL GFX1013 STOCK BOOT"
+  if [[ -x "$GFX1013" ]]; then
+    "$GFX1013" disable --reset || {
+      echo "ERROR: reset is fail-closed until the stock boot path is restored and verified." >&2
+      exit 1
+    }
+  elif gfx1013_risk_present; then
+    echo "ERROR: GFX1013 artifacts exist but the package lifecycle helper is unavailable; refusing reset." >&2
+    exit 1
+  else
+    echo "GFX1013 profile is not staged."
+  fi
+}
+
 stop_services() {
-  heading "1. STOP APPLIANCE SERVICES"
+  heading "2. STOP APPLIANCE SERVICES"
   systemctl disable --now \
     open-webui.service tika.service \
     ollama.service ollama-task.service ollama-embedding.service ollama-agent.service \
@@ -91,13 +114,13 @@ remove_live_manager_service() {
 
 
 remove_profiles() {
-  heading "2. REMOVE APPLIANCE HOST PROFILES"
+  heading "3. REMOVE APPLIANCE HOST PROFILES"
   BC250_ASSUME_YES=1 "$MEMORY_PROFILE" remove || failed "memory profile removal failed"
   BC250_ASSUME_YES=1 "$SWAP_PROFILE" remove || failed "swap profile removal failed"
 }
 
 remove_containers() {
-  heading "3. REMOVE APPLIANCE CONTAINERS"
+  heading "4. REMOVE APPLIANCE CONTAINERS"
   command -v podman >/dev/null 2>&1 || return
   local container image
   for container in open-webui tika; do
@@ -112,7 +135,7 @@ remove_containers() {
 }
 
 remove_network_policy() {
-  heading "4. REMOVE APPLIANCE NETWORK POLICY"
+  heading "5. REMOVE APPLIANCE NETWORK POLICY"
   if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld.service; then
     firewall-cmd --quiet --permanent --remove-service=http >/dev/null 2>&1 || true
     firewall-cmd --quiet --reload >/dev/null 2>&1 || failed "firewalld reload failed"
@@ -121,7 +144,7 @@ remove_network_policy() {
 }
 
 remove_official_ollama() {
-  heading "5. REMOVE SEPARATELY INSTALLED OLLAMA"
+  heading "6. REMOVE SEPARATELY INSTALLED OLLAMA"
   local path
   for path in /usr/local/bin/ollama /usr/bin/ollama; do
     [[ -e "$path" || -L "$path" ]] || continue
@@ -143,13 +166,13 @@ remove_official_ollama() {
 }
 
 remove_main_package() {
-  heading "6. REMOVE BC-250 RPM"
+  heading "7. REMOVE BC-250 RPM"
   rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 || { echo "bc250-llm-server.x86_64 is already absent."; return; }
   dnf remove -y bc250-llm-server.x86_64 || { echo "ERROR: RPM removal failed; persistent data was retained." >&2; return 1; }
 }
 
 remove_persistent_data() {
-  heading "7. REMOVE APPLIANCE DATA"
+  heading "8. REMOVE APPLIANCE DATA"
   rm -rf -- \
     /etc/containers/systemd/open-webui.container.d \
     /etc/bc250-llm-server /etc/cyan-skillfish-governor-smu \
@@ -181,6 +204,7 @@ main() {
   require_root
   discover_container_images
   confirm_reset
+  restore_gfx1013_stock_boot
   stop_services
   remove_live_manager_service
   remove_profiles

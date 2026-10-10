@@ -592,7 +592,14 @@ dashboard_text() {
 
   banner=RUNNING
   [[ $phase != failed ]] || banner=FAILED
-  [[ $phase != done ]] || banner=COMPLETED
+  if [[ $phase == done ]]; then
+    banner=COMPLETED
+    if ((q > 0)); then
+      banner="COMPLETED — QUALITY MIXED"
+    elif ((incomplete > 0)); then
+      banner="COMPLETED — QUALITY REVIEW"
+    fi
+  fi
   printf 'BC-250 revalidation  [%s %s]\n\n' "$banner" "$elapsed"
   printf 'Phase         %-4s  %s\n' "${position:-?}" "$label"
   printf 'Stage         %s\n' "$stage"
@@ -1363,7 +1370,7 @@ record_edge_diagnostics() {
   done < <(jq -r '.diagnostics[]? | select(.kind == "context-truncation") | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
   while IFS=$'\t' read -r model mem hard tight; do
     [[ -n $model ]] || continue
-    record_event "$label" diagnostic info "$model: resource pressure: MemAvailable minimum ${mem} MiB; diagnostic threshold ${tight} MiB; hard failure floor ${hard} MiB; result=PASS (tight headroom, no hard-floor violation)"
+    record_event "$label" diagnostic info "$model: qualification: PASS; diagnostic headroom: TIGHT; MemAvailable minimum ${mem} MiB; tight threshold ${tight} MiB; hard failure floor ${hard} MiB"
   done < <(jq -r '.diagnostics[]? | select(.kind == "resource-headroom") | [.model, (.mem_available_min_mib|floor|tostring), (.hard_floor_mib|floor|tostring), (.tight_threshold_mib|floor|tostring)] | @tsv' "$sanity_json")
 }
 

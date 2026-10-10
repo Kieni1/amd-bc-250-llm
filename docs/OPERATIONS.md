@@ -25,6 +25,9 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250 maintenance` | Backups, safe power/WOL and optional companion integration |
 | `bc250 benchmark` | Explicit model and appliance benchmarks |
 | `bc250 revalidate` | Whole-appliance qualification harness |
+| `bc250 package-gate` | Capture a closed authoritative release gate |
+| `bc250 resilience` | Run/resume bounded resilience lanes 20–26 |
+| `bc250 gfx1013` | Opt-in exact-kernel GFX1013 compute lifecycle |
 | `bc250 agent-mode` | Enter/leave/status exclusive Agent mode |
 | `bc250 code`, `bc250 code-commit`, `bc250 gitea-review` | Optional coding-agent workflows |
 | `bc250 compare-mtp`, `bc250 fetch-mtp`, `bc250 run-mtp` | Optional MTP workflows |
@@ -88,6 +91,18 @@ core installation/verification from package-owned Open WebUI state and reports t
 `APPLIED + VERIFIED`, `SKIPPED`, or `RETRY REQUIRED`; a nonfatal Open WebUI setup problem is no
 longer hidden behind an unconditional whole-install success message. Completion then prints a plain
 `OVERVIEW` followed by an amber `NEXT STEPS` block for CU routing, model reconciliation and validation.
+
+### Experimental GFX1013 compute profile
+
+The supported lifecycle is `bc250 gfx1013 {status|prepare|enable|disable}`. It
+ships default-off as profile `v0.2.1-alpha`, pinned to upstream `0.2.0-alpha`
+commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. Preparation verifies the
+package patch/full-source manifests and builds an exact-running-kernel module;
+stock boot remains the saved default while the patched entry is staged for one
+boot only. `enable` is permitted only after a successful marked patched boot and
+scopes private RADV to `ollama.service`. `disable`, `bc250 reset`, and final RPM
+erase restore+verify stock saved/next boot before destructive cleanup. See
+[`GFX1013.md`](GFX1013.md) for the complete safety contract and dependencies.
 
 ### Models
 
@@ -375,6 +390,8 @@ sudo bc250 revalidate status
 sudo bc250 revalidate status --raw  # machine-readable key=value state
 sudo bc250 revalidate abort
 sudo bc250 revalidate cleanup
+sudo bc250 package-gate capture --candidate-rpm /path/to/candidate.rpm --token-file FILE
+sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
 
 `bc250 status` derives `normal`, `degraded`, `stopped` and exclusive `agent` topology from the same

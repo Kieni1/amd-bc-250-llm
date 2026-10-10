@@ -118,7 +118,7 @@ ollama_version_line
         self.assertIn("listener-only", source)
         self.assertIn("Open WebUI application readiness", source)
         self.assertIn("resident:", source)
-        self.assertIn("Reboot recommendation: not checked", source)
+        self.assertIn("OS/package restart check: UNKNOWN", source)
 
     def test_runtime_state_identifies_only_active_zram_swap_membership(self) -> None:
         helper = ROOT / "cmd/monitoring/runtime-state.sh"

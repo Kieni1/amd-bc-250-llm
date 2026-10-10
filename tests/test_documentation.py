@@ -48,7 +48,7 @@ class DocumentationTests(unittest.TestCase):
 
     def test_shell_examples_do_not_invent_bc250_commands(self) -> None:
         # The only deliberately standalone bc250-* commands are the CU tools.
-        allowed = {"cu-live-manager", "40cu", "llm-server", "documents", "night-shutdown", "wol", "coding-agent"}
+        allowed = {"cu-live-manager", "40cu", "llm-server", "documents", "night-shutdown", "wol", "coding-agent", "gfx1013"}
         for path, relative in package_markdown_paths():
             text = path.read_text(encoding="utf-8")
             blocks = re.findall(r"```(?:bash|text)?\n(.*?)```", text, re.DOTALL)

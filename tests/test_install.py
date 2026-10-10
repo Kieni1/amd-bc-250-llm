@@ -557,7 +557,7 @@ step_8_application_services
     def test_setup_plan_covers_resume_decision_points(self) -> None:
         source = INSTALLER.read_text()
         block = source[source.index("show_plan() {"):source.index("wait_for_open_webui() {")]
-        for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "root filesystem available", "VG expansion available", "root grow required", "reboot required"):
+        for label in ("root grow", "Fedora update", "Ollama", "TTM profile", "swap", "40-CU", "root filesystem available", "VG expansion available", "root grow required", "BC-250 configuration reboot"):
             self.assertIn(label, block)
         self.assertIn("repository check/update in step 2", block)
         self.assertNotIn("${kernel:-current}", block)
