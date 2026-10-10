@@ -120,6 +120,28 @@ ollama_version_line
         self.assertIn("resident:", source)
         self.assertIn("OS/package restart check: UNKNOWN", source)
 
+
+    def test_machine_readable_status_and_doctor_are_packaged_interfaces(self) -> None:
+        status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
+        doctor = ROOT / "cmd/monitoring/doctor.py"
+        self.assertIn("Usage: bc250 status [--json]", status)
+        self.assertIn('"schema": "bc250.status.v1"', status_json)
+        self.assertIn('"gfx1013": gfx_status(libexec)', status_json)
+        result = subprocess.run(
+            [str(doctor), "--help"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("read-only appliance diagnostics", result.stdout)
+        doctor_source = doctor.read_text(encoding="utf-8")
+        self.assertIn('"schema": "bc250.doctor.v1"', doctor_source)
+        self.assertIn('["rpm", "-V", PACKAGE]', doctor_source)
+        self.assertIn("diagnostic headroom TIGHT", doctor_source)
+        self.assertIn("STALE_KERNEL", doctor_source)
+
     def test_runtime_state_identifies_only_active_zram_swap_membership(self) -> None:
         helper = ROOT / "cmd/monitoring/runtime-state.sh"
         command = f"""

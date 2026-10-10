@@ -15,6 +15,7 @@ ROUTES=(
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
+  "doctor|$LIBEXEC/doctor.py"
   "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
   "gfx1013|$LIBEXEC/gfx1013.sh"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
@@ -27,11 +28,13 @@ ROUTES=(
   "ollama-profile|$LIBEXEC/ollama-profile.sh"
   "openwebui-setup|$LIBEXEC/openwebui-setup.py"
   "package-gate|$LIBEXEC/qualification/package_gate_capture.py"
+  "qualification|$LIBEXEC/qualification/qualification_inventory.py"
   "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
   "status|$LIBEXEC/status.sh"
   "support-bundle|$LIBEXEC/support-bundle.sh"
   "storage|$LIBEXEC/storage.py"
   "verify|$LIBEXEC/verify.sh"
+  "version|$LIBEXEC/version.py"
 )
 
 usage() {
@@ -39,13 +42,13 @@ usage() {
 Usage: bc250 COMMAND [ARGUMENTS...]
 
 Core appliance:
-  install, status, verify, support-bundle, storage, reset
+  install, status, doctor, verify, version, support-bundle, storage, reset
 
 Models and product workflows:
   model, rag, ocr, openwebui-setup, ollama-profile
 
 Validation and maintenance:
-  benchmark, revalidate, package-gate, resilience, maintenance, agent-mode, gfx1013
+  benchmark, revalidate, package-gate, qualification, resilience, maintenance, agent-mode, gfx1013
 
 Optional specialist workflows:
   code, code-commit, gitea-review, compare-mtp, fetch-mtp, run-mtp
@@ -61,6 +64,7 @@ command="${1:-help}"
 (($# == 0)) || shift
 case "$command" in
   help|-h|--help) usage; exit 0 ;;
+  --version) exec "$LIBEXEC/version.py" --short ;;
 esac
 
 for route in "${ROUTES[@]}"; do

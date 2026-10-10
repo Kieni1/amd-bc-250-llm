@@ -1,53 +1,56 @@
 {
   "schema": 1,
   "kind": "workbench-checkpoint",
-  "release_identity": "bc250-llm-server-0.13.1-1.5",
-  "predecessor_artifact": "amd-bc-250-llm-0.13.1-1.4.zip",
-  "predecessor_sha256": "b508e22e0ad4d983a70a514a15741fe4c5349c81339d874d89bc5237f207a767",
-  "batch": "0.13.1-1.5-gfx1013-opt-in-profile-v0.2.1-alpha",
+  "release_identity": "bc250-llm-server-0.13.1-1.7",
+  "predecessor_artifact": "amd-bc-250-llm-0.13.1-1.6.zip",
+  "predecessor_sha256": "d4c001b708c0fb495bf65af0cd4a9ddafe634497f4f795bdf128c3fd4a33b0a5",
+  "batch": "0.13.1-1.7-gfx1013-benchmark-evidence-qol",
   "changed_files": [
     "CHANGELOG.md",
     "Makefile",
     "README.md",
     "TLDR.md",
     "WORKBENCH-STATE.json",
+    "cmd/benchmark/gfx1013-ab.py",
+    "cmd/monitoring/version.py",
+    "cmd/qualification/qualification_inventory.py",
     "cmd/system/gfx1013.sh",
     "development/DEVELOPMENT-SCOPE.json",
     "development/TESTING-STRATEGY.md",
     "development/VALIDATION-MATRIX.md",
+    "docs/BENCHMARKING.md",
     "docs/GFX1013.md",
     "docs/OPERATIONS.md",
-    "gfx1013/upstream/**",
-    "licenses/THIRD_PARTY_NOTICES.md",
+    "docs/QUALIFICATION.md",
     "packaging/bc250",
     "packaging/bc250-llm-server.spec",
+    "packaging/completions/bc250.bash",
     "packaging/install-manifest.tsv",
     "scripts/validate.py",
-    "tests/test_documentation.py",
-    "tests/test_gfx1013.py",
+    "tests/test_gfx1013_benchmark.py",
     "tests/test_packaging.py",
-    "tests/test_uninstall.py",
-    "uninstall.sh"
+    "tests/test_qualification_inventory.py"
   ],
   "completed": [
-    "Added package profile v0.2.1-alpha pinned to DryhoppedIPA/bc250-gfx1013-fix 0.2.0-alpha commit d3e6dc062c34d2523db0abe5741d1f5b0dea00d9.",
-    "Selected only three V33 kernel patches plus Mesa/RADV compute patch 0001; mesh/task, 40-CU, FSR, fan/power and unrelated toolkit changes remain excluded.",
-    "Added package-owned patch and full-source SHA-256 manifests and pinned Mesa 26.2.0-rc3 source identity.",
-    "Implemented exact-running-kernel prepare with Fedora SRPM identity, patch dry-run, module SHA/vermagic/symbol-version ABI checks, transactional stock-module restoration and dedicated patched initramfs/BLS staging.",
-    "Bound preparation to the exact kernel-devel RPM/build-tree identity and persist/revalidate stock module/initramfs plus private RADV library/ICD hashes before promotion.",
-    "Kept exact stock BLS saved/default; prepare sets the patched entry as next boot only.",
-    "Made disable/reset/final RPM erase fail closed until stock saved + next boot are restored and verified."
+    "Added reboot-aware same-package GFX1013 A1 stock, B enabled and A2 restored-stock benchmark capture without automating lifecycle or reboot transitions.",
+    "Bound benchmark phases to exact installed package, running kernel, prompt and model digests and seal phase/campaign evidence with SHA-256 manifests.",
+    "Added conservative advisory promotion screening requiring A2, repeatable throughput, clean GPU/restart/residency evidence and bounded memory/swap/temperature behavior.",
+    "Preserve sealed failure evidence for interrupted/failed benchmark phases without overwriting successful phase evidence.",
+    "Added bc250 qualification list/--json and dry-run-first terminal-evidence cleanup with newest-per-class retention and path/symlink safety.",
+    "Added bc250 version/--json/--short, global bc250 --version and packaged Bash completion.",
+    "Kept the 1.6 GFX1013 Secure Boot, exact-kernel, rollback and private-RADV runtime guards unchanged and kept GFX1013 default-off."
   ],
   "validation": [
-    "Repository preflight: PASS.",
-    "Focused GFX1013/packaging/uninstall/documentation tests: 79/79 PASS.",
-    "Full deterministic repository validation: 562/562 PASS across 19 modules.",
-    "Packaged GFX1013 PATCH-SHA256SUMS and SOURCE-SHA256SUMS: PASS.",
-    "Binary RPM/SRPM build: external Fedora 44 gate; this sandbox lacks rpmbuild/Rust and the cached vendored governor inputs."
+    "Non-build source regression set passed: 577/577 tests across 19 modules, including benchmark, GFX1013, qualification/inventory, packaging metadata, operations, documentation, install/OpenWebUI/RAG/runtime/state/storage/translation/uninstall and frozen maintenance behavior.",
+    "Repository source preflight passed; development scope/frozen-tree check passed; changed Python sources compiled; changed shell/dispatcher/completion syntax passed bash -n.",
+    "Ruff and ShellCheck executables are unavailable in this workspace. The operator-provided Fedora make lint gate remains authoritative.",
+    "Per operator instruction, make sources/sources-check, make rpm/%check, rpmlint, RPM payload validation and clean SRPM rebuild were not run here."
   ],
   "device_followup": [
-    "Build/install exact 0.13.1-1.5 on Fedora 44 BC-250 with running kernel 7.2.9-200.fc44.x86_64.",
-    "Run bc250 gfx1013 prepare, reboot the one-shot patched BLS entry, verify kernel/RADV/Ollama, then enable only after successful patched boot.",
-    "Capture baseline-vs-GFX1013 LLM A/B evidence, then disable and verify stock boot restoration, rpm -V and no failed units."
+    "Build exact 0.13.1-1.7 with the operator Fedora release gate.",
+    "Upgrade the exact device and verify inherited 1.6 lifecycle safety with bc250 doctor/status/gfx1013 status.",
+    "Capture A1 with sudo bc250 gfx1013 benchmark stock on stock 1.7.",
+    "Prepare/reboot/enable normally, capture B, disable/reboot stock, capture A2, then run benchmark report.",
+    "Review package-quality/product-quality evidence separately before considering any default-on GFX1013 policy."
   ]
 }

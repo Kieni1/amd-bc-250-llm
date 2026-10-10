@@ -12,7 +12,9 @@ This is the canonical operator reference for day-to-day administration. It combi
 |---|---|
 | `bc250` | Canonical appliance dispatcher |
 | `bc250 install` | Apply/resume appliance setup |
-| `bc250 status` | Concise read-only appliance status |
+| `bc250 status` | Concise read-only appliance status; `--json` is machine-readable |
+| `bc250 version` | Exact installed package/runtime/GFX identity; `--json` is machine-readable |
+| `bc250 doctor` | Read-only appliance diagnostics; `--json` is machine-readable |
 | `bc250 verify` | Detailed local verification |
 | `bc250 support-bundle` | Redacted support evidence archive |
 | `bc250 storage` | Report/dedupe/prune package-owned storage |
@@ -27,6 +29,7 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250 revalidate` | Whole-appliance qualification harness |
 | `bc250 package-gate` | Capture a closed authoritative release gate |
 | `bc250 resilience` | Run/resume bounded resilience lanes 20–26 |
+| `bc250 qualification` | Inventory or conservatively prune package-owned qualification evidence |
 | `bc250 gfx1013` | Opt-in exact-kernel GFX1013 compute lifecycle |
 | `bc250 agent-mode` | Enter/leave/status exclusive Agent mode |
 | `bc250 code`, `bc250 code-commit`, `bc250 gitea-review` | Optional coding-agent workflows |
@@ -36,6 +39,15 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `llm-run-diagnose` | Detailed model-run diagnostic |
 
 Use `bc250 --help` for the grouped command list. Commands that modify host or service-owned data normally require `sudo`.
+
+### Qualification evidence inventory
+
+Use `bc250 qualification list [--json]` to inventory package-gate, resilience and
+GFX1013 benchmark evidence. `bc250 qualification clean` is dry-run by default and
+selects only old terminal evidence while retaining the newest records per class; add
+`--apply` only after reviewing the exact paths. Symlinked or out-of-root paths are
+refused.
+
 
 ### Guided installer
 
@@ -94,15 +106,49 @@ longer hidden behind an unconditional whole-install success message. Completion 
 
 ### Experimental GFX1013 compute profile
 
-The supported lifecycle is `bc250 gfx1013 {status|prepare|enable|disable}`. It
-ships default-off as profile `v0.2.1-alpha`, pinned to upstream `0.2.0-alpha`
-commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. Preparation verifies the
-package patch/full-source manifests and builds an exact-running-kernel module;
-stock boot remains the saved default while the patched entry is staged for one
-boot only. `enable` is permitted only after a successful marked patched boot and
-scopes private RADV to `ollama.service`. `disable`, `bc250 reset`, and final RPM
-erase restore+verify stock saved/next boot before destructive cleanup. See
-[`GFX1013.md`](GFX1013.md) for the complete safety contract and dependencies.
+The supported operator lifecycle is `bc250 gfx1013 {status|prepare|enable|disable|reset|benchmark}`.
+It ships default-off as profile `v0.2.1-alpha`, pinned to upstream `0.2.0-alpha`
+commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. Use the non-destructive checks
+before making boot changes:
+
+```bash
+sudo bc250 gfx1013 status
+sudo bc250 gfx1013 status --json
+sudo bc250 gfx1013 prepare --check
+sudo bc250 gfx1013 disable --check
+sudo bc250 gfx1013 reset --check
+```
+
+Preparation is exact-kernel and refuses enabled/unknown Secure Boot because this
+package does not sign or enroll the locally built `amdgpu` module. Stock boot
+remains the saved default while a verified patched entry is staged for one boot
+only. `enable` is permitted only after that marked patched boot; it proves that
+the private ICD exposes the exact BC-250 `1002:13fe` through RADV and scopes the
+override to `ollama.service`. A systemd boot-marker condition plus privileged runtime guard fails `ollama.service`
+closed after a later stock/stale-kernel boot until the operator rolls back or
+reprepares, preventing that private RADV path from reaching the wrong kernel.
+
+
+Release 1.7 also exposes a reboot-aware evidence screen without automating lifecycle
+transitions:
+
+```bash
+sudo bc250 gfx1013 benchmark stock
+# prepare -> patched reboot -> enable
+sudo bc250 gfx1013 benchmark gfx
+# disable -> stock reboot
+sudo bc250 gfx1013 benchmark restored
+sudo bc250 gfx1013 benchmark report
+```
+
+A2 is required before the helper can emit `PROMOTION_CANDIDATE`. The result remains
+advisory and never changes the default-off policy.
+
+`status` reports `DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`,
+`STALE_KERNEL`, `ROLLBACK_REQUIRED` or `BROKEN`. `disable`, recovery `reset`, RPM
+upgrade and final erase all fail closed until a safe stock saved/default **and
+next** boot path is restored and verified. See [`GFX1013.md`](GFX1013.md) for
+the complete state machine, recovery and Secure Boot policy.
 
 ### Models
 
@@ -374,6 +420,9 @@ See [`HARDWARE.md`](HARDWARE.md) before changing GPU routing.
 
 ```bash
 sudo bc250 status
+sudo bc250 status --json
+sudo bc250 doctor
+sudo bc250 doctor --json
 sudo bc250 support-bundle
 sudo bc250 verify
 sudo bc250 verify --summary
@@ -393,6 +442,13 @@ sudo bc250 revalidate cleanup
 sudo bc250 package-gate capture --candidate-rpm /path/to/candidate.rpm --token-file FILE
 sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
+
+`sudo bc250 status --json` emits schema `bc250.status.v1` with installed package, kernel,
+service topology, memory/swap/PSI, failed-unit, restart-diagnostic and GFX1013
+state. `bc250 doctor` layers read-only PASS/WARN/FAIL diagnostics over that state,
+including `rpm -V`, runtime topology, memory headroom, GFX/Secure-Boot state and
+exact running-kernel `kernel-devel` availability; run it with `sudo` to include
+the full package verifier.
 
 `bc250 status` derives `normal`, `degraded`, `stopped` and exclusive `agent` topology from the same
 classifier used by `bc250 agent-mode status`; a concise `Overall` / `Runtime mode` summary appears

@@ -80,7 +80,7 @@ gfx1013_risk_present() {
 restore_gfx1013_stock_boot() {
   heading "1. RESTORE OPTIONAL GFX1013 STOCK BOOT"
   if [[ -x "$GFX1013" ]]; then
-    "$GFX1013" disable --reset || {
+    "$GFX1013" reset || {
       echo "ERROR: reset is fail-closed until the stock boot path is restored and verified." >&2
       exit 1
     }

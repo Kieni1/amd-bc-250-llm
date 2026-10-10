@@ -12,12 +12,12 @@ podman run --rm --pull="$pull_policy" \
   bash -Eeuxo pipefail -c '
     build_packages=(
       bash cargo curl findutils gcc git gzip make
-      libdrm-devel patch python3 rpm-build rust
+      libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck
       systemd systemd-rpm-macros tar xz
     )
     if ! rpm -q "${build_packages[@]}" >/dev/null 2>&1; then
       dnf install -y "${build_packages[@]}"
     fi
 
-    make rpm
+    make release-gate
   '

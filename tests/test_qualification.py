@@ -228,6 +228,57 @@ class QualificationTests(unittest.TestCase):
         self.assertEqual(state["result"], "INCOMPLETE")
         self.assertTrue(state["evidence_gaps"])
 
+
+    def test_16_package_gate_schema_and_configuration_identity_are_bound(self) -> None:
+        self.assertEqual(common.PACKAGE_GATE_SCHEMA, "bc250.package-gate.v2")
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "config.toml"
+            config.write_text("value = 1\n", encoding="utf-8")
+            first = common.qualification_config_identity((config,))
+            config.write_text("value = 2\n", encoding="utf-8")
+            second = common.qualification_config_identity((config,))
+        self.assertNotEqual(first, second)
+
+    def test_gfx_identity_uses_machine_readable_stable_subset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            helper = libexec / "gfx1013.sh"
+            helper.write_text("#!/bin/sh\n", encoding="utf-8")
+            original = common.run_command
+            payload = {
+                "schema": "bc250.gfx1013-status.v1",
+                "state": "ENABLED",
+                "profile": "v0.2.1-alpha",
+                "upstream": {"version": "0.2.0-alpha", "commit": "d3e6dc"},
+                "source_identity_ok": True,
+                "package": {"prepared_nevra": "bc250-llm-server-0.13.1-1.6.fc44.x86_64"},
+                "kernel": {"prepared": "7.2.9-200.fc44.x86_64"},
+                "enabled_recorded": True,
+                "ollama_private_radv_override": True,
+                "private_radv_present": True,
+                "private_icd_present": True,
+                "vulkan": {"vendor_id": "0x1002", "device_id": "0x13fe", "driver_name": "radv"},
+                "boot": {"saved_entry": "transient-not-bound"},
+            }
+            common.run_command = lambda *args, **kwargs: command_result(
+                [str(helper), "status", "--json"],
+                stdout=json.dumps(payload),
+            )
+            try:
+                identity = common.gfx1013_identity(libexec)
+            finally:
+                common.run_command = original
+        self.assertEqual(identity["state"], "ENABLED")
+        self.assertEqual(identity["vulkan"]["device_id"], "0x13fe")
+        self.assertNotIn("boot", identity)
+
+    def test_package_gate_and_resume_bind_kernel_config_and_gfx_identity(self) -> None:
+        gate_source = (QUALIFICATION / "package_gate_capture.py").read_text(encoding="utf-8")
+        manager_source = (QUALIFICATION / "resilience_manager.py").read_text(encoding="utf-8")
+        self.assertIn('"schema_version": 2', gate_source)
+        self.assertIn('"qualification_identity": qualification', gate_source)
+        self.assertIn("kernel/configuration/GFX1013 identity", manager_source)
+
     def test_package_gate_cli_has_no_result_override(self) -> None:
         source = (QUALIFICATION / "package_gate_capture.py").read_text(encoding="utf-8")
         self.assertNotIn('add_argument("--result"', source)

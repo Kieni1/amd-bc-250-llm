@@ -247,10 +247,12 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("models/sources", manifest)
         self.assertIn("uninstall.sh\t{libexec}/uninstall.sh", manifest)
         self.assertIn("cmd/monitoring/status.sh\t{libexec}/status.sh", manifest)
+        self.assertIn("cmd/monitoring/status-json.py\t{libexec}/status-json.py", manifest)
+        self.assertIn("cmd/monitoring/doctor.py\t{libexec}/doctor.py", manifest)
         self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        for route in ("model", "status", "support-bundle", "fetch-mtp", "gfx1013", "ocr", "rag", "package-gate", "resilience"):
+        for route in ("model", "status", "doctor", "version", "support-bundle", "fetch-mtp", "gfx1013", "ocr", "rag", "package-gate", "qualification", "resilience"):
             self.assertRegex(dispatcher, rf'(?m)^  "{route}\|', route)
         self.assertNotIn('--list-aliases', dispatcher)
         self.assertNotIn('"uninstall|', dispatcher)
@@ -267,6 +269,10 @@ class PackagingTests(unittest.TestCase):
             "cmd/benchmark/runtime-benchmark.py\t{libexec}/runtime-benchmark.py",
             "cmd/benchmark/openwebui-benchmark.py\t{libexec}/openwebui-benchmark.py",
             "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
+            "cmd/benchmark/gfx1013-ab.py\t{libexec}/gfx1013-ab.py",
+            "cmd/qualification/qualification_inventory.py\t{libexec}/qualification/qualification_inventory.py",
+            "cmd/monitoring/version.py\t{libexec}/version.py",
+            "packaging/completions/bc250.bash\t{bashcompletiondir}/bc250",
             "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
             "examples/benchmark/agent-cases.json\t{share}/benchmark/agent-cases.json",
             "examples/benchmark/usecase-office.json\t{share}/benchmark/usecase-office.json",
@@ -277,6 +283,20 @@ class PackagingTests(unittest.TestCase):
             "MODELS.md\t{docdir}/MODELS.md",
         ):
             self.assertIn(entry, manifest)
+
+    def test_17_operator_qol_interfaces_are_packaged(self) -> None:
+        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        self.assertIn('"qualification|$LIBEXEC/qualification/qualification_inventory.py"', dispatcher)
+        self.assertIn('"version|$LIBEXEC/version.py"', dispatcher)
+        self.assertIn('--version) exec "$LIBEXEC/version.py" --short', dispatcher)
+        self.assertIn("gfx1013-ab.py\t{libexec}/gfx1013-ab.py", manifest)
+        self.assertIn("qualification_inventory.py\t{libexec}/qualification/qualification_inventory.py", manifest)
+        self.assertIn("packaging/completions/bc250.bash\t{bashcompletiondir}/bc250", manifest)
+        self.assertIn("qualification", completion)
+        self.assertIn("stock gfx restored status report", completion)
+        self.assertIn("--older-than-days --keep-latest --apply", completion)
 
     def test_dispatcher_suppresses_python_bytecode_in_package_helpers(self) -> None:
         dispatcher = ROOT / "packaging/bc250"
@@ -690,8 +710,10 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertRegex(workflow, r"(?m)^  push:$")
         self.assertRegex(workflow, r"(?m)^  pull_request:$")
-        self.assertIn("ruff check .", workflow)
-        self.assertIn("shellcheck", workflow)
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("make release-gate", workflow)
+        self.assertIn("ruff check .", makefile)
+        self.assertIn("shellcheck", makefile)
         self.assertIn("ruff rust ShellCheck", workflow)
 
     def test_build_environment_uses_portable_c_locale(self) -> None:
@@ -857,6 +879,10 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("check-rpm-payload", makefile)
         self.assertIn("/usr/bin/bc250-40cu", makefile)
         self.assertIn("/usr/bin/bc250-cu-live-manager", makefile)
+        self.assertIn("/usr/libexec/bc250-llm-server/status-json.py", makefile)
+        self.assertIn("/usr/libexec/bc250-llm-server/doctor.py", makefile)
+        self.assertIn("/usr/libexec/bc250-llm-server/qualification/package_gate_capture.py", makefile)
+        self.assertIn("/usr/libexec/bc250-llm-server/qualification/resilience_manager.py", makefile)
         self.assertIn("grep '^/usr/bin/bc250-'", makefile)
         self.assertIn("/quality-checks/", makefile)
         self.assertIn("/usr/share/licenses/bc250-llm-server/LICENSE.cyan-skillfish-governor", makefile)
@@ -865,15 +891,13 @@ class PackagingTests(unittest.TestCase):
 
     def test_ci_runs_configured_rpmlint_after_rpm_build(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("rpmlint", workflow)
-        self.assertLess(
-            workflow.index("- name: Build RPMs"),
-            workflow.index("- name: Lint built RPMs"),
-        )
-        self.assertIn(
-            "run: rpmlint -c packaging/rpmlint.toml dist/*.rpm",
-            workflow,
-        )
+        self.assertIn("make release-gate", workflow)
+        release_gate = makefile[makefile.index("release-gate:"):makefile.index("\n\nclean:")]
+        self.assertLess(release_gate.index("$(MAKE) rpm"), release_gate.index("rpmlint -c"))
+        self.assertIn("rpmlint -c packaging/rpmlint.toml $(DISTDIR)/*.rpm", release_gate)
+        self.assertIn("$(MAKE) check-srpm-rebuild", release_gate)
 
     def test_rpmlint_policy_filters_only_intentional_appliance_findings(self) -> None:
         import tomllib

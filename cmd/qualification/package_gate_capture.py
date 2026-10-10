@@ -17,6 +17,7 @@ try:
         QualificationError,
         atomic_write_json,
         normal_topology_status,
+        qualification_identity,
         query_candidate_rpm,
         query_installed_rpm,
         run_command,
@@ -192,6 +193,27 @@ def capture(args: argparse.Namespace) -> int:
         f"candidate={candidate['nevra']}\ninstalled={installed['nevra']}\ncandidate_sha256={candidate_sha}",
     )
 
+    qualification = qualification_identity(args.libexec)
+    gfx = qualification.get("gfx1013") if isinstance(qualification.get("gfx1013"), dict) else {}
+    gfx_state = str(gfx.get("state", "BROKEN"))
+    if gfx_state in {"DISABLED", "ENABLED"}:
+        gfx_status = "PASS"
+        gfx_detail = f"stable GFX1013 lifecycle state: {gfx_state}"
+    elif gfx_state in {"PREPARED", "PATCHED_BOOT_UNVERIFIED", "STALE_KERNEL"}:
+        gfx_status = "INCOMPLETE"
+        gfx_detail = f"transitional/stale GFX1013 lifecycle state: {gfx_state}"
+    else:
+        gfx_status = "DEFECT"
+        gfx_detail = f"unsafe GFX1013 lifecycle state: {gfx_state}"
+    checks["qualification_identity"] = _check_payload(
+        gfx_status,
+        gfx_detail,
+        kernel=qualification.get("kernel"),
+        gfx1013_state=gfx_state,
+    )
+    statuses.append(gfx_status)
+    _write_text(evidence / "qualification-identity.json", json.dumps(qualification, indent=2, sort_keys=True))
+
     verify_path = args.libexec / "verify.sh"
     if not verify_path.is_file():
         checks["bc250_verify"] = _check_payload("HARNESS", f"missing verifier: {verify_path}")
@@ -267,7 +289,10 @@ def capture(args: argparse.Namespace) -> int:
             write_command_evidence(evidence / "owui-rag-smoke-command.txt", rag)
             if rag.returncode == 0:
                 rag_status = "PASS"
-                rag_detail = "bounded Open WebUI RAG ingest/retrieve smoke passed and synthetic state cleanup completed"
+                rag_detail = (
+                    "bounded Open WebUI RAG ingest/retrieve smoke passed "
+                    "and synthetic state cleanup completed"
+                )
             elif rag.returncode == 3:
                 rag_status = "DEFECT"
                 rag_detail = "Open WebUI RAG smoke completed with a product/quality defect"
@@ -317,7 +342,7 @@ def capture(args: argparse.Namespace) -> int:
     result = _result_priority(statuses)
     gate = {
         "schema": PACKAGE_GATE_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "created_at": utc_now(),
         "authority": "bc250 package-gate capture; result derived from package-owned live checks",
         "candidate": {
@@ -327,6 +352,7 @@ def capture(args: argparse.Namespace) -> int:
             "size": candidate_path.stat().st_size,
         },
         "installed": installed,
+        "qualification_identity": qualification,
         "source_artifact": source,
         "checks": checks,
         "cleanup_restoration": restoration,

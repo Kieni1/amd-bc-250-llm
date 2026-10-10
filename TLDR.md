@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.5` (Tika 4.1.0-full; qualification hardening).
+Current release source: `bc250-llm-server-0.13.1-1.7` (Tika 4.1.0-full; qualification hardening).
 
 ## Install
 
@@ -36,6 +36,9 @@ package-owned four-lane topology.
 
 ```bash
 sudo bc250 status
+sudo bc250 status --json
+sudo bc250 doctor
+bc250 version
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
 sudo bc250 storage status
@@ -52,6 +55,37 @@ sudo bc250 openwebui-setup init
 
 When an RPM upgrade changes Open WebUI with existing persistent state, RPM `%pre` unconditionally requests Open WebUI stop, proves `ActiveState=inactive`, and holds boot enablement before the new Quadlet can restart. The guided installer then creates a verified stopped-state rollback archive before allowing the new image to start. See
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the supported restore procedure.
+
+GFX1013 remains experimental/default-off. Check the exact-kernel and Secure Boot
+prerequisites before staging anything:
+
+```bash
+sudo bc250 gfx1013 status
+sudo bc250 gfx1013 prepare --check
+sudo bc250 gfx1013 prepare
+# reboot the one-shot patched entry, then:
+sudo bc250 gfx1013 enable
+# rollback/recovery:
+sudo bc250 gfx1013 disable
+sudo bc250 gfx1013 reset --check
+```
+
+A stale/new stock kernel fails `ollama.service` closed while the private patched RADV override is present; status reports `STALE_KERNEL` and requires rollback/reprepare before normal Ollama service is restored.
+
+For the bounded same-package GFX performance screen:
+
+```bash
+sudo bc250 gfx1013 benchmark stock       # A1, stock boot
+# prepare -> patched reboot -> enable
+sudo bc250 gfx1013 benchmark gfx         # B
+# disable -> reboot stock
+sudo bc250 gfx1013 benchmark restored    # A2 control
+sudo bc250 gfx1013 benchmark report
+```
+
+Qualification evidence can be reviewed with `sudo bc250 qualification list`;
+`sudo bc250 qualification clean` only previews old terminal evidence unless
+`--apply` is explicitly supplied.
 
 For RAG, keep operator documents under `/srv/bc250-documents`; batch preparation stops at a human review gate:
 
@@ -196,7 +230,7 @@ result directories, tuning commands, RAG qualification and thermal profiles.
 ## Experimental GFX1013 (opt-in)
 
 ```bash
-bc250 gfx1013 status
+sudo bc250 gfx1013 status
 sudo bc250 gfx1013 prepare
 # reboot the staged one-shot patched entry
 sudo bc250 gfx1013 enable

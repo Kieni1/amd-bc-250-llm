@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import subprocess
 import tempfile
@@ -82,6 +83,90 @@ class Gfx1013Tests(unittest.TestCase):
         self.assertIn("v0.2.1-alpha / experimental / default OFF", result.stdout)
         self.assertIn("Package patch/full-source manifests: PASS", result.stdout)
         self.assertIn("Ollama private-RADV override: disabled", result.stdout)
+
+
+    def test_status_json_exposes_explicit_lifecycle_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            env = os.environ.copy()
+            env.update(
+                {
+                    "BC250_GFX1013_SOURCE": str(SOURCE),
+                    "BC250_GFX1013_STATE_ROOT": str(tmp / "state"),
+                    "BC250_GFX1013_PREFIX_ROOT": str(tmp / "prefix"),
+                    "BC250_GFX1013_DROPIN": str(tmp / "dropin.conf"),
+                    "BC250_GFX1013_UPSTREAM_GENERATOR": str(tmp / "upstream-generator"),
+                    "BC250_GFX1013_UPSTREAM_STATE": str(tmp / "upstream-state"),
+                }
+            )
+            result = subprocess.run(
+                [str(SCRIPT), "status", "--json"],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "bc250.gfx1013-status.v1")
+        self.assertEqual(payload["state"], "DISABLED")
+        self.assertEqual(payload["profile"], "v0.2.1-alpha")
+        self.assertTrue(payload["default_off"])
+
+    def test_16_hardens_secure_boot_stale_kernel_and_private_radv_guard(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        for state in (
+            "DISABLED",
+            "PREPARED",
+            "PATCHED_BOOT_UNVERIFIED",
+            "ENABLED",
+            "STALE_KERNEL",
+            "ROLLBACK_REQUIRED",
+            "BROKEN",
+        ):
+            self.assertIn(state, source)
+        for token in (
+            "mokutil --sb-state",
+            "unsigned local amdgpu",
+            "BC250_GFX1013_PACKAGE_NEVRA",
+            "ConditionKernelCommandLine=$PATCH_MARKER",
+            "ExecCondition=+$INSTALLED_SELF ollama-guard",
+            "loaded amdgpu srcversion differs from prepared module",
+            "verify_private_radv_device",
+            'vendor.group(1).lower() == "0x1002"',
+            'device.group(1).lower() == "0x13fe"',
+            'name.lower() != "radv"',
+        ):
+            self.assertIn(token, source)
+        self.assertNotIn("mokutil --import", source)
+        self.assertNotIn("sign-file", source)
+
+    def test_optional_build_dependencies_cover_current_mesa_python_and_glslang_needs(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("python3-packaging", source)
+        self.assertIn("glslang-devel", source)
+        self.assertIn("missing_build_packages", source)
+
+    def test_check_and_recovery_interfaces_are_non_destructive_before_commit(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("prepare [--check]", source)
+        self.assertIn("disable [--check]", source)
+        self.assertIn("reset [--check]", source)
+        self.assertIn("GFX1013 prepare check: PASS", source)
+        self.assertIn("GFX1013 rollback check: PASS", source)
+        self.assertIn("No boot state, files or services were changed.", source)
+        reset = source[source.index("reset() {"): source.index('case "${1:-status}"')]
+        self.assertLess(reset.index("restore_stock_boot"), reset.index("remove_orphaned_package_artifacts"))
+
+    def test_upgrade_rolls_back_old_gfx_profile_before_payload_replacement(self) -> None:
+        spec = SPEC.read_text(encoding="utf-8")
+        pre = spec[spec.index("%pre"): spec.index("%post")]
+        self.assertIn("gfx1013.sh disable --package-upgrade", pre)
+        self.assertIn("refusing package upgrade", pre)
+        self.assertLess(
+            pre.index("gfx1013.sh disable --package-upgrade"),
+            pre.index("systemctl stop open-webui.service"),
+        )
 
     def test_lifecycle_is_exact_kernel_stock_first_and_ollama_scoped(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")

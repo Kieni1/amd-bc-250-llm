@@ -48,7 +48,7 @@ class ResetTests(unittest.TestCase):
 
     def test_reset_restores_gfx1013_before_any_destructive_reset_work(self) -> None:
         source = RESET.read_text(encoding="utf-8")
-        self.assertIn('"$GFX1013" disable --reset', source)
+        self.assertIn('"$GFX1013" reset', source)
         self.assertIn("reset is fail-closed", source)
         self.assertLess(source.index("restore_gfx1013_stock_boot"), source.index("stop_services"))
         main = source[source.index("main() {"):]

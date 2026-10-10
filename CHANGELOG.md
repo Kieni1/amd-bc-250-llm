@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.13.1-1.7 - 2026-10-11
+
+- Add a reboot-aware `bc250 gfx1013 benchmark` campaign for the accepted default-off profile: A1 stock -> B GFX1013 -> A2 restored-stock control, with exact package/kernel/model-digest binding and no automatic lifecycle transitions.
+- Keep the performance screen intentionally bounded to Standard + Advanced by default, with optional Deep confirmation; capture cold load, TTFC/TTFA, prompt/decode throughput and run spread plus MemAvailable, swap, memory PSI, GPU clock/temperature, Ollama restarts and kernel GPU-fault signatures.
+- Generate machine-readable `report.json` plus a concise `report.txt` comparing A1/B and A2 control drift; any automatic promotion signal is advisory only and GFX1013 remains experimental/default-off pending product-quality and operator review.
+- Add `bc250 qualification list [--json]` across package-gate, resilience and GFX A/B evidence, including current/stale applicability where identity can be established.
+- Add dry-run-first `bc250 qualification clean`: only terminal evidence can be selected, newest evidence per class is retained, incomplete/resumable campaigns are preserved, and cleanup refuses paths outside package-owned roots.
+- Add `bc250 version [--json|--short]`, global `bc250 --version`, and packaged Bash completion for the supported multicall interface.
+- Keep the 1.6 GFX1013 safety/rollback/Secure-Boot/runtime-guard architecture and all production model/runtime/CU defaults unchanged.
+
+## 0.13.1-1.6 - 2026-10-10
+
+- Harden the default-off GFX1013 lifecycle with explicit `DISABLED`/`PREPARED`/`PATCHED_BOOT_UNVERIFIED`/`ENABLED`/`STALE_KERNEL`/`ROLLBACK_REQUIRED`/`BROKEN` states, machine-readable status and exact package/kernel drift detection.
+- Fail `gfx1013 prepare` closed when Secure Boot is enabled or cannot be established on EFI; the package deliberately does not automate signing keys or MOK enrollment for the locally built `amdgpu` module.
+- Add non-destructive `prepare --check`, `disable --check` and `reset --check`, strengthen transactional prepare cleanup, and make recovery prefer a verifiable current-kernel stock BLS entry instead of blindly restoring an obsolete prepared-kernel entry.
+- Pin the private RADV ICD to the package-private library, verify Vulkan exposes exact BC-250 PCI `1002:13fe` through RADV before enable, and persist Vulkan identity evidence.
+- Guard the Ollama private-RADV override with the patched boot marker plus a privileged runtime identity/hash check so a later stock/stale kernel cannot consume the patched Mesa path.
+- Roll back any prepared/active GFX1013 profile before RPM upgrade payload replacement; retain fail-closed stock saved/default + next-boot restoration for reset and final erase.
+- Add `bc250 status --json` and read-only `bc250 doctor [--json]` for package, topology, resource, restart, GFX1013, Secure Boot and exact kernel-devel visibility.
+- Upgrade the package-gate schema to v2 and bind gate/resilience evidence to the installed RPM, running kernel, qualification-relevant configuration and stable GFX1013 identity so stale PASS evidence cannot silently resume.
+- Add one `make release-gate` entry point and use it from Fedora CI for Ruff/ShellCheck, authoritative RPM `%check`, configured rpmlint, binary payload validation and clean SRPM rebuild.
+
 ## 0.13.1-1.5 - 2026-10-10
 
 - Add the default-off `bc250 gfx1013 {status|prepare|enable|disable}` lifecycle as package profile `v0.2.1-alpha`, pinned to `DryhoppedIPA/bc250-gfx1013-fix` `0.2.0-alpha` commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`.

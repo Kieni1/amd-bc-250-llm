@@ -59,7 +59,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.13.1-1.5 source builds on the exact-device-qualified 0.13.1-1.0 optimization baseline and the closed Sidechat 15–19 program. Release 1.5 retains the 1.4 qualification/Tika baseline and adds only the default-off GFX1013 package profile v0.2.1-alpha; it does not reopen model/runtime optimization. Runtime/model/CU defaults remain frozen at 32K, q8_0 KV, parallel=1, flash attention on, current keep-alive/Deep admission policy and the current production model identities. Sidechat 19 rejected the combined q4_0 + TOP_K=4 arm because Advanced/Qwen became unstable under q4_0, while TOP_K=4 itself passed RAG/product acceptance and is promoted alone. The release also carries evaluator/readiness/benchmark-evidence/model-status fixes identified by Sidechats 15–19. Configured rpmlint remains a CI build gate, Agent remains optional, and broad model/runtime discovery stays closed.
+The current 0.13.1-1.7 source builds on the 1.6 GFX1013 safety/observability source candidate while the last operator-confirmed built package checkpoint remains 0.13.1-1.5. Release 1.7 is bounded QoL/qualification work: reboot-aware same-package GFX1013 A1/B/A2 benchmarking, evidence inventory/cleanup, exact version reporting and shell completion. The 1.6 Secure Boot, exact-kernel, rollback and private-RADV runtime guards are not weakened. Runtime/model/CU defaults remain frozen at 32K, q8_0 KV, parallel=1, flash attention on, current keep-alive/Deep admission policy and current production model identities. GFX1013 remains profile v0.2.1-alpha, experimental and default-off. Configured Ruff/ShellCheck, `%check`, rpmlint, RPM payload validation and clean SRPM rebuild remain grouped under the authoritative Fedora `make release-gate`; Agent remains optional and broad model/runtime discovery stays closed.
 
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
@@ -121,11 +121,13 @@ state changes. Restore state before moving to another lane.
 - RAG hidden-reasoning exhaustion with empty visible output is INCOMPLETE/retry only when no independent retrieval/semantic defect exists; repetition remains a quality failure.
 - Verification must distinguish a configured/initialized zram device from a `/dev/zramN` that is actually active swap, and must parse actual failed systemd unit rows.
 
-## Current 0.13.1-1.5 qualification boundary
+## Current 0.13.1-1.7 qualification boundary
 
 Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
 
 The pre-0.13.1 investigation attributed those writes to dispatcher-launched RAG/benchmark Python imports and proved `PYTHONDONTWRITEBYTECODE=1` prevents them. It also proved optional absent/cached models were semantically healthy despite `MISSING`/false `DRIFT` labels, and that graveyard source content must stay inert while an operator-manually registered historical model still follows normal Open WebUI testing-policy visibility. Those hygiene/model-state fixes shipped in the final 0.13.1-1.0 logic checkpoint and remain protected in 1.2. The 1.1 delta was the closed Sidechat 15–19 RAG/tooling/readiness/verification work described above; the 1.2 corrective delta narrows semantic substitution and hardens HTTP/swap diagnostics without changing qualified defaults; exact-device testing should therefore upgrade the exact 1.0 baseline to 1.2 and exercise only that bounded delta unless it exposes a regression.
+
+For 1.6, the package-build gate is intentionally separate from device qualification. The operator-provided Fedora workstation sequence is authoritative for source cache, Ruff/ShellCheck, preflight, RPM `%check`, configured rpmlint, binary payload and clean SRPM rebuild. Device work should then focus on the changed safety boundary: 1.5 -> 1.6 upgrade with GFX disabled and, when applicable, prepared/enabled-state rollback; `bc250 doctor`; JSON status schemas; Secure Boot refusal; `prepare --check`; one-shot patched boot; exact BC-250 RADV identity; stale/new-stock-kernel Ollama guard; disable/reset; and final stock saved + next boot restoration. Do not turn this into another broad model tournament.
 
 ## 6. Recommended current work order
 
@@ -154,7 +156,7 @@ The distinct `sudo systemctl reboot` invocation is device-proven unreliable on t
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.5 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
+The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.7 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
 acceptance should be one bounded real-office corpus pass (real PDFs/Tika/OCR, tables, multilingual

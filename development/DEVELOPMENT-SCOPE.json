@@ -2,8 +2,8 @@
   "schema_version": 1,
   "release": {
     "version": "0.13.1",
-    "rpm_release": "1.5",
-    "nvr": "bc250-llm-server-0.13.1-1.5"
+    "rpm_release": "1.7",
+    "nvr": "bc250-llm-server-0.13.1-1.7"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
@@ -88,10 +88,12 @@
         "quality-checks/main/**",
         "quality-checks/task/**",
         "quality-checks/translation/**",
-        "quality-checks/utils/**"
+        "quality-checks/utils/**",
+        "tests/test_gfx1013_benchmark.py"
       ],
       "focused_tests": [
-        "tests.test_benchmark"
+        "tests.test_benchmark",
+        "tests.test_gfx1013_benchmark"
       ],
       "notes": [
         "Clean reasoning-only exhaustion at the production ceiling is INCOMPLETE; repetitive degeneration remains a quality defect."
@@ -161,8 +163,8 @@
       ]
     },
     "verification-diagnostics": {
-      "status": "boundary_active",
-      "description": "Verifier, status, diagnostics, support bundles and LAN verification.",
+      "status": "active",
+      "description": "Verifier, human/JSON status, doctor diagnostics, support bundles and LAN verification.",
       "paths": [
         "cmd/monitoring/**",
         "tests/test_operations.py",
@@ -432,19 +434,41 @@
     },
     "gfx1013-experimental": {
       "status": "active",
-      "description": "Opt-in exact-kernel GFX1013 compute-queue lifecycle, pinned source/patch identity, private Ollama-only RADV and fail-closed rollback.",
+      "description": "Opt-in exact-kernel GFX1013 lifecycle plus bounded same-package A1/B/A2 inference evidence; Secure Boot/kernel-drift guards, private Ollama-only RADV and fail-closed rollback remain authoritative.",
       "paths": [
         "cmd/system/gfx1013.sh",
         "gfx1013/**",
         "docs/GFX1013.md",
-        "tests/test_gfx1013.py"
+        "tests/test_gfx1013.py",
+        "cmd/benchmark/gfx1013-ab.py",
+        "tests/test_gfx1013_benchmark.py"
       ],
       "focused_tests": [
-        "tests.test_gfx1013"
+        "tests.test_gfx1013",
+        "tests.test_gfx1013_benchmark"
       ],
       "notes": [
-        "Default OFF. Stock saved/default boot must remain authoritative until a verified patched boot is explicitly enabled.",
-        "Final erase/reset must restore and verify stock saved + next boot before destructive GFX1013 cleanup."
+        "Default OFF. Stock saved/default boot remains authoritative until a verified patched boot is explicitly enabled.",
+        "Private RADV activation is guarded by the patched boot marker, exact package/kernel identity and private payload hashes so a later stock-kernel boot cannot consume the patched ICD.",
+        "Prepare/disable/reset expose non-destructive checks; reset/final erase/upgrade must prove a safe stock saved + next boot before destructive GFX1013 cleanup.",
+        "Release 1.7 benchmark phases never automate prepare/enable/disable/reboot; A2 is required before an advisory PROMOTION_CANDIDATE can be emitted."
+      ]
+    },
+    "qualification-control": {
+      "status": "active",
+      "description": "Package-gate/resilience qualification control plus package-owned evidence inventory and conservative cleanup.",
+      "paths": [
+        "cmd/qualification/**",
+        "docs/QUALIFICATION.md",
+        "tests/test_qualification.py",
+        "tests/test_qualification_inventory.py"
+      ],
+      "focused_tests": [
+        "tests.test_qualification",
+        "tests.test_qualification_inventory"
+      ],
+      "notes": [
+        "Evidence cleanup is dry-run-first, terminal-only, preserves newest records per class and refuses symlink/out-of-root deletion targets."
       ]
     }
   }

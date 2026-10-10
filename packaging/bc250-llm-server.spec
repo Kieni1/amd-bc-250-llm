@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.5%{?dist}
+Release:        1.7%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -131,9 +131,19 @@ python3 scripts/install-manifest.py \
   --define "modulesloaddir=%{_modulesloaddir}" \
   --define "modprobedir=%{_modprobedir}" \
   --define "dbusdir=%{_datadir}/dbus-1/system.d" \
-  --define "live_manager_commit=%{live_manager_commit}"
+  --define "live_manager_commit=%{live_manager_commit}" \
+  --define "bashcompletiondir=%{_datadir}/bash-completion/completions"
 
 %pre
+# Package upgrades never carry an active/prepared GFX1013 boot profile across
+# RPM identity. Roll it back with the currently installed helper before payload
+# replacement; fail closed if a verified stock saved + next boot cannot be set.
+if [ "$1" -gt 1 ] && [ -x %{project_libexec}/gfx1013.sh ]; then
+  %{project_libexec}/gfx1013.sh disable --package-upgrade || {
+    echo "ERROR: refusing package upgrade because GFX1013 stock-boot rollback could not be verified." >&2
+    exit 1
+  }
+fi
 # On upgrades with existing Open WebUI state, stop the currently running
 # service before the new Quadlet payload can become eligible through any
 # subsequent daemon-reload.  Keep boot enablement held until bc250 install
@@ -269,6 +279,18 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.7
+- Add reboot-aware GFX1013 A1/B/A2 LLM benchmark campaigns with exact package/kernel/model-digest binding, telemetry, GPU-fault capture and JSON/text comparison reports.
+- Add package-owned qualification evidence inventory and conservative dry-run-first cleanup for old terminal package-gate, resilience and GFX benchmark artifacts.
+- Add bc250 version/--version and packaged bash completion for the supported multicall interface.
+- Keep GFX1013 v0.2.1-alpha default-off; this release adds qualification/operator QoL without changing the accepted kernel/RADV profile or production model/runtime defaults.
+
+* Sat Oct 10 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.6
+- Harden the opt-in GFX1013 lifecycle with Secure Boot fail-closed checks, explicit lifecycle states, stale-kernel/package detection, transactional prepare cleanup and verified current-stock rollback/recovery.
+- Verify the private RADV ICD points at the package library and that Vulkan exposes BC-250 PCI 1002:13fe through RADV before activation; retain device evidence in lifecycle state.
+- Add machine-readable bc250/gfx1013 status, read-only bc250 doctor diagnostics, dry-run prepare/rollback checks, and package-upgrade rollback of any prepared/active GFX1013 profile.
+- Bind package-gate/resilience evidence to RPM, kernel, relevant configuration and GFX1013 identity so stale qualification cannot silently resume after state changes.
+
 * Sat Oct 10 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.5
 - Add default-off package profile v0.2.1-alpha for exact-kernel GFX1013 compute queues, pinned to DryhoppedIPA 0.2.0-alpha commit d3e6dc062c34d2523db0abe5741d1f5b0dea00d9 with package source/patch SHA-256 manifests.
 - Keep stock saved/default boot authoritative through prepare; promote only after a verified patched boot and private-RADV/Ollama smoke, with RADV scoped to ollama.service.

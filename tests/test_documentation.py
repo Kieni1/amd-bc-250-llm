@@ -65,6 +65,7 @@ class DocumentationTests(unittest.TestCase):
             r"bc250\s+model\s+(?:status|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
             r"bc250\s+ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
             r"bc250\s+benchmark\s+owui-system-context(?:\s|$)",
+            r"bc250\s+gfx1013\s+(?:prepare|enable|disable|reset)(?:\s|$)",
             r"bc250-40cu(?:\s|$)",
             r"bc250-cu-live-manager(?:\s|$)",
         )

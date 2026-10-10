@@ -4,7 +4,7 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.13.1-1.5` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.13.1-1.7` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -62,6 +62,9 @@ CU expansion uses the packaged live WGP manager on the stock Fedora AMDGPU path;
 
 ```bash
 sudo bc250 status
+sudo bc250 status --json    # machine-readable appliance/GFX state
+sudo bc250 doctor           # read-only integrated diagnostics
+bc250 version               # exact package/runtime/GFX identity
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
 ```
@@ -69,13 +72,19 @@ sudo bc250 support-bundle   # redacted support evidence archive
 Release qualification adds `sudo bc250 package-gate capture` and the durable
 `sudo bc250 resilience ...` manager. See [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md)
 for the closed gate format, Tika 4.1 bounded smoke, interruption semantics and
-post-reboot Lane 26 resume rules.
+post-reboot Lane 26 resume rules. `sudo bc250 qualification list` inventories gate,
+resilience and GFX benchmark evidence; `qualification clean` is dry-run-first and
+only prunes old terminal evidence.
 
-Experimental GFX1013 compute-queue support is package-owned but default-off.
-Use `bc250 gfx1013 status`, then `sudo bc250 gfx1013 prepare`; only a successful
-marked patched boot can be promoted with `sudo bc250 gfx1013 enable`. Private
-RADV is scoped to `ollama.service`, and reset/RPM erase fail closed until the
-stock boot path is restored. See [`docs/GFX1013.md`](docs/GFX1013.md).
+Experimental GFX1013 compute-queue support remains package-owned and default-off.
+Release 1.6 established the explicit lifecycle states, Secure Boot fail-closed
+preflight, package/kernel-drift handling, private-RADV runtime guard and stock-first
+rollback authority. Release 1.7 keeps that safety boundary unchanged and adds a
+reboot-aware LLM A/B campaign: capture A1 stock with `sudo bc250 gfx1013 benchmark stock`, qualify/enable the patched path normally, capture B with `benchmark gfx`,
+then disable/reboot stock and capture the recommended A2 control with `benchmark
+restored`. `benchmark report` compares prompt/decode throughput, load/TTFT, memory,
+swap/PSI, GPU telemetry, restarts and GPU-fault evidence. It never changes boot or
+GFX lifecycle state itself. See [`docs/GFX1013.md`](docs/GFX1013.md).
 
 Storage visibility and explicit reclamation:
 
@@ -183,7 +192,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.5. Exact-device 0.12.2-0.8 qualification
+Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.7. Exact-device 0.12.2-0.8 qualification
 passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
 whole-appliance revalidation with this runtime; 0.13.1 does not change the Ollama pin.
 Runtime updates remain deliberately pinned rather than following upstream automatically.

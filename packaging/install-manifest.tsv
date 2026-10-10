@@ -72,10 +72,12 @@ file	0755	cmd/benchmark/category-benchmark.py	{libexec}/category-benchmark.py
 file	0755	cmd/benchmark/runtime-benchmark.py	{libexec}/runtime-benchmark.py
 file	0755	cmd/benchmark/openwebui-benchmark.py	{libexec}/openwebui-benchmark.py
 file	0755	cmd/benchmark/benchmark_common.py	{libexec}/benchmark_common.py
+file	0755	cmd/benchmark/gfx1013-ab.py	{libexec}/gfx1013-ab.py
 file	0755	cmd/benchmark/revalidate.sh	{libexec}/revalidate.sh
 file	0644	cmd/qualification/resilience_common.py	{libexec}/qualification/resilience_common.py
 file	0755	cmd/qualification/package_gate_capture.py	{libexec}/qualification/package_gate_capture.py
 file	0755	cmd/qualification/resilience_manager.py	{libexec}/qualification/resilience_manager.py
+file	0755	cmd/qualification/qualification_inventory.py	{libexec}/qualification/qualification_inventory.py
 dir	0755	-	{share}/benchmark
 dir	0755	-	{share}/benchmark/ocr
 file	0644	examples/benchmark/embedding-office.json	{share}/benchmark/embedding-office.json
@@ -94,6 +96,9 @@ file	0644	examples/benchmark/ocr/office-fr-scan.png	{share}/benchmark/ocr/office
 file	0755	cmd/monitoring/llm-run-diagnose.sh	{bindir}/llm-run-diagnose
 file	0644	cmd/monitoring/runtime-state.sh	{libexec}/runtime-state.sh
 file	0755	cmd/monitoring/status.sh	{libexec}/status.sh
+file	0755	cmd/monitoring/status-json.py	{libexec}/status-json.py
+file	0755	cmd/monitoring/doctor.py	{libexec}/doctor.py
+file	0755	cmd/monitoring/version.py	{libexec}/version.py
 file	0755	cmd/monitoring/support-bundle.sh	{libexec}/support-bundle.sh
 file	0755	cmd/system/40cu.sh	{bindir}/bc250-40cu
 file	0755	cmd/system/cu-status.sh	{libexec}/cu-status.sh
@@ -113,6 +118,7 @@ file	0755	models/coding-agent/commit-agent.sh	{libexec}/coding-agent/commit-agen
 file	0755	models/coding-agent/gitea-review.sh	{libexec}/coding-agent/gitea-review.sh
 
 file	0755	packaging/bc250	{bindir}/bc250
+file	0644	packaging/completions/bc250.bash	{bashcompletiondir}/bc250
 file	0644	gfx1013/upstream/VERSION	{share}/gfx1013/upstream/VERSION
 file	0644	gfx1013/upstream/SOURCE-REVISION	{share}/gfx1013/upstream/SOURCE-REVISION
 file	0644	gfx1013/upstream/PACKAGE-PROFILE-VERSION	{share}/gfx1013/upstream/PACKAGE-PROFILE-VERSION

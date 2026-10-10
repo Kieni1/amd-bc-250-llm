@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Concise, read-only appliance status. Use bc250 verify for pass/fail checks.
 set -uo pipefail
-CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
-RUNTIME_STATE="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/runtime-state.sh"
+LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
+CU_STATUS="$LIBEXEC/cu-status.sh"
+RUNTIME_STATE="$LIBEXEC/runtime-state.sh"
+STATUS_JSON="$LIBEXEC/status-json.py"
 if [[ ! -r "$RUNTIME_STATE" ]]; then
   RUNTIME_STATE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/runtime-state.sh"
 fi
@@ -187,14 +189,22 @@ openwebui_readiness() {
 
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
   cat <<'USAGE'
-Usage: bc250 status
+Usage: bc250 status [--json]
 
-Print a concise, read-only summary of the BC-250 appliance. Run with sudo for
+Print a concise, read-only summary of the BC-250 appliance. --json emits a
+machine-readable identity/topology/resource/GFX1013 snapshot. Run with sudo for
 complete live-CU and storage information. Use bc250 verify for pass/fail checks.
 USAGE
   exit 0
+elif [[ "${1:-}" == --json ]]; then
+  (($# == 1)) || { echo "ERROR: bc250 status --json accepts no additional arguments." >&2; exit 2; }
+  if [[ ! -x "$STATUS_JSON" ]]; then
+    STATUS_JSON="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/status-json.py"
+  fi
+  [[ -x "$STATUS_JSON" ]] || { echo "ERROR: status JSON helper is unavailable: $STATUS_JSON" >&2; exit 2; }
+  exec "$STATUS_JSON"
 elif (($#)); then
-  echo "ERROR: bc250 status does not accept arguments." >&2
+  echo "ERROR: bc250 status accepts only --json." >&2
   exit 2
 fi
 

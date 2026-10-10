@@ -227,10 +227,10 @@ def check_dispatcher_and_runtime_contracts() -> None:
     dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
     routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
-        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp",
+        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "doctor",
         "fetch-mtp", "gfx1013", "gitea-review", "install", "maintenance", "model", "ocr",
         "package-gate", "rag", "reset", "resilience", "revalidate", "ollama-profile",
-        "openwebui-setup", "run-mtp", "status", "support-bundle", "storage", "verify",
+        "openwebui-setup", "qualification", "run-mtp", "status", "support-bundle", "storage", "verify", "version",
     }
     if routes != required:
         fail(f"dispatcher command set differs from the supported interface: {sorted(routes)}")
@@ -262,6 +262,17 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "grub2-set-default",
             "VK_DRIVER_FILES",
             "prepare_cleanup_on_exit",
+            "Secure Boot",
+            "ROLLBACK_REQUIRED",
+            "STALE_KERNEL",
+            "status_json",
+            "reset()",
+            "verify_private_radv_device",
+            "BC250_GFX1013_PACKAGE_NEVRA",
+            "ConditionKernelCommandLine=$PATCH_MARKER",
+            "ExecCondition=+$INSTALLED_SELF ollama-guard",
+            "ollama_guard()",
+            "benchmark {stock|gfx|restored|status|report}",
         ),
         "cmd/system/storage.py": (
             "reflink=1",

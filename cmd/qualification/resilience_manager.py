@@ -22,6 +22,7 @@ try:
         active_swaps,
         atomic_write_json,
         normal_topology_status,
+        qualification_identity,
         query_installed_rpm,
         rc_result,
         refresh_managed_swap,
@@ -141,6 +142,15 @@ class CampaignManager:
                 "installed RPM does not match the authoritative package-gate candidate",
                 "INCOMPLETE",
             )
+        gate_qualification = gate.get("qualification_identity")
+        if not isinstance(gate_qualification, dict):
+            raise QualificationError("package-gate lacks qualification identity", "INCOMPLETE")
+        observed_qualification = qualification_identity()
+        if observed_qualification != gate_qualification:
+            raise QualificationError(
+                "current kernel/configuration/GFX1013 identity no longer matches the package gate",
+                "INCOMPLETE",
+            )
         plan = load_plan(plan_source)
 
         self.campaign.mkdir(parents=True, exist_ok=False)
@@ -171,6 +181,7 @@ class CampaignManager:
             "phase": "pre-reboot",
             "result": "INCOMPLETE",
             "package_identity": installed,
+            "qualification_identity": observed_qualification,
             "package_gate_manifest_sha256": copied_gate.manifest_sha256,
             "source_identity": source_identity(self._source_paths()),
             "plan_sha256": sha256_path(self.plan_path),
@@ -212,6 +223,16 @@ class CampaignManager:
         candidate = gate_validation.gate.get("candidate")
         if not isinstance(candidate, dict) or candidate.get("nevra") != installed["nevra"]:
             return self.mark_gap("installed RPM no longer matches package-gate candidate")
+        expected_qualification = self.state.get("qualification_identity")
+        gate_qualification = gate_validation.gate.get("qualification_identity")
+        if not isinstance(expected_qualification, dict) or gate_qualification != expected_qualification:
+            return self.mark_gap("qualification identity in the package gate/campaign is missing or changed")
+        try:
+            observed_qualification = qualification_identity()
+        except QualificationError as exc:
+            return self.mark_gap(f"current qualification identity unavailable: {exc}")
+        if observed_qualification != expected_qualification:
+            return self.mark_gap("kernel/configuration/GFX1013 identity changed since campaign start")
 
         expected_source = self.state.get("source_identity")
         try:

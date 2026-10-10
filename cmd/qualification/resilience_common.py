@@ -16,10 +16,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 PACKAGE_NAME = "bc250-llm-server"
-PACKAGE_GATE_SCHEMA = "bc250.package-gate.v1"
+PACKAGE_GATE_SCHEMA = "bc250.package-gate.v2"
 RESILIENCE_PLAN_SCHEMA = "bc250.resilience-plan.v1"
 RESILIENCE_STATE_SCHEMA = "bc250.resilience-state.v1"
 MANAGED_SWAP = Path("/var/lib/bc250-llm-server/swap/bc250-llm.swap")
+DEFAULT_LIBEXEC = Path("/usr/libexec/bc250-llm-server")
+QUALIFICATION_CONFIG_PATHS = (
+    Path("/etc/cyan-skillfish-governor-smu/config.toml"),
+    Path("/etc/bc250-llm-server/mtp-models.toml"),
+    Path("/etc/bc250-llm-server/models.d"),
+    Path("/etc/systemd/system/ollama.service.d/70-bc250-gfx1013.conf"),
+)
 
 RESULT_TO_RC = {
     "PASS": 0,
@@ -191,6 +198,77 @@ def write_command_evidence(path: Path, result: CommandResult) -> None:
     ]
     path.write_text("\n".join(text), encoding="utf-8")
     os.chmod(path, 0o600)
+
+
+
+def _path_tree_identity(path: Path) -> object:
+    if not path.exists():
+        return {"status": "missing"}
+    if path.is_symlink():
+        return {"status": "symlink", "target": os.readlink(path)}
+    if path.is_file():
+        return {"status": "file", "sha256": sha256_path(path)}
+    if path.is_dir():
+        entries: dict[str, object] = {}
+        for child in sorted(path.rglob("*")):
+            relative = child.relative_to(path).as_posix()
+            if child.is_symlink():
+                entries[relative] = {"type": "symlink", "target": os.readlink(child)}
+            elif child.is_file():
+                entries[relative] = {"type": "file", "sha256": sha256_path(child)}
+            elif child.is_dir():
+                entries[relative] = {"type": "dir"}
+        return {"status": "directory", "entries": entries}
+    return {"status": "other"}
+
+
+def qualification_config_identity(paths: Iterable[Path] = QUALIFICATION_CONFIG_PATHS) -> dict[str, object]:
+    return {str(path): _path_tree_identity(path) for path in paths}
+
+
+def gfx1013_identity(libexec: Path | None = None) -> dict[str, object]:
+    libexec = libexec or Path(os.environ.get("BC250_LIBEXEC", DEFAULT_LIBEXEC))
+    helper = libexec / "gfx1013.sh"
+    if not helper.is_file():
+        raise QualificationError(f"GFX1013 status helper is missing: {helper}", "INCOMPLETE")
+    result = run_command([str(helper), "status", "--json"], timeout=60)
+    if result.returncode != 0:
+        raise QualificationError(
+            f"GFX1013 status failed: {result.stderr.strip() or result.stdout.strip() or f'rc={result.returncode}'}",
+            "INCOMPLETE",
+        )
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise QualificationError(f"GFX1013 status returned invalid JSON: {exc}", "INCOMPLETE") from exc
+    if not isinstance(payload, dict) or payload.get("schema") != "bc250.gfx1013-status.v1":
+        raise QualificationError("GFX1013 status returned an unrecognized schema", "INCOMPLETE")
+    package = payload.get("package") if isinstance(payload.get("package"), dict) else {}
+    kernel = payload.get("kernel") if isinstance(payload.get("kernel"), dict) else {}
+    vulkan = payload.get("vulkan") if isinstance(payload.get("vulkan"), dict) else {}
+    return {
+        "state": payload.get("state"),
+        "profile": payload.get("profile"),
+        "upstream": payload.get("upstream"),
+        "source_identity_ok": payload.get("source_identity_ok"),
+        "prepared_package_nevra": package.get("prepared_nevra"),
+        "prepared_kernel": kernel.get("prepared"),
+        "enabled_recorded": payload.get("enabled_recorded"),
+        "ollama_private_radv_override": payload.get("ollama_private_radv_override"),
+        "private_radv_present": payload.get("private_radv_present"),
+        "private_icd_present": payload.get("private_icd_present"),
+        "vulkan": vulkan,
+    }
+
+
+def qualification_identity(libexec: Path | None = None) -> dict[str, object]:
+    libexec = libexec or Path(os.environ.get("BC250_LIBEXEC", DEFAULT_LIBEXEC))
+    return {
+        "installed_package": query_installed_rpm(),
+        "kernel": os.uname().release,
+        "configuration": qualification_config_identity(),
+        "gfx1013": gfx1013_identity(libexec),
+    }
 
 
 def parse_swapon_output(text: str) -> list[tuple[Path, int]]:
