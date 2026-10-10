@@ -694,6 +694,25 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("shellcheck", workflow)
         self.assertIn("ruff rust ShellCheck", workflow)
 
+    def test_build_environment_uses_portable_c_locale(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
+            encoding="utf-8"
+        )
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertRegex(workflow, r"(?m)^  LANG: C$")
+        self.assertRegex(workflow, r"(?m)^  LC_ALL: C$")
+        self.assertIn("export LANG := C", makefile)
+        self.assertIn("export LC_ALL := C", makefile)
+        self.assertNotIn("en_US.UTF-8", workflow + makefile)
+
+    def test_main_rpm_description_respects_rpmlint_line_limit(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        match = re.search(r"(?ms)^%description\s*$\n(.*?)(?=^%[A-Za-z])", spec)
+        self.assertIsNotNone(match)
+        assert match is not None
+        too_long = [line for line in match.group(1).splitlines() if len(line) > 79]
+        self.assertEqual(too_long, [])
+
     def test_build_outputs_share_one_dist_directory(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(

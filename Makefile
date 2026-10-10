@@ -1,4 +1,6 @@
 SHELL := /bin/bash
+export LANG := C
+export LC_ALL := C
 NAME := bc250-llm-server
 VERSION := $(shell cat VERSION)
 TOPDIR := $(CURDIR)/rpmbuild

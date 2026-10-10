@@ -137,6 +137,13 @@ def check_version() -> None:
         fail("spec Release or top changelog entry is malformed")
     elif changelog_match.group(1) != f"{version}-{release_match.group(1)}":
         fail("top changelog entry does not match Version-Release")
+    description_match = re.search(
+        r"(?ms)^%description\s*$\n(.*?)(?=^%[A-Za-z])", spec
+    )
+    if description_match is None:
+        fail("RPM spec is missing the main %description")
+    elif any(len(line) > 79 for line in description_match.group(1).splitlines()):
+        fail("RPM %description contains a line longer than 79 characters")
     if re.search(r"(?m)^Requires:\s+git\s*$", spec):
         fail("runtime dependency must use git-core instead of the larger git meta-package")
 
@@ -359,6 +366,10 @@ def check_dispatcher_and_runtime_contracts() -> None:
             fail("runtime governor commit metadata is malformed")
 
     workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+    if not re.search(r"(?m)^  LANG: C$", workflow):
+        fail("GitHub Actions must force portable LANG=C")
+    if not re.search(r"(?m)^  LC_ALL: C$", workflow):
+        fail("GitHub Actions must force portable LC_ALL=C")
     refs = re.findall(r"uses:\s+actions/[^@\s]+@([^\s#]+)", workflow)
     if not refs or any(re.fullmatch(r"[0-9a-f]{40}", ref) is None for ref in refs):
         fail("GitHub Actions must use full reviewed commit IDs")

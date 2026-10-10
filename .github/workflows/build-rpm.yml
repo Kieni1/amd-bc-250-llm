@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+env:
+  LANG: C
+  LC_ALL: C
+
 jobs:
   build:
     runs-on: ubuntu-latest

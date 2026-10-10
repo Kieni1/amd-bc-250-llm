@@ -89,7 +89,8 @@ installed, but the RPM never changes CU routing automatically. The Ollama
 binary remains an upstream payload installed by the guided helper. The RPM owns
 the complete four-lane systemd topology. Model weights, users and
 operator-created Open WebUI state, HTTPS and CU changes remain
-operator-controlled. Experimental GFX1013 compute-queue support is package-owned, opt-in and default-off.
+operator-controlled. Experimental GFX1013 compute-queue support is
+package-owned, opt-in and default-off.
 
 %prep
 %setup -q
