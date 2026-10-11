@@ -10,13 +10,17 @@ CACHE_ROOT="${BC250_GFX1013_CACHE_ROOT:-/var/cache/bc250-llm-server/gfx1013}"
 DROPIN="${BC250_GFX1013_DROPIN:-/etc/systemd/system/ollama.service.d/70-bc250-gfx1013.conf}"
 UPSTREAM_GENERATOR="${BC250_GFX1013_UPSTREAM_GENERATOR:-/usr/lib/systemd/user-environment-generators/60-bc250-gfx1013-v33}"
 UPSTREAM_STATE="${BC250_GFX1013_UPSTREAM_STATE:-/var/lib/bc250-gfx1013}"
-PACKAGE_PROFILE=v0.2.1-alpha
+PACKAGE_PROFILE=v0.2.2-alpha
 UPSTREAM_VERSION=0.2.0-alpha
 PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9
 TESTED_KERNEL=7.2.9-200.fc44.x86_64
-MESA_VERSION=26.2.0-rc3
-MESA_URL="${BC250_GFX1013_MESA_URL:-https://archive.mesa3d.org/mesa-${MESA_VERSION}.tar.xz}"
-MESA_SHA256=f733c005660d342a51c6727d1ad481f43d05b4c601ac72247fa641e1d73a8ad1
+MESA_VERSION=26.2.4
+MESA_FEDORA_RELEASE=1.fc44
+MESA_SRPM_NEVRA="mesa-${MESA_VERSION}-${MESA_FEDORA_RELEASE}.src"
+MESA_SRPM_CANONICAL_URL="https://kojipkgs.fedoraproject.org/packages/mesa/${MESA_VERSION}/${MESA_FEDORA_RELEASE}/src/mesa-${MESA_VERSION}-${MESA_FEDORA_RELEASE}.src.rpm"
+MESA_SRPM_URL="${BC250_GFX1013_MESA_SRPM_URL:-$MESA_SRPM_CANONICAL_URL}"
+MESA_SOURCE0="mesa-${MESA_VERSION}.tar.xz"
+MESA_SOURCE0_SHA256=bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9
 ACTIVE_STATE="$STATE_ROOT/active.env"
 PATCH_MARKER=bc250.gfx1013_v33=1
 PROFILE_VARIANT=bc250-gfx1013-v33
@@ -45,7 +49,7 @@ Experimental BC-250 GFX1013 compute-queue profile. Default is OFF.
            Reboot-aware same-package A1/B/A2 LLM performance campaign. Benchmarking
            never changes boot state or enables/disables GFX1013 itself.
 
-The package profile is v0.2.1-alpha, based on upstream 0.2.0-alpha commit
+The package profile is v0.2.2-alpha, based on upstream 0.2.0-alpha commit
  d3e6dc062c34d2523db0abe5741d1f5b0dea00d9. Mesh/task, 40-CU, FSR and tuning
 changes are outside this profile.
 USAGE
@@ -76,7 +80,14 @@ benchmark() {
 }
 
 say() { printf '%s\n' "$*"; }
-die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
+die() {
+  local message="$*"
+  if [[ -n ${PREPARE_DIR:-} && ${PREPARE_COMMITTED:-1} != 1 ]]; then
+    PREPARE_FAILURE_REASON="$message"
+  fi
+  printf 'ERROR: %s\n' "$message" >&2
+  exit 2
+}
 need_root() { [[ ${EUID:-$(id -u)} -eq 0 ]] || die "requires root (run with sudo)"; }
 kernel_release() { uname -r; }
 prepared_dir_for() { printf '%s/prepared/%s' "$STATE_ROOT" "$1"; }
@@ -140,7 +151,7 @@ secure_boot_prepare_ok() {
 }
 
 GFX_BUILD_PACKAGES=(
-  gcc gcc-c++ make rpm-build elfutils-libelf-devel openssl-devel meson ninja-build
+  gcc gcc-c++ make rpm-build cargo-rpm-macros binutils elfutils-libelf-devel openssl-devel meson ninja-build
   bison flex python3-mako python3-pyyaml python3-packaging glslang glslang-devel
   libdrm-devel libxcb-devel libX11-devel
   libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel
@@ -181,6 +192,14 @@ source_identity_ok() {
   [[ -s "$SOURCE/PATCH-SHA256SUMS" && -s "$SOURCE/SOURCE-SHA256SUMS" ]] || return 1
   (cd "$SOURCE" && sha256sum --quiet -c PATCH-SHA256SUMS) || return 1
   (cd "$SOURCE" && sha256sum --quiet -c SOURCE-SHA256SUMS) || return 1
+  # Cross-check the package constants against the carried Fedora Mesa provenance.
+  [[ -r "$SOURCE/MESA-SOURCE" ]] || return 1
+  grep -qx "version=$MESA_VERSION" "$SOURCE/MESA-SOURCE" || return 1
+  grep -qx "fedora_release=$MESA_FEDORA_RELEASE" "$SOURCE/MESA-SOURCE" || return 1
+  grep -qx "srpm_nevra=$MESA_SRPM_NEVRA" "$SOURCE/MESA-SOURCE" || return 1
+  grep -qx "srpm_url=$MESA_SRPM_CANONICAL_URL" "$SOURCE/MESA-SOURCE" || return 1
+  grep -qx "source0=$MESA_SOURCE0" "$SOURCE/MESA-SOURCE" || return 1
+  grep -qx "source0_sha256=$MESA_SOURCE0_SHA256" "$SOURCE/MESA-SOURCE" || return 1
   # This package profile deliberately applies only the compute-queue Mesa patch.
   [[ "$(grep -Ev '^[[:space:]]*(#|$)' "$SOURCE/patches/mesa/series")" == "0001-gfx1013-compute-queue-fix.patch" ]] || return 1
 }
@@ -238,12 +257,13 @@ load_active_state() {
   [[ "${BC250_GFX1013_STOCK_MODULE:-}" == /usr/lib/modules/"$BC250_GFX1013_KERNEL"/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko* ||
      "${BC250_GFX1013_STOCK_MODULE:-}" == /lib/modules/"$BC250_GFX1013_KERNEL"/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko* ]] || return 1
   [[ "${BC250_GFX1013_ENABLED:-0}" =~ ^[01]$ ]] || return 1
+  [[ "${BC250_GFX1013_MESA_SRPM_NEVRA:-}" == "$MESA_SRPM_NEVRA" ]] || return 1
   local hash_name
   for hash_name in \
     BC250_GFX1013_MODULE_SHA256 BC250_GFX1013_ABI_SHA256 \
     BC250_GFX1013_PATCH_MANIFEST_SHA256 BC250_GFX1013_SOURCE_MANIFEST_SHA256 \
-    BC250_GFX1013_KERNEL_SRPM_SHA256 BC250_GFX1013_MESA_SOURCE_SHA256 \
-    BC250_GFX1013_STOCK_MODULE_SHA256 BC250_GFX1013_STOCK_INITRAMFS_SHA256 \
+    BC250_GFX1013_KERNEL_SRPM_SHA256 BC250_GFX1013_MESA_SRPM_SHA256 \
+    BC250_GFX1013_MESA_SOURCE_SHA256 BC250_GFX1013_STOCK_MODULE_SHA256 BC250_GFX1013_STOCK_INITRAMFS_SHA256 \
     BC250_GFX1013_PRIVATE_RADV_SHA256 BC250_GFX1013_ICD_SHA256; do
     [[ "${!hash_name:-}" =~ ^[0-9a-f]{64}$ ]] || return 1
   done
@@ -387,14 +407,15 @@ status_json() {
     "$patched_running" "$dropin_present" "$radv_present" "$icd_present" \
     "${BC250_GFX1013_STOCK_ENTRY_ID:-}" "${BC250_GFX1013_PATCHED_ENTRY_ID:-}" \
     "${BC250_GFX1013_VULKAN_VENDOR_ID:-}" "${BC250_GFX1013_VULKAN_DEVICE_ID:-}" \
-    "${BC250_GFX1013_VULKAN_DRIVER_NAME:-}" "${BC250_GFX1013_VULKAN_SUMMARY_SHA256:-}" <<'PY_JSON'
+    "${BC250_GFX1013_VULKAN_DRIVER_NAME:-}" "${BC250_GFX1013_VULKAN_SUMMARY_SHA256:-}" \
+    "$MESA_VERSION" "$MESA_SRPM_NEVRA" "$MESA_SOURCE0" "$MESA_SOURCE0_SHA256" <<'PY_JSON'
 import json
 import sys
 (
     state, reason, profile, upstream, commit, running_kernel, tested_kernel, secure_boot,
     source_ok, device_ok, package, prepared_package, prepared_kernel, enabled, saved, next_entry,
     patched_running, dropin, radv, icd, stock_entry, patched_entry, vk_vendor, vk_device,
-    vk_driver, vk_summary_sha,
+    vk_driver, vk_summary_sha, mesa_version, mesa_srpm_nevra, mesa_source0, mesa_source0_sha,
 ) = sys.argv[1:]
 def b(value: str) -> bool:
     return value == "true"
@@ -406,6 +427,12 @@ payload = {
     "default_off": True,
     "profile": profile,
     "upstream": {"version": upstream, "commit": commit},
+    "mesa": {
+        "version": mesa_version,
+        "fedora_source_nevra": mesa_srpm_nevra,
+        "source0": mesa_source0,
+        "source0_sha256": mesa_source0_sha,
+    },
     "package": {"installed_nevra": package or None, "prepared_nevra": prepared_package or None},
     "kernel": {"running": running_kernel, "prepared": prepared_kernel or None, "reference": tested_kernel},
     "secure_boot": secure_boot,
@@ -444,7 +471,7 @@ status() {
   echo "State reason: $reason"
   echo "GFX1013 package profile: $PACKAGE_PROFILE / experimental / default OFF until enable"
   echo "Pinned upstream: $UPSTREAM_VERSION @ $PINNED_COMMIT"
-  echo "Mesa source: $MESA_VERSION @ sha256:$MESA_SHA256"
+  echo "Mesa baseline: Fedora $MESA_SRPM_NEVRA; Source0 $MESA_SOURCE0 @ sha256:$MESA_SOURCE0_SHA256"
   echo "Installed package: ${current_package:-unavailable}"
   echo "Secure Boot: $secure"
   kernel_state
@@ -495,14 +522,14 @@ check_os_and_boot_tools() {
   [[ "${ID:-}" == fedora ]] || die "GFX1013 package profile supports Fedora only"
   command -v rpm-ostree >/dev/null 2>&1 && die "image/Atomic Fedora is not supported by this direct exact-kernel profile"
   local cmd missing=()
-  for cmd in curl xz zstd tar cpio patch gcc g++ make rpm rpm2cpio meson ninja python3 \
+  for cmd in curl xz zstd gzip tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
     sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
     command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
   done
   if ((${#missing[@]})); then
     printf 'ERROR: GFX1013 build/install tools missing: %s\n' "${missing[*]}" >&2
     printf 'Install the optional build dependencies and exact running-kernel headers, for example:\n' >&2
-    printf '  sudo dnf install kernel-devel-%s gcc gcc-c++ make rpm-build elfutils-libelf-devel openssl-devel meson ninja-build bison flex python3-mako python3-pyyaml python3-packaging glslang glslang-devel libdrm-devel libxcb-devel libX11-devel libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel zlib-devel libzstd-devel spirv-tools-devel\n' "$(kernel_release | sed 's/\.x86_64$//')" >&2
+    printf '  sudo dnf install kernel-devel-%s gcc gcc-c++ make rpm-build cargo-rpm-macros binutils elfutils-libelf-devel openssl-devel meson ninja-build bison flex python3-mako python3-pyyaml python3-packaging glslang glslang-devel libdrm-devel libxcb-devel libX11-devel libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel zlib-devel libzstd-devel spirv-tools-devel\n' "$(kernel_release | sed 's/\.x86_64$//')" >&2
     exit 2
   fi
   local missing_packages package
@@ -565,20 +592,92 @@ compress_module_like_stock() {
 
 apply_patch_checked() {
   local tree=$1 patch_file=$2
-  patch --dry-run -p1 -s -d "$tree" < "$patch_file" >/dev/null || die "patch dry-run failed: $patch_file"
-  patch -p1 -s -d "$tree" < "$patch_file"
+  patch --batch --forward --fuzz=0 --dry-run -p1 -s -d "$tree" < "$patch_file" >/dev/null || \
+    die "patch zero-fuzz dry-run failed: $patch_file"
+  patch --batch --forward --fuzz=0 -p1 -s -d "$tree" < "$patch_file"
 }
 
-verify_module_abi() {
-  local build=$1 module=$2 symvers="$build/Module.symvers" required
-  [[ -r "$symvers" ]] || die "kernel Module.symvers is missing: $symvers"
-  required="$(mktemp)"
-  modprobe --show-modversions "$module" 2>/dev/null | sort -u > "$required" || { rm -f "$required"; die "unable to read module symbol versions"; }
-  [[ -s "$required" ]] || { rm -f "$required"; die "built amdgpu exposes no versioned ABI requirements"; }
-  python3 - "$symvers" "$required" <<'PY_ABI' || { rm -f "$required"; die "built amdgpu symbol-version ABI does not match the exact kernel build tree"; }
+select_linux_source_archive() {
+  local root=$1 path
+  local -a matches=()
+  while IFS= read -r path; do
+    matches+=("$path")
+  done < <(find "$root" -type f \( \
+    -name 'linux-*.tar.xz' -o -name 'linux-*.tar.zst' -o -name 'linux-*.tar.gz' \
+    -o -name 'linux-*.tar.bz2' -o -name 'linux-*.tar' \) -print | sort)
+  ((${#matches[@]} == 1)) || {
+    printf 'ERROR: expected exactly one Linux source archive in exact kernel SRPM; found %d\n' "${#matches[@]}" >&2
+    printf '  %s\n' "${matches[@]:-<none>}" >&2
+    return 1
+  }
+  printf '%s\n' "${matches[0]}"
+}
+
+adapt_external_amd_trace_paths() {
+  local amd_root=$1
+  python3 - "$amd_root" <<'PY_TRACE'
 import sys
 from pathlib import Path
 
+root = Path(sys.argv[1]).resolve()
+path = root / "amdgpu" / "amdgpu_trace.h"
+old = "#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu"
+if not path.is_file():
+    raise SystemExit(f"required AMD trace header is missing: {path}")
+text = path.read_text(encoding="utf-8", errors="strict")
+count = text.count(old)
+if count != 1:
+    raise SystemExit(f"expected exactly one in-tree TRACE_INCLUDE_PATH in {path}, found {count}")
+new = f"#define TRACE_INCLUDE_PATH {path.parent.resolve()}"
+path.write_text(text.replace(old, new, 1), encoding="utf-8")
+print(f"adapted external TRACE_INCLUDE_PATH in {path}")
+PY_TRACE
+}
+
+materialize_module_ko() {
+  local module=$1 out=$2
+  case "$module" in
+    *.ko) cp -p "$module" "$out" ;;
+    *.ko.xz) xz -dc "$module" > "$out" ;;
+    *.ko.zst) zstd -q -dc "$module" > "$out" ;;
+    *.ko.gz) gzip -dc "$module" > "$out" ;;
+    *) die "unsupported built module compression for ABI verification: $module" ;;
+  esac
+  [[ -s "$out" ]] || die "decompressed module is empty: $module"
+}
+
+kernel_modversions_enabled() {
+  local build=$1 kernel=$2 config=''
+  if [[ -r "$build/.config" ]]; then
+    config="$build/.config"
+  elif [[ -r "/boot/config-$kernel" ]]; then
+    config="/boot/config-$kernel"
+  else
+    die "exact kernel configuration unavailable for ABI verification"
+  fi
+  if grep -qx 'CONFIG_MODVERSIONS=y' "$config"; then
+    return 0
+  fi
+  if grep -qx '# CONFIG_MODVERSIONS is not set' "$config" || grep -qx 'CONFIG_MODVERSIONS=n' "$config"; then
+    return 1
+  fi
+  die "CONFIG_MODVERSIONS state is ambiguous in $config"
+}
+
+verify_module_abi() {
+  local build=$1 module=$2 work=$3 kernel=$4 symvers="$build/Module.symvers"
+  local raw="$work/abi-amdgpu.ko" required="$work/abi-required.txt"
+  [[ -r "$symvers" ]] || die "kernel Module.symvers is missing: $symvers"
+  materialize_module_ko "$module" "$raw"
+  if kernel_modversions_enabled "$build" "$kernel"; then
+    {
+      echo 'mode=modversions'
+      modprobe --show-modversions "$raw" 2>/dev/null | sort -u
+    } > "$required" || die "unable to read module symbol versions"
+    [[ "$(wc -l < "$required")" -gt 1 ]] || die "built amdgpu exposes no versioned ABI requirements"
+    python3 - "$symvers" "$required" <<'PY_ABI_CRC' || die "built amdgpu symbol-version ABI does not match the exact kernel build tree"
+import sys
+from pathlib import Path
 symvers, required = map(Path, sys.argv[1:])
 known = {}
 for line in symvers.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -588,7 +687,7 @@ for line in symvers.read_text(encoding="utf-8", errors="replace").splitlines():
 errors = []
 for line in required.read_text(encoding="utf-8", errors="replace").splitlines():
     fields = line.split()
-    if len(fields) < 2:
+    if len(fields) < 2 or fields[0].startswith("mode="):
         continue
     crc, symbol = fields[0].lower(), fields[1]
     actual = known.get(symbol)
@@ -599,14 +698,35 @@ for line in required.read_text(encoding="utf-8", errors="replace").splitlines():
 if errors:
     print("; ".join(errors[:20]), file=sys.stderr)
     raise SystemExit(1)
-PY_ABI
+PY_ABI_CRC
+  else
+    {
+      echo 'mode=symbol-resolution'
+      nm -u --format=posix "$raw" | awk '$2 == "U" {print $1}' | sort -u
+    } > "$required" || die "unable to enumerate built amdgpu imported symbols"
+    [[ "$(wc -l < "$required")" -gt 1 ]] || die "built amdgpu exposes no strong imported symbols"
+    python3 - "$symvers" "$required" <<'PY_ABI_SYMBOLS' || die "built amdgpu imports symbols absent from the exact kernel Module.symvers"
+import sys
+from pathlib import Path
+symvers, required = map(Path, sys.argv[1:])
+known = set()
+for line in symvers.read_text(encoding="utf-8", errors="replace").splitlines():
+    fields = line.split()
+    if len(fields) >= 2:
+        known.add(fields[1])
+needed = [line for line in required.read_text(encoding="utf-8").splitlines() if line and not line.startswith("mode=")]
+missing = [symbol for symbol in needed if symbol not in known]
+if missing:
+    print("missing imports: " + ", ".join(missing[:20]), file=sys.stderr)
+    raise SystemExit(1)
+PY_ABI_SYMBOLS
+  fi
   sha256sum "$required" | awk '{print $1}'
-  rm -f "$required"
 }
 
 build_kernel_module() {
   local kernel=$1 build=$2 work=$3 artifact=$4 stock_module=$5
-  local version release srpm_url srpm expected_vr actual_vr source_root tarball linux_root patch_file raw
+  local version release srpm_url srpm expected_vr actual_vr source_root srpm_root tarball linux_root patch_file raw
   version="${kernel%%-*}"
   release="${kernel#*-}"; release="${release%.*}"
   srpm_url="${BC250_GFX1013_KERNEL_SRPM_URL:-https://kojipkgs.fedoraproject.org/packages/kernel/${version}/${release}/src/kernel-${version}-${release}.src.rpm}"
@@ -618,17 +738,22 @@ build_kernel_module() {
   rpm -K "$srpm" >/dev/null 2>&1 || die "kernel source RPM failed RPM digest/signature verification"
 
   source_root="$work/kernel"
-  rm -rf "$source_root"; install -d -m 0750 "$source_root"
-  (cd "$source_root" && rpm2cpio "$srpm" | cpio -id --quiet 'linux-*.tar.xz')
-  tarball="$(find "$source_root" -maxdepth 1 -type f -name 'linux-*.tar.xz' | head -1)"
-  [[ -n "$tarball" ]] || die "kernel source tarball not found in exact source RPM"
+  srpm_root="$source_root/srpm"
+  rm -rf "$source_root"; install -d -m 0750 "$srpm_root"
+  (cd "$srpm_root" && rpm2cpio "$srpm" | cpio -id --quiet)
+  find "$srpm_root" -type f -printf '%P\n' | LC_ALL=C sort > "$work/kernel-srpm-members.txt"
+  tarball="$(select_linux_source_archive "$srpm_root")" || die "kernel source archive selection failed"
   tar -C "$source_root" -xf "$tarball" --wildcards 'linux-*/drivers/gpu/drm/amd'
-  linux_root="$(find "$source_root" -maxdepth 1 -type d -name 'linux-*' | head -1)"
-  [[ -n "$linux_root" ]] || die "extracted kernel source root not found"
+  local -a linux_roots=()
+  mapfile -t linux_roots < <(find "$source_root" -mindepth 1 -maxdepth 1 -type d -name 'linux-*' -print | sort)
+  ((${#linux_roots[@]} == 1)) || die "expected exactly one extracted Linux source root"
+  linux_root="${linux_roots[0]}"
+  adapt_external_amd_trace_paths "$linux_root/drivers/gpu/drm/amd" >>"$work/kernel-build.log" 2>&1 || \
+    die "AMD external-module trace-path adaptation failed; see $work/kernel-build.log"
   for patch_file in "$SOURCE"/patches/kernel/v33/*.patch; do
     apply_patch_checked "$linux_root" "$patch_file"
   done
-  make -C "$build" "M=$linux_root/drivers/gpu/drm/amd/amdgpu" modules "-j$(nproc)" >"$work/kernel-build.log" 2>&1 || \
+  make -C "$build" "M=$linux_root/drivers/gpu/drm/amd/amdgpu" modules "-j$(nproc)" >>"$work/kernel-build.log" 2>&1 || \
     die "amdgpu build failed; see $work/kernel-build.log"
   raw="$linux_root/drivers/gpu/drm/amd/amdgpu/amdgpu.ko"
   [[ -f "$raw" ]] || die "amdgpu build produced no module"
@@ -636,30 +761,60 @@ build_kernel_module() {
   printf '%s\n' "$srpm"
 }
 
+prepare_fedora_mesa_source() {
+  local work=$1 srpm=$2 prepared_out=$3 source0_out=$4
+  local rpm_top="$work/mesa-rpmbuild" spec actual_nevra source0
+  rm -rf "$rpm_top"
+  mkdir -p "$rpm_top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+  (cd "$rpm_top/SOURCES" && rpm2cpio "$srpm" | cpio -id --quiet)
+  spec="$(find "$rpm_top/SOURCES" -maxdepth 1 -type f -name 'mesa*.spec' -print -quit)"
+  [[ -n "$spec" ]] || die "Mesa source RPM contains no spec file"
+  mv "$spec" "$rpm_top/SPECS/mesa.spec"
+  source0="$rpm_top/SOURCES/$MESA_SOURCE0"
+  [[ -f "$source0" ]] || die "Mesa source RPM does not contain expected Source0: $MESA_SOURCE0"
+  printf '%s  %s\n' "$MESA_SOURCE0_SHA256" "$source0" | sha256sum --quiet -c || \
+    die "Fedora Mesa Source0 failed pinned SHA-256 verification"
+  actual_nevra="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' "$srpm" 2>/dev/null || true)"
+  [[ "$actual_nevra" == "$MESA_SRPM_NEVRA" ]] || die "Mesa source RPM identity mismatch: expected $MESA_SRPM_NEVRA, got ${actual_nevra:-unreadable}"
+  rpmbuild -bp --nodeps --define "_topdir $rpm_top" "$rpm_top/SPECS/mesa.spec" \
+    >"$work/mesa-prep.log" 2>&1 || die "Fedora Mesa %prep failed; see $work/mesa-prep.log"
+  local -a candidates=()
+  mapfile -t candidates < <(find "$rpm_top/BUILD" -type f -path '*/src/amd/common/ac_gpu_info.c' -print | sort)
+  ((${#candidates[@]} == 1)) || die "Fedora Mesa %prep did not produce exactly one ac_gpu_info.c"
+  python3 - "${candidates[0]}" "$prepared_out" <<'PY_MESA_ROOT'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1]).resolve()
+root = p.parents[3]
+Path(sys.argv[2]).write_text(str(root) + "\n", encoding="utf-8")
+PY_MESA_ROOT
+  printf '%s\n' "$source0" > "$source0_out"
+}
+
 build_mesa() {
-  local work=$1 stage=$2 tarball source_root mesa_src patch_name
-  tarball="$CACHE_ROOT/mesa-${MESA_VERSION}.tar.xz"
-  fetch_file "$MESA_URL" "$tarball"
-  printf '%s  %s\n' "$MESA_SHA256" "$tarball" | sha256sum --quiet -c || die "Mesa source tarball failed SHA-256 verification"
-  source_root="$work/mesa"
-  rm -rf "$source_root" "$stage"; install -d -m 0750 "$source_root" "$stage"
-  tar -C "$source_root" -xf "$tarball"
-  mesa_src="$source_root/mesa-${MESA_VERSION}"
-  [[ -d "$mesa_src" ]] || die "Mesa source root missing after extraction"
+  local work=$1 stage=$2 info_file=$3 srpm patch_name
+  local prepared_file="$work/mesa-prepared-root" source0_file="$work/mesa-source0-path" mesa_src source0
+  srpm="$CACHE_ROOT/mesa-${MESA_VERSION}-${MESA_FEDORA_RELEASE}.src.rpm"
+  fetch_file "$MESA_SRPM_URL" "$srpm"
+  rpm -K "$srpm" >/dev/null 2>&1 || die "Mesa source RPM failed RPM digest/signature verification"
+  prepare_fedora_mesa_source "$work" "$srpm" "$prepared_file" "$source0_file"
+  mesa_src="$(<"$prepared_file")"; source0="$(<"$source0_file")"
+  [[ -d "$mesa_src" ]] || die "Fedora-prepared Mesa source root is missing"
+  rm -rf "$stage"; install -d -m 0750 "$stage"
   while IFS= read -r patch_name; do
     [[ -z "$patch_name" || "$patch_name" == \#* ]] && continue
     apply_patch_checked "$mesa_src" "$SOURCE/patches/mesa/$patch_name"
   done < "$SOURCE/patches/mesa/series"
-  meson setup "$source_root/build" "$mesa_src" \
+  meson setup "$work/mesa-build" "$mesa_src" \
     -Dvulkan-drivers=amd -Dgallium-drivers= -Dplatforms=x11,wayland \
     -Dglx=disabled -Dllvm=disabled -Dvideo-codecs= \
     -Dprefix="$(private_prefix)" -Dlibdir=lib64 -Dbuildtype=release \
     >"$work/mesa-setup.log" 2>&1 || die "Mesa setup failed; see $work/mesa-setup.log"
-  ninja -C "$source_root/build" >"$work/mesa-build.log" 2>&1 || die "Mesa build failed; see $work/mesa-build.log"
-  DESTDIR="$stage" ninja -C "$source_root/build" install >>"$work/mesa-build.log" 2>&1 || die "Mesa staging install failed"
+  ninja -C "$work/mesa-build" >"$work/mesa-build.log" 2>&1 || die "Mesa build failed; see $work/mesa-build.log"
+  DESTDIR="$stage" ninja -C "$work/mesa-build" install >>"$work/mesa-build.log" 2>&1 || die "Mesa staging install failed"
   [[ -f "$stage$(private_prefix)/lib64/libvulkan_radeon.so" ]] || die "private RADV library missing from staged Mesa"
   [[ -f "$stage$(private_icd)" ]] || die "private RADV ICD missing from staged Mesa"
-  printf '%s\n' "$tarball"
+  printf '%s\n%s\n' "$srpm" "$source0" > "$info_file"
 }
 
 pin_private_icd_library() {
@@ -742,6 +897,9 @@ PREPARE_PATCHED_INITRAMFS=''
 PREPARE_PRIVATE_PREFIX=''
 PREPARE_PREVIOUS_NEXT=''
 PREPARE_DIR=''
+PREPARE_FINAL_DIR=''
+PREPARE_STAGE='initialization'
+PREPARE_FAILURE_REASON=''
 restore_stock_module() {
   [[ "$RESTORE_NEEDED" == 1 ]] || return 0
   [[ -n "$RESTORE_STOCK_MODULE" && -f "$RESTORE_BACKUP_MODULE" ]] || return 1
@@ -827,6 +985,45 @@ restore_previous_next() {
   if [[ -n "$value" ]]; then grub2-editenv - set "next_entry=$value"; else grub2-editenv - unset next_entry >/dev/null 2>&1 || true; fi
 }
 
+rotate_prepare_failures() {
+  local root="$STATE_ROOT/failures" path
+  local -a entries=()
+  [[ -d "$root" ]] || return 0
+  mapfile -t entries < <(find "$root" -mindepth 1 -maxdepth 1 -type d -name 'failure-*' -print | sort -r)
+  if ((${#entries[@]} > 5)); then
+    for path in "${entries[@]:5}"; do rm -rf -- "$path"; done
+  fi
+}
+
+preserve_prepare_failure() {
+  local rc=$1 timestamp dest log package_id
+  [[ -n "$PREPARE_DIR" && -d "$PREPARE_DIR" ]] || return 0
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  dest="$STATE_ROOT/failures/failure-${timestamp}-$$"
+  install -d -m 0700 "$dest"
+  package_id="$(package_nevra)"
+  {
+    printf 'stage=%s\n' "$PREPARE_STAGE"
+    printf 'exit_rc=%s\n' "$rc"
+    printf 'reason=%q\n' "${PREPARE_FAILURE_REASON:-unknown}"
+    printf 'package_nevra=%s\n' "${package_id:-unavailable}"
+    printf 'kernel=%s\n' "$(kernel_release)"
+    printf 'profile=%s\n' "$PACKAGE_PROFILE"
+    printf 'upstream_version=%s\n' "$UPSTREAM_VERSION"
+    printf 'upstream_commit=%s\n' "$PINNED_COMMIT"
+    printf 'mesa_fedora_srpm=%s\n' "$MESA_SRPM_NEVRA"
+    printf 'mesa_source0_sha256=%s\n' "$MESA_SOURCE0_SHA256"
+  } > "$dest/failure.env"
+  chmod 0600 "$dest/failure.env"
+  for log in kernel-srpm-members.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
+    if [[ -f "$PREPARE_DIR/work/$log" && ! -L "$PREPARE_DIR/work/$log" ]]; then
+      install -m 0600 "$PREPARE_DIR/work/$log" "$dest/$log"
+    fi
+  done
+  rotate_prepare_failures
+  printf 'GFX1013 prepare failure evidence: %s\n' "$dest" >&2
+}
+
 prepare_cleanup_on_exit() {
   local rc=$1
   trap - EXIT INT TERM
@@ -835,11 +1032,14 @@ prepare_cleanup_on_exit() {
     rc=2
   fi
   if [[ "$PREPARE_COMMITTED" != 1 ]]; then
+    preserve_prepare_failure "$rc" || true
     [[ -z "$PREPARE_PATCHED_BLS" ]] || rm -f -- "$PREPARE_PATCHED_BLS"
     [[ -z "$PREPARE_PATCHED_INITRAMFS" ]] || rm -f -- "$PREPARE_PATCHED_INITRAMFS"
     [[ -z "$PREPARE_PRIVATE_PREFIX" ]] || rm -rf -- "$PREPARE_PRIVATE_PREFIX"
     rm -f -- "$ACTIVE_STATE"
+    [[ -z "$PREPARE_FINAL_DIR" ]] || rm -rf -- "$PREPARE_FINAL_DIR"
     [[ -z "$PREPARE_DIR" ]] || rm -rf -- "$PREPARE_DIR"
+    rmdir "$STATE_ROOT/prepared" 2>/dev/null || true
     if command -v grub2-editenv >/dev/null 2>&1; then
       restore_previous_next "$PREPARE_PREVIOUS_NEXT" >/dev/null 2>&1 || rc=2
     fi
@@ -871,7 +1071,7 @@ prepare_preflight() {
     echo "  Atomic/rpm-ostree host: PASS (not detected)"
   fi
 
-  for command in curl xz zstd tar cpio patch gcc g++ make rpm rpm2cpio meson ninja python3 \
+  for command in curl xz zstd gzip tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
     sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
     command -v "$command" >/dev/null 2>&1 || missing_commands+=("$command")
   done
@@ -974,6 +1174,7 @@ prepare_preflight() {
     echo "  Package identity: BLOCKED (unavailable)"; failures=$((failures + 1));
   }
 
+  echo "  Patch applicability/buildability: NOT BUILT (validated by prepare and the Fedora source gate)"
   if ((failures)); then
     printf 'GFX1013 prepare check: BLOCKED (%d issue(s))\n' "$failures"
     echo "No files, boot state or services were changed."
@@ -1000,9 +1201,10 @@ prepare() {
   [[ ! -e "$UPSTREAM_GENERATOR" && ! -e "$UPSTREAM_STATE/active.env" ]] || \
     die "a separate upstream GFX1013 installation is active; uninstall/disable it before using the package lifecycle"
 
-  local kernel build build_owner prepared work artifact stage stock_module stock_bls vermagic srcversion module_sha abi_sha package_id
-  local kernel_srpm mesa_tarball patch_sha source_sha kernel_srpm_sha mesa_source_sha private_radv_sha private_icd_sha
-  local -a stage_info
+  local kernel build build_owner prepared transaction work artifact_work artifact stage stock_module stock_bls
+  local vermagic srcversion module_sha abi_sha package_id kernel_srpm patch_sha source_sha kernel_srpm_sha
+  local mesa_info_file mesa_srpm mesa_source0 mesa_srpm_sha mesa_source_sha private_radv_sha private_icd_sha
+  local -a stage_info mesa_info
   local patched_bls patched_id patched_initramfs stock_initramfs saved_before next_before stock_hash initramfs_hash
   kernel="$(kernel_release)"; build="/lib/modules/$kernel/build"
   [[ -e "$build" ]] || die "exact kernel build tree missing: $build"
@@ -1011,7 +1213,11 @@ prepare() {
   if [[ "$kernel" != "$TESTED_KERNEL" ]]; then
     printf 'WARNING: running %s; package reference qualification was %s. Building exact-kernel artifacts only.\n' "$kernel" "$TESTED_KERNEL" >&2
   fi
-  prepared="$(prepared_dir_for "$kernel")"; work="$prepared/work"; stage="$prepared/mesa-stage"
+
+  prepared="$(prepared_dir_for "$kernel")"
+  transaction="$STATE_ROOT/.prepare-${kernel}-$$"
+  work="$transaction/work"
+  stage="$transaction/mesa-stage"
   stock_module="$(find_stock_module "$kernel")" || die "stock distro amdgpu module not found; refusing to overwrite a non-stock module path"
   stock_bls="$(find_stock_bls "$kernel")" || die "could not identify exactly one stock BLS entry for $kernel"
   local stock_entry_id current_saved
@@ -1020,6 +1226,7 @@ prepare() {
   [[ "$current_saved" == "$stock_entry_id" ]] || \
     die "saved/default boot is not the exact stock entry $stock_entry_id (found ${current_saved:-<unset>}); restore/select stock before prepare"
   stock_entry_file_safe "$stock_bls" || die "identified stock BLS entry is missing or already carries the patched marker"
+
   local machine_id preflight_patched_bls preflight_patched_initramfs
   machine_id="$(< /etc/machine-id)"
   preflight_patched_bls="/boot/loader/entries/${machine_id}-${kernel}-${PROFILE_VARIANT}.conf"
@@ -1027,33 +1234,61 @@ prepare() {
   [[ ! -e "$preflight_patched_bls" && ! -e "$preflight_patched_initramfs" ]] || \
     die "stale GFX1013 boot artifacts already exist; use 'bc250 gfx1013 reset' before prepare"
   [[ ! -e "$(private_prefix)" ]] || die "private GFX1013 prefix already exists; use 'bc250 gfx1013 reset' before prepare"
+  [[ ! -e "$prepared" ]] || die "stale exact-kernel preparation exists; use 'bc250 gfx1013 reset' before prepare"
   package_id="$(package_nevra)"
   [[ -n "$package_id" ]] || die "installed bc250-llm-server RPM identity is unavailable"
+
+  artifact_work="$transaction/amdgpu${stock_module##*amdgpu}"
   artifact="$prepared/amdgpu${stock_module##*amdgpu}"
-  PREPARE_DIR="$prepared"
+  PREPARE_DIR="$transaction"
+  PREPARE_FINAL_DIR="$prepared"
   PREPARE_PATCHED_BLS="$preflight_patched_bls"
   PREPARE_PATCHED_INITRAMFS="$preflight_patched_initramfs"
   PREPARE_PRIVATE_PREFIX="$(private_prefix)"
   PREPARE_PREVIOUS_NEXT="$(grub_value next_entry)"
   PREPARE_COMMITTED=0
+  PREPARE_STAGE='transaction-initialization'
+  PREPARE_FAILURE_REASON=''
   trap 'prepare_cleanup_on_exit $?' EXIT
   trap 'exit 130' INT TERM
-  rm -rf "$prepared"; install -d -m 0700 "$work"
+  rm -rf "$transaction"
+  install -d -m 0700 "$work"
 
   say "Building $PACKAGE_PROFILE for exact kernel $kernel"
   say "Pinned upstream: $UPSTREAM_VERSION @ $PINNED_COMMIT"
-  say "Mesa profile: compute queue patch only; mesh/task patches excluded"
-  kernel_srpm="$(build_kernel_module "$kernel" "$build" "$work" "$artifact" "$stock_module")"
-  mesa_tarball="$(build_mesa "$work" "$stage")"
-  vermagic="$(modinfo -F vermagic "$artifact" 2>/dev/null || true)"
+  say "Mesa baseline: Fedora $MESA_SRPM_NEVRA; private compute-queue patch only"
+
+  PREPARE_STAGE='kernel-source-and-module-build'
+  kernel_srpm="$(build_kernel_module "$kernel" "$build" "$work" "$artifact_work" "$stock_module")"
+
+  PREPARE_STAGE='mesa-fedora-prep-and-build'
+  mesa_info_file="$work/mesa-info"
+  build_mesa "$work" "$stage" "$mesa_info_file"
+  mapfile -t mesa_info < "$mesa_info_file"
+  ((${#mesa_info[@]} == 2)) || die "internal Mesa provenance evidence error"
+  mesa_srpm="${mesa_info[0]}"; mesa_source0="${mesa_info[1]}"
+
+  PREPARE_STAGE='module-vermagic-and-abi-validation'
+  vermagic="$(modinfo -F vermagic "$artifact_work" 2>/dev/null || true)"
   [[ "$vermagic" == "$kernel "* ]] || die "built amdgpu vermagic does not match exact running kernel ($vermagic)"
-  srcversion="$(modinfo -F srcversion "$artifact" 2>/dev/null || true)"
-  abi_sha="$(verify_module_abi "$build" "$artifact")"
-  module_sha="$(sha256sum "$artifact" | awk '{print $1}')"
+  srcversion="$(modinfo -F srcversion "$artifact_work" 2>/dev/null || true)"
+  abi_sha="$(verify_module_abi "$build" "$artifact_work" "$work" "$kernel")"
+  module_sha="$(sha256sum "$artifact_work" | awk '{print $1}')"
   patch_sha="$(patch_manifest_sha)"; source_sha="$(source_manifest_sha)"
   kernel_srpm_sha="$(sha256sum "$kernel_srpm" | awk '{print $1}')"
-  mesa_source_sha="$(sha256sum "$mesa_tarball" | awk '{print $1}')"
-  [[ "$mesa_source_sha" == "$MESA_SHA256" ]] || die "Mesa source SHA changed after build"
+  mesa_srpm_sha="$(sha256sum "$mesa_srpm" | awk '{print $1}')"
+  mesa_source_sha="$(sha256sum "$mesa_source0" | awk '{print $1}')"
+  [[ "$mesa_source_sha" == "$MESA_SOURCE0_SHA256" ]] || die "Fedora Mesa Source0 SHA changed after build"
+
+  # Commit boundary: all source, module ABI and private Mesa build validation has
+  # completed. Only now create package lifecycle artifacts under prepared/, /opt and /boot.
+  PREPARE_STAGE='lifecycle-artifact-staging'
+  install -d -m 0700 "$prepared" "$prepared/build-evidence"
+  install -m 0644 "$artifact_work" "$artifact"
+  local log
+  for log in kernel-srpm-members.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
+    [[ -f "$work/$log" ]] && install -m 0600 "$work/$log" "$prepared/build-evidence/$log"
+  done
 
   local stage_info_file="$prepared/stage-info"
   stage_patched_boot "$kernel" "$prepared" "$artifact" "$stage" "$stock_module" "$stock_bls" "$stage_info_file"
@@ -1065,6 +1300,7 @@ prepare() {
   patched_bls=${stage_info[0]}; patched_id=${stage_info[1]}; patched_initramfs=${stage_info[2]}; stock_initramfs=${stage_info[3]}
   saved_before=${stage_info[4]}; next_before=${stage_info[5]}; stock_hash=${stage_info[6]}; initramfs_hash=${stage_info[7]}
 
+  PREPARE_STAGE='lifecycle-state-commit'
   cat > "$ACTIVE_STATE" <<EOF_STATE
 BC250_GFX1013_PROFILE=$PACKAGE_PROFILE
 BC250_GFX1013_UPSTREAM_VERSION=$UPSTREAM_VERSION
@@ -1081,6 +1317,8 @@ BC250_GFX1013_ABI_SHA256=$abi_sha
 BC250_GFX1013_PATCH_MANIFEST_SHA256=$patch_sha
 BC250_GFX1013_SOURCE_MANIFEST_SHA256=$source_sha
 BC250_GFX1013_KERNEL_SRPM_SHA256=$kernel_srpm_sha
+BC250_GFX1013_MESA_SRPM_NEVRA=$MESA_SRPM_NEVRA
+BC250_GFX1013_MESA_SRPM_SHA256=$mesa_srpm_sha
 BC250_GFX1013_MESA_SOURCE_SHA256=$mesa_source_sha
 BC250_GFX1013_STOCK_MODULE=$stock_module
 BC250_GFX1013_STOCK_MODULE_SHA256=$stock_hash
@@ -1100,18 +1338,21 @@ BC250_GFX1013_PREVIOUS_SAVED_ENTRY=$saved_before
 BC250_GFX1013_PREVIOUS_NEXT_ENTRY=$next_before
 BC250_GFX1013_ENABLED=0
 EOF_STATE
-  # Strip .conf only from the stock BLS-derived entry id after writing a safe replacement.
   sed -i "s#^BC250_GFX1013_STOCK_ENTRY_ID=.*#BC250_GFX1013_STOCK_ENTRY_ID=$(basename "$stock_bls" .conf)#" "$ACTIVE_STATE"
   chmod 0600 "$ACTIVE_STATE"
   cp -p "$ACTIVE_STATE" "$(prepared_stamp_for "$kernel")"
+
+  PREPARE_STAGE='one-shot-boot-selection'
   grub2-editenv - set "next_entry=$patched_id"
   [[ "$(grub_value next_entry)" == "$patched_id" ]] || { restore_previous_next "$next_before"; rm -f "$ACTIVE_STATE"; die "failed to select patched entry for one-shot boot"; }
-  # prepare must not promote the patched entry to the saved default.
   [[ "$(grub_value saved_entry)" == "$saved_before" ]] || { restore_previous_next "$next_before"; rm -f "$ACTIVE_STATE"; die "prepare unexpectedly changed the saved/default boot entry"; }
+
   PREPARE_COMMITTED=1
   RESTORE_NEEDED=0
+  rm -rf "$transaction"
+  PREPARE_DIR=''
   trap - EXIT INT TERM
-  echo "Exact-kernel build, manifest verification, vermagic check, private RADV staging and patched initramfs: PASS"
+  echo "Exact-kernel build, ABI verification, Fedora Mesa provenance/patch validation, private RADV staging and patched initramfs: PASS"
   echo "Stock saved/default boot remains unchanged; patched boot is selected for the next boot only."
   echo "Next: reboot once, run 'bc250 gfx1013 status', then: sudo bc250 gfx1013 enable"
 }
@@ -1127,7 +1368,16 @@ verify_active_identity() {
   [[ "$current_build_owner" == "$BC250_GFX1013_KERNEL_DEVEL_NEVRA" ]] || die "kernel-devel package identity changed since prepare"
   [[ -f "$BC250_GFX1013_MODULE" ]] || die "prepared exact-kernel module artifact is missing"
   [[ "$(sha256sum "$BC250_GFX1013_MODULE" | awk '{print $1}')" == "$BC250_GFX1013_MODULE_SHA256" ]] || die "prepared module SHA-256 mismatch"
-  [[ "$(verify_module_abi "$BC250_GFX1013_BUILD_TREE" "$BC250_GFX1013_MODULE")" == "$BC250_GFX1013_ABI_SHA256" ]] || die "prepared module ABI evidence changed"
+  local abi_tmp current_abi
+  abi_tmp="$(mktemp -d)"
+  if ! current_abi="$(verify_module_abi "$BC250_GFX1013_BUILD_TREE" "$BC250_GFX1013_MODULE" "$abi_tmp" "$BC250_GFX1013_KERNEL")"; then
+    rm -rf "$abi_tmp"
+    die "prepared module ABI revalidation failed"
+  fi
+  rm -rf "$abi_tmp"
+  [[ "$current_abi" == "$BC250_GFX1013_ABI_SHA256" ]] || die "prepared module ABI evidence changed"
+  [[ "${BC250_GFX1013_MESA_SRPM_NEVRA:-}" == "$MESA_SRPM_NEVRA" ]] || die "prepared Mesa Fedora source identity differs from package baseline"
+  [[ "${BC250_GFX1013_MESA_SOURCE_SHA256:-}" == "$MESA_SOURCE0_SHA256" ]] || die "prepared Mesa Source0 identity differs from package baseline"
   [[ -f "$BC250_GFX1013_STOCK_MODULE" ]] || die "recorded stock amdgpu module is missing"
   [[ "$(sha256sum "$BC250_GFX1013_STOCK_MODULE" | awk '{print $1}')" == "$BC250_GFX1013_STOCK_MODULE_SHA256" ]] || die "stock amdgpu changed since prepare"
   [[ -f "$BC250_GFX1013_STOCK_INITRAMFS" ]] || die "recorded stock initramfs is missing"
@@ -1260,7 +1510,8 @@ EOF_VK_STATE
 }
 
 risky_artifacts_without_state() {
-  [[ -e "$ACTIVE_STATE" || -e "$DROPIN" || -d "$(private_prefix)" || -d "$STATE_ROOT/prepared" ]] && return 0
+  [[ -e "$ACTIVE_STATE" || -e "$DROPIN" || -d "$(private_prefix)" ]] && return 0
+  find "$STATE_ROOT/prepared" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q . && return 0
   find /boot/loader/entries -maxdepth 1 -type f -name "*-${PROFILE_VARIANT}.conf" -print -quit 2>/dev/null | grep -q . && return 0
   find /boot -maxdepth 1 -type f -name "initramfs-*-${PROFILE_VARIANT}.img" -print -quit 2>/dev/null | grep -q . && return 0
   return 1

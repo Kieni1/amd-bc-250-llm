@@ -17,7 +17,7 @@ SPEC = ROOT / "packaging/bc250-llm-server.spec"
 class Gfx1013Tests(unittest.TestCase):
     def test_package_profile_identity_and_selected_patch_set(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("PACKAGE_PROFILE=v0.2.1-alpha", source)
+        self.assertIn("PACKAGE_PROFILE=v0.2.2-alpha", source)
         self.assertIn("UPSTREAM_VERSION=0.2.0-alpha", source)
         self.assertIn("PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9", source)
         self.assertIn("TESTED_KERNEL=7.2.9-200.fc44.x86_64", source)
@@ -80,7 +80,7 @@ class Gfx1013Tests(unittest.TestCase):
                 check=False,
             )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("v0.2.1-alpha / experimental / default OFF", result.stdout)
+        self.assertIn("v0.2.2-alpha / experimental / default OFF", result.stdout)
         self.assertIn("Package patch/full-source manifests: PASS", result.stdout)
         self.assertIn("Ollama private-RADV override: disabled", result.stdout)
 
@@ -110,7 +110,7 @@ class Gfx1013Tests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["schema"], "bc250.gfx1013-status.v1")
         self.assertEqual(payload["state"], "DISABLED")
-        self.assertEqual(payload["profile"], "v0.2.1-alpha")
+        self.assertEqual(payload["profile"], "v0.2.2-alpha")
         self.assertTrue(payload["default_off"])
 
     def test_16_hardens_secure_boot_stale_kernel_and_private_radv_guard(self) -> None:
@@ -170,6 +170,8 @@ class Gfx1013Tests(unittest.TestCase):
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("python3-packaging", source)
         self.assertIn("glslang-devel", source)
+        self.assertIn("cargo-rpm-macros", source)
+        self.assertIn("for cmd in curl xz zstd gzip tar cpio patch gcc g++ make cargo rpm", source)
         self.assertIn("missing_build_packages", source)
 
     def test_check_and_recovery_interfaces_are_non_destructive_before_commit(self) -> None:
@@ -198,7 +200,7 @@ class Gfx1013Tests(unittest.TestCase):
         for token in (
             'build="/lib/modules/$kernel/build"',
             "rpm -qp --qf '%{VERSION}-%{RELEASE}",
-            "patch --dry-run",
+            "--fuzz=0 --dry-run",
             "modinfo -F vermagic",
             "modprobe --show-modversions",
             "kernel_build_owner",
@@ -253,6 +255,43 @@ build_requirement_provider zlib-devel
         self.assertIn("status: satisfied", source)
         self.assertIn("prepare check: BLOCKED", source)
         self.assertIn("No files, boot state or services were changed.", source)
+
+
+    def test_110_rebases_private_radv_and_hardens_prepare_build_pipeline(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        mesa = (SOURCE / "MESA-SOURCE").read_text(encoding="utf-8")
+        patch = (SOURCE / "patches/mesa/0001-gfx1013-compute-queue-fix.patch").read_text(encoding="utf-8")
+        self.assertIn("MESA_VERSION=26.2.4", source)
+        self.assertIn("MESA_FEDORA_RELEASE=1.fc44", source)
+        self.assertIn("mesa-26.2.4-1.fc44.src", mesa)
+        self.assertIn("bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9", mesa)
+        self.assertNotIn("26.2.0-rc3", mesa)
+        self.assertIn("Fedora 44 Mesa 26.2.4 already contains", patch)
+        self.assertNotIn("ver_minor = info->ip[AMD_IP_COMPUTE].ver_minor = 1", patch)
+        for token in (
+            "select_linux_source_archive",
+            "linux-*.tar.zst",
+            "adapt_external_amd_trace_paths",
+            "expected exactly one in-tree TRACE_INCLUDE_PATH",
+            "kernel_modversions_enabled",
+            "mode=symbol-resolution",
+            "Module.symvers",
+            "materialize_module_ko",
+            "PREPARE_COMMITTED=0",
+            "preserve_prepare_failure",
+            "rotate_prepare_failures",
+            "kernel-srpm-members.txt",
+        ):
+            self.assertIn(token, source)
+
+    def test_mesa_source_validation_is_part_of_sources_gate(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        validator = (ROOT / "scripts/check-gfx1013-mesa.py").read_text(encoding="utf-8")
+        self.assertIn("./scripts/check-gfx1013-mesa.py --fetch", makefile)
+        self.assertIn("./scripts/check-gfx1013-mesa.py", makefile)
+        self.assertIn('"mesa-26.2.4-1.fc44.src"', validator)
+        self.assertIn("--fuzz=0", validator)
+        self.assertIn("Fedora Mesa %prep", validator)
 
     def test_disable_and_package_erase_are_fail_closed(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
