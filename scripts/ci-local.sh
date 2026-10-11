@@ -16,7 +16,7 @@ podman run --rm --pull="$pull_policy" \
       systemd systemd-rpm-macros tar xz zstd
     )
     if ! rpm -q "${build_packages[@]}" >/dev/null 2>&1; then
-      dnf install -y "${build_packages[@]}"
+      dnf --disable-repo=fedora-cisco-openh264 install -y "${build_packages[@]}"
     fi
 
     make release-gate
