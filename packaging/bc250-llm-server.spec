@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.8%{?dist}
+Release:        1.9%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -279,6 +279,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.9
+- Recognize mokutil's explicit unsupported Secure Boot state as disabled-unsupported so unsigned GFX1013 preparation is allowed only when the platform explicitly reports Secure Boot unsupported/disabled; enabled and genuinely unknown states remain fail-closed.
+- Make non-root status/version runtime identity explicitly NOT INSPECTED when root-owned Podman metadata is inaccessible, without degrading appliance health solely because the caller lacks privilege; sudo retains exact version/digest verification.
+- Keep the accepted GFX1013 profile, runtime/model/CU defaults, benchmark policy and default-OFF behavior unchanged.
+
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.8
 - Fix upgrade convergence so an already-running stale Tika container is recreated when its live version or image digest differs from the package pin, then verify live identity before declaring convergence.
 - Make the Tika 4.1 package-gate extraction marker robust to Markdown underscore escaping and include observed extraction details on failure.
