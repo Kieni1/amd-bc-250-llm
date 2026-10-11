@@ -249,6 +249,27 @@ def runtime_identity(share: Path) -> dict[str, object]:
     owui_expected_version = runtime.get("BC250_OPEN_WEBUI_VERSION")
     tika_expected_digest = runtime.get("BC250_TIKA_IMAGE_DIGEST")
     owui_expected_digest = runtime.get("BC250_OPEN_WEBUI_IMAGE_DIGEST")
+    if os.geteuid() != 0:
+        reason = "requires sudo to inspect package-owned root Podman containers"
+        return {
+            "inspection": "not_inspected",
+            "reason": reason,
+            "match": None,
+            "tika": {
+                "inspection": "not_inspected",
+                "reason": reason,
+                "expected": {"version": tika_expected_version, "digest": tika_expected_digest},
+                "observed": {"version": None, "digest": None, "image": None},
+                "match": None,
+            },
+            "open_webui": {
+                "inspection": "not_inspected",
+                "reason": reason,
+                "expected": {"version": owui_expected_version, "digest": owui_expected_digest},
+                "observed": {"version": None, "digest": None, "image": None},
+                "match": None,
+            },
+        }
     tika_image = container_image_identity("tika")
     owui_image = container_image_identity("open-webui")
     tika_observed_version = tika_live_version()
@@ -269,8 +290,12 @@ def runtime_identity(share: Path) -> dict[str, object]:
     if tika_match is not None and owui_match is not None:
         overall_match = tika_match and owui_match
     return {
+        "inspection": "complete",
+        "reason": None,
         "match": overall_match,
         "tika": {
+            "inspection": "complete",
+            "reason": None,
             "expected": {"version": tika_expected_version, "digest": tika_expected_digest},
             "observed": {
                 "version": tika_observed_version,
@@ -280,6 +305,8 @@ def runtime_identity(share: Path) -> dict[str, object]:
             "match": tika_match,
         },
         "open_webui": {
+            "inspection": "complete",
+            "reason": None,
             "expected": {"version": owui_expected_version, "digest": owui_expected_digest},
             "observed": {
                 "version": owui_observed_version,

@@ -206,7 +206,7 @@ status_json_path() {
 }
 
 runtime_identity_summary() {
-  local payload="$1" service expected_version expected_digest observed_version observed_digest match label
+  local payload="$1" service expected_version expected_digest observed_version observed_digest match inspection label
   for service in open_webui tika; do
     case "$service" in
       open_webui) label="Open WebUI" ;;
@@ -214,10 +214,15 @@ runtime_identity_summary() {
     esac
     expected_version="$(jq -r --arg service "$service" '.runtime_identity[$service].expected.version // "unknown"' <<< "$payload" 2>/dev/null || true)"
     expected_digest="$(jq -r --arg service "$service" '.runtime_identity[$service].expected.digest // "unknown"' <<< "$payload" 2>/dev/null || true)"
+    inspection="$(jq -r --arg service "$service" '.runtime_identity[$service].inspection // "unknown"' <<< "$payload" 2>/dev/null || true)"
+    printf '  %-12s expected %s @ %s\n' "$label" "${expected_version:-unknown}" "${expected_digest:-unknown}"
+    if [[ "$inspection" == not_inspected ]]; then
+      printf '  %-12s observed not inspected (requires sudo) — NOT INSPECTED\n' ''
+      continue
+    fi
     observed_version="$(jq -r --arg service "$service" '.runtime_identity[$service].observed.version // "unavailable"' <<< "$payload" 2>/dev/null || true)"
     observed_digest="$(jq -r --arg service "$service" '.runtime_identity[$service].observed.digest // "unavailable"' <<< "$payload" 2>/dev/null || true)"
     match="$(jq -r --arg service "$service" 'if .runtime_identity[$service].match == true then "MATCH" elif .runtime_identity[$service].match == false then "MISMATCH" else "UNKNOWN" end' <<< "$payload" 2>/dev/null || true)"
-    printf '  %-12s expected %s @ %s\n' "$label" "${expected_version:-unknown}" "${expected_digest:-unknown}"
     printf '  %-12s observed %s @ %s — %s\n' '' "${observed_version:-unavailable}" "${observed_digest:-unavailable}" "${match:-UNKNOWN}"
   done
 }
@@ -251,7 +256,10 @@ if [[ -x "$STATUS_JSON" ]]; then
 fi
 if [[ -n "$status_payload" ]]; then
   runtime_match="$(jq -r 'if .runtime_identity.match == true then "true" elif .runtime_identity.match == false then "false" else "unknown" end' <<< "$status_payload" 2>/dev/null || true)"
-  [[ "$runtime_match" == true ]] || runtime_identity_warning=1
+  runtime_inspection="$(jq -r '.runtime_identity.inspection // "unknown"' <<< "$status_payload" 2>/dev/null || true)"
+  if [[ "$runtime_inspection" != not_inspected && "$runtime_match" != true ]]; then
+    runtime_identity_warning=1
+  fi
 else
   runtime_identity_warning=1
 fi

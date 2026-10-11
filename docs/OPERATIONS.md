@@ -1208,6 +1208,8 @@ retention policy do not by themselves change the contract version.
 
 Release 1.8 distinguishes package configuration from live container identity. `bc250 status`, `bc250 status --json` and `bc250 version` expose the expected and observed Open WebUI/Tika versions and image digests plus a match state. A reachable but stale package-owned container is therefore visible instead of being mistaken for convergence.
 
+Release 1.9 keeps that privileged verification unchanged but fixes the non-root view. Because the package-owned Podman containers live in root's store, an ordinary user cannot authoritatively inspect their image digests. Non-root status/version therefore report `NOT INSPECTED (requires sudo)` and do not degrade appliance health solely for missing privilege. Run the same command with `sudo` when exact observed version/digest identity is required.
+
 `sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
 
 `bc250 doctor` reports **Overall appliance health** separately from **Optional GFX1013 readiness**. Secure-Boot/kernel-devel uncertainty for the default-off experimental path does not by itself make a healthy stock appliance unhealthy.

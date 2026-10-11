@@ -97,6 +97,12 @@ def match_label(value: object) -> str:
 def runtime_line(label: str, row: dict[str, Any] | None) -> str:
     row = row if isinstance(row, dict) else {}
     expected = row.get("expected") if isinstance(row.get("expected"), dict) else {}
+    if row.get("inspection") == "not_inspected":
+        return (
+            f"{label:<13} expected {expected.get('version') or 'unknown'} @ "
+            f"{expected.get('digest') or 'unknown'}; observed not inspected (requires sudo); "
+            "NOT INSPECTED"
+        )
     observed = row.get("observed") if isinstance(row.get("observed"), dict) else {}
     return (
         f"{label:<13} expected {expected.get('version') or 'unknown'} @ {expected.get('digest') or 'unknown'}; "

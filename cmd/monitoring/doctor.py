@@ -58,7 +58,7 @@ def rpm_verify(checks: list[dict[str, Any]]) -> None:
 def verify_product(checks: list[dict[str, Any]], libexec: Path) -> None:
     helper = libexec / "verify.sh"
     if os.geteuid() != 0:
-        add(checks, "package-verifier", "WARN", "not run without root; rerun doctor with sudo for full verification")
+        add(checks, "package-verifier", "INFO", "not run without root; rerun doctor with sudo for full verification")
         return
     if not helper.is_file():
         add(checks, "package-verifier", "FAIL", f"missing verifier: {helper}")
@@ -156,7 +156,7 @@ def gfx(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
             "enabled; optional GFX1013 preparation is blocked for unsigned local amdgpu",
             category="gfx_readiness",
         )
-    elif secure in {"disabled", "disabled-non-efi"}:
+    elif secure in {"disabled", "disabled-non-efi", "disabled-unsupported"}:
         add(checks, "secure-boot", "PASS", secure, category="gfx_readiness")
     else:
         add(
@@ -172,6 +172,14 @@ def runtime_identities(checks: list[dict[str, Any]], status: dict[str, Any]) -> 
     identities = status.get("runtime_identity")
     if not isinstance(identities, dict):
         add(checks, "runtime-identity", "WARN", "package runtime identity is unavailable")
+        return
+    if identities.get("inspection") == "not_inspected":
+        add(
+            checks,
+            "runtime-identity",
+            "INFO",
+            "not inspected without root; run with sudo for package-owned container identity",
+        )
         return
     for key, label in (("open_webui", "Open WebUI"), ("tika", "Tika")):
         row = identities.get(key)

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import importlib.util
 import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -149,6 +151,54 @@ ollama_version_line
         source = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
         self.assertIn('value.startswith("Apache Tika ")', source)
         self.assertIn('value.removeprefix("Apache Tika ").strip()', source)
+
+    def test_non_root_runtime_identity_is_not_inspected_without_health_mismatch(self) -> None:
+        module_path = ROOT / "cmd/monitoring/status-json.py"
+        spec = importlib.util.spec_from_file_location("bc250_status_json_test", module_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            share = Path(temporary)
+            (share / "runtime.env").write_text(
+                "\n".join(
+                    [
+                        "BC250_OPEN_WEBUI_VERSION=0.11.4",
+                        "BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:" + "1" * 64,
+                        "BC250_TIKA_VERSION=4.1.0-full",
+                        "BC250_TIKA_IMAGE_DIGEST=sha256:" + "2" * 64,
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch.object(module.os, "geteuid", return_value=1000),
+                mock.patch.object(module, "container_image_identity") as inspect_image,
+                mock.patch.object(module, "tika_live_version") as tika_version,
+                mock.patch.object(module, "open_webui_live_version") as owui_version,
+            ):
+                payload = module.runtime_identity(share)
+        self.assertEqual(payload["inspection"], "not_inspected")
+        self.assertIsNone(payload["match"])
+        self.assertIn("requires sudo", payload["reason"])
+        for service in ("open_webui", "tika"):
+            self.assertEqual(payload[service]["inspection"], "not_inspected")
+            self.assertIsNone(payload[service]["match"])
+            self.assertIsNone(payload[service]["observed"]["digest"])
+        inspect_image.assert_not_called()
+        tika_version.assert_not_called()
+        owui_version.assert_not_called()
+
+        status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        version = (ROOT / "cmd/monitoring/version.py").read_text(encoding="utf-8")
+        doctor = (ROOT / "cmd/monitoring/doctor.py").read_text(encoding="utf-8")
+        self.assertIn('runtime_inspection" != not_inspected', status)
+        self.assertIn("observed not inspected (requires sudo) — NOT INSPECTED", status)
+        self.assertIn('row.get("inspection") == "not_inspected"', version)
+        self.assertIn('"INFO"', doctor)
+        self.assertIn('"disabled-unsupported"', doctor)
 
     def test_public_runtime_identity_and_package_identity_are_unambiguous(self) -> None:
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
