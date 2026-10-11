@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.1-1.10 - 2026-10-11
+
+- Rebase the GFX1013 private RADV source baseline from stale Mesa 26.2.0-rc3 to exact Fedora 44 `mesa-26.2.4-1.fc44`; retain the pinned upstream GFX1013 commit but advance the package profile to `v0.2.2-alpha`.
+- Drop the obsolete private Mesa IP-version correction already upstream since Mesa 26.2.1; carry only dedicated-compute-queue exposure plus the GFX1013 async-compute threadgroup workaround, with an authoritative zero-fuzz applicability check against Fedora's exact `%prep` tree.
+- Make Fedora kernel-SRPM extraction tolerant of supported Linux source archive compression/path forms while requiring exactly one unambiguous source archive.
+- Add a deliberate external-module adaptation for AMD trace include paths before building the exact-kernel amdgpu module.
+- Make module ABI verification kernel-configuration aware: retain symbol CRC comparison when `CONFIG_MODVERSIONS=y`, otherwise require exact vermagic plus imported-symbol resolution against the exact kernel `Module.symvers`; support `.ko`, `.ko.xz`, `.ko.zst` and `.ko.gz` artifacts.
+- Tighten GFX1013 prepare transactionality so pre-commit failures restore/remain `DISABLED`, leave no private RADV/ICD/BLS/next-entry authority, and retain only a bounded root-owned failure evidence bundle (newest five).
+- Add installed package NEVRA to human `bc250 status`, and retain the 1.9 Secure Boot `disabled-unsupported`, provider-aware dependency, non-root `NOT INSPECTED`, package-gate and default-off safety behavior.
+- Do not treat the developer-prepared 1.9 artifacts as release authority; the rebuilt package requires a fresh stock A1 before patched-boot/B/A2 qualification.
+
 ## 0.13.1-1.9 - 2026-10-11
 
 - Fix the exact-device Secure Boot detector for EFI systems where `mokutil --sb-state` explicitly reports `This system doesn't support Secure Boot`: expose `disabled-unsupported`, allow GFX1013 preparation for that explicit disabled/unsupported state, and keep enabled or genuinely unknown states fail-closed.
