@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.1-1.9 - 2026-10-11
+
+- Fix the exact-device Secure Boot detector for EFI systems where `mokutil --sb-state` explicitly reports `This system doesn't support Secure Boot`: expose `disabled-unsupported`, allow GFX1013 preparation for that explicit disabled/unsupported state, and keep enabled or genuinely unknown states fail-closed.
+- Fix non-root runtime-identity UX: `bc250 status`/`version` now report package-owned Open WebUI/Tika identity as `NOT INSPECTED (requires sudo)` instead of misclassifying root-Podman visibility limits as runtime drift; privileged status/doctor/verify retain exact version+digest checks.
+- Keep the 1.8 Tika convergence/package-gate/provider/read-only benchmark fixes, GFX1013 profile v0.2.1-alpha, model/runtime/CU defaults, benchmark policy and default-OFF policy unchanged.
+- Treat the exact 1.8 A1 as historical for this rebuilt package identity; capture a fresh 1.9 A1 before B/A2.
+
 ## 0.13.1-1.8 - 2026-10-11
 
 - Fix upgrade convergence so `bc250 install` compares the live Tika version/image digest with the package pin and recreates `tika.service` only when the running container is stale; reachability is no longer reported as runtime convergence.
