@@ -238,8 +238,23 @@ def prepare_fedora_tree(srpm: Path, metadata: dict[str, str], temporary: Path) -
 
 def validate_pre_patch_semantics(source: Path) -> None:
     text = source.read_text(encoding="utf-8")
-    if "GFX1013 is known to have broken compute queue" not in text:
-        raise ValidationError("Fedora Mesa baseline no longer contains the expected GFX1013 compute-queue guard")
+    queue_guard = (
+        "   /* GFX1013 is known to have broken compute queue */\n"
+        "   if (device_info.family == FAMILY_NV && ASICREV_IS(device_info.external_rev, GFX1013)) {\n"
+        "      info->ip[AMD_IP_COMPUTE].num_queues = 0;\n"
+        "   }\n"
+    )
+    if text.count(queue_guard) != 1:
+        marker = "GFX1013 is known to have broken compute queue"
+        start = text.find(marker)
+        context = "<marker absent>"
+        if start >= 0:
+            context = text[max(0, start - 180) : start + 420].strip()
+        raise ValidationError(
+            "Fedora Mesa baseline no longer contains exactly one expected post-enumeration "
+            "GFX1013 compute-queue disable block; observed context: "
+            f"{context!r}"
+        )
     if "info->family == CHIP_TONGA;" not in text:
         raise ValidationError("Fedora Mesa baseline no longer contains the expected async-compute workaround")
 

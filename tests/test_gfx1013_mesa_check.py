@@ -65,17 +65,15 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
             target.parent.mkdir(parents=True)
             lines = [f"/* filler {index} */\n" for index in range(1, 1100)]
             first = [
-                "      */\n",
-                "      info->ip[ip_type].num_queues = 1;\n",
-                "   } else if (ip_info->available_rings) {\n",
-                "      /* GFX1013 is known to have broken compute queue */\n",
-                "      if (ip_type == AMD_IP_COMPUTE && device_info->family == FAMILY_NV &&\n",
-                "          ASICREV_IS(device_info->external_rev, GFX1013))\n",
-                "         return false;\n",
+                "   /* GFX1013 is known to have broken compute queue */\n",
+                "   if (device_info.family == FAMILY_NV && ASICREV_IS(device_info.external_rev, GFX1013)) {\n",
+                "      info->ip[AMD_IP_COMPUTE].num_queues = 0;\n",
+                "   }\n",
                 "\n",
-                "      info->ip[ip_type].num_queues = util_bitcount(ip_info->available_rings);\n",
-                "   } else {\n",
-                "      return false;\n",
+                "   /* Set dword padding minus 1. */\n",
+                "   info->ip[AMD_IP_GFX].ib_pad_dw_mask = 0x7;\n",
+                "   info->ip[AMD_IP_COMPUTE].ib_pad_dw_mask = 0x7;\n",
+                "   info->ip[AMD_IP_SDMA].ib_pad_dw_mask = 0xf;\n",
             ]
             second = [
                 "    * dimension mode.\n",
@@ -86,7 +84,7 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
                 "   /* GFX7 CP requires 32 bytes alignment for the indirect buffer arguments on\n",
                 "    * the compute queue.\n",
             ]
-            lines[479 : 479 + len(first)] = first
+            lines[518 : 518 + len(first)] = first
             lines[1014 : 1014 + len(second)] = second
             target.write_text("".join(lines), encoding="utf-8")
             result = subprocess.run(
@@ -104,7 +102,30 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
             source.write_text(
                 "/* Fix incorrect IP versions reported by the kernel. */\n"
                 "/* no GFX1013 correction here */\n"
+                "   /* GFX1013 is known to have broken compute queue */\n"
+                "   if (device_info.family == FAMILY_NV && ASICREV_IS(device_info.external_rev, GFX1013)) {\n"
+                "      info->ip[AMD_IP_COMPUTE].num_queues = 0;\n"
+                "   }\n"
+                "info->family == CHIP_TONGA;\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(mesa_check.ValidationError):
+                mesa_check.validate_pre_patch_semantics(source)
+
+
+    def test_semantic_guard_rejects_legacy_helper_local_queue_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "ac_gpu_info.c"
+            source.write_text(
+                "/* Fix incorrect IP versions reported by the kernel. */\n"
+                "if (device_info->family == FAMILY_NV &&\n"
+                "    ASICREV_IS(device_info->external_rev, GFX1013)) {\n"
+                "   info->ip[AMD_IP_GFX].ver_minor = info->ip[AMD_IP_COMPUTE].ver_minor = 1;\n"
+                "}\n"
                 "/* GFX1013 is known to have broken compute queue */\n"
+                "if (ip_type == AMD_IP_COMPUTE && device_info->family == FAMILY_NV &&\n"
+                "    ASICREV_IS(device_info->external_rev, GFX1013))\n"
+                "   return false;\n"
                 "info->family == CHIP_TONGA;\n",
                 encoding="utf-8",
             )

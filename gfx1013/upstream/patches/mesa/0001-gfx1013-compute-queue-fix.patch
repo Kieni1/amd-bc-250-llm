@@ -17,18 +17,16 @@ it with the stock kernel path.
 
 --- a/src/amd/common/ac_gpu_info.c
 +++ b/src/amd/common/ac_gpu_info.c
-@@ -480,11 +480,6 @@ ac_fill_hw_ip_info(struct radeon_info *info, const struct drm_amdgpu_info_device
-       */
-       info->ip[ip_type].num_queues = 1;
-    } else if (ip_info->available_rings) {
--      /* GFX1013 is known to have broken compute queue */
--      if (ip_type == AMD_IP_COMPUTE && device_info->family == FAMILY_NV &&
--          ASICREV_IS(device_info->external_rev, GFX1013))
--         return false;
+@@ -519,9 +519,4 @@
+-   /* GFX1013 is known to have broken compute queue */
+-   if (device_info.family == FAMILY_NV && ASICREV_IS(device_info.external_rev, GFX1013)) {
+-      info->ip[AMD_IP_COMPUTE].num_queues = 0;
+-   }
 -
-       info->ip[ip_type].num_queues = util_bitcount(ip_info->available_rings);
-    } else {
-       return false;
+    /* Set dword padding minus 1. */
+    info->ip[AMD_IP_GFX].ib_pad_dw_mask = 0x7;
+    info->ip[AMD_IP_COMPUTE].ib_pad_dw_mask = 0x7;
+    info->ip[AMD_IP_SDMA].ib_pad_dw_mask = 0xf;
 @@ -1015,7 +1010,8 @@ void ac_fill_bug_info(struct radeon_info *info)
      * dimension mode.
      */
