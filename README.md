@@ -6,7 +6,7 @@ hardware profiles, diagnostics and optional specialist tools.
 
 Current release source: `bc250-llm-server-0.13.1-1.10` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
 
-GFX1013 remains experimental/default-off as package profile `v0.2.2-alpha`; its private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`, with zero-fuzz source applicability checked by the Fedora release gate.
+GFX1013 remains experimental/default-off as package profile `v0.2.2-alpha`; its private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`, with zero-fuzz source applicability checked by the Fedora release gate. Prepare uses an isolated dracut module tree and never replaces the authoritative stock `amdgpu` path.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable

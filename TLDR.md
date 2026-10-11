@@ -5,7 +5,7 @@ for the complete command reference and the topic docs for rationale/recovery det
 
 Current release source: `bc250-llm-server-0.13.1-1.10` (Tika 4.1.0-full; GFX1013 prepare/build integration hardening).
 
-GFX1013 is still opt-in/default-off. Profile `v0.2.2-alpha` rebases private RADV to Fedora 44 `mesa-26.2.4-1.fc44`, makes exact-kernel build verification configuration-aware, and makes failed prepare pre-commit cleanup transactional.
+GFX1013 is still opt-in/default-off. Profile `v0.2.2-alpha` rebases private RADV to Fedora 44 `mesa-26.2.4-1.fc44`, makes exact-kernel compatibility verification configuration-aware, proves Fedora kernel patch-target provenance, and builds the patched initramfs from an isolated module tree without replacing stock `amdgpu`.
 
 ## Install
 
