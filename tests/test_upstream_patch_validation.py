@@ -52,11 +52,11 @@ class UpstreamPatchContractTests(unittest.TestCase):
     def test_make_sources_runs_patch_validation_after_source_preparation(self):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn(
-            "sources:\n\t./scripts/prepare-sources.py\n\t./scripts/check-upstream-patches.py",
+            "sources:\n\t./scripts/prepare-sources.py\n\t./scripts/check-gfx1013-mesa.py --fetch\n\t./scripts/check-upstream-patches.py",
             makefile,
         )
         self.assertIn(
-            "sources-check:\n\t./scripts/prepare-sources.py --check\n\t./scripts/check-upstream-patches.py",
+            "sources-check:\n\t./scripts/prepare-sources.py --check\n\t./scripts/check-gfx1013-mesa.py\n\t./scripts/check-upstream-patches.py",
             makefile,
         )
 

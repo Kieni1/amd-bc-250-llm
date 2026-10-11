@@ -1,3 +1,6 @@
-version=26.2.0-rc3
-url=https://archive.mesa3d.org/mesa-26.2.0-rc3.tar.xz
-sha256=f733c005660d342a51c6727d1ad481f43d05b4c601ac72247fa641e1d73a8ad1
+version=26.2.4
+fedora_release=1.fc44
+srpm_nevra=mesa-26.2.4-1.fc44.src
+srpm_url=https://kojipkgs.fedoraproject.org/packages/mesa/26.2.4/1.fc44/src/mesa-26.2.4-1.fc44.src.rpm
+source0=mesa-26.2.4.tar.xz
+source0_sha256=bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9
