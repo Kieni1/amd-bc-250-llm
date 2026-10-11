@@ -151,8 +151,10 @@ secure_boot_prepare_ok() {
 }
 
 GFX_BUILD_PACKAGES=(
-  gcc gcc-c++ make rpm-build cargo-rpm-macros binutils elfutils-libelf-devel openssl-devel meson ninja-build
-  bison flex python3-mako python3-pyyaml python3-packaging glslang glslang-devel
+  gcc gcc-c++ make rpm rpm-build cargo rust cargo-rpm-macros binutils bzip2 cpio dracut patch xz
+  elfutils-libelf-devel openssl-devel meson ninja-build
+  bison flex python3-mako python3-pycparser python3-pyyaml python3-packaging glslang glslang-devel
+  vulkan-headers vulkan-loader-devel systemd-devel libdisplay-info-devel
   libdrm-devel libxcb-devel libX11-devel
   libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel
   zlib-devel libzstd-devel spirv-tools-devel
@@ -257,12 +259,18 @@ load_active_state() {
   [[ "${BC250_GFX1013_STOCK_MODULE:-}" == /usr/lib/modules/"$BC250_GFX1013_KERNEL"/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko* ||
      "${BC250_GFX1013_STOCK_MODULE:-}" == /lib/modules/"$BC250_GFX1013_KERNEL"/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko* ]] || return 1
   [[ "${BC250_GFX1013_ENABLED:-0}" =~ ^[01]$ ]] || return 1
+  [[ "${BC250_GFX1013_RECOVERY_REQUIRED:-0}" =~ ^[01]$ ]] || return 1
+  [[ "${BC250_GFX1013_TRANSACTION_PHASE:-}" =~ ^(BOOT_ENTRY_STAGING|PREPARED|ENABLING|ENABLED|DISABLING|RECOVERY_REQUIRED|SAFETY_FAILURE)$ ]] || return 1
+  [[ "${BC250_GFX1013_KERNEL_SRPM_NEVR:-}" =~ ^kernel-[A-Za-z0-9._+~-]+$ ]] || return 1
+  [[ "${BC250_GFX1013_KERNEL_SOURCE_PROVENANCE_MODE:-}" == fedora-prepared-source ]] || return 1
+  [[ "${BC250_GFX1013_ABI_MODE:-}" =~ ^(modversions|symbol-resolution)$ ]] || return 1
   [[ "${BC250_GFX1013_MESA_SRPM_NEVRA:-}" == "$MESA_SRPM_NEVRA" ]] || return 1
   local hash_name
   for hash_name in \
     BC250_GFX1013_MODULE_SHA256 BC250_GFX1013_ABI_SHA256 \
     BC250_GFX1013_PATCH_MANIFEST_SHA256 BC250_GFX1013_SOURCE_MANIFEST_SHA256 \
-    BC250_GFX1013_KERNEL_SRPM_SHA256 BC250_GFX1013_MESA_SRPM_SHA256 \
+    BC250_GFX1013_KERNEL_SRPM_SHA256 BC250_GFX1013_KERNEL_SOURCE_PROVENANCE_SHA256 \
+    BC250_GFX1013_KERNEL_TARGET_MANIFEST_SHA256 BC250_GFX1013_MESA_SRPM_SHA256 \
     BC250_GFX1013_MESA_SOURCE_SHA256 BC250_GFX1013_STOCK_MODULE_SHA256 BC250_GFX1013_STOCK_INITRAMFS_SHA256 \
     BC250_GFX1013_PRIVATE_RADV_SHA256 BC250_GFX1013_ICD_SHA256; do
     [[ "${!hash_name:-}" =~ ^[0-9a-f]{64}$ ]] || return 1
@@ -319,6 +327,11 @@ gfx_lifecycle_state() {
   if ! load_active_state; then
     GFX_STATE_REASON='active lifecycle state exists but failed validation'
     GFX_LIFECYCLE_STATE=BROKEN
+    return 0
+  fi
+  if [[ "${BC250_GFX1013_RECOVERY_REQUIRED:-0}" == 1 || "${BC250_GFX1013_TRANSACTION_PHASE:-}" =~ ^(RECOVERY_REQUIRED|SAFETY_FAILURE|ENABLING|DISABLING|BOOT_ENTRY_STAGING)$ ]]; then
+    GFX_STATE_REASON="lifecycle transaction requires recovery (${BC250_GFX1013_TRANSACTION_PHASE:-unknown})"
+    GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     return 0
   fi
   if [[ -z "${BC250_GFX1013_PACKAGE_NEVRA:-}" ]]; then
@@ -522,14 +535,14 @@ check_os_and_boot_tools() {
   [[ "${ID:-}" == fedora ]] || die "GFX1013 package profile supports Fedora only"
   command -v rpm-ostree >/dev/null 2>&1 && die "image/Atomic Fedora is not supported by this direct exact-kernel profile"
   local cmd missing=()
-  for cmd in curl xz zstd gzip tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
+  for cmd in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
     sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
     command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
   done
   if ((${#missing[@]})); then
     printf 'ERROR: GFX1013 build/install tools missing: %s\n' "${missing[*]}" >&2
     printf 'Install the optional build dependencies and exact running-kernel headers, for example:\n' >&2
-    printf '  sudo dnf install kernel-devel-%s gcc gcc-c++ make rpm-build cargo-rpm-macros binutils elfutils-libelf-devel openssl-devel meson ninja-build bison flex python3-mako python3-pyyaml python3-packaging glslang glslang-devel libdrm-devel libxcb-devel libX11-devel libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel zlib-devel libzstd-devel spirv-tools-devel\n' "$(kernel_release | sed 's/\.x86_64$//')" >&2
+    printf '  sudo dnf install kernel-devel-%s gcc gcc-c++ make rpm-build cargo rust cargo-rpm-macros binutils bzip2 elfutils-libelf-devel openssl-devel meson ninja-build bison flex python3-mako python3-pycparser python3-pyyaml python3-packaging glslang glslang-devel vulkan-headers vulkan-loader-devel systemd-devel libdisplay-info-devel libdrm-devel libxcb-devel libX11-devel libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel zlib-devel libzstd-devel spirv-tools-devel\n' "$(kernel_release | sed 's/\.x86_64$//')" >&2
     exit 2
   fi
   local missing_packages package
@@ -595,22 +608,6 @@ apply_patch_checked() {
   patch --batch --forward --fuzz=0 --dry-run -p1 -s -d "$tree" < "$patch_file" >/dev/null || \
     die "patch zero-fuzz dry-run failed: $patch_file"
   patch --batch --forward --fuzz=0 -p1 -s -d "$tree" < "$patch_file"
-}
-
-select_linux_source_archive() {
-  local root=$1 path
-  local -a matches=()
-  while IFS= read -r path; do
-    matches+=("$path")
-  done < <(find "$root" -type f \( \
-    -name 'linux-*.tar.xz' -o -name 'linux-*.tar.zst' -o -name 'linux-*.tar.gz' \
-    -o -name 'linux-*.tar.bz2' -o -name 'linux-*.tar' \) -print | sort)
-  ((${#matches[@]} == 1)) || {
-    printf 'ERROR: expected exactly one Linux source archive in exact kernel SRPM; found %d\n' "${#matches[@]}" >&2
-    printf '  %s\n' "${matches[@]:-<none>}" >&2
-    return 1
-  }
-  printf '%s\n' "${matches[0]}"
 }
 
 adapt_external_amd_trace_paths() {
@@ -724,9 +721,44 @@ PY_ABI_SYMBOLS
   sha256sum "$required" | awk '{print $1}'
 }
 
+prepare_fedora_kernel_source() {
+  local work=$1 srpm=$2 prepared_out=$3
+  local rpm_top="$work/kernel-rpmbuild" spec
+  local -a specs=()
+  rm -rf "$rpm_top"
+  mkdir -p "$rpm_top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+  (cd "$rpm_top/SOURCES" && rpm2cpio "$srpm" | cpio -id --quiet) || \
+    die "cannot extract exact Fedora kernel source RPM"
+
+  if [[ -f "$rpm_top/SOURCES/kernel.spec" ]]; then
+    spec="$rpm_top/SOURCES/kernel.spec"
+  else
+    mapfile -t specs < <(find "$rpm_top/SOURCES" -maxdepth 1 -type f -name '*.spec' -print | sort)
+    ((${#specs[@]} == 1)) || die "kernel source RPM must contain exactly one usable spec file"
+    spec="${specs[0]}"
+  fi
+  mv "$spec" "$rpm_top/SPECS/kernel.spec"
+
+  # Source authority is the exact Fedora-prepared tree, not pristine Source0.
+  # --nodeps avoids asking RPM to solve dependencies here; prepare_preflight is
+  # responsible for the package-owned prerequisite contract.
+  PREPARE_STAGE='kernel-fedora-prep'
+  rpmbuild -bp --nodeps --define "_topdir $rpm_top" "$rpm_top/SPECS/kernel.spec" \
+    >"$work/kernel-prep.log" 2>&1 || die "Fedora kernel %prep failed; see $work/kernel-prep.log"
+
+  PREPARE_STAGE='kernel-source-provenance'
+  python3 "$SOURCE/check-kernel-provenance.py" \
+    --prepared-build-root "$rpm_top/BUILD" \
+    --patch-dir "$SOURCE/patches/kernel/v33" \
+    --root-output "$prepared_out" \
+    --output "$work/kernel-source-provenance.txt" \
+    >>"$work/kernel-build.log" 2>&1 || \
+    die "Fedora-prepared kernel source-provenance check failed; see $work/kernel-build.log"
+}
+
 build_kernel_module() {
   local kernel=$1 build=$2 work=$3 artifact=$4 stock_module=$5
-  local version release srpm_url srpm expected_vr actual_vr source_root srpm_root tarball linux_root patch_file raw
+  local version release srpm_url srpm expected_vr actual_vr source_package source_root prepared_file linux_root patch_file raw
   version="${kernel%%-*}"
   release="${kernel#*-}"; release="${release%.*}"
   srpm_url="${BC250_GFX1013_KERNEL_SRPM_URL:-https://kojipkgs.fedoraproject.org/packages/kernel/${version}/${release}/src/kernel-${version}-${release}.src.rpm}"
@@ -734,20 +766,25 @@ build_kernel_module() {
   fetch_file "$srpm_url" "$srpm"
   expected_vr="${kernel%.*}"
   actual_vr="$(rpm -qp --qf '%{VERSION}-%{RELEASE}\n' "$srpm" 2>/dev/null || true)"
+  source_package="$(rpm -qp --qf '%{SOURCEPACKAGE}\n' "$srpm" 2>/dev/null || true)"
   [[ "$actual_vr" == "$expected_vr" ]] || die "kernel source RPM identity mismatch: expected $expected_vr, got ${actual_vr:-unreadable}"
+  [[ "$source_package" == 1 ]] || die "kernel package is not marked as a source RPM"
   rpm -K "$srpm" >/dev/null 2>&1 || die "kernel source RPM failed RPM digest/signature verification"
 
   source_root="$work/kernel"
-  srpm_root="$source_root/srpm"
-  rm -rf "$source_root"; install -d -m 0750 "$srpm_root"
-  (cd "$srpm_root" && rpm2cpio "$srpm" | cpio -id --quiet)
-  find "$srpm_root" -type f -printf '%P\n' | LC_ALL=C sort > "$work/kernel-srpm-members.txt"
-  tarball="$(select_linux_source_archive "$srpm_root")" || die "kernel source archive selection failed"
-  tar -C "$source_root" -xf "$tarball" --wildcards 'linux-*/drivers/gpu/drm/amd'
-  local -a linux_roots=()
-  mapfile -t linux_roots < <(find "$source_root" -mindepth 1 -maxdepth 1 -type d -name 'linux-*' -print | sort)
-  ((${#linux_roots[@]} == 1)) || die "expected exactly one extracted Linux source root"
-  linux_root="${linux_roots[0]}"
+  rm -rf "$source_root"
+  install -d -m 0750 "$source_root"
+  # Keep a member inventory as bounded evidence, but do not use raw SRPM text as
+  # a substitute for Fedora's own %prep source transformation.
+  mkdir -p "$source_root/srpm-members"
+  (cd "$source_root/srpm-members" && rpm2cpio "$srpm" | cpio -it --quiet) | LC_ALL=C sort > "$work/kernel-srpm-members.txt" || \
+    die "cannot inventory exact Fedora kernel source RPM"
+
+  prepared_file="$work/kernel-prepared-root"
+  prepare_fedora_kernel_source "$work" "$srpm" "$prepared_file"
+  linux_root="$(<"$prepared_file")"
+  [[ -d "$linux_root/drivers/gpu/drm/amd" ]] || die "Fedora %prep did not produce the expected AMDGPU source tree"
+
   adapt_external_amd_trace_paths "$linux_root/drivers/gpu/drm/amd" >>"$work/kernel-build.log" 2>&1 || \
     die "AMD external-module trace-path adaptation failed; see $work/kernel-build.log"
   for patch_file in "$SOURCE"/patches/kernel/v33/*.patch; do
@@ -763,7 +800,7 @@ build_kernel_module() {
 
 prepare_fedora_mesa_source() {
   local work=$1 srpm=$2 prepared_out=$3 source0_out=$4
-  local rpm_top="$work/mesa-rpmbuild" spec actual_nevra source0
+  local rpm_top="$work/mesa-rpmbuild" spec actual_nevr source_package source0
   rm -rf "$rpm_top"
   mkdir -p "$rpm_top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
   (cd "$rpm_top/SOURCES" && rpm2cpio "$srpm" | cpio -id --quiet)
@@ -774,8 +811,12 @@ prepare_fedora_mesa_source() {
   [[ -f "$source0" ]] || die "Mesa source RPM does not contain expected Source0: $MESA_SOURCE0"
   printf '%s  %s\n' "$MESA_SOURCE0_SHA256" "$source0" | sha256sum --quiet -c || \
     die "Fedora Mesa Source0 failed pinned SHA-256 verification"
-  actual_nevra="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' "$srpm" 2>/dev/null || true)"
-  [[ "$actual_nevra" == "$MESA_SRPM_NEVRA" ]] || die "Mesa source RPM identity mismatch: expected $MESA_SRPM_NEVRA, got ${actual_nevra:-unreadable}"
+  # Do not use %{ARCH} as the source-RPM discriminator.  Fedora source RPM
+  # headers can retain the build architecture; SOURCEPACKAGE is authoritative.
+  actual_nevr="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}\n' "$srpm" 2>/dev/null || true)"
+  source_package="$(rpm -qp --qf '%{SOURCEPACKAGE}\n' "$srpm" 2>/dev/null || true)"
+  [[ "$actual_nevr" == "${MESA_SRPM_NEVRA%.src}" ]] || die "Mesa source RPM identity mismatch: expected ${MESA_SRPM_NEVRA%.src}, got ${actual_nevr:-unreadable}"
+  [[ "$source_package" == 1 ]] || die "Mesa package is not marked as a source RPM"
   rpmbuild -bp --nodeps --define "_topdir $rpm_top" "$rpm_top/SPECS/mesa.spec" \
     >"$work/mesa-prep.log" 2>&1 || die "Fedora Mesa %prep failed; see $work/mesa-prep.log"
   local -a candidates=()
@@ -887,70 +928,77 @@ PY_VK
   printf '%s|%s\n' "$identity" "$sha"
 }
 
-RESTORE_NEEDED=0
-RESTORE_STOCK_MODULE=''
-RESTORE_BACKUP_MODULE=''
-RESTORE_KERNEL=''
 PREPARE_COMMITTED=1
 PREPARE_PATCHED_BLS=''
 PREPARE_PATCHED_INITRAMFS=''
 PREPARE_PRIVATE_PREFIX=''
 PREPARE_PREVIOUS_NEXT=''
+PREPARE_BOOT_STATE_CHANGED=0
 PREPARE_DIR=''
 PREPARE_FINAL_DIR=''
 PREPARE_STAGE='initialization'
 PREPARE_FAILURE_REASON=''
-restore_stock_module() {
-  [[ "$RESTORE_NEEDED" == 1 ]] || return 0
-  [[ -n "$RESTORE_STOCK_MODULE" && -f "$RESTORE_BACKUP_MODULE" ]] || return 1
-  install -m 0644 "$RESTORE_BACKUP_MODULE" "$RESTORE_STOCK_MODULE" || return 1
-  command -v restorecon >/dev/null 2>&1 && restorecon "$RESTORE_STOCK_MODULE" >/dev/null 2>&1 || true
-  depmod -a "$RESTORE_KERNEL" || return 1
-  RESTORE_NEEDED=0
-}
 
 stage_patched_boot() {
   local kernel=$1 prepared=$2 module_payload=$3 mesa_stage=$4 stock_module=$5 stock_bls=$6 info_file=$7
-  local backup stock_initramfs machine patched_bls patched_id patched_initramfs verify_root embedded
+  local evidence stock_initramfs machine patched_bls patched_id patched_initramfs verify_root embedded
   local stock_hash initramfs_hash payload_hash saved_before next_before staging_entry private
-  backup="$prepared/backup"
-  stock_initramfs="/boot/initramfs-${kernel}.img"
+  local stock_modules_root stock_module_real stock_rel kmod_stage staged_module
+  evidence="$prepared/boot-evidence"
+  stock_initramfs="${BC250_GFX1013_BOOT_ROOT:-/boot}/initramfs-${kernel}.img"
   [[ -f "$stock_initramfs" ]] || die "stock initramfs missing: $stock_initramfs"
-  machine="$(< /etc/machine-id)"
+  machine="$(< "${BC250_GFX1013_MACHINE_ID_FILE:-/etc/machine-id}")"
   patched_id="${machine}-${kernel}-${PROFILE_VARIANT}"
-  patched_bls="/boot/loader/entries/${patched_id}.conf"
-  patched_initramfs="/boot/initramfs-${kernel}-${PROFILE_VARIANT}.img"
+  patched_bls="${BC250_GFX1013_BOOT_ROOT:-/boot}/loader/entries/${patched_id}.conf"
+  patched_initramfs="${BC250_GFX1013_BOOT_ROOT:-/boot}/initramfs-${kernel}-${PROFILE_VARIANT}.img"
   [[ ! -e "$patched_bls" && ! -e "$patched_initramfs" ]] || die "stale GFX1013 boot artifacts exist; run disable/repair before prepare"
   private="$(private_prefix)"
   [[ ! -e "$private" ]] || die "private GFX1013 prefix already exists: $private"
 
-  install -d -m 0700 "$backup"
-  cp --preserve=all "$stock_module" "$backup/stock-amdgpu${stock_module##*amdgpu}"
-  cp --preserve=all "$stock_initramfs" "$backup/stock-initramfs.img"
-  grub2-editenv list > "$backup/grubenv-before.txt"
+  install -d -m 0700 "$evidence"
+  grub2-editenv list > "$evidence/grubenv-before.txt"
   saved_before="$(grub_value saved_entry)"; next_before="$(grub_value next_entry)"
-  printf '%s\n' "$saved_before" > "$backup/saved-entry-before.txt"
-  printf '%s\n' "$next_before" > "$backup/next-entry-before.txt"
+  printf '%s\n' "$saved_before" > "$evidence/saved-entry-before.txt"
+  printf '%s\n' "$next_before" > "$evidence/next-entry-before.txt"
   stock_hash="$(sha256sum "$stock_module" | awk '{print $1}')"
   initramfs_hash="$(sha256sum "$stock_initramfs" | awk '{print $1}')"
   payload_hash="$(sha256sum "$module_payload" | awk '{print $1}')"
+  printf '%s  %s\n' "$stock_hash" "$stock_module" > "$evidence/stock-module.sha256"
+  printf '%s  %s\n' "$initramfs_hash" "$stock_initramfs" > "$evidence/stock-initramfs.sha256"
 
-  RESTORE_STOCK_MODULE="$stock_module"
-  RESTORE_BACKUP_MODULE="$(find "$backup" -maxdepth 1 -type f -name 'stock-amdgpu*' | head -1)"
-  RESTORE_KERNEL="$kernel"
-  RESTORE_NEEDED=1
-  install -m 0644 "$module_payload" "$stock_module"
-  command -v restorecon >/dev/null 2>&1 && restorecon "$stock_module" >/dev/null 2>&1 || true
-  depmod -a "$kernel"
-  dracut -f "$patched_initramfs" "$kernel"
-  restore_stock_module || die "failed to restore stock amdgpu after patched initramfs generation"
-  [[ "$(sha256sum "$stock_module" | awk '{print $1}')" == "$stock_hash" ]] || die "stock amdgpu was not restored byte-for-byte"
+  # Safety invariant: never replace the authoritative stock amdgpu.  Build the
+  # experimental initramfs from an isolated private module tree; unlink and
+  # replace only the staged amdgpu path before asking dracut to use --kmoddir.
+  stock_modules_root="$(readlink -f "${BC250_GFX1013_MODULES_ROOT:-/usr/lib/modules}/$kernel")"
+  stock_module_real="$(readlink -f "$stock_module")"
+  [[ -d "$stock_modules_root" ]] || die "stock module tree is missing: $stock_modules_root"
+  case "$stock_module_real" in
+    "$stock_modules_root"/*) stock_rel="${stock_module_real#"$stock_modules_root"/}" ;;
+    *) die "stock amdgpu is outside the exact stock module tree" ;;
+  esac
+  kmod_stage="$PREPARE_DIR/kmod/$kernel"
+  install -d -m 0700 "$kmod_stage"
+  cp -a --reflink=auto "$stock_modules_root/." "$kmod_stage/" || die "failed to construct isolated kernel-module staging tree"
+  staged_module="$kmod_stage/$stock_rel"
+  [[ -f "$staged_module" ]] || die "isolated module tree does not contain stock amdgpu path"
+  rm -f -- "$staged_module"
+  install -m 0644 "$module_payload" "$staged_module"
+  [[ "$(sha256sum "$stock_module" | awk '{print $1}')" == "$stock_hash" ]] || die "stock amdgpu changed before isolated dracut generation"
+  dracut --kmoddir "$kmod_stage" --force-drivers amdgpu -f "$patched_initramfs" "$kernel" || \
+    die "patched initramfs generation from isolated module tree failed"
+  [[ "$(sha256sum "$stock_module" | awk '{print $1}')" == "$stock_hash" ]] || die "stock amdgpu changed during isolated dracut generation"
   [[ "$(sha256sum "$stock_initramfs" | awk '{print $1}')" == "$initramfs_hash" ]] || die "stock initramfs changed unexpectedly"
+  rm -rf -- "$PREPARE_DIR/kmod"
 
   verify_root="$(mktemp -d)"
   (cd "$verify_root" && lsinitrd --unpack "$patched_initramfs")
-  embedded="$(find "$verify_root" -type f -name 'amdgpu.ko*' -path "*/${kernel}/*" | head -1)"
-  [[ -n "$embedded" ]] || { rm -rf "$verify_root"; die "patched initramfs contains no amdgpu module"; }
+  local -a embedded_modules=()
+  mapfile -t embedded_modules < <(find "$verify_root" -type f -name 'amdgpu.ko*' -path "*/${kernel}/*" -print | sort)
+  ((${#embedded_modules[@]} == 1)) || {
+    rm -rf "$verify_root"
+    die "patched initramfs must contain exactly one amdgpu module (found ${#embedded_modules[@]})"
+  }
+  embedded="${embedded_modules[0]}"
   [[ "$(sha256sum "$embedded" | awk '{print $1}')" == "$payload_hash" ]] || { rm -rf "$verify_root"; die "patched initramfs contains the wrong amdgpu module"; }
   rm -rf "$verify_root"
 
@@ -969,7 +1017,11 @@ stage_patched_boot() {
     { print }
   ' "$stock_bls" > "$staging_entry"
   grep -qw "$PATCH_MARKER" "$staging_entry" || { rm -f "$staging_entry"; die "patched BLS marker generation failed"; }
-  install -m 0644 "$staging_entry" "$patched_bls"; rm -f "$staging_entry"
+  if ! install -m 0644 "$staging_entry" "$patched_bls"; then
+    rm -f "$staging_entry"
+    die "failed to install patched BLS entry"
+  fi
+  rm -f "$staging_entry"
   command -v restorecon >/dev/null 2>&1 && restorecon "$patched_bls" "$patched_initramfs" >/dev/null 2>&1 || true
 
   install -d -m 0755 "$(dirname "$private")"
@@ -982,7 +1034,21 @@ stage_patched_boot() {
 
 restore_previous_next() {
   local value=$1
-  if [[ -n "$value" ]]; then grub2-editenv - set "next_entry=$value"; else grub2-editenv - unset next_entry >/dev/null 2>&1 || true; fi
+  if [[ -n "$value" ]]; then
+    grub2-editenv - set "next_entry=$value" || return 1
+  else
+    grub2-editenv - unset next_entry >/dev/null 2>&1 || true
+  fi
+  [[ "$(grub_value next_entry)" == "$value" ]]
+}
+
+select_patched_next_boot() {
+  local patched_id=$1 saved_before=$2
+  # Rollback becomes authoritative before the first boot-manager mutation.
+  PREPARE_BOOT_STATE_CHANGED=1
+  grub2-editenv - set "next_entry=$patched_id" || die "failed to select patched entry for one-shot boot"
+  [[ "$(grub_value next_entry)" == "$patched_id" ]] || die "failed to verify patched one-shot boot selection"
+  [[ "$(grub_value saved_entry)" == "$saved_before" ]] || die "prepare unexpectedly changed the saved/default boot entry"
 }
 
 rotate_prepare_failures() {
@@ -1015,7 +1081,7 @@ preserve_prepare_failure() {
     printf 'mesa_source0_sha256=%s\n' "$MESA_SOURCE0_SHA256"
   } > "$dest/failure.env"
   chmod 0600 "$dest/failure.env"
-  for log in kernel-srpm-members.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
+  for log in kernel-srpm-members.txt kernel-prep.log kernel-source-provenance.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
     if [[ -f "$PREPARE_DIR/work/$log" && ! -L "$PREPARE_DIR/work/$log" ]]; then
       install -m 0600 "$PREPARE_DIR/work/$log" "$dest/$log"
     fi
@@ -1024,15 +1090,42 @@ preserve_prepare_failure() {
   printf 'GFX1013 prepare failure evidence: %s\n' "$dest" >&2
 }
 
+set_active_transaction_state() {
+  local phase=$1 recovery=${2:-0} reason=${3:-} tmp
+  [[ -f "$ACTIVE_STATE" ]] || return 1
+  tmp="$ACTIVE_STATE.tmp"
+  awk '!/^BC250_GFX1013_TRANSACTION_PHASE=/ && !/^BC250_GFX1013_RECOVERY_REQUIRED=/ && !/^BC250_GFX1013_RECOVERY_REASON=/' "$ACTIVE_STATE" > "$tmp"
+  {
+    printf 'BC250_GFX1013_TRANSACTION_PHASE=%s\n' "$phase"
+    printf 'BC250_GFX1013_RECOVERY_REQUIRED=%s\n' "$recovery"
+    [[ -z "$reason" ]] || printf 'BC250_GFX1013_RECOVERY_REASON=%q\n' "$reason"
+  } >> "$tmp"
+  chmod 0600 "$tmp"
+  mv -f "$tmp" "$ACTIVE_STATE"
+}
+
+mark_prepare_safety_failure() {
+  set_active_transaction_state SAFETY_FAILURE 1 "$1"
+}
+
 prepare_cleanup_on_exit() {
   local rc=$1
   trap - EXIT INT TERM
-  if ! restore_stock_module; then
-    echo "ERROR: failed to restore stock amdgpu during GFX1013 prepare cleanup" >&2
-    rc=2
-  fi
   if [[ "$PREPARE_COMMITTED" != 1 ]]; then
     preserve_prepare_failure "$rc" || true
+
+    # Boot-manager rollback is safety authority.  Never delete the patched BLS,
+    # initramfs, lifecycle state or recovery evidence until prior next_entry has
+    # been restored and verified.
+    if [[ "$PREPARE_BOOT_STATE_CHANGED" == 1 ]]; then
+      if ! restore_previous_next "$PREPARE_PREVIOUS_NEXT"; then
+        mark_prepare_safety_failure 'failed to restore previous GRUB next_entry during prepare rollback' || true
+        echo "ERROR: GFX1013 prepare rollback could not restore boot-manager state; recovery artifacts were preserved" >&2
+        exit 5
+      fi
+      PREPARE_BOOT_STATE_CHANGED=0
+    fi
+
     [[ -z "$PREPARE_PATCHED_BLS" ]] || rm -f -- "$PREPARE_PATCHED_BLS"
     [[ -z "$PREPARE_PATCHED_INITRAMFS" ]] || rm -f -- "$PREPARE_PATCHED_INITRAMFS"
     [[ -z "$PREPARE_PRIVATE_PREFIX" ]] || rm -rf -- "$PREPARE_PRIVATE_PREFIX"
@@ -1040,9 +1133,6 @@ prepare_cleanup_on_exit() {
     [[ -z "$PREPARE_FINAL_DIR" ]] || rm -rf -- "$PREPARE_FINAL_DIR"
     [[ -z "$PREPARE_DIR" ]] || rm -rf -- "$PREPARE_DIR"
     rmdir "$STATE_ROOT/prepared" 2>/dev/null || true
-    if command -v grub2-editenv >/dev/null 2>&1; then
-      restore_previous_next "$PREPARE_PREVIOUS_NEXT" >/dev/null 2>&1 || rc=2
-    fi
   fi
   exit "$rc"
 }
@@ -1071,7 +1161,7 @@ prepare_preflight() {
     echo "  Atomic/rpm-ostree host: PASS (not detected)"
   fi
 
-  for command in curl xz zstd gzip tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
+  for command in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
     sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
     command -v "$command" >/dev/null 2>&1 || missing_commands+=("$command")
   done
@@ -1080,6 +1170,12 @@ prepare_preflight() {
     failures=$((failures + 1))
   else
     echo "  Required commands: PASS"
+  fi
+  if command -v dracut >/dev/null 2>&1 && dracut --help 2>&1 | grep -q -- '--kmoddir'; then
+    echo "  Isolated dracut module tree: PASS (--kmoddir supported)"
+  else
+    echo "  Isolated dracut module tree: BLOCKED (--kmoddir unavailable)"
+    failures=$((failures + 1))
   fi
 
   echo "  Optional build requirements/providers:"
@@ -1202,7 +1298,8 @@ prepare() {
     die "a separate upstream GFX1013 installation is active; uninstall/disable it before using the package lifecycle"
 
   local kernel build build_owner prepared transaction work artifact_work artifact stage stock_module stock_bls
-  local vermagic srcversion module_sha abi_sha package_id kernel_srpm patch_sha source_sha kernel_srpm_sha
+  local vermagic srcversion module_sha abi_sha abi_mode package_id kernel_srpm kernel_srpm_nevr patch_sha source_sha kernel_srpm_sha
+  local kernel_provenance_file kernel_provenance_sha kernel_provenance_mode kernel_target_manifest_sha
   local mesa_info_file mesa_srpm mesa_source0 mesa_srpm_sha mesa_source_sha private_radv_sha private_icd_sha
   local -a stage_info mesa_info
   local patched_bls patched_id patched_initramfs stock_initramfs saved_before next_before stock_hash initramfs_hash
@@ -1246,6 +1343,7 @@ prepare() {
   PREPARE_PATCHED_INITRAMFS="$preflight_patched_initramfs"
   PREPARE_PRIVATE_PREFIX="$(private_prefix)"
   PREPARE_PREVIOUS_NEXT="$(grub_value next_entry)"
+  PREPARE_BOOT_STATE_CHANGED=0
   PREPARE_COMMITTED=0
   PREPARE_STAGE='transaction-initialization'
   PREPARE_FAILURE_REASON=''
@@ -1260,6 +1358,15 @@ prepare() {
 
   PREPARE_STAGE='kernel-source-and-module-build'
   kernel_srpm="$(build_kernel_module "$kernel" "$build" "$work" "$artifact_work" "$stock_module")"
+  kernel_srpm_nevr="$(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}\n' "$kernel_srpm" 2>/dev/null || true)"
+  [[ -n "$kernel_srpm_nevr" ]] || die "kernel source RPM NEVR is unavailable after build"
+  kernel_provenance_file="$work/kernel-source-provenance.txt"
+  [[ -r "$kernel_provenance_file" ]] || die "kernel source-provenance evidence is missing"
+  kernel_provenance_sha="$(sha256sum "$kernel_provenance_file" | awk '{print $1}')"
+  kernel_provenance_mode="$(sed -n 's/^mode=//p' "$kernel_provenance_file" | head -1)"
+  kernel_target_manifest_sha="$(sed -n 's/^target_manifest_sha256=//p' "$kernel_provenance_file" | head -1)"
+  [[ "$kernel_provenance_mode" == fedora-prepared-source ]] || die "kernel source-provenance mode is invalid"
+  [[ "$kernel_target_manifest_sha" =~ ^[0-9a-f]{64}$ ]] || die "kernel source target-manifest evidence is invalid"
 
   PREPARE_STAGE='mesa-fedora-prep-and-build'
   mesa_info_file="$work/mesa-info"
@@ -1273,6 +1380,8 @@ prepare() {
   [[ "$vermagic" == "$kernel "* ]] || die "built amdgpu vermagic does not match exact running kernel ($vermagic)"
   srcversion="$(modinfo -F srcversion "$artifact_work" 2>/dev/null || true)"
   abi_sha="$(verify_module_abi "$build" "$artifact_work" "$work" "$kernel")"
+  abi_mode="$(sed -n 's/^mode=//p' "$work/abi-required.txt" | head -1)"
+  [[ "$abi_mode" =~ ^(modversions|symbol-resolution)$ ]] || die "module compatibility verification mode is invalid"
   module_sha="$(sha256sum "$artifact_work" | awk '{print $1}')"
   patch_sha="$(patch_manifest_sha)"; source_sha="$(source_manifest_sha)"
   kernel_srpm_sha="$(sha256sum "$kernel_srpm" | awk '{print $1}')"
@@ -1286,7 +1395,7 @@ prepare() {
   install -d -m 0700 "$prepared" "$prepared/build-evidence"
   install -m 0644 "$artifact_work" "$artifact"
   local log
-  for log in kernel-srpm-members.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
+  for log in kernel-srpm-members.txt kernel-prep.log kernel-source-provenance.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
     [[ -f "$work/$log" ]] && install -m 0600 "$work/$log" "$prepared/build-evidence/$log"
   done
 
@@ -1309,14 +1418,19 @@ BC250_GFX1013_PACKAGE_NEVRA=$package_id
 BC250_GFX1013_KERNEL=$kernel
 BC250_GFX1013_BUILD_TREE=$build
 BC250_GFX1013_KERNEL_DEVEL_NEVRA=$build_owner
+BC250_GFX1013_KERNEL_SRPM_NEVR=$kernel_srpm_nevr
+BC250_GFX1013_KERNEL_SRPM_SHA256=$kernel_srpm_sha
+BC250_GFX1013_KERNEL_SOURCE_PROVENANCE_MODE=$kernel_provenance_mode
+BC250_GFX1013_KERNEL_SOURCE_PROVENANCE_SHA256=$kernel_provenance_sha
+BC250_GFX1013_KERNEL_TARGET_MANIFEST_SHA256=$kernel_target_manifest_sha
 BC250_GFX1013_MODULE=$artifact
 BC250_GFX1013_MODULE_SHA256=$module_sha
 BC250_GFX1013_MODULE_SRCVERSION=$srcversion
 BC250_GFX1013_VERMAGIC=$(printf '%q' "$vermagic")
+BC250_GFX1013_ABI_MODE=$abi_mode
 BC250_GFX1013_ABI_SHA256=$abi_sha
 BC250_GFX1013_PATCH_MANIFEST_SHA256=$patch_sha
 BC250_GFX1013_SOURCE_MANIFEST_SHA256=$source_sha
-BC250_GFX1013_KERNEL_SRPM_SHA256=$kernel_srpm_sha
 BC250_GFX1013_MESA_SRPM_NEVRA=$MESA_SRPM_NEVRA
 BC250_GFX1013_MESA_SRPM_SHA256=$mesa_srpm_sha
 BC250_GFX1013_MESA_SOURCE_SHA256=$mesa_source_sha
@@ -1336,23 +1450,23 @@ BC250_GFX1013_ICD=$(private_icd)
 BC250_GFX1013_ICD_SHA256=$private_icd_sha
 BC250_GFX1013_PREVIOUS_SAVED_ENTRY=$saved_before
 BC250_GFX1013_PREVIOUS_NEXT_ENTRY=$next_before
+BC250_GFX1013_TRANSACTION_PHASE=BOOT_ENTRY_STAGING
+BC250_GFX1013_RECOVERY_REQUIRED=0
 BC250_GFX1013_ENABLED=0
 EOF_STATE
   sed -i "s#^BC250_GFX1013_STOCK_ENTRY_ID=.*#BC250_GFX1013_STOCK_ENTRY_ID=$(basename "$stock_bls" .conf)#" "$ACTIVE_STATE"
   chmod 0600 "$ACTIVE_STATE"
-  cp -p "$ACTIVE_STATE" "$(prepared_stamp_for "$kernel")"
 
   PREPARE_STAGE='one-shot-boot-selection'
-  grub2-editenv - set "next_entry=$patched_id"
-  [[ "$(grub_value next_entry)" == "$patched_id" ]] || { restore_previous_next "$next_before"; rm -f "$ACTIVE_STATE"; die "failed to select patched entry for one-shot boot"; }
-  [[ "$(grub_value saved_entry)" == "$saved_before" ]] || { restore_previous_next "$next_before"; rm -f "$ACTIVE_STATE"; die "prepare unexpectedly changed the saved/default boot entry"; }
+  select_patched_next_boot "$patched_id" "$saved_before"
 
+  sed -i 's/^BC250_GFX1013_TRANSACTION_PHASE=.*/BC250_GFX1013_TRANSACTION_PHASE=PREPARED/' "$ACTIVE_STATE"
+  cp -p "$ACTIVE_STATE" "$(prepared_stamp_for "$kernel")"
   PREPARE_COMMITTED=1
-  RESTORE_NEEDED=0
   rm -rf "$transaction"
   PREPARE_DIR=''
   trap - EXIT INT TERM
-  echo "Exact-kernel build, ABI verification, Fedora Mesa provenance/patch validation, private RADV staging and patched initramfs: PASS"
+  echo "Exact-kernel build, module compatibility verification, Fedora source provenance/patch validation, private RADV staging and patched initramfs: PASS"
   echo "Stock saved/default boot remains unchanged; patched boot is selected for the next boot only."
   echo "Next: reboot once, run 'bc250 gfx1013 status', then: sudo bc250 gfx1013 enable"
 }
@@ -1368,14 +1482,16 @@ verify_active_identity() {
   [[ "$current_build_owner" == "$BC250_GFX1013_KERNEL_DEVEL_NEVRA" ]] || die "kernel-devel package identity changed since prepare"
   [[ -f "$BC250_GFX1013_MODULE" ]] || die "prepared exact-kernel module artifact is missing"
   [[ "$(sha256sum "$BC250_GFX1013_MODULE" | awk '{print $1}')" == "$BC250_GFX1013_MODULE_SHA256" ]] || die "prepared module SHA-256 mismatch"
-  local abi_tmp current_abi
+  local abi_tmp current_abi current_abi_mode
   abi_tmp="$(mktemp -d)"
   if ! current_abi="$(verify_module_abi "$BC250_GFX1013_BUILD_TREE" "$BC250_GFX1013_MODULE" "$abi_tmp" "$BC250_GFX1013_KERNEL")"; then
     rm -rf "$abi_tmp"
     die "prepared module ABI revalidation failed"
   fi
+  current_abi_mode="$(sed -n 's/^mode=//p' "$abi_tmp/abi-required.txt" | head -1)"
   rm -rf "$abi_tmp"
-  [[ "$current_abi" == "$BC250_GFX1013_ABI_SHA256" ]] || die "prepared module ABI evidence changed"
+  [[ "$current_abi_mode" == "$BC250_GFX1013_ABI_MODE" ]] || die "prepared module compatibility mode changed"
+  [[ "$current_abi" == "$BC250_GFX1013_ABI_SHA256" ]] || die "prepared module compatibility evidence changed"
   [[ "${BC250_GFX1013_MESA_SRPM_NEVRA:-}" == "$MESA_SRPM_NEVRA" ]] || die "prepared Mesa Fedora source identity differs from package baseline"
   [[ "${BC250_GFX1013_MESA_SOURCE_SHA256:-}" == "$MESA_SOURCE0_SHA256" ]] || die "prepared Mesa Source0 identity differs from package baseline"
   [[ -f "$BC250_GFX1013_STOCK_MODULE" ]] || die "recorded stock amdgpu module is missing"
@@ -1449,15 +1565,23 @@ ENABLE_COMMITTED=1
 ENABLE_WAS_ACTIVE=0
 ENABLE_PREVIOUS_SAVED=''
 enable_cleanup_on_exit() {
-  local rc=$1
+  local rc=$1 rollback_ok=1
   trap - EXIT INT TERM
   if [[ "$ENABLE_COMMITTED" != 1 ]]; then
     rm -f -- "$DROPIN" "$DROPIN.tmp"
-    systemctl daemon-reload >/dev/null 2>&1 || rc=2
+    systemctl daemon-reload >/dev/null 2>&1 || rollback_ok=0
     if [[ -n "$ENABLE_PREVIOUS_SAVED" ]]; then
-      grub2-set-default "$ENABLE_PREVIOUS_SAVED" >/dev/null 2>&1 || rc=2
+      grub2-set-default "$ENABLE_PREVIOUS_SAVED" >/dev/null 2>&1 || rollback_ok=0
+      [[ "$(grub_value saved_entry)" == "$ENABLE_PREVIOUS_SAVED" ]] || rollback_ok=0
     fi
     ((ENABLE_WAS_ACTIVE)) && systemctl restart ollama.service >/dev/null 2>&1 || true
+    if ((rollback_ok)); then
+      set_active_transaction_state PREPARED 0 || true
+    else
+      set_active_transaction_state SAFETY_FAILURE 1 'failed to restore saved/default boot during enable rollback' || true
+      echo "ERROR: GFX1013 enable rollback could not restore boot-manager state; recovery state was preserved" >&2
+      rc=5
+    fi
   fi
   exit "$rc"
 }
@@ -1482,6 +1606,7 @@ enable() {
   ENABLE_PREVIOUS_SAVED="$(grub_value saved_entry)"
   [[ "$ENABLE_PREVIOUS_SAVED" == "$BC250_GFX1013_STOCK_ENTRY_ID" ]] || \
     die "stock saved/default boot changed after prepare; refusing promotion"
+  set_active_transaction_state ENABLING 0 || die "cannot persist GFX1013 ENABLING transaction state"
   ENABLE_COMMITTED=0
   trap 'enable_cleanup_on_exit $?' EXIT
   trap 'exit 130' INT TERM
@@ -1493,8 +1618,10 @@ enable() {
   grub2-set-default "$BC250_GFX1013_PATCHED_ENTRY_ID" || die "failed to promote the verified patched boot"
   [[ "$(grub_value saved_entry)" == "$BC250_GFX1013_PATCHED_ENTRY_ID" ]] || die "patched saved/default boot verification failed"
   state_tmp="$ACTIVE_STATE.tmp"
-  awk '!/^BC250_GFX1013_ENABLED=/ && !/^BC250_GFX1013_VULKAN_/' "$ACTIVE_STATE" > "$state_tmp"
+  awk '!/^BC250_GFX1013_ENABLED=/ && !/^BC250_GFX1013_VULKAN_/ && !/^BC250_GFX1013_TRANSACTION_PHASE=/ && !/^BC250_GFX1013_RECOVERY_REQUIRED=/ && !/^BC250_GFX1013_RECOVERY_REASON=/' "$ACTIVE_STATE" > "$state_tmp"
   cat >> "$state_tmp" <<EOF_VK_STATE
+BC250_GFX1013_TRANSACTION_PHASE=ENABLED
+BC250_GFX1013_RECOVERY_REQUIRED=0
 BC250_GFX1013_ENABLED=1
 BC250_GFX1013_VULKAN_VENDOR_ID=$vk_vendor
 BC250_GFX1013_VULKAN_DEVICE_ID=$vk_device
@@ -1613,6 +1740,7 @@ disable() {
 
   # Fail closed: boot restoration is the first destructive authority. Nothing
   # package-owned is removed until saved + next boot both point to a verified stock BLS.
+  set_active_transaction_state DISABLING 0 || die "cannot persist GFX1013 DISABLING transaction state"
   restore_stock_boot
 
   systemctl is-active --quiet ollama.service && was_active=1 || true
@@ -1668,6 +1796,10 @@ reset() {
     echo "GFX1013 recovery reset completed; stock boot and normal system Mesa are authoritative."
   fi
 }
+
+if [[ ${BC250_GFX1013_LIBRARY_ONLY:-0} == 1 ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 case "${1:-status}" in
   status)
