@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import sys
 import tempfile
 import unittest
 from argparse import Namespace
+from contextlib import redirect_stdout
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -98,7 +100,7 @@ class Gfx1013BenchmarkTests(unittest.TestCase):
             base = {
                 "schema": MODULE.SCHEMA,
                 "identity": {
-                    "package_nevra": "bc250-llm-server-0.13.1-1.7.fc44.x86_64",
+                    "package_nevra": "bc250-llm-server-0.13.1-1.8.fc44.x86_64",
                     "kernel": "test",
                 },
                 "models": {"standard": {"model": model, "digest": "abc"}},
@@ -153,6 +155,18 @@ class Gfx1013BenchmarkTests(unittest.TestCase):
             self.assertEqual(report["recommendation"]["state"], "PROMOTION_CANDIDATE")
             self.assertIn("A2 restored-stock control: CAPTURED", (campaign / "report.txt").read_text())
 
+
+    def test_status_without_campaign_is_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "benchmarks"
+            args = Namespace(root=root, campaign_dir=None, json=True)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(MODULE.status_campaign(args), 0)
+            payload = json.loads(output.getvalue())
+            self.assertFalse(payload["active"])
+            self.assertIsNone(payload["campaign"])
+            self.assertFalse(root.exists())
 
     def test_closed_manifest_rejects_unlisted_or_modified_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

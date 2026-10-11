@@ -22,6 +22,12 @@ def command_result(argv: list[str], rc: int = 0, stdout: str = "", stderr: str =
 
 
 class QualificationTests(unittest.TestCase):
+    def test_tika_gate_marker_is_extraction_safe_and_reports_observed_text(self) -> None:
+        source = (QUALIFICATION / "package_gate_capture.py").read_text(encoding="utf-8")
+        self.assertIn('marker = "BC250TIKA410PACKAGEGATE7D6D6F"', source)
+        self.assertNotIn("BC250_TIKA_410_PACKAGE_GATE_7D6D6F", source)
+        self.assertIn("observed=extraction.stdout.strip()", source)
+
     def test_managed_swap_refresh_only_touches_package_swap_and_restores_priority(self) -> None:
         calls: list[list[str]] = []
 

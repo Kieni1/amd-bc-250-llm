@@ -773,6 +773,46 @@ else
   info "private Tika HTTP check skipped because container DNS resolution failed"
 fi
 
+section "Package runtime identity"
+expected_tika_version="${BC250_TIKA_VERSION%-full}"
+observed_tika_version="$(podman exec open-webui python -c '
+import urllib.request
+print(urllib.request.urlopen("http://tika:9998/version", timeout=10).read().decode("utf-8", "replace").strip())
+' 2>/dev/null || true)"
+if [[ "$observed_tika_version" == *"$expected_tika_version"* ]]; then
+  ok "Tika live version matches package pin ($expected_tika_version)"
+else
+  bad "Tika live version differs from package pin (expected $expected_tika_version; observed ${observed_tika_version:-unavailable})"
+fi
+observed_tika_image="$(podman inspect --format '{{.ImageName}}' tika 2>/dev/null | head -1 || true)"
+observed_tika_digest="$(grep -oE 'sha256:[0-9a-f]{64}' <<< "$observed_tika_image" | head -1 || true)"
+if [[ -z "$observed_tika_digest" && -n "$observed_tika_image" ]]; then
+  observed_tika_digest="$(podman image inspect --format '{{.Digest}}' "$observed_tika_image" 2>/dev/null | head -1 || true)"
+fi
+if [[ "$observed_tika_digest" == "${BC250_TIKA_IMAGE_DIGEST:-}" && -n "$observed_tika_digest" ]]; then
+  ok "Tika running image digest matches package pin"
+else
+  bad "Tika running image digest differs from package pin (expected ${BC250_TIKA_IMAGE_DIGEST:-unknown}; observed ${observed_tika_digest:-unavailable})"
+fi
+observed_owui_version="$(curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/api/version 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)"
+if [[ "$observed_owui_version" == "${BC250_OPEN_WEBUI_VERSION:-}" && -n "$observed_owui_version" ]]; then
+  ok "Open WebUI live version matches package pin ($observed_owui_version)"
+else
+  bad "Open WebUI live version differs from package pin (expected ${BC250_OPEN_WEBUI_VERSION:-unknown}; observed ${observed_owui_version:-unavailable})"
+fi
+observed_owui_image="$(podman inspect --format '{{.ImageName}}' open-webui 2>/dev/null | head -1 || true)"
+observed_owui_digest="$(grep -oE 'sha256:[0-9a-f]{64}' <<< "$observed_owui_image" | head -1 || true)"
+if [[ -z "$observed_owui_digest" && -n "$observed_owui_image" ]]; then
+  observed_owui_digest="$(podman image inspect --format '{{.Digest}}' "$observed_owui_image" 2>/dev/null | head -1 || true)"
+fi
+if [[ "$observed_owui_digest" == "${BC250_OPEN_WEBUI_IMAGE_DIGEST:-}" && -n "$observed_owui_digest" ]]; then
+  ok "Open WebUI running image digest matches package pin"
+else
+  bad "Open WebUI running image digest differs from package pin (expected ${BC250_OPEN_WEBUI_IMAGE_DIGEST:-unknown}; observed ${observed_owui_digest:-unavailable})"
+fi
+info "bc250 verify checks operational health and package-owned runtime identity; release acceptance additionally requires bc250 package-gate."
+
+section "Container host gateway"
 if podman exec open-webui getent hosts host.containers.internal >/dev/null 2>&1; then
   ok "Open WebUI resolves host.containers.internal"
 else

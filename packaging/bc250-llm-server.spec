@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.7%{?dist}
+Release:        1.8%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -158,7 +158,7 @@ if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
     exit 1
   fi
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
-  echo "Open WebUI inactive and boot-held for migration safety. Run: sudo bc250 install"
+  echo "Open WebUI inactive and boot-held for migration safety."
 fi
 
 %post
@@ -175,7 +175,7 @@ chmod 0600 "$secret_env"
 # defensively; guided convergence restores it only after the verified snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
   rm -f /etc/containers/systemd/open-webui.container.d/90-enable.conf
-  echo "Open WebUI remains stopped and boot-held for migration safety. Run: sudo bc250 install"
+  echo "Open WebUI remains stopped and boot-held for migration safety."
 fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 
@@ -279,6 +279,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.8
+- Fix upgrade convergence so an already-running stale Tika container is recreated when its live version or image digest differs from the package pin, then verify live identity before declaring convergence.
+- Make the Tika 4.1 package-gate extraction marker robust to Markdown underscore escaping and include observed extraction details on failure.
+- Make GFX1013 build dependency checks provider-aware on Fedora and aggregate independent prepare --check blockers in one read-only preflight.
+- Make GFX1013 benchmark status strictly read-only on pristine state, and improve expected-vs-observed runtime identity, stock-vs-optional-GFX doctor severity, canonical JSON package identity and operator wording.
+
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.7
 - Add reboot-aware GFX1013 A1/B/A2 LLM benchmark campaigns with exact package/kernel/model-digest binding, telemetry, GPU-fault capture and JSON/text comparison reports.
 - Add package-owned qualification evidence inventory and conservative dry-run-first cleanup for old terminal package-gate, resilience and GFX benchmark artifacts.

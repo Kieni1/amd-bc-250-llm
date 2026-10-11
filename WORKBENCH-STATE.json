@@ -1,20 +1,25 @@
 {
   "schema": 1,
   "kind": "workbench-checkpoint",
-  "release_identity": "bc250-llm-server-0.13.1-1.7",
-  "predecessor_artifact": "amd-bc-250-llm-0.13.1-1.6.zip",
-  "predecessor_sha256": "d4c001b708c0fb495bf65af0cd4a9ddafe634497f4f795bdf128c3fd4a33b0a5",
-  "batch": "0.13.1-1.7-gfx1013-benchmark-evidence-qol",
+  "release_identity": "bc250-llm-server-0.13.1-1.8",
+  "predecessor_artifact": "amd-bc-250-llm-0.13.1-1.7.zip",
+  "predecessor_sha256": "c21b8636b5feb6d188be902062945862e311ae2abd4f84c67baae55ebf2fd986",
+  "batch": "0.13.1-1.8-device-defect-ux-fixes",
   "changed_files": [
     "CHANGELOG.md",
-    "Makefile",
     "README.md",
     "TLDR.md",
     "WORKBENCH-STATE.json",
     "cmd/benchmark/gfx1013-ab.py",
+    "cmd/monitoring/doctor.py",
+    "cmd/monitoring/status-json.py",
+    "cmd/monitoring/status.sh",
+    "cmd/monitoring/verify-server.sh",
     "cmd/monitoring/version.py",
+    "cmd/qualification/package_gate_capture.py",
     "cmd/qualification/qualification_inventory.py",
     "cmd/system/gfx1013.sh",
+    "cmd/system/install.sh",
     "development/DEVELOPMENT-SCOPE.json",
     "development/TESTING-STRATEGY.md",
     "development/VALIDATION-MATRIX.md",
@@ -22,35 +27,36 @@
     "docs/GFX1013.md",
     "docs/OPERATIONS.md",
     "docs/QUALIFICATION.md",
-    "packaging/bc250",
     "packaging/bc250-llm-server.spec",
-    "packaging/completions/bc250.bash",
-    "packaging/install-manifest.tsv",
-    "scripts/validate.py",
+    "tests/test_gfx1013.py",
     "tests/test_gfx1013_benchmark.py",
+    "tests/test_install.py",
+    "tests/test_operations.py",
     "tests/test_packaging.py",
-    "tests/test_qualification_inventory.py"
+    "tests/test_qualification.py"
   ],
   "completed": [
-    "Added reboot-aware same-package GFX1013 A1 stock, B enabled and A2 restored-stock benchmark capture without automating lifecycle or reboot transitions.",
-    "Bound benchmark phases to exact installed package, running kernel, prompt and model digests and seal phase/campaign evidence with SHA-256 manifests.",
-    "Added conservative advisory promotion screening requiring A2, repeatable throughput, clean GPU/restart/residency evidence and bounded memory/swap/temperature behavior.",
-    "Preserve sealed failure evidence for interrupted/failed benchmark phases without overwriting successful phase evidence.",
-    "Added bc250 qualification list/--json and dry-run-first terminal-evidence cleanup with newest-per-class retention and path/symlink safety.",
-    "Added bc250 version/--json/--short, global bc250 --version and packaged Bash completion.",
-    "Kept the 1.6 GFX1013 Secure Boot, exact-kernel, rollback and private-RADV runtime guards unchanged and kept GFX1013 default-off."
+    "Fix 1.3-to-1.7 upgrade-convergence defect by comparing live Tika version/digest with the package pin and recreating tika.service only when stale.",
+    "Fix the Tika 4.1 package-gate false negative with an extraction-safe deterministic marker and observed-text evidence on failure.",
+    "Make GFX1013 prepare preflight provider-aware and aggregate independently discoverable blockers in one read-only check.",
+    "Make GFX1013 benchmark status strictly read-only when no campaign exists.",
+    "Expose configured/expected versus observed Open WebUI and Tika identities in status/version and verify package-owned runtime identity explicitly.",
+    "Separate stock appliance health from optional GFX1013 readiness in doctor output, normalize public RPM identity fields, and clarify restart/optional-feature wording.",
+    "Reduce RPM transaction guidance to one final post-transaction bc250 install action while preserving migration-safety explanations.",
+    "Keep the 1.7 benchmark/evidence workflow and 1.6 GFX1013 lifecycle safety architecture otherwise unchanged and default-off."
   ],
   "validation": [
-    "Non-build source regression set passed: 577/577 tests across 19 modules, including benchmark, GFX1013, qualification/inventory, packaging metadata, operations, documentation, install/OpenWebUI/RAG/runtime/state/storage/translation/uninstall and frozen maintenance behavior.",
-    "Repository source preflight passed; development scope/frozen-tree check passed; changed Python sources compiled; changed shell/dispatcher/completion syntax passed bash -n.",
-    "Ruff and ShellCheck executables are unavailable in this workspace. The operator-provided Fedora make lint gate remains authoritative.",
-    "Per operator instruction, make sources/sources-check, make rpm/%check, rpmlint, RPM payload validation and clean SRPM rebuild were not run here."
+    "Focused defect/UX regression set passed: 178/178 tests across GFX1013 benchmark/lifecycle, monitoring/operations, installer convergence, qualification and packaging modules.",
+    "Additional documentation and adjacent-state regressions passed: 17/17 documentation tests and 39/39 uninstall, qualification-inventory, runtime and state tests.",
+    "Repository source validator passed; development scope/frozen-tree check passed; changed Python sources compiled; changed shell/dispatcher syntax passed bash -n.",
+    "Ruff and ShellCheck executables are unavailable in this workspace. The operator Fedora make lint gate remains authoritative.",
+    "Per operator instruction, make clean/sources/sources-check/lint/preflight, make rpm/%check, rpmlint, RPM payload validation and clean SRPM rebuild were not run here."
   ],
   "device_followup": [
-    "Build exact 0.13.1-1.7 with the operator Fedora release gate.",
-    "Upgrade the exact device and verify inherited 1.6 lifecycle safety with bc250 doctor/status/gfx1013 status.",
-    "Capture A1 with sudo bc250 gfx1013 benchmark stock on stock 1.7.",
-    "Prepare/reboot/enable normally, capture B, disable/reboot stock, capture A2, then run benchmark report.",
-    "Review package-quality/product-quality evidence separately before considering any default-on GFX1013 policy."
+    "Build exact 0.13.1-1.8 with the operator Fedora release gate.",
+    "Retest upgrade/convergence from a prior live Tika 4.0.0 state and require automatic convergence to the 1.8 Tika pin.",
+    "Require authoritative package-gate PASS, then capture a fresh A1 bound to the 1.8 package identity.",
+    "Require provider-aware gfx1013 prepare --check PASS before prepare/one-shot patched boot/enable/B.",
+    "Disable, reboot stock, prove stock authority, capture A2 and synthesize A1/B/A2 before any GFX policy decision."
   ]
 }

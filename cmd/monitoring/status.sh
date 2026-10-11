@@ -66,14 +66,22 @@ runtime_mode() {
 
 
 topology_summary() {
-  local mode="$1" unit label missing=()
+  local mode="$1" runtime_identity_warning="${2:-0}" unit label missing=()
   case "$mode" in
     normal)
-      echo "Overall: HEALTHY"
+      if [[ "$runtime_identity_warning" == 1 ]]; then
+        echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch/unavailable"
+      else
+        echo "Overall: HEALTHY"
+      fi
       echo "Runtime mode: normal"
       ;;
     agent)
-      echo "Overall: HEALTHY"
+      if [[ "$runtime_identity_warning" == 1 ]]; then
+        echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch/unavailable"
+      else
+        echo "Overall: HEALTHY"
+      fi
       echo "Runtime mode: exclusive agent"
       ;;
     degraded)
@@ -187,6 +195,33 @@ openwebui_readiness() {
   printf 'listener=%s; backend=%s; front-door=%s' "$listener" "$backend" "$frontdoor"
 }
 
+status_json_path() {
+  if [[ -x "$STATUS_JSON" ]]; then
+    printf '%s\n' "$STATUS_JSON"
+  else
+    local local_helper
+    local_helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/status-json.py"
+    [[ -x "$local_helper" ]] && printf '%s\n' "$local_helper"
+  fi
+}
+
+runtime_identity_summary() {
+  local payload="$1" service expected_version expected_digest observed_version observed_digest match label
+  for service in open_webui tika; do
+    case "$service" in
+      open_webui) label="Open WebUI" ;;
+      tika) label="Tika" ;;
+    esac
+    expected_version="$(jq -r --arg service "$service" '.runtime_identity[$service].expected.version // "unknown"' <<< "$payload" 2>/dev/null || true)"
+    expected_digest="$(jq -r --arg service "$service" '.runtime_identity[$service].expected.digest // "unknown"' <<< "$payload" 2>/dev/null || true)"
+    observed_version="$(jq -r --arg service "$service" '.runtime_identity[$service].observed.version // "unavailable"' <<< "$payload" 2>/dev/null || true)"
+    observed_digest="$(jq -r --arg service "$service" '.runtime_identity[$service].observed.digest // "unavailable"' <<< "$payload" 2>/dev/null || true)"
+    match="$(jq -r --arg service "$service" 'if .runtime_identity[$service].match == true then "MATCH" elif .runtime_identity[$service].match == false then "MISMATCH" else "UNKNOWN" end' <<< "$payload" 2>/dev/null || true)"
+    printf '  %-12s expected %s @ %s\n' "$label" "${expected_version:-unknown}" "${expected_digest:-unknown}"
+    printf '  %-12s observed %s @ %s — %s\n' '' "${observed_version:-unavailable}" "${observed_digest:-unavailable}" "${match:-UNKNOWN}"
+  done
+}
+
 if [[ "${1:-}" == -h || "${1:-}" == --help ]]; then
   cat <<'USAGE'
 Usage: bc250 status [--json]
@@ -198,10 +233,8 @@ USAGE
   exit 0
 elif [[ "${1:-}" == --json ]]; then
   (($# == 1)) || { echo "ERROR: bc250 status --json accepts no additional arguments." >&2; exit 2; }
-  if [[ ! -x "$STATUS_JSON" ]]; then
-    STATUS_JSON="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/status-json.py"
-  fi
-  [[ -x "$STATUS_JSON" ]] || { echo "ERROR: status JSON helper is unavailable: $STATUS_JSON" >&2; exit 2; }
+  STATUS_JSON="$(status_json_path)"
+  [[ -x "$STATUS_JSON" ]] || { echo "ERROR: status JSON helper is unavailable" >&2; exit 2; }
   exec "$STATUS_JSON"
 elif (($#)); then
   echo "ERROR: bc250 status accepts only --json." >&2
@@ -210,7 +243,19 @@ fi
 
 echo "BC-250 appliance status"
 mode="$(runtime_mode)"
-topology_summary "$mode"
+STATUS_JSON="$(status_json_path)"
+status_payload=''
+runtime_identity_warning=0
+if [[ -x "$STATUS_JSON" ]]; then
+  status_payload="$("$STATUS_JSON" 2>/dev/null || true)"
+fi
+if [[ -n "$status_payload" ]]; then
+  runtime_match="$(jq -r 'if .runtime_identity.match == true then "true" elif .runtime_identity.match == false then "false" else "unknown" end' <<< "$status_payload" 2>/dev/null || true)"
+  [[ "$runtime_match" == true ]] || runtime_identity_warning=1
+else
+  runtime_identity_warning=1
+fi
+topology_summary "$mode" "$runtime_identity_warning"
 
 section "Platform"
 printf '  Kernel:       %s\n' "$(uname -r)"
@@ -222,8 +267,7 @@ if command -v needs-restarting >/dev/null 2>&1; then
     echo "  OS/package restart check: RECOMMENDED after package/kernel updates"
   fi
 else
-  echo "  OS/package restart check: UNKNOWN"
-  echo "  Reason: optional needs-restarting helper unavailable"
+  echo "  Restart advisory: not evaluated (optional helper unavailable)"
 fi
 
 section "CPU power states"
@@ -310,6 +354,12 @@ for unit in open-webui.service tika.service nginx.service; do
   service_status "$unit"
 done
 printf '  %-38s %s\n' 'Open WebUI application readiness' "$(openwebui_readiness)"
+if [[ -n "$status_payload" ]]; then
+  echo "  Package runtime identity:"
+  runtime_identity_summary "$status_payload"
+else
+  echo "  Package runtime identity: unavailable"
+fi
 
 section "Memory and swap"
 free -h 2>/dev/null | sed 's/^/  /' || true

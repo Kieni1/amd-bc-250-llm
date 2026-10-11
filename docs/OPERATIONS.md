@@ -443,7 +443,7 @@ sudo bc250 package-gate capture --candidate-rpm /path/to/candidate.rpm --token-f
 sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
 
-`sudo bc250 status --json` emits schema `bc250.status.v1` with installed package, kernel,
+`sudo bc250 status --json` emits schema `bc250.status.v2` with installed package, kernel,
 service topology, memory/swap/PSI, failed-unit, restart-diagnostic and GFX1013
 state. `bc250 doctor` layers read-only PASS/WARN/FAIL diagnostics over that state,
 including `rpm -V`, runtime topology, memory headroom, GFX/Secure-Boot state and
@@ -1203,3 +1203,13 @@ values such as IP address, MAC address, public-key fingerprint, wake time and Pi
 retention policy do not by themselves change the contract version.
 
 <!-- END BC250_MAINTENANCE_CONTRACT -->
+
+## Expected versus observed runtime identity
+
+Release 1.8 distinguishes package configuration from live container identity. `bc250 status`, `bc250 status --json` and `bc250 version` expose the expected and observed Open WebUI/Tika versions and image digests plus a match state. A reachable but stale package-owned container is therefore visible instead of being mistaken for convergence.
+
+`sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
+
+`bc250 doctor` reports **Overall appliance health** separately from **Optional GFX1013 readiness**. Secure-Boot/kernel-devel uncertainty for the default-off experimental path does not by itself make a healthy stock appliance unhealthy.
+
+When the optional `needs-restarting` helper is absent, status reports `Restart advisory: not evaluated (optional helper unavailable)` rather than treating that absence as a health failure.

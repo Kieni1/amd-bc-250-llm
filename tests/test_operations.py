@@ -61,7 +61,7 @@ class StatusTests(unittest.TestCase):
         self.assertIn('Overall: DEGRADED', source)
         self.assertIn('Recovery: sudo bc250 agent-mode normal', source)
         self.assertIn('Overall: UNAVAILABLE', source)
-        self.assertIn('Reason: optional needs-restarting helper unavailable', source)
+        self.assertIn('Restart advisory: not evaluated (optional helper unavailable)', source)
 
     def test_status_reports_protected_storage_instead_of_zero_size(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -118,7 +118,7 @@ ollama_version_line
         self.assertIn("listener-only", source)
         self.assertIn("Open WebUI application readiness", source)
         self.assertIn("resident:", source)
-        self.assertIn("OS/package restart check: UNKNOWN", source)
+        self.assertIn("Restart advisory: not evaluated (optional helper unavailable)", source)
 
 
     def test_machine_readable_status_and_doctor_are_packaged_interfaces(self) -> None:
@@ -126,7 +126,7 @@ ollama_version_line
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
         doctor = ROOT / "cmd/monitoring/doctor.py"
         self.assertIn("Usage: bc250 status [--json]", status)
-        self.assertIn('"schema": "bc250.status.v1"', status_json)
+        self.assertIn('"schema": "bc250.status.v2"', status_json)
         self.assertIn('"gfx1013": gfx_status(libexec)', status_json)
         result = subprocess.run(
             [str(doctor), "--help"],
@@ -137,10 +137,32 @@ ollama_version_line
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("read-only appliance diagnostics", result.stdout)
         doctor_source = doctor.read_text(encoding="utf-8")
-        self.assertIn('"schema": "bc250.doctor.v1"', doctor_source)
+        self.assertIn('"schema": "bc250.doctor.v2"', doctor_source)
         self.assertIn('["rpm", "-V", PACKAGE]', doctor_source)
         self.assertIn("diagnostic headroom TIGHT", doctor_source)
         self.assertIn("STALE_KERNEL", doctor_source)
+        self.assertIn("runtime_identity", status_json)
+        self.assertIn("Overall appliance health:", doctor_source)
+        self.assertIn("Optional GFX1013 readiness:", doctor_source)
+
+    def test_status_json_normalizes_the_known_tika_version_prefix(self) -> None:
+        source = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
+        self.assertIn('value.startswith("Apache Tika ")', source)
+        self.assertIn('value.removeprefix("Apache Tika ").strip()', source)
+
+    def test_public_runtime_identity_and_package_identity_are_unambiguous(self) -> None:
+        status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
+        version = (ROOT / "cmd/monitoring/version.py").read_text(encoding="utf-8")
+        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        for source in (status_json, version):
+            self.assertIn('"epoch": epoch', source)
+            self.assertIn('f"{name}-{version}-{release}.{arch}"', source)
+            self.assertNotIn('f"{name}-{epoch}:{version}-{release}.{arch}"', source)
+        self.assertIn("runtime_identity", status_json)
+        self.assertIn("configured_runtime", version)
+        self.assertIn("runtime_identity", version)
+        self.assertIn('section "Package runtime identity"', verify)
+        self.assertIn("release acceptance additionally requires bc250 package-gate", verify)
 
     def test_runtime_state_identifies_only_active_zram_swap_membership(self) -> None:
         helper = ROOT / "cmd/monitoring/runtime-state.sh"

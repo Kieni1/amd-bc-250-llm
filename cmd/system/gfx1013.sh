@@ -143,10 +143,17 @@ GFX_BUILD_PACKAGES=(
   zlib-devel libzstd-devel spirv-tools-devel
 )
 
+build_requirement_provider() {
+  local requirement=$1
+  rpm -q --whatprovides --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' \
+    "$requirement" 2>/dev/null | head -1 || true
+}
+
 missing_build_packages() {
-  local package missing=()
-  for package in "${GFX_BUILD_PACKAGES[@]}"; do
-    rpm -q "$package" >/dev/null 2>&1 || missing+=("$package")
+  local requirement provider missing=()
+  for requirement in "${GFX_BUILD_PACKAGES[@]}"; do
+    provider="$(build_requirement_provider "$requirement")"
+    [[ -n "$provider" ]] || missing+=("$requirement")
   done
   ((${#missing[@]})) && printf '%s\n' "${missing[@]}"
   return 0
@@ -468,10 +475,12 @@ status() {
     || echo "Separate upstream GFX1013 installation: absent"
   missing_packages="$(missing_build_packages)"
   if [[ -n "$missing_packages" ]]; then
-    echo "Optional GFX build RPMs: missing"
-    while IFS= read -r package; do [[ -n "$package" ]] && printf '  %s\n' "$package"; done <<< "$missing_packages"
+    echo "Optional GFX build requirements: missing"
+    while IFS= read -r package; do
+      [[ -n "$package" ]] && printf '  requirement: %s; provider: <none>; status: MISSING\n' "$package"
+    done <<< "$missing_packages"
   else
-    echo "Optional GFX build RPMs: installed"
+    echo "Optional GFX build requirements: satisfied (provider-aware)"
   fi
 }
 
@@ -497,8 +506,8 @@ check_os_and_boot_tools() {
   missing_packages="$(missing_build_packages)"
   if [[ -n "$missing_packages" ]]; then
     mapfile -t missing_package_list <<< "$missing_packages"
-    printf 'ERROR: optional GFX1013 build RPMs missing:\n' >&2
-    for package in "${missing_package_list[@]}"; do [[ -n "$package" ]] && printf '  %s\n' "$package" >&2; done
+    printf 'ERROR: optional GFX1013 build requirements missing:\n' >&2
+    for package in "${missing_package_list[@]}"; do [[ -n "$package" ]] && printf '  requirement: %s; provider: <none>; status: MISSING\n' "$package" >&2; done
     printf 'Install them with: sudo dnf install' >&2
     for package in "${missing_package_list[@]}"; do [[ -n "$package" ]] && printf ' %q' "$package" >&2; done
     printf '\n' >&2
@@ -834,10 +843,151 @@ prepare_cleanup_on_exit() {
   exit "$rc"
 }
 
+prepare_preflight() {
+  local failures=0 kernel build build_owner stock_module stock_bls stock_entry_id current_saved
+  local secure package_id requirement provider command os_id='' machine_id preflight_bls preflight_initramfs
+  local -a missing_commands=()
+
+  echo "GFX1013 prepare preflight (read-only):"
+  if [[ -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    os_id="${ID:-}"
+  fi
+  if [[ "$os_id" == fedora ]]; then
+    echo "  Fedora host: PASS"
+  else
+    echo "  Fedora host: BLOCKED (${os_id:-unknown})"
+    failures=$((failures + 1))
+  fi
+  if command -v rpm-ostree >/dev/null 2>&1; then
+    echo "  Atomic/rpm-ostree host: BLOCKED (unsupported by direct exact-kernel profile)"
+    failures=$((failures + 1))
+  else
+    echo "  Atomic/rpm-ostree host: PASS (not detected)"
+  fi
+
+  for command in curl xz zstd tar cpio patch gcc g++ make rpm rpm2cpio meson ninja python3 \
+    sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
+    command -v "$command" >/dev/null 2>&1 || missing_commands+=("$command")
+  done
+  if ((${#missing_commands[@]})); then
+    printf '  Required commands: BLOCKED (missing: %s)\n' "${missing_commands[*]}"
+    failures=$((failures + 1))
+  else
+    echo "  Required commands: PASS"
+  fi
+
+  echo "  Optional build requirements/providers:"
+  for requirement in "${GFX_BUILD_PACKAGES[@]}"; do
+    provider="$(build_requirement_provider "$requirement")"
+    if [[ -n "$provider" ]]; then
+      printf '    requirement: %-26s provider: %-44s status: satisfied\n' "$requirement" "$provider"
+    else
+      printf '    requirement: %-26s provider: %-44s status: MISSING\n' "$requirement" '<none>'
+      failures=$((failures + 1))
+    fi
+  done
+
+  secure="$(secure_boot_state)"
+  case "$secure" in
+    disabled|disabled-non-efi) echo "  Secure Boot: PASS ($secure)" ;;
+    enabled) echo "  Secure Boot: BLOCKED (unsigned package-built amdgpu is not enrolled)"; failures=$((failures + 1)) ;;
+    *) echo "  Secure Boot: BLOCKED (state unknown)"; failures=$((failures + 1)) ;;
+  esac
+
+  if source_identity_ok; then
+    echo "  Package source/patch manifests: PASS"
+  else
+    echo "  Package source/patch manifests: BLOCKED"
+    failures=$((failures + 1))
+  fi
+  if bc250_device_present; then
+    echo "  BC-250 PCI 1002:13fe: PASS"
+  else
+    echo "  BC-250 PCI 1002:13fe: BLOCKED (not found)"
+    failures=$((failures + 1))
+  fi
+
+  [[ ! -e "$ACTIVE_STATE" ]] || { echo "  Existing lifecycle state: BLOCKED (disable/reset first)"; failures=$((failures + 1)); }
+  [[ ! -e "$DROPIN" ]] || { echo "  Ollama private-RADV override: BLOCKED (unexpected pre-existing drop-in)"; failures=$((failures + 1)); }
+  [[ ! -e "$UPSTREAM_GENERATOR" && ! -e "$UPSTREAM_STATE/active.env" ]] || {
+    echo "  Separate upstream GFX1013 state: BLOCKED (conflict detected)"; failures=$((failures + 1));
+  }
+
+  kernel="$(kernel_release)"
+  build="/lib/modules/$kernel/build"
+  if [[ -e "$build" ]]; then
+    build="$(readlink -f "$build")"
+    build_owner="$(kernel_build_owner "$kernel" "$build" 2>/dev/null || true)"
+    if [[ "$build_owner" == "kernel-devel-${kernel}" ]]; then
+      echo "  Exact kernel-devel: PASS ($build_owner)"
+    else
+      echo "  Exact kernel-devel: BLOCKED (build tree owner ${build_owner:-unknown})"
+      failures=$((failures + 1))
+    fi
+  else
+    echo "  Exact kernel-devel: BLOCKED (missing $build)"
+    failures=$((failures + 1))
+  fi
+
+  stock_module="$(find_stock_module "$kernel" 2>/dev/null || true)"
+  [[ -n "$stock_module" ]] && echo "  Stock amdgpu module: PASS ($stock_module)" || {
+    echo "  Stock amdgpu module: BLOCKED (not found)"; failures=$((failures + 1));
+  }
+  stock_bls="$(find_stock_bls "$kernel" 2>/dev/null || true)"
+  if [[ -n "$stock_bls" ]]; then
+    stock_entry_id="$(basename "$stock_bls" .conf)"
+    current_saved="$(grub_value saved_entry)"
+    if [[ "$current_saved" == "$stock_entry_id" ]] && stock_entry_file_safe "$stock_bls"; then
+      echo "  Stock BLS/default boot: PASS ($stock_entry_id)"
+    else
+      echo "  Stock BLS/default boot: BLOCKED (saved=${current_saved:-unset}, expected=$stock_entry_id)"
+      failures=$((failures + 1))
+    fi
+  else
+    echo "  Stock BLS/default boot: BLOCKED (could not identify exactly one stock entry)"
+    failures=$((failures + 1))
+  fi
+
+  machine_id="$(cat /etc/machine-id 2>/dev/null || true)"
+  if [[ -n "$machine_id" ]]; then
+    preflight_bls="/boot/loader/entries/${machine_id}-${kernel}-${PROFILE_VARIANT}.conf"
+    preflight_initramfs="/boot/initramfs-${kernel}-${PROFILE_VARIANT}.img"
+    if [[ -e "$preflight_bls" || -e "$preflight_initramfs" || -e "$(private_prefix)" ]]; then
+      echo "  Stale staged artifacts: BLOCKED (reset required)"
+      failures=$((failures + 1))
+    else
+      echo "  Stale staged artifacts: PASS"
+    fi
+  else
+    echo "  Machine identity: BLOCKED (/etc/machine-id unavailable)"
+    failures=$((failures + 1))
+  fi
+
+  package_id="$(package_nevra)"
+  [[ -n "$package_id" ]] && echo "  Package identity: PASS ($package_id)" || {
+    echo "  Package identity: BLOCKED (unavailable)"; failures=$((failures + 1));
+  }
+
+  if ((failures)); then
+    printf 'GFX1013 prepare check: BLOCKED (%d issue(s))\n' "$failures"
+    echo "No files, boot state or services were changed."
+    return 2
+  fi
+  echo "GFX1013 prepare check: PASS"
+  echo "No files, boot state or services were changed."
+  return 0
+}
+
 prepare() {
   local check_only=0
   [[ ${1:-} == --check ]] && check_only=1
   need_root
+  if ((check_only)); then
+    prepare_preflight
+    return $?
+  fi
   check_os_and_boot_tools
   source_identity_ok || die "package-pinned GFX1013 patch/full-source identity failed: $SOURCE"
   bc250_device_present || die "AMD BC-250 PCI device 1002:13fe not found"
@@ -875,16 +1025,6 @@ prepare() {
   [[ ! -e "$(private_prefix)" ]] || die "private GFX1013 prefix already exists; use 'bc250 gfx1013 reset' before prepare"
   package_id="$(package_nevra)"
   [[ -n "$package_id" ]] || die "installed bc250-llm-server RPM identity is unavailable"
-  if ((check_only)); then
-    echo "GFX1013 prepare check: PASS"
-    echo "  package:      $package_id"
-    echo "  kernel:       $kernel"
-    echo "  kernel-devel: $build_owner"
-    echo "  stock BLS:    $stock_entry_id"
-    echo "  Secure Boot:  $(secure_boot_state)"
-    echo "No files, boot state or services were changed."
-    return 0
-  fi
   artifact="$prepared/amdgpu${stock_module##*amdgpu}"
   PREPARE_DIR="$prepared"
   PREPARE_PATCHED_BLS="$preflight_patched_bls"

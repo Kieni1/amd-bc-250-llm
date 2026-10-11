@@ -1,6 +1,6 @@
 # Package gate and resilience qualification
 
-Release 0.13.1-1.7 retains the package-owned qualification control added in 1.4 without reopening the
+Release 0.13.1-1.8 retains the package-owned qualification control added in 1.4 without reopening the
 closed model/runtime optimization program. Release 1.6 additionally binds gate/resume authority to the
 running kernel, qualification-relevant configuration and stable GFX1013 identity so evidence cannot be
 silently reused after those inputs change. The authoritative result taxonomy is:
@@ -139,3 +139,9 @@ Cleanup is dry-run by default. `--apply` requires root, operates only on direct,
 non-symlink children of package-owned evidence roots, preserves nonterminal evidence,
 and always retains the newest requested number per evidence class. This command is
 space-management QoL only; it never changes qualification results.
+
+## 1.8 package-gate corrections
+
+The Tika extraction smoke uses an alphanumeric deterministic marker that is preserved literally by the pinned Tika 4.1 parser. A failed extraction records both the expected marker and observed extracted text so parser-formatting changes are diagnosable rather than reported as a generic RAG failure.
+
+`bc250 verify` validates operational appliance health **and package-owned live runtime identity**. It is still not release authority: package acceptance additionally requires the authoritative `bc250 package-gate` evidence and the applicable release/device gates.

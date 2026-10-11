@@ -225,7 +225,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
         self.assertIn('bc250 model status mtp --include-disabled --compact', source)
         self.assertIn('sudo bc250 fetch-mtp MODEL_ID', source)
-        self.assertIn('Review optional models or repair any selected optional-model drift now? [y/N]:', source)
+        self.assertIn('Review or install optional models now? [y/N]:', source)
         self.assertNotIn('bc250 model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -522,6 +522,19 @@ systemctl() {
 bc250() { local cmd="$1"; shift; case "$cmd" in agent-mode) printf 'mode:%s\n' "$*" >> "$BC250_TEST_LOG" ;; model) printf 'model:%s\n' "$*" >> "$BC250_TEST_LOG" ;; *) return 64 ;; esac; }
 firewall-cmd() { printf 'firewall:%s\n' "$*" >> "$BC250_TEST_LOG"; }
 setsebool() { :; }
+podman() {
+  case "$*" in
+    "inspect --format {{.ImageName}} tika")
+      printf 'apache/tika:4.1.0-full@sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7\n'
+      ;;
+    "image inspect --format {{.Digest}} "*)
+      printf 'sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7\n'
+      ;;
+    "exec open-webui getent hosts "*) return 0 ;;
+    "exec open-webui python -c "*) printf 'Apache Tika 4.1.0\n' ;;
+    *) return 0 ;;
+  esac
+}
 require_progress_terminal() { :; }
 prepare_hf_authentication() { :; }
 input_is_interactive() { return 1; }
@@ -553,6 +566,50 @@ step_8_application_services
             self.assertLess(required, owui)
             self.assertIn("mode:leave", calls)
             self.assertFalse(enable_target.exists())
+
+    def test_stale_tika_identity_restarts_only_tika_when_network_is_healthy(self) -> None:
+        result = source_probe(r'''
+systemctl() {
+  case "$1" in
+    is-active) return 0 ;;
+    show) return 0 ;;
+    restart)
+      printf 'restart:%s\n' "$2"
+      [[ "$2" == tika.service ]] && TIKA_REFRESHED=1
+      return 0
+      ;;
+    *) return 0 ;;
+  esac
+}
+firewall-cmd() { [[ "$*" == *--query-service=http* ]] && return 0; return 0; }
+setsebool() { :; }
+prepare_openwebui_migration_backup() { :; }
+hold_open_webui_publication() { :; }
+application_network_healthy() { return 0; }
+tika_expected_version() { printf '4.1.0\n'; }
+tika_running_version() { [[ ${TIKA_REFRESHED:-0} == 1 ]] && printf 'Apache Tika 4.1.0\n' || printf 'Apache Tika 4.0.0\n'; }
+tika_container_digest() { [[ ${TIKA_REFRESHED:-0} == 1 ]] && printf '%s\n' "$BC250_TIKA_IMAGE_DIGEST" || printf 'sha256:%064d\n' 0; }
+tika_runtime_identity_match() { [[ ${TIKA_REFRESHED:-0} == 1 ]]; }
+wait_for_tika_runtime_identity() { tika_runtime_identity_match; }
+step_8_application_services
+''')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout.count("restart:tika.service"), 1)
+        self.assertNotIn("restart:open-webui.service", result.stdout)
+        self.assertIn("Tika runtime identity differs from the package pin", result.stdout)
+        self.assertIn("Tika runtime identity: current", result.stdout)
+
+    def test_tika_upgrade_convergence_is_identity_aware_and_targeted(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        block = source[source.index("step_8_application_services() {"): source.index("show_plan() {")]
+        self.assertIn("tika_runtime_identity_match", block)
+        self.assertIn("Tika runtime identity differs from the package pin; recreating tika.service.", block)
+        self.assertIn("systemctl restart tika.service", block)
+        self.assertIn("Runtime identities: checking...", block)
+        self.assertIn("wait_for_tika_runtime_identity", block)
+        self.assertNotIn("networking is healthy; restart not required", block.lower())
+        self.assertIn("Optional catalog entries unavailable for registration:", source)
+        self.assertIn("(non-blocking)", source)
 
     def test_setup_plan_covers_resume_decision_points(self) -> None:
         source = INSTALLER.read_text()

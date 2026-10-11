@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.13.1-1.8 - 2026-10-11
+
+- Fix upgrade convergence so `bc250 install` compares the live Tika version/image digest with the package pin and recreates `tika.service` only when the running container is stale; reachability is no longer reported as runtime convergence.
+- Fix the authoritative Tika 4.1 package-gate smoke by using an extraction-safe deterministic marker and retaining the observed extracted text in defect evidence.
+- Make GFX1013 build dependency checks provider-aware (including Fedora 44 `zlib-ng-compat-devel` satisfying `zlib-devel`) and make `prepare --check` aggregate independently discoverable blockers without mutation.
+- Make `bc250 gfx1013 benchmark status [--json]` strictly read-only when no campaign exists so a status query cannot create/chmod package state or dirty `rpm -V`.
+- Expose expected/configured and observed/live Open WebUI/Tika version+digest identity in machine-readable and human status/version output, and make `bc250 verify` validate package-owned runtime identity while keeping release qualification explicitly separate.
+- Separate overall appliance health from optional GFX1013 readiness in `bc250 doctor`; normalize canonical NEVRA/epoch JSON fields and soften unavailable restart-helper/optional-catalog wording.
+- Simplify the optional-model prompt and reduce RPM transaction setup guidance to one final `sudo bc250 install` action while preserving upgrade migration-safety messaging.
+- Keep GFX1013 profile v0.2.1-alpha, lifecycle safety, benchmark policy, model/runtime/CU defaults and default-OFF policy unchanged.
+
 ## 0.13.1-1.7 - 2026-10-11
 
 - Add a reboot-aware `bc250 gfx1013 benchmark` campaign for the accepted default-off profile: A1 stock -> B GFX1013 -> A2 restored-stock control, with exact package/kernel/model-digest binding and no automatic lifecycle transitions.

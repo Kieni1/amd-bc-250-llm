@@ -341,3 +341,7 @@ criteria; severe early truncation remains an infrastructure qualification failur
 same section also reports tight resource headroom when MemAvailable falls below 512 MiB
 while remaining above the unchanged 128 MiB hard floor, and accepted use cases that reach
 their output budget. These are visibility signals, not relaxed acceptance criteria.
+
+## Read-only status guarantee
+
+`bc250 gfx1013 benchmark status` and `status --json` are queries only. If no campaign exists they return a valid "no active campaign" result without creating the benchmark root, active pointer, campaign directory, or changing package-owned directory modes. Only capture/report commands that explicitly create evidence may create benchmark state.

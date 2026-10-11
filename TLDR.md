@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.7` (Tika 4.1.0-full; qualification hardening).
+Current release source: `bc250-llm-server-0.13.1-1.8` (Tika 4.1.0-full; device-defect and observability fixes).
 
 ## Install
 

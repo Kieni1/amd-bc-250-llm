@@ -104,7 +104,7 @@ def _tika_smoke(evidence: Path) -> tuple[str, dict[str, object]]:
         return "DEFECT", checks
     checks["version"] = _check_payload("PASS", f"Tika {TIKA_EXPECTED} reachable from Open WebUI")
 
-    marker = "BC250_TIKA_410_PACKAGE_GATE_7D6D6F"
+    marker = "BC250TIKA410PACKAGEGATE7D6D6F"
     extraction_script = f"""
 import urllib.request
 marker = {marker!r}
@@ -125,7 +125,11 @@ raise SystemExit(0 if marker in text else 7)
     write_command_evidence(evidence / "tika-extraction.txt", extraction)
     if extraction.returncode != 0 or marker not in extraction.stdout:
         checks["deterministic_extraction"] = _check_payload(
-            "DEFECT", "small deterministic Tika extraction failed"
+            "DEFECT",
+            "small deterministic Tika extraction failed",
+            expected=marker,
+            observed=extraction.stdout.strip(),
+            returncode=extraction.returncode,
         )
         return "DEFECT", checks
     checks["deterministic_extraction"] = _check_payload(

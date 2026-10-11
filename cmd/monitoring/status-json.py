@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -12,6 +13,7 @@ from typing import Any
 
 PACKAGE = "bc250-llm-server"
 DEFAULT_LIBEXEC = Path("/usr/libexec/bc250-llm-server")
+DEFAULT_SHARE = Path("/usr/share/bc250-llm-server")
 
 
 def run(argv: list[str], timeout: int = 20) -> subprocess.CompletedProcess[str] | None:
@@ -21,17 +23,43 @@ def run(argv: list[str], timeout: int = 20) -> subprocess.CompletedProcess[str] 
         return None
 
 
+def key_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return values
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
+
+
 def rpm_identity() -> dict[str, str | None]:
-    result = run(["rpm", "-q", "--qf", "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}\\n", PACKAGE])
+    result = run(
+        ["rpm", "-q", "--qf", "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}\n", PACKAGE]
+    )
+    empty = {
+        "name": PACKAGE,
+        "epoch": None,
+        "nevra": None,
+        "version": None,
+        "release": None,
+        "arch": None,
+    }
     if result is None or result.returncode != 0:
-        return {"name": PACKAGE, "nevra": None, "version": None, "release": None, "arch": None}
+        return empty
     fields = result.stdout.strip().split("|")
     if len(fields) != 5:
-        return {"name": PACKAGE, "nevra": None, "version": None, "release": None, "arch": None}
+        return empty
     name, epoch, version, release, arch = fields
     return {
         "name": name,
-        "nevra": f"{name}-{epoch}:{version}-{release}.{arch}",
+        "epoch": epoch,
+        "nevra": f"{name}-{version}-{release}.{arch}",
         "version": version,
         "release": release,
         "arch": arch,
@@ -140,18 +168,132 @@ def failed_units() -> list[str] | None:
     return units
 
 
-def restart_status() -> str:
+def restart_status() -> dict[str, str | None]:
     available = run(["bash", "-lc", "command -v needs-restarting >/dev/null 2>&1"])
     if available is None or available.returncode != 0:
-        return "unknown"
+        return {"status": "not_evaluated", "reason": "optional needs-restarting helper unavailable"}
     probe = run(["needs-restarting", "-r"])
     if probe is None:
-        return "unknown"
-    return "pass" if probe.returncode == 0 else "recommended"
+        return {"status": "not_evaluated", "reason": "needs-restarting could not be executed"}
+    if probe.returncode == 0:
+        return {"status": "pass", "reason": None}
+    return {"status": "recommended", "reason": "package/kernel restart recommended"}
+
+
+def container_image_identity(name: str) -> dict[str, str | None]:
+    result = run(["podman", "inspect", "--format", "{{.ImageName}}", name])
+    image = result.stdout.strip() if result and result.returncode == 0 else ""
+    digest_match = re.search(r"sha256:[0-9a-f]{64}", image)
+    digest = digest_match.group(0) if digest_match else None
+    if image and digest is None:
+        inspected = run(["podman", "image", "inspect", "--format", "{{.Digest}}", image])
+        candidate = inspected.stdout.strip() if inspected and inspected.returncode == 0 else ""
+        if re.fullmatch(r"sha256:[0-9a-f]{64}", candidate):
+            digest = candidate
+    return {"image": image or None, "digest": digest}
+
+
+def tika_live_version() -> str | None:
+    script = (
+        "import urllib.request; "
+        "print(urllib.request.urlopen('http://tika:9998/version', timeout=5)"
+        ".read().decode('utf-8','replace').strip())"
+    )
+    result = run(["podman", "exec", "open-webui", "python", "-c", script])
+    if result is None or result.returncode != 0:
+        return None
+    value = result.stdout.strip()
+    if value.startswith("Apache Tika "):
+        value = value.removeprefix("Apache Tika ").strip()
+    return value or None
+
+
+def open_webui_live_version() -> str | None:
+    result = run(
+        [
+            "curl",
+            "-fsS",
+            "--connect-timeout",
+            "1",
+            "--max-time",
+            "3",
+            "http://127.0.0.1:3000/api/version",
+        ]
+    )
+    if result is None or result.returncode != 0:
+        return None
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    version = payload.get("version")
+    return version if isinstance(version, str) and version else None
+
+
+def identity_match(
+    expected_version: str | None,
+    expected_digest: str | None,
+    observed_version: str | None,
+    observed_digest: str | None,
+) -> bool | None:
+    if not expected_version or not expected_digest or not observed_version or not observed_digest:
+        return None
+    return observed_version == expected_version and observed_digest == expected_digest
+
+
+def runtime_identity(share: Path) -> dict[str, object]:
+    runtime = key_values(share / "runtime.env")
+    tika_expected_version = (runtime.get("BC250_TIKA_VERSION") or "").removesuffix("-full") or None
+    owui_expected_version = runtime.get("BC250_OPEN_WEBUI_VERSION")
+    tika_expected_digest = runtime.get("BC250_TIKA_IMAGE_DIGEST")
+    owui_expected_digest = runtime.get("BC250_OPEN_WEBUI_IMAGE_DIGEST")
+    tika_image = container_image_identity("tika")
+    owui_image = container_image_identity("open-webui")
+    tika_observed_version = tika_live_version()
+    owui_observed_version = open_webui_live_version()
+    tika_match = identity_match(
+        tika_expected_version,
+        tika_expected_digest,
+        tika_observed_version,
+        tika_image["digest"],
+    )
+    owui_match = identity_match(
+        owui_expected_version,
+        owui_expected_digest,
+        owui_observed_version,
+        owui_image["digest"],
+    )
+    overall_match = None
+    if tika_match is not None and owui_match is not None:
+        overall_match = tika_match and owui_match
+    return {
+        "match": overall_match,
+        "tika": {
+            "expected": {"version": tika_expected_version, "digest": tika_expected_digest},
+            "observed": {
+                "version": tika_observed_version,
+                "digest": tika_image["digest"],
+                "image": tika_image["image"],
+            },
+            "match": tika_match,
+        },
+        "open_webui": {
+            "expected": {"version": owui_expected_version, "digest": owui_expected_digest},
+            "observed": {
+                "version": owui_observed_version,
+                "digest": owui_image["digest"],
+                "image": owui_image["image"],
+            },
+            "match": owui_match,
+        },
+    }
 
 
 def main() -> int:
     libexec = Path(os.environ.get("BC250_LIBEXEC", DEFAULT_LIBEXEC))
+    share = Path(os.environ.get("BC250_SHARE", DEFAULT_SHARE))
     services = {
         unit: unit_state(unit)
         for unit in (
@@ -165,7 +307,7 @@ def main() -> int:
         )
     }
     payload = {
-        "schema": "bc250.status.v1",
+        "schema": "bc250.status.v2",
         "package": rpm_identity(),
         "kernel": os.uname().release,
         "command_line": (
@@ -175,6 +317,7 @@ def main() -> int:
         ),
         "runtime_mode": runtime_mode(libexec),
         "services": services,
+        "runtime_identity": runtime_identity(share),
         "memory": memory_status(),
         "memory_psi": memory_psi(),
         "failed_units": failed_units(),

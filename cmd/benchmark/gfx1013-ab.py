@@ -441,7 +441,8 @@ def set_active(root: Path, campaign: Path) -> None:
 
 
 def resolve_campaign(root: Path, supplied: Path | None, *, create: bool = False) -> Path:
-    ensure_campaign_root(root)
+    if create:
+        ensure_campaign_root(root)
     if supplied is not None:
         candidate = supplied.resolve()
         root_resolved = root.resolve()
@@ -1009,10 +1010,30 @@ def report_campaign(args: argparse.Namespace) -> int:
 
 
 def status_campaign(args: argparse.Namespace) -> int:
-    campaign_dir = resolve_campaign(args.root.resolve(), args.campaign_dir)
+    root = args.root.resolve()
+    if args.campaign_dir is None and not active_pointer(root).is_file():
+        payload = {
+            "schema": SCHEMA,
+            "active": False,
+            "campaign": None,
+            "identity": None,
+            "models": None,
+            "phases": {phase: "NOT_STARTED" for phase in PHASES},
+            "report_present": False,
+        }
+        if args.json:
+            json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+            sys.stdout.write("\n")
+        else:
+            print("GFX1013 benchmark campaign: none active")
+            print("  Run 'sudo bc250 gfx1013 benchmark stock' to start A1 capture.")
+        return 0
+
+    campaign_dir = resolve_campaign(root, args.campaign_dir)
     campaign = read_json(campaign_dir / "campaign.json")
     payload = {
         "schema": SCHEMA,
+        "active": True,
         "campaign": str(campaign_dir),
         "identity": campaign.get("identity"),
         "models": campaign.get("models"),
@@ -1024,8 +1045,9 @@ def status_campaign(args: argparse.Namespace) -> int:
         sys.stdout.write("\n")
     else:
         print(f"GFX1013 benchmark campaign: {campaign_dir}")
+        phases = payload["phases"] if isinstance(payload["phases"], dict) else {}
         for phase in PHASES:
-            print(f"  {phase:8s}: {payload['phases'].get(phase, 'UNKNOWN')}")
+            print(f"  {phase:8s}: {phases.get(phase, 'UNKNOWN')}")
         print(f"  report  : {'present' if payload['report_present'] else 'absent'}")
     return 0
 

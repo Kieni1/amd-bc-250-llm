@@ -381,6 +381,16 @@ class PackagingTests(unittest.TestCase):
         for forbidden in ("firewall-cmd", "setsebool", "dnf ", "systemctl enable --now"):
             self.assertNotIn(forbidden, post)
 
+    def test_rpm_transaction_has_one_final_setup_instruction(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        scriptlets = spec[spec.index("%pre\n"): spec.index("%preun")]
+        self.assertEqual(scriptlets.count("sudo bc250 install"), 1)
+        posttrans = scriptlets[scriptlets.index("%posttrans"):]
+        self.assertIn('echo "Next step:"', posttrans)
+        self.assertIn('echo "  sudo bc250 install"', posttrans)
+        pre_and_post = scriptlets[: scriptlets.index("%posttrans")]
+        self.assertNotIn("sudo bc250 install", pre_and_post)
+
     def test_package_standard_ollama_uses_runtime_authority(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Concise package/runtime version report for operators and support evidence."""
+"""Concise package, configured-runtime and observed-runtime identity report."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ DEFAULT_SHARE = Path("/usr/share/bc250-llm-server")
 DEFAULT_LIBEXEC = Path("/usr/libexec/bc250-llm-server")
 
 
-def command(argv: list[str], timeout: int = 10) -> subprocess.CompletedProcess[str] | None:
+def command(argv: list[str], timeout: int = 20) -> subprocess.CompletedProcess[str] | None:
     try:
         return subprocess.run(argv, text=True, capture_output=True, timeout=timeout, check=False)
     except (OSError, subprocess.TimeoutExpired):
@@ -25,22 +25,25 @@ def command(argv: list[str], timeout: int = 10) -> subprocess.CompletedProcess[s
 
 def rpm_identity() -> dict[str, str | None]:
     result = command(
-        [
-            "rpm",
-            "-q",
-            "--qf",
-            "%{NAME}|%{VERSION}|%{RELEASE}|%{ARCH}\\n",
-            PACKAGE,
-        ]
+        ["rpm", "-q", "--qf", "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}\n", PACKAGE]
     )
+    empty = {
+        "name": PACKAGE,
+        "epoch": None,
+        "version": None,
+        "release": None,
+        "arch": None,
+        "nevra": None,
+    }
     if result is None or result.returncode != 0:
-        return {"name": PACKAGE, "version": None, "release": None, "arch": None, "nevra": None}
+        return empty
     fields = result.stdout.strip().split("|")
-    if len(fields) != 4:
-        return {"name": PACKAGE, "version": None, "release": None, "arch": None, "nevra": None}
-    name, version, release, arch = fields
+    if len(fields) != 5:
+        return empty
+    name, epoch, version, release, arch = fields
     return {
         "name": name,
+        "epoch": epoch,
         "version": version,
         "release": release,
         "arch": arch,
@@ -70,11 +73,10 @@ def one_line(path: Path) -> str | None:
         return None
 
 
-def gfx_status(libexec: Path) -> dict[str, Any] | None:
-    helper = libexec / "gfx1013.sh"
-    if not helper.is_file():
+def json_helper(path: Path, *args: str) -> dict[str, Any] | None:
+    if not path.is_file():
         return None
-    result = command([str(helper), "status", "--json"])
+    result = command([str(path), *args], timeout=30)
     if result is None or result.returncode != 0:
         return None
     try:
@@ -84,8 +86,30 @@ def gfx_status(libexec: Path) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def match_label(value: object) -> str:
+    if value is True:
+        return "MATCH"
+    if value is False:
+        return "MISMATCH"
+    return "UNKNOWN"
+
+
+def runtime_line(label: str, row: dict[str, Any] | None) -> str:
+    row = row if isinstance(row, dict) else {}
+    expected = row.get("expected") if isinstance(row.get("expected"), dict) else {}
+    observed = row.get("observed") if isinstance(row.get("observed"), dict) else {}
+    return (
+        f"{label:<13} expected {expected.get('version') or 'unknown'} @ {expected.get('digest') or 'unknown'}; "
+        f"observed {observed.get('version') or 'unavailable'} @ {observed.get('digest') or 'unavailable'}; "
+        f"{match_label(row.get('match'))}"
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="bc250 version", description="Show package and pinned runtime identities.")
+    parser = argparse.ArgumentParser(
+        prog="bc250 version",
+        description="Show package pins separately from observed runtime identities.",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--short", action="store_true", help="print only installed package NVR/NEVRA")
     args = parser.parse_args(argv)
@@ -95,9 +119,15 @@ def main(argv: list[str] | None = None) -> int:
     share = Path(os.environ.get("BC250_SHARE", DEFAULT_SHARE))
     libexec = Path(os.environ.get("BC250_LIBEXEC", DEFAULT_LIBEXEC))
     package = rpm_identity()
-    runtime = key_values(share / "runtime.env")
+    configured = key_values(share / "runtime.env")
     source_version = one_line(share / "VERSION")
-    gfx = gfx_status(libexec)
+    status = json_helper(libexec / "status-json.py")
+    gfx = status.get("gfx1013") if isinstance(status, dict) else None
+    if not isinstance(gfx, dict):
+        gfx = json_helper(libexec / "gfx1013.sh", "status", "--json")
+    runtime_identity = status.get("runtime_identity") if isinstance(status, dict) else None
+    if not isinstance(runtime_identity, dict):
+        runtime_identity = {}
     gfx_upstream = gfx.get("upstream") if isinstance(gfx, dict) else None
     if not isinstance(gfx_upstream, dict):
         gfx_upstream = {}
@@ -105,17 +135,19 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(gfx_kernel, dict):
         gfx_kernel = {}
     payload: dict[str, Any] = {
-        "schema": "bc250.version.v1",
+        "schema": "bc250.version.v2",
         "package": package,
         "source_version": source_version,
         "kernel": os.uname().release,
-        "runtime": {
-            "ollama": runtime.get("BC250_OLLAMA_VERSION"),
-            "open_webui": runtime.get("BC250_OPEN_WEBUI_VERSION"),
-            "tika": runtime.get("BC250_TIKA_VERSION"),
-            "tika_digest": runtime.get("BC250_TIKA_IMAGE_DIGEST"),
-            "governor": runtime.get("BC250_GOVERNOR_VERSION"),
+        "configured_runtime": {
+            "ollama": configured.get("BC250_OLLAMA_VERSION"),
+            "open_webui": configured.get("BC250_OPEN_WEBUI_VERSION"),
+            "open_webui_digest": configured.get("BC250_OPEN_WEBUI_IMAGE_DIGEST"),
+            "tika": configured.get("BC250_TIKA_VERSION"),
+            "tika_digest": configured.get("BC250_TIKA_IMAGE_DIGEST"),
+            "governor": configured.get("BC250_GOVERNOR_VERSION"),
         },
+        "runtime_identity": runtime_identity,
         "gfx1013": {
             "state": gfx.get("state") if gfx else None,
             "package_profile": gfx.get("profile") if gfx else None,
@@ -131,11 +163,13 @@ def main(argv: list[str] | None = None) -> int:
         json.dump(payload, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")
         return 0
+
     print(f"Package:      {package.get('nevra') or 'unavailable'}")
     print(f"Kernel:       {payload['kernel']}")
-    print(f"Ollama:       {payload['runtime']['ollama'] or 'unknown'}")
-    print(f"Open WebUI:   {payload['runtime']['open_webui'] or 'unknown'}")
-    print(f"Tika:         {payload['runtime']['tika'] or 'unknown'} @ {payload['runtime']['tika_digest'] or 'unknown'}")
+    print(f"Ollama pin:   {payload['configured_runtime']['ollama'] or 'unknown'}")
+    print(runtime_line("Open WebUI:", runtime_identity.get("open_webui")))
+    print(runtime_line("Tika:", runtime_identity.get("tika")))
+    print(f"Governor pin: {payload['configured_runtime']['governor'] or 'unknown'}")
     if gfx:
         print(
             "GFX1013:      "

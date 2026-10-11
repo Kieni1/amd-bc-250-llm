@@ -194,6 +194,41 @@ class Gfx1013Tests(unittest.TestCase):
         self.assertNotIn("/etc/environment", source)
         self.assertNotIn("install -m 0755", source[source.find("UPSTREAM_GENERATOR"):])
 
+    def test_build_requirement_accepts_an_installed_provider(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        start = source.index("build_requirement_provider() {")
+        end = source.index("\nmissing_build_packages() {", start)
+        function = source[start:end]
+        command = function + r'''
+rpm() {
+  [[ "$*" == *"--whatprovides"*"zlib-devel"* ]] || return 7
+  printf 'zlib-ng-compat-devel-2.3.3-3.fc44.x86_64\n'
+}
+build_requirement_provider zlib-devel
+'''
+        result = subprocess.run(
+            ["bash", "-c", command],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            result.stdout.strip(),
+            "zlib-ng-compat-devel-2.3.3-3.fc44.x86_64",
+        )
+
+    def test_prepare_preflight_is_provider_aware_and_aggregated(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("rpm -q --whatprovides", source)
+        self.assertIn("build_requirement_provider", source)
+        self.assertIn("prepare_preflight", source)
+        self.assertIn("requirement:", source)
+        self.assertIn("provider:", source)
+        self.assertIn("status: satisfied", source)
+        self.assertIn("prepare check: BLOCKED", source)
+        self.assertIn("No files, boot state or services were changed.", source)
+
     def test_disable_and_package_erase_are_fail_closed(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         disable = source[source.index("disable() {"): source.index('case "${1:-status}"')]

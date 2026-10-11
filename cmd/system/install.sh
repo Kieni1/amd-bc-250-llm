@@ -395,7 +395,7 @@ step_7_models() {
   echo "MTP remains a separate opt-in workflow: sudo bc250 fetch-mtp MODEL_ID"
   local selection="${BC250_MODEL_SELECTION:-}" review=""
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
-    read -r -p "Review optional models or repair any selected optional-model drift now? [y/N]: " review
+    read -r -p "Review or install optional models now? [y/N]: " review
     case "${review,,}" in
       y|yes)
         echo
@@ -408,7 +408,7 @@ step_7_models() {
         drift_count="$(grep -c '\[DRIFT' <<< "$optional_status" || true)"
         deferred_count="$(grep -ci 'deferred' <<< "$optional_status" || true)"
         echo "Model status: current=${current_count:-0} optional=${optional_count:-0} selected drift=${drift_count:-0} deferred=${deferred_count:-0}"
-        ((unavailable_count == 0)) || echo "  optional registration unavailable=${unavailable_count}"
+        ((unavailable_count == 0)) || echo "  Optional catalog entries unavailable for registration: ${unavailable_count} (non-blocking)"
         echo "Model catalog/status:"
         printf '%s\n' "$optional_status"
         echo
@@ -505,6 +505,49 @@ publish_openwebui_after_convergence() {
 }
 
 
+tika_expected_version() {
+  printf '%s\n' "${BC250_TIKA_VERSION%-full}"
+}
+
+tika_container_image_name() {
+  podman inspect --format '{{.ImageName}}' tika 2>/dev/null | head -1 || true
+}
+
+tika_container_digest() {
+  local image digest
+  image="$(tika_container_image_name)"
+  digest="$(grep -oE 'sha256:[0-9a-f]{64}' <<< "$image" | head -1 || true)"
+  if [[ -z "$digest" && -n "$image" ]]; then
+    digest="$(podman image inspect --format '{{.Digest}}' "$image" 2>/dev/null | head -1 || true)"
+  fi
+  [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] && printf '%s\n' "$digest"
+}
+
+tika_running_version() {
+  podman exec open-webui python -c '
+import urllib.request
+print(urllib.request.urlopen("http://tika:9998/version", timeout=5).read().decode("utf-8", "replace").strip())
+' 2>/dev/null || true
+}
+
+tika_runtime_identity_match() {
+  local expected_version observed_version observed_digest
+  expected_version="$(tika_expected_version)"
+  observed_digest="$(tika_container_digest)"
+  observed_version="$(tika_running_version)"
+  [[ "$observed_digest" == "$BC250_TIKA_IMAGE_DIGEST" ]] || return 1
+  [[ "$observed_version" == *"$expected_version"* ]] || return 1
+}
+
+wait_for_tika_runtime_identity() {
+  local attempt
+  for attempt in {1..30}; do
+    tika_runtime_identity_match && return 0
+    sleep 1
+  done
+  return 1
+}
+
 application_network_healthy() {
   systemctl is-active --quiet tika.service 2>/dev/null || return 1
   systemctl is-active --quiet open-webui.service 2>/dev/null || return 1
@@ -569,7 +612,8 @@ prepare_openwebui_migration_backup() {
 
 step_8_application_services() {
   heading "8. START APPLICATION SERVICES"
-  local firewall_changed=0 tika_was_active=0 owui_was_active=0 unit_refresh_needed=0
+  local firewall_changed=0 tika_was_active=0 owui_was_active=0 unit_refresh_needed=0 tika_identity_refresh=0
+  local observed_tika_version='' observed_tika_digest=''
   systemctl is-active --quiet tika.service 2>/dev/null && tika_was_active=1
   systemctl is-active --quiet open-webui.service 2>/dev/null && owui_was_active=1
   for unit in tika.service open-webui.service; do
@@ -598,16 +642,43 @@ step_8_application_services() {
   prepare_openwebui_migration_backup
   hold_open_webui_publication
   systemctl start tika.service open-webui.service
-  # Recreate already-running containers only when package/firewall state changed
-  # or the live private path is unhealthy.  A no-op installer rerun should not
-  # churn healthy application containers.
-  if { ((tika_was_active || owui_was_active)) && ((firewall_changed || unit_refresh_needed)); } || ! application_network_healthy; then
-    echo "Refreshing private Podman application networking after configuration reconciliation."
+
+  # Reachability alone is not convergence: an upgrade can leave an already-running
+  # Tika container on the previous image even after the Quadlet pin changed.
+  if ((tika_was_active)) && ! tika_runtime_identity_match; then
+    observed_tika_version="$(tika_running_version)"
+    observed_tika_digest="$(tika_container_digest)"
+    echo "Tika runtime identity differs from the package pin; recreating tika.service."
+    echo "  expected version: $(tika_expected_version)"
+    echo "  observed version: ${observed_tika_version:-unavailable}"
+    echo "  expected digest:  $BC250_TIKA_IMAGE_DIGEST"
+    echo "  observed digest:  ${observed_tika_digest:-unavailable}"
     systemctl restart tika.service
+    tika_identity_refresh=1
+  fi
+
+  # Recreate already-running containers only when package/firewall state changed,
+  # Tika identity was stale, or the live private path is unhealthy. A no-op
+  # installer rerun should not churn healthy application containers.
+  if { ((tika_was_active || owui_was_active)) && ((firewall_changed || unit_refresh_needed)); } || \
+     ! application_network_healthy; then
+    echo "Refreshing private Podman application networking after configuration reconciliation."
+    ((tika_identity_refresh)) || systemctl restart tika.service
     systemctl restart open-webui.service
   else
-    echo "Private application networking is healthy; restart not required."
+    echo "Private application endpoints: reachable"
   fi
+
+  echo "Runtime identities: checking..."
+  if ! wait_for_tika_runtime_identity; then
+    echo "ERROR: Tika runtime identity did not converge to the package pin." >&2
+    echo "  expected version: $(tika_expected_version)" >&2
+    echo "  observed version: $(tika_running_version || true)" >&2
+    echo "  expected digest:  $BC250_TIKA_IMAGE_DIGEST" >&2
+    echo "  observed digest:  $(tika_container_digest || true)" >&2
+    return 1
+  fi
+  echo "Tika runtime identity: current ($(tika_expected_version), $BC250_TIKA_IMAGE_DIGEST)"
 }
 
 
@@ -1046,7 +1117,7 @@ print_40cu_completion_status() {
 
 
 print_setup_summary() {
-  local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED" restart_state="UNKNOWN"
+  local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED" restart_state="not evaluated (optional helper unavailable)"
   curl -fsS --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && owui_state="BACKEND READY"
   if [[ "$owui_state" == "BACKEND READY" ]] && curl -fsS --max-time 3 http://127.0.0.1:80/api/version >/dev/null 2>&1; then
     owui_state="FRONT DOOR READY"
