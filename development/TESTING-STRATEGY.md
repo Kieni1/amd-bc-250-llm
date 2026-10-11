@@ -59,7 +59,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.13.1-1.9 source is a narrow corrective release over exact-device-tested 1.8. Exact-device 1.8 proved the Tika convergence/package-gate/provider/read-only benchmark fixes and captured a clean stock A1, then exposed two remaining issues before any GFX mutation: `mokutil` explicitly reported Secure Boot unsupported while the package classified the state as unknown, and ordinary non-root status/version treated inability to inspect root-owned Podman metadata as runtime uncertainty. Release 1.9 recognizes that explicit unsupported state as `disabled-unsupported` while retaining fail-closed behavior for enabled/unknown states, and labels non-root runtime identity `NOT INSPECTED` without degrading appliance health solely for missing privilege. Runtime/model/CU defaults, GFX1013 profile v0.2.1-alpha and A1/B/A2 policy remain unchanged. Because package identity changes, capture a fresh 1.9 A1 before B/A2. Configured Ruff/ShellCheck, `%check`, rpmlint, RPM payload validation and clean SRPM rebuild remain grouped under the authoritative Fedora `make release-gate`; Agent remains optional and broad model/runtime discovery stays closed.
+The current 0.13.1-1.10 source consolidates the exact-device GFX1013 prepare/build repairs discovered on 1.9. Stock 1.9, package gate, Secure Boot disabled-unsupported handling, provider-aware dependency resolution and non-root runtime identity all passed on device; the remaining blockers were kernel-SRPM source discovery, external AMD trace paths, the stale Mesa 26.2.0-rc3 patch baseline, ABI verification assumptions and non-transactional failure residue. Release 1.10 rebases private RADV to exact Fedora 44 mesa-26.2.4-1.fc44 under package profile v0.2.2-alpha, validates the private Mesa delta against Fedora %prep with zero fuzz, hardens exact-kernel external-module/ABI handling and preserves bounded failed-build evidence while restoring DISABLED on pre-commit failure. Production model/runtime/CU defaults and the A1/B/A2 promotion policy remain unchanged. Because package identity changes, capture a fresh 1.10 A1 before B/A2. Configured Ruff/ShellCheck, %check, rpmlint, RPM payload validation and clean SRPM rebuild remain grouped under the authoritative Fedora make release-gate; Agent remains optional and broad model/runtime discovery stays closed.
 
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
@@ -121,7 +121,7 @@ state changes. Restore state before moving to another lane.
 - RAG hidden-reasoning exhaustion with empty visible output is INCOMPLETE/retry only when no independent retrieval/semantic defect exists; repetition remains a quality failure.
 - Verification must distinguish a configured/initialized zram device from a `/dev/zramN` that is actually active swap, and must parse actual failed systemd unit rows.
 
-## Current 0.13.1-1.9 qualification boundary
+## Current 0.13.1-1.10 qualification boundary
 
 Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
 
@@ -158,7 +158,7 @@ The distinct `sudo systemctl reboot` invocation is device-proven unreliable on t
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.9 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
+The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.10 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
 acceptance should be one bounded real-office corpus pass (real PDFs/Tika/OCR, tables, multilingual
