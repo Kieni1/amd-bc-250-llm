@@ -35,22 +35,41 @@
     "tests/test_gfx1013_mesa_check.py",
     "tests/test_operations.py",
     "tests/test_qualification.py",
-    "tests/test_upstream_patch_validation.py"
+    "tests/test_upstream_patch_validation.py",
+    "gfx1013/upstream/check-kernel-provenance.py",
+    "packaging/install-manifest.tsv",
+    "tests/test_gfx1013_kernel_provenance.py"
   ],
   "completed": [
     "Rebase private GFX1013 RADV from Mesa 26.2.0-rc3 to exact Fedora 44 mesa-26.2.4-1.fc44 provenance while retaining upstream kernel commit d3e6dc062c34d2523db0abe5741d1f5b0dea00d9.",
     "Advance the package profile to v0.2.2-alpha and drop the obsolete GFX1013 IP-version hunk already upstream since Mesa 26.2.1; retain only the dedicated compute-queue exposure and async-compute threadgroup workaround.",
     "Add exact Fedora Mesa SRPM/%prep zero-fuzz patch applicability validation to the source gate.",
-    "Make exact Fedora kernel SRPM source discovery compression/path tolerant and fail closed on ambiguity.",
+    "Make the exact Fedora kernel SRPM %prep tree authoritative for GFX1013 AMDGPU source construction and fail closed unless exactly one prepared tree contains every BC-250 patch target.",
     "Adapt the exact amdgpu trace header deliberately for external-module compilation before applying the package kernel patches.",
     "Make module ABI verification CONFIG_MODVERSIONS-aware with exact vermagic plus Module.symvers symbol resolution when CRC modversions are unavailable, including compressed module formats.",
     "Make GFX1013 prepare transactional across build/ABI/Mesa/initramfs/BLS staging and retain only bounded failed-build evidence on pre-commit failure.",
-    "Expose installed package NEVRA in human bc250 status while retaining 1.9 Secure Boot, provider-aware dependency, non-root NOT INSPECTED, package-gate and default-OFF safety behavior."
+    "Expose installed package NEVRA in human bc250 status while retaining 1.9 Secure Boot, provider-aware dependency, non-root NOT INSPECTED, package-gate and default-OFF safety behavior.",
+    "Fix Fedora source-RPM identity validation to use source NEVR plus SOURCEPACKAGE=1 rather than assuming source RPM headers report ARCH=src.",
+    "Never replace the authoritative stock amdgpu during prepare; generate the patched initramfs from an isolated dracut --kmoddir tree and verify stock module/initramfs hashes remain unchanged.",
+    "Fingerprint every AMDGPU file touched by the BC-250 patch set from the Fedora-prepared kernel tree and patch/build those exact prepared files rather than pristine Source0.",
+    "Restore and verify previous boot-manager next_entry before deleting staged boot/recovery artifacts; preserve SAFETY_FAILURE recovery state when rollback cannot be proven.",
+    "Persist kernel SRPM NEVR/digest, kernel target-provenance identity, transaction phase, recovery-required state and the exact module compatibility verification mode.",
+    "Make directly executed GFX build/source helpers explicit in provider-aware preflight, including RPM/cpio/dracut and archive helpers used by Fedora source preparation.",
+    "Align optional private-RADV prerequisites with the current Fedora Mesa build surface (python3-pycparser, Vulkan headers/loader development metadata, systemd-devel and libdisplay-info-devel).",
+    "Close the prepare one-shot boot rollback race by arming rollback before GRUB next_entry mutation and require exactly one SHA-matching amdgpu module in the generated patched initramfs.",
+    "Add behavioral prepare/rollback fault injection for dracut, BLS staging, GRUB set/restore, SIGINT and SIGTERM, including preserved SAFETY_FAILURE recovery state when GRUB restoration cannot be proven.",
+    "Declare cargo and rust explicitly in the optional device-side GFX build requirements so the Fedora Mesa cargo-rpm-macros preparation path has an actionable prerequisite contract."
   ],
   "validation": [
     "Source-level validation only in this workspace; authoritative Fedora make release-gate remains operator-owned.",
     "Exact Fedora 44 Mesa 26.2.4-1.fc44 package identity and upstream Source0 SHA-256 were rechecked against current public Fedora/Mesa sources.",
-    "The source gate now validates the private Mesa patch against Fedora %prep with --fuzz=0; this workspace does not execute that Fedora RPM-dependent gate."
+    "The source gate now validates the private Mesa patch against Fedora %prep with --fuzz=0; this workspace does not execute that Fedora RPM-dependent gate.",
+    "The exact observed Mesa source-RPM failure is regression-covered: source RPM identity no longer depends on the RPM ARCH tag and binary packages with the same NEVR remain rejected.",
+    "Post-failure focused source tests cover Mesa/source identity, Fedora-prepared kernel provenance, isolated initramfs staging, behavioral rollback fault injection, packaging, operations, qualification and documentation; Fedora RPM-dependent build gates remain operator-owned.",
+    "Post-correction focused GFX/Mesa/kernel-provenance regression set: 33/33 PASS, including behavioral dracut/BLS/GRUB/signal fault injection.",
+    "Deterministic source tests after Fedora-prepared kernel provenance and behavioral rollback corrections: 617/617 PASS across all 23 test modules in bounded groups.",
+    "Kernel provenance now uses exact Fedora SRPM %prep output as patch/build authority; source-text target-equivalence scanning is no longer the safety proof.",
+    "Repository preflight remains PASS after the post-Mesa-identity fixes; source acquisition and earlier pipeline stages were intentionally not rerun."
   ],
   "device_followup": [
     "Reset the existing developer-prepared 1.9 state to clean DISABLED before upgrading.",

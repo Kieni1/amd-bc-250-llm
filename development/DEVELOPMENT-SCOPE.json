@@ -207,13 +207,15 @@
         "licenses/**",
         "scripts/ci-local.sh",
         "quality-checks/package/**",
-        "tests/test_gfx1013_mesa_check.py"
+        "tests/test_gfx1013_mesa_check.py",
+        "tests/test_gfx1013_kernel_provenance.py"
       ],
       "focused_tests": [
         "tests.test_packaging",
         "tests.test_sources",
         "tests.test_upstream_patch_validation",
-        "tests.test_gfx1013_mesa_check"
+        "tests.test_gfx1013_mesa_check",
+        "tests.test_gfx1013_kernel_provenance"
       ],
       "boundary_interfaces": [
         "installed path ownership",
@@ -455,7 +457,9 @@
       "notes": [
         "Default OFF. Stock saved/default boot remains authoritative until a verified patched boot is explicitly enabled.",
         "Profile v0.2.2-alpha keeps the upstream 0.2.0-alpha kernel commit but rebases private RADV to exact Fedora 44 mesa-26.2.4-1.fc44; the release source gate validates the Mesa patch against Fedora %prep with zero fuzz.",
-        "Prepare builds under temporary staging first; pre-commit failure restores/remains DISABLED and keeps only bounded root-owned failure evidence.",
+        "Prepare builds under temporary staging first; the patched initramfs uses an isolated dracut kmod tree and never replaces the authoritative stock amdgpu path.",
+        "Kernel source authority comes from the exact Fedora kernel SRPM %prep tree; every BC-250 AMDGPU patch target is fingerprinted from that prepared tree before zero-fuzz package patching.",
+        "Pre-commit failure restores/remains DISABLED and keeps only bounded root-owned failure evidence; boot-manager rollback must verify before patched boot artifacts are deleted.",
         "Private RADV activation is guarded by the patched boot marker, exact package/kernel identity and private payload hashes so a later stock-kernel boot cannot consume the patched ICD.",
         "Prepare/disable/reset expose non-destructive checks; reset/final erase/upgrade must prove a safe stock saved + next boot before destructive GFX1013 cleanup.",
         "Benchmark phases never automate prepare/enable/disable/reboot; A2 is required before an advisory PROMOTION_CANDIDATE can be emitted."
