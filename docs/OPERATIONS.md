@@ -107,8 +107,8 @@ longer hidden behind an unconditional whole-install success message. Completion 
 ### Experimental GFX1013 compute profile
 
 The supported operator lifecycle is `bc250 gfx1013 {status|prepare|enable|disable|reset|benchmark}`.
-It ships default-off as profile `v0.2.1-alpha`, pinned to upstream `0.2.0-alpha`
-commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. Use the non-destructive checks
+It ships default-off as profile `v0.2.2-alpha`, pinned to upstream `0.2.0-alpha`
+commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. The private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`; the release gate checks the carried Mesa patch against Fedora `%prep` with zero fuzz. Use the non-destructive checks
 before making boot changes:
 
 ```bash

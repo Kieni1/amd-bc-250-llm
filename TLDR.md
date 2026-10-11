@@ -3,7 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.9` (Tika 4.1.0-full; Secure Boot detector and non-root identity UX fixes).
+Current release source: `bc250-llm-server-0.13.1-1.10` (Tika 4.1.0-full; GFX1013 prepare/build integration hardening).
+
+GFX1013 is still opt-in/default-off. Profile `v0.2.2-alpha` rebases private RADV to Fedora 44 `mesa-26.2.4-1.fc44`, makes exact-kernel build verification configuration-aware, and makes failed prepare pre-commit cleanup transactional.
 
 ## Install
 
