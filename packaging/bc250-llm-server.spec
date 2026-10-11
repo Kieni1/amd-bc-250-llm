@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.9%{?dist}
+Release:        1.10%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -279,6 +279,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.10
+- Rework GFX1013 prepare around the exact Fedora 44 Mesa 26.2.4-1.fc44 source lineage, carrying only the still-required private-RADV compute-queue/dispatch workaround and validating zero-fuzz applicability against Fedora %prep.
+- Harden exact-kernel preparation with robust Fedora kernel-SRPM source archive discovery, explicit external-amdgpu trace-path adaptation and CONFIG_MODVERSIONS-aware ABI verification for compressed or uncompressed modules.
+- Make pre-commit prepare failures transactional: restore DISABLED stock authority, remove staged boot/private-RADV artifacts and retain a bounded root-only failure evidence bundle for diagnosis.
+- Show installed package NEVRA in human bc250 status and retain the 1.9 Secure Boot/provider/non-root identity/default-off safety behavior unchanged.
+
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.9
 - Recognize mokutil's explicit unsupported Secure Boot state as disabled-unsupported so unsigned GFX1013 preparation is allowed only when the platform explicitly reports Secure Boot unsupported/disabled; enabled and genuinely unknown states remain fail-closed.
 - Make non-root status/version runtime identity explicitly NOT INSPECTED when root-owned Podman metadata is inaccessible, without degrading appliance health solely because the caller lacks privilege; sudo retains exact version/digest verification.
