@@ -27,6 +27,13 @@ qualification boundary and have had GPU-hang risk. The package does not import
 40-CU, FSR, mesh/task, fan, undervolt or overclock changes through this
 lifecycle.
 
+For the kernel side, the package verifies the exact Fedora kernel SRPM identity
+and records a target-equivalence manifest for every AMDGPU file touched by the
+BC-250 V33 patches. If Fedora downstream SRPM material touches any target, this
+profile fails closed instead of silently treating pristine Source0 as Fedora's
+prepared source. The patched initramfs is generated from an isolated kmod tree;
+the authoritative stock amdgpu path is never replaced by `prepare`.
+
 Kernel-derived patches remain GPL-2.0-only. The Mesa patch and this upstream
 project's installer/documentation code are MIT-licensed. See the upstream
 repository for complete attribution and history.
