@@ -169,9 +169,14 @@ class Gfx1013Tests(unittest.TestCase):
     def test_optional_build_dependencies_cover_current_mesa_python_and_glslang_needs(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("python3-packaging", source)
+        self.assertIn("python3-pycparser", source)
+        self.assertIn("vulkan-headers", source)
+        self.assertIn("vulkan-loader-devel", source)
+        self.assertIn("systemd-devel", source)
+        self.assertIn("libdisplay-info-devel", source)
         self.assertIn("glslang-devel", source)
         self.assertIn("cargo-rpm-macros", source)
-        self.assertIn("for cmd in curl xz zstd gzip tar cpio patch gcc g++ make cargo rpm", source)
+        self.assertIn("for cmd in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm", source)
         self.assertIn("missing_build_packages", source)
 
     def test_check_and_recovery_interfaces_are_non_destructive_before_commit(self) -> None:
@@ -269,8 +274,9 @@ build_requirement_provider zlib-devel
         self.assertIn("Fedora 44 Mesa 26.2.4 already contains", patch)
         self.assertNotIn("ver_minor = info->ip[AMD_IP_COMPUTE].ver_minor = 1", patch)
         for token in (
-            "select_linux_source_archive",
-            "linux-*.tar.zst",
+            "prepare_fedora_kernel_source",
+            'rpmbuild -bp --nodeps --define "_topdir $rpm_top"',
+            "kernel-prep.log",
             "adapt_external_amd_trace_paths",
             "expected exactly one in-tree TRACE_INCLUDE_PATH",
             "kernel_modversions_enabled",
@@ -283,6 +289,292 @@ build_requirement_provider zlib-devel
             "kernel-srpm-members.txt",
         ):
             self.assertIn(token, source)
+
+    def _run_stage_fault(self, root: Path, fault: str) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env.update(
+            {
+                "BC250_GFX1013_LIBRARY_ONLY": "1",
+                "BC250_GFX1013_SOURCE": str(SOURCE),
+                "BC250_GFX1013_STATE_ROOT": str(root / "state"),
+                "BC250_GFX1013_PREFIX_ROOT": str(root / "prefix"),
+                "BC250_GFX1013_BOOT_ROOT": str(root / "boot"),
+                "BC250_GFX1013_MODULES_ROOT": str(root / "modules"),
+                "BC250_GFX1013_MACHINE_ID_FILE": str(root / "machine-id"),
+                "FAULT": fault,
+            }
+        )
+        script = rf'''\
+source "{SCRIPT}"
+kernel=7.2.9-200.fc44.x86_64
+prepared="$BC250_GFX1013_STATE_ROOT/prepared/$kernel"
+transaction="$BC250_GFX1013_STATE_ROOT/.prepare-test"
+mesa_stage="$transaction/mesa-stage"
+stock_module="$BC250_GFX1013_MODULES_ROOT/$kernel/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko"
+stock_bls="$BC250_GFX1013_BOOT_ROOT/loader/entries/machine-$kernel.conf"
+module_payload="$transaction/amdgpu.ko"
+info="$prepared/stage-info"
+mkdir -p "$(dirname "$stock_module")" "$(dirname "$stock_bls")" "$prepared" "$transaction/work"
+printf machine > "$BC250_GFX1013_MACHINE_ID_FILE"
+printf stockmodule > "$stock_module"
+printf stockinit > "$BC250_GFX1013_BOOT_ROOT/initramfs-$kernel.img"
+printf 'title stock\nversion %s\ninitrd /initramfs-%s.img\noptions quiet\n' "$kernel" "$kernel" > "$stock_bls"
+printf patchedmodule > "$module_payload"
+private=$(private_prefix)
+mkdir -p "$mesa_stage$private/lib64" "$mesa_stage$private/share/vulkan/icd.d"
+printf radv > "$mesa_stage$private/lib64/libvulkan_radeon.so"
+printf '%s\n' '{{"ICD":{{"library_path":"libvulkan_radeon.so","api_version":"1.3.0"}}}}' > "$mesa_stage$private/share/vulkan/icd.d/radeon_icd.x86_64.json"
+
+grub2-editenv() {{
+  if [[ ${{1:-}} == list ]]; then
+    printf 'saved_entry=stock\nnext_entry=previous\n'
+  else
+    return 0
+  fi
+}}
+grub_value() {{ [[ $1 == saved_entry ]] && printf stock || printf previous; }}
+if [[ "$FAULT" == dracut ]]; then
+  dracut() {{ return 77; }}
+else
+  dracut() {{
+    local out='' kmod=''
+    while (($#)); do
+      case "$1" in
+        --kmoddir) kmod=$2; shift 2 ;;
+        -f) out=$2; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    printf initramfs > "$out"
+    cp "$(find "$kmod" -type f -name 'amdgpu.ko*' -print -quit)" "{root}/fake-embedded.ko"
+  }}
+  lsinitrd() {{
+    mkdir -p "lib/modules/$kernel/kernel/drivers/gpu/drm/amd/amdgpu"
+    cp "{root}/fake-embedded.ko" "lib/modules/$kernel/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko"
+  }}
+fi
+if [[ "$FAULT" == bls ]]; then
+  install() {{
+    local last="${{@: -1}}"
+    if [[ "$last" == "$PREPARE_PATCHED_BLS" ]]; then return 91; fi
+    command install "$@"
+  }}
+fi
+
+PREPARE_DIR="$transaction"
+PREPARE_FINAL_DIR="$prepared"
+PREPARE_PATCHED_BLS="$BC250_GFX1013_BOOT_ROOT/loader/entries/machine-$kernel-$PROFILE_VARIANT.conf"
+PREPARE_PATCHED_INITRAMFS="$BC250_GFX1013_BOOT_ROOT/initramfs-$kernel-$PROFILE_VARIANT.img"
+PREPARE_PRIVATE_PREFIX="$private"
+PREPARE_PREVIOUS_NEXT=previous
+PREPARE_BOOT_STATE_CHANGED=0
+PREPARE_COMMITTED=0
+PREPARE_STAGE="fault-$FAULT"
+PREPARE_FAILURE_REASON=''
+trap 'prepare_cleanup_on_exit $?' EXIT
+stage_patched_boot "$kernel" "$prepared" "$module_payload" "$mesa_stage" "$stock_module" "$stock_bls" "$info"
+'''
+        return subprocess.run(
+            ["bash", "-c", script],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def _run_boot_transaction_fault(self, root: Path, fault: str) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env.update(
+            {
+                "BC250_GFX1013_LIBRARY_ONLY": "1",
+                "BC250_GFX1013_SOURCE": str(SOURCE),
+                "BC250_GFX1013_STATE_ROOT": str(root / "state"),
+                "BC250_GFX1013_PREFIX_ROOT": str(root / "prefix"),
+                "FAULT": fault,
+            }
+        )
+        script = rf'''\
+source "{SCRIPT}"
+mkdir -p "$BC250_GFX1013_STATE_ROOT" "$BC250_GFX1013_PREFIX_ROOT/keep" "{root}/transaction" "{root}/prepared"
+printf old > "{root}/next"
+printf stock > "{root}/saved"
+printf bls > "{root}/patched.conf"
+printf initramfs > "{root}/patched.img"
+cat > "$ACTIVE_STATE" <<'EOF'
+BC250_GFX1013_TRANSACTION_PHASE=BOOT_ENTRY_STAGING
+BC250_GFX1013_RECOVERY_REQUIRED=0
+BC250_GFX1013_ENABLED=0
+EOF
+
+grub2-editenv() {{
+  if [[ ${{1:-}} == list ]]; then
+    printf 'saved_entry=%s\nnext_entry=%s\n' "$(cat "{root}/saved")" "$(cat "{root}/next")"
+    return 0
+  fi
+  if [[ ${{2:-}} == set ]]; then
+    value=${{3#next_entry=}}
+    if [[ "$FAULT" == set-fail && "$value" == patched ]]; then return 41; fi
+    if [[ "$FAULT" == restore-fail && "$value" == old ]]; then return 42; fi
+    printf '%s' "$value" > "{root}/next"
+    return 0
+  fi
+  if [[ ${{2:-}} == unset ]]; then
+    : > "{root}/next"
+    return 0
+  fi
+  return 1
+}}
+grub_value() {{
+  [[ $1 == saved_entry ]] && cat "{root}/saved" || cat "{root}/next"
+}}
+
+PREPARE_DIR="{root}/transaction"
+PREPARE_FINAL_DIR="{root}/prepared"
+PREPARE_PATCHED_BLS="{root}/patched.conf"
+PREPARE_PATCHED_INITRAMFS="{root}/patched.img"
+PREPARE_PRIVATE_PREFIX="$BC250_GFX1013_PREFIX_ROOT/keep"
+PREPARE_PREVIOUS_NEXT=old
+PREPARE_BOOT_STATE_CHANGED=0
+PREPARE_COMMITTED=0
+PREPARE_STAGE="boot-$FAULT"
+PREPARE_FAILURE_REASON=''
+trap 'prepare_cleanup_on_exit $?' EXIT
+trap 'exit 130' INT TERM
+select_patched_next_boot patched stock
+case "$FAULT" in
+  restore-fail) die "forced post-selection failure" ;;
+  sigterm) kill -TERM $$ ;;
+  sigint) kill -INT $$ ;;
+  set-fail) : ;;
+  *) exit 99 ;;
+esac
+'''
+        return subprocess.run(
+            ["bash", "-c", script],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+    def test_110_behavioral_stage_faults_leave_stock_untouched_and_clean_partial_artifacts(self) -> None:
+        kernel = "7.2.9-200.fc44.x86_64"
+        for fault in ("dracut", "bls"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                result = self._run_stage_fault(root, fault)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                stock_module = root / "modules" / kernel / "kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko"
+                stock_initramfs = root / "boot" / f"initramfs-{kernel}.img"
+                self.assertEqual(stock_module.read_text(encoding="utf-8"), "stockmodule")
+                self.assertEqual(stock_initramfs.read_text(encoding="utf-8"), "stockinit")
+                self.assertFalse((root / "boot/loader/entries" / f"machine-{kernel}-bc250-gfx1013-v33.conf").exists())
+                self.assertFalse((root / "boot" / f"initramfs-{kernel}-bc250-gfx1013-v33.img").exists())
+                self.assertFalse((root / "prefix/0.2.0-alpha").exists())
+                self.assertFalse((root / "state/.prepare-test").exists())
+                self.assertFalse((root / "state/active.env").exists())
+                failures = list((root / "state/failures").glob("failure-*/failure.env"))
+                self.assertEqual(len(failures), 1)
+                evidence = failures[0].read_text(encoding="utf-8")
+                self.assertIn(f"stage=fault-{fault}", evidence)
+                if fault == "dracut":
+                    self.assertIn("patched\\ initramfs\\ generation", evidence)
+                else:
+                    self.assertIn("failed\\ to\\ install\\ patched\\ BLS\\ entry", evidence)
+
+    def test_110_behavioral_grub_set_failure_restores_and_cleans(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = self._run_boot_transaction_fault(root, "set-fail")
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertEqual((root / "next").read_text(encoding="utf-8"), "old")
+            self.assertEqual((root / "saved").read_text(encoding="utf-8"), "stock")
+            self.assertFalse((root / "patched.conf").exists())
+            self.assertFalse((root / "patched.img").exists())
+            self.assertFalse((root / "prefix/keep").exists())
+            self.assertFalse((root / "state/active.env").exists())
+            self.assertEqual(len(list((root / "state/failures").glob("failure-*/failure.env"))), 1)
+
+    def test_110_behavioral_grub_restore_failure_preserves_recovery_state_and_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = self._run_boot_transaction_fault(root, "restore-fail")
+            self.assertEqual(result.returncode, 5, result.stderr)
+            self.assertEqual((root / "next").read_text(encoding="utf-8"), "patched")
+            self.assertEqual((root / "saved").read_text(encoding="utf-8"), "stock")
+            self.assertTrue((root / "patched.conf").is_file())
+            self.assertTrue((root / "patched.img").is_file())
+            self.assertTrue((root / "prefix/keep").is_dir())
+            self.assertTrue((root / "transaction").is_dir())
+            state = (root / "state/active.env").read_text(encoding="utf-8")
+            self.assertIn("BC250_GFX1013_TRANSACTION_PHASE=SAFETY_FAILURE", state)
+            self.assertIn("BC250_GFX1013_RECOVERY_REQUIRED=1", state)
+            self.assertIn("failed\\ to\\ restore\\ previous\\ GRUB\\ next_entry", state)
+            failures = list((root / "state/failures").glob("failure-*/failure.env"))
+            self.assertEqual(len(failures), 1)
+
+    def test_110_behavioral_prepare_signals_restore_boot_state_and_clean(self) -> None:
+        for fault in ("sigint", "sigterm"):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                result = self._run_boot_transaction_fault(root, fault)
+                self.assertEqual(result.returncode, 130, result.stderr)
+                self.assertEqual((root / "next").read_text(encoding="utf-8"), "old")
+                self.assertEqual((root / "saved").read_text(encoding="utf-8"), "stock")
+                self.assertFalse((root / "patched.conf").exists())
+                self.assertFalse((root / "patched.img").exists())
+                self.assertFalse((root / "prefix/keep").exists())
+                self.assertFalse((root / "state/active.env").exists())
+                self.assertEqual(len(list((root / "state/failures").glob("failure-*/failure.env"))), 1)
+
+    def test_110_prepare_never_overwrites_stock_amdgpu_and_rolls_boot_back_first(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        stage = source[source.index("stage_patched_boot() {"): source.index("restore_previous_next() {")]
+        cleanup = source[source.index("prepare_cleanup_on_exit() {"): source.index("prepare_preflight() {")]
+        self.assertIn('dracut --kmoddir "$kmod_stage"', stage)
+        self.assertIn('cp -a --reflink=auto "$stock_modules_root/." "$kmod_stage/"', stage)
+        self.assertIn('stock amdgpu changed during isolated dracut generation', stage)
+        self.assertIn('patched initramfs must contain exactly one amdgpu module', stage)
+        self.assertNotIn('install -m 0644 "$module_payload" "$stock_module"', stage)
+        self.assertNotIn("restore_stock_module", source)
+        self.assertLess(cleanup.index('restore_previous_next "$PREPARE_PREVIOUS_NEXT"'), cleanup.index('rm -f -- "$PREPARE_PATCHED_BLS"'))
+        self.assertIn("mark_prepare_safety_failure", cleanup)
+        self.assertIn("SAFETY_FAILURE", source)
+        self.assertIn("recovery artifacts were preserved", cleanup)
+        selector = source[source.index("select_patched_next_boot() {"): source.index("rotate_prepare_failures() {")]
+        self.assertLess(
+            selector.index("PREPARE_BOOT_STATE_CHANGED=1"),
+            selector.index('grub2-editenv - set "next_entry=$patched_id"'),
+        )
+        prepare = source[source.index("prepare() {"): source.index("verify_active_identity() {")]
+        self.assertIn('select_patched_next_boot "$patched_id" "$saved_before"', prepare)
+
+    def test_110_records_fedora_kernel_source_lineage_and_transaction_phases(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('check-kernel-provenance.py', source)
+        self.assertIn('fedora-prepared-source', source)
+        self.assertIn('BC250_GFX1013_KERNEL_SRPM_NEVR=', source)
+        self.assertIn('BC250_GFX1013_KERNEL_SOURCE_PROVENANCE_SHA256=', source)
+        self.assertIn('BC250_GFX1013_KERNEL_TARGET_MANIFEST_SHA256=', source)
+        self.assertIn('BC250_GFX1013_TRANSACTION_PHASE=BOOT_ENTRY_STAGING', source)
+        self.assertIn('BC250_GFX1013_TRANSACTION_PHASE=PREPARED', source)
+        self.assertIn('set_active_transaction_state ENABLING', source)
+        self.assertIn('set_active_transaction_state DISABLING', source)
+        self.assertIn('BC250_GFX1013_ABI_MODE=', source)
+
+
+    def test_110_fedora_mesa_prep_declares_cargo_toolchain_on_device(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        packages = source[source.index("GFX_BUILD_PACKAGES=("): source.index("build_requirement_provider() {")]
+        self.assertIn("cargo rust cargo-rpm-macros", packages)
+        self.assertIn("rpm-build cargo rust cargo-rpm-macros", source)
+
+    def test_110_source_rpm_detection_does_not_require_arch_src(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        validator = (ROOT / "scripts/check-gfx1013-mesa.py").read_text(encoding="utf-8")
+        self.assertIn("%{SOURCEPACKAGE}", source)
+        self.assertIn("%{SOURCEPACKAGE}", validator)
+        self.assertNotIn("%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\\n' \"$srpm\"", source)
 
     def test_mesa_source_validation_is_part_of_sources_gate(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
