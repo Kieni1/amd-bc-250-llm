@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts/check-gfx1013-mesa.py"
@@ -25,6 +26,30 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
             metadata["source0_sha256"],
             "bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9",
         )
+
+
+    def test_source_rpm_identity_uses_sourcepackage_not_arch(self) -> None:
+        metadata = mesa_check.read_metadata()
+        query = subprocess.CompletedProcess(
+            ["rpm"], 0, b"mesa-26.2.4-1.fc44\n1\n", b""
+        )
+        verify = subprocess.CompletedProcess(["rpm"], 0, b"digests signatures OK\n", b"")
+        with patch.object(mesa_check, "require_command", return_value="rpm"), patch.object(
+            mesa_check, "run", side_effect=[query, verify]
+        ):
+            mesa_check.validate_srpm_identity(Path("mesa-26.2.4-1.fc44.src.rpm"), metadata)
+
+    def test_binary_rpm_is_rejected_even_when_nevr_matches(self) -> None:
+        metadata = mesa_check.read_metadata()
+        query = subprocess.CompletedProcess(
+            ["rpm"], 0, b"mesa-26.2.4-1.fc44\n0\n", b""
+        )
+        with (
+            patch.object(mesa_check, "require_command", return_value="rpm"),
+            patch.object(mesa_check, "run", return_value=query),
+            self.assertRaises(mesa_check.ValidationError),
+        ):
+            mesa_check.validate_srpm_identity(Path("mesa.rpm"), metadata)
 
     def test_private_patch_is_minimal_for_current_mesa_baseline(self) -> None:
         patch = mesa_check.PATCH.read_text(encoding="utf-8")
@@ -93,6 +118,10 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
         self.assertIn("cargo-rpm-macros", gfx)
         self.assertIn("cargo-rpm-macros", workflow)
         self.assertIn("cargo-rpm-macros", ci_local)
+        self.assertIn("bzip2", workflow)
+        self.assertIn("zstd", workflow)
+        self.assertIn("bzip2", ci_local)
+        self.assertIn("zstd", ci_local)
         self.assertIn("rpmbuild -bp --nodeps", gfx)
 
 

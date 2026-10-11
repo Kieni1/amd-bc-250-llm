@@ -119,13 +119,33 @@ def fetch_srpm(metadata: dict[str, str], *, allow_fetch: bool) -> Path:
 
 def validate_srpm_identity(srpm: Path, metadata: dict[str, str]) -> None:
     rpm = require_command("rpm")
-    query = run([rpm, "-qp", "--qf", "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n", str(srpm)])
+    # Source RPM headers may retain the architecture of the machine that built
+    # the SRPM (for example i686/x86_64).  `%{ARCH}` therefore cannot be used
+    # to prove that a package is a source RPM.  Validate NEVR separately and
+    # require the RPM SOURCEPACKAGE marker instead.
+    query = run(
+        [
+            rpm,
+            "-qp",
+            "--qf",
+            "%{NAME}-%{VERSION}-%{RELEASE}\n%{SOURCEPACKAGE}\n",
+            str(srpm),
+        ]
+    )
     if query.returncode != 0:
         raise ValidationError("cannot query Fedora Mesa SRPM identity")
-    identity = query.stdout.decode("utf-8", errors="replace").strip()
-    if identity != metadata["srpm_nevra"]:
+    fields = query.stdout.decode("utf-8", errors="replace").splitlines()
+    if len(fields) != 2:
+        raise ValidationError("Fedora Mesa SRPM identity query returned an unexpected result")
+    identity, source_package = fields
+    expected_nevr = metadata["srpm_nevra"].removesuffix(".src")
+    if identity != expected_nevr:
         raise ValidationError(
-            f"Fedora Mesa SRPM identity mismatch: {identity!r} != {metadata['srpm_nevra']!r}"
+            f"Fedora Mesa SRPM NEVR mismatch: {identity!r} != {expected_nevr!r}"
+        )
+    if source_package != "1":
+        raise ValidationError(
+            f"Fedora Mesa package is not marked as a source RPM (SOURCEPACKAGE={source_package!r})"
         )
     verify = run([rpm, "-K", str(srpm)])
     output = (verify.stdout + verify.stderr).decode("utf-8", errors="replace")
