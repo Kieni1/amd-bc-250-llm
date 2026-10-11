@@ -11,9 +11,9 @@ podman run --rm --pull="$pull_policy" \
   "$build_image" \
   bash -Eeuxo pipefail -c '
     build_packages=(
-      bash cargo cargo-rpm-macros cpio curl findutils gcc git gzip make
+      bash bzip2 cargo cargo-rpm-macros cpio curl findutils gcc git gzip make
       libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck
-      systemd systemd-rpm-macros tar xz
+      systemd systemd-rpm-macros tar xz zstd
     )
     if ! rpm -q "${build_packages[@]}" >/dev/null 2>&1; then
       dnf install -y "${build_packages[@]}"

@@ -106,6 +106,7 @@ check-rpm-payload:
 	  /usr/share/bash-completion/completions/bc250 \
 	  /usr/share/bc250-llm-server/gfx1013/upstream/PATCH-SHA256SUMS \
 	  /usr/share/bc250-llm-server/gfx1013/upstream/SOURCE-SHA256SUMS \
+	  /usr/share/bc250-llm-server/gfx1013/upstream/check-kernel-provenance.py \
 	  /usr/share/doc/bc250-llm-server/docs/GFX1013.md \
 	  /usr/share/doc/bc250-llm-server/docs/RAG.md \
 	  /usr/share/licenses/bc250-llm-server/LICENSE \
