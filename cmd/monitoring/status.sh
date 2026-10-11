@@ -266,6 +266,8 @@ fi
 topology_summary "$mode" "$runtime_identity_warning"
 
 section "Platform"
+package_nevra="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' bc250-llm-server 2>/dev/null | head -1 || true)"
+printf '  Package:      %s\n' "${package_nevra:-unavailable}"
 printf '  Kernel:       %s\n' "$(uname -r)"
 printf '  Command line: %s\n' "$(cat /proc/cmdline 2>/dev/null || printf 'unavailable')"
 if command -v needs-restarting >/dev/null 2>&1; then

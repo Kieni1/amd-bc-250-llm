@@ -254,7 +254,7 @@ class QualificationTests(unittest.TestCase):
             payload = {
                 "schema": "bc250.gfx1013-status.v1",
                 "state": "ENABLED",
-                "profile": "v0.2.1-alpha",
+                "profile": "v0.2.2-alpha",
                 "upstream": {"version": "0.2.0-alpha", "commit": "d3e6dc"},
                 "source_identity_ok": True,
                 "package": {"prepared_nevra": "bc250-llm-server-0.13.1-1.6.fc44.x86_64"},

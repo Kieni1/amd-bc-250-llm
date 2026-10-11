@@ -56,6 +56,12 @@ class StatusTests(unittest.TestCase):
             self.assertIn(expected, source)
 
 
+    def test_status_human_platform_includes_installed_package_identity(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        self.assertIn('section "Platform"', source)
+        self.assertIn("Package:", source)
+        self.assertIn("bc250-llm-server 2>/dev/null", source)
+
     def test_status_surfaces_topology_aware_overall_state(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         self.assertIn('Overall: HEALTHY', source)
