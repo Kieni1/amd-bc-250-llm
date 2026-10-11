@@ -2,11 +2,21 @@
 
 ## 0.13.1-1.10 - 2026-10-11
 
+- Fix the observed Fedora Mesa SRPM gate failure by validating source-package identity with `SOURCEPACKAGE=1` rather than `%{ARCH}=src`; apply the same rule in device-side Mesa preparation so the build does not fail again later.
+- Arm prepare rollback before writing GRUB `next_entry`, require exactly one patched `amdgpu` in the generated initramfs, and keep the stock module/initramfs immutable through isolated dracut staging.
+- Make `cargo` and `rust` explicit optional GFX build requirements alongside `cargo-rpm-macros` so Fedora Mesa `%prep` prerequisites are actionable on the appliance as well as CI.
+- Fix Fedora source-RPM identity validation: source RPM headers may retain a build architecture such as `i686`, so both the release source gate and device-side Mesa preparation now validate source NEVR plus RPM `SOURCEPACKAGE=1` instead of assuming `%{ARCH}=src`.
+- Make exact Fedora kernel `%prep` output authoritative for GFX1013 module construction: locate exactly one prepared source tree containing every BC-250 AMDGPU patch target, fingerprint those prepared files, then adapt/patch/build that same tree.
+- Remove the prepare-time stock-module replacement window entirely. The patched initramfs is now generated from an isolated dracut `--kmoddir` module tree, with before/after hashes proving the authoritative stock `amdgpu` and stock initramfs remain unchanged.
+- Correct prepare rollback ordering so previous GRUB `next_entry` is restored and verified before patched boot/private artifacts are removed; failed boot-manager restoration preserves lifecycle/recovery artifacts and records `SAFETY_FAILURE`.
+- Persist transaction phase, kernel SRPM NEVR/digest, kernel target-provenance digest and module compatibility mode; preserve the distinction between MODVERSIONS CRC validation and the weaker exact-kernel symbol-compatibility fallback.
+- Make directly used GFX build/source helpers explicit in preflight, including RPM/cpio/dracut and archive helpers needed by the Fedora source-preparation paths.
+- Align the optional private-RADV prerequisite check with the current Fedora Mesa build surface by requiring `python3-pycparser`, Vulkan headers/loader development metadata, `systemd-devel` and `libdisplay-info-devel` instead of relying on incidental workstation packages.
 - Rebase the GFX1013 private RADV source baseline from stale Mesa 26.2.0-rc3 to exact Fedora 44 `mesa-26.2.4-1.fc44`; retain the pinned upstream GFX1013 commit but advance the package profile to `v0.2.2-alpha`.
 - Drop the obsolete private Mesa IP-version correction already upstream since Mesa 26.2.1; carry only dedicated-compute-queue exposure plus the GFX1013 async-compute threadgroup workaround, with an authoritative zero-fuzz applicability check against Fedora's exact `%prep` tree.
-- Make Fedora kernel-SRPM extraction tolerant of supported Linux source archive compression/path forms while requiring exactly one unambiguous source archive.
+- Add behavioral GFX1013 transaction regressions for dracut failure, BLS-install failure, GRUB one-shot selection failure, failed GRUB restoration, SIGINT and SIGTERM; failed boot restoration must preserve recovery artifacts and persist `SAFETY_FAILURE`/`RECOVERY_REQUIRED`.
 - Add a deliberate external-module adaptation for AMD trace include paths before building the exact-kernel amdgpu module.
-- Make module ABI verification kernel-configuration aware: retain symbol CRC comparison when `CONFIG_MODVERSIONS=y`, otherwise require exact vermagic plus imported-symbol resolution against the exact kernel `Module.symvers`; support `.ko`, `.ko.xz`, `.ko.zst` and `.ko.gz` artifacts.
+- Make module compatibility verification kernel-configuration aware: retain symbol CRC comparison when `CONFIG_MODVERSIONS=y`, otherwise require exact vermagic plus imported-symbol resolution against the exact kernel `Module.symvers`; support `.ko`, `.ko.xz`, `.ko.zst` and `.ko.gz` artifacts.
 - Tighten GFX1013 prepare transactionality so pre-commit failures restore/remain `DISABLED`, leave no private RADV/ICD/BLS/next-entry authority, and retain only a bounded root-owned failure evidence bundle (newest five).
 - Add installed package NEVRA to human `bc250 status`, and retain the 1.9 Secure Boot `disabled-unsupported`, provider-aware dependency, non-root `NOT INSPECTED`, package-gate and default-off safety behavior.
 - Do not treat the developer-prepared 1.9 artifacts as release authority; the rebuilt package requires a fresh stock A1 before patched-boot/B/A2 qualification.
