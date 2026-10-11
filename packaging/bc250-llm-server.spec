@@ -281,9 +281,13 @@ fi
 %changelog
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.10
 - Rework GFX1013 prepare around the exact Fedora 44 Mesa 26.2.4-1.fc44 source lineage, carrying only the still-required private-RADV compute-queue/dispatch workaround and validating zero-fuzz applicability against Fedora %prep.
-- Harden exact-kernel preparation with robust Fedora kernel-SRPM source archive discovery, explicit external-amdgpu trace-path adaptation and CONFIG_MODVERSIONS-aware ABI verification for compressed or uncompressed modules.
-- Make pre-commit prepare failures transactional: restore DISABLED stock authority, remove staged boot/private-RADV artifacts and retain a bounded root-only failure evidence bundle for diagnosis.
+- Make exact Fedora kernel SRPM `%prep` output the GFX1013 AMDGPU source authority, fingerprint every BC-250 patch target from that prepared tree, then apply the package patches/build against the exact running kernel.
+- Validate source RPMs by source NEVR plus SOURCEPACKAGE rather than assuming the RPM ARCH header is src; this accepts Fedora SRPMs whose header retains a build architecture.
+- Generate the patched initramfs from an isolated dracut kmod tree so prepare never replaces the authoritative stock amdgpu module; verify stock module/initramfs hashes before and after.
+- Make rollback ordering fail closed: restore/verify prior boot-manager state before deleting staged artifacts, persist recovery-required SAFETY_FAILURE state on rollback failure, and retain bounded root-only failure evidence.
 - Show installed package NEVRA in human bc250 status and retain the 1.9 Secure Boot/provider/non-root identity/default-off safety behavior unchanged.
+- Arm GRUB next-entry rollback before mutation, require one exact patched amdgpu in the staged initramfs, and declare the Mesa Cargo toolchain explicitly in GFX preflight.
+- Add behavioral fault-injection coverage for dracut/BLS failures, GRUB set/restore failures and SIGINT/SIGTERM prepare interruption; failed GRUB restoration preserves recovery artifacts and SAFETY_FAILURE state.
 
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.9
 - Recognize mokutil's explicit unsupported Secure Boot state as disabled-unsupported so unsigned GFX1013 preparation is allowed only when the platform explicitly reports Secure Boot unsupported/disabled; enabled and genuinely unknown states remain fail-closed.

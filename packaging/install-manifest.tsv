@@ -127,6 +127,7 @@ file	0644	gfx1013/upstream/LICENSE	{share}/gfx1013/upstream/LICENSE
 file	0644	gfx1013/upstream/UPSTREAM-NOTICE.md	{share}/gfx1013/upstream/UPSTREAM-NOTICE.md
 file	0644	gfx1013/upstream/PATCH-SHA256SUMS	{share}/gfx1013/upstream/PATCH-SHA256SUMS
 file	0644	gfx1013/upstream/SOURCE-SHA256SUMS	{share}/gfx1013/upstream/SOURCE-SHA256SUMS
+file	0755	gfx1013/upstream/check-kernel-provenance.py	{share}/gfx1013/upstream/check-kernel-provenance.py
 file	0644	gfx1013/upstream/patches/kernel/v33/*.patch	{share}/gfx1013/upstream/patches/kernel/v33/
 file	0644	gfx1013/upstream/patches/mesa/*.patch	{share}/gfx1013/upstream/patches/mesa/
 file	0644	gfx1013/upstream/patches/mesa/series	{share}/gfx1013/upstream/patches/mesa/series
