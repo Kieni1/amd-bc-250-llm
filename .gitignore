@@ -4,6 +4,7 @@
 /sources/*.tar.gz
 /sources/*.tar.xz
 /sources/*.sha256
+/sources/gfx1013/
 /vendor/
 *.rpm
 *.src.rpm

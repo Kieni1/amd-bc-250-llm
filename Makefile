@@ -27,10 +27,12 @@ help:
 
 sources:
 	./scripts/prepare-sources.py
+	./scripts/check-gfx1013-mesa.py --fetch
 	./scripts/check-upstream-patches.py
 
 sources-check:
 	./scripts/prepare-sources.py --check
+	./scripts/check-gfx1013-mesa.py
 	./scripts/check-upstream-patches.py
 
 lint:
@@ -149,5 +151,6 @@ clean:
 
 clean-sources:
 	rm -f sources/*.tar.gz sources/*.tar.xz sources/*.sha256
+	rm -rf sources/gfx1013
 
 distclean: clean clean-sources
