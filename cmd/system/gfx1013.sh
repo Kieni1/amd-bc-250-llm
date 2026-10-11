@@ -93,9 +93,13 @@ package_nevra() {
 secure_boot_state() {
   local output value efivar
   if command -v mokutil >/dev/null 2>&1; then
-    output="$(LC_ALL=C mokutil --sb-state 2>/dev/null || true)"
+    output="$(LC_ALL=C mokutil --sb-state 2>&1 || true)"
     if grep -qi 'SecureBoot enabled' <<<"$output"; then printf 'enabled\n'; return 0; fi
     if grep -qi 'SecureBoot disabled' <<<"$output"; then printf 'disabled\n'; return 0; fi
+    if grep -Eqi "does(n't| not) support Secure Boot|Secure Boot.*unsupported|SecureBoot.*unsupported" <<<"$output"; then
+      printf 'disabled-unsupported\n'
+      return 0
+    fi
   fi
   if [[ ! -d /sys/firmware/efi ]]; then
     printf 'disabled-non-efi\n'
@@ -129,7 +133,7 @@ secure_boot_prepare_ok() {
   local state
   state="$(secure_boot_state)"
   case "$state" in
-    disabled|disabled-non-efi) return 0 ;;
+    disabled|disabled-non-efi|disabled-unsupported) return 0 ;;
     enabled) die "Secure Boot is enabled; the package does not sign or enroll its locally built amdgpu module. Disable Secure Boot or use an operator-managed signing workflow before prepare." ;;
     *) die "Secure Boot state cannot be established; refusing to stage an unsigned local amdgpu module" ;;
   esac
@@ -891,7 +895,7 @@ prepare_preflight() {
 
   secure="$(secure_boot_state)"
   case "$secure" in
-    disabled|disabled-non-efi) echo "  Secure Boot: PASS ($secure)" ;;
+    disabled|disabled-non-efi|disabled-unsupported) echo "  Secure Boot: PASS ($secure)" ;;
     enabled) echo "  Secure Boot: BLOCKED (unsigned package-built amdgpu is not enrolled)"; failures=$((failures + 1)) ;;
     *) echo "  Secure Boot: BLOCKED (state unknown)"; failures=$((failures + 1)) ;;
   esac

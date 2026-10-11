@@ -141,6 +141,31 @@ class Gfx1013Tests(unittest.TestCase):
         self.assertNotIn("mokutil --import", source)
         self.assertNotIn("sign-file", source)
 
+    def test_secure_boot_unsupported_is_treated_as_explicitly_disabled(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        start = source.index("secure_boot_state() {")
+        end = source.index("\nsecure_boot_prepare_ok() {", start)
+        function = source[start:end]
+        with tempfile.TemporaryDirectory() as temporary:
+            mock_mokutil = Path(temporary) / "mokutil"
+            mock_mokutil.write_text(
+                "#!/usr/bin/env bash\necho \"This system doesn't support Secure Boot\" >&2\nexit 255\n",
+                encoding="utf-8",
+            )
+            mock_mokutil.chmod(0o755)
+            env = os.environ | {"PATH": f"{temporary}:{os.environ.get('PATH', '')}"}
+            result = subprocess.run(
+                ["bash", "-c", function + "\nsecure_boot_state"],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "disabled-unsupported")
+        self.assertIn("disabled|disabled-non-efi|disabled-unsupported", source)
+        self.assertIn('Secure Boot: PASS ($secure)', source)
+
     def test_optional_build_dependencies_cover_current_mesa_python_and_glslang_needs(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("python3-packaging", source)
