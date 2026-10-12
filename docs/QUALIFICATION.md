@@ -37,9 +37,8 @@ The gate directory contains `gate.json`, raw evidence, and a closed
 `qualification_identity` containing the exact installed RPM, running kernel,
 qualification-relevant configuration-tree hashes and a stable subset of
 `bc250 gfx1013 status --json`. GFX1013 `DISABLED` and `ENABLED` are stable gate
-states; `PREPARED`, `PATCHED_BOOT_UNVERIFIED` and `STALE_KERNEL` are controlled
-`INCOMPLETE` states, while broken/rollback-required GFX state is a product
-defect. Any unlisted/missing file, checksum mismatch, unknown schema, non-PASS
+states; `PREPARED` and `PATCHED_BOOT_UNVERIFIED` are controlled `INCOMPLETE`
+states, while `ROLLBACK_REQUIRED` is a product defect. Any unlisted/missing file, checksum mismatch, unknown schema, non-PASS
 authoritative result, or later identity drift is rejected by the resilience
 manager.
 
