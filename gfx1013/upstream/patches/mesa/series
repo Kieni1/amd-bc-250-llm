@@ -1,4 +1,4 @@
-# BC-250 LLM package profile v0.2.2-alpha.
+# BC-250 LLM package profile v0.2.4-alpha.
 # Fedora Mesa 26.2.4 already includes the GFX1013 IP-version correction;
 # carry only compute-queue exposure + the required async-compute workaround.
 0001-gfx1013-compute-queue-fix.patch

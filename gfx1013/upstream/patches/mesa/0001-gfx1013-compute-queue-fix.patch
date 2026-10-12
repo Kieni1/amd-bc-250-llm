@@ -17,9 +17,7 @@ it with the stock kernel path.
 
 --- a/src/amd/common/ac_gpu_info.c
 +++ b/src/amd/common/ac_gpu_info.c
-@@ -480,12 +480,7 @@ ac_fill_hw_ip_info(struct radeon_info *info, const struct drm_amdgpu_info_device
-       */
-       info->ip[ip_type].num_queues = 1;
+@@ -482,8 +482,3 @@ ac_fill_hw_ip_info(struct radeon_info *info, const struct drm_amdgpu_info_device
     } else if (ip_info->available_rings) {
 -      /* GFX1013 is known to have broken compute queue */
 -      if (ip_type == AMD_IP_COMPUTE && device_info->family == FAMILY_NV &&
@@ -28,8 +26,6 @@ it with the stock kernel path.
 -
        info->ip[ip_type].num_queues = util_bitcount(ip_info->available_rings);
     }
- 
-    /* Gfx6-8 don't set ip_discovery_version. */
 @@ -1015,7 +1010,8 @@ void ac_fill_bug_info(struct radeon_info *info)
      * dimension mode.
      */

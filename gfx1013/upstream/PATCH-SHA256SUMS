@@ -1,4 +1,4 @@
 0f1103241c38c0e81eb453e3c8eecf5b2a60d82ce2b128eef14edff93c3c463b  patches/kernel/v33/0001-gfx1013-mmio-pasid-route.patch
 f44fa410667531a346abc4f45f2886c268b06136b351a10d1cf4581090878bc1  patches/kernel/v33/0002-gfx1013-compute-gfxoff-guard.patch
 348b7f0c5521567c92a6f6a67f7080c88902baa600bde73d1391efb80a46bf4c  patches/kernel/v33/0003-gfx1013-scoped-pasid-type0.patch
-44bcab177e7d4b3ee768555c2906157ad9022b9b770a615590f2c0536128e1f3  patches/mesa/0001-gfx1013-compute-queue-fix.patch
+b74c84460adef32d9d1117b52b9a7f55fdbe114c903e7ff6754d62683fd1ac68  patches/mesa/0001-gfx1013-compute-queue-fix.patch
