@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.13.1
-Release:        1.10%{?dist}
+Release:        1.12%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -279,6 +279,19 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Mon Oct 12 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.12
+- Make the private GFX1013 Mesa build explicitly headless: AMD Vulkan only, with no X11/Wayland, EGL/GBM/OpenGL/GLES, Mesa layers/tools, LLVM or video frontends and no Meson fallback downloads.
+- Reduce the deployed private Mesa prefix to libvulkan_radeon.so plus its ICD, audit ELF dependencies for GUI/WSI linkage/RPATH, and run the enable-time Vulkan smoke with graphical session variables unset.
+- Remove GUI-only optional GFX build requirements and add a Fedora release-gate build of the exact production headless RADV path so configuration/dependency drift fails before release artifacts are accepted.
+- Add the matching Fedora kernel-devel/SRPM external-amdgpu build, vermagic and ABI verification path to the release gate; fail closed on ambiguous Mesa spec selection and unresolved AMD trace include paths.
+- Validate the final pinned private ICD during staging and make GFX build preflight explicitly account for git-core plus Fedora RPM macro packages used by source preparation.
+
+* Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.11
+- Run the Fedora release gate as an unprivileged builder after root-only dependency setup so %check cannot hide privileged-path assumptions.
+- Exclude the unrelated fedora-cisco-openh264 repository from build-tool installation and keep local/container CI policy aligned.
+- Publish closed binary/source checksum manifests for split CI artifacts and verify both before upload.
+- Tighten the Fedora Mesa 26.2.4 GFX1013 zero-fuzz hunk to the exact semantically validated helper-local compute-queue guard and verify patch identity before source validation.
+
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.10
 - Rework GFX1013 prepare around the exact Fedora 44 Mesa 26.2.4-1.fc44 source lineage, carrying only the still-required private-RADV compute-queue/dispatch workaround and validating zero-fuzz applicability against Fedora %prep.
 - Make exact Fedora kernel SRPM `%prep` output the GFX1013 AMDGPU source authority, fingerprint every BC-250 patch target from that prepared tree, then apply the package patches/build against the exact running kernel.
