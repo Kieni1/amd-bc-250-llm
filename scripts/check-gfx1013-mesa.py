@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 METADATA = ROOT / "gfx1013/upstream/MESA-SOURCE"
 PATCH = ROOT / "gfx1013/upstream/patches/mesa/0001-gfx1013-compute-queue-fix.patch"
+PATCH_MANIFEST = ROOT / "gfx1013/upstream/PATCH-SHA256SUMS"
+PATCH_MANIFEST_PATH = "patches/mesa/0001-gfx1013-compute-queue-fix.patch"
 CACHE_DIR = ROOT / "sources/gfx1013"
 
 EXPECTED = {
@@ -28,6 +31,22 @@ EXPECTED = {
     "source0_sha256": "bce5f7fbebb934373b86c999a064d52fb5065878dc57f287f95346648ec832e9",
 }
 
+HEADLESS_MESON_OPTIONS = (
+    "platforms",
+    "vulkan-drivers",
+    "gallium-drivers",
+    "glx",
+    "egl",
+    "gbm",
+    "gles1",
+    "gles2",
+    "opengl",
+    "llvm",
+    "video-codecs",
+    "display-info",
+    "vulkan-layers",
+    "tools",
+)
 
 class ValidationError(RuntimeError):
     pass
@@ -94,6 +113,37 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def validate_patch_identity(
+    patch_path: Path = PATCH,
+    manifest_path: Path = PATCH_MANIFEST,
+) -> None:
+    try:
+        lines = manifest_path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise ValidationError(f"cannot read GFX1013 patch manifest: {error}") from error
+
+    matches: list[str] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        digest, separator, relative = line.partition("  ")
+        if separator and relative == PATCH_MANIFEST_PATH:
+            matches.append(digest)
+
+    if len(matches) != 1:
+        raise ValidationError(
+            "GFX1013 patch manifest must contain exactly one Mesa patch identity "
+            f"for {PATCH_MANIFEST_PATH!r} (found {len(matches)})"
+        )
+    actual = sha256(patch_path)
+    if actual != matches[0]:
+        raise ValidationError(
+            "GFX1013 Mesa patch identity mismatch: "
+            f"{actual} != {matches[0]}; patch and manifest are from different revisions"
+        )
+
+
 def fetch_srpm(metadata: dict[str, str], *, allow_fetch: bool) -> Path:
     target = CACHE_DIR / f"mesa-{metadata['version']}-{metadata['fedora_release']}.src.rpm"
     if target.is_file():
@@ -107,7 +157,22 @@ def fetch_srpm(metadata: dict[str, str], *, allow_fetch: bool) -> Path:
     temporary = target.with_suffix(target.suffix + ".part")
     temporary.unlink(missing_ok=True)
     result = run(
-        [curl, "--fail", "--location", "--retry", "3", "--output", str(temporary), metadata["srpm_url"]]
+        [
+            curl,
+            "--fail",
+            "--location",
+            "--retry",
+            "3",
+            "--retry-all-errors",
+            "--retry-delay",
+            "2",
+            "--proto",
+            "=https",
+            "--tlsv1.2",
+            "--output",
+            str(temporary),
+            metadata["srpm_url"],
+        ]
     )
     if result.returncode != 0:
         temporary.unlink(missing_ok=True)
@@ -236,6 +301,25 @@ def prepare_fedora_tree(srpm: Path, metadata: dict[str, str], temporary: Path) -
     return candidates[0].parents[3]
 
 
+def validate_headless_meson_schema(source_root: Path) -> None:
+    options = source_root / "meson.options"
+    try:
+        text = options.read_text(encoding="utf-8")
+    except OSError as error:
+        raise ValidationError(f"cannot read Fedora-prepared Mesa meson.options: {error}") from error
+
+    missing = [
+        option
+        for option in HEADLESS_MESON_OPTIONS
+        if re.search(rf"option\(\s*['\"]{re.escape(option)}['\"]", text) is None
+    ]
+    if missing:
+        raise ValidationError(
+            "Fedora Mesa no longer exposes required headless RADV Meson options: "
+            + ", ".join(missing)
+        )
+
+
 def validate_pre_patch_semantics(source: Path) -> None:
     text = source.read_text(encoding="utf-8")
     queue_guard = (
@@ -303,6 +387,7 @@ def validate(*, allow_fetch: bool) -> str:
     metadata = read_metadata()
     if not PATCH.is_file():
         raise ValidationError(f"GFX1013 Mesa patch is missing: {PATCH}")
+    validate_patch_identity()
     srpm = fetch_srpm(metadata, allow_fetch=allow_fetch)
     validate_srpm_identity(srpm, metadata)
 
@@ -310,6 +395,7 @@ def validate(*, allow_fetch: bool) -> str:
         temporary = Path(name)
         source_root = prepare_fedora_tree(srpm, metadata, temporary)
         source = source_root / "src/amd/common/ac_gpu_info.c"
+        validate_headless_meson_schema(source_root)
         validate_pre_patch_semantics(source)
         apply_patch(source_root, dry_run=True)
         apply_patch(source_root, dry_run=False)
