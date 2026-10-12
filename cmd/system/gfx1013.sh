@@ -10,7 +10,7 @@ CACHE_ROOT="${BC250_GFX1013_CACHE_ROOT:-/var/cache/bc250-llm-server/gfx1013}"
 DROPIN="${BC250_GFX1013_DROPIN:-/etc/systemd/system/ollama.service.d/70-bc250-gfx1013.conf}"
 UPSTREAM_GENERATOR="${BC250_GFX1013_UPSTREAM_GENERATOR:-/usr/lib/systemd/user-environment-generators/60-bc250-gfx1013-v33}"
 UPSTREAM_STATE="${BC250_GFX1013_UPSTREAM_STATE:-/var/lib/bc250-gfx1013}"
-PACKAGE_PROFILE=v0.2.2-alpha
+PACKAGE_PROFILE=v0.2.4-alpha
 UPSTREAM_VERSION=0.2.0-alpha
 PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9
 TESTED_KERNEL=7.2.9-200.fc44.x86_64
@@ -25,6 +25,9 @@ ACTIVE_STATE="$STATE_ROOT/active.env"
 PATCH_MARKER=bc250.gfx1013_v33=1
 PROFILE_VARIANT=bc250-gfx1013-v33
 INSTALLED_SELF="${BC250_GFX1013_INSTALLED_SELF:-/usr/libexec/bc250-llm-server/gfx1013.sh}"
+LIFECYCLE_LOCK="${BC250_GFX1013_LIFECYCLE_LOCK:-/run/lock/bc250-gfx1013.lock}"
+LIFECYCLE_LOCK_HELD=0
+LIFECYCLE_LOCK_FD=''
 
 usage() {
   cat <<'USAGE'
@@ -49,7 +52,7 @@ Experimental BC-250 GFX1013 compute-queue profile. Default is OFF.
            Reboot-aware same-package A1/B/A2 LLM performance campaign. Benchmarking
            never changes boot state or enables/disables GFX1013 itself.
 
-The package profile is v0.2.2-alpha, based on upstream 0.2.0-alpha commit
+The package profile is v0.2.4-alpha, based on upstream 0.2.0-alpha commit
  d3e6dc062c34d2523db0abe5741d1f5b0dea00d9. Mesh/task, 40-CU, FSR and tuning
 changes are outside this profile.
 USAGE
@@ -89,6 +92,20 @@ die() {
   exit 2
 }
 need_root() { [[ ${EUID:-$(id -u)} -eq 0 ]] || die "requires root (run with sudo)"; }
+
+acquire_lifecycle_lock() {
+  ((LIFECYCLE_LOCK_HELD)) && return 0
+  command -v flock >/dev/null 2>&1 || die "required lifecycle lock tool is unavailable: flock"
+  [[ -d "$(dirname "$LIFECYCLE_LOCK")" ]] || install -d -m 0755 "$(dirname "$LIFECYCLE_LOCK")"
+  exec {LIFECYCLE_LOCK_FD}>"$LIFECYCLE_LOCK" || die "cannot open GFX1013 lifecycle lock: $LIFECYCLE_LOCK"
+  if ! flock -n "$LIFECYCLE_LOCK_FD"; then
+    eval "exec ${LIFECYCLE_LOCK_FD}>&-" || true
+    LIFECYCLE_LOCK_FD=''
+    die "another GFX1013 lifecycle mutation is already in progress"
+  fi
+  LIFECYCLE_LOCK_HELD=1
+}
+
 kernel_release() { uname -r; }
 prepared_dir_for() { printf '%s/prepared/%s' "$STATE_ROOT" "$1"; }
 prepared_stamp_for() { printf '%s/prepared.env' "$(prepared_dir_for "$1")"; }
@@ -151,12 +168,10 @@ secure_boot_prepare_ok() {
 }
 
 GFX_BUILD_PACKAGES=(
-  gcc gcc-c++ make rpm rpm-build cargo rust cargo-rpm-macros binutils bzip2 cpio dracut patch xz
+  gcc gcc-c++ make rpm rpm-build redhat-rpm-config kernel-srpm-macros git-core cargo rust cargo-rpm-macros binutils bzip2 cpio dracut patch xz
   elfutils-libelf-devel openssl-devel meson ninja-build
   bison flex python3-mako python3-pycparser python3-pyyaml python3-packaging glslang glslang-devel
-  vulkan-headers vulkan-loader-devel systemd-devel libdisplay-info-devel
-  libdrm-devel libxcb-devel libX11-devel
-  libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel
+  vulkan-headers vulkan-loader-devel systemd-devel libdrm-devel expat-devel pkgconf-pkg-config
   zlib-devel libzstd-devel spirv-tools-devel
 )
 
@@ -299,25 +314,39 @@ kernel_state() {
 }
 
 stock_entry_file_safe() {
-  local path=$1
+  local path=$1 expected_kernel=${2:-} version linux_path token initrd_ok=0
   [[ -f "$path" ]] || return 1
   grep -qw "$PATCH_MARKER" "$path" 2>/dev/null && return 1
+
+  version="$(awk '$1 == "version" {print $2}' "$path")"
+  [[ "$version" =~ ^[A-Za-z0-9._+-]+$ ]] || return 1
+  [[ -z "$expected_kernel" || "$version" == "$expected_kernel" ]] || return 1
+  linux_path="$(awk '$1 == "linux" {print $2}' "$path")"
+  [[ "${linux_path##*/}" == "vmlinuz-$version" ]] || return 1
+  while read -r token; do
+    [[ "${token##*/}" == "initramfs-$version.img" ]] && initrd_ok=1
+  done < <(awk '$1 == "initrd" {for (i=2; i<=NF; i++) print $i}' "$path")
+  ((initrd_ok)) || return 1
   return 0
 }
 
 GFX_STATE_REASON=''
-GFX_LIFECYCLE_STATE='BROKEN'
+GFX_LIFECYCLE_STATE='ROLLBACK_REQUIRED'
 gfx_lifecycle_state() {
-  local current_kernel current_package saved enabled
+  local current_kernel current_package saved next enabled phase
   GFX_STATE_REASON=''
   current_kernel="$(kernel_release)"
   current_package="$(package_nevra)"
   saved="$(grub_value saved_entry)"
+  next="$(grub_value next_entry)"
 
   if [[ ! -e "$ACTIVE_STATE" ]]; then
-    if risky_artifacts_without_state; then
-      GFX_STATE_REASON='package GFX1013 artifacts exist without valid lifecycle state'
-      GFX_LIFECYCLE_STATE=BROKEN
+    if patched_boot_running; then
+      GFX_STATE_REASON='patched boot marker is running without authoritative package lifecycle state'
+      GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
+    elif risky_artifacts_without_state; then
+      GFX_STATE_REASON='package GFX1013 artifacts exist without authoritative lifecycle state'
+      GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     else
       GFX_STATE_REASON='no prepared or active GFX1013 profile'
       GFX_LIFECYCLE_STATE=DISABLED
@@ -326,16 +355,18 @@ gfx_lifecycle_state() {
   fi
   if ! load_active_state; then
     GFX_STATE_REASON='active lifecycle state exists but failed validation'
-    GFX_LIFECYCLE_STATE=BROKEN
+    GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     return 0
   fi
-  if [[ "${BC250_GFX1013_RECOVERY_REQUIRED:-0}" == 1 || "${BC250_GFX1013_TRANSACTION_PHASE:-}" =~ ^(RECOVERY_REQUIRED|SAFETY_FAILURE|ENABLING|DISABLING|BOOT_ENTRY_STAGING)$ ]]; then
-    GFX_STATE_REASON="lifecycle transaction requires recovery (${BC250_GFX1013_TRANSACTION_PHASE:-unknown})"
+  phase="${BC250_GFX1013_TRANSACTION_PHASE:-}"
+  enabled="${BC250_GFX1013_ENABLED:-0}"
+  if [[ "${BC250_GFX1013_RECOVERY_REQUIRED:-0}" == 1 || "$phase" =~ ^(RECOVERY_REQUIRED|SAFETY_FAILURE|ENABLING|DISABLING|BOOT_ENTRY_STAGING)$ ]]; then
+    GFX_STATE_REASON="lifecycle transaction requires recovery (${phase:-unknown})"
     GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     return 0
   fi
   if [[ -z "${BC250_GFX1013_PACKAGE_NEVRA:-}" ]]; then
-    GFX_STATE_REASON='pre-1.6 preparation lacks package identity; rollback/reprepare required'
+    GFX_STATE_REASON='pre-greenfield preparation lacks package identity; rollback/reprepare required'
     GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     return 0
   fi
@@ -344,54 +375,62 @@ gfx_lifecycle_state() {
     GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     return 0
   fi
-  if ! stock_entry_file_safe "$BC250_GFX1013_STOCK_BLS"; then
-    GFX_STATE_REASON='recorded stock BLS entry is missing or contains the patched marker'
+  if ! stock_entry_file_safe "$BC250_GFX1013_STOCK_BLS" "$BC250_GFX1013_KERNEL"; then
+    GFX_STATE_REASON='recorded stock BLS entry is missing, patched, or does not match its kernel/initramfs identity'
     GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
     return 0
   fi
   if [[ "$current_kernel" != "$BC250_GFX1013_KERNEL" ]]; then
-    if patched_boot_running; then
-      GFX_STATE_REASON="patched marker is present on kernel $current_kernel but preparation belongs to $BC250_GFX1013_KERNEL"
+    GFX_STATE_REASON="running kernel $current_kernel differs from prepared kernel $BC250_GFX1013_KERNEL; rollback/reprepare required"
+    GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
+    return 0
+  fi
+
+  case "$phase:$enabled" in
+    ENABLED:1)
+      if ! patched_boot_running; then
+        GFX_STATE_REASON='enabled state requires the marked patched boot'
+        GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED; return 0
+      fi
+      if [[ ! -f "$DROPIN" || ! -f "$BC250_GFX1013_ICD" || ! -f "$BC250_GFX1013_PRIVATE_RADV_LIB" ]]; then
+        GFX_STATE_REASON='enabled state is missing the Ollama override or private RADV payload'
+        GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED; return 0
+      fi
+      if [[ "$saved" != "$BC250_GFX1013_PATCHED_ENTRY_ID" ]]; then
+        GFX_STATE_REASON='enabled state does not have the patched BLS entry as saved/default'
+        GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED; return 0
+      fi
+      GFX_STATE_REASON='verified lifecycle state records GFX1013 as enabled'
+      GFX_LIFECYCLE_STATE=ENABLED
+      ;;
+    PREPARED:0)
+      if [[ -f "$DROPIN" ]]; then
+        GFX_STATE_REASON='Ollama private-RADV override exists before enabled commit'
+        GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
+      elif [[ "$saved" != "$BC250_GFX1013_STOCK_ENTRY_ID" ]]; then
+        GFX_STATE_REASON='prepared state requires the recorded stock BLS as saved/default'
+        GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
+      elif patched_boot_running; then
+        if [[ -n "$next" ]]; then
+          GFX_STATE_REASON='patched boot is running but one-shot next_entry was not consumed'
+          GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
+        else
+          GFX_STATE_REASON='running the prepared one-shot patched boot; activation not yet committed'
+          GFX_LIFECYCLE_STATE=PATCHED_BOOT_UNVERIFIED
+        fi
+      elif [[ "$next" != "$BC250_GFX1013_PATCHED_ENTRY_ID" ]]; then
+        GFX_STATE_REASON='prepared state requires next_entry to select the staged patched BLS'
+        GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
+      else
+        GFX_STATE_REASON='exact-kernel profile is prepared; stock saved/default and patched one-shot boot are authoritative'
+        GFX_LIFECYCLE_STATE=PREPARED
+      fi
+      ;;
+    *)
+      GFX_STATE_REASON="lifecycle phase/enabled mismatch ($phase/$enabled)"
       GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
-    else
-      GFX_STATE_REASON="running kernel $current_kernel differs from prepared kernel $BC250_GFX1013_KERNEL; Ollama start is fail-closed until rollback/reprepare so private RADV cannot run on the stale kernel"
-      GFX_LIFECYCLE_STATE=STALE_KERNEL
-    fi
-    return 0
-  fi
-
-  enabled="${BC250_GFX1013_ENABLED:-0}"
-  if [[ "$enabled" == 1 ]]; then
-    if ! patched_boot_running; then
-      GFX_STATE_REASON='state says enabled but current boot is not the marked patched boot'
-      GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED; return 0
-    fi
-    if [[ ! -f "$DROPIN" || ! -f "$BC250_GFX1013_ICD" || ! -f "$BC250_GFX1013_PRIVATE_RADV_LIB" ]]; then
-      GFX_STATE_REASON='enabled state is missing the Ollama override or private RADV payload'
-      GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED; return 0
-    fi
-    if [[ "$saved" != "$BC250_GFX1013_PATCHED_ENTRY_ID" ]]; then
-      GFX_STATE_REASON='enabled state does not have the patched BLS entry as saved/default'
-      GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED; return 0
-    fi
-    GFX_STATE_REASON='verified lifecycle state records GFX1013 as enabled'
-    GFX_LIFECYCLE_STATE=ENABLED
-    return 0
-  fi
-
-  if [[ -f "$DROPIN" ]]; then
-    GFX_STATE_REASON='Ollama private-RADV override exists while lifecycle state is not enabled'
-    GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
-  elif patched_boot_running; then
-    GFX_STATE_REASON='running the one-shot patched boot; enable has not yet committed'
-    GFX_LIFECYCLE_STATE=PATCHED_BOOT_UNVERIFIED
-  elif [[ "$saved" == "$BC250_GFX1013_PATCHED_ENTRY_ID" ]]; then
-    GFX_STATE_REASON='patched boot is saved/default while lifecycle state is not enabled'
-    GFX_LIFECYCLE_STATE=ROLLBACK_REQUIRED
-  else
-    GFX_STATE_REASON='exact-kernel profile is prepared; stock boot remains authoritative'
-    GFX_LIFECYCLE_STATE=PREPARED
-  fi
+      ;;
+  esac
 }
 
 status_json() {
@@ -535,14 +574,14 @@ check_os_and_boot_tools() {
   [[ "${ID:-}" == fedora ]] || die "GFX1013 package profile supports Fedora only"
   command -v rpm-ostree >/dev/null 2>&1 && die "image/Atomic Fedora is not supported by this direct exact-kernel profile"
   local cmd missing=()
-  for cmd in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
-    sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
+  for cmd in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm readelf \
+    sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default flock awk sed grep find install; do
     command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
   done
   if ((${#missing[@]})); then
     printf 'ERROR: GFX1013 build/install tools missing: %s\n' "${missing[*]}" >&2
     printf 'Install the optional build dependencies and exact running-kernel headers, for example:\n' >&2
-    printf '  sudo dnf install kernel-devel-%s gcc gcc-c++ make rpm-build cargo rust cargo-rpm-macros binutils bzip2 elfutils-libelf-devel openssl-devel meson ninja-build bison flex python3-mako python3-pycparser python3-pyyaml python3-packaging glslang glslang-devel vulkan-headers vulkan-loader-devel systemd-devel libdisplay-info-devel libdrm-devel libxcb-devel libX11-devel libxshmfence-devel libXrandr-devel wayland-devel wayland-protocols-devel expat-devel zlib-devel libzstd-devel spirv-tools-devel\n' "$(kernel_release | sed 's/\.x86_64$//')" >&2
+    printf '  sudo dnf install kernel-devel-%s gcc gcc-c++ make rpm-build redhat-rpm-config kernel-srpm-macros git-core cargo rust cargo-rpm-macros binutils bzip2 elfutils-libelf-devel openssl-devel meson ninja-build bison flex python3-mako python3-pycparser python3-pyyaml python3-packaging glslang glslang-devel vulkan-headers vulkan-loader-devel systemd-devel libdrm-devel expat-devel pkgconf-pkg-config zlib-devel libzstd-devel spirv-tools-devel\n' "$(kernel_release | sed 's/\.x86_64$//')" >&2
     exit 2
   fi
   local missing_packages package
@@ -564,7 +603,9 @@ fetch_file() {
   local url=$1 dest=$2
   if [[ -s "$dest" ]]; then return 0; fi
   install -d -m 0750 "$(dirname "$dest")"
-  curl -fL --retry 3 --retry-delay 2 -o "$dest.part" "$url"
+  rm -f -- "$dest.part"
+  curl --fail --location --retry 3 --retry-all-errors --retry-delay 2 \
+    --proto '=https' --tlsv1.2 --output "$dest.part" "$url" || { rm -f -- "$dest.part"; return 1; }
   mv -f "$dest.part" "$dest"
 }
 
@@ -613,21 +654,85 @@ apply_patch_checked() {
 adapt_external_amd_trace_paths() {
   local amd_root=$1
   python3 - "$amd_root" <<'PY_TRACE'
+import re
 import sys
 from pathlib import Path
 
 root = Path(sys.argv[1]).resolve()
-path = root / "amdgpu" / "amdgpu_trace.h"
-old = "#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu"
-if not path.is_file():
-    raise SystemExit(f"required AMD trace header is missing: {path}")
-text = path.read_text(encoding="utf-8", errors="strict")
-count = text.count(old)
-if count != 1:
-    raise SystemExit(f"expected exactly one in-tree TRACE_INCLUDE_PATH in {path}, found {count}")
-new = f"#define TRACE_INCLUDE_PATH {path.parent.resolve()}"
-path.write_text(text.replace(old, new, 1), encoding="utf-8")
-print(f"adapted external TRACE_INCLUDE_PATH in {path}")
+if not root.is_dir():
+    raise SystemExit(f"AMD source root is missing: {root}")
+
+macro = re.compile(
+    r"^(?P<prefix>\s*#\s*define\s+TRACE_INCLUDE_PATH\s+)"
+    r"(?P<value>\S+)(?P<suffix>\s*)$"
+)
+in_tree = re.compile(
+    r"^(?:\.\./)+(?P<target>drivers/gpu/drm/amd(?:/[A-Za-z0-9_.+-]+)*)$"
+)
+adapted: list[str] = []
+unresolved: list[str] = []
+
+for path in sorted(root.rglob("*.h")):
+    text = path.read_text(encoding="utf-8", errors="strict")
+    lines = text.splitlines(keepends=True)
+    changed = False
+    for index, line in enumerate(lines):
+        newline = "\n" if line.endswith("\n") else ""
+        body = line[:-1] if newline else line
+        match = macro.match(body)
+        if not match:
+            if "TRACE_INCLUDE_PATH" in body and "drivers/gpu/drm/amd" in body and "../" in body:
+                unresolved.append(f"{path}:{index + 1}:unexpected TRACE_INCLUDE_PATH syntax: {body.strip()}")
+            continue
+        value = match.group("value")
+        relative = in_tree.match(value)
+        if not relative:
+            if value.startswith("../") and "drivers/gpu/drm/amd" in value:
+                unresolved.append(f"{path}:{index + 1}:{value}")
+            continue
+
+        relative_parent = path.parent.relative_to(root)
+        expected = "drivers/gpu/drm/amd"
+        if relative_parent.parts:
+            expected += "/" + relative_parent.as_posix()
+        if relative.group("target") != expected:
+            unresolved.append(
+                f"{path}:{index + 1}:{value} (expected target {expected})"
+            )
+            continue
+
+        replacement = str(path.parent.resolve())
+        lines[index] = (
+            match.group("prefix") + replacement + match.group("suffix") + newline
+        )
+        adapted.append(f"{path}:{index + 1}:{value}->{replacement}")
+        changed = True
+    if changed:
+        path.write_text("".join(lines), encoding="utf-8")
+
+# Fail closed if any relative in-tree AMD trace path remains after the explicit
+# transformations above. Absolute paths produced by this helper are allowed.
+for path in sorted(root.rglob("*.h")):
+    for index, line in enumerate(path.read_text(encoding="utf-8", errors="strict").splitlines(), 1):
+        match = macro.match(line)
+        if not match:
+            if "TRACE_INCLUDE_PATH" in line and "drivers/gpu/drm/amd" in line and "../" in line:
+                unresolved.append(f"{path}:{index}:unexpected TRACE_INCLUDE_PATH syntax: {line.strip()}")
+            continue
+        value = match.group("value")
+        if value.startswith("../") and "drivers/gpu/drm/amd" in value:
+            unresolved.append(f"{path}:{index}:{value}")
+
+if unresolved:
+    raise SystemExit(
+        "unresolved or unexpected in-tree AMD TRACE_INCLUDE_PATH values: "
+        + "; ".join(sorted(set(unresolved)))
+    )
+if adapted:
+    for item in adapted:
+        print(f"adapted external TRACE_INCLUDE_PATH: {item}")
+else:
+    print("no relative in-tree AMD TRACE_INCLUDE_PATH values required adaptation")
 PY_TRACE
 }
 
@@ -769,7 +874,9 @@ build_kernel_module() {
   source_package="$(rpm -qp --qf '%{SOURCEPACKAGE}\n' "$srpm" 2>/dev/null || true)"
   [[ "$actual_vr" == "$expected_vr" ]] || die "kernel source RPM identity mismatch: expected $expected_vr, got ${actual_vr:-unreadable}"
   [[ "$source_package" == 1 ]] || die "kernel package is not marked as a source RPM"
-  rpm -K "$srpm" >/dev/null 2>&1 || die "kernel source RPM failed RPM digest/signature verification"
+  local rpm_verify
+  rpm_verify="$(LC_ALL=C rpm -K "$srpm" 2>&1)" || die "kernel source RPM failed RPM digest/signature verification: $rpm_verify"
+  grep -Eqi 'NOKEY|NOT OK' <<<"$rpm_verify" && die "kernel source RPM signature is not trusted: $rpm_verify"
 
   source_root="$work/kernel"
   rm -rf "$source_root"
@@ -803,9 +910,16 @@ prepare_fedora_mesa_source() {
   local rpm_top="$work/mesa-rpmbuild" spec actual_nevr source_package source0
   rm -rf "$rpm_top"
   mkdir -p "$rpm_top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-  (cd "$rpm_top/SOURCES" && rpm2cpio "$srpm" | cpio -id --quiet)
-  spec="$(find "$rpm_top/SOURCES" -maxdepth 1 -type f -name 'mesa*.spec' -print -quit)"
-  [[ -n "$spec" ]] || die "Mesa source RPM contains no spec file"
+  (cd "$rpm_top/SOURCES" && rpm2cpio "$srpm" | cpio -id --quiet) || \
+    die "cannot extract exact Fedora Mesa source RPM"
+  local -a specs=()
+  if [[ -f "$rpm_top/SOURCES/mesa.spec" ]]; then
+    spec="$rpm_top/SOURCES/mesa.spec"
+  else
+    mapfile -t specs < <(find "$rpm_top/SOURCES" -maxdepth 1 -type f -name 'mesa*.spec' -print | sort)
+    ((${#specs[@]} == 1)) || die "Mesa source RPM must contain mesa.spec or exactly one mesa*.spec candidate"
+    spec="${specs[0]}"
+  fi
   mv "$spec" "$rpm_top/SPECS/mesa.spec"
   source0="$rpm_top/SOURCES/$MESA_SOURCE0"
   [[ -f "$source0" ]] || die "Mesa source RPM does not contain expected Source0: $MESA_SOURCE0"
@@ -837,7 +951,9 @@ build_mesa() {
   local prepared_file="$work/mesa-prepared-root" source0_file="$work/mesa-source0-path" mesa_src source0
   srpm="$CACHE_ROOT/mesa-${MESA_VERSION}-${MESA_FEDORA_RELEASE}.src.rpm"
   fetch_file "$MESA_SRPM_URL" "$srpm"
-  rpm -K "$srpm" >/dev/null 2>&1 || die "Mesa source RPM failed RPM digest/signature verification"
+  local rpm_verify
+  rpm_verify="$(LC_ALL=C rpm -K "$srpm" 2>&1)" || die "Mesa source RPM failed RPM digest/signature verification: $rpm_verify"
+  grep -Eqi 'NOKEY|NOT OK' <<<"$rpm_verify" && die "Mesa source RPM signature is not trusted: $rpm_verify"
   prepare_fedora_mesa_source "$work" "$srpm" "$prepared_file" "$source0_file"
   mesa_src="$(<"$prepared_file")"; source0="$(<"$source0_file")"
   [[ -d "$mesa_src" ]] || die "Fedora-prepared Mesa source root is missing"
@@ -847,15 +963,68 @@ build_mesa() {
     apply_patch_checked "$mesa_src" "$SOURCE/patches/mesa/$patch_name"
   done < "$SOURCE/patches/mesa/series"
   meson setup "$work/mesa-build" "$mesa_src" \
-    -Dvulkan-drivers=amd -Dgallium-drivers= -Dplatforms=x11,wayland \
-    -Dglx=disabled -Dllvm=disabled -Dvideo-codecs= \
+    --wrap-mode=nodownload \
+    -Dvulkan-drivers=amd -Dgallium-drivers=[] -Dplatforms=[] \
+    -Dglx=disabled -Degl=disabled -Dgbm=disabled \
+    -Dgles1=disabled -Dgles2=disabled -Dopengl=false \
+    -Dllvm=disabled -Dvideo-codecs=[] -Ddisplay-info=disabled \
+    -Dvulkan-layers=[] -Dtools=[] \
     -Dprefix="$(private_prefix)" -Dlibdir=lib64 -Dbuildtype=release \
-    >"$work/mesa-setup.log" 2>&1 || die "Mesa setup failed; see $work/mesa-setup.log"
-  ninja -C "$work/mesa-build" >"$work/mesa-build.log" 2>&1 || die "Mesa build failed; see $work/mesa-build.log"
-  DESTDIR="$stage" ninja -C "$work/mesa-build" install >>"$work/mesa-build.log" 2>&1 || die "Mesa staging install failed"
-  [[ -f "$stage$(private_prefix)/lib64/libvulkan_radeon.so" ]] || die "private RADV library missing from staged Mesa"
-  [[ -f "$stage$(private_icd)" ]] || die "private RADV ICD missing from staged Mesa"
+    >"$work/mesa-setup.log" 2>&1 || die "Mesa headless setup failed; see $work/mesa-setup.log"
+  ninja -C "$work/mesa-build" >"$work/mesa-build.log" 2>&1 || die "Mesa headless RADV build failed; see $work/mesa-build.log"
+
+  local install_stage="$work/mesa-install" installed_prefix
+  rm -rf "$install_stage"
+  install -d -m 0750 "$install_stage"
+  DESTDIR="$install_stage" ninja -C "$work/mesa-build" install >>"$work/mesa-build.log" 2>&1 || die "Mesa staging install failed"
+  installed_prefix="$install_stage$(private_prefix)"
+  [[ -f "$installed_prefix/lib64/libvulkan_radeon.so" ]] || die "private RADV library missing from staged Mesa"
+  [[ -f "$installed_prefix/share/vulkan/icd.d/radeon_icd.x86_64.json" ]] || die "private RADV ICD missing from staged Mesa"
+
+  # Keep the deployed private runtime intentionally tiny: RADV plus its ICD only.
+  # Internal Mesa build products are statically linked into RADV; any unexpected
+  # GUI/window-system linkage is rejected below before lifecycle commit.
+  rm -rf "$stage"
+  install -D -m 0755 "$installed_prefix/lib64/libvulkan_radeon.so" "$stage$(private_radv_lib)"
+  install -D -m 0644 "$installed_prefix/share/vulkan/icd.d/radeon_icd.x86_64.json" "$stage$(private_icd)"
+  # Make staging identical to the deployable runtime before CI/audit. The ICD
+  # must point at the final package-private RADV path, never at a system driver.
+  pin_private_icd_library "$stage$(private_icd)" "$(private_radv_lib)"
+  verify_headless_radv_stage "$stage" "$work/mesa-radv-needed.txt"
   printf '%s\n%s\n' "$srpm" "$source0" > "$info_file"
+}
+
+verify_headless_radv_stage() {
+  local stage=$1 evidence=$2 root library relative dynamic
+  local -a payload=() needed=() forbidden=()
+  root="$stage$(private_prefix)"
+  library="$stage$(private_radv_lib)"
+  [[ -d "$root" && -f "$library" && -f "$stage$(private_icd)" ]] || \
+    die "headless private RADV stage is incomplete"
+  private_icd_library_ok "$stage$(private_icd)" "$(private_radv_lib)" || \
+    die "headless private RADV ICD does not point at the final package-private library"
+
+  mapfile -t payload < <(find "$root" \( -type f -o -type l \) -printf '%P\n' | sort)
+  ((${#payload[@]} == 2)) || die "headless private RADV stage contains unexpected files: ${payload[*]:-<none>}"
+  [[ "${payload[0]}" == lib64/libvulkan_radeon.so ]] || die "headless private RADV payload is missing the canonical RADV library"
+  [[ "${payload[1]}" == share/vulkan/icd.d/radeon_icd.x86_64.json ]] || die "headless private RADV payload is missing the canonical ICD manifest"
+
+  dynamic="${evidence%.txt}-dynamic.txt"
+  readelf -d "$library" > "$dynamic" || die "cannot inspect private RADV ELF dependencies"
+  mapfile -t needed < <(sed -n 's/.*Shared library: \[\([^]]*\)\].*/\1/p' "$dynamic" | sort -u)
+  ((${#needed[@]})) || die "private RADV dependency audit found no ELF NEEDED entries"
+  printf '%s\n' "${needed[@]}" > "$evidence"
+  for relative in "${needed[@]}"; do
+    case "$relative" in
+      libX11.so*|libX11-xcb.so*|libXext.so*|libXfixes.so*|libXrandr.so*|libxcb.so*|libxcb-*.so*|libwayland-client.so*|libwayland-egl.so*|libxshmfence.so*|libdisplay-info.so*|libEGL.so*|libGL.so*|libGLES*.so*|libgbm.so*)
+        forbidden+=("$relative")
+        ;;
+    esac
+  done
+  ((${#forbidden[@]} == 0)) || die "headless private RADV unexpectedly links GUI/WSI libraries: ${forbidden[*]}"
+  if grep -Eq '\((RPATH|RUNPATH)\)' "$dynamic"; then
+    die "headless private RADV must not carry RPATH/RUNPATH"
+  fi
 }
 
 pin_private_icd_library() {
@@ -898,9 +1067,12 @@ verify_private_radv_device() {
   [[ -f "$icd" && -f "$library" ]] || die "private RADV payload is incomplete"
   private_icd_library_ok "$icd" "$library" || die "private ICD does not point at the package private RADV library"
   summary="$(mktemp)"
-  if ! VK_DRIVER_FILES="$icd" vulkaninfo --summary >"$summary" 2>&1; then
+  if ! (
+    unset DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE
+    VK_DRIVER_FILES="$icd" vulkaninfo --summary
+  ) >"$summary" 2>&1; then
     rm -f "$summary"
-    die "private RADV failed Vulkan loader smoke check"
+    die "private headless RADV failed Vulkan loader smoke check without X11/Wayland session variables"
   fi
   identity="$(python3 - "$summary" <<'PY_VK'
 import re
@@ -1026,8 +1198,8 @@ stage_patched_boot() {
 
   install -d -m 0755 "$(dirname "$private")"
   cp -a "$mesa_stage$private" "$private"
-  pin_private_icd_library "$(private_icd)" "$(private_radv_lib)"
-  private_icd_library_ok "$(private_icd)" "$(private_radv_lib)" || die "failed to pin private RADV ICD to the package private library"
+  private_icd_library_ok "$(private_icd)" "$(private_radv_lib)" || \
+    die "deployed private RADV ICD does not retain the package-private library identity"
 
   printf '%s\n' "$patched_bls" "$patched_id" "$patched_initramfs" "$stock_initramfs" "$saved_before" "$next_before" "$stock_hash" "$initramfs_hash" > "$info_file"
 }
@@ -1081,7 +1253,7 @@ preserve_prepare_failure() {
     printf 'mesa_source0_sha256=%s\n' "$MESA_SOURCE0_SHA256"
   } > "$dest/failure.env"
   chmod 0600 "$dest/failure.env"
-  for log in kernel-srpm-members.txt kernel-prep.log kernel-source-provenance.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
+  for log in kernel-srpm-members.txt kernel-prep.log kernel-source-provenance.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log mesa-radv-needed.txt mesa-radv-needed-dynamic.txt; do
     if [[ -f "$PREPARE_DIR/work/$log" && ! -L "$PREPARE_DIR/work/$log" ]]; then
       install -m 0600 "$PREPARE_DIR/work/$log" "$dest/$log"
     fi
@@ -1161,8 +1333,8 @@ prepare_preflight() {
     echo "  Atomic/rpm-ostree host: PASS (not detected)"
   fi
 
-  for command in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm \
-    sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default awk sed grep find install; do
+  for command in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm rpm2cpio rpmbuild meson ninja python3 nm readelf \
+    sha256sum modinfo modprobe depmod dracut lsinitrd grub2-editenv grub2-set-default flock awk sed grep find install; do
     command -v "$command" >/dev/null 2>&1 || missing_commands+=("$command")
   done
   if ((${#missing_commands[@]})); then
@@ -1289,6 +1461,8 @@ prepare() {
     prepare_preflight
     return $?
   fi
+  acquire_lifecycle_lock
+  patched_boot_running && die "cannot prepare while a patched GFX1013 boot marker is running; restore/reboot to stock first"
   check_os_and_boot_tools
   source_identity_ok || die "package-pinned GFX1013 patch/full-source identity failed: $SOURCE"
   bc250_device_present || die "AMD BC-250 PCI device 1002:13fe not found"
@@ -1322,7 +1496,7 @@ prepare() {
   current_saved="$(grub_value saved_entry)"
   [[ "$current_saved" == "$stock_entry_id" ]] || \
     die "saved/default boot is not the exact stock entry $stock_entry_id (found ${current_saved:-<unset>}); restore/select stock before prepare"
-  stock_entry_file_safe "$stock_bls" || die "identified stock BLS entry is missing or already carries the patched marker"
+  stock_entry_file_safe "$stock_bls" "$kernel" || die "identified stock BLS entry does not match the expected stock kernel/initramfs identity"
 
   local machine_id preflight_patched_bls preflight_patched_initramfs
   machine_id="$(< /etc/machine-id)"
@@ -1395,7 +1569,7 @@ prepare() {
   install -d -m 0700 "$prepared" "$prepared/build-evidence"
   install -m 0644 "$artifact_work" "$artifact"
   local log
-  for log in kernel-srpm-members.txt kernel-prep.log kernel-source-provenance.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log; do
+  for log in kernel-srpm-members.txt kernel-prep.log kernel-source-provenance.txt kernel-build.log mesa-prep.log mesa-setup.log mesa-build.log mesa-radv-needed.txt mesa-radv-needed-dynamic.txt; do
     [[ -f "$work/$log" ]] && install -m 0600 "$work/$log" "$prepared/build-evidence/$log"
   done
 
@@ -1507,7 +1681,16 @@ verify_active_identity() {
 
 ollama_guard() {
   local current_package loaded_srcversion
+  gfx_lifecycle_state
+  [[ "$GFX_LIFECYCLE_STATE" == ENABLED ]] || {
+    echo "GFX1013 Ollama guard: lifecycle is not coherently enabled ($GFX_LIFECYCLE_STATE: $GFX_STATE_REASON)" >&2
+    return 1
+  }
   load_active_state || { echo "GFX1013 Ollama guard: lifecycle state is missing/invalid" >&2; return 1; }
+  [[ "${BC250_GFX1013_TRANSACTION_PHASE:-}" == ENABLED && "${BC250_GFX1013_RECOVERY_REQUIRED:-1}" == 0 && "${BC250_GFX1013_ENABLED:-0}" == 1 ]] || {
+    echo "GFX1013 Ollama guard: enabled state flags are incoherent" >&2
+    return 1
+  }
   current_package="$(package_nevra)"
   [[ -n "$current_package" && "$current_package" == "${BC250_GFX1013_PACKAGE_NEVRA:-}" ]] || {
     echo "GFX1013 Ollama guard: package identity changed since prepare" >&2
@@ -1564,35 +1747,71 @@ EOF_DROPIN
 ENABLE_COMMITTED=1
 ENABLE_WAS_ACTIVE=0
 ENABLE_PREVIOUS_SAVED=''
+ENABLE_PREVIOUS_NEXT=''
+
+ollama_enable_smoke() {
+  local attempt
+  for attempt in {1..20}; do
+    curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && return 0
+    sleep 1
+  done
+  return 1
+}
+
+restore_prepared_state_after_enable_failure() {
+  local tmp="$ACTIVE_STATE.rollback.tmp"
+  [[ -r "$ACTIVE_STATE" ]] || return 1
+  awk '!/^BC250_GFX1013_ENABLED=/ && !/^BC250_GFX1013_VULKAN_/ && !/^BC250_GFX1013_TRANSACTION_PHASE=/ && !/^BC250_GFX1013_RECOVERY_REQUIRED=/ && !/^BC250_GFX1013_RECOVERY_REASON=/' "$ACTIVE_STATE" > "$tmp" || return 1
+  cat >> "$tmp" <<'EOF_PREPARED_STATE'
+BC250_GFX1013_TRANSACTION_PHASE=PREPARED
+BC250_GFX1013_RECOVERY_REQUIRED=0
+BC250_GFX1013_ENABLED=0
+EOF_PREPARED_STATE
+  chmod 0600 "$tmp" || return 1
+  mv -f "$tmp" "$ACTIVE_STATE" || return 1
+  cp -p "$ACTIVE_STATE" "$(prepared_stamp_for "$BC250_GFX1013_KERNEL")" || return 1
+}
+
 enable_cleanup_on_exit() {
   local rc=$1 rollback_ok=1
   trap - EXIT INT TERM
   if [[ "$ENABLE_COMMITTED" != 1 ]]; then
-    rm -f -- "$DROPIN" "$DROPIN.tmp"
+    set +e
+    rm -f -- "$DROPIN" "$DROPIN.tmp" || rollback_ok=0
     systemctl daemon-reload >/dev/null 2>&1 || rollback_ok=0
     if [[ -n "$ENABLE_PREVIOUS_SAVED" ]]; then
       grub2-set-default "$ENABLE_PREVIOUS_SAVED" >/dev/null 2>&1 || rollback_ok=0
       [[ "$(grub_value saved_entry)" == "$ENABLE_PREVIOUS_SAVED" ]] || rollback_ok=0
     fi
-    ((ENABLE_WAS_ACTIVE)) && systemctl restart ollama.service >/dev/null 2>&1 || true
+    restore_previous_next "$ENABLE_PREVIOUS_NEXT" >/dev/null 2>&1 || rollback_ok=0
+    restore_prepared_state_after_enable_failure >/dev/null 2>&1 || rollback_ok=0
+    if ((ENABLE_WAS_ACTIVE)); then
+      systemctl restart ollama.service >/dev/null 2>&1 || true
+    fi
     if ((rollback_ok)); then
-      set_active_transaction_state PREPARED 0 || true
+      :
     else
-      set_active_transaction_state SAFETY_FAILURE 1 'failed to restore saved/default boot during enable rollback' || true
-      echo "ERROR: GFX1013 enable rollback could not restore boot-manager state; recovery state was preserved" >&2
+      set_active_transaction_state SAFETY_FAILURE 1 'failed to restore boot/lifecycle state during enable rollback' >/dev/null 2>&1 || true
+      echo "ERROR: GFX1013 enable rollback could not fully restore boot/lifecycle state; recovery state was preserved" >&2
       rc=5
     fi
+    set -e
   fi
   exit "$rc"
 }
 
 enable() {
   need_root
+  acquire_lifecycle_lock
+  gfx_lifecycle_state
+  [[ "$GFX_LIFECYCLE_STATE" == PATCHED_BOOT_UNVERIFIED ]] || \
+    die "enable requires PATCHED_BOOT_UNVERIFIED, found $GFX_LIFECYCLE_STATE: $GFX_STATE_REASON"
   load_active_state || die "no valid active GFX1013 preparation"
+  [[ "${BC250_GFX1013_TRANSACTION_PHASE:-}" == PREPARED && "${BC250_GFX1013_RECOVERY_REQUIRED:-1}" == 0 && "${BC250_GFX1013_ENABLED:-0}" == 0 ]] || \
+    die "prepared lifecycle flags are incoherent; recovery is required"
   [[ "$(kernel_release)" == "$BC250_GFX1013_KERNEL" ]] || die "prepared state belongs to kernel $BC250_GFX1013_KERNEL, not $(kernel_release)"
   verify_active_identity
   bc250_device_present || die "AMD BC-250 PCI device 1002:13fe not found"
-  patched_boot_running || die "current boot is not the staged GFX1013 boot; refusing Mesa-only activation"
   [[ "$(modinfo -F vermagic "$BC250_GFX1013_MODULE" 2>/dev/null || true)" == "$BC250_GFX1013_KERNEL "* ]] || die "prepared module vermagic changed/mismatched"
   local vk_identity vk_vendor vk_device vk_driver vk_summary_sha state_tmp
   vk_identity="$(verify_private_radv_device "$BC250_GFX1013_ICD" "$BC250_GFX1013_PRIVATE_RADV_LIB")"
@@ -1602,21 +1821,22 @@ enable() {
 
   ENABLE_WAS_ACTIVE=0
   systemctl is-active --quiet ollama.service && ENABLE_WAS_ACTIVE=1 || true
-  [[ ! -e "$UPSTREAM_GENERATOR" ]] || die "separate upstream environment generator appeared after prepare; refusing activation"
+  [[ ! -e "$UPSTREAM_GENERATOR" && ! -e "$UPSTREAM_STATE/active.env" ]] || die "separate upstream GFX1013 installation appeared after prepare; refusing activation"
   ENABLE_PREVIOUS_SAVED="$(grub_value saved_entry)"
+  ENABLE_PREVIOUS_NEXT="$(grub_value next_entry)"
   [[ "$ENABLE_PREVIOUS_SAVED" == "$BC250_GFX1013_STOCK_ENTRY_ID" ]] || \
     die "stock saved/default boot changed after prepare; refusing promotion"
+  [[ -z "$ENABLE_PREVIOUS_NEXT" ]] || die "patched one-shot next_entry was not consumed; refusing activation"
+
   set_active_transaction_state ENABLING 0 || die "cannot persist GFX1013 ENABLING transaction state"
   ENABLE_COMMITTED=0
   trap 'enable_cleanup_on_exit $?' EXIT
   trap 'exit 130' INT TERM
+
   write_ollama_dropin
-  if ((ENABLE_WAS_ACTIVE)); then
-    systemctl restart ollama.service || die "Ollama restart failed with private RADV; patched boot was not promoted"
-    systemctl is-active --quiet ollama.service || die "Ollama is not active after private RADV activation; patched boot was not promoted"
-  fi
   grub2-set-default "$BC250_GFX1013_PATCHED_ENTRY_ID" || die "failed to promote the verified patched boot"
   [[ "$(grub_value saved_entry)" == "$BC250_GFX1013_PATCHED_ENTRY_ID" ]] || die "patched saved/default boot verification failed"
+
   state_tmp="$ACTIVE_STATE.tmp"
   awk '!/^BC250_GFX1013_ENABLED=/ && !/^BC250_GFX1013_VULKAN_/ && !/^BC250_GFX1013_TRANSACTION_PHASE=/ && !/^BC250_GFX1013_RECOVERY_REQUIRED=/ && !/^BC250_GFX1013_RECOVERY_REASON=/' "$ACTIVE_STATE" > "$state_tmp"
   cat >> "$state_tmp" <<EOF_VK_STATE
@@ -1631,6 +1851,13 @@ EOF_VK_STATE
   chmod 0600 "$state_tmp"
   mv -f "$state_tmp" "$ACTIVE_STATE"
   cp -p "$ACTIVE_STATE" "$(prepared_stamp_for "$BC250_GFX1013_KERNEL")"
+
+  if ((ENABLE_WAS_ACTIVE)); then
+    systemctl restart ollama.service || die "Ollama restart failed with committed private RADV state"
+    systemctl is-active --quiet ollama.service || die "Ollama is not active after private RADV activation"
+    ollama_enable_smoke || die "Ollama API smoke check failed after private RADV activation"
+  fi
+
   ENABLE_COMMITTED=1
   trap - EXIT INT TERM
   echo "GFX1013 enabled: verified patched boot is saved default; private RADV is scoped to ollama.service only."
@@ -1639,6 +1866,7 @@ EOF_VK_STATE
 risky_artifacts_without_state() {
   [[ -e "$ACTIVE_STATE" || -e "$DROPIN" || -d "$(private_prefix)" ]] && return 0
   find "$STATE_ROOT/prepared" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null | grep -q . && return 0
+  find "$STATE_ROOT" -mindepth 1 -maxdepth 1 -type d -name '.prepare-*' -print -quit 2>/dev/null | grep -q . && return 0
   find /boot/loader/entries -maxdepth 1 -type f -name "*-${PROFILE_VARIANT}.conf" -print -quit 2>/dev/null | grep -q . && return 0
   find /boot -maxdepth 1 -type f -name "initramfs-*-${PROFILE_VARIANT}.img" -print -quit 2>/dev/null | grep -q . && return 0
   return 1
@@ -1652,7 +1880,7 @@ resolve_safe_stock_target() {
     printf '%s|%s\n' "$current_bls" "$(basename "$current_bls" .conf)"
     return 0
   fi
-  if load_active_state && stock_entry_file_safe "$BC250_GFX1013_STOCK_BLS"; then
+  if load_active_state && stock_entry_file_safe "$BC250_GFX1013_STOCK_BLS" "$BC250_GFX1013_KERNEL"; then
     printf '%s|%s\n' "$BC250_GFX1013_STOCK_BLS" "$BC250_GFX1013_STOCK_ENTRY_ID"
     return 0
   fi
@@ -1710,7 +1938,9 @@ remove_loaded_state_artifacts() {
 
 remove_orphaned_package_artifacts() {
   local path
-  rm -f -- "$DROPIN" "$UPSTREAM_GENERATOR"
+  [[ ! -e "$UPSTREAM_GENERATOR" && ! -e "$UPSTREAM_STATE/active.env" ]] || \
+    die "separate upstream GFX1013 installation is present; refusing package orphan cleanup"
+  rm -f -- "$DROPIN"
   rm -rf -- "$(private_prefix)"
   while IFS= read -r path; do rm -f -- "$path"; done < <(
     find /boot/loader/entries -maxdepth 1 -type f -name "*-${PROFILE_VARIANT}.conf" -print 2>/dev/null
@@ -1719,6 +1949,9 @@ remove_orphaned_package_artifacts() {
     find /boot -maxdepth 1 -type f -name "initramfs-*-${PROFILE_VARIANT}.img" -print 2>/dev/null
   )
   rm -rf -- "$STATE_ROOT/prepared"
+  while IFS= read -r path; do rm -rf -- "$path"; done < <(
+    find "$STATE_ROOT" -mindepth 1 -maxdepth 1 -type d -name '.prepare-*' -print 2>/dev/null
+  )
   rm -f -- "$ACTIVE_STATE"
 }
 
@@ -1730,6 +1963,7 @@ disable() {
     --check) rollback_check disable; return 0 ;;
     *) die "unsupported disable option: $option" ;;
   esac
+  acquire_lifecycle_lock
   if ! load_active_state; then
     if risky_artifacts_without_state; then
       die "GFX1013 artifacts exist but authoritative lifecycle state is missing/invalid; use 'bc250 gfx1013 reset' after proving the stock boot path"
@@ -1769,6 +2003,7 @@ reset() {
     --check) rollback_check reset; return 0 ;;
     *) die "unsupported reset option: $option" ;;
   esac
+  acquire_lifecycle_lock
   if load_active_state; then
     disable
     return 0
@@ -1778,8 +2013,12 @@ reset() {
     return 0
   fi
 
-  # Recovery is deliberately independent of stale lifecycle metadata. It first
-  # proves and commits a stock BLS path for the current/recorded kernel, then cleans
+  # Recovery is deliberately independent of stale lifecycle metadata, but never
+  # claims ownership of a separate upstream installation. Refuse before any boot
+  # mutation when such state is present.
+  [[ ! -e "$UPSTREAM_GENERATOR" && ! -e "$UPSTREAM_STATE/active.env" ]] || \
+    die "separate upstream GFX1013 installation is present; refusing package recovery cleanup"
+  # Prove and commit a stock BLS path for the current/recorded kernel, then clean
   # only package-owned GFX1013 paths.
   restore_stock_boot
   systemctl is-active --quiet ollama.service && was_active=1 || true
