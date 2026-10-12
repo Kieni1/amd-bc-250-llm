@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.13.1-1.12 - 2026-10-12
+
+- Harden the greenfield GFX1013 lifecycle into five authoritative states (`DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`, `ROLLBACK_REQUIRED`), with any stale kernel, invalid metadata, interrupted phase, boot-authority mismatch or patched boot without state collapsing to fail-closed `ROLLBACK_REQUIRED`.
+- Serialize every mutating GFX1013 lifecycle command with one nonblocking package lock, including RPM upgrade rollback; make `enable` require the exact `PATCHED_BOOT_UNVERIFIED` classifier state and make the Ollama `ExecCondition` accept only coherent `ENABLED` state.
+- Reorder enable so private-RADV state is durably committed before Ollama restart/smoke, while rollback restores saved/default and `next_entry`, rewrites state to PREPARED, and continues boot restoration even when cleanup operations fail.
+- Strengthen stock BLS authority to verify kernel, vmlinuz and initramfs identity; detect/clean stale `.prepare-*` trees; refuse orphan cleanup when a separate upstream installation is present; never delete its environment generator; reject SRPM `NOKEY`/`NOT OK`; and correct the 1.12 qualification documentation.
+- Advance the experimental GFX1013 package profile to `v0.2.4-alpha` and make its private Mesa/RADV build explicitly headless for the Fedora LLM appliance: AMD Vulkan only, no X11/Wayland WSI, EGL, GBM, OpenGL/GLES, Mesa Vulkan layers/tools, LLVM or video-codec frontends, with Meson subproject downloads disabled.
+- Remove GUI-only private-Mesa build prerequisites (`libX11-devel`, `libxcb-devel`, `libxshmfence-devel`, `libXrandr-devel`, `wayland-devel`, `wayland-protocols-devel`, `libdisplay-info-devel`) while retaining the stock Fedora `mesa-vulkan-drivers` runtime path for default-off operation.
+- Stage only `libvulkan_radeon.so` plus `radeon_icd.x86_64.json`, reject private RADV with direct X11/Wayland/related WSI linkage or RPATH/RUNPATH, and verify the BC-250 Vulkan device with graphical session variables unset before enable.
+- Add a Fedora release-gate build of the exact production headless RADV builder and install its explicit headless build dependencies in GitHub/local container CI so Meson option or dependency drift is caught before RPM publication.
+- Add a Fedora release-gate build of the production exact-kernel path: discover one installed Fedora `kernel-devel` tree, fetch/run `%prep` for its exact matching kernel SRPM, fingerprint the Fedora-prepared patch targets, adapt allowed AMD trace include paths, apply V33 with zero fuzz, build/compress `amdgpu`, then require exact vermagic and ABI verification.
+- Make Mesa SRPM spec selection fail closed (`mesa.spec` preferred, otherwise exactly one `mesa*.spec`), broaden AMD trace adaptation to all explicitly matching in-tree AMD trace headers while rejecting unresolved relative paths, and make the staged RADV ICD point at the final private library before CI payload audit.
+- Keep `git-core` and `vulkan-tools` explicit/verified prerequisites: both were already RPM runtime dependencies; GFX build preflight now also names `git-core` plus Fedora RPM macro packages used by `%prep`.
+- Correct the GFX1013 upstream notice to describe Fedora kernel `%prep` as source authority rather than the superseded target-equivalence heuristic.
+
+## 0.13.1-1.11 - 2026-10-11
+
+- Run the authoritative Fedora release gate as an unprivileged builder after root-only dependency installation, preventing `%check` and source validation from silently relying on root-only filesystem access.
+- Disable the unrelated `fedora-cisco-openh264` repository only for CI build-tool installation so transient Cisco codec delivery failures cannot abort a build that does not use OpenH264.
+- Generate and verify closed `SHA256SUMS.binary` and `SHA256SUMS.source` manifests so each split GitHub Actions artifact is independently verifiable.
+- Correct the Fedora Mesa 26.2.4 GFX1013 patch gate to use minimal zero-fuzz context exactly matching the semantically validated helper-local compute-queue guard, and verify the patch blob against the closed patch manifest before applicability testing.
+- Carry forward the still-unbuilt 1.10 GFX1013 Fedora-prepared kernel provenance, isolated dracut staging and behavioral rollback fault-injection fixes unchanged.
+
 ## 0.13.1-1.10 - 2026-10-11
 
 - Fix the observed Fedora Mesa SRPM gate failure by validating source-package identity with `SOURCEPACKAGE=1` rather than `%{ARCH}=src`; apply the same rule in device-side Mesa preparation so the build does not fail again later.
