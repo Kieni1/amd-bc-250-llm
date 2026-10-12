@@ -17,7 +17,7 @@ SPEC = ROOT / "packaging/bc250-llm-server.spec"
 class Gfx1013Tests(unittest.TestCase):
     def test_package_profile_identity_and_selected_patch_set(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("PACKAGE_PROFILE=v0.2.2-alpha", source)
+        self.assertIn("PACKAGE_PROFILE=v0.2.4-alpha", source)
         self.assertIn("UPSTREAM_VERSION=0.2.0-alpha", source)
         self.assertIn("PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9", source)
         self.assertIn("TESTED_KERNEL=7.2.9-200.fc44.x86_64", source)
@@ -80,7 +80,7 @@ class Gfx1013Tests(unittest.TestCase):
                 check=False,
             )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("v0.2.2-alpha / experimental / default OFF", result.stdout)
+        self.assertIn("v0.2.4-alpha / experimental / default OFF", result.stdout)
         self.assertIn("Package patch/full-source manifests: PASS", result.stdout)
         self.assertIn("Ollama private-RADV override: disabled", result.stdout)
 
@@ -110,7 +110,7 @@ class Gfx1013Tests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["schema"], "bc250.gfx1013-status.v1")
         self.assertEqual(payload["state"], "DISABLED")
-        self.assertEqual(payload["profile"], "v0.2.2-alpha")
+        self.assertEqual(payload["profile"], "v0.2.4-alpha")
         self.assertTrue(payload["default_off"])
 
     def test_16_hardens_secure_boot_stale_kernel_and_private_radv_guard(self) -> None:
@@ -120,9 +120,7 @@ class Gfx1013Tests(unittest.TestCase):
             "PREPARED",
             "PATCHED_BOOT_UNVERIFIED",
             "ENABLED",
-            "STALE_KERNEL",
             "ROLLBACK_REQUIRED",
-            "BROKEN",
         ):
             self.assertIn(state, source)
         for token in (
@@ -166,18 +164,117 @@ class Gfx1013Tests(unittest.TestCase):
         self.assertIn("disabled|disabled-non-efi|disabled-unsupported", source)
         self.assertIn('Secure Boot: PASS ($secure)', source)
 
-    def test_optional_build_dependencies_cover_current_mesa_python_and_glslang_needs(self) -> None:
+    def test_optional_build_dependencies_cover_headless_radv_needs_without_gui_devel(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("python3-packaging", source)
-        self.assertIn("python3-pycparser", source)
-        self.assertIn("vulkan-headers", source)
-        self.assertIn("vulkan-loader-devel", source)
-        self.assertIn("systemd-devel", source)
-        self.assertIn("libdisplay-info-devel", source)
-        self.assertIn("glslang-devel", source)
-        self.assertIn("cargo-rpm-macros", source)
-        self.assertIn("for cmd in curl xz zstd gzip bzip2 tar cpio patch gcc g++ make cargo rpm", source)
+        packages = source[source.index("GFX_BUILD_PACKAGES=("): source.index("build_requirement_provider() {")]
+        for requirement in (
+            "python3-packaging",
+            "python3-pycparser",
+            "vulkan-headers",
+            "vulkan-loader-devel",
+            "systemd-devel",
+            "libdrm-devel",
+            "pkgconf-pkg-config",
+            "glslang-devel",
+            "cargo-rpm-macros",
+            "git-core",
+            "redhat-rpm-config",
+            "kernel-srpm-macros",
+        ):
+            self.assertIn(requirement, packages)
+        for gui_requirement in (
+            "libdisplay-info-devel",
+            "libxcb-devel",
+            "libX11-devel",
+            "libxshmfence-devel",
+            "libXrandr-devel",
+            "wayland-devel",
+            "wayland-protocols-devel",
+        ):
+            self.assertNotIn(gui_requirement, packages)
+        self.assertIn("readelf", source)
         self.assertIn("missing_build_packages", source)
+
+    def test_private_mesa_build_is_headless_minimal_and_offline(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        build = source[source.index("build_mesa() {"): source.index("pin_private_icd_library() {")]
+        for option in (
+            "--wrap-mode=nodownload",
+            "-Dvulkan-drivers=amd",
+            "-Dgallium-drivers=[]",
+            "-Dplatforms=[]",
+            "-Dglx=disabled",
+            "-Degl=disabled",
+            "-Dgbm=disabled",
+            "-Dgles1=disabled",
+            "-Dgles2=disabled",
+            "-Dopengl=false",
+            "-Dllvm=disabled",
+            "-Dvideo-codecs=[]",
+            "-Ddisplay-info=disabled",
+            "-Dvulkan-layers=[]",
+            "-Dtools=[]",
+        ):
+            self.assertIn(option, build)
+        self.assertNotIn("-Dplatforms=x11,wayland", build)
+        self.assertIn("verify_headless_radv_stage", build)
+        self.assertIn("lib64/libvulkan_radeon.so", build)
+        self.assertIn("share/vulkan/icd.d/radeon_icd.x86_64.json", build)
+
+    def test_headless_radv_stage_audit_accepts_system_only_deps_and_rejects_gui_deps(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prefix_root = root / "prefix"
+            stage = root / "stage"
+            private = stage / prefix_root.relative_to("/") / "0.2.0-alpha"
+            (private / "lib64").mkdir(parents=True)
+            (private / "share/vulkan/icd.d").mkdir(parents=True)
+            (private / "lib64/libvulkan_radeon.so").write_bytes(b"fake")
+            (private / "share/vulkan/icd.d/radeon_icd.x86_64.json").write_text(
+                json.dumps({"ICD": {"library_path": str(prefix_root / "0.2.0-alpha/lib64/libvulkan_radeon.so")}}) + "\n",
+                encoding="utf-8",
+            )
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            readelf = fake_bin / "readelf"
+            readelf.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' ' 0x0000000000000001 (NEEDED)             Shared library: [libdrm_amdgpu.so.1]' "
+                "' 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]'\n",
+                encoding="utf-8",
+            )
+            readelf.chmod(0o755)
+            env = os.environ | {
+                "PATH": f"{fake_bin}:{os.environ.get('PATH', '')}",
+                "BC250_GFX1013_LIBRARY_ONLY": "1",
+                "BC250_GFX1013_PREFIX_ROOT": str(prefix_root),
+            }
+            command = (
+                f'source {SCRIPT!s}; '
+                'verify_headless_radv_stage "$1" "$2"'
+            )
+            result = subprocess.run(
+                ["bash", "-c", command, "bash", str(stage), str(root / "needed.txt")],
+                env=env, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            readelf.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' ' 0x0000000000000001 (NEEDED)             Shared library: [libxcb.so.1]'\n",
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["bash", "-c", command, "bash", str(stage), str(root / "needed.txt")],
+                env=env, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("GUI/WSI", result.stderr)
+
+    def test_private_radv_device_smoke_unsets_graphical_session_variables(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        verifier = source[source.index("verify_private_radv_device() {"): source.index("PREPARE_DIR='", source.index("verify_private_radv_device() {"))]
+        self.assertIn("unset DISPLAY WAYLAND_DISPLAY XDG_SESSION_TYPE", verifier)
+        self.assertIn("private headless RADV failed Vulkan loader smoke check", verifier)
 
     def test_check_and_recovery_interfaces_are_non_destructive_before_commit(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -217,7 +314,7 @@ class Gfx1013Tests(unittest.TestCase):
             "prepare_cleanup_on_exit",
             '[[ "$current_saved" == "$stock_entry_id" ]]',
             'grub2-editenv - set "next_entry=$patched_id"',
-            'patched_boot_running || die',
+            'enable requires PATCHED_BOOT_UNVERIFIED',
             "VK_DRIVER_FILES=$BC250_GFX1013_ICD",
             'grub2-set-default "$BC250_GFX1013_PATCHED_ENTRY_ID"',
             "enable_cleanup_on_exit",
@@ -225,6 +322,98 @@ class Gfx1013Tests(unittest.TestCase):
             self.assertIn(token, source)
         self.assertNotIn("/etc/environment", source)
         self.assertNotIn("install -m 0755", source[source.find("UPSTREAM_GENERATOR"):])
+
+    def _run_classifier_case(self, *, active: bool, phase: str = "PREPARED", enabled: str = "0", recovery: str = "0", saved: str = "stock", next_entry: str = "patched", patched: bool = False) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state = root / "state"
+            state.mkdir()
+            if active:
+                (state / "active.env").write_text("placeholder\n", encoding="utf-8")
+            env = os.environ.copy()
+            env.update(
+                {
+                    "BC250_GFX1013_LIBRARY_ONLY": "1",
+                    "BC250_GFX1013_STATE_ROOT": str(state),
+                    "BC250_GFX1013_PREFIX_ROOT": str(root / "prefix"),
+                    "BC250_GFX1013_DROPIN": str(root / "dropin"),
+                    "CASE_PHASE": phase,
+                    "CASE_ENABLED": enabled,
+                    "CASE_RECOVERY": recovery,
+                    "CASE_SAVED": saved,
+                    "CASE_NEXT": next_entry,
+                    "CASE_PATCHED": "1" if patched else "0",
+                }
+            )
+            script = rf'''
+source "{SCRIPT}"
+kernel_release() {{ printf '7.2.9-200.fc44.x86_64\n'; }}
+package_nevra() {{ printf 'bc250-llm-server-0.13.1-1.12.x86_64\n'; }}
+grub_value() {{ [[ $1 == saved_entry ]] && printf '%s\n' "$CASE_SAVED" || printf '%s\n' "$CASE_NEXT"; }}
+patched_boot_running() {{ [[ "$CASE_PATCHED" == 1 ]]; }}
+risky_artifacts_without_state() {{ return 1; }}
+stock_entry_file_safe() {{ return 0; }}
+load_active_state() {{
+  [[ -e "$ACTIVE_STATE" ]] || return 1
+  BC250_GFX1013_PACKAGE_NEVRA=bc250-llm-server-0.13.1-1.12.x86_64
+  BC250_GFX1013_KERNEL=7.2.9-200.fc44.x86_64
+  BC250_GFX1013_STOCK_BLS=/boot/loader/entries/stock.conf
+  BC250_GFX1013_STOCK_ENTRY_ID=stock
+  BC250_GFX1013_PATCHED_ENTRY_ID=patched
+  BC250_GFX1013_ICD=/tmp/icd
+  BC250_GFX1013_PRIVATE_RADV_LIB=/tmp/radv
+  BC250_GFX1013_TRANSACTION_PHASE="$CASE_PHASE"
+  BC250_GFX1013_RECOVERY_REQUIRED="$CASE_RECOVERY"
+  BC250_GFX1013_ENABLED="$CASE_ENABLED"
+}}
+gfx_lifecycle_state
+printf '%s|%s\n' "$GFX_LIFECYCLE_STATE" "$GFX_STATE_REASON"
+'''
+            return subprocess.run(["bash", "-c", script], env=env, text=True, capture_output=True, check=False)
+
+    def test_greenfield_lifecycle_classifier_fails_closed_on_authority_mismatch(self) -> None:
+        cases = (
+            ({"active": False, "patched": True}, "ROLLBACK_REQUIRED"),
+            ({"active": True, "saved": "other", "next_entry": "unrelated"}, "ROLLBACK_REQUIRED"),
+            ({"active": True, "phase": "SAFETY_FAILURE", "recovery": "1", "patched": True, "next_entry": ""}, "ROLLBACK_REQUIRED"),
+            ({"active": True, "saved": "stock", "next_entry": "patched", "patched": False}, "PREPARED"),
+            ({"active": True, "saved": "stock", "next_entry": "", "patched": True}, "PATCHED_BOOT_UNVERIFIED"),
+        )
+        for kwargs, expected in cases:
+            with self.subTest(kwargs=kwargs):
+                result = self._run_classifier_case(**kwargs)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(result.stdout.startswith(expected + "|"), result.stdout)
+
+    def test_enable_guard_lock_and_recovery_are_fail_closed(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        enable = source[source.index("enable() {"): source.index("risky_artifacts_without_state() {")]
+        guard = source[source.index("ollama_guard() {"): source.index("write_ollama_dropin() {")]
+        cleanup = source[source.index("enable_cleanup_on_exit() {"): source.index("enable() {")]
+        reset = source[source.index("reset() {"): source.index('if [[ ${BC250_GFX1013_LIBRARY_ONLY:-0}')]
+        orphan = source[source.index("remove_orphaned_package_artifacts() {"): source.index("disable() {")]
+        self.assertIn("acquire_lifecycle_lock", enable)
+        self.assertIn("enable requires PATCHED_BOOT_UNVERIFIED", enable)
+        self.assertIn("BC250_GFX1013_TRANSACTION_PHASE:-", enable)
+        self.assertIn("gfx_lifecycle_state", guard)
+        self.assertIn('[[ "$GFX_LIFECYCLE_STATE" == ENABLED ]]', guard)
+        self.assertLess(enable.index('mv -f "$state_tmp" "$ACTIVE_STATE"'), enable.index("systemctl restart ollama.service"))
+        self.assertIn("ollama_enable_smoke", enable)
+        self.assertIn("set +e", cleanup)
+        self.assertIn('restore_previous_next "$ENABLE_PREVIOUS_NEXT"', cleanup)
+        self.assertIn("restore_prepared_state_after_enable_failure", cleanup)
+        self.assertNotIn('rm -f -- "$DROPIN" "$UPSTREAM_GENERATOR"', orphan)
+        self.assertIn("separate upstream GFX1013 installation is present", orphan)
+        self.assertLess(reset.index("separate upstream GFX1013 installation is present"), reset.index("restore_stock_boot"))
+
+    def test_mutating_commands_take_one_nonblocking_lifecycle_lock(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        lock = source[source.index("acquire_lifecycle_lock() {"): source.index("kernel_release() {")]
+        self.assertIn("flock -n", lock)
+        self.assertIn("LIFECYCLE_LOCK_HELD", lock)
+        for function, end_marker in (("prepare() {", "verify_active_identity() {"), ("disable() {", "reset() {"), ("reset() {", 'if [[ ${BC250_GFX1013_LIBRARY_ONLY:-0}')):
+            body = source[source.index(function): source.index(end_marker, source.index(function))]
+            self.assertIn("acquire_lifecycle_lock", body)
 
     def test_build_requirement_accepts_an_installed_provider(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -262,6 +451,90 @@ build_requirement_provider zlib-devel
         self.assertIn("No files, boot state or services were changed.", source)
 
 
+
+    def test_trace_path_adaptation_scans_allowed_amd_trace_headers_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "amd"
+            amdgpu = root / "amdgpu" / "amdgpu_trace.h"
+            amdkfd = root / "amdkfd" / "kfd_trace.h"
+            amdgpu.parent.mkdir(parents=True)
+            amdkfd.parent.mkdir(parents=True)
+            amdgpu.write_text(
+                "#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/amdgpu\n",
+                encoding="utf-8",
+            )
+            amdkfd.write_text(
+                "#define TRACE_INCLUDE_PATH ../../../drivers/gpu/drm/amd/amdkfd\n",
+                encoding="utf-8",
+            )
+            env = os.environ | {
+                "BC250_GFX1013_LIBRARY_ONLY": "1",
+                "BC250_GFX1013_SOURCE": str(SOURCE),
+            }
+            result = subprocess.run(
+                [
+                    "bash",
+                    "-Eeuo",
+                    "pipefail",
+                    "-c",
+                    'source "$1"; adapt_external_amd_trace_paths "$2"',
+                    "bash",
+                    str(SCRIPT),
+                    str(root),
+                ],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(str(amdgpu.parent.resolve()), amdgpu.read_text(encoding="utf-8"))
+            self.assertIn(str(amdkfd.parent.resolve()), amdkfd.read_text(encoding="utf-8"))
+
+            amdgpu.write_text(
+                "#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/display\n",
+                encoding="utf-8",
+            )
+            bad = subprocess.run(
+                [
+                    "bash",
+                    "-Eeuo",
+                    "pipefail",
+                    "-c",
+                    'source "$1"; adapt_external_amd_trace_paths "$2"',
+                    "bash",
+                    str(SCRIPT),
+                    str(root),
+                ],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(bad.returncode, 0)
+            self.assertIn("unresolved or unexpected in-tree AMD TRACE_INCLUDE_PATH", bad.stderr)
+
+    def test_mesa_spec_selection_is_fail_closed(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        prep = source[source.index("prepare_fedora_mesa_source() {"): source.index("build_mesa() {")]
+        self.assertIn('[[ -f "$rpm_top/SOURCES/mesa.spec" ]]', prep)
+        self.assertIn("-name 'mesa*.spec' -print | sort", prep)
+        self.assertIn('((${#specs[@]} == 1))', prep)
+        self.assertNotIn("-print -quit", prep)
+
+    def test_headless_stage_icd_is_pinned_before_audit_and_deploy(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        build = source[source.index("build_mesa() {"): source.index("verify_headless_radv_stage() {")]
+        self.assertLess(
+            build.index('pin_private_icd_library "$stage$(private_icd)" "$(private_radv_lib)"'),
+            build.index('verify_headless_radv_stage "$stage"'),
+        )
+        verify = source[source.index("verify_headless_radv_stage() {"): source.index("pin_private_icd_library() {")]
+        self.assertIn('private_icd_library_ok "$stage$(private_icd)" "$(private_radv_lib)"', verify)
+        staging = source[source.index("stage_patched_boot() {"): source.index("restore_previous_next() {")]
+        self.assertNotIn("pin_private_icd_library", staging)
+        self.assertIn("deployed private RADV ICD does not retain", staging)
+
     def test_110_rebases_private_radv_and_hardens_prepare_build_pipeline(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         mesa = (SOURCE / "MESA-SOURCE").read_text(encoding="utf-8")
@@ -278,7 +551,7 @@ build_requirement_provider zlib-devel
             'rpmbuild -bp --nodeps --define "_topdir $rpm_top"',
             "kernel-prep.log",
             "adapt_external_amd_trace_paths",
-            "expected exactly one in-tree TRACE_INCLUDE_PATH",
+            "unresolved or unexpected in-tree AMD TRACE_INCLUDE_PATH",
             "kernel_modversions_enabled",
             "mode=symbol-resolution",
             "Module.symvers",
@@ -567,7 +840,9 @@ esac
         source = SCRIPT.read_text(encoding="utf-8")
         packages = source[source.index("GFX_BUILD_PACKAGES=("): source.index("build_requirement_provider() {")]
         self.assertIn("cargo rust cargo-rpm-macros", packages)
-        self.assertIn("rpm-build cargo rust cargo-rpm-macros", source)
+        self.assertIn("redhat-rpm-config", packages)
+        self.assertIn("kernel-srpm-macros", packages)
+        self.assertIn("git-core", packages)
 
     def test_110_source_rpm_detection_does_not_require_arch_src(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
