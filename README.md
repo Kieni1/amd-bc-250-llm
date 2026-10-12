@@ -4,9 +4,9 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.13.1-1.10` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.13.1-1.12` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
 
-GFX1013 remains experimental/default-off as package profile `v0.2.2-alpha`; its private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`, with zero-fuzz source applicability checked by the Fedora release gate. Prepare uses an isolated dracut module tree and never replaces the authoritative stock `amdgpu` path.
+GFX1013 remains experimental/default-off as package profile `v0.2.4-alpha`; its private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`, built as headless AMD-Vulkan-only Mesa with no X11/Wayland/EGL/GBM/OpenGL stack in the private prefix. The Fedora release gate compiles both production GFX paths: exact Fedora kernel-SRPM `%prep` + patched external `amdgpu` with vermagic/ABI verification, and the same headless private RADV builder. Prepare uses an isolated dracut module tree and never replaces the authoritative stock `amdgpu` path.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -194,7 +194,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.10. Exact-device 0.12.2-0.8 qualification
+Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.12. Exact-device 0.12.2-0.8 qualification
 passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
 whole-appliance revalidation with this runtime; 0.13.1 does not change the Ollama pin.
 Runtime updates remain deliberately pinned rather than following upstream automatically.

@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.10` (Tika 4.1.0-full; GFX1013 prepare/build integration hardening).
+Current release source: `bc250-llm-server-0.13.1-1.12` (Tika 4.1.0-full; GFX1013 prepare/build integration hardening).
 
-GFX1013 is still opt-in/default-off. Profile `v0.2.2-alpha` rebases private RADV to Fedora 44 `mesa-26.2.4-1.fc44`, makes exact-kernel compatibility verification configuration-aware, proves Fedora kernel patch-target provenance, and builds the patched initramfs from an isolated module tree without replacing stock `amdgpu`.
+GFX1013 is still opt-in/default-off. Profile `v0.2.4-alpha` uses Fedora 44 `mesa-26.2.4-1.fc44` but builds/deploys only headless AMD Vulkan RADV (no private X11/Wayland/EGL/GBM/OpenGL stack), makes exact-kernel compatibility verification configuration-aware, proves Fedora kernel patch-target provenance, and builds the patched initramfs from an isolated module tree without replacing stock `amdgpu`. The Fedora release gate now compiles and ABI-checks that production kernel-module path as well as the headless RADV path.
 
 ## Install
 
@@ -72,7 +72,7 @@ sudo bc250 gfx1013 disable
 sudo bc250 gfx1013 reset --check
 ```
 
-A stale/new stock kernel fails `ollama.service` closed while the private patched RADV override is present; status reports `STALE_KERNEL` and requires rollback/reprepare before normal Ollama service is restored.
+A stale/new stock kernel fails `ollama.service` closed while the private patched RADV override is present; status reports `ROLLBACK_REQUIRED` and requires rollback/reprepare before normal Ollama service is restored.
 
 For the bounded same-package GFX performance screen:
 
