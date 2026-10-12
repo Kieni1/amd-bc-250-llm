@@ -143,8 +143,6 @@ def gfx(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
         add(checks, "gfx1013", "PASS", f"{state}: {reason}", category="gfx_readiness")
     elif state in {"PREPARED", "PATCHED_BOOT_UNVERIFIED"}:
         add(checks, "gfx1013", "WARN", f"{state}: {reason}", category="gfx_readiness")
-    elif state == "STALE_KERNEL":
-        add(checks, "gfx1013", "FAIL", f"{state}: {reason}")
     else:
         add(checks, "gfx1013", "FAIL", f"{state}: {reason}")
     secure = str(payload.get("secure_boot", "unknown"))
