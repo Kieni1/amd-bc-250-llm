@@ -203,9 +203,9 @@ def capture(args: argparse.Namespace) -> int:
     if gfx_state in {"DISABLED", "ENABLED"}:
         gfx_status = "PASS"
         gfx_detail = f"stable GFX1013 lifecycle state: {gfx_state}"
-    elif gfx_state in {"PREPARED", "PATCHED_BOOT_UNVERIFIED", "STALE_KERNEL"}:
+    elif gfx_state in {"PREPARED", "PATCHED_BOOT_UNVERIFIED"}:
         gfx_status = "INCOMPLETE"
-        gfx_detail = f"transitional/stale GFX1013 lifecycle state: {gfx_state}"
+        gfx_detail = f"transitional GFX1013 lifecycle state: {gfx_state}"
     else:
         gfx_status = "DEFECT"
         gfx_detail = f"unsafe GFX1013 lifecycle state: {gfx_state}"
