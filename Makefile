@@ -7,18 +7,21 @@ TOPDIR := $(CURDIR)/rpmbuild
 DISTDIR := $(CURDIR)/dist
 UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 
-.PHONY: help sources sources-check lint source-tar preflight validate prepare-rpm-output rpm-tree srpm rpm check-rpm-payload check-srpm-rebuild release-gate clean clean-sources distclean
+.PHONY: help sources sources-check gfx1013-kernel-build-check gfx1013-mesa-build-check lint source-tar preflight validate prepare-rpm-output rpm-tree srpm rpm artifact-manifests check-rpm-payload check-srpm-rebuild release-gate clean clean-sources distclean
 
 help:
 	@printf '%s\n' \
 	  'make sources    Download pinned governor and live-manager sources' \
 	  'make sources-check  Verify the local source cache and SHA-256 sidecars' \
+	  'make gfx1013-kernel-build-check  Build and ABI-check patched amdgpu against Fedora kernel-devel' \
+	  'make gfx1013-mesa-build-check  Build the pinned private headless RADV in staging' \
 	  'make lint       Run Ruff and ShellCheck' \
 	  'make preflight  Run cheap source/structure checks' \
 	  'make validate   Run preflight plus deterministic tests' \
 	  'make source-tar Create the project source archive' \
 	  'make srpm       Build the source RPM' \
 	  'make rpm        Build binary and source RPMs' \
+	  'make artifact-manifests  Create closed binary/source checksum manifests' \
 	  'make check-rpm-payload  Verify the built greenfield RPM file surface' \
 	  'make check-srpm-rebuild  Rebuild the generated SRPM from a clean temporary topdir' \
 	  'make release-gate  Run the authoritative Fedora workstation/CI RPM gate' \
@@ -34,6 +37,21 @@ sources-check:
 	./scripts/prepare-sources.py --check
 	./scripts/check-gfx1013-mesa.py
 	./scripts/check-upstream-patches.py
+
+gfx1013-kernel-build-check:
+	./scripts/check-gfx1013-kernel-build.sh
+
+gfx1013-mesa-build-check:
+	@set -Eeuo pipefail; \
+	tmp="$$(mktemp -d)"; trap 'rm -rf "$$tmp"' EXIT; \
+	mkdir -p "$$tmp/work"; \
+	BC250_GFX1013_LIBRARY_ONLY=1 \
+	BC250_GFX1013_SOURCE='$(CURDIR)/gfx1013/upstream' \
+	BC250_GFX1013_CACHE_ROOT='$(CURDIR)/sources/gfx1013' \
+	BC250_GFX1013_PREFIX_ROOT=/opt/bc250-gfx1013-ci \
+	bash -Eeuo pipefail -c 'source "$$1/cmd/system/gfx1013.sh"; build_mesa "$$2/work" "$$2/stage" "$$2/mesa-info"; prefix="$$2/stage$$(private_prefix)"; test -f "$$prefix/lib64/libvulkan_radeon.so"; test -f "$$prefix/share/vulkan/icd.d/radeon_icd.x86_64.json"; test "$$(find "$$prefix" \( -type f -o -type l \) | wc -l)" -eq 2' \
+	  bash '$(CURDIR)' "$$tmp"; \
+	echo 'Headless private RADV build check passed.'
 
 lint:
 	ruff check .
@@ -58,7 +76,7 @@ validate:
 prepare-rpm-output:
 	rm -rf $(TOPDIR)
 	mkdir -p $(DISTDIR)
-	rm -f $(DISTDIR)/*.rpm $(DISTDIR)/*.src.rpm $(DISTDIR)/SHA256SUMS
+	rm -f $(DISTDIR)/*.rpm $(DISTDIR)/*.src.rpm $(DISTDIR)/SHA256SUMS $(DISTDIR)/SHA256SUMS.binary $(DISTDIR)/SHA256SUMS.source
 
 rpm-tree: prepare-rpm-output sources source-tar preflight
 	mkdir -p $(TOPDIR)/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} $(DISTDIR)
@@ -69,7 +87,7 @@ rpm-tree: prepare-rpm-output sources source-tar preflight
 srpm: rpm-tree
 	rpmbuild --define '_topdir $(TOPDIR)' -bs $(TOPDIR)/SPECS/$(NAME).spec
 	cp -f $(TOPDIR)/SRPMS/*.src.rpm $(DISTDIR)/
-	cd $(DISTDIR) && sha256sum *.src.rpm > SHA256SUMS
+	cd $(DISTDIR) && sha256sum *.src.rpm > SHA256SUMS.source && cp SHA256SUMS.source SHA256SUMS
 
 rpm: rpm-tree
 	rpmbuild --define '_topdir $(TOPDIR)' -ba $(TOPDIR)/SPECS/$(NAME).spec
@@ -77,6 +95,20 @@ rpm: rpm-tree
 	find $(TOPDIR)/SRPMS -type f -name '*.src.rpm' -exec cp -f {} $(DISTDIR)/ \;
 	$(MAKE) check-rpm-payload
 	cd $(DISTDIR) && sha256sum *.rpm > SHA256SUMS
+	$(MAKE) artifact-manifests
+
+artifact-manifests:
+	@set -Eeuo pipefail; \
+	cd '$(DISTDIR)'; \
+	shopt -s nullglob; \
+	binary_rpms=( *.x86_64.rpm ); \
+	source_rpms=( *.src.rpm ); \
+	[[ "$${#binary_rpms[@]}" -gt 0 ]] || { echo 'ERROR: no binary RPMs found for closed manifest.' >&2; exit 1; }; \
+	[[ "$${#source_rpms[@]}" -gt 0 ]] || { echo 'ERROR: no source RPMs found for closed manifest.' >&2; exit 1; }; \
+	sha256sum "$${binary_rpms[@]}" > SHA256SUMS.binary; \
+	sha256sum "$${source_rpms[@]}" > SHA256SUMS.source; \
+	sha256sum -c SHA256SUMS.binary; \
+	sha256sum -c SHA256SUMS.source
 
 check-rpm-payload:
 	@set -Eeuo pipefail; \
@@ -139,6 +171,8 @@ release-gate:
 	$(MAKE) clean
 	$(MAKE) sources
 	$(MAKE) sources-check
+	$(MAKE) gfx1013-kernel-build-check
+	$(MAKE) gfx1013-mesa-build-check
 	$(MAKE) lint
 	$(MAKE) preflight
 	$(MAKE) rpm </dev/null
