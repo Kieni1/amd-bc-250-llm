@@ -148,7 +148,7 @@ ollama_version_line
         self.assertIn('"schema": "bc250.doctor.v2"', doctor_source)
         self.assertIn('["rpm", "-V", PACKAGE]', doctor_source)
         self.assertIn("diagnostic headroom TIGHT", doctor_source)
-        self.assertIn("STALE_KERNEL", doctor_source)
+        self.assertIn("ROLLBACK_REQUIRED", (ROOT / "cmd/system/gfx1013.sh").read_text(encoding="utf-8"))
         self.assertIn("runtime_identity", status_json)
         self.assertIn("Overall appliance health:", doctor_source)
         self.assertIn("Optional GFX1013 readiness:", doctor_source)
