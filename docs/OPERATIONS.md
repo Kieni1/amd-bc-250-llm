@@ -107,8 +107,8 @@ longer hidden behind an unconditional whole-install success message. Completion 
 ### Experimental GFX1013 compute profile
 
 The supported operator lifecycle is `bc250 gfx1013 {status|prepare|enable|disable|reset|benchmark}`.
-It ships default-off as profile `v0.2.2-alpha`, pinned to upstream `0.2.0-alpha`
-commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. The private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`; the release gate checks the carried Mesa patch against Fedora `%prep` with zero fuzz. Use the non-destructive checks
+It ships default-off as profile `v0.2.4-alpha`, pinned to upstream `0.2.0-alpha`
+commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. The private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44` and is built headless (AMD Vulkan only, without private X11/Wayland/EGL/GBM/OpenGL frontends); the release gate checks the carried Mesa patch against Fedora `%prep` with zero fuzz and compiles the same production headless Mesa path. Use the non-destructive checks
 before making boot changes:
 
 ```bash
@@ -145,7 +145,7 @@ A2 is required before the helper can emit `PROMOTION_CANDIDATE`. The result rema
 advisory and never changes the default-off policy.
 
 `status` reports `DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`,
-`STALE_KERNEL`, `ROLLBACK_REQUIRED` or `BROKEN`. `disable`, recovery `reset`, RPM
+`ROLLBACK_REQUIRED`. `disable`, recovery `reset`, RPM
 upgrade and final erase all fail closed until a safe stock saved/default **and
 next** boot path is restored and verified. See [`GFX1013.md`](GFX1013.md) for
 the complete state machine, recovery and Secure Boot policy.
