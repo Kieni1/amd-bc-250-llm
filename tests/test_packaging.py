@@ -726,6 +726,26 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("shellcheck", makefile)
         self.assertIn("ruff rust ShellCheck", workflow)
 
+    def test_ci_release_gate_is_non_root_and_avoids_unrelated_codec_repo(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        ci_local = (ROOT / "scripts/ci-local.sh").read_text(encoding="utf-8")
+        self.assertIn("--disable-repo=fedora-cisco-openh264", workflow)
+        self.assertIn("--disable-repo=fedora-cisco-openh264", ci_local)
+        self.assertIn("useradd --create-home", workflow)
+        self.assertIn("runuser -u bc250-builder", workflow)
+        self.assertIn("runuser -u bc250-builder", ci_local)
+        self.assertNotRegex(workflow, r"(?m)^\s+run: make release-gate$")
+
+    def test_ci_split_artifacts_have_closed_checksum_manifests(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("dist/SHA256SUMS.binary", workflow)
+        self.assertIn("dist/SHA256SUMS.source", workflow)
+        self.assertIn('sha256sum "$${binary_rpms[@]}" > SHA256SUMS.binary', makefile)
+        self.assertIn('sha256sum "$${source_rpms[@]}" > SHA256SUMS.source', makefile)
+        self.assertIn("sha256sum -c SHA256SUMS.binary", makefile)
+        self.assertIn("sha256sum -c SHA256SUMS.source", makefile)
+
     def test_build_environment_uses_portable_c_locale(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
             encoding="utf-8"
@@ -763,6 +783,10 @@ class PackagingTests(unittest.TestCase):
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertIn("Requires:       git-core", spec)
         self.assertNotRegex(spec, r"(?m)^Requires:\s+git\s*$")
+
+    def test_gfx1013_vulkaninfo_runtime_dependency_is_explicit(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("Requires:       vulkan-tools", spec)
 
     def test_package_provides_its_own_ollama_account(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
