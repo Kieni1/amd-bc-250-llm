@@ -2,8 +2,8 @@
   "schema_version": 1,
   "release": {
     "version": "0.13.1",
-    "rpm_release": "1.10",
-    "nvr": "bc250-llm-server-0.13.1-1.10"
+    "rpm_release": "1.12",
+    "nvr": "bc250-llm-server-0.13.1-1.12"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
@@ -187,6 +187,7 @@
       "description": "RPM metadata, install manifest, upstream/source preparation and source validators.",
       "paths": [
         "packaging/**",
+        "scripts/check-gfx1013-kernel-build.sh",
         "scripts/check-gfx1013-mesa.py",
         "scripts/check-upstream-patches.py",
         "scripts/install-manifest.py",
@@ -456,7 +457,7 @@
       ],
       "notes": [
         "Default OFF. Stock saved/default boot remains authoritative until a verified patched boot is explicitly enabled.",
-        "Profile v0.2.2-alpha keeps the upstream 0.2.0-alpha kernel commit but rebases private RADV to exact Fedora 44 mesa-26.2.4-1.fc44; the release source gate validates the Mesa patch against Fedora %prep with zero fuzz.",
+        "Profile v0.2.4-alpha keeps the upstream 0.2.0-alpha kernel commit and exact Fedora 44 mesa-26.2.4-1.fc44 baseline, but builds/deploys only headless AMD Vulkan RADV; the release gate validates Fedora %prep/zero-fuzz patching and compiles both the production external-amdgpu kernel path with vermagic/ABI verification and the exact production headless Mesa builder.",
         "Prepare builds under temporary staging first; the patched initramfs uses an isolated dracut kmod tree and never replaces the authoritative stock amdgpu path.",
         "Kernel source authority comes from the exact Fedora kernel SRPM %prep tree; every BC-250 AMDGPU patch target is fingerprinted from that prepared tree before zero-fuzz package patching.",
         "Pre-commit failure restores/remains DISABLED and keeps only bounded root-owned failure evidence; boot-manager rollback must verify before patched boot artifacts are deleted.",
