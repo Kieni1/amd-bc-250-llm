@@ -38,7 +38,8 @@ show_status() {
 }
 
 apply_profile() {
-  local profile="$1" source="$PROFILE_DIR/$profile.conf"
+  local profile="$1" source
+  source="$PROFILE_DIR/$profile.conf"
   require_root
   [[ -r "$source" ]] || { echo "ERROR: missing profile $source" >&2; exit 1; }
   install -d -m0755 "$OVERRIDE_DIR"

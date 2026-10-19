@@ -121,9 +121,7 @@ Exact IDs are preferred. Only the unambiguous `qwen35-9b` convenience alias rema
 use. Use exact IDs for 27B models so a future package-policy change cannot silently retarget an
 alias. Retired MTP entries have no alias and are not accepted by the active runner.
 
-`PORT`, `CTX` and `DRAFT_N_MAX` override catalog values. `UBATCH=384` remains an explicit
-gfx1013 stability-control A/B only when the affected model/runtime path warrants it; an
-unset `UBATCH` preserves the runtime default. `MIN_MEM_AVAILABLE_MIB` may be changed only
+`PORT`, `CTX`, `DRAFT_N_MAX` and optional `UBATCH` override catalog values; an unset `UBATCH` preserves the runtime default. `MIN_MEM_AVAILABLE_MIB` may be changed only
 as an explicitly recorded experiment, not merely to bypass a failed safety preflight.
 
 When supported, the runner adds `--cache-ram 0` and `--no-cache-idle-slots` alongside
@@ -163,6 +161,6 @@ acceptance telemetry may still describe valid inference, but it is insufficient 
 to qualify speculative decoding.
 
 Do not claim an MTP win from tok/s alone. Final qualification still requires useful answer
-quality, draft acceptance, memory/swap behavior, gfx1013 stability and clean normal-appliance
+quality, draft acceptance, memory/swap behavior, runtime stability and clean normal-appliance
 state after the run. After this pre-flight polish, do not extend the framework again until
 real BC-250 evidence identifies a concrete measurement or runtime defect.

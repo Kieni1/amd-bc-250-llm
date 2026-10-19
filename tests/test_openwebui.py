@@ -5,6 +5,7 @@ import copy
 import hashlib
 import importlib.util
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -730,6 +731,21 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 self.assertEqual(OPENWEBUI.main(), 0)
             self.assertNotIn(secret, stdout.getvalue())
             self.assertNotIn(secret, stderr.getvalue())
+
+    def test_suggested_token_file_ignores_inaccessible_optional_paths(self) -> None:
+        class InaccessiblePath:
+            def is_file(self) -> bool:
+                raise PermissionError("denied")
+
+        for target in ("DEFAULT_TOKEN_FILE", "LEGACY_TOKEN_FILE"):
+            with (
+                self.subTest(target=target),
+                mock.patch.object(OPENWEBUI, "DEFAULT_TOKEN_FILE", Path("/definitely/missing")),
+                mock.patch.object(OPENWEBUI, "LEGACY_TOKEN_FILE", Path("/definitely/missing")),
+                mock.patch.object(OPENWEBUI, target, InaccessiblePath()),
+                mock.patch.dict(os.environ, {}, clear=True),
+            ):
+                self.assertEqual(OPENWEBUI.suggested_token_file(), "")
 
     def test_translation_roles_match_stage2e_contract_exactly(self) -> None:
         prompt_path = ROOT / "config/openwebui/prompts/translation-explicit-direction-v1.txt"

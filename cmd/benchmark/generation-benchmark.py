@@ -452,6 +452,9 @@ def run_generate(
     answer = str(response.get("response") or "")
     thinking = str(response.get("thinking") or "")
     metrics = response_metrics(response, wall)
+    metrics["answer_started"] = bool(answer.strip())
+    metrics["answer_chars"] = len(answer)
+    metrics["thinking_chars"] = len(thinking)
     metrics.update(validate_ollama_completion(response, answer + thinking))
     metrics.update(client.runtime_state(model))
     metrics.update(telemetry)
@@ -516,7 +519,7 @@ def run_chat_stream(
     answer = "".join(content_parts)
     thinking = "".join(thinking_parts)
     metrics.update(validate_ollama_completion(final, answer + thinking))
-    metrics["answer_started"] = bool(answer)
+    metrics["answer_started"] = bool(answer.strip())
     metrics["answer_chars"] = len(answer)
     metrics["thinking_chars"] = len(thinking)
     metrics.update(client.runtime_state(model))
@@ -647,6 +650,51 @@ def budget_diagnostics(
     if thinking.strip():
         diagnostics.append("thinking-budget")
     return diagnostics
+
+
+def visible_response_identity(response: str, thinking: str) -> dict[str, Any]:
+    """Describe visible-output identity without conflating hidden thinking.
+
+    A thinking-only completion has useful diagnostic content, but it has no visible
+    answer identity.  In particular, never hash the empty visible response and
+    present that digest as deterministic visible-output evidence.
+    """
+    if response.strip():
+        return {
+            "state": "present",
+            "determinism_eligible": True,
+            "sha256": hashlib.sha256(response.encode("utf-8")).hexdigest(),
+        }
+    return {
+        "state": "thinking-only" if thinking.strip() else "empty",
+        "determinism_eligible": False,
+        "sha256": None,
+    }
+
+
+def generation_measurement_semantics(
+    metrics: dict[str, Any],
+    *,
+    requested: int,
+    response: str,
+    thinking: str,
+) -> dict[str, Any]:
+    """Return outcome/diagnostics for one generation measurement.
+
+    Performance thresholds are unchanged.  This only prevents a run with no
+    visible answer from being represented as complete visible-output evidence.
+    """
+    effective_metrics = dict(metrics)
+    effective_metrics["answer_started"] = bool(response.strip())
+    diagnostics = budget_diagnostics(effective_metrics, requested, thinking)
+    identity = visible_response_identity(response, thinking)
+    if not identity["determinism_eligible"]:
+        diagnostics.append("visible-answer-empty")
+    return {
+        "outcome": "pass" if identity["determinism_eligible"] else "incomplete",
+        "diagnostics": diagnostics,
+        "visible_response": identity,
+    }
 
 
 def select_models(client: OllamaClient, explicit: list[str], *, interactive: bool = True) -> list[str]:
@@ -1045,12 +1093,18 @@ def main() -> int:
             if value
         ]
         warning = "; ".join(warnings) or None
+        response_text = str(detail.get("response") or "")
+        thinking_text = str(detail.get("thinking") or "")
+        semantics = generation_measurement_semantics(
+            metrics,
+            requested=requested,
+            response=response_text,
+            thinking=thinking_text,
+        )
         diagnostics: list[str] = []
         if early_stop_warning(metrics, requested, early_fraction):
             diagnostics.append("early-stop")
-        diagnostics.extend(
-            budget_diagnostics(metrics, requested, str(detail.get("thinking") or ""))
-        )
+        diagnostics.extend(semantics["diagnostics"])
         if extra_warning:
             diagnostics.append("context-truncation")
         if float(metrics.get("seconds_ge_80c") or 0) > 0:
@@ -1077,7 +1131,7 @@ def main() -> int:
                 model=model,
                 case_id=f"{test}-{run}",
                 result_type="measurement",
-                outcome="pass",
+                outcome=str(semantics["outcome"]),
                 diagnostics=diagnostics,
                 metrics=metrics,
                 timestamp=row["timestamp"],
@@ -1088,8 +1142,9 @@ def main() -> int:
                 requested_tokens=requested,
                 prompt_sha256=hashlib.sha256(prompt_text.encode()).hexdigest(),
                 request=request_meta,
-                response=detail.get("response", ""),
-                thinking=detail.get("thinking", ""),
+                response=response_text,
+                thinking=thinking_text,
+                visible_response_identity=semantics["visible_response"],
                 context_target_tokens=detail.get("context_target_tokens"),
                 notes=warnings,
             ),

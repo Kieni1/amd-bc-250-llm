@@ -128,20 +128,11 @@ def main(argv: list[str] | None = None) -> int:
     configured = key_values(share / "runtime.env")
     source_version = one_line(share / "VERSION")
     status = json_helper(libexec / "status-json.py")
-    gfx = status.get("gfx1013") if isinstance(status, dict) else None
-    if not isinstance(gfx, dict):
-        gfx = json_helper(libexec / "gfx1013.sh", "status", "--json")
     runtime_identity = status.get("runtime_identity") if isinstance(status, dict) else None
     if not isinstance(runtime_identity, dict):
         runtime_identity = {}
-    gfx_upstream = gfx.get("upstream") if isinstance(gfx, dict) else None
-    if not isinstance(gfx_upstream, dict):
-        gfx_upstream = {}
-    gfx_kernel = gfx.get("kernel") if isinstance(gfx, dict) else None
-    if not isinstance(gfx_kernel, dict):
-        gfx_kernel = {}
     payload: dict[str, Any] = {
-        "schema": "bc250.version.v2",
+        "schema": "bc250.version.v3",
         "package": package,
         "source_version": source_version,
         "kernel": os.uname().release,
@@ -154,13 +145,6 @@ def main(argv: list[str] | None = None) -> int:
             "governor": configured.get("BC250_GOVERNOR_VERSION"),
         },
         "runtime_identity": runtime_identity,
-        "gfx1013": {
-            "state": gfx.get("state") if gfx else None,
-            "package_profile": gfx.get("profile") if gfx else None,
-            "upstream_version": gfx_upstream.get("version"),
-            "pinned_commit": gfx_upstream.get("commit"),
-            "prepared_kernel": gfx_kernel.get("prepared"),
-        },
     }
     if args.short:
         print(package.get("nevra") or source_version or "unknown")
@@ -176,14 +160,6 @@ def main(argv: list[str] | None = None) -> int:
     print(runtime_line("Open WebUI:", runtime_identity.get("open_webui")))
     print(runtime_line("Tika:", runtime_identity.get("tika")))
     print(f"Governor pin: {payload['configured_runtime']['governor'] or 'unknown'}")
-    if gfx:
-        print(
-            "GFX1013:      "
-            f"{gfx.get('state', 'unknown')} / {gfx.get('profile', 'unknown')} / "
-            f"{gfx_upstream.get('commit', 'unknown')}"
-        )
-    else:
-        print("GFX1013:      unavailable")
     return 0 if package.get("nevra") else 2
 
 

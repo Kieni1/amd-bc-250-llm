@@ -1850,6 +1850,7 @@ class FriendlyArgumentParser(argparse.ArgumentParser):
 
 CLI_EPILOG = """Common workflows:
   bc250 model list
+  sudo bc250 model install
   sudo bc250 model status agentic
   sudo bc250 model apply agentic MODEL
   sudo bc250 model apply all all
@@ -1999,6 +2000,25 @@ def build_parser() -> argparse.ArgumentParser:
     catalog_arguments(path, category_optional=True)
     path.add_argument("id", nargs="?", help="exact catalog model id")
 
+    installing = commands.add_parser(
+        "install",
+        help="interactively install/manage models from the combined catalog",
+    )
+    selection_arguments(installing)
+    mutation_common_arguments(installing)
+    installing.add_argument("--source", type=Path, help="alternate MTP TOML catalog")
+    installing.add_argument(
+        "--modelfile-dir",
+        type=Path,
+        action="append",
+        help="alternate Modelfile directory; may be repeated",
+    )
+    installing.add_argument(
+        "--token-file",
+        type=Path,
+        help="Hugging Face token file for downloads",
+    )
+
     applying = commands.add_parser(
         "apply",
         help="make selected models match the current catalog; reuse verified GGUFs",
@@ -2051,7 +2071,7 @@ def require_privilege(command: str) -> None:
         raise ModelError(
             "status inspects protected GGUF/state directories; run: sudo bc250 model status ..."
         )
-    if command in {"apply", "refresh", "unregister", "remove", "purge-retired"} and os.geteuid() != 0:
+    if command in {"install", "apply", "refresh", "unregister", "remove", "purge-retired"} and os.geteuid() != 0:
         raise ModelError(f"{command} changes package-managed model state; run with sudo")
 
 
@@ -2409,11 +2429,57 @@ def selected_models_for_catalog(
         return models
     if selection is None:
         selection = prompt_line(
-            "Models (id/index/range/recommended/production/all; Enter to cancel): "
+            "Select models by number, range, or group (recommended/production/all); press Enter to cancel: "
         )
     if not selection:
         return []
     return select_models(models, selection)
+
+
+def print_install_catalog_state(catalogs: list[tuple[dict, list[dict]]]) -> list[dict]:
+    """Show the combined normal-model catalog with current local state."""
+    available = all_available_models(catalogs, command="apply", include_disabled=False)
+    registrations = registered_models_by_host(
+        [defaults["ollama_host"] for defaults, _models in catalogs if defaults.get("ollama_host")]
+    )
+    available_ids = {(model["category"], model["id"]) for model in available}
+    print("Available models:")
+    for defaults, models in catalogs:
+        chosen = [model for model in models if (model["category"], model["id"]) in available_ids]
+        if not chosen:
+            continue
+        category = defaults["category"]
+        label = "Experimental" if category == "experiments" else ("MTP" if category == "mtp" else category.title())
+        print(f"{label} models:")
+        host = defaults.get("ollama_host")
+        for model in chosen:
+            inspection = inspect_model_state(
+                defaults,
+                model,
+                registrations=registrations.get(host) if host else None,
+            )
+            print_model_inspection_compact(inspection)
+    return available
+
+
+def run_install_workflow(
+    args: argparse.Namespace, *, directories: list[Path] | None, source: Path | None
+) -> int:
+    catalogs = load_all_catalogs(directories=directories, source=source)
+    available = print_install_catalog_state(catalogs)
+    print("\nSelect models to install/reconcile.")
+    selected = selected_models_for_catalog(available, args.selection, interactive=True)
+    if not selected:
+        print("Cancelled — no changes made.")
+        return 0
+    operation = argparse.Namespace(**vars(args))
+    operation.command = "apply"
+    operation.category = "all"
+    operation.revision = None
+    operation.sha256 = None
+    operation.min_free_bytes = None
+    operation.include_disabled = False
+    return run_all_catalog_operation(catalogs, selected, operation)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -2444,6 +2510,9 @@ def main(argv: list[str] | None = None) -> int:
         Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None
     )
     directories = args.modelfile_dir
+
+    if args.command == "install":
+        return run_install_workflow(args, directories=directories, source=source)
 
     if args.command == "list":
         category = args.category or "all"

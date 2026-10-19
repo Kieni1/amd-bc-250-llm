@@ -3368,7 +3368,7 @@ status_run --raw
     def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         main = source[source.index("main() {"):]
-        self.assertIn('echo "  sudo bc250 revalidate start"', main)
+        self.assertIn('sudo bc250 revalidate start', main)
         self.assertNotIn("completion_owui_token", main)
         self.assertNotIn("sudo bc250 revalidate start --owui-token-file FILE", main)
         self.assertNotIn('echo "  Revalidation (partial): sudo bc250 revalidate start --skip-owui"', main)
@@ -3976,6 +3976,36 @@ cleanup_failed_launch
         self.assertEqual(
             generation.budget_diagnostics(metrics, 128, "reasoning"),
             ["output-budget", "thinking-budget"],
+        )
+
+    def test_generation_visible_response_identity_never_hashes_thinking_only_output(self) -> None:
+        thinking_only = generation.visible_response_identity("", "reasoning")
+        self.assertEqual(thinking_only["state"], "thinking-only")
+        self.assertFalse(thinking_only["determinism_eligible"])
+        self.assertIsNone(thinking_only["sha256"])
+
+        visible = generation.visible_response_identity("hello", "reasoning")
+        self.assertEqual(visible["state"], "present")
+        self.assertTrue(visible["determinism_eligible"])
+        self.assertEqual(
+            visible["sha256"],
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+        )
+
+    def test_generation_thinking_only_budget_exhaustion_is_incomplete(self) -> None:
+        semantics = generation.generation_measurement_semantics(
+            {"done_reason": "length"},
+            requested=128,
+            response="",
+            thinking="reasoning",
+        )
+        self.assertEqual(semantics["outcome"], "incomplete")
+        self.assertEqual(semantics["visible_response"]["state"], "thinking-only")
+        self.assertFalse(semantics["visible_response"]["determinism_eligible"])
+        self.assertIsNone(semantics["visible_response"]["sha256"])
+        self.assertEqual(
+            semantics["diagnostics"],
+            ["output-budget", "thinking-budget", "visible-answer-empty"],
         )
 
     def test_round2c2_removes_stale_revalidation_and_splits_workflow_responsibility(self) -> None:

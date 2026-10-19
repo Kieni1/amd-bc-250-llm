@@ -1121,13 +1121,21 @@ def suggested_token_file() -> str:
     configured = os.environ.get("BC250_OWUI_TOKEN_FILE", "").strip()
     if configured:
         return configured
-    if DEFAULT_TOKEN_FILE.is_file():
+    try:
+        default_exists = DEFAULT_TOKEN_FILE.is_file()
+    except OSError:
+        default_exists = False
+    if default_exists:
         try:
             if is_openwebui_api_key(read_token_file(str(DEFAULT_TOKEN_FILE))):
                 return str(DEFAULT_TOKEN_FILE)
         except ApiError:
             pass
-    if LEGACY_TOKEN_FILE.is_file():
+    try:
+        legacy_exists = LEGACY_TOKEN_FILE.is_file()
+    except OSError:
+        legacy_exists = False
+    if legacy_exists:
         return str(LEGACY_TOKEN_FILE)
     return ""
 

@@ -160,7 +160,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_interactive_maintenance_values_reprompt_instead_of_aborting(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
         command = (
-            "source <(sed '$d' " + str(script) + "); "
+            "source " + str(script) + "; "
             "if ask_yes_no 'Continue' yes; then echo YES; else echo NO; fi; "
             "action=$(ask_power_action poweroff); "
             "when=$(ask_power_time 18:30); "
@@ -197,7 +197,7 @@ class MaintenanceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             command = (
-                "source <(sed '$d' " + str(script) + "); "
+                "source " + str(script) + "; "
                 "enable_units() { :; }; "
                 "setup_pruning; "
                 "printf 'TOKEN=%s\n' \"$(get_setting OWUI_API_KEY '')\""
@@ -222,7 +222,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_wol_interface_prompt_explains_ip_address_and_reprompts(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
         command = (
-            "source <(sed '$d' " + str(script) + "); "
+            "source " + str(script) + "; "
             "default_route_interface() { echo enp0s16f0u1; }; "
             "interface_ipv4_address() { echo 192.168.1.191; }; "
             "network_interface_exists() { [[ $1 == enp0s16f0u1 ]]; }; "
@@ -280,7 +280,7 @@ class MaintenanceTests(unittest.TestCase):
             systemctl.chmod(0o755)
             journalctl.chmod(0o755)
             command = (
-                "source <(sed '$d' " + str(script) + " ); "
+                "source " + str(script) + "; "
                 "systemd_available() { return 0; }; run_task backup-config"
             )
             result = subprocess.run(
@@ -310,7 +310,7 @@ class MaintenanceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             command = (
-                "source <(sed '$d' " + str(script) + " ); CONFIG="
+                "source " + str(script) + "; CONFIG="
                 + str(config) + "; preflight_prune"
             )
             result = subprocess.run(
@@ -796,6 +796,18 @@ class MaintenanceTests(unittest.TestCase):
             self.assertEqual(
                 log.read_text(encoding="utf-8").splitlines(), ["1", "2", "3"]
             )
+
+    def test_restore_users_is_sourceable_without_running_restore(self) -> None:
+        script = ROOT / "cmd/maintenance/restore-users.sh"
+        result = subprocess.run(
+            ["bash", "-c", 'source "$1"; printf "SOURCED\n"', "restore-source-test", str(script)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(result.stdout, "SOURCED\n")
 
     def test_identity_restore_compares_new_fk_violations_against_baseline(self) -> None:
         script = ROOT / "cmd/maintenance/restore-users.sh"

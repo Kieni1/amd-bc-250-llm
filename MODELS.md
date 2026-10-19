@@ -94,7 +94,7 @@ retirement catalog.
 
 Selections accept names, displayed indexes, comma lists, ranges or `all`. Prefer names
 in scripts. The category `all` means the combined catalog; it does not itself select every
-model. Use `sudo bc250 model apply all all` only when you deliberately mean every eligible
+model. For routine interactive installs, use `sudo bc250 model install`; pressing Enter at the selection prompt cancels without changes. Use `sudo bc250 model apply all all` only when you deliberately mean every eligible
 non-MTP model. A moving source revision such as `latest` or `main` is allowed on purpose:
 this package is a model-testing tool. The recorded digest identifies the exact artifact currently
 installed; it is not a permanent product pin for moving `latest`/`main` sources. `status --online` can
