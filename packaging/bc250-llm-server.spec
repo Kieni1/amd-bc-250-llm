@@ -9,8 +9,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.13.1
-Release:        1.9%{?dist}
+Version:        0.14.1
+Release:        1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -45,7 +45,6 @@ Requires:       firewalld
 Requires:       gawk
 Requires:       git-core
 Requires:       grubby
-Requires:       grub2-tools-minimal
 Requires:       gzip
 Requires:       hostname
 Requires:       iproute
@@ -89,8 +88,7 @@ installed, but the RPM never changes CU routing automatically. The Ollama
 binary remains an upstream payload installed by the guided helper. The RPM owns
 the complete four-lane systemd topology. Model weights, users and
 operator-created Open WebUI state, HTTPS and CU changes remain
-operator-controlled. Experimental GFX1013 compute-queue support is
-package-owned, opt-in and default-off.
+operator-controlled. The core package uses the stock Fedora AMDGPU/Mesa stack.
 
 %prep
 %setup -q
@@ -109,7 +107,7 @@ cargo build --release --frozen --offline
 popd
 
 %check
-bash scripts/validate.sh
+bash scripts/validate.sh --package </dev/null
 
 %install
 python3 scripts/install-manifest.py \
@@ -135,15 +133,6 @@ python3 scripts/install-manifest.py \
   --define "bashcompletiondir=%{_datadir}/bash-completion/completions"
 
 %pre
-# Package upgrades never carry an active/prepared GFX1013 boot profile across
-# RPM identity. Roll it back with the currently installed helper before payload
-# replacement; fail closed if a verified stock saved + next boot cannot be set.
-if [ "$1" -gt 1 ] && [ -x %{project_libexec}/gfx1013.sh ]; then
-  %{project_libexec}/gfx1013.sh disable --package-upgrade || {
-    echo "ERROR: refusing package upgrade because GFX1013 stock-boot rollback could not be verified." >&2
-    exit 1
-  }
-fi
 # On upgrades with existing Open WebUI state, stop the currently running
 # service before the new Quadlet payload can become eligible through any
 # subsequent daemon-reload.  Keep boot enablement held until bc250 install
@@ -181,7 +170,7 @@ systemctl daemon-reload >/dev/null 2>&1 || :
 
 %posttrans
 if [ "$1" -gt 1 ] 2>/dev/null; then
-  echo "BC-250 LLM appliance package upgraded."
+  echo "BC-250 LLM appliance package transaction completed."
   echo "Open WebUI remains held until package setup/migration completes."
 else
   echo "BC-250 LLM appliance package installed."
@@ -190,26 +179,17 @@ fi
 echo
 bc250_amber=''
 bc250_reset=''
-if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ]; then
+if [ -t 1 ] && [ "${TERM:-dumb}" != dumb ] && [ -z "${NO_COLOR:-}" ]; then
   bc250_amber='\033[1;33m'
   bc250_reset='\033[0m'
 fi
 printf '%b' "$bc250_amber"
-echo "Next step:"
+echo "Next action:"
 echo "  sudo bc250 install"
 printf '%b' "$bc250_reset"
 
 %preun
 if [ "$1" -eq 0 ]; then
-  # Final erase is fail-closed for the opt-in GFX1013 profile. The helper
-  # restores and verifies the stock saved + next boot path before removing any
-  # patched boot/private-RADV artifact. Refuse erase if that proof cannot be made.
-  if [ -x %{project_libexec}/gfx1013.sh ]; then
-    %{project_libexec}/gfx1013.sh disable --package-erase || {
-      echo "ERROR: refusing package erase because the stock GFX1013 boot rollback could not be verified." >&2
-      exit 1
-    }
-  fi
   systemctl stop open-webui.service tika.service \
     ollama.service ollama-task.service ollama-embedding.service ollama-agent.service \
     >/dev/null 2>&1 || :
@@ -243,7 +223,6 @@ fi
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/package-gates
-%ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/gfx1013
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/resilience
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation/results
@@ -279,6 +258,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Mon Oct 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1
+- Promote the accepted clean-core C7 source gate to the first unused 0.14.1 release identity without changing the Ollama 0.34.4 runtime pin or device-acceptance status.
+- Distinguish ordinary GitHub CI evidence from an explicitly selected workflow-dispatch release-authority run; emit a separate release-selection record for that selected run.
+- Record Fedora/container and key build-tool versions in release evidence, and make BUILD_DIR the supported Make-level build-root override while BC250_BUILD_DIR remains an internal helper variable.
+
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.9
 - Recognize mokutil's explicit unsupported Secure Boot state as disabled-unsupported so unsigned GFX1013 preparation is allowed only when the platform explicitly reports Secure Boot unsupported/disabled; enabled and genuinely unknown states remain fail-closed.
 - Make non-root status/version runtime identity explicitly NOT INSPECTED when root-owned Podman metadata is inaccessible, without degrading appliance health solely because the caller lacks privilege; sudo retains exact version/digest verification.

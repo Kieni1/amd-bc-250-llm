@@ -18,8 +18,10 @@ ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging/bc250-llm-server.spec"
 MANIFEST = ROOT / "packaging/install-manifest.tsv"
 UPSTREAMS = ROOT / "packaging/upstreams.toml"
+RELEASE_CONTRACT = ROOT / "release-contract.json"
 EXCLUDED_TREES = {
     ".git",
+    ".build",
     "build",
     "dist",
     "rpmbuild",
@@ -38,18 +40,39 @@ def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
 
 
+def dynamic_excluded_roots() -> tuple[Path, ...]:
+    roots: list[Path] = []
+    for name in ("BC250_BUILD_DIR", "BC250_SOURCE_DIR"):
+        value = os.environ.get(name)
+        if not value:
+            continue
+        try:
+            path = Path(value).expanduser().resolve()
+            relative = path.relative_to(ROOT)
+        except (OSError, ValueError):
+            continue
+        if relative.parts and relative not in roots:
+            roots.append(relative)
+    return tuple(roots)
+
+
 def included_files():
+    dynamic = dynamic_excluded_roots()
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
-        if path.is_file() and not any(
-            part in EXCLUDED_TREES for part in relative.parts
-        ):
-            yield relative, path
+        if not path.is_file():
+            continue
+        if any(part in EXCLUDED_TREES for part in relative.parts):
+            continue
+        if any(relative == excluded or excluded in relative.parents for excluded in dynamic):
+            continue
+        yield relative, path
 
 
 def check_required_inputs() -> None:
     required = (
         "VERSION",
+        "release-contract.json",
         "MODELS.md",
         "Makefile",
         "install",
@@ -78,10 +101,14 @@ def check_required_inputs() -> None:
         "docs/BENCHMARKING.md",
         "docs/SECURITY.md",
         "docs/RAG.md",
+        "scripts/check-release-source.sh",
         "scripts/check-upstream-patches.py",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",
+        "scripts/release-contract.py",
+        "scripts/release-evidence.py",
+        "tests/test_release_pipeline.py",
         "licenses/LICENSE",
     )
     for relative in required:
@@ -95,10 +122,12 @@ def check_required_inputs() -> None:
         "cmd/monitoring/status.sh",
         "cmd/monitoring/support-bundle.sh",
         "cmd/maintenance/maintenance.sh",
+        "scripts/check-release-source.sh",
         "scripts/check-upstream-patches.py",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",
+        "scripts/release-evidence.py",
         "scripts/validate.sh",
     )
     for relative in executables:
@@ -146,6 +175,90 @@ def check_version() -> None:
         fail("RPM %description contains a line longer than 79 characters")
     if re.search(r"(?m)^Requires:\s+git\s*$", spec):
         fail("runtime dependency must use git-core instead of the larger git meta-package")
+
+
+def check_release_contract() -> None:
+    try:
+        contract = json.loads(RELEASE_CONTRACT.read_text(encoding="utf-8"))
+        spec = SPEC.read_text(encoding="utf-8")
+        scope = json.loads((ROOT / "development/DEVELOPMENT-SCOPE.json").read_text(encoding="utf-8"))
+        runtime_lines = (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines()
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read release contract metadata: {error}")
+        return
+
+    if contract.get("schema") != "bc250.release-contract.v2":
+        fail("release-contract.json has an unsupported schema")
+        return
+    package = contract.get("package", {})
+    runtime = contract.get("runtime", {})
+    authority = contract.get("authority", {})
+    validation = contract.get("validation", {})
+
+    def spec_value(field: str) -> str:
+        match = re.search(rf"^{re.escape(field)}:\s*([^%\s]+)", spec, re.MULTILINE)
+        return match.group(1) if match else ""
+
+    expected_name = package.get("name", "")
+    expected_version = package.get("version", "")
+    expected_release = package.get("rpm_release", "")
+    if expected_name != spec_value("Name"):
+        fail("release contract package.name differs from RPM spec Name")
+    if expected_version != (ROOT / "VERSION").read_text(encoding="utf-8").strip():
+        fail("release contract package.version differs from VERSION")
+    if expected_version != spec_value("Version"):
+        fail("release contract package.version differs from RPM spec Version")
+    if expected_release != spec_value("Release"):
+        fail("release contract package.rpm_release differs from RPM spec Release")
+    if str(package.get("fedora", "")) != "44":
+        fail("release contract Fedora target must remain 44")
+
+    release = scope.get("release", {}) if isinstance(scope, dict) else {}
+    if release.get("version") != expected_version or release.get("rpm_release") != expected_release:
+        fail("development scope release identity differs from release contract")
+    if release.get("nvr") != f"{expected_name}-{expected_version}-{expected_release}":
+        fail("development scope NVR differs from release contract")
+
+    runtime_values: dict[str, str] = {}
+    for raw in runtime_lines:
+        line = raw.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            runtime_values[key] = value
+    if runtime_values.get("BC250_OLLAMA_VERSION") != runtime.get("ollama"):
+        fail("runtime Ollama pin differs from release contract")
+
+    primary = authority.get("primary", {}) if isinstance(authority, dict) else {}
+    secondary = authority.get("secondary", {}) if isinstance(authority, dict) else {}
+    if primary.get("kind") != "github-actions" or primary.get("workflow") != ".github/workflows/build-rpm.yml":
+        fail("release contract primary authority must be the GitHub Actions RPM workflow")
+    if primary.get("gate") != "make release-gate":
+        fail("release contract primary authority must use make release-gate")
+    if secondary.get("kind") != "local-reproduction" or secondary.get("entrypoint") != "scripts/ci-local.sh":
+        fail("release contract secondary path must be local reproduction via scripts/ci-local.sh")
+
+    if primary.get("selection_event") != "workflow_dispatch" or primary.get("selection_record") != "release-selection.json":
+        fail("release contract must distinguish explicit workflow-dispatch release selection")
+    evidence = contract.get("evidence", {}) if isinstance(contract, dict) else {}
+    if evidence.get("release_evidence_schema") != "bc250.release-evidence.v2":
+        fail("release contract must require bc250.release-evidence.v2")
+    if evidence.get("release_selection_schema") != "bc250.release-selection.v1":
+        fail("release contract must require bc250.release-selection.v1")
+    build_root = contract.get("build_root", {}) if isinstance(contract, dict) else {}
+    if build_root.get("make_override") != "BUILD_DIR" or build_root.get("helper_internal") != "BC250_BUILD_DIR":
+        fail("release contract build-root policy must use BUILD_DIR with internal BC250_BUILD_DIR")
+
+    release_test = validation.get("release_pipeline_test")
+    excludes = validation.get("package_excludes")
+    if release_test != "tests/test_release_pipeline.py":
+        fail("release contract must identify tests/test_release_pipeline.py as the host release test")
+    if excludes != [release_test]:
+        fail("release contract package exclusions must contain only the host release-pipeline test")
+    stages = validation.get("stages")
+    if not isinstance(stages, list) or [stage.get("id") for stage in stages if isinstance(stage, dict)] != [
+        "preflight-freeze", "frozen-package", "artifact-evidence"
+    ]:
+        fail("release contract stage order must be preflight-freeze, frozen-package, artifact-evidence")
 
 
 def check_configuration() -> None:
@@ -227,8 +340,8 @@ def check_dispatcher_and_runtime_contracts() -> None:
     dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
     routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
-        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "doctor",
-        "fetch-mtp", "gfx1013", "gitea-review", "install", "maintenance", "model", "ocr",
+        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "doctor", "health",
+        "fetch-mtp", "gitea-review", "install", "maintenance", "model", "ocr",
         "package-gate", "rag", "reset", "resilience", "revalidate", "ollama-profile",
         "openwebui-setup", "qualification", "run-mtp", "status", "support-bundle", "storage", "verify", "version",
     }
@@ -253,26 +366,6 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "MTP remains a separate opt-in workflow",
             "bc250 model apply all",
             "request_primary_reboot_if_needed",
-        ),
-        "cmd/system/gfx1013.sh": (
-            "PACKAGE_PROFILE=v0.2.1-alpha",
-            "PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9",
-            "SOURCE-SHA256SUMS",
-            "PATCH-SHA256SUMS",
-            "grub2-set-default",
-            "VK_DRIVER_FILES",
-            "prepare_cleanup_on_exit",
-            "Secure Boot",
-            "ROLLBACK_REQUIRED",
-            "STALE_KERNEL",
-            "status_json",
-            "reset()",
-            "verify_private_radv_device",
-            "BC250_GFX1013_PACKAGE_NEVRA",
-            "ConditionKernelCommandLine=$PATCH_MARKER",
-            "ExecCondition=+$INSTALLED_SELF ollama-guard",
-            "ollama_guard()",
-            "benchmark {stock|gfx|restored|status|report}",
         ),
         "cmd/system/storage.py": (
             "reflink=1",
@@ -330,7 +423,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "Requires:       git-core",
             "%posttrans",
             "BC-250 LLM appliance package installed.",
-            "BC-250 LLM appliance package upgraded.",
+            "BC-250 LLM appliance package transaction completed.",
             "sudo bc250 install",
         ),
     }
@@ -403,15 +496,11 @@ def check_greenfield_command_surface() -> None:
         "reset" + "-info",
         "uninstall" + "-info",
     )
-    # gfx1013 is also the deliberate package artifact namespace
-    # (/opt/bc250-gfx1013, BLS variant, state paths), so a blind prefixed-token
-    # ban would reject valid internal paths. The public dispatcher still owns
-    # the command spelling `bc250 gfx1013`.
-    names = [name for name in routes if name != "gfx1013"] + list(removed)
+    names = list(routes) + list(removed)
     prefixed_pattern = re.compile(
         r"\bbc250-(?:" + "|".join(re.escape(name) for name in names) + r")\b(?=[\s`'\"),;:]|$)"
     )
-    removed_model_verbs = ("install", "cleanup", "cleanup" + "-retired", "resolve")
+    removed_model_verbs = ("cleanup", "cleanup" + "-retired", "resolve")
     model_pattern = re.compile(
         r"\bbc250\s+model\s+(?:"
         + "|".join(re.escape(name) for name in removed_model_verbs)
@@ -547,6 +636,7 @@ def main() -> int:
     check_required_inputs()
     check_syntax()
     check_version()
+    check_release_contract()
     check_configuration()
     check_layout_and_docs()
     check_repository_safety()

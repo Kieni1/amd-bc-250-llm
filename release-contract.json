@@ -1,0 +1,64 @@
+{
+  "authority": {
+    "primary": {
+      "ci_events": [
+        "push",
+        "pull_request"
+      ],
+      "gate": "make release-gate",
+      "kind": "github-actions",
+      "policy": "GitHub CI builds are evidence; only an explicitly selected workflow-dispatch run is release artifact authority.",
+      "producer": "github-actions",
+      "selection_event": "workflow_dispatch",
+      "selection_record": "release-selection.json",
+      "workflow": ".github/workflows/build-rpm.yml"
+    },
+    "secondary": {
+      "entrypoint": "scripts/ci-local.sh",
+      "gate": "make release-gate",
+      "kind": "local-reproduction",
+      "policy": "Reproduction/debug evidence only; never release artifact authority."
+    }
+  },
+  "build_root": {
+    "helper_internal": "BC250_BUILD_DIR",
+    "make_override": "BUILD_DIR",
+    "policy": "Use BUILD_DIR=/path for Make-level custom build roots; BC250_BUILD_DIR is internal to helper scripts and must not be supplied independently."
+  },
+  "evidence": {
+    "environment_policy": "Record Fedora/container and key tool versions; do not pin the entire Fedora toolchain.",
+    "record_environment": true,
+    "release_evidence_schema": "bc250.release-evidence.v2",
+    "release_selection_schema": "bc250.release-selection.v1"
+  },
+  "package": {
+    "fedora": "44",
+    "name": "bc250-llm-server",
+    "rpm_release": "1",
+    "version": "0.14.1"
+  },
+  "runtime": {
+    "ollama": "0.34.4"
+  },
+  "schema": "bc250.release-contract.v2",
+  "validation": {
+    "package_excludes": [
+      "tests/test_release_pipeline.py"
+    ],
+    "release_pipeline_test": "tests/test_release_pipeline.py",
+    "stages": [
+      {
+        "description": "verify source identity, prepare pinned sources, lint, run release-pipeline contracts, then freeze Source0 and spec",
+        "id": "preflight-freeze"
+      },
+      {
+        "description": "build binary/source RPMs from the exact frozen source/spec snapshot; RPM %check runs package-context deterministic tests",
+        "id": "frozen-package"
+      },
+      {
+        "description": "verify payload/SRPM rebuild and emit closed binary/source manifests plus release-evidence.json",
+        "id": "artifact-evidence"
+      }
+    ]
+  }
+}

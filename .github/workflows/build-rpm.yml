@@ -2,6 +2,12 @@ name: Build Fedora RPM
 
 on:
   workflow_dispatch:
+    inputs:
+      release_authority:
+        description: Mark this exact workflow-dispatch run as the selected release artifact authority
+        required: true
+        default: false
+        type: boolean
   push:
   pull_request:
 
@@ -11,6 +17,9 @@ permissions:
 env:
   LANG: C
   LC_ALL: C
+  BC250_REQUIRE_GIT_SOURCE: "1"
+  BC250_BUILD_IMAGE_REF: "fedora:44"
+  BC250_RELEASE_AUTHORITY: ${{ github.event_name == 'workflow_dispatch' && inputs.release_authority && 'true' || 'false' }}
 
 jobs:
   build:
@@ -21,29 +30,64 @@ jobs:
     steps:
       - name: Install build tools
         run: |
-          dnf install -y \
-            bash cargo curl findutils gcc git gzip make \
-            libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck \
-            systemd systemd-rpm-macros tar xz
+          dnf --disable-repo=fedora-cisco-openh264 install -y \
+            bash cargo cpio curl findutils gcc git-core gzip make \
+            libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck shadow-utils \
+            systemd systemd-rpm-macros tar util-linux xz
 
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Run authoritative Fedora RPM gate
-        run: make release-gate
+      - name: Run Fedora RPM gate as unprivileged builder
+        run: |
+          useradd --no-create-home --home-dir /tmp/bc250-builder --shell /bin/bash bc250-builder
+          mkdir -p /tmp/bc250-builder
+          chown bc250-builder:bc250-builder /tmp/bc250-builder
+          chown -R bc250-builder:bc250-builder "$GITHUB_WORKSPACE"
+          runuser -u bc250-builder -- env \
+            HOME=/tmp/bc250-builder \
+            LANG="$LANG" LC_ALL="$LC_ALL" \
+            BC250_REQUIRE_GIT_SOURCE="$BC250_REQUIRE_GIT_SOURCE" \
+            BC250_BUILD_IMAGE_REF="$BC250_BUILD_IMAGE_REF" \
+            BC250_RELEASE_AUTHORITY="$BC250_RELEASE_AUTHORITY" \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \
+            GITHUB_SHA="$GITHUB_SHA" \
+            GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" \
+            GITHUB_WORKFLOW="$GITHUB_WORKFLOW" \
+            GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            GITHUB_REF="$GITHUB_REF" \
+            make release-gate
 
-      - name: Upload binary RPM
+      - name: Upload binary RPM evidence
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: bc250-llm-server-binary-rpm
           path: |
             dist/*.x86_64.rpm
-            dist/SHA256SUMS
+            dist/SHA256SUMS.binary
+            dist/SHA256SUMS.inputs
+            dist/release-evidence.json
 
-      - name: Upload source RPM
+      - name: Upload source RPM evidence
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: bc250-llm-server-source-rpm
           path: |
             dist/*.src.rpm
-            dist/SHA256SUMS
+            dist/SHA256SUMS.source
+            dist/SHA256SUMS.inputs
+            dist/release-evidence.json
+      - name: Upload selected release authority record
+        if: env.BC250_RELEASE_AUTHORITY == 'true'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bc250-llm-server-release-selection
+          path: |
+            dist/release-selection.json
+            dist/release-evidence.json
+            dist/SHA256SUMS.binary
+            dist/SHA256SUMS.source
+            dist/SHA256SUMS.inputs

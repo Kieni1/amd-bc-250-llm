@@ -1,50 +1,88 @@
 {
-  "schema": 1,
+  "schema": 2,
   "kind": "workbench-checkpoint",
-  "release_identity": "bc250-llm-server-0.13.1-1.9",
-  "predecessor_artifact": "amd-bc-250-llm-0.13.1-1.8.zip",
-  "predecessor_sha256": "0d409419d3ecbfd4860dac01837ee2f4982a3f108b901249a96c90fcd90b636c",
-  "batch": "0.13.1-1.9-secureboot-runtime-identity-fixes",
-  "changed_files": [
-    "CHANGELOG.md",
-    "README.md",
-    "TLDR.md",
-    "WORKBENCH-STATE.json",
-    "cmd/monitoring/doctor.py",
-    "cmd/monitoring/status-json.py",
-    "cmd/monitoring/status.sh",
-    "cmd/monitoring/version.py",
-    "cmd/system/gfx1013.sh",
-    "development/DEVELOPMENT-SCOPE.json",
-    "development/TESTING-STRATEGY.md",
-    "development/VALIDATION-MATRIX.md",
-    "docs/GFX1013.md",
-    "docs/OPERATIONS.md",
-    "packaging/bc250-llm-server.spec",
-    "tests/test_gfx1013.py",
-    "tests/test_operations.py"
-  ],
-  "completed": [
-    "Recognize mokutil's explicit unsupported Secure Boot result as disabled-unsupported and allow prepare for that explicit state while retaining fail-closed behavior for enabled and genuinely unknown states.",
-    "Keep mokutil stderr in the Secure Boot probe so the unsupported platform result is not discarded.",
-    "Make non-root status/version runtime identity explicitly NOT INSPECTED because root-owned Podman metadata requires privilege; do not treat that visibility limit as runtime drift.",
-    "Keep privileged status/doctor/verify exact runtime version/digest verification unchanged.",
-    "Treat missing privilege in doctor package-verifier/runtime-identity checks as informational rather than appliance-health degradation.",
-    "Keep the accepted GFX1013 v0.2.1-alpha patch profile, model/runtime/CU defaults, benchmark policy and default-OFF behavior unchanged."
-  ],
-  "validation": [
-    "Mapped GFX1013/benchmark/operations/packaging/source/upstream-patch regression set passed: 132/132 tests.",
-    "Adjacent documentation/install/qualification regression set passed: 73/73 tests; total source-level regression coverage run for this release was 205/205.",
-    "Repository source validator passed; development scope/frozen-tree check passed; changed Python sources compiled; changed shell syntax passed bash -n.",
-    "Ruff and ShellCheck executables are unavailable in this workspace; the operator Fedora lint gate remains authoritative.",
-    "RPM/build/rpmlint/payload/SRPM gates were intentionally not run per operator instruction; the operator Fedora release gate remains authoritative."
-  ],
-  "device_followup": [
-    "Build exact 0.13.1-1.9 with the operator Fedora release gate.",
-    "Confirm bc250 gfx1013 prepare --check reports Secure Boot PASS (disabled-unsupported) on the exact device without mutation.",
-    "Confirm ordinary bc250 status/version report runtime identity NOT INSPECTED without degrading appliance health, while sudo status/version/doctor/verify retain exact MATCH.",
-    "Capture a fresh 1.9 A1; do not reuse the exact 1.8 A1 as release authority.",
-    "If Advanced prefill/TTFC again differs materially from historical 1.7/1.8 observations, repeat A1 once before B and inspect per-run timing/memory placement.",
-    "Only after clean 1.9 stock/package/preflight gates proceed to prepare, one-shot patched reboot, enable, B, disable, stock reboot, A2 and synthesis."
-  ]
+  "release": {
+    "name": "bc250-llm-server",
+    "version": "0.14.1",
+    "rpm_release": "1",
+    "nvr": "bc250-llm-server-0.14.1-1",
+    "runtime_ollama": "0.34.4",
+    "fedora": "44"
+  },
+  "checkpoint": {
+    "id": "C8",
+    "status": "SOURCE-READY",
+    "phase": "release-identity-and-authoritative-build",
+    "next_action": "Run the explicit authoritative Fedora 44 GitHub Actions workflow_dispatch build; capture release-evidence.json and release-selection.json before C9."
+  },
+  "source_predecessor": {
+    "checkpoint": "C7",
+    "status": "PASS",
+    "archive": "amd-bc-250-llm-clean-core-C7.zip",
+    "archive_sha256": "cbb0260a40cf404ce7e9c84eea7a2092e62eb8277696235609722dd62bb2939e",
+    "deterministic_tests": {
+      "total": "617/617",
+      "modules": 20,
+      "package_context": "598/598",
+      "package_modules": 19,
+      "host_release_pipeline": "19/19"
+    }
+  },
+  "immutable_evidence": {
+    "c5d": {
+      "archive": "amd-bc-250-llm-clean-core-C5-D.zip",
+      "archive_sha256": "25be3783716451c84f54209ae16a38c5de1ef1675c4b579fd02cfff08865c710",
+      "canonical_manifest_sha256": "e43ab0244de09bc4fc1981db36d956860e6d01715566fe91a9597c869b59e651",
+      "source_files": 362,
+      "deterministic_tests": {
+        "total": "613/613",
+        "modules": 20,
+        "package_context": "594/594",
+        "package_modules": 19,
+        "host_release_pipeline": "19/19"
+      },
+      "status": "PASS",
+      "note": "Immutable accepted C5-D behavioral/source freeze. Later bookkeeping/QC bytes must not redefine this identity."
+    }
+  },
+  "build_authority": {
+    "producer": "github-actions",
+    "primary_workflow": ".github/workflows/build-rpm.yml",
+    "ci_events": [
+      "push",
+      "pull_request"
+    ],
+    "selection_event": "workflow_dispatch",
+    "release_authority_requires_explicit_selection": true,
+    "selection_record": "release-selection.json",
+    "local_reproduction": "scripts/ci-local.sh or make release-gate in matching Fedora 44; never substitutes for selected GitHub artifact authority"
+  },
+  "build_root_policy": {
+    "supported_make_override": "BUILD_DIR=/path",
+    "internal_helper_variable": "BC250_BUILD_DIR",
+    "note": "BC250_BUILD_DIR must not be supplied independently to Make."
+  },
+  "validation": {
+    "c7_integrated_source_gate": "PASS",
+    "c8_source_validation": "PASS — 619/619 across 20 modules (598/598 package-context across 19 modules; 21/21 host release-pipeline)",
+    "device_acceptance": "PENDING C9"
+  },
+  "history": {
+    "status": [
+      "C0 PASS",
+      "C1 PASS",
+      "C2 PASS",
+      "C3 PASS",
+      "C4 PASS",
+      "C5-A PASS",
+      "C5-B PASS",
+      "C5-C PASS",
+      "C5-D PASS",
+      "C5 CLOSED",
+      "C6 PASS/FROZEN",
+      "C7 PASS/FROZEN",
+      "C8 SOURCE GATE PASS / SOURCE-READY"
+    ],
+    "note": "Detailed earlier counts and decisions remain in frozen handovers/reports; schema v2 keeps only current authority plus immutable predecessor evidence."
+  }
 }

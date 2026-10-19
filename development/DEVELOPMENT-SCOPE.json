@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "release": {
-    "version": "0.13.1",
-    "rpm_release": "1.9",
-    "nvr": "bc250-llm-server-0.13.1-1.9"
+    "version": "0.14.1",
+    "rpm_release": "1",
+    "nvr": "bc250-llm-server-0.14.1-1"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
@@ -88,12 +88,10 @@
         "quality-checks/main/**",
         "quality-checks/task/**",
         "quality-checks/translation/**",
-        "quality-checks/utils/**",
-        "tests/test_gfx1013_benchmark.py"
+        "quality-checks/utils/**"
       ],
       "focused_tests": [
-        "tests.test_benchmark",
-        "tests.test_gfx1013_benchmark"
+        "tests.test_benchmark"
       ],
       "notes": [
         "Clean reasoning-only exhaustion at the production ceiling is INCOMPLETE; repetitive degeneration remains a quality defect."
@@ -205,7 +203,12 @@
         "patches/**",
         "licenses/**",
         "scripts/ci-local.sh",
-        "quality-checks/package/**"
+        "quality-checks/package/**",
+        "release-contract.json",
+        "scripts/release-contract.py",
+        "scripts/release-evidence.py",
+        "scripts/release-selection.py",
+        "tests/test_release_pipeline.py"
       ],
       "focused_tests": [
         "tests.test_packaging",
@@ -223,6 +226,7 @@
       "status": "boundary_active",
       "description": "Current operator docs, validation strategy and current integration handovers. Historical evidence remains archive-only.",
       "paths": [
+        "WORKBENCH-STATE.json",
         "README.md",
         "TLDR.md",
         "docs/OPERATIONS.md",
@@ -236,15 +240,20 @@
         "development/handovers/DEVELOPMENT-WORKFLOW.md",
         "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
         "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
-        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.3.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.13.1-1.3.md",
         "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
         "development/handovers/README.md",
         "tests/test_documentation.py",
         "docs/FILESTRUCTURE.md",
         "development/README.md",
         "development/DECISIONS.md",
-        "development/handovers/OPERATIONS-HANDOVER.md"
+        "development/handovers/OPERATIONS-HANDOVER.md",
+        "development/handovers/CURRENT_WORK_CLEAN_CORE_RECONSTRUCTION.md",
+        "development/handovers/RELEASE_BUILD_AND_VALIDATION_HANDOVER.md",
+        "development/handovers/TESTING-HANDOVER.md",
+        "development/handovers/C3_PROPOSITION_REVIEW_AND_REQUIRED_REWORK.md",
+        "development/handovers/04_DONOR_DELTA_1.9_TO_2.2_AND_FORWARD_PORT_LEDGER.md",
+        "scripts/check-clean-core-absence.sh",
+        "scripts/check-current-guidance.sh"
       ],
       "focused_tests": [
         "tests.test_documentation"
@@ -268,7 +277,7 @@
       "focused_tests": [
         "tests.test_maintenance"
       ],
-      "baseline_sha256": "a7be66cff68088075e45bdd63963a76024fe08534212277efb0a625ba050018f",
+      "baseline_sha256": "5df7a82413a2f7e6b37ee4f336ee0566e7fc80f01abc0a993c8bf254178822e0",
       "thaw_if": [
         "maintenance/companion behavior is intentionally changed",
         "protected Open WebUI credential path/format changes",
@@ -324,7 +333,7 @@
         "models/experiments/compare-mtp.sh"
       ],
       "focused_tests": [],
-      "baseline_sha256": "79c3fbead84c08ca60a9a70636a04ff0c3f914e4a93153e37ab70f215bf122e4",
+      "baseline_sha256": "35f97085389b2fe5e2926dd1a449ff4e2e36adb6f3c3157bbf7f141af7f75579",
       "thaw_if": [
         "MTP is explicitly returned to active comparison",
         "generic model lifecycle begins managing MTP"
@@ -400,19 +409,14 @@
         "development/model-runs/**",
         "development/patchnotes/**",
         "development/references/**",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.1-*.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.1.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.2.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.3.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.4.md",
-        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.4.md",
+        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_*.md",
+        "development/handovers/RELEASE-TESTING-HANDOVER-*.md",
         "development/handovers/RAG-TESTING-HANDOVER-*.md",
         "development/SOURCE-REFRESH-*.md",
-        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_0.12.2-0.5.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-0.12.2-0.5.md"
+        "development/handovers/archive/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "60ba4996e716377ce7b543138a6e4a26d60e1a332de29db7405d81f39019ae2d"
+      "baseline_sha256": "9d30e16aac8e82043367bb944c74c98db3c5a6c2bd7373731b170277c87697f0"
     },
     "quality-history": {
       "status": "archive_only",
@@ -431,28 +435,6 @@
       ],
       "focused_tests": [],
       "baseline_sha256": "22ebca78262c46caeb569005cc1dd5eeb68900f6365aa6574c717d29388967fd"
-    },
-    "gfx1013-experimental": {
-      "status": "active",
-      "description": "Opt-in exact-kernel GFX1013 lifecycle plus bounded same-package A1/B/A2 inference evidence; Secure Boot/kernel-drift guards, private Ollama-only RADV and fail-closed rollback remain authoritative.",
-      "paths": [
-        "cmd/system/gfx1013.sh",
-        "gfx1013/**",
-        "docs/GFX1013.md",
-        "tests/test_gfx1013.py",
-        "cmd/benchmark/gfx1013-ab.py",
-        "tests/test_gfx1013_benchmark.py"
-      ],
-      "focused_tests": [
-        "tests.test_gfx1013",
-        "tests.test_gfx1013_benchmark"
-      ],
-      "notes": [
-        "Default OFF. Stock saved/default boot remains authoritative until a verified patched boot is explicitly enabled.",
-        "Private RADV activation is guarded by the patched boot marker, exact package/kernel identity and private payload hashes so a later stock-kernel boot cannot consume the patched ICD.",
-        "Prepare/disable/reset expose non-destructive checks; reset/final erase/upgrade must prove a safe stock saved + next boot before destructive GFX1013 cleanup.",
-        "Release 1.7 benchmark phases never automate prepare/enable/disable/reboot; A2 is required before an advisory PROMOTION_CANDIDATE can be emitted."
-      ]
     },
     "qualification-control": {
       "status": "active",
