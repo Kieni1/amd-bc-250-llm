@@ -21,14 +21,15 @@ fi
 source "$runtime_env"
 INSTALL_MODE="full"
 OWUI_TOKEN_FILE="${BC250_OWUI_TOKEN_FILE:-}"
-OWUI_VERIFY_TOKEN_FILE="/run/bc250-llm-server/install-openwebui-token"
+RUNTIME_DIR="${BC250_RUNTIME_DIR:-/run/bc250-llm-server}"
+OWUI_VERIFY_TOKEN_FILE="$RUNTIME_DIR/install-openwebui-token"
 DEFAULT_OWUI_TOKEN_FILE="/var/lib/bc250-llm-server/secrets/openwebui-admin.key"
 LEGACY_OWUI_TOKEN_FILE="/root/owui-test.key"
 CORE_VERIFICATION_STATE="NOT RUN"
 LOCAL_MAINTENANCE_STATE="NOT CONFIGURED (optional)"
 COMPANION_STATE="NOT CONFIGURED (optional)"
 BACKUP_EXPORT_STATE="NOT CONFIGURED (optional)"
-HF_SESSION_FILE="/run/bc250-llm-server/install-hf-session"
+HF_SESSION_FILE="$RUNTIME_DIR/install-hf-session"
 OWUI_SETUP_STATE="not-run"
 OWUI_UPGRADE_BACKUP=""
 
@@ -385,7 +386,7 @@ step_6_runtime_topology() {
 step_7_models() {
   heading "7. MODELS"
   require_progress_terminal
-  install -d -m0700 /run/bc250-llm-server
+  install -d -m0700 "$RUNTIME_DIR"
   : > "$HF_SESSION_FILE"
   chmod 0600 "$HF_SESSION_FILE"
   export BC250_HF_SESSION_FILE="$HF_SESSION_FILE"

@@ -281,19 +281,17 @@ def multipart_upload(client: JsonClient, path: Path, knowledge_id: str) -> dict[
     )
     boundary = "----bc250-bench-" + uuid.uuid4().hex
     mime = mimetypes.guess_type(path.name)[0] or "text/markdown"
-    body = b"".join(
-        [
-            (
-                f'--{boundary}\r\nContent-Disposition: form-data; name="metadata"'
-                f"\r\n\r\n{metadata}\r\n"
-            ).encode(),
-            (
-                f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
-                f'filename="{path.name}"\r\nContent-Type: {mime}\r\n\r\n'
-            ).encode(),
-            content,
-            f"\r\n--{boundary}--\r\n".encode(),
-        ]
+    body = (
+        (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="metadata"'
+            f"\r\n\r\n{metadata}\r\n"
+        ).encode()
+        + (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
+            f'filename="{path.name}"\r\nContent-Type: {mime}\r\n\r\n'
+        ).encode()
+        + content
+        + f"\r\n--{boundary}--\r\n".encode()
     )
     headers = {
         "Content-Type": f"multipart/form-data; boundary={boundary}",

@@ -4,10 +4,15 @@
 
 - Return the clean-core line to the normal RPM naming convention: `Version: 0.14.1`, first package `Release: 1`; future package-only revisions increment the integer Release.
 
-- Assign the first clean-core release identity after the C7 integrated source gate; Ollama remains pinned at 0.34.4 and no device acceptance is implied by the source bump.
+- Clean the pre-release source tree around the 0.14.1-1 operating model: replace reconstruction-era active handovers/workbench guidance with release-oriented state, retain the full regression suite, restore the 175-test benchmark module, and keep a bounded package-critical RPM `%check` separate from advisory full-suite quality.
+- Make installer test/runtime scratch state explicitly overridable without changing the production `/run/bc250-llm-server` default; isolate source-tarball fixtures from inherited build-helper environment.
+- Assign the first clean-core release identity after integrated source validation; Ollama remains pinned at 0.34.4 and no device acceptance is implied by the source bump.
 - Separate GitHub CI production from explicit release selection: normal push/PR runs remain CI evidence, while a deliberately selected workflow-dispatch run can emit `release-selection.json` as C9 artifact authority.
 - Extend release evidence with Fedora/container/build-tool provenance without pinning the Fedora toolchain.
 - Define `BUILD_DIR=/path` as the supported Make-level custom build-root interface; `BC250_BUILD_DIR` is internal to helper scripts.
+- Harden the unreleased candidate gate against repeat build iterations: run Ruff/ShellCheck plus current-guidance/scope checks before source preparation/freeze, make configured rpmlint blocking after RPM construction, and keep only the broad behavioral suite advisory.
+- Make GitHub/local Fedora build dependencies explicit for release-gate commands instead of relying on base-image composition, and remove Ruff FLY002-shaped literal-join fixtures from current Python source/tests.
+- Reconcile current guidance after removal of the experimental GFX path: bounded cleanup is a transition task, while the product roadmap returns to local office RAG/document quality, German–French translation UX and polished local-assistant operation.
 
 ## 0.13.1-1.9 - 2026-10-11
 

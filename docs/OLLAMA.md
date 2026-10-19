@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; 0.13.1-1.2 keeps the pin unchanged.
+Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; the current 0.14.1-1 release keeps the pin unchanged.
 
 ## Install and verify
 
@@ -65,7 +65,7 @@ transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regres
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.13.1-1.2 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
+The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.14.1-1 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
 
 The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package

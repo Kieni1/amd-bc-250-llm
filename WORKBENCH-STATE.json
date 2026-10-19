@@ -1,88 +1,39 @@
 {
   "schema": 2,
-  "kind": "workbench-checkpoint",
+  "kind": "release-workbench",
   "release": {
     "name": "bc250-llm-server",
     "version": "0.14.1",
     "rpm_release": "1",
     "nvr": "bc250-llm-server-0.14.1-1",
+    "fedora": "44",
     "runtime_ollama": "0.34.4",
-    "fedora": "44"
+    "state": "source-ready-build-pending"
   },
-  "checkpoint": {
-    "id": "C8",
-    "status": "SOURCE-READY",
-    "phase": "release-identity-and-authoritative-build",
-    "next_action": "Run the explicit authoritative Fedora 44 GitHub Actions workflow_dispatch build; capture release-evidence.json and release-selection.json before C9."
-  },
-  "source_predecessor": {
-    "checkpoint": "C7",
-    "status": "PASS",
-    "archive": "amd-bc-250-llm-clean-core-C7.zip",
-    "archive_sha256": "cbb0260a40cf404ce7e9c84eea7a2092e62eb8277696235609722dd62bb2939e",
-    "deterministic_tests": {
-      "total": "617/617",
-      "modules": 20,
-      "package_context": "598/598",
-      "package_modules": 19,
-      "host_release_pipeline": "19/19"
-    }
-  },
-  "immutable_evidence": {
-    "c5d": {
-      "archive": "amd-bc-250-llm-clean-core-C5-D.zip",
-      "archive_sha256": "25be3783716451c84f54209ae16a38c5de1ef1675c4b579fd02cfff08865c710",
-      "canonical_manifest_sha256": "e43ab0244de09bc4fc1981db36d956860e6d01715566fe91a9597c869b59e651",
-      "source_files": 362,
-      "deterministic_tests": {
-        "total": "613/613",
-        "modules": 20,
-        "package_context": "594/594",
-        "package_modules": 19,
-        "host_release_pipeline": "19/19"
-      },
-      "status": "PASS",
-      "note": "Immutable accepted C5-D behavioral/source freeze. Later bookkeeping/QC bytes must not redefine this identity."
-    }
+  "next_work": {
+    "build": "Run/select the authoritative Fedora 44 GitHub workflow_dispatch build and freeze exact RPM/SRPM/evidence identities.",
+    "device": "Run the low-cost core functionality check on exactly the selected 0.14.1-1 RPM.",
+    "after_pass": "Freeze the stock-core baseline, do only bounded simplification that removes obsolete ownership/risk, then shift directly to the product roadmap: office RAG/document workflows, German\u2013French translation UX, and polished local-assistant operation."
   },
   "build_authority": {
-    "producer": "github-actions",
-    "primary_workflow": ".github/workflows/build-rpm.yml",
-    "ci_events": [
-      "push",
-      "pull_request"
-    ],
+    "primary": "GitHub Actions / Fedora 44",
+    "workflow": ".github/workflows/build-rpm.yml",
     "selection_event": "workflow_dispatch",
-    "release_authority_requires_explicit_selection": true,
     "selection_record": "release-selection.json",
-    "local_reproduction": "scripts/ci-local.sh or make release-gate in matching Fedora 44; never substitutes for selected GitHub artifact authority"
-  },
-  "build_root_policy": {
-    "supported_make_override": "BUILD_DIR=/path",
-    "internal_helper_variable": "BC250_BUILD_DIR",
-    "note": "BC250_BUILD_DIR must not be supplied independently to Make."
+    "local": "scripts/ci-local.sh or matching Fedora 44 execution for reproduction/debug only"
   },
   "validation": {
-    "c7_integrated_source_gate": "PASS",
-    "c8_source_validation": "PASS — 619/619 across 20 modules (598/598 package-context across 19 modules; 21/21 host release-pipeline)",
-    "device_acceptance": "PENDING C9"
+    "full_source_suite": "PASS \u2014 641/641 across 24 modules using isolated module execution",
+    "release_preflight": "PASS \u2014 22/22 release-pipeline contract tests",
+    "rpm_package_check": "PASS \u2014 83/83 across 5 package-critical modules; verified unprivileged",
+    "device_acceptance": "PENDING exact selected 0.14.1-1 RPM"
+  },
+  "long_term": {
+    "direction": "stock-first local office AI appliance; simplify obsolete infrastructure where it reduces risk, then prioritize RAG/document quality, German\u2013French translation and ordinary-user UX before optional expert-layer expansion",
+    "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM",
+    "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses"
   },
   "history": {
-    "status": [
-      "C0 PASS",
-      "C1 PASS",
-      "C2 PASS",
-      "C3 PASS",
-      "C4 PASS",
-      "C5-A PASS",
-      "C5-B PASS",
-      "C5-C PASS",
-      "C5-D PASS",
-      "C5 CLOSED",
-      "C6 PASS/FROZEN",
-      "C7 PASS/FROZEN",
-      "C8 SOURCE GATE PASS / SOURCE-READY"
-    ],
-    "note": "Detailed earlier counts and decisions remain in frozen handovers/reports; schema v2 keeps only current authority plus immutable predecessor evidence."
+    "note": "Detailed reconstruction/GFX history is intentionally not active state. Compact rationale is retained under development/handovers/archive and Git history."
   }
 }
