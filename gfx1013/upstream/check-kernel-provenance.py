@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Locate and fingerprint the Fedora-prepared AMDGPU source used by BC-250 patches."""
 from __future__ import annotations
 

@@ -68,6 +68,23 @@ Profiles and optional qualification modes:
 - `--deep-context`: adds explicit approximate 4K and 16K prompt targets. The recorded
   `prompt_eval_count` is authoritative; this mode deliberately does not force 32K.
 
+### Allocation-ceiling experiments are not production qualification
+
+The package deliberately keeps `--deep-context` bounded. External BC-250 work in
+akandr/bc250-rocm commit [`bd897ec`](https://github.com/akandr/bc250-rocm/commit/bd897eccac05cb02f1c0c1e3cb9d4e6a490f58b2)
+showed that an unused `llama-bench` sequence-state copy could materially understate
+ROCm's allocation ceiling. The corrected [ceiling campaign](https://github.com/akandr/bc250-rocm/blob/bd897eccac05cb02f1c0c1e3cb9d4e6a490f58b2/logs/context-ceilings-2026-09-30/README.md)
+found deeper limits, with Vulkan generally deeper still. It also recorded extreme
+memory pressure, swap writes and gfx-ring timeouts near the edge.
+
+Interpret such a ceiling as **"this benchmark allocation completed"**, not **"this is a
+safe service context"**. A production/service context additionally needs useful output
+inside the model's trained window, repeatability, acceptable latency, thermal headroom,
+low swap pressure, clean GPU journals and recovery behavior. Do not promote a larger
+`num_ctx`, KV-cache policy or service profile from allocation-ceiling evidence alone.
+The external stress harnesses/log corpus remain external evidence and are intentionally
+not vendored into this package.
+
 Generation evidence records the effective local Ollama service command/environment when
 available, including the resolved `OLLAMA_KV_CACHE_TYPE`, and captures the current CU
 status. Completion integrity requires Ollama's terminal `done=true` record and rejects
@@ -106,7 +123,7 @@ Use the lifecycle-owned benchmark when evaluating the experimental compute-queue
 
 ```bash
 sudo bc250 gfx1013 benchmark stock
-# prepare -> patched reboot -> enable
+# prepare -> stage-boot -> patched reboot -> enable
 sudo bc250 gfx1013 benchmark gfx
 # disable -> stock reboot
 sudo bc250 gfx1013 benchmark restored
@@ -116,8 +133,10 @@ sudo bc250 gfx1013 benchmark report
 This is intentionally separate from generic model benchmarking. A1/B/A2 must use the
 same package, running kernel, prompt and exact model digests, so the primary comparison
 measures stock versus GFX1013 rather than a package/model change. Standard and Advanced
-are the default screen; `--include-deep` adds a bounded Deep confirmation. The helper
-never calls prepare/enable/disable/reboot itself. See `docs/GFX1013.md` for evidence and
+are the default screen; `--include-deep` adds a bounded Deep confirmation. A fixed-seed
+output identity is also compared across A1/B/A2 so a performance gain cannot qualify
+when deterministic inference changes or becomes unstable. The helper
+never calls prepare/stage-boot/enable/disable/reset/reboot itself. See `docs/GFX1013.md` for evidence and
 promotion-candidate rules.
 
 ## Embeddings

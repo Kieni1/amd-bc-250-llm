@@ -1,4 +1,4 @@
-name: Build Fedora RPM
+name: Source validation
 
 on:
   workflow_dispatch:
@@ -13,52 +13,26 @@ env:
   LC_ALL: C
 
 jobs:
-  build:
+  validate:
     runs-on: ubuntu-latest
     container:
       image: fedora:44
 
     steps:
-      - name: Install build tools
+      - name: Install source-validation tools
         run: |
           dnf --disable-repo=fedora-cisco-openh264 install -y \
-            bash binutils bison bzip2 cargo cargo-rpm-macros cpio curl elfutils-libelf-devel \
-            expat-devel findutils flex gcc gcc-c++ git-core glslang glslang-devel gzip kernel-devel kernel-srpm-macros kmod libdrm-devel \
-            libzstd-devel make meson ninja-build openssl-devel patch pkgconf-pkg-config python3 \
-            python3-mako python3-packaging python3-pycparser python3-pyyaml redhat-rpm-config rpm-build rpmlint shadow-utils ruff rust ShellCheck \
-            spirv-tools-devel systemd systemd-devel systemd-rpm-macros \
-            tar util-linux vulkan-headers vulkan-loader-devel xz zlib-devel zstd
+            bash findutils git-core python3 ruff ShellCheck
 
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Prepare non-root builder
+      - name: Run deterministic source validation
         run: |
-          useradd --create-home --shell /bin/bash --uid 10001 bc250-builder
-          chown -R bc250-builder:bc250-builder "$GITHUB_WORKSPACE"
+          make lint
+          make validate
 
-      - name: Run authoritative Fedora RPM gate as non-root builder
+      - name: Explain release-build authority
         run: |
-          builder_home="$(getent passwd bc250-builder | cut -d: -f6)"
-          test -n "$builder_home"
-          runuser -u bc250-builder -- env \
-            HOME="$builder_home" \
-            LANG=C LC_ALL=C \
-            GITHUB_WORKSPACE="$GITHUB_WORKSPACE" \
-            bash -Eeuxo pipefail -c 'cd "$GITHUB_WORKSPACE" && make release-gate'
-
-      - name: Upload binary RPM
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: bc250-llm-server-binary-rpm
-          path: |
-            dist/*.x86_64.rpm
-            dist/SHA256SUMS.binary
-
-      - name: Upload source RPM
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
-        with:
-          name: bc250-llm-server-source-rpm
-          path: |
-            dist/*.src.rpm
-            dist/SHA256SUMS.source
+          echo 'RPM release artifacts are intentionally built only on the Fedora 44 maintainer workstation.'
+          echo 'Run ./build-local.sh --full there for the authoritative release gate.'

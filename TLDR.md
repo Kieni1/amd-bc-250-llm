@@ -3,9 +3,15 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.13.1-1.12` (Tika 4.1.0-full; GFX1013 prepare/build integration hardening).
+Current release source: `bc250-llm-server-0.13.1-2.2` (Tika 4.1.0-full; GFX1013 prepare/build integration hardening).
+Release/build identity is centralized in `release-contract.json`; full preflight validates the exact frozen source/spec and package suite before sudo or expensive GFX builds.
 
-GFX1013 is still opt-in/default-off. Profile `v0.2.4-alpha` uses Fedora 44 `mesa-26.2.4-1.fc44` but builds/deploys only headless AMD Vulkan RADV (no private X11/Wayland/EGL/GBM/OpenGL stack), makes exact-kernel compatibility verification configuration-aware, proves Fedora kernel patch-target provenance, and builds the patched initramfs from an isolated module tree without replacing stock `amdgpu`. The Fedora release gate now compiles and ABI-checks that production kernel-module path as well as the headless RADV path.
+GFX1013 is still opt-in/default-off. Profile `v0.2.5-alpha` uses Fedora 44 `mesa-26.2.4-1.fc44` but builds/deploys only headless AMD Vulkan RADV (no private X11/Wayland/EGL/GBM/OpenGL stack), makes exact-kernel compatibility verification configuration-aware, proves Fedora kernel patch-target provenance, and builds the patched initramfs from an isolated module tree without replacing stock `amdgpu`. GFX prepare now requires `rpm_macro(py3_shebang_fix)` through RPM provider resolution before source/build work, so a missing Fedora kernel `%prep` macro blocks early rather than failing later as shell `fg: no job control`. Default GFX status/preflight output is exception-focused; use `status --verbose` or `prepare --check --verbose` for provider/provenance detail. The Fedora release gate compiles and ABI-checks the production kernel-module path as well as the headless RADV path. Local `--full` runs authenticate sudo once at startup, then source/lint/release-contract preflight freezes the validated RPM source/spec inputs before any expensive GFX work; the sudo ticket is refreshed non-interactively through the run and later privileged calls are non-interactive. Major stages print ISO-8601 plus total/per-stage elapsed timestamps so slow checkpoints are visible immediately, and a successful build ends with the generated main RPM path. `--allow-dirty` is engineering-only and cannot produce a release-qualified result. RPM `%check` excludes host release-orchestration tests, which are already enforced by preflight.
+
+Context note: corrected external ceiling tests show that benchmark allocation limits can
+be much deeper than earlier measurements, but extreme runs also incurred severe swap
+and GPU timeout pressure. No production context/profile limit is raised in 1.15; a
+benchmark allocation ceiling is not a safe service context.
 
 ## Install
 
@@ -39,7 +45,7 @@ package-owned four-lane topology.
 ```bash
 sudo bc250 status
 sudo bc250 status --json
-sudo bc250 doctor
+sudo bc250 health
 bc250 version
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
@@ -64,7 +70,13 @@ prerequisites before staging anything:
 ```bash
 sudo bc250 gfx1013 status
 sudo bc250 gfx1013 prepare --check
+# full dependency/provider/provenance detail when needed:
+sudo bc250 gfx1013 prepare --check --verbose
+# optional if the check reports source MISS/PARTIAL:
+sudo bc250 gfx1013 prepare --download-only
 sudo bc250 gfx1013 prepare
+sudo bc250 gfx1013 status
+sudo bc250 gfx1013 stage-boot
 # reboot the one-shot patched entry, then:
 sudo bc250 gfx1013 enable
 # rollback/recovery:
@@ -72,13 +84,13 @@ sudo bc250 gfx1013 disable
 sudo bc250 gfx1013 reset --check
 ```
 
-A stale/new stock kernel fails `ollama.service` closed while the private patched RADV override is present; status reports `ROLLBACK_REQUIRED` and requires rollback/reprepare before normal Ollama service is restored.
+A stale/new stock kernel still fails `ollama.service` closed while the private patched RADV override is present and reports `ROLLBACK_REQUIRED`. A different known-safe transition, `STOCK_REBOOT_REQUIRED`, is used only when a previous patched runtime is still loaded but verified stock saved/default and next boot are already restored with the private override disabled; in that case the immediate action is simply `sudo reboot`.
 
 For the bounded same-package GFX performance screen:
 
 ```bash
 sudo bc250 gfx1013 benchmark stock       # A1, stock boot
-# prepare -> patched reboot -> enable
+# prepare -> stage-boot -> patched reboot -> enable
 sudo bc250 gfx1013 benchmark gfx         # B
 # disable -> reboot stock
 sudo bc250 gfx1013 benchmark restored    # A2 control
@@ -234,6 +246,7 @@ result directories, tuning commands, RAG qualification and thermal profiles.
 ```bash
 sudo bc250 gfx1013 status
 sudo bc250 gfx1013 prepare
+sudo bc250 gfx1013 stage-boot
 # reboot the staged one-shot patched entry
 sudo bc250 gfx1013 enable
 # rollback:

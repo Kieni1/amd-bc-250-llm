@@ -399,8 +399,8 @@ class GenerationPolicyTests(unittest.TestCase):
             returncode=0,
             stdout=(
                 "ExecStart={ path=/usr/local/bin/ollama ; argv[]=/usr/local/bin/ollama serve ; }\n"
-                "Environment=OLLAMA_VULKAN=1 OLLAMA_KV_CACHE_TYPE=q8_0 "
-                "GGML_VK_VISIBLE_DEVICES=0\n"
+                "Environment=OLLAMA_VULKAN=1 OLLAMA_IGPU_ENABLE=1 "
+                "OLLAMA_KV_CACHE_TYPE=q8_0 GGML_VK_VISIBLE_DEVICES=0\n"
             ),
             stderr="",
         )
@@ -409,6 +409,7 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertEqual(evidence["service"], "ollama.service")
         self.assertEqual(evidence["kv_cache_type"], "q8_0")
         self.assertEqual(evidence["environment"]["OLLAMA_VULKAN"], "1")
+        self.assertEqual(evidence["environment"]["OLLAMA_IGPU_ENABLE"], "1")
         self.assertIn("ollama serve", evidence["exec_start"])
 
     def test_deep_context_prompt_keeps_requested_target_explicit(self) -> None:
@@ -3123,11 +3124,12 @@ phase_roles
                         "test-model",
                         "--profile",
                         "edge",
+                        "--non-interactive",
                         "--output-dir",
                         str(generation_dir),
                     ],
                 ),
-                patch.object(generation.OllamaClient, "version", return_value="0.34.0"),
+                patch.object(generation.OllamaClient, "version", return_value="0.40.3"),
                 patch.object(generation.OllamaClient, "show", return_value={}),
                 patch.object(
                     generation.OllamaClient,
@@ -3307,6 +3309,7 @@ phase_roles
             bundle.write_text("bundle\n", encoding="utf-8")
             script = f'''\
 source "{source}" help >/dev/null
+need_root() {{ :; }}
 WORK="{work}"
 REPORT_DIR="{reports}"
 PHASE_REPORT_DIR="{phases}"
@@ -3368,7 +3371,7 @@ status_run --raw
     def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         main = source[source.index("main() {"):]
-        self.assertIn('echo "  sudo bc250 revalidate start"', main)
+        self.assertIn('echo "  Quality validation:  sudo bc250 revalidate start"', main)
         self.assertNotIn("completion_owui_token", main)
         self.assertNotIn("sudo bc250 revalidate start --owui-token-file FILE", main)
         self.assertNotIn('echo "  Revalidation (partial): sudo bc250 revalidate start --skip-owui"', main)
@@ -3582,7 +3585,7 @@ status_run --raw
                 models=[{"model": "task-test", "digest": "abc"}],
                 fixtures=common.fixture_metadata(fixture),
                 options={"lane": 11435},
-                runtimes=[{"kind": "ollama", "url": "http://127.0.0.1:11435", "version": "0.34.0"}],
+                runtimes=[{"kind": "ollama", "url": "http://127.0.0.1:11435", "version": "0.40.3"}],
             )
             common.write_benchmark_metadata(meta_path, meta)
             common.finalize_benchmark_metadata(meta_path)
@@ -3599,7 +3602,7 @@ status_run --raw
             base_url = "http://127.0.0.1:11437"
             timeout = 321.0
             def version(self) -> str:
-                return "0.34.0"
+                return "0.40.3"
             def show(self, _model: str) -> dict[str, object]:
                 return {"details": {"family": "test"}}
             def digest(self, _model: str) -> str:
@@ -3883,7 +3886,7 @@ status_run --raw
                 self.base_url = url
                 seen.append(url)
             def version(self) -> str:
-                return "0.34.0"
+                return "0.40.3"
             def digest(self, _model: str) -> str:
                 return "digest"
 

@@ -508,8 +508,83 @@ class CategoryInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(
             set(subparsers.choices),
-            {"list", "status", "path", "apply", "refresh", "unregister", "remove", "purge-retired"},
+            {"list", "status", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
         )
+
+    def test_model_install_is_stateful_combined_catalog_frontend_to_apply(self) -> None:
+        defaults = {"category": "production", "ollama_host": "127.0.0.1:11434"}
+        model = {"category": "production", "id": "p", "name": "prod-p", "index": 0, "provider": "ollama-hf", "origin": "catalog"}
+        catalogs = [(defaults, [model])]
+        inspection = modelctl.ModelInspection(
+            model=model,
+            source_status="missing",
+            source_detail="missing",
+            source_path=None,
+            source_checksum=None,
+            state_path=None,
+            modelfile_status="missing",
+            runtime_modelfile=None,
+            registration_status="missing",
+            remote_status="not checked",
+            remote_detail=None,
+            overall_status="MISSING",
+        )
+        args = modelctl.argparse.Namespace(
+            command="install", selection=None, quiet=False, host=None, destination=None,
+            source=None, modelfile_dir=None, token_file=None, hf_session={"resolved": False, "token": ""},
+        )
+        output = StringIO()
+        with (
+            patch.object(modelctl, "load_all_catalogs", return_value=catalogs),
+            patch.object(modelctl, "registered_models_by_host", return_value={"127.0.0.1:11434": set()}),
+            patch.object(modelctl, "inspect_model_state", return_value=inspection),
+            patch.object(modelctl, "selected_models_for_catalog", return_value=[model]),
+            patch.object(modelctl, "run_all_catalog_operation", return_value=0) as run_op,
+            redirect_stdout(output),
+        ):
+            self.assertEqual(modelctl.run_install_workflow(args, directories=None, source=None), 0)
+        self.assertIn("Available models:", output.getvalue())
+        self.assertIn("MISSING", output.getvalue())
+        self.assertEqual(run_op.call_args.args[1], [model])
+        operation = run_op.call_args.args[2]
+        self.assertEqual(operation.command, "apply")
+        self.assertEqual(operation.category, "all")
+
+    def test_model_install_empty_selection_is_a_hard_no_mutation_cancel(self) -> None:
+        defaults = {"category": "production", "ollama_host": "127.0.0.1:11434"}
+        model = {"category": "production", "id": "p", "name": "prod-p", "index": 0, "provider": "ollama-hf", "origin": "catalog"}
+        catalogs = [(defaults, [model])]
+        inspection = modelctl.ModelInspection(
+            model=model,
+            source_status="missing",
+            source_detail="missing",
+            source_path=None,
+            source_checksum=None,
+            state_path=None,
+            modelfile_status="missing",
+            runtime_modelfile=None,
+            registration_status="missing",
+            remote_status="not checked",
+            remote_detail=None,
+            overall_status="MISSING",
+        )
+        args = modelctl.argparse.Namespace(
+            command="install", selection=None, quiet=False, host=None, destination=None,
+            source=None, modelfile_dir=None, token_file=None, hf_session={"resolved": False, "token": ""},
+        )
+        output = StringIO()
+        with (
+            patch.object(modelctl, "load_all_catalogs", return_value=catalogs),
+            patch.object(modelctl, "registered_models_by_host", return_value={"127.0.0.1:11434": set()}),
+            patch.object(modelctl, "inspect_model_state", return_value=inspection),
+            patch.object(modelctl, "prompt_line", return_value=""),
+            patch.object(modelctl, "run_all_catalog_operation", return_value=0) as run_op,
+            redirect_stdout(output),
+        ):
+            self.assertEqual(modelctl.run_install_workflow(args, directories=None, source=None), 0)
+        self.assertIn("Enter cancels without changes", output.getvalue())
+        self.assertIn("No models selected.", output.getvalue())
+        run_op.assert_not_called()
 
 
     def test_destructive_combined_catalog_prompt_does_not_casually_print_all_command(self) -> None:

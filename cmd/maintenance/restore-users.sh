@@ -3,11 +3,18 @@
 set -Eeuo pipefail
 umask 0077
 DB="${OWUI_DB:-/var/lib/open-webui/webui.db}"
-SRC="${1:?Usage: restore-users.sh <owui-users-*.sql.gz>}"
+SRC=""
 ROLLBACK_DIR="${USERS_ROLLBACK_DIR:-/var/backups/bc250-llm-server/rollback/users}"
 FORCE_SCHEMA_MISMATCH="${FORCE_SCHEMA_MISMATCH:-0}"
 
-[[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
+require_root() {
+  [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; return 1; }
+}
+
+main() {
+  [[ $# -eq 1 ]] || { echo "Usage: restore-users.sh <owui-users-*.sql.gz>" >&2; return 2; }
+  SRC="$1"
+  require_root || return $?
 [[ -f "$DB" && -r "$SRC" ]] || { echo "ERROR: DB or backup missing." >&2; exit 1; }
 for cmd in sqlite3 gzip zcat python3 sha256sum sort comm awk; do
   command -v "$cmd" >/dev/null 2>&1 || { echo "ERROR: missing command: $cmd" >&2; exit 1; }
@@ -137,3 +144,9 @@ echo "New FK violations: 0"
 echo "Restore: successful"
 echo "Pre-restore DB: $pre"
 echo "Start Open WebUI and test an administrator login."
+
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

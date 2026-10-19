@@ -437,7 +437,7 @@ class StateTests(unittest.TestCase):
                 hf_session={"resolved": False, "token": ""},
             )
             with (
-                patch.dict(os.environ, {}, clear=False),
+                patch.dict(os.environ, {"HF_HOME": str(base / "hf-cache")}, clear=False),
                 patch.object(modelctl.os, "geteuid", return_value=0),
                 patch.object(modelctl, "ollama_identity", return_value=(1, 1)),
                 patch.object(modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"),

@@ -14,7 +14,7 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250 install` | Apply/resume appliance setup |
 | `bc250 status` | Concise read-only appliance status; `--json` is machine-readable |
 | `bc250 version` | Exact installed package/runtime/GFX identity; `--json` is machine-readable |
-| `bc250 doctor` | Read-only appliance diagnostics; `--json` is machine-readable |
+| `bc250 health` | Read-only appliance diagnostics; `--json` is machine-readable (`bc250 doctor` remains a compatibility alias) |
 | `bc250 verify` | Detailed local verification |
 | `bc250 support-bundle` | Redacted support evidence archive |
 | `bc250 storage` | Report/dedupe/prune package-owned storage |
@@ -102,29 +102,44 @@ a no-op update with current model sources does not ask for one.
 core installation/verification from package-owned Open WebUI state and reports the latter as
 `APPLIED + VERIFIED`, `SKIPPED`, or `RETRY REQUIRED`; a nonfatal Open WebUI setup problem is no
 longer hidden behind an unconditional whole-install success message. Completion then prints a plain
-`OVERVIEW` followed by an amber `NEXT STEPS` block for CU routing, model reconciliation and validation.
+`OVERVIEW` followed by an amber `NEXT STEPS` block ordered as system status/validation (including deeper quality/benchmarking), setup/repair, model management, then `Optional improvements`. The generic GFX entry is limited to the read-only `gfx1013 prepare --check` preflight.
 
 ### Experimental GFX1013 compute profile
 
-The supported operator lifecycle is `bc250 gfx1013 {status|prepare|enable|disable|reset|benchmark}`.
-It ships default-off as profile `v0.2.4-alpha`, pinned to upstream `0.2.0-alpha`
+The GFX commands are intentionally separated by role rather than presented as one undifferentiated lifecycle. The normal advanced-user activation path is:
+
+```text
+prepare --check -> prepare -> stage-boot -> reboot -> enable
+```
+
+Return to stock is `disable -> reboot`. `status` is read-only inspection at any time; `reset` is recovery-only; `benchmark` is qualification/performance testing.
+It ships default-off as profile `v0.2.5-alpha`, pinned to upstream `0.2.0-alpha`
 commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. The private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44` and is built headless (AMD Vulkan only, without private X11/Wayland/EGL/GBM/OpenGL frontends); the release gate checks the carried Mesa patch against Fedora `%prep` with zero fuzz and compiles the same production headless Mesa path. Use the non-destructive checks
 before making boot changes:
 
 ```bash
 sudo bc250 gfx1013 status
+sudo bc250 gfx1013 status --brief
+sudo bc250 gfx1013 status --verbose
 sudo bc250 gfx1013 status --json
 sudo bc250 gfx1013 prepare --check
+sudo bc250 gfx1013 prepare --check --verbose
+sudo bc250 gfx1013 prepare --download-only  # optional source prefetch/resume
 sudo bc250 gfx1013 disable --check
 sudo bc250 gfx1013 reset --check
 ```
 
-Preparation is exact-kernel and refuses enabled/unknown Secure Boot because this
-package does not sign or enroll the locally built `amdgpu` module. Stock boot
-remains the saved default while a verified patched entry is staged for one boot
-only. `enable` is permitted only after that marked patched boot; it proves that
-the private ICD exposes the exact BC-250 `1002:13fe` through RADV and scopes the
-override to `ollama.service`. A systemd boot-marker condition plus privileged runtime guard fails `ollama.service`
+Default status/check output is operator-focused; use `--verbose` for complete
+dependency/provider, provenance, hash and boot-internal detail. The dependency gate
+includes the RPM capability `rpm_macro(py3_shebang_fix)` (normally provided by
+`python3-rpm-macros`) and blocks before source/build work when it is unavailable.
+When `prepare --check` reports a kernel/Mesa source cache `MISS` or `PARTIAL`, it prints the optional `prepare --download-only` prefetch action before the build action. Preparation is exact-kernel and refuses enabled/unknown Secure Boot because this
+package does not sign or enroll the locally built `amdgpu` module. `prepare` is
+build-only; `stage-boot` separately creates/selects the one-shot patched boot while
+stock remains the saved default. If a package rollback left a one-shot `next_entry` that exactly matches the recorded verified-stock entry, `stage-boot` may safely replace that benign selection; an unknown/non-stock one-shot selection remains fail-closed and unchanged. `enable` is permitted only after that marked
+patched boot; it attests the loaded patched module, exact BC-250 `1002:13fe` RADV
+identity and dedicated compute-only queue, then smoke-tests Ollama before promoting
+the patched boot default. The private override remains scoped to `ollama.service`. A systemd boot-marker condition plus privileged runtime guard fails `ollama.service`
 closed after a later stock/stale-kernel boot until the operator rolls back or
 reprepares, preventing that private RADV path from reaching the wrong kernel.
 
@@ -134,7 +149,7 @@ transitions:
 
 ```bash
 sudo bc250 gfx1013 benchmark stock
-# prepare -> patched reboot -> enable
+# prepare -> stage-boot -> patched reboot -> enable
 sudo bc250 gfx1013 benchmark gfx
 # disable -> stock reboot
 sudo bc250 gfx1013 benchmark restored
@@ -144,8 +159,7 @@ sudo bc250 gfx1013 benchmark report
 A2 is required before the helper can emit `PROMOTION_CANDIDATE`. The result remains
 advisory and never changes the default-off policy.
 
-`status` reports `DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`,
-`ROLLBACK_REQUIRED`. `disable`, recovery `reset`, RPM
+Default `status` uses operator wording; `--brief`, `--verbose` and `--json` retain the lifecycle enums `DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`, `STOCK_REBOOT_REQUIRED` and `ROLLBACK_REQUIRED` for evidence and automation. `STOCK_REBOOT_REQUIRED` means a previous patched runtime is still loaded while verified stock saved/default and next boot are already restored; the immediate action is `sudo reboot`. `disable`, recovery `reset`, RPM
 upgrade and final erase all fail closed until a safe stock saved/default **and
 next** boot path is restored and verified. See [`GFX1013.md`](GFX1013.md) for
 the complete state machine, recovery and Secure Boot policy.
@@ -156,6 +170,7 @@ The model manager deliberately separates read-only discovery/state inspection fr
 mutating lifecycle operations:
 
 ```bash
+sudo bc250 model install
 bc250 model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
 sudo bc250 model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
 bc250 model path CATEGORY ID
@@ -421,8 +436,8 @@ See [`HARDWARE.md`](HARDWARE.md) before changing GPU routing.
 ```bash
 sudo bc250 status
 sudo bc250 status --json
-sudo bc250 doctor
-sudo bc250 doctor --json
+sudo bc250 health
+sudo bc250 health --json
 sudo bc250 support-bundle
 sudo bc250 verify
 sudo bc250 verify --summary
@@ -445,7 +460,7 @@ sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience
 
 `sudo bc250 status --json` emits schema `bc250.status.v2` with installed package, kernel,
 service topology, memory/swap/PSI, failed-unit, restart-diagnostic and GFX1013
-state. `bc250 doctor` layers read-only PASS/WARN/FAIL diagnostics over that state,
+state. `bc250 health` layers read-only PASS/WARN/FAIL diagnostics over that state,
 including `rpm -V`, runtime topology, memory headroom, GFX/Secure-Boot state and
 exact running-kernel `kernel-devel` availability; run it with `sudo` to include
 the full package verifier.
@@ -1212,6 +1227,6 @@ Release 1.9 keeps that privileged verification unchanged but fixes the non-root 
 
 `sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
 
-`bc250 doctor` reports **Overall appliance health** separately from **Optional GFX1013 readiness**. Secure-Boot/kernel-devel uncertainty for the default-off experimental path does not by itself make a healthy stock appliance unhealthy.
+`bc250 health` reports **Overall appliance health** separately from **Optional GFX1013 readiness**. Secure-Boot/kernel-devel uncertainty for the default-off experimental path does not by itself make a healthy stock appliance unhealthy.
 
 When the optional `needs-restarting` helper is absent, status reports `Restart advisory: not evaluated (optional helper unavailable)` rather than treating that absence as a health failure.

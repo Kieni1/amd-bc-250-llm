@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; 0.13.1-1.2 keeps the pin unchanged.
+Package standard: **Ollama v0.40.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. This is a package pin carried by 0.13.1-2.2 and requires fresh exact-device BC-250 qualification before release acceptance; the prior 0.34.4 runtime remains the last fully qualified comparison baseline.
 
 ## Install and verify
 
@@ -57,38 +57,19 @@ general comparison. GPT-OSS 20B with warm Jina remains the production memory-edg
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 
-## 0.34.4 qualified runtime notes
+## 0.40.4 runtime qualification status
 
-Ollama 0.34.4 is the package-pinned runtime and is qualified on the exact-device 0.12.2-0.8 baseline. Ollama 0.34.2 remains useful only as the immediate historical comparison baseline from the original runtime-upgrade campaign.
-Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
-transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
-were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
-envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
+Ollama 0.40.4 is the package-pinned runtime candidate. It supersedes 0.34.4 as the package standard but is not treated as device-qualified merely because the package builds. Fresh BC-250 qualification must cover the normal main/task/embedding lanes, exclusive agent mode, Vulkan/UMA behavior, production generation, embeddings, Open WebUI/RAG, long-context behavior, lane transitions and final cleanup.
 
-The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.13.1-1.2 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
+Ollama 0.34.4 remains the immediate qualified comparison baseline from 0.12.2-0.8. Use it for regression comparison only; normal install and verification converge to the 0.40.4 package pin.
 
-The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
-identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
-checks therefore use the supported runtime version and stable model/digest provenance rather than old textual
-serialization.
+Serialized `/api/show` Modelfile/parameter text is not immutable model identity. Package checks therefore use the supported runtime version and stable model/digest provenance rather than depending on old textual serialization.
 
-The package continues to use the experimental Vulkan backend on BC-250. Current
-Ollama Linux guidance still supports `OLLAMA_VULKAN=1` and
-`GGML_VK_VISIBLE_DEVICES`. For more accurate Vulkan free-memory information the
-upstream docs suggest `cap_perfmon`; this package does **not** grant that capability
-automatically. An operator may test it deliberately after locating the real binary:
+The package continues to use the Vulkan backend on BC-250 and keeps the device selection explicit with `OLLAMA_VULKAN=1` and `GGML_VK_VISIBLE_DEVICES=0`. Ollama 0.40.4 also exposes `OLLAMA_IGPU_ENABLE`; all four package-owned lanes set `OLLAMA_IGPU_ENABLE=1` because BC-250 is a UMA/integrated-GPU-class device and must not be filtered from Vulkan discovery.
 
-```bash
-command -v ollama
-sudo setcap cap_perfmon+ep "$(command -v ollama)"
-getcap "$(command -v ollama)"
-```
+Upstream Vulkan documentation mentions the Linux `cap_perfmon` file capability as a way to improve free-memory reporting. The package deliberately does **not** add or recommend that capability for BC-250: an open upstream Ollama issue reports that adding `cap_perfmon` can itself break GPU discovery. Until that interaction is separately qualified on BC-250, leave `/usr/local/bin/ollama` without package-managed file capabilities and rely on the normal Vulkan scheduling path.
 
-Granite 4.2 needs special context discipline on small shared-memory systems: its
-GGUF advertises 128K context and an open 0.33.x upstream report documents OOMs on
-<=16 GB hosts when that full value is selected. The packaged Granite experiments
-therefore retain explicit `PARAMETER num_ctx 32768`; do not remove that bound for
-BC-250 comparison runs.
+Granite 4.2 needs special context discipline on small shared-memory systems. The packaged Granite experiments retain explicit `PARAMETER num_ctx 32768`; do not remove that bound for BC-250 comparison runs without separate evidence.
 
 ## Runtime profiles
 
@@ -104,11 +85,18 @@ sudo bc250 ollama-profile reset
 | Balanced | 32,768 | q8_0 | 1 / 1 |
 | Max context | 65,536 | q4_0 | 1 / 1 |
 
+The external October 2026 BC-250 context-ceiling work does **not** change these values.
+Its corrected benchmark methodology raises measured allocation ceilings after removing
+an unused sequence-state copy, but those edge runs are not service qualification and
+include severe swap/ring-timeout cases. `balanced` remains the production default;
+`max-context` remains an explicit operator profile, not a new production baseline.
+See `docs/HARDWARE.md` and `docs/BENCHMARKING.md` for the evidence boundary.
+
 Both enable flash attention. `balanced` is the production default. `max-context` remains an explicit operator profile for 65,536-token experiments/needs; its q4_0 KV setting was **not** promoted to the production default after integrated acceptance found Advanced/Qwen instability at the 6,144-token reasoning ceiling. Service profiles do not modify individual Modelfiles.
 
 ## Benchmark API baseline
 
-`bc250 benchmark` targets the package-pinned Ollama **0.34.4** candidate request schema. Neutral generation
+`bc250 benchmark` targets the package-pinned Ollama **0.40.4** candidate request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
@@ -134,7 +122,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.34.4** as the package-standard qualified runtime for this release. Before changing that pin, review
+Treat **0.40.4** as the package-standard candidate runtime for this release. Before changing that pin, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;

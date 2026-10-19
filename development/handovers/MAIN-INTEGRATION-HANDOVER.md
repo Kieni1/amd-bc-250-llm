@@ -1,7 +1,7 @@
 # AMD BC-250 LLM appliance — main integration handover
 
-Release target: `bc250-llm-server-0.13.1-1.3`  
-Current handover date: 2026-10-09
+Release target: `bc250-llm-server-0.13.1-1.17`  
+Current build-pipeline handover date: 2026-10-14
 
 ## Purpose
 
@@ -18,10 +18,24 @@ It records:
 
 ## 1. Authority and evidence boundaries
 
+### Current 1.17 build/release and device-failure authority
+
+For build/release orchestration, this subsection supersedes older 1.3/1.16-era build notes later in this historical handover. Current target is `bc250-llm-server-0.13.1-1.17.fc44`; `release-contract.json` owns release identity and stage ordering.
+
+`./build-local.sh --full` authenticates sudo once at startup, keeps that ticket alive non-interactively, then runs the non-root frozen-source preflight before any expensive GFX compilation. Exact Fedora kernel/Mesa dependency provisioning uses only `sudo -n`; exact-kernel amdgpu, private RADV, RPM/package, rpmlint and SRPM self-contained rebuild gates execute from the validated frozen source snapshot. Host release-pipeline tests run before GFX work; RPM `%check` contains package/SRPM contracts only.
+
+Major checkpoints print ISO-8601 timestamps plus total elapsed and per-stage elapsed time. Successful builds print the generated main RPM path as the final stdout line. The current handoff for this work is `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.17.md`.
+
+The accepted 1.16 Fedora release build completed from clean commit `56e8abf2e1702d02b0e5bab177f91f29e7b2d214` in 10m47s, including the frozen-source gate, exact-kernel amdgpu/ABI build, private headless RADV, RPM `%check`, transformed payload, rpmlint and self-contained SRPM rebuild. Its main RPM SHA-256 is `ad50e5fb4f49d55b1dcf5c45e7f58338ae03a6952864a11ef18a789fbf08f072`; SRPM SHA-256 is `566459d2d13a0792c62533836370697cb1c98e5391450d29f2a974ab1c0d0d2b`.
+
+Device testing of that exact 1.16 package on running kernel `7.2.10-200.fc44.x86_64` exposed the next real blocker: Fedora kernel `%prep` received literal `%py3_shebang_fix`, then failed with `fg: no job control`. Device-side GFX preflight had not required `rpm_macro(py3_shebang_fix)` even though Fedora's kernel spec needs it and `python3-rpm-macros` normally provides it. 1.17 adds capability-based provider qualification, blocks `prepare --check` and actual `prepare` before source/build when absent, classifies the exact `%prep` stage/cause, fixes evidence archive compression, and simplifies default status/preflight output while retaining verbose forensic detail. Exact-kernel, stock-first rollback and lifecycle behavior are intentionally unchanged.
+
+1.17 also advances the package-standard Ollama pin from 0.40.3 to 0.40.4 using the exact generic Linux AMD64 payload SHA-256 `15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a`. This pin needs fresh exact-device runtime acceptance; it does not inherit 0.40.3 qualification.
+
 Current source/release target:
 
 ```text
-bc250-llm-server-0.13.1-1.3
+bc250-llm-server-0.13.1-1.17
 original 1.0 predecessor workbench:
   amd-bc-250-llm-0.13.1-1.0-workbench-release-final.zip
   SHA-256 04f53c980b29a28dc6988f7c39f339f3f4df8d99be01cb4638ea5639c9daa5c8
@@ -33,22 +47,21 @@ The later 1.0 checkpoint is not treated as a separate product release. Its hygie
 corrections are preserved where they represent correctness properties, while the accepted
 Sidechat 15–19 results define the 1.1 functional delta.
 
-Current source validation for this reviewed 1.2 tree:
+Current source-level validation for the 1.17 handover update:
 
 ```text
-542 deterministic unittest cases PASS across all 17 test modules
-focused changed-surface behavioral suites PASS
-python3 development/scope.py check PASS
-python3 scripts/validate.py / RPM preflight PASS
-59 shell sources bash -n PASS
-35 Python sources AST-parse PASS
-15 JSON + 5 TOML files parse PASS
-Ruff binary, ShellCheck, configured rpmlint and rpmbuild are external/unavailable in this artifact environment; the user-supplied Ruff run's final SIM103/I001 findings plus earlier one-line/semicolon violations were corrected locally without suppressions
+42/42 focused GFX1013 lifecycle tests PASS after the macro/evidence/classifier changes
+19/19 host release-pipeline tests PASS after the final-main-RPM output contract
+bash -n cmd/system/gfx1013.sh build-local.sh PASS
+full 1.17 source/package/frozen-source validation is required before artifact handoff
+Ruff/ShellCheck/rpmbuild/rpmlint remain authoritative on the Fedora 44 workstation
 ```
 
-Exact-device authority remains the installed and qualified `0.13.1-1.0.fc44` baseline until
-an exact `0.13.1-1.3.fc44` RPM is built and installed. Do not transfer exact-device qualification
-across source revisions.
+The 1.16 package has clean Fedora release-build authority but its GFX1013 device
+attempt failed safely at kernel `%prep`; it is not a completed GFX qualification.
+No 1.17 build/device qualification exists until a clean Fedora full gate produces the
+exact 1.17 RPM and that artifact is installed/tested. Do not transfer exact-device
+qualification across source revisions or the Ollama pin change.
 
 The closed optimization result carried through 1.1 into 1.2 is deliberately narrow:
 
@@ -75,9 +88,9 @@ The 1.2 corrective delta is intentionally small: semantic date/time/invoice subs
 Current pins:
 
 ```text
-Ollama       0.34.4
+Ollama       0.40.4
 Open WebUI   0.11.4
-Tika         4.0.0-full
+Tika         4.1.0-full
 Governor     0.4.13
 ```
 
@@ -778,19 +791,22 @@ exposes a regression.
 
 ## 19. Remaining release work
 
-High-value next sequence:
+High-value next sequence for the current 1.17 corrective release:
 
-1. build the exact reviewed `0.13.1-1.3` RPM/SRPM in the normal Fedora/GitHub environment;
-2. require Ruff, ShellCheck, configured rpmlint and actual-RPM payload/build gates there;
-3. deliberately upgrade the qualified exact `0.13.1-1.0.fc44` appliance to that exact 1.2 RPM;
-4. prove installed effective production state is `q8_0` + `TOP_K=4` with the other closed runtime defaults unchanged;
-5. run the focused 1.2 corrective delta: optional/default model semantics, grouped citation and invoice/date/time/numeric evaluators, RAG reasoning-INCOMPLETE behavior, front-door readiness, active-zram-swap and failed-unit verification, non-interactive benchmark/start-state evidence;
-6. smoke Documents/RAG direct + Open WebUI and one normal q8_0 Advanced Structured path without reopening q4_0 discovery;
-7. verify canonical command/layout/docs, normal topology, Open WebUI desired state and board-specific CU saved/live consistency;
-8. prove restart/reboot persistence, `rpm -V` cleanliness, no new unowned package-tree `/usr` state, preserved operator-added registrations and expected residency/restoration;
-9. freeze/tag only after the exact installed-RPM evidence is clean.
+1. complete source-level validation for the 1.17 macro-capability, failure-classifier, evidence-archive, concise/verbose CLI and Ollama 0.40.4 changes;
+2. build the exact reviewed `0.13.1-1.17` RPM/SRPM with the authoritative Fedora 44 `./build-local.sh --full` path from a clean tree;
+3. require early sudo/checkpoint flow, Ruff, ShellCheck, frozen-source preflight, exact kernel/Mesa gates, configured rpmlint, transformed-payload integrity and clean SRPM rebuild; preserve the log and the final main-RPM path printed by the build driver;
+4. install that exact 1.17 RPM on the BC-250 and record NEVRA, SHA-256, `rpm -V` and observed Ollama 0.40.4 identity;
+5. run `sudo bc250 gfx1013 status --brief` and `sudo bc250 gfx1013 prepare --check`; if `rpm_macro(py3_shebang_fix)` is absent, require an early `BLOCKED` result before source acquisition and install the reported provider (normally `python3-rpm-macros`);
+6. rerun preflight and continue only after the dependency/capability, carried-source and installed-payload layers are clean;
+7. capture a fresh 1.17 stock A1, then perform the existing greenfield GFX lifecycle `prepare -> stage-boot -> patched reboot -> enable -> B -> disable/reset -> stock reboot -> A2` with exact stage/evidence capture;
+8. prove a failed prepare still leaves boot/runtime/service state unchanged and source cache reusable; preserve the actual gzip evidence archive when a failure is intentionally/incidentally encountered;
+9. smoke the normal main/task/embedding lanes and Open WebUI/RAG on Ollama 0.40.4 without changing production context/KV/swap/governor/model policy;
+10. freeze/tag only after the exact 1.17 installed-RPM evidence is clean.
 
-Do not replay Sidechats 15–19, model-selection campaigns or unrelated optional specialist domains unless this bounded delta exposes a real regression.
+The accepted 1.16 clean full build is the build-pipeline baseline, not a substitute for the required 1.17 full gate. The 1.16 device `%prep` failure is the authoritative reproduction for the missing-macro fix and must remain in the handover history.
+
+Do not replay closed model-selection or unrelated specialist campaigns unless the 1.17 bounded delta exposes a real regression.
 
 ## 20. Main-chat decision rule
 

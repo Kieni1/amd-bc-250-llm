@@ -102,9 +102,9 @@ systemctl() {
 }
 curl() {
   [[ ${@: -1} == http://127.0.0.1:11436/api/version ]] || return 9
-  printf '{"version":"0.34.0"}\n'
+  printf '{"version":"0.40.3"}\n'
 }
-jq() { printf '0.34.0\n'; }
+jq() { printf '0.40.3\n'; }
 ollama_version_line
 """
         result = subprocess.run(
@@ -114,7 +114,7 @@ ollama_version_line
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "Ollama server version: 0.34.0")
+        self.assertEqual(result.stdout.strip(), "Ollama server version: 0.40.3")
         self.assertNotIn("Warning", result.stdout)
 
     def test_status_reports_openwebui_application_readiness(self) -> None:
@@ -143,7 +143,7 @@ ollama_version_line
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("read-only appliance diagnostics", result.stdout)
+        self.assertIn("read-only appliance health diagnostics", result.stdout)
         doctor_source = doctor.read_text(encoding="utf-8")
         self.assertIn('"schema": "bc250.doctor.v2"', doctor_source)
         self.assertIn('["rpm", "-V", PACKAGE]', doctor_source)
@@ -151,7 +151,53 @@ ollama_version_line
         self.assertIn("ROLLBACK_REQUIRED", (ROOT / "cmd/system/gfx1013.sh").read_text(encoding="utf-8"))
         self.assertIn("runtime_identity", status_json)
         self.assertIn("Overall appliance health:", doctor_source)
-        self.assertIn("Optional GFX1013 readiness:", doctor_source)
+        self.assertIn("Core appliance health:", doctor_source)
+        self.assertIn("Experimental GFX1013:", doctor_source)
+        self.assertIn('category="gfx_readiness"', doctor_source)
+        self.assertIn('"DEGRADED" if gfx_failures', doctor_source)
+        self.assertIn('state == "NOT_INSPECTED"', doctor_source)
+        self.assertIn('"NOT INSPECTED" if gfx_not_inspected', doctor_source)
+        self.assertIn('"NO_COLOR" not in os.environ', doctor_source)
+        self.assertIn('experimental GFX1013 lifecycle action required', status)
+        self.assertIn('Experimental GFX1013: ACTION REQUIRED', status)
+        self.assertIn('gfx_state" == STOCK_REBOOT_REQUIRED', status)
+
+    def test_doctor_color_contract_is_tty_only_and_no_color_safe(self) -> None:
+        module_path = ROOT / "cmd/monitoring/doctor.py"
+        spec = importlib.util.spec_from_file_location("bc250_doctor_color_test", module_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        class TtyStream:
+            @staticmethod
+            def isatty() -> bool:
+                return True
+
+        class PlainStream:
+            @staticmethod
+            def isatty() -> bool:
+                return False
+
+        with mock.patch.object(module.sys, "stdout", TtyStream()), mock.patch.dict(
+            module.os.environ, {"TERM": "xterm"}, clear=False
+        ):
+            module.os.environ.pop("NO_COLOR", None)
+            self.assertIn("\x1b[1;32mPASS\x1b[0m", module.color_verdict("PASS"))
+            self.assertIn("\x1b[1;31mFAIL\x1b[0m", module.color_verdict("FAIL"))
+            self.assertIn("\x1b[1;33mWARNING\x1b[0m", module.color_verdict("WARNING"))
+
+        with mock.patch.object(module.sys, "stdout", PlainStream()), mock.patch.dict(
+            module.os.environ, {"TERM": "xterm"}, clear=False
+        ):
+            module.os.environ.pop("NO_COLOR", None)
+            self.assertEqual(module.color_verdict("PASS"), "PASS")
+
+        with mock.patch.object(module.sys, "stdout", TtyStream()), mock.patch.dict(
+            module.os.environ, {"TERM": "xterm", "NO_COLOR": "1"}, clear=False
+        ):
+            self.assertEqual(module.color_verdict("FAIL"), "FAIL")
 
     def test_status_json_normalizes_the_known_tika_version_prefix(self) -> None:
         source = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")

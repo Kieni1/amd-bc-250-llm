@@ -22,8 +22,8 @@ import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = ROOT / "packaging/upstreams.toml"
-SOURCE_DIR = ROOT / "sources"
-WORK_DIR = ROOT / "build/source-work"
+SOURCE_DIR = Path(os.environ.get("BC250_SOURCE_DIR", ROOT / "sources")).resolve()
+WORK_DIR = Path(os.environ.get("BC250_BUILD_DIR", ROOT / "build")).resolve() / "source-work"
 
 
 class SourceError(RuntimeError):
@@ -230,6 +230,11 @@ def prepare_cargo_vendor(source: dict, archive: Path, *, force: bool) -> Path:
         write_checksum(vendor)
     finally:
         temporary.unlink(missing_ok=True)
+        shutil.rmtree(work, ignore_errors=True)
+        try:
+            WORK_DIR.rmdir()
+        except OSError:
+            pass
     print(f"Created and checksummed {display_path(vendor)}")
     return vendor
 
@@ -258,7 +263,7 @@ def main() -> int:
 
     sources = load_sources()
     if args.print_files:
-        print(" ".join(str(path.relative_to(ROOT)) for path in source_files(sources)))
+        print(" ".join(str(path) for path in source_files(sources)))
         return 0
 
     requested = set(args.ids)
@@ -271,14 +276,14 @@ def main() -> int:
 
     if args.check:
         missing = [
-            str(path.relative_to(ROOT))
+            str(path)
             for path in source_files(selected)
             if not path.is_file() or path.stat().st_size == 0
         ]
         if missing:
             raise SourceError(f"missing source files: {', '.join(missing)}")
         unchecked = [
-            str(path.relative_to(ROOT))
+            str(path)
             for path in source_files(selected)
             if not checksum_path(path).is_file()
         ]

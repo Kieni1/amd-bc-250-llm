@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import shutil
 import subprocess
@@ -17,7 +18,7 @@ METADATA = ROOT / "gfx1013/upstream/MESA-SOURCE"
 PATCH = ROOT / "gfx1013/upstream/patches/mesa/0001-gfx1013-compute-queue-fix.patch"
 PATCH_MANIFEST = ROOT / "gfx1013/upstream/PATCH-SHA256SUMS"
 PATCH_MANIFEST_PATH = "patches/mesa/0001-gfx1013-compute-queue-fix.patch"
-CACHE_DIR = ROOT / "sources/gfx1013"
+CACHE_DIR = Path(os.environ.get("BC250_GFX1013_CACHE_ROOT", ROOT / "sources/gfx1013")).resolve()
 
 EXPECTED = {
     "version": "26.2.4",
@@ -76,6 +77,20 @@ def require_command(name: str) -> str:
         raise ValidationError(f"required command is unavailable: {name}")
     return command
 
+
+
+
+def require_rpm_macro(name: str) -> None:
+    rpm = require_command("rpm")
+    result = run([rpm, "--eval", f"%{{{name}}}"])
+    if result.returncode != 0:
+        raise ValidationError(f"cannot evaluate required Fedora RPM macro: %{name}")
+    expanded = result.stdout.decode("utf-8", errors="replace").strip()
+    if not expanded or expanded == f"%{{{name}}}":
+        raise ValidationError(
+            f"required Fedora RPM macro %{{{name}}} is unavailable; "
+            "run scripts/provision-gfx1013-mesa-builddeps.sh as root"
+        )
 
 def read_metadata(path: Path = METADATA) -> dict[str, str]:
     try:
@@ -155,7 +170,6 @@ def fetch_srpm(metadata: dict[str, str], *, allow_fetch: bool) -> Path:
     curl = require_command("curl")
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     temporary = target.with_suffix(target.suffix + ".part")
-    temporary.unlink(missing_ok=True)
     result = run(
         [
             curl,
@@ -166,6 +180,8 @@ def fetch_srpm(metadata: dict[str, str], *, allow_fetch: bool) -> Path:
             "--retry-all-errors",
             "--retry-delay",
             "2",
+            "--continue-at",
+            "-",
             "--proto",
             "=https",
             "--tlsv1.2",
@@ -175,9 +191,15 @@ def fetch_srpm(metadata: dict[str, str], *, allow_fetch: bool) -> Path:
         ]
     )
     if result.returncode != 0:
-        temporary.unlink(missing_ok=True)
         detail = (result.stderr or result.stdout).decode("utf-8", errors="replace").strip()
-        raise ValidationError(f"cannot download exact Fedora Mesa SRPM: {detail}")
+        raise ValidationError(
+            f"cannot download exact Fedora Mesa SRPM; resumable partial retained at {temporary}: {detail}"
+        )
+    try:
+        validate_srpm_identity(temporary, metadata)
+    except ValidationError:
+        temporary.unlink(missing_ok=True)
+        raise
     temporary.replace(target)
     return target
 
@@ -251,6 +273,7 @@ def extract_srpm(srpm: Path, destination: Path) -> None:
 
 def prepare_fedora_tree(srpm: Path, metadata: dict[str, str], temporary: Path) -> Path:
     rpmbuild = require_command("rpmbuild")
+    require_rpm_macro("cargo_prep")
     extracted = temporary / "srpm"
     extracted.mkdir()
     extract_srpm(srpm, extracted)

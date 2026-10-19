@@ -38,8 +38,8 @@ one candidate.
 ## 2. Test ownership
 
 - **Source/chat environment:** unit/static checks that are actually available.
-- **GitHub:** RPM/package build.
-- **Workstation:** Ruff and developer linting as configured by the user.
+- **GitHub:** deterministic source/static validation only; no release RPM authority.
+- **Fedora 44 workstation:** authoritative local RPM/SRPM build, GFX1013 production-build checks, Ruff/ShellCheck and release gate.
 - **BC-250:** real services, GPU/resource behavior, model quality, WOL/power, Open WebUI,
   llama.cpp/MTP and integration qualification.
 
@@ -59,7 +59,34 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.13.1-1.12 source carries forward and release-hardens the exact-device GFX1013 prepare/build repairs discovered on 1.9. Stock 1.9, package gate, Secure Boot disabled-unsupported handling, provider-aware dependency resolution and non-root runtime identity all passed on device; the remaining blockers were kernel-SRPM source discovery, external AMD trace paths, the stale Mesa 26.2.0-rc3 patch baseline, ABI verification assumptions and non-transactional failure residue. The inherited 1.10 GFX source work rebases private RADV to exact Fedora 44 mesa-26.2.4-1.fc44 under package profile v0.2.4-alpha, validates the private Mesa delta against Fedora %prep with zero fuzz, hardens exact-kernel external-module compatibility handling, uses the exact Fedora kernel SRPM `%prep` tree as AMDGPU patch/build authority, behaviorally fault-injects prepare/rollback boundaries, generates the patched initramfs from an isolated dracut kmod tree without replacing stock amdgpu, and preserves bounded failed-build/recovery evidence while restoring DISABLED on ordinary pre-commit failure. Production model/runtime/CU defaults and the A1/B/A2 promotion policy remain unchanged. Because package identity changes, capture a fresh 1.12 A1 before B/A2. The authoritative Fedora make release-gate now compiles both production GFX paths first: matching Fedora kernel SRPM/%prep -> external amdgpu -> vermagic/ABI verification, then headless private RADV. Configured Ruff/ShellCheck, %check, rpmlint, RPM payload validation and clean SRPM rebuild remain grouped under that gate; Agent remains optional and broad model/runtime discovery stays closed.
+The current 0.13.1-1.17 source carries forward the exact-device GFX1013 repairs and
+the accepted 1.16 release-pipeline architecture. The authoritative Fedora 44 local gate
+keeps all generated state below `.build/`, runs Ruff/ShellCheck plus host release-pipeline
+contracts first, freezes the validated RPM source/spec inputs, then compiles the exact Fedora
+kernel-SRPM `%prep` -> external amdgpu -> vermagic/ABI path and the exact headless private
+RADV path. RPM `%check` runs package/SRPM contracts only, followed by transformed-RPM
+payload validation, configured rpmlint and the clean SRPM rebuild. GitHub does source/static
+validation only. A clean 1.16 run proved this build architecture end to end in 10m47s;
+1.17 still requires its own clean full gate because the package identity and Ollama pin change.
+
+On-device GFX preparation remains exact-kernel and default-off. The 1.16 device attempt on
+`7.2.10-200.fc44.x86_64` proved source acquisition/signature/cache behavior, then failed safely
+during Fedora kernel `%prep` because `rpm_macro(py3_shebang_fix)` had no installed provider and
+literal `%py3_shebang_fix` reached the shell (`fg: no job control`). 1.17 therefore qualifies
+that RPM capability as a prepare prerequisite and must block before source acquisition/build when
+it is absent. The negative blocker and positive provider case are deterministic regressions.
+
+Source RPM acquisition is
+resumable and visible in `prepare --check`; `prepare` commits build artifacts only, while
+`stage-boot` separately creates/selects the one-shot patched boot. `enable` requires loaded
+module attestation, exact BC-250 private-RADV identity plus a dedicated compute-only queue,
+and an Ollama restart/API smoke while stock is still the saved boot; only then may the
+patched boot be promoted. A1/B/A2 benchmarking now also treats deterministic output drift as
+a promotion blocker. Default GFX output is operator-focused while `--verbose` retains provider,
+provenance/hash and boot internals; prepare failure evidence is a real gzip `.tar.gz` and the
+summary must surface exact stage/cause rather than `unknown`. Because package identity and Ollama
+change, capture a fresh 1.17 A1 before B/A2.
+Agent remains optional and broad model/runtime discovery stays closed.
 
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
@@ -121,7 +148,11 @@ state changes. Restore state before moving to another lane.
 - RAG hidden-reasoning exhaustion with empty visible output is INCOMPLETE/retry only when no independent retrieval/semantic defect exists; repetition remains a quality failure.
 - Verification must distinguish a configured/initialized zram device from a `/dev/zramN` that is actually active swap, and must parse actual failed systemd unit rows.
 
-## Current 0.13.1-1.12 qualification boundary
+## Release-pipeline testing doctrine
+
+Treat the full Fedora release build as confirmation, not exploration. Work from one canonical integration tree, generate minimal deltas only from that tree, and reject mixed-generation state through `release-contract.json` consistency checks. Before privileged or expensive work, run host orchestration contracts and then the complete package suite from the exact frozen source archive/spec pair. Re-check Git identity when that snapshot is frozen and run provisioning/heavy release gates from the frozen tree itself. Prefer behavioral fake-command tests for external tools and explicit hostile-environment cases over assertions about incidental shell/Makefile layout.
+
+## Current 0.13.1-1.17 qualification boundary
 
 Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
 
@@ -129,7 +160,9 @@ The pre-0.13.1 investigation attributed those writes to dispatcher-launched RAG/
 
 Exact-device 1.8 closed the four 1.7 blockers: upgrade/package convergence, Tika 4.1 gate extraction, provider-aware GFX dependencies and pristine benchmark-status read-only behavior all passed, package gate passed, and a fresh 1.8 stock A1 was captured with clean RPM/GRUB/service integrity. Stage 1B then found `mokutil` returning `This system doesn't support Secure Boot` on an EFI platform that kernel/boot evidence identifies as disabled/unsupported; 1.8 incorrectly returned `unknown` and correctly blocked mutation. The same device also proved ordinary users cannot inspect root-owned Podman container digests, causing false runtime-identity warnings while sudo status/doctor/verify were clean. Release 1.9 fixes only those boundaries. The 1.8 A1 remains useful historical performance evidence but is not authority for rebuilt 1.9; capture a fresh A1 before B/A2.
 
-For 1.6, the package-build gate is intentionally separate from device qualification. The operator-provided Fedora workstation sequence is authoritative for source cache, Ruff/ShellCheck, preflight, RPM `%check`, configured rpmlint, binary payload and clean SRPM rebuild. Device work should then focus on the changed safety boundary: 1.5 -> 1.6 upgrade with GFX disabled and, when applicable, prepared/enabled-state rollback; `bc250 doctor`; JSON status schemas; Secure Boot refusal; `prepare --check`; one-shot patched boot; exact BC-250 RADV identity; stale/new-stock-kernel Ollama guard; disable/reset; and final stock saved + next boot restoration. Do not turn this into another broad model tournament.
+The 1.16 package-build gate is now proven by a clean Fedora 44 full run from commit `56e8abf2e1702d02b0e5bab177f91f29e7b2d214`: frozen-source package validation, exact-kernel patched-amdgpu/ABI, headless private RADV, RPM `%check`, transformed-payload validation, rpmlint and self-contained SRPM rebuild all passed. That is historical build authority only; the resulting device prepare exposed the missing `rpm_macro(py3_shebang_fix)` preflight contract described above and did not complete GFX qualification.
+
+For 1.17, the local Fedora 44 `./build-local.sh --full` sequence remains authoritative and must be rerun clean. Device testing then starts with the exact installed 1.17 RPM and Ollama 0.40.4, verifies `status --brief` and `prepare --check`, proves the macro capability is either satisfied by an installed provider (normally `python3-rpm-macros`) or blocks before any source/build work, captures fresh stock A1, and only then continues `prepare -> stage-boot -> patched reboot -> enable -> B -> disable/reset -> stock reboot -> A2`. Preserve the exact failure archive and stage/cause summary if preparation fails. Do not turn this into another broad model tournament or alter exact-kernel/rollback/lifecycle behavior as part of the macro fix.
 
 ## 6. Recommended current work order
 
@@ -158,7 +191,7 @@ The distinct `sudo systemctl reboot` invocation is device-proven unreliable on t
 
 Companion forced-command, idle S5/WOL and live upload deletion are separate acceptance work and become mandatory only when those optional features are about to be enabled or their boundary changed. Do not turn them into automatic gates for unrelated RPMs. The model unregister/re-apply support block is likewise optional unless the model lifecycle changed; if used, inspect protected source paths with privileged `test/stat` and avoid `refresh`/`remove` when the purpose is no-redownload lifecycle verification.
 
-The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.12 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
+The current harness v4.8 qualifies the package-owned production roles for the 0.13.1-1.17 line and remains the milestone whole-appliance gate. It records starting swap, memory-pressure and residency evidence so state-dependent resource events are not misclassified as tuning effects.
 
 For RAG, model selection is closed: use Gemma E4B for the production document role. Future RAG
 acceptance should be one bounded real-office corpus pass (real PDFs/Tika/OCR, tables, multilingual

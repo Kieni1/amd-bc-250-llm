@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import glob
+import json
 import re
 import shutil
 import subprocess
@@ -39,6 +40,16 @@ def dispatcher_routes() -> set[str]:
 
 
 class DocumentationTests(unittest.TestCase):
+    def test_active_docs_match_release_contract_identity(self) -> None:
+        contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
+        package = contract["package"]
+        identity = f"{package['name']}-{package['version']}-{package['rpm_release']}"
+        version_release = f"{package['version']}-{package['rpm_release']}"
+        self.assertIn(identity, (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn(identity, (ROOT / "TLDR.md").read_text(encoding="utf-8"))
+        self.assertIn(version_release, (ROOT / "docs/GFX1013.md").read_text(encoding="utf-8"))
+        self.assertIn(version_release, (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8"))
+
     def test_command_reference_covers_every_public_dispatcher_route(self) -> None:
         reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         for route in sorted(dispatcher_routes()):
@@ -62,7 +73,7 @@ class DocumentationTests(unittest.TestCase):
             r"bc250\s+ocr\s+install(?:\s|$)",
             r"bc250\s+openwebui-setup\s+(?:init|apply|save-key)(?:\s|$)",
             r"bc250\s+agent-mode\s+(?:enter|leave|normal)(?:\s|$)",
-            r"bc250\s+model\s+(?:status|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
+            r"bc250\s+model\s+(?:status|install|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
             r"bc250\s+ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
             r"bc250\s+benchmark\s+owui-system-context(?:\s|$)",
             r"bc250\s+gfx1013\s+(?:prepare|enable|disable|reset)(?:\s|$)",
@@ -82,7 +93,7 @@ class DocumentationTests(unittest.TestCase):
 
     def test_current_docs_use_supported_model_rag_and_storage_subcommands(self) -> None:
         allowed = {
-            "model": {"list", "status", "path", "apply", "refresh", "unregister", "remove", "purge-retired"},
+            "model": {"list", "status", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
             "rag": {"init", "prepare-batch", "review", "validate", "activate", "supersede", "status", "ingest"},
             "storage": {"status", "dedupe", "prune-sources"},
         }
@@ -208,6 +219,18 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("output budget", commands)
         self.assertIn("Model-quality findings", quality)
 
+    def test_ollama_0404_bc250_vulkan_contract_and_gfx_prefetch_are_documented(self) -> None:
+        ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
+        gfx = (ROOT / "docs/GFX1013.md").read_text(encoding="utf-8")
+        operations = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
+        tldr = (ROOT / "TLDR.md").read_text(encoding="utf-8")
+        self.assertIn("Ollama 0.40.4", ollama)
+        self.assertIn("OLLAMA_IGPU_ENABLE=1", ollama)
+        self.assertIn("all four package-owned lanes", ollama)
+        self.assertNotIn("sudo setcap cap_perfmon", ollama)
+        for text in (gfx, operations, tldr):
+            self.assertIn("bc250 gfx1013 prepare --download-only", text)
+
     def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
@@ -329,6 +352,22 @@ class DocumentationTests(unittest.TestCase):
                 cache_dir.rmdir()
             except OSError:
                 pass
+
+    def test_context_ceiling_guidance_does_not_raise_service_defaults(self) -> None:
+        hardware = (ROOT / "docs/HARDWARE.md").read_text(encoding="utf-8")
+        benchmarking = (ROOT / "docs/BENCHMARKING.md").read_text(encoding="utf-8")
+        ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
+        balanced = (ROOT / "cmd/system/ollama-profiles/balanced.conf").read_text(encoding="utf-8")
+        max_context = (ROOT / "cmd/system/ollama-profiles/max-context.conf").read_text(encoding="utf-8")
+
+        for text in (hardware, benchmarking):
+            self.assertIn("bd897eccac05cb02f1c0c1e3cb9d4e6a490f58b2", text)
+        self.assertIn("Benchmark allocation ceiling is not a safe service context", hardware)
+        self.assertIn("Allocation-ceiling experiments are not production qualification", benchmarking)
+        self.assertIn("does **not** change these values", ollama)
+        self.assertIn('OLLAMA_CONTEXT_LENGTH=32768', balanced)
+        self.assertIn('OLLAMA_CONTEXT_LENGTH=65536', max_context)
+
 
 if __name__ == "__main__":
     unittest.main()

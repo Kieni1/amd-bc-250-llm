@@ -12,6 +12,34 @@ BOOTSTRAP = ROOT / "install"
 INSTALLER = ROOT / "cmd/system/install.sh"
 
 
+def _run_tty_bash(body: str, *, extra_env: dict[str, str] | None = None) -> tuple[int, str]:
+    env = os.environ.copy()
+    env.update(extra_env or {})
+    master, slave = os.openpty()
+    proc = subprocess.Popen(
+        ["bash", "-c", body],
+        stdin=subprocess.DEVNULL,
+        stdout=slave,
+        stderr=slave,
+        env=env,
+        close_fds=True,
+    )
+    os.close(slave)
+    chunks: list[bytes] = []
+    try:
+        while True:
+            try:
+                chunk = os.read(master, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        os.close(master)
+    return proc.wait(timeout=10), b"".join(chunks).decode("utf-8", errors="replace")
+
+
 def _write_fake_jq(fake_bin: Path) -> None:
     fake_bin.mkdir(exist_ok=True)
     jq = fake_bin / "jq"
@@ -51,14 +79,40 @@ else:
     jq.chmod(0o755)
 
 
+def _write_fake_install(fake_bin: Path) -> None:
+    fake_bin.mkdir(exist_ok=True)
+    install = fake_bin / "install"
+    install.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "if [[ \"$#\" -eq 3 && \"$1\" == \"-d\" && \"$2\" == \"-m0700\" && \"$3\" == \"/run/bc250-llm-server\" ]]; then\n"
+        "  mkdir -p -m0700 -- \"$(dirname -- \"$BC250_TEST_HF_SESSION_FILE\")\"\n"
+        "  exit 0\n"
+        "fi\n"
+        "exec /usr/bin/install \"$@\"\n",
+        encoding="utf-8",
+    )
+    install.chmod(0o755)
+
 def source_probe(body: str) -> subprocess.CompletedProcess[str]:
     with tempfile.TemporaryDirectory() as tmp:
-        fake_bin = Path(tmp) / "bin"
+        tmpdir = Path(tmp)
+        fake_bin = tmpdir / "bin"
+        runtime_dir = tmpdir / "run" / "bc250-llm-server"
         _write_fake_jq(fake_bin)
+        _write_fake_install(fake_bin)
         env = os.environ.copy()
         env["PATH"] = f"{fake_bin}:{env.get('PATH', '')}"
+        env["BC250_TEST_HF_SESSION_FILE"] = str(runtime_dir / "install-hf-session")
+        env["BC250_TEST_OWUI_VERIFY_TOKEN_FILE"] = str(runtime_dir / "install-openwebui-token")
         return subprocess.run(
-            ["bash", "-c", f'source "$1"\n{body}', "installer-test", str(INSTALLER)],
+            [
+                "bash",
+                "-c",
+                f'source "$1"\nHF_SESSION_FILE="$BC250_TEST_HF_SESSION_FILE"\nOWUI_VERIFY_TOKEN_FILE="$BC250_TEST_OWUI_VERIFY_TOKEN_FILE"\n{body}',
+                "installer-test",
+                str(INSTALLER),
+            ],
             stdin=subprocess.DEVNULL,
             text=True,
             stdout=subprocess.PIPE,
@@ -510,6 +564,7 @@ main
             enable_target = tmpdir / "open-webui.container.d" / "90-enable.conf"
             enable_source = ROOT / "config/openwebui/open-webui-enable.conf"
             body = r'''
+HF_SESSION_FILE="$BC250_TEST_HF_SESSION_FILE"
 systemctl() {
   printf 'systemctl:%s\n' "$*" >> "$BC250_TEST_LOG"
   case "${1:-}" in
@@ -544,9 +599,11 @@ step_8_application_services
 '''
             fake_bin = tmpdir / "bin"
             _write_fake_jq(fake_bin)
+            _write_fake_install(fake_bin)
             env = {
                 "PATH": f"{fake_bin}:/usr/bin:/bin",
                 "BC250_TEST_LOG": str(log),
+                "BC250_TEST_HF_SESSION_FILE": str(tmpdir / "run" / "bc250-llm-server" / "install-hf-session"),
                 "BC250_OWUI_ENABLE_SOURCE": str(enable_source),
                 "BC250_OWUI_ENABLE_DROPIN": str(enable_target),
             }
@@ -686,36 +743,122 @@ step_8_application_services
         for heading in (
             'echo "OVERVIEW"',
             'echo "Administration"',
-            'echo "Storage"',
+            'echo "Storage & cleanup"',
             'echo "NEXT STEPS"',
-            'echo "CU routing (optional)"',
-            'echo "Status / validation"',
-            'echo "Full quality revalidation"',
-            'echo "Benchmark"',
+            'echo "System status / validation"',
+            'echo "Setup / repair"',
+            'echo "Models"',
+            'echo "Optional improvements"',
         ):
             self.assertIn(heading, main)
         for item in (
             "sudo bc250 openwebui-setup status",
+            "sudo bc250 model install",
             "sudo bc250 model status",
             "bc250 rag --help",
             "sudo bc250 maintenance --help",
             "sudo bc250 storage --help",
             "sudo bc250-cu-live-manager",
             "sudo bc250 status",
+            "sudo bc250 health",
+            "sudo bc250 verify",
             "sudo bc250 revalidate start",
-            "sudo bc250-40cu status",
             "bc250 benchmark --help",
+            "sudo bc250 install",
+            "sudo bc250 gfx1013 prepare --check",
         ):
             self.assertIn(item, main)
-        self.assertNotIn('echo "Further setup"', main)
-        self.assertNotIn('echo "Models"', main)
-        self.assertNotIn('echo "  Open WebUI:    sudo bc250 openwebui-setup init"', main)
-        self.assertNotIn('echo "  sudo bc250 install --models-only"', main)
-        self.assertIn("completion_amber=$'\\033[1;33m'", main)
-        self.assertLess(main.index('echo "OVERVIEW"'), main.index("completion_amber=$'\\033[1;33m'"))
-        self.assertLess(main.index("completion_amber=$'\\033[1;33m'"), main.index('echo "NEXT STEPS"'))
-        self.assertNotIn('echo "Validation / benchmark"', main)
-        self.assertNotIn('echo "Models / runtime lanes"', main)
+        self.assertNotIn("sudo bc250 model --help", main)
+        next_steps = main[main.index('echo "NEXT STEPS"'):]
+        self.assertLess(next_steps.index('echo "System status / validation"'), next_steps.index('echo "Setup / repair"'))
+        self.assertLess(next_steps.index('echo "Setup / repair"'), next_steps.index('echo "Models"'))
+        self.assertLess(next_steps.index('echo "Models"'), next_steps.index('echo "Optional improvements"'))
+        self.assertLess(next_steps.index("sudo bc250 revalidate start"), next_steps.index('echo "Setup / repair"'))
+        self.assertLess(next_steps.index("bc250 benchmark --help"), next_steps.index('echo "Setup / repair"'))
+        self.assertNotIn("sudo bc250 gfx1013 --help", next_steps)
+        self.assertNotIn('echo "  Prepare: sudo bc250 gfx1013 prepare"', next_steps)
+        self.assertIn("/usr/share/doc/bc250-llm-server/docs/OPERATIONS.md", main)
+        self.assertIn("completion_emphasis_begin", main)
+        self.assertIn("completion_emphasis_end", main)
+        self.assertLess(main.index('echo "OVERVIEW"'), main.index("completion_emphasis_begin"))
+        self.assertLess(main.index("completion_emphasis_begin"), main.index('echo "NEXT STEPS"'))
+
+    def test_22_installer_uses_shared_gfx_state_for_stock_reboot_pending_guidance(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn('readonly GFX1013_HELPER="$LIBEXEC_DIR/gfx1013.sh"', source)
+        self.assertIn("jq -e '.state == \"STOCK_REBOOT_REQUIRED\"'", source)
+        summary = source[source.index("print_setup_summary() {"): source.index("main() {")]
+        self.assertIn('GFX1013_STOCK_REBOOT_PENDING=1', summary)
+        self.assertIn('Experimental GFX1013         : stock reboot pending', summary)
+        self.assertIn('Current GFX runtime          : previous patched boot', summary)
+        self.assertIn('Verified next GFX boot       : stock', summary)
+        self.assertIn('GFX1013 reboot required      : YES', summary)
+        main = source[source.index("main() {"):]
+        self.assertIn('echo "Required reboot"', main)
+        self.assertIn('Complete GFX1013 stock restoration: sudo reboot', main)
+        self.assertIn('after reboot: sudo bc250 gfx1013 prepare --check', main)
+        pending_start = main.index(
+            'if ((GFX1013_STOCK_REBOOT_PENDING)); then',
+            main.index('echo "Optional improvements"'),
+        )
+        pending_branch = main[pending_start:main.index('else', pending_start)]
+        self.assertIn('after reboot: sudo bc250 gfx1013 prepare --check', pending_branch)
+        self.assertNotIn('GFX1013 check:       sudo bc250 gfx1013 prepare --check', pending_branch)
+        self.assertLess(
+            main.index('Complete GFX1013 stock restoration: sudo reboot'),
+            main.index('after reboot: sudo bc250 gfx1013 prepare --check'),
+        )
+
+    def test_22_gfx_stock_reboot_pending_probe_delegates_to_gfx_status_json(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            helper = libexec / "gfx1013.sh"
+            helper.write_text(
+                "#!/usr/bin/bash\nprintf '%s\n' '{\"state\":\"STOCK_REBOOT_REQUIRED\"}'\n",
+                encoding="utf-8",
+            )
+            helper.chmod(0o755)
+            body = f'''
+export BC250_LIBEXEC="{libexec}"
+source "{INSTALLER}"
+if gfx1013_stock_reboot_pending; then printf 'PENDING\n'; else printf 'NOT-PENDING\n'; fi
+'''
+            result = subprocess.run(
+                ["bash", "-c", body],
+                text=True,
+                capture_output=True,
+                check=False,
+                env={**os.environ},
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "PENDING")
+
+    def test_installer_next_steps_color_is_tty_only_and_no_color_safe(self) -> None:
+        body = f'source "{INSTALLER}"; completion_emphasis_begin; printf "NEXT STEPS"; completion_emphasis_end'
+        plain = subprocess.run(
+            ["bash", "-c", body],
+            text=True,
+            capture_output=True,
+            env={**os.environ, "TERM": "xterm"},
+            check=False,
+        )
+        self.assertEqual(plain.returncode, 0, plain.stderr)
+        self.assertEqual(plain.stdout, "NEXT STEPS")
+        self.assertNotIn("\x1b", plain.stdout)
+
+        rc, tty = _run_tty_bash(body, extra_env={"TERM": "xterm"})
+        self.assertEqual(rc, 0, tty)
+        self.assertIn("\x1b[1;33m", tty)
+        self.assertIn("NEXT STEPS", tty)
+        self.assertIn("\x1b[0m", tty)
+
+        rc, no_color = _run_tty_bash(
+            body, extra_env={"TERM": "xterm", "NO_COLOR": "1"}
+        )
+        self.assertEqual(rc, 0, no_color)
+        self.assertIn("NEXT STEPS", no_color)
+        self.assertNotIn("\x1b", no_color)
+
 
     def test_installer_distinguishes_backend_from_usable_front_door(self) -> None:
         source = INSTALLER.read_text()

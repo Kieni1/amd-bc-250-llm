@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,13 +15,176 @@ SOURCE = ROOT / "gfx1013/upstream"
 SPEC = ROOT / "packaging/bc250-llm-server.spec"
 
 
+def dependency_shell_source() -> str:
+    source = SCRIPT.read_text(encoding="utf-8")
+    start = source.index("GFX_BUILD_PACKAGES=(")
+    end = source.index("\nread_one_line() {", start)
+    return source[start:end]
+
+
+def run_stage_boot_case(
+    next_entry: str,
+    *,
+    fail_commit_once: bool = False,
+    precreate_patched: bool = False,
+) -> tuple[subprocess.CompletedProcess[str], dict[str, object]]:
+    """Exercise stage-boot against a sandboxed GRUB/state model."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        active = root / "active.env"
+        active.write_text("prepared\n", encoding="utf-8")
+        (root / "prepared").mkdir()
+        (root / "saved").write_text("stock\n", encoding="utf-8")
+        (root / "next").write_text(next_entry + "\n", encoding="utf-8")
+        if precreate_patched:
+            (root / "patched.conf").write_text("patched\n", encoding="utf-8")
+            (root / "patched.img").write_text("patched\n", encoding="utf-8")
+        shell = r"""
+set -Eeuo pipefail
+export BC250_GFX1013_LIBRARY_ONLY=1
+source "$SCRIPT_PATH"
+mkdir -p "$BC250_GFX1013_STATE_ROOT"
+ACTIVE_STATE="$ACTIVE_PATH"
+need_root() { :; }
+acquire_lifecycle_lock() { :; }
+gfx_lifecycle_state() { GFX_LIFECYCLE_STATE=PREPARED; GFX_STATE_REASON=prepared; }
+load_active_state() {
+  BC250_GFX1013_STOCK_ENTRY_ID=stock
+  BC250_GFX1013_PATCHED_ENTRY_ID=patched
+  BC250_GFX1013_KERNEL=test-kernel
+  BC250_GFX1013_PATCHED_BLS="$ROOT_PATH/patched.conf"
+  BC250_GFX1013_PATCHED_INITRAMFS="$ROOT_PATH/patched.img"
+  BC250_GFX1013_MODULE="$ROOT_PATH/amdgpu.ko"
+  BC250_GFX1013_STOCK_MODULE="$ROOT_PATH/stock.ko"
+  BC250_GFX1013_STOCK_BLS="$ROOT_PATH/stock.conf"
+  BC250_GFX1013_STOCK_INITRAMFS="$ROOT_PATH/stock.img"
+  BC250_GFX1013_STOCK_MODULE_SHA256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  BC250_GFX1013_STOCK_INITRAMFS_SHA256=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  BC250_GFX1013_BUILD_EVIDENCE="$ROOT_PATH/prepared/build-evidence"
+  return 0
+}
+verify_active_identity() { :; }
+patched_boot_running() { return 1; }
+grub_value() {
+  case "$1" in
+    saved_entry) tr -d '\n' < "$ROOT_PATH/saved" ;;
+    next_entry) tr -d '\n' < "$ROOT_PATH/next" ;;
+    *) return 2 ;;
+  esac
+}
+grub2-editenv() {
+  [[ "$1" == - ]] || return 64
+  case "$2" in
+    set)
+      value=${3#next_entry=}
+      printf '%s\n' "$value" > "$ROOT_PATH/next"
+      printf 'set:%s\n' "$value" >> "$ROOT_PATH/grub.log"
+      ;;
+    unset)
+      [[ "$3" == next_entry ]] || return 64
+      : > "$ROOT_PATH/next"
+      printf 'unset\n' >> "$ROOT_PATH/grub.log"
+      ;;
+    *) return 64 ;;
+  esac
+}
+set_active_transaction_state() {
+  phase=$1
+  printf '%s\n' "$phase" >> "$ROOT_PATH/transactions.log"
+  if [[ ${FAIL_COMMIT_ONCE:-0} == 1 && "$phase" == PREPARED && ! -e "$ROOT_PATH/commit-failed" ]]; then
+    : > "$ROOT_PATH/commit-failed"
+    return 1
+  fi
+  return 0
+}
+prepared_stamp_for() { printf '%s\n' "$ROOT_PATH/prepared/prepared.env"; }
+prepared_dir_for() { printf '%s\n' "$ROOT_PATH/prepared"; }
+set_staged_boot_identity() { :; }
+stage_patched_boot() {
+  info_file=$7
+  : > "$BC250_GFX1013_PATCHED_BLS"
+  : > "$BC250_GFX1013_PATCHED_INITRAMFS"
+  printf '%s\n' \
+    "$BC250_GFX1013_PATCHED_BLS" \
+    "$BC250_GFX1013_PATCHED_ENTRY_ID" \
+    "$BC250_GFX1013_PATCHED_INITRAMFS" \
+    "$BC250_GFX1013_STOCK_INITRAMFS" \
+    "$(grub_value saved_entry)" \
+    "$(grub_value next_entry)" \
+    "$BC250_GFX1013_STOCK_MODULE_SHA256" \
+    "$BC250_GFX1013_STOCK_INITRAMFS_SHA256" \
+    cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc \
+    dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd \
+    > "$info_file"
+}
+stage_boot
+"""
+        env = {
+            **os.environ,
+            "SCRIPT_PATH": str(SCRIPT),
+            "ROOT_PATH": str(root),
+            "ACTIVE_PATH": str(active),
+            "BC250_GFX1013_STATE_ROOT": str(root / "state"),
+            "FAIL_COMMIT_ONCE": "1" if fail_commit_once else "0",
+        }
+        result = subprocess.run(
+            ["bash", "-c", shell],
+            env=env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        state: dict[str, object] = {
+            "saved": (root / "saved").read_text(encoding="utf-8").strip(),
+            "next": (root / "next").read_text(encoding="utf-8").strip(),
+            "grub_log": (root / "grub.log").read_text(encoding="utf-8").splitlines()
+            if (root / "grub.log").exists()
+            else [],
+            "transactions": (root / "transactions.log").read_text(encoding="utf-8").splitlines()
+            if (root / "transactions.log").exists()
+            else [],
+            "patched_bls": (root / "patched.conf").exists(),
+            "patched_initramfs": (root / "patched.img").exists(),
+        }
+        return result, state
+
+
+def run_tty_bash(body: str, *, extra_env: dict[str, str] | None = None) -> tuple[int, str]:
+    env = os.environ.copy()
+    env.update(extra_env or {})
+    master, slave = os.openpty()
+    proc = subprocess.Popen(
+        ["bash", "-c", body],
+        stdin=subprocess.DEVNULL,
+        stdout=slave,
+        stderr=slave,
+        env=env,
+        close_fds=True,
+    )
+    os.close(slave)
+    chunks: list[bytes] = []
+    try:
+        while True:
+            try:
+                chunk = os.read(master, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        os.close(master)
+    return proc.wait(timeout=10), b"".join(chunks).decode("utf-8", errors="replace")
+
+
 class Gfx1013Tests(unittest.TestCase):
     def test_package_profile_identity_and_selected_patch_set(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("PACKAGE_PROFILE=v0.2.4-alpha", source)
+        self.assertIn("PACKAGE_PROFILE=v0.2.5-alpha", source)
         self.assertIn("UPSTREAM_VERSION=0.2.0-alpha", source)
         self.assertIn("PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9", source)
-        self.assertIn("TESTED_KERNEL=7.2.9-200.fc44.x86_64", source)
+        self.assertIn("PATCH_REFERENCE_KERNEL=7.2.9-200.fc44.x86_64", source)
+        self.assertIn("PACKAGE_QUALIFICATION_KERNEL=7.2.10-200.fc44.x86_64", source)
         series = (SOURCE / "patches/mesa/series").read_text(encoding="utf-8")
         active = [line.strip() for line in series.splitlines() if line.strip() and not line.lstrip().startswith("#")]
         self.assertEqual(active, ["0001-gfx1013-compute-queue-fix.patch"])
@@ -57,6 +221,13 @@ class Gfx1013Tests(unittest.TestCase):
         }
         self.assertEqual(covered, actual)
 
+    def test_nounset_safe_local_assignments_for_build_helpers(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("local build=$1 module=$2 work=$3 kernel=$4\n  local symvers=\"$build/Module.symvers\"", source)
+        self.assertIn("local index=$1 label=$2\n  local marker=\"[$index/7] $label\"", source)
+        self.assertNotIn("local build=$1 module=$2 work=$3 kernel=$4 symvers=", source)
+        self.assertNotIn("local index=$1 label=$2 marker=", source)
+
     def test_status_verifies_local_package_source_without_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             tmp = Path(temporary)
@@ -79,10 +250,37 @@ class Gfx1013Tests(unittest.TestCase):
                 stderr=subprocess.STDOUT,
                 check=False,
             )
+            verbose = subprocess.run(
+                [str(SCRIPT), "status", "--verbose"],
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+            brief = subprocess.run(
+                [str(SCRIPT), "status", "--brief"],
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("v0.2.4-alpha / experimental / default OFF", result.stdout)
-        self.assertIn("Package patch/full-source manifests: PASS", result.stdout)
-        self.assertIn("Ollama private-RADV override: disabled", result.stdout)
+        self.assertIn("GFX1013 state: disabled", result.stdout)
+        self.assertIn("Integrity:", result.stdout)
+        self.assertIn("Private RADV: absent / disabled", result.stdout)
+        self.assertNotIn("Pinned upstream:", result.stdout)
+        self.assertNotIn("Mesa baseline:", result.stdout)
+        self.assertEqual(verbose.returncode, 0, verbose.stdout)
+        self.assertIn("v0.2.5-alpha / experimental / default OFF", verbose.stdout)
+        self.assertIn("Carried source integrity: PASS", verbose.stdout)
+        self.assertIn("Experimental private-RADV override: disabled", verbose.stdout)
+        self.assertIn("Pinned upstream:", verbose.stdout)
+        self.assertEqual(brief.returncode, 0, brief.stdout)
+        self.assertEqual(brief.stdout.count("Boot:"), 1, brief.stdout)
+        self.assertNotIn("Pinned upstream:", brief.stdout)
+        self.assertNotIn("Mesa baseline:", brief.stdout)
 
 
     def test_status_json_exposes_explicit_lifecycle_state(self) -> None:
@@ -108,10 +306,44 @@ class Gfx1013Tests(unittest.TestCase):
             )
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["schema"], "bc250.gfx1013-status.v1")
+        self.assertEqual(payload["schema"], "bc250.gfx1013-status.v2")
         self.assertEqual(payload["state"], "DISABLED")
-        self.assertEqual(payload["profile"], "v0.2.4-alpha")
+        self.assertEqual(payload["profile"], "v0.2.5-alpha")
         self.assertTrue(payload["default_off"])
+
+    def test_nonroot_status_only_reports_not_inspected_for_inaccessible_state(self) -> None:
+        if os.geteuid() == 0:
+            self.skipTest("requires an unprivileged test runner")
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            state = tmp / "state"
+            state.mkdir()
+            env = os.environ.copy()
+            env.update(
+                {
+                    "BC250_GFX1013_SOURCE": str(SOURCE),
+                    "BC250_GFX1013_STATE_ROOT": str(state),
+                    "BC250_GFX1013_PREFIX_ROOT": str(tmp / "prefix"),
+                    "BC250_GFX1013_DROPIN": str(tmp / "dropin.conf"),
+                    "BC250_GFX1013_UPSTREAM_GENERATOR": str(tmp / "upstream-generator"),
+                    "BC250_GFX1013_UPSTREAM_STATE": str(tmp / "upstream-state"),
+                }
+            )
+            state.chmod(0o000)
+            try:
+                result = subprocess.run(
+                    [str(SCRIPT), "status", "--json"],
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+            finally:
+                state.chmod(0o700)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["state"], "NOT_INSPECTED")
+        self.assertIn("root inspection", payload["reason"])
 
     def test_16_hardens_secure_boot_stale_kernel_and_private_radv_guard(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -120,6 +352,7 @@ class Gfx1013Tests(unittest.TestCase):
             "PREPARED",
             "PATCHED_BOOT_UNVERIFIED",
             "ENABLED",
+            "STOCK_REBOOT_REQUIRED",
             "ROLLBACK_REQUIRED",
         ):
             self.assertIn(state, source)
@@ -278,7 +511,7 @@ class Gfx1013Tests(unittest.TestCase):
 
     def test_check_and_recovery_interfaces_are_non_destructive_before_commit(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("prepare [--check]", source)
+        self.assertIn("prepare [--check|--download-only] [--verbose]", source)
         self.assertIn("disable [--check]", source)
         self.assertIn("reset [--check]", source)
         self.assertIn("GFX1013 prepare check: PASS", source)
@@ -353,6 +586,7 @@ grub_value() {{ [[ $1 == saved_entry ]] && printf '%s\n' "$CASE_SAVED" || printf
 patched_boot_running() {{ [[ "$CASE_PATCHED" == 1 ]]; }}
 risky_artifacts_without_state() {{ return 1; }}
 stock_entry_file_safe() {{ return 0; }}
+resolve_safe_stock_target() {{ printf '/boot/loader/entries/stock.conf|stock\n'; }}
 load_active_state() {{
   [[ -e "$ACTIVE_STATE" ]] || return 1
   BC250_GFX1013_PACKAGE_NEVRA=bc250-llm-server-0.13.1-1.12.x86_64
@@ -376,8 +610,8 @@ printf '%s|%s\n' "$GFX_LIFECYCLE_STATE" "$GFX_STATE_REASON"
             ({"active": False, "patched": True}, "ROLLBACK_REQUIRED"),
             ({"active": True, "saved": "other", "next_entry": "unrelated"}, "ROLLBACK_REQUIRED"),
             ({"active": True, "phase": "SAFETY_FAILURE", "recovery": "1", "patched": True, "next_entry": ""}, "ROLLBACK_REQUIRED"),
-            ({"active": True, "saved": "stock", "next_entry": "patched", "patched": False}, "PREPARED"),
-            ({"active": True, "saved": "stock", "next_entry": "", "patched": True}, "PATCHED_BOOT_UNVERIFIED"),
+            ({"active": True, "saved": "stock", "next_entry": "patched", "patched": False}, "ROLLBACK_REQUIRED"),
+            ({"active": True, "saved": "stock", "next_entry": "", "patched": True}, "ROLLBACK_REQUIRED"),
         )
         for kwargs, expected in cases:
             with self.subTest(kwargs=kwargs):
@@ -385,26 +619,153 @@ printf '%s|%s\n' "$GFX_LIFECYCLE_STATE" "$GFX_STATE_REASON"
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertTrue(result.stdout.startswith(expected + "|"), result.stdout)
 
+    def test_22_upgrade_from_enabled_is_classified_as_stock_reboot_pending(self) -> None:
+        result = self._run_classifier_case(
+            active=False,
+            saved="stock",
+            next_entry="stock",
+            patched=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(result.stdout.startswith("STOCK_REBOOT_REQUIRED|"), result.stdout)
+        self.assertIn("reboot required", result.stdout)
+
+    def test_22_reboot_pending_state_drives_json_reset_check_reset_and_prepare_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            stock_bls = root / "stock.conf"
+            stock_bls.write_text("stock\n", encoding="utf-8")
+            env = {
+                **os.environ,
+                "BC250_GFX1013_LIBRARY_ONLY": "1",
+                "BC250_GFX1013_STATE_ROOT": str(root / "state"),
+                "BC250_GFX1013_PREFIX_ROOT": str(root / "prefix"),
+                "BC250_GFX1013_DROPIN": str(root / "dropin"),
+                "ROOT_PATH": str(root),
+            }
+            script = rf'''
+source "{SCRIPT}"
+need_root() {{ :; }}
+acquire_lifecycle_lock() {{ :; }}
+kernel_release() {{ printf '7.2.10-200.fc44.x86_64\n'; }}
+package_nevra() {{ printf 'bc250-llm-server-0.13.1-2.2.x86_64\n'; }}
+grub_value() {{ printf 'stock\n'; }}
+patched_boot_running() {{ return 0; }}
+risky_artifacts_without_state() {{ return 1; }}
+stock_entry_file_safe() {{ return 0; }}
+resolve_safe_stock_target() {{ printf '%s|stock\n' "$ROOT_PATH/stock.conf"; }}
+source_identity_ok() {{ return 0; }}
+installed_payload_integrity_detail() {{ return 0; }}
+bc250_device_present() {{ return 0; }}
+secure_boot_state() {{ printf 'disabled\n'; }}
+private_icd() {{ printf '%s/private/icd.json\n' "$ROOT_PATH"; }}
+private_radv_lib() {{ printf '%s/private/radv.so\n' "$ROOT_PATH"; }}
+load_active_state() {{ return 1; }}
+
+gfx_lifecycle_state
+printf 'CLASS=%s|%s\n' "$GFX_LIFECYCLE_STATE" "$GFX_STATE_REASON"
+status_json
+if rollback_check reset; then
+  printf 'RESET_CHECK_RC=0\n'
+else
+  printf 'RESET_CHECK_RC=%s\n' "$?"
+fi
+if reset; then
+  printf 'RESET_RC=0\n'
+else
+  printf 'RESET_RC=%s\n' "$?"
+fi
+if prepare_runtime_ready; then
+  printf 'PREPARE_GUARD_RC=0|UNEXPECTED-PASS\n'
+else
+  rc=$?
+  printf 'PREPARE_GUARD_RC=%s|BLOCKED|%s|%s\n' "$rc" "$PREPARE_RUNTIME_BLOCK_REASON" "$PREPARE_RUNTIME_NEXT_ACTION"
+fi
+if prepare; then
+  printf 'PREPARE_RC=0|UNEXPECTED-PASS\n'
+else
+  printf 'PREPARE_RC=%s|BLOCKED\n' "$?"
+fi
+'''
+            result = subprocess.run(
+                ["bash", "-c", script],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = result.stdout.splitlines()
+        self.assertTrue(lines[0].startswith("CLASS=STOCK_REBOOT_REQUIRED|"), result.stdout)
+        json_start = result.stdout.index("{\n")
+        decoder = json.JSONDecoder()
+        payload, json_end = decoder.raw_decode(result.stdout[json_start:])
+        trailing = result.stdout[json_start + json_end :]
+        self.assertEqual(payload["state"], "STOCK_REBOOT_REQUIRED")
+        self.assertEqual(payload["boot"]["stock_entry"], "stock")
+        self.assertEqual(payload["boot"]["saved_entry"], "stock")
+        self.assertEqual(payload["boot"]["next_entry"], "stock")
+        self.assertIn("GFX1013 rollback check: PASS", trailing)
+        self.assertIn("Next action: sudo reboot", trailing)
+        self.assertIn("Reset: PASS (stock rollback prepared; reboot pending)", trailing)
+        self.assertIn("Current runtime: patched GFX1013", trailing)
+        self.assertIn("Verified next boot: stock (stock)", trailing)
+        self.assertIn("A reboot is required to complete the return to stock.", trailing)
+        self.assertIn("RESET_CHECK_RC=0", trailing)
+        self.assertIn("RESET_RC=0", trailing)
+        self.assertIn("PREPARE_GUARD_RC=1|BLOCKED|", trailing)
+        self.assertIn("|sudo reboot", trailing)
+        self.assertIn("PREPARE_RC=2|BLOCKED", trailing)
+
+    def test_22_prepare_check_and_prepare_share_runtime_readiness_guard(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        preflight = source[source.index("prepare_preflight() {"): source.index("prefetch_sources() {")]
+        prepare = source[source.index("prepare() {"): source.index("verify_active_identity() {")]
+        self.assertIn("prepare_runtime_ready", preflight)
+        self.assertIn("prepare_runtime_ready", prepare)
+        self.assertIn('preflight_primary_action="$PREPARE_RUNTIME_NEXT_ACTION"', preflight)
+        self.assertIn('print_next_action "$preflight_primary_action"', preflight)
+        self.assertIn('print_next_action "$PREPARE_RUNTIME_NEXT_ACTION"', prepare)
+
+
+    def test_22_prepare_check_preserves_blocked_preflight_return_code(self) -> None:
+        body = f'''
+export BC250_GFX1013_LIBRARY_ONLY=1
+source "{SCRIPT}"
+need_root() {{ :; }}
+prepare_preflight() {{ return 2; }}
+if prepare --check; then
+  printf 'RC=0\n'
+else
+  printf 'RC=%s\n' "$?"
+fi
+'''
+        result = subprocess.run(
+            ["bash", "-c", body],
+            text=True,
+            capture_output=True,
+            check=False,
+            env={**os.environ},
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "RC=2")
+
     def test_enable_guard_lock_and_recovery_are_fail_closed(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
         enable = source[source.index("enable() {"): source.index("risky_artifacts_without_state() {")]
         guard = source[source.index("ollama_guard() {"): source.index("write_ollama_dropin() {")]
         cleanup = source[source.index("enable_cleanup_on_exit() {"): source.index("enable() {")]
-        reset = source[source.index("reset() {"): source.index('if [[ ${BC250_GFX1013_LIBRARY_ONLY:-0}')]
-        orphan = source[source.index("remove_orphaned_package_artifacts() {"): source.index("disable() {")]
         self.assertIn("acquire_lifecycle_lock", enable)
         self.assertIn("enable requires PATCHED_BOOT_UNVERIFIED", enable)
-        self.assertIn("BC250_GFX1013_TRANSACTION_PHASE:-", enable)
-        self.assertIn("gfx_lifecycle_state", guard)
-        self.assertIn('[[ "$GFX_LIFECYCLE_STATE" == ENABLED ]]', guard)
-        self.assertLess(enable.index('mv -f "$state_tmp" "$ACTIVE_STATE"'), enable.index("systemctl restart ollama.service"))
+        self.assertIn("loaded_amdgpu_identity_ok", guard)
+        self.assertIn("GFX_MODULE_ATTESTATION_REASON", guard)
+        self.assertIn("ENABLING:0|ENABLED:1", guard)
         self.assertIn("ollama_enable_smoke", enable)
-        self.assertIn("set +e", cleanup)
-        self.assertIn('restore_previous_next "$ENABLE_PREVIOUS_NEXT"', cleanup)
+        self.assertLess(enable.index("systemctl restart ollama.service"), enable.index('grub2-set-default "$BC250_GFX1013_PATCHED_ENTRY_ID"'))
+        self.assertLess(enable.index("ollama_enable_smoke"), enable.index('grub2-set-default "$BC250_GFX1013_PATCHED_ENTRY_ID"'))
+        self.assertLess(enable.index('grub2-set-default "$BC250_GFX1013_PATCHED_ENTRY_ID"'), enable.index('mv -f "$state_tmp" "$ACTIVE_STATE"'))
         self.assertIn("restore_prepared_state_after_enable_failure", cleanup)
-        self.assertNotIn('rm -f -- "$DROPIN" "$UPSTREAM_GENERATOR"', orphan)
-        self.assertIn("separate upstream GFX1013 installation is present", orphan)
-        self.assertLess(reset.index("separate upstream GFX1013 installation is present"), reset.index("restore_stock_boot"))
+        self.assertIn('restore_previous_next "$ENABLE_PREVIOUS_NEXT"', cleanup)
 
     def test_mutating_commands_take_one_nonblocking_lifecycle_lock(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -415,42 +776,298 @@ printf '%s|%s\n' "$GFX_LIFECYCLE_STATE" "$GFX_STATE_REASON"
             body = source[source.index(function): source.index(end_marker, source.index(function))]
             self.assertIn("acquire_lifecycle_lock", body)
 
-    def test_build_requirement_accepts_an_installed_provider(self) -> None:
-        source = SCRIPT.read_text(encoding="utf-8")
-        start = source.index("build_requirement_provider() {")
-        end = source.index("\nmissing_build_packages() {", start)
-        function = source[start:end]
-        command = function + r'''
+    def test_build_requirement_exact_package_uses_success_status(self) -> None:
+        command = dependency_shell_source() + r'''
 rpm() {
-  [[ "$*" == *"--whatprovides"*"zlib-devel"* ]] || return 7
-  printf 'zlib-ng-compat-devel-2.3.3-3.fc44.x86_64\n'
+  if [[ "$*" == *"--whatprovides"* ]]; then
+    printf 'unexpected capability lookup\n' >&2
+    return 9
+  fi
+  printf 'vulkan-headers-1.4.341.0-1.fc44.noarch\n'
+  return 0
 }
-build_requirement_provider zlib-devel
+build_requirement_provider vulkan-headers
 '''
-        result = subprocess.run(
-            ["bash", "-c", command],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "vulkan-headers-1.4.341.0-1.fc44.noarch")
+        self.assertNotIn("unexpected capability lookup", result.stderr)
+
+    def test_build_requirement_falls_back_to_capability_provider(self) -> None:
+        command = dependency_shell_source() + r'''
+rpm() {
+  if [[ "$*" == *"--whatprovides"* ]]; then
+    printf 'provider-devel-9.1-2.fc44.x86_64\n'
+    return 0
+  fi
+  printf 'package virtual-devel is not installed\n'
+  return 1
+}
+build_requirement_provider virtual-devel
+'''
+        result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "provider-devel-9.1-2.fc44.x86_64")
+        self.assertNotIn("not installed", result.stdout)
+
+    def test_missing_requirement_stdout_never_becomes_provider_and_blocks_dependency_preflight(self) -> None:
+        command = dependency_shell_source() + r'''
+rpm() {
+  local requirement=${!#}
+  printf 'package %s is not installed\n' "$requirement"
+  return 1
+}
+GFX_BUILD_PACKAGES=(vulkan-loader-devel)
+GFX_BUILD_CAPABILITIES=()
+if check_build_requirements; then
+  printf 'UNEXPECTED-PASS\n'
+  exit 0
+fi
+printf 'BLOCKED:%s\n' "${GFX_MISSING_BUILD_REQUIREMENTS[*]}"
+exit 23
+'''
+        result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 23, result.stderr)
+        self.assertIn("provider: <none>", result.stdout)
+        self.assertIn("NOT INSTALLED", result.stdout)
+        self.assertIn("BLOCKED:vulkan-loader-devel", result.stdout)
+        self.assertNotIn("package vulkan-loader-devel is not installed", result.stdout)
+        self.assertNotIn("status: SATISFIED", result.stdout)
+
+    def test_zlib_devel_compatibility_provider_is_satisfied(self) -> None:
+        command = dependency_shell_source() + r'''
+rpm() {
+  if [[ "$*" == *"--whatprovides"*"zlib-devel"* ]]; then
+    printf 'zlib-ng-compat-devel-2.3.3-3.fc44.x86_64\n'
+    return 0
+  fi
+  printf 'package zlib-devel is not installed\n'
+  return 1
+}
+GFX_BUILD_PACKAGES=(zlib-devel)
+GFX_BUILD_CAPABILITIES=()
+check_build_requirements 1
+'''
+        result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("zlib-ng-compat-devel-2.3.3-3.fc44.x86_64", result.stdout)
+        self.assertIn("status: SATISFIED", result.stdout)
+        self.assertNotIn("package zlib-devel is not installed", result.stdout)
+
+    def test_rpm_macro_requirement_resolves_to_python3_rpm_macros_provider(self) -> None:
+        command = dependency_shell_source() + r'''
+rpm() {
+  local requirement=${!#}
+  if [[ "$*" == *"--whatprovides"* && "$requirement" == 'rpm_macro(py3_shebang_fix)' ]]; then
+    printf 'python3-rpm-macros-3.14-4.fc44.noarch\n'
+    return 0
+  fi
+  printf 'package %s is not installed\n' "$requirement"
+  return 1
+}
+build_requirement_provider 'rpm_macro(py3_shebang_fix)'
+'''
+        result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "python3-rpm-macros-3.14-4.fc44.noarch")
+
+    def test_default_dependency_output_is_exception_focused_and_verbose_retains_providers(self) -> None:
+        command = dependency_shell_source() + r'''
+rpm() {
+  local requirement=${!#}
+  if [[ "$requirement" == present-devel ]]; then
+    printf 'present-devel-1-1.fc44.x86_64\n'
+    return 0
+  fi
+  return 1
+}
+GFX_BUILD_PACKAGES=(present-devel missing-devel)
+GFX_BUILD_CAPABILITIES=()
+printf '%s\n' DEFAULT
+check_build_requirements 0 || true
+printf '%s\n' VERBOSE
+check_build_requirements 1 || true
+'''
+        result = subprocess.run(["bash", "-c", command], text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        default, verbose = result.stdout.split("VERBOSE\n", 1)
+        self.assertIn("Build dependencies: BLOCKED — 1 missing", default)
+        self.assertIn("missing-devel — NOT INSTALLED", default)
+        self.assertNotIn("status: SATISFIED", default)
+        self.assertNotIn("present-devel-1-1", default)
+        self.assertIn("present-devel-1-1.fc44.x86_64", verbose)
+        self.assertIn("status: SATISFIED", verbose)
+        self.assertIn("status: NOT INSTALLED", verbose)
+
+    def test_prepare_blocks_missing_rpm_macro_before_source_acquisition(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            os_release = tmp / "os-release"
+            os_release.write_text("ID=fedora\n", encoding="utf-8")
+            fakebin = tmp / "bin"
+            fakebin.mkdir()
+            for name in (
+                "cargo",
+                "rpm2cpio",
+                "rpmbuild",
+                "meson",
+                "vulkaninfo",
+                "dracut",
+                "lsinitrd",
+                "grub2-editenv",
+                "grub2-set-default",
+            ):
+                path = fakebin / name
+                path.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+                path.chmod(0o755)
+            marker = tmp / "source-acquired"
+            command = r'''
+set -Eeuo pipefail
+export BC250_GFX1013_LIBRARY_ONLY=1
+export BC250_GFX1013_OS_RELEASE_FILE="$2"
+source "$1"
+need_root() { :; }
+acquire_lifecycle_lock() { :; }
+patched_boot_running() { return 1; }
+secure_boot_prepare_ok() { :; }
+rpm() {
+  local requirement=${!#}
+  if [[ "$requirement" == 'rpm_macro(py3_shebang_fix)' ]]; then
+    return 1
+  fi
+  printf 'provider-1-1.fc44.x86_64\n'
+  return 0
+}
+fetch_verified_srpm() { : > "$3"; }
+prepare
+'''
+            env = os.environ | {"PATH": f"{fakebin}:{os.environ.get('PATH', '')}"}
+            result = subprocess.run(
+                ["bash", "-c", command, "bash", str(SCRIPT), str(os_release), str(marker)],
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        combined = result.stdout + result.stderr
+        self.assertIn("rpm_macro(py3_shebang_fix)", combined)
+        self.assertIn("NOT INSTALLED", combined)
+        self.assertFalse(marker.exists(), combined)
+
+    def test_kernel_prep_failure_classifier_recognizes_missing_py3_shebang_macro(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            log = Path(temporary) / "kernel-prep.log"
+            log.write_text(
+                "kernel.spec:2216: Fixing Python shebangs...\n"
+                "+ %py3_shebang_fix tools/kvm/kvm_stat/kvm_stat\n"
+                "/var/tmp/rpm-tmp.X: line 171: fg: no job control\n"
+                "error: Bad exit status from /var/tmp/rpm-tmp.X (%prep)\n",
+                encoding="utf-8",
+            )
+            command = r'''
+export BC250_GFX1013_LIBRARY_ONLY=1
+source "$1"
+classify_prepare_log_failure '[2/7] Run Fedora kernel %prep' "$2"
+prepare_stage_display '[2/7] Run Fedora kernel %prep'
+'''
+            result = subprocess.run(
+                ["bash", "-c", command, "bash", str(SCRIPT), str(log)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
-            result.stdout.strip(),
-            "zlib-ng-compat-devel-2.3.3-3.fc44.x86_64",
+            result.stdout.splitlines(),
+            ["required RPM macro unavailable: py3_shebang_fix", "Fedora kernel %prep"],
         )
 
-    def test_prepare_preflight_is_provider_aware_and_aggregated(self) -> None:
+    def test_prepare_failure_evidence_is_real_gzip_tar_archive(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            prepare_dir = tmp / "transaction"
+            work = prepare_dir / "work"
+            work.mkdir(parents=True)
+            (work / "kernel-prep.log").write_text("error: synthetic prep failure\n", encoding="utf-8")
+            state_root = tmp / "state"
+            command = r'''
+set -Eeuo pipefail
+export BC250_GFX1013_LIBRARY_ONLY=1
+export BC250_GFX1013_STATE_ROOT="$2"
+source "$1"
+PREPARE_DIR="$3"
+PREPARE_STAGE='[2/7] Run Fedora kernel %prep'
+PREPARE_FAILURE_REASON='required RPM macro unavailable: py3_shebang_fix'
+package_nevra() { printf 'bc250-llm-server-0.13.1-1.17.fc44.x86_64\n'; }
+kernel_release() { printf '7.2.10-200.fc44.x86_64\n'; }
+preserve_prepare_evidence 2 failure
+printf '%s\n' "$PREPARE_EVIDENCE_PATH"
+'''
+            result = subprocess.run(
+                ["bash", "-c", command, "bash", str(SCRIPT), str(state_root), str(prepare_dir)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            archive = Path(result.stdout.strip().splitlines()[-1])
+            self.assertTrue(archive.name.endswith(".tar.gz"))
+            self.assertEqual(archive.read_bytes()[:2], b"\x1f\x8b")
+            with tarfile.open(archive, "r:gz") as tf:
+                names = tf.getnames()
+                self.assertTrue(any(name.endswith("/result.env") for name in names), names)
+                self.assertTrue(any(name.endswith("/kernel-prep.log") for name in names), names)
+
+    def test_prepare_preflight_consumes_dependency_status_and_aggregates(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("rpm -q --whatprovides", source)
-        self.assertIn("build_requirement_provider", source)
-        self.assertIn("prepare_preflight", source)
-        self.assertIn("requirement:", source)
-        self.assertIn("provider:", source)
-        self.assertIn("status: satisfied", source)
-        self.assertIn("prepare check: BLOCKED", source)
-        self.assertIn("No files, boot state or services were changed.", source)
+        preflight = source[source.index("prepare_preflight() {"): source.index("prefetch_sources() {", source.index("prepare_preflight() {"))]
+        self.assertIn('if ! check_build_requirements "$verbose"; then', preflight)
+        self.assertIn('missing_requirements=("${GFX_MISSING_BUILD_REQUIREMENTS[@]}")', preflight)
+        self.assertIn("dependency_blocked=1", preflight)
+        self.assertIn("NOT CHECKED — required command modinfo unavailable", preflight)
+        self.assertIn("NOT CHECKED — required command rpm unavailable", preflight)
+        self.assertIn("failures != ${#remediation[@]}", preflight)
+        self.assertIn("prepare check: BLOCKED — %d remediation required", preflight)
+        self.assertIn("No files, boot state or services were changed.", preflight)
 
 
+
+    def test_module_attestation_contract_is_shared_and_srcversion_is_supplemental(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        release_gate = (ROOT / "scripts/check-gfx1013-kernel-build.sh").read_text(encoding="utf-8")
+        helper = source[source.index("validate_built_module_identity() {"): source.index("build_kernel_module() {", source.index("validate_built_module_identity() {"))]
+        prepare = source[source.index("prepare() {"): source.index("verify_active_identity() {", source.index("prepare() {"))]
+        self.assertIn("srcversion_policy=supplemental", helper)
+        self.assertIn('module_sha="$(sha256sum "$module" | awk \'{print $1}\')"', helper)
+        self.assertIn('[[ "$vermagic" == "$kernel "* ]]', helper)
+        self.assertIn("verify_module_abi", helper)
+        self.assertIn("validate_built_module_identity", prepare)
+        self.assertIn("validate_built_module_identity", release_gate)
+        self.assertNotIn("lacks the srcversion identity required for runtime attestation", source)
+
+    def test_kernel_identity_fields_distinguish_qualification_and_patch_reference(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
+        self.assertEqual(contract["gfx1013"]["qualification_kernel"], "7.2.10-200.fc44.x86_64")
+        self.assertEqual(contract["gfx1013"]["patch_reference_kernel"], "7.2.9-200.fc44.x86_64")
+        self.assertIn("Package qualification: $PACKAGE_QUALIFICATION_KERNEL", source)
+        self.assertIn("Patch/profile reference: $PATCH_REFERENCE_KERNEL", source)
+        self.assertIn("Preparing device-local GFX1013 artifacts", source)
+        self.assertNotIn("Exact-kernel rebuild: REQUIRED", source)
+
+    def test_prepare_failure_evidence_captures_module_identity(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        evidence = source[source.index("preserve_prepare_evidence() {"): source.index("prepare_cleanup_on_exit() {", source.index("preserve_prepare_evidence() {"))]
+        self.assertIn("module-identity-built.txt", evidence)
+        self.assertIn("module-identity-stock.txt", evidence)
+        self.assertIn("kernel-srcversion-config.txt", evidence)
+        self.assertIn("capture_module_identity_evidence", evidence)
+
+    def test_stock_module_lookup_targets_exact_kernel_first(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        function = source[source.index("find_stock_module() {"): source.index("find_stock_bls() {", source.index("find_stock_module() {"))]
+        self.assertIn('modinfo -k "$kernel" -n amdgpu', function)
 
     def test_trace_path_adaptation_scans_allowed_amd_trace_headers_and_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -477,10 +1094,11 @@ build_requirement_provider zlib-devel
                     "-Eeuo",
                     "pipefail",
                     "-c",
-                    'source "$1"; adapt_external_amd_trace_paths "$2"',
+                    'source "$1"; adapt_external_amd_trace_paths "$2" "$3"',
                     "bash",
                     str(SCRIPT),
                     str(root),
+                    str(Path(temporary) / "trace-include"),
                 ],
                 env=env,
                 text=True,
@@ -488,8 +1106,11 @@ build_requirement_provider zlib-devel
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(str(amdgpu.parent.resolve()), amdgpu.read_text(encoding="utf-8"))
-            self.assertIn(str(amdkfd.parent.resolve()), amdkfd.read_text(encoding="utf-8"))
+            self.assertIn("#define TRACE_INCLUDE_PATH _bc250_trace_0001", amdgpu.read_text(encoding="utf-8"))
+            self.assertIn("#define TRACE_INCLUDE_PATH _bc250_trace_0002", amdkfd.read_text(encoding="utf-8"))
+            include_root = Path(temporary) / "trace-include"
+            self.assertEqual((include_root / "_bc250_trace_0001").resolve(), amdgpu.parent.resolve())
+            self.assertEqual((include_root / "_bc250_trace_0002").resolve(), amdkfd.parent.resolve())
 
             amdgpu.write_text(
                 "#define TRACE_INCLUDE_PATH ../../drivers/gpu/drm/amd/display\n",
@@ -501,10 +1122,11 @@ build_requirement_provider zlib-devel
                     "-Eeuo",
                     "pipefail",
                     "-c",
-                    'source "$1"; adapt_external_amd_trace_paths "$2"',
+                    'source "$1"; adapt_external_amd_trace_paths "$2" "$3"',
                     "bash",
                     str(SCRIPT),
                     str(root),
+                    str(Path(temporary) / "trace-include"),
                 ],
                 env=env,
                 text=True,
@@ -513,6 +1135,34 @@ build_requirement_provider zlib-devel
             )
             self.assertNotEqual(bad.returncode, 0)
             self.assertIn("unresolved or unexpected in-tree AMD TRACE_INCLUDE_PATH", bad.stderr)
+
+    def test_kernel_external_build_uses_trace_include_namespace(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        build = source[source.index("build_kernel_module() {"): source.index("prepare_fedora_mesa_source() {")]
+        self.assertIn('trace_include_root="$work/trace-include"', build)
+        self.assertIn('adapt_external_amd_trace_paths "$linux_root/drivers/gpu/drm/amd" "$trace_include_root"', build)
+        self.assertIn('"KCFLAGS=-I$trace_include_root"', build)
+
+    def test_kernel_build_progress_is_heartbeat_driven_and_parallelism_is_configurable(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        helper = source[source.index("gfx_build_progress() {"): source.index("prepare_fedora_kernel_source() {")]
+        build = source[source.index("build_kernel_module() {"): source.index("prepare_fedora_mesa_source() {")]
+        self.assertIn("BC250_GFX1013_BUILD_PROGRESS", helper)
+        self.assertIn("BC250_GFX1013_HEARTBEAT_SECONDS", helper)
+        self.assertIn('still running, $elapsed elapsed', helper)
+        self.assertIn("BC250_GFX1013_BUILD_JOBS", helper)
+        self.assertNotIn("detected > 4", helper)
+        self.assertIn('detected="$(nproc)"', helper)
+        self.assertIn("requested <= 64", helper)
+        self.assertIn('jobs="$(kernel_build_jobs)"', build)
+        self.assertIn('"-j$jobs"', build)
+        self.assertNotIn('"-j$(nproc)"', build)
+        self.assertIn('run_kernel_logged_phase "amdgpu external-module build"', build)
+
+    def test_kernel_checker_enables_progress_without_forcing_device_output(self) -> None:
+        checker = (ROOT / "scripts/check-gfx1013-kernel-build.sh").read_text(encoding="utf-8")
+        self.assertIn('BC250_GFX1013_BUILD_PROGRESS="${BC250_GFX1013_BUILD_PROGRESS:-1}"', checker)
+        self.assertIn('BC250_GFX1013_HEARTBEAT_SECONDS="${BC250_GFX1013_HEARTBEAT_SECONDS:-60}"', checker)
 
     def test_mesa_spec_selection_is_fail_closed(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -533,7 +1183,8 @@ build_requirement_provider zlib-devel
         self.assertIn('private_icd_library_ok "$stage$(private_icd)" "$(private_radv_lib)"', verify)
         staging = source[source.index("stage_patched_boot() {"): source.index("restore_previous_next() {")]
         self.assertNotIn("pin_private_icd_library", staging)
-        self.assertIn("deployed private RADV ICD does not retain", staging)
+        prepare = source[source.index("prepare() {"): source.index("stage_boot() {")]
+        self.assertIn("deployed private RADV ICD does not retain", prepare)
 
     def test_110_rebases_private_radv_and_hardens_prepare_build_pipeline(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -557,8 +1208,8 @@ build_requirement_provider zlib-devel
             "Module.symvers",
             "materialize_module_ko",
             "PREPARE_COMMITTED=0",
-            "preserve_prepare_failure",
-            "rotate_prepare_failures",
+            "preserve_prepare_evidence",
+            "rotate_prepare_evidence",
             "kernel-srpm-members.txt",
         ):
             self.assertIn(token, source)
@@ -618,6 +1269,8 @@ else
         *) shift ;;
       esac
     done
+    [[ "$kmod" == "{root}/state/.prepare-test/work/kmod/lib/modules/$kernel" ]] || return 78
+    printf '%s\n' "$kmod" > "{root}/dracut-kmoddir"
     printf initramfs > "$out"
     cp "$(find "$kmod" -type f -name 'amdgpu.ko*' -print -quit)" "{root}/fake-embedded.ko"
   }}
@@ -645,7 +1298,7 @@ PREPARE_COMMITTED=0
 PREPARE_STAGE="fault-$FAULT"
 PREPARE_FAILURE_REASON=''
 trap 'prepare_cleanup_on_exit $?' EXIT
-stage_patched_boot "$kernel" "$prepared" "$module_payload" "$mesa_stage" "$stock_module" "$stock_bls" "$info"
+stage_patched_boot "$kernel" "$prepared" "$module_payload" "$stock_module" "$stock_bls" "$transaction/work" "$info"
 '''
         return subprocess.run(
             ["bash", "-c", script],
@@ -654,6 +1307,29 @@ stage_patched_boot "$kernel" "$prepared" "$module_payload" "$mesa_stage" "$stock
             capture_output=True,
             check=False,
         )
+
+    def test_20_stage_boot_uses_dracut_lib_modules_hierarchy(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        staging = source[source.index("stage_patched_boot() {"): source.index("restore_previous_next() {")]
+        self.assertIn('kmod_stage="$kmod_stage_root/lib/modules/$kernel"', staging)
+        self.assertNotIn('kmod_stage="$work/kmod/$kernel"', staging)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = self._run_stage_fault(root, "none")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(
+                (root / "dracut-kmoddir").read_text(encoding="utf-8").strip(),
+                f"{root}/state/.prepare-test/work/kmod/lib/modules/7.2.9-200.fc44.x86_64",
+            )
+
+    def test_20_stage_boot_dracut_failure_leaves_stock_module_unchanged(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = self._run_stage_fault(root, "dracut")
+            self.assertNotEqual(result.returncode, 0)
+            stock = root / "modules/7.2.9-200.fc44.x86_64/kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko"
+            self.assertEqual(stock.read_text(encoding="utf-8"), "stockmodule")
+            self.assertIn("patched initramfs generation from isolated module tree failed", result.stderr)
 
     def _run_boot_transaction_fault(self, root: Path, fault: str) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
@@ -730,97 +1406,125 @@ esac
             check=False,
         )
 
-    def test_110_behavioral_stage_faults_leave_stock_untouched_and_clean_partial_artifacts(self) -> None:
-        kernel = "7.2.9-200.fc44.x86_64"
-        for fault in ("dracut", "bls"):
-            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                result = self._run_stage_fault(root, fault)
-                self.assertEqual(result.returncode, 2, result.stderr)
-                stock_module = root / "modules" / kernel / "kernel/drivers/gpu/drm/amd/amdgpu/amdgpu.ko"
-                stock_initramfs = root / "boot" / f"initramfs-{kernel}.img"
-                self.assertEqual(stock_module.read_text(encoding="utf-8"), "stockmodule")
-                self.assertEqual(stock_initramfs.read_text(encoding="utf-8"), "stockinit")
-                self.assertFalse((root / "boot/loader/entries" / f"machine-{kernel}-bc250-gfx1013-v33.conf").exists())
-                self.assertFalse((root / "boot" / f"initramfs-{kernel}-bc250-gfx1013-v33.img").exists())
-                self.assertFalse((root / "prefix/0.2.0-alpha").exists())
-                self.assertFalse((root / "state/.prepare-test").exists())
-                self.assertFalse((root / "state/active.env").exists())
-                failures = list((root / "state/failures").glob("failure-*/failure.env"))
-                self.assertEqual(len(failures), 1)
-                evidence = failures[0].read_text(encoding="utf-8")
-                self.assertIn(f"stage=fault-{fault}", evidence)
-                if fault == "dracut":
-                    self.assertIn("patched\\ initramfs\\ generation", evidence)
-                else:
-                    self.assertIn("failed\\ to\\ install\\ patched\\ BLS\\ entry", evidence)
-
-    def test_110_behavioral_grub_set_failure_restores_and_cleans(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            result = self._run_boot_transaction_fault(root, "set-fail")
-            self.assertEqual(result.returncode, 2, result.stderr)
-            self.assertEqual((root / "next").read_text(encoding="utf-8"), "old")
-            self.assertEqual((root / "saved").read_text(encoding="utf-8"), "stock")
-            self.assertFalse((root / "patched.conf").exists())
-            self.assertFalse((root / "patched.img").exists())
-            self.assertFalse((root / "prefix/keep").exists())
-            self.assertFalse((root / "state/active.env").exists())
-            self.assertEqual(len(list((root / "state/failures").glob("failure-*/failure.env"))), 1)
-
-    def test_110_behavioral_grub_restore_failure_preserves_recovery_state_and_artifacts(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            result = self._run_boot_transaction_fault(root, "restore-fail")
-            self.assertEqual(result.returncode, 5, result.stderr)
-            self.assertEqual((root / "next").read_text(encoding="utf-8"), "patched")
-            self.assertEqual((root / "saved").read_text(encoding="utf-8"), "stock")
-            self.assertTrue((root / "patched.conf").is_file())
-            self.assertTrue((root / "patched.img").is_file())
-            self.assertTrue((root / "prefix/keep").is_dir())
-            self.assertTrue((root / "transaction").is_dir())
-            state = (root / "state/active.env").read_text(encoding="utf-8")
-            self.assertIn("BC250_GFX1013_TRANSACTION_PHASE=SAFETY_FAILURE", state)
-            self.assertIn("BC250_GFX1013_RECOVERY_REQUIRED=1", state)
-            self.assertIn("failed\\ to\\ restore\\ previous\\ GRUB\\ next_entry", state)
-            failures = list((root / "state/failures").glob("failure-*/failure.env"))
-            self.assertEqual(len(failures), 1)
-
-    def test_110_behavioral_prepare_signals_restore_boot_state_and_clean(self) -> None:
-        for fault in ("sigint", "sigterm"):
-            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as temporary:
-                root = Path(temporary)
-                result = self._run_boot_transaction_fault(root, fault)
-                self.assertEqual(result.returncode, 130, result.stderr)
-                self.assertEqual((root / "next").read_text(encoding="utf-8"), "old")
-                self.assertEqual((root / "saved").read_text(encoding="utf-8"), "stock")
-                self.assertFalse((root / "patched.conf").exists())
-                self.assertFalse((root / "patched.img").exists())
-                self.assertFalse((root / "prefix/keep").exists())
-                self.assertFalse((root / "state/active.env").exists())
-                self.assertEqual(len(list((root / "state/failures").glob("failure-*/failure.env"))), 1)
-
-    def test_110_prepare_never_overwrites_stock_amdgpu_and_rolls_boot_back_first(self) -> None:
+    def test_114_prepare_is_build_only_and_stage_boot_owns_boot_activation(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
-        stage = source[source.index("stage_patched_boot() {"): source.index("restore_previous_next() {")]
-        cleanup = source[source.index("prepare_cleanup_on_exit() {"): source.index("prepare_preflight() {")]
-        self.assertIn('dracut --kmoddir "$kmod_stage"', stage)
-        self.assertIn('cp -a --reflink=auto "$stock_modules_root/." "$kmod_stage/"', stage)
-        self.assertIn('stock amdgpu changed during isolated dracut generation', stage)
-        self.assertIn('patched initramfs must contain exactly one amdgpu module', stage)
-        self.assertNotIn('install -m 0644 "$module_payload" "$stock_module"', stage)
-        self.assertNotIn("restore_stock_module", source)
-        self.assertLess(cleanup.index('restore_previous_next "$PREPARE_PREVIOUS_NEXT"'), cleanup.index('rm -f -- "$PREPARE_PATCHED_BLS"'))
-        self.assertIn("mark_prepare_safety_failure", cleanup)
-        self.assertIn("SAFETY_FAILURE", source)
-        self.assertIn("recovery artifacts were preserved", cleanup)
-        selector = source[source.index("select_patched_next_boot() {"): source.index("rotate_prepare_failures() {")]
-        self.assertLess(
-            selector.index("PREPARE_BOOT_STATE_CHANGED=1"),
-            selector.index('grub2-editenv - set "next_entry=$patched_id"'),
+        prepare = source[source.index("prepare() {"): source.index("STAGE_BOOT_COMMITTED=1")]
+        stage = source[source.index("stage_boot() {"): source.index("verify_active_identity() {")]
+        self.assertNotIn("stage_patched_boot", prepare)
+        self.assertNotIn('grub2-editenv - set "next_entry=', prepare)
+        self.assertIn("Private RADV: built and staged", prepare)
+        self.assertIn("Boot state changed: no", prepare)
+        self.assertIn("stage_patched_boot", stage)
+        self.assertIn("select_patched_next_boot", stage)
+        self.assertIn("set_active_transaction_state BOOT_ENTRY_STAGING", stage)
+        self.assertIn("set_active_transaction_state PREPARED", stage)
+        self.assertIn("Prepared build retained: yes", source)
+        self.assertIn('next" != "$BC250_GFX1013_STOCK_ENTRY_ID"', stage)
+        self.assertIn("GFX1013 stage-boot: BLOCKED", stage)
+        self.assertIn("Existing one-shot boot: verified stock entry", stage)
+        self.assertIn('print_next_action "sudo bc250 gfx1013 status --verbose"', stage)
+        bls = source[source.index("stage_patched_boot() {"): source.index("restore_previous_next() {")]
+        self.assertNotIn("amdgpu.sched_policy=2", bls)
+        self.assertIn("bc250.gfx1013_v33=1", bls)
+        self.assertNotIn("$mesa_stage", bls)
+        self.assertNotIn('$(dirname "$private")', bls)
+
+    def test_21_stage_boot_state_machine_covers_all_next_entry_branches(self) -> None:
+        empty, empty_state = run_stage_boot_case("")
+        self.assertEqual(empty.returncode, 0, empty.stderr)
+        self.assertIn("Boot activation: PASS", empty.stdout)
+        self.assertEqual(empty_state["saved"], "stock")
+        self.assertEqual(empty_state["next"], "patched")
+        self.assertEqual(empty_state["grub_log"], ["set:patched"])
+
+        stock, stock_state = run_stage_boot_case("stock")
+        self.assertEqual(stock.returncode, 0, stock.stderr)
+        self.assertIn("Existing one-shot boot: verified stock entry", stock.stdout)
+        self.assertEqual(stock_state["saved"], "stock")
+        self.assertEqual(stock_state["next"], "patched")
+        self.assertEqual(stock_state["grub_log"], ["set:patched"])
+
+        unknown, unknown_state = run_stage_boot_case("admin-custom")
+        self.assertEqual(unknown.returncode, 2, unknown.stderr)
+        self.assertIn("GFX1013 stage-boot: BLOCKED", unknown.stderr)
+        self.assertIn("admin-custom", unknown.stderr)
+        self.assertIn("status --verbose", unknown.stderr)
+        self.assertEqual(unknown_state["saved"], "stock")
+        self.assertEqual(unknown_state["next"], "admin-custom")
+        self.assertEqual(unknown_state["grub_log"], [])
+        self.assertFalse(unknown_state["patched_bls"])
+        self.assertFalse(unknown_state["patched_initramfs"])
+
+        conflicting, conflicting_state = run_stage_boot_case("patched")
+        self.assertEqual(conflicting.returncode, 2, conflicting.stderr)
+        self.assertIn("patched next_entry is selected but its boot artifacts are missing", conflicting.stderr)
+        self.assertEqual(conflicting_state["next"], "patched")
+        self.assertEqual(conflicting_state["grub_log"], [])
+
+        staged, staged_state = run_stage_boot_case("patched", precreate_patched=True)
+        self.assertEqual(staged.returncode, 0, staged.stderr)
+        self.assertIn("Boot activation: already staged", staged.stdout)
+        self.assertEqual(staged_state["saved"], "stock")
+        self.assertEqual(staged_state["next"], "patched")
+        self.assertEqual(staged_state["grub_log"], [])
+
+    def test_21_stage_boot_restores_verified_stock_next_entry_after_post_selection_failure(self) -> None:
+        result, state = run_stage_boot_case("stock", fail_commit_once=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn("GFX1013 stage-boot: FAILED", result.stderr)
+        self.assertIn("Prepared build retained: yes", result.stderr)
+        self.assertIn("Partial boot artifacts removed: yes", result.stderr)
+        self.assertIn("Boot selection restored: yes", result.stderr)
+        self.assertEqual(state["saved"], "stock")
+        self.assertEqual(state["next"], "stock")
+        self.assertEqual(state["grub_log"], ["set:patched", "set:stock"])
+        self.assertFalse(state["patched_bls"])
+        self.assertFalse(state["patched_initramfs"])
+        self.assertGreaterEqual(state["transactions"].count("PREPARED"), 2)
+
+    def test_21_help_and_normal_completion_are_workflow_oriented(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        usage = source[source.index("usage() {"):source.index("benchmark_helper() {")]
+        help_result = subprocess.run(
+            [str(SCRIPT), "--help"], text=True, capture_output=True, check=False
         )
-        prepare = source[source.index("prepare() {"): source.index("verify_active_identity() {")]
-        self.assertIn('select_patched_next_boot "$patched_id" "$saved_before"', prepare)
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        for heading in ("Typical activation", "Return to stock", "Inspection", "Preparation", "Activation", "Deactivation", "Recovery only", "Qualification / performance testing"):
+            self.assertIn(heading, usage)
+            self.assertIn(heading, help_result.stdout)
+        self.assertNotIn("build the pinned V33", usage)
+        self.assertIn("build the patched amdgpu module", usage)
+        self.assertIn("make the verified patched boot persistent", usage)
+        self.assertIn("a reboot is required", usage)
+        enable = source[source.index("enable() {"):source.index("risky_artifacts_without_state() {")]
+        self.assertIn('print_next_action "none — GFX1013 is ready"', enable)
+        self.assertIn('echo "Qualification only: sudo bc250 gfx1013 status"', enable)
+        disable = source[source.index("disable() {"):source.index("reset() {")]
+        self.assertIn('print_next_action "sudo reboot"', disable)
+        self.assertNotIn('sudo reboot  # unload', disable)
+
+    def test_114_source_downloads_resume_and_operator_interrupt_is_distinct(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        fetch = source[source.index("fetch_verified_srpm() {"): source.index("find_stock_module() {")]
+        cleanup = source[source.index("prepare_cleanup_on_exit() {"): source.index("prepare_preflight() {")]
+        self.assertIn("--continue-at -", fetch)
+        self.assertIn("resumable partial retained", fetch)
+        self.assertIn("validate_source_rpm", fetch)
+        self.assertLess(fetch.index('validate_source_rpm "$part"'), fetch.index('mv -f -- "$part" "$dest"'))
+        self.assertIn("GFX1013 prepare interrupted by operator.", cleanup)
+        self.assertIn("Exit status: 130", cleanup)
+        self.assertIn("Rerun 'sudo bc250 gfx1013 prepare' to resume.", cleanup)
+
+    def test_114_long_build_interrupts_kill_process_group_and_queue_attestation_is_compute_only(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        phase = source[source.index("stop_active_phase() {"): source.index("kernel_build_jobs() {")]
+        self.assertIn('kill -TERM -- "-$pid"', phase)
+        self.assertIn('kill -KILL -- "-$pid"', phase)
+        self.assertIn('setsid --wait', phase)
+        queue = source[source.index("verify_private_radv_compute_queue() {"): source.index("verify_loaded_amdgpu_identity() {")]
+        self.assertIn('QUEUE_COMPUTE_BIT', queue)
+        self.assertIn('QUEUE_GRAPHICS_BIT', queue)
+        self.assertIn('"QUEUE_GRAPHICS_BIT" not in flags', queue)
 
     def test_110_records_fedora_kernel_source_lineage_and_transaction_phases(self) -> None:
         source = SCRIPT.read_text(encoding="utf-8")
@@ -829,7 +1533,6 @@ esac
         self.assertIn('BC250_GFX1013_KERNEL_SRPM_NEVR=', source)
         self.assertIn('BC250_GFX1013_KERNEL_SOURCE_PROVENANCE_SHA256=', source)
         self.assertIn('BC250_GFX1013_KERNEL_TARGET_MANIFEST_SHA256=', source)
-        self.assertIn('BC250_GFX1013_TRANSACTION_PHASE=BOOT_ENTRY_STAGING', source)
         self.assertIn('BC250_GFX1013_TRANSACTION_PHASE=PREPARED', source)
         self.assertIn('set_active_transaction_state ENABLING', source)
         self.assertIn('set_active_transaction_state DISABLING', source)
@@ -871,6 +1574,41 @@ esac
         self.assertIn("gfx1013.sh disable --package-erase", preun)
         self.assertIn("refusing package erase", preun)
         self.assertLess(preun.index("gfx1013.sh disable --package-erase"), preun.index("systemctl stop open-webui.service"))
+
+
+    def test_21_gfx_next_action_color_is_tty_only_and_no_color_safe(self) -> None:
+        body = (
+            f'export BC250_GFX1013_LIBRARY_ONLY=1; source "{SCRIPT}"; '
+            'print_next_action "sudo reboot"'
+        )
+        plain = subprocess.run(
+            ["bash", "-c", body],
+            text=True,
+            capture_output=True,
+            env={**os.environ, "TERM": "xterm"},
+            check=False,
+        )
+        self.assertEqual(plain.returncode, 0, plain.stderr)
+        self.assertEqual(plain.stdout, "Next action: sudo reboot\n")
+        self.assertNotIn("\x1b", plain.stdout)
+
+        rc, tty = run_tty_bash(body, extra_env={"TERM": "xterm"})
+        self.assertEqual(rc, 0, tty)
+        self.assertIn("\x1b[1;33mNext action: sudo reboot\x1b[0m", tty)
+
+        rc, no_color = run_tty_bash(
+            body, extra_env={"TERM": "xterm", "NO_COLOR": "1"}
+        )
+        self.assertEqual(rc, 0, no_color)
+        self.assertIn("Next action: sudo reboot", no_color)
+        self.assertNotIn("\x1b", no_color)
+
+    def test_nonroot_status_does_not_infer_missing_lifecycle_state(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("authoritative lifecycle state requires root inspection", source)
+        self.assertIn("GFX_LIFECYCLE_STATE=NOT_INSPECTED", source)
+        self.assertIn("NOT_INSPECTED) printf 'sudo bc250 gfx1013 status --brief", source)
+        self.assertIn("NO_COLOR", source)
 
 
 if __name__ == "__main__":

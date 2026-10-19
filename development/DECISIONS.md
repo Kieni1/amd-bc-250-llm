@@ -100,7 +100,7 @@ or package architecture changes so strongly that most subsystems become coupled 
 
 **Status:** ACTIVE
 
-**Decision:** Keep `prod-gpt-oss20b-ggml-org-mxfp4`, Ollama `0.34.0`, the current
+**Decision:** Keep `prod-gpt-oss20b-ggml-org-mxfp4`, the package-pinned Ollama `0.40.4`, the current
 governor/CU policy and current KV defaults while the main-model qualification cycle is
 open. Strengthen candidate evidence before considering promotion.
 
@@ -112,7 +112,7 @@ thermal/CU evidence for finalists; GPU-journal/error capture; gfx1013 runtime-de
 evidence when speculative decoding is tested.
 
 **Do not infer yet:** no global KV-default change, no forced F16, no forced 32K tests, no
-global `n_ubatch=384`, no governor/CU policy change, no Ollama upgrade and no new main
+global `n_ubatch=384`, no governor/CU policy change, no further Ollama upgrade and no new main
 model promotion without real BC-250 evidence.
 
 **Retest only if:** upstream/runtime changes invalidate one of these gates, or real BC-250

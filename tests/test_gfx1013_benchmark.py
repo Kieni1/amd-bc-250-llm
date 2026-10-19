@@ -44,7 +44,11 @@ class Gfx1013BenchmarkTests(unittest.TestCase):
         self.assertAlmostEqual(MODULE.delta_pct(100, 95), -5.0)
 
     def test_recommendation_requires_a2_and_clean_safety_evidence(self) -> None:
+        deterministic_hash = "a" * 64
         aggregate_a1 = {
+            "output_sha256": deterministic_hash,
+            "output_sha256_set": [deterministic_hash],
+            "output_consistent": True,
             "prompt_tps_cv_pct": 2.0,
             "generation_tps_cv_pct": 2.0,
             "mem_available_min_mib": 1000.0,
@@ -52,6 +56,9 @@ class Gfx1013BenchmarkTests(unittest.TestCase):
             "temp_max_c": 70.0,
         }
         aggregate_b = {
+            "output_sha256": deterministic_hash,
+            "output_sha256_set": [deterministic_hash],
+            "output_consistent": True,
             "prompt_tps_cv_pct": 2.5,
             "generation_tps_cv_pct": 2.5,
             "mem_available_min_mib": 980.0,
@@ -90,6 +97,42 @@ class Gfx1013BenchmarkTests(unittest.TestCase):
         self.assertEqual(MODULE.recommendation(report)["state"], "KEEP_OPTIONAL")
 
 
+    def test_recommendation_blocks_deterministic_output_mismatch(self) -> None:
+        good = {
+            "output_sha256": "a" * 64,
+            "output_sha256_set": ["a" * 64],
+            "output_consistent": True,
+            "prompt_tps_cv_pct": 1.0,
+            "generation_tps_cv_pct": 1.0,
+            "mem_available_min_mib": 1000.0,
+            "swap_peak_delta_mib": 0.0,
+            "temp_max_c": 70.0,
+        }
+        bad = {**good, "output_sha256": "b" * 64, "output_sha256_set": ["b" * 64]}
+        role = {
+            "delta": {"prompt_tps_gain_pct": 10.0, "generation_tps_gain_pct": 7.0},
+            "a1_stock": good,
+            "b_gfx": bad,
+            "a2_restored": good,
+            "a2_control_drift": {"prompt_tps_vs_a1_pct": 0.0, "generation_tps_vs_a1_pct": 0.0},
+        }
+        clean = {
+            "gpu_fault_count": 0,
+            "gpu_journal_error": None,
+            "ollama_restart_delta": 0,
+            "residency_restoration": "PASS",
+        }
+        result = MODULE.recommendation({
+            "roles": {"standard": role},
+            "a1_stock_meta": clean,
+            "b_gfx_meta": clean,
+            "a2_restored_meta": clean,
+            "a2_restored_present": True,
+        })
+        self.assertEqual(result["state"], "KEEP_OPTIONAL")
+        self.assertTrue(any("GFX deterministic output differs from stock" in reason for reason in result["blockers"]))
+
+
     def test_report_can_be_generated_without_mutating_lifecycle(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -113,6 +156,9 @@ class Gfx1013BenchmarkTests(unittest.TestCase):
                     "model": model,
                     "digest": "abc",
                     "aggregate": {
+                        "output_sha256": "a" * 64,
+                        "output_sha256_set": ["a" * 64],
+                        "output_consistent": True,
                         "prompt_tps_median": prompt,
                         "generation_tps_median": generation,
                         "prompt_tps_cv_pct": 2.0,

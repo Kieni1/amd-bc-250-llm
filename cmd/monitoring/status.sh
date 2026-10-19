@@ -66,10 +66,12 @@ runtime_mode() {
 
 
 topology_summary() {
-  local mode="$1" runtime_identity_warning="${2:-0}" unit label missing=()
+  local mode="$1" runtime_identity_warning="${2:-0}" gfx_action_required="${3:-0}" unit label missing=()
   case "$mode" in
     normal)
-      if [[ "$runtime_identity_warning" == 1 ]]; then
+      if [[ "$gfx_action_required" == 1 ]]; then
+        echo "Overall: DEGRADED — experimental GFX1013 lifecycle action required"
+      elif [[ "$runtime_identity_warning" == 1 ]]; then
         echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch/unavailable"
       else
         echo "Overall: HEALTHY"
@@ -77,7 +79,9 @@ topology_summary() {
       echo "Runtime mode: normal"
       ;;
     agent)
-      if [[ "$runtime_identity_warning" == 1 ]]; then
+      if [[ "$gfx_action_required" == 1 ]]; then
+        echo "Overall: DEGRADED — experimental GFX1013 lifecycle action required"
+      elif [[ "$runtime_identity_warning" == 1 ]]; then
         echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch/unavailable"
       else
         echo "Overall: HEALTHY"
@@ -263,7 +267,18 @@ if [[ -n "$status_payload" ]]; then
 else
   runtime_identity_warning=1
 fi
-topology_summary "$mode" "$runtime_identity_warning"
+gfx_action_required=0
+gfx_state=''
+gfx_reason=''
+if [[ -n "$status_payload" ]]; then
+  gfx_state="$(jq -r '.gfx1013.state // "UNAVAILABLE"' <<< "$status_payload" 2>/dev/null || true)"
+  gfx_reason="$(jq -r '.gfx1013.reason // "no reason supplied"' <<< "$status_payload" 2>/dev/null || true)"
+  [[ "$gfx_state" == STOCK_REBOOT_REQUIRED || "$gfx_state" == ROLLBACK_REQUIRED || "$gfx_state" == BROKEN ]] && gfx_action_required=1
+fi
+topology_summary "$mode" "$runtime_identity_warning" "$gfx_action_required"
+if ((gfx_action_required)); then
+  echo "Experimental GFX1013: ACTION REQUIRED — ${gfx_state}: ${gfx_reason}"
+fi
 
 section "Platform"
 package_nevra="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' bc250-llm-server 2>/dev/null | head -1 || true)"

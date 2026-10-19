@@ -36,6 +36,7 @@ DEFAULT_ROOT = Path("/var/lib/bc250-llm-server/gfx1013/benchmarks")
 DEFAULT_GFX_HELPER = Path("/usr/libexec/bc250-llm-server/gfx1013.sh")
 DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
 PHASES = ("stock", "gfx", "restored")
+DETERMINISTIC_SEED = 424242
 EXPECTED_GFX_STATE = {"stock": "DISABLED", "gfx": "ENABLED", "restored": "DISABLED"}
 ROLE_IDS = {
     "standard": "bc250-office-standard",
@@ -260,7 +261,7 @@ def think_value(model: str, policy: dict[str, Any]) -> bool | str | None:
 
 def build_payload(model: str, prompt: str, num_predict: int) -> dict[str, Any]:
     policy = request_policy_for_model(model)
-    options: dict[str, Any] = {"num_predict": num_predict}
+    options: dict[str, Any] = {"num_predict": num_predict, "seed": DETERMINISTIC_SEED}
     for key in (
         "temperature",
         "top_p",
@@ -371,7 +372,14 @@ def aggregate_role(cold: dict[str, Any], warm: list[dict[str, Any]]) -> dict[str
     swap_starts = values("swap_used_start_mib")
     swap_peaks = values("swap_used_max_mib")
     mem_mins = values("mem_available_min_mib")
+    output_hashes = [str(row.get("output_sha256") or "") for row in all_rows]
+    output_hashes = [value for value in output_hashes if value]
+    output_hash_set = sorted(set(output_hashes))
     return {
+        "deterministic_seed": DETERMINISTIC_SEED,
+        "output_sha256": output_hash_set[0] if len(output_hash_set) == 1 else None,
+        "output_sha256_set": output_hash_set,
+        "output_consistent": bool(output_hashes) and len(output_hash_set) == 1,
         "cold_load_s": num(cold.get("load_s")),
         "cold_ttfc_s": num(cold.get("ttfc_s")),
         "cold_ttfa_s": num(cold.get("ttfa_s")),
@@ -732,7 +740,7 @@ def phase_run(
             f"TTFC={fmt(agg.get('ttfc_s_median'))} s"
         )
     if phase == "stock":
-        print("Next: prepare/boot/enable GFX1013, then run 'sudo bc250 gfx1013 benchmark gfx'.")
+        print("Next: run 'sudo bc250 gfx1013 prepare', 'sudo bc250 gfx1013 stage-boot', reboot, then 'sudo bc250 gfx1013 enable'.")
     elif phase == "gfx":
         print("Next: disable GFX1013, reboot stock, then run 'sudo bc250 gfx1013 benchmark restored'.")
     else:
@@ -793,6 +801,11 @@ def compare_role(stock: dict[str, Any], gfx: dict[str, Any], restored: dict[str,
         "a2_restored": a2,
         "delta": comparisons,
         "a2_control_drift": restored_drift,
+        "output_identity": {
+            "a1_stock": a.get("output_sha256"),
+            "b_gfx": b.get("output_sha256"),
+            "a2_restored": a2.get("output_sha256") if a2 is not None else None,
+        },
     }
 
 
@@ -821,6 +834,23 @@ def recommendation(report: dict[str, Any]) -> dict[str, Any]:
         a1 = row.get("a1_stock") if isinstance(row.get("a1_stock"), dict) else {}
         b = row.get("b_gfx") if isinstance(row.get("b_gfx"), dict) else {}
         a2 = row.get("a2_restored") if isinstance(row.get("a2_restored"), dict) else None
+        for label, aggregate in (("A1", a1), ("B", b)):
+            if aggregate.get("output_consistent") is not True:
+                blockers.append(f"{role} {label} deterministic output is not stable across repeated runs")
+        a1_hash = a1.get("output_sha256")
+        b_hash = b.get("output_sha256")
+        if not a1_hash or not b_hash:
+            blockers.append(f"{role} A1/B deterministic output identity is missing")
+        elif a1_hash != b_hash:
+            blockers.append(f"{role} GFX deterministic output differs from stock")
+        if a2 is not None:
+            if a2.get("output_consistent") is not True:
+                blockers.append(f"{role} A2 deterministic output is not stable across repeated runs")
+            a2_hash = a2.get("output_sha256")
+            if not a1_hash or not a2_hash:
+                blockers.append(f"{role} A1/A2 deterministic output identity is missing")
+            elif a1_hash != a2_hash:
+                blockers.append(f"{role} restored-stock deterministic output differs from A1")
         for label, aggregate in (("A1", a1), ("B", b)):
             for metric in ("prompt_tps_cv_pct", "generation_tps_cv_pct"):
                 value = num(aggregate.get(metric))

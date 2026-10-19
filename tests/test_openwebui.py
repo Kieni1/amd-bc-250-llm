@@ -5,6 +5,7 @@ import copy
 import hashlib
 import importlib.util
 import io
+import os
 import sys
 import tempfile
 import unittest
@@ -731,6 +732,18 @@ class OpenWebUIStatusTests(unittest.TestCase):
             self.assertNotIn(secret, stdout.getvalue())
             self.assertNotIn(secret, stderr.getvalue())
 
+    def test_suggested_token_file_ignores_inaccessible_legacy_path(self) -> None:
+        class InaccessiblePath:
+            def is_file(self) -> bool:
+                raise PermissionError("denied")
+
+        with (
+            mock.patch.object(OPENWEBUI, "DEFAULT_TOKEN_FILE", Path("/definitely/missing")),
+            mock.patch.object(OPENWEBUI, "LEGACY_TOKEN_FILE", InaccessiblePath()),
+            mock.patch.dict(os.environ, {}, clear=True),
+        ):
+            self.assertEqual(OPENWEBUI.suggested_token_file(), "")
+
     def test_translation_roles_match_stage2e_contract_exactly(self) -> None:
         prompt_path = ROOT / "config/openwebui/prompts/translation-explicit-direction-v1.txt"
         prompt = prompt_path.read_text(encoding="utf-8")
@@ -1262,6 +1275,11 @@ class OpenWebUIStatusTests(unittest.TestCase):
             with (
                 mock.patch.object(OPENWEBUI, "DEFAULT_TOKEN_FILE", path),
                 mock.patch.object(OPENWEBUI, "verify_token") as verify,
+                mock.patch.object(
+                    OPENWEBUI,
+                    "read_token_file",
+                    side_effect=lambda value: Path(value).read_text(encoding="utf-8").strip(),
+                ),
             ):
                 OPENWEBUI.save_default_maintenance_api_key(
                     "http://127.0.0.1:3000", KeyClient(), "temporary-jwt"

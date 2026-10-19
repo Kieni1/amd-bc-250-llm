@@ -669,7 +669,8 @@ else
 fi
 ollama_env="$(systemctl show ollama.service -p Environment --value 2>/dev/null || true)"
 for key in OLLAMA_CONTEXT_LENGTH OLLAMA_KV_CACHE_TYPE OLLAMA_FLASH_ATTENTION \
-  OLLAMA_NUM_PARALLEL OLLAMA_MAX_LOADED_MODELS OLLAMA_HOST OLLAMA_MODELS OLLAMA_NO_CLOUD; do
+  OLLAMA_NUM_PARALLEL OLLAMA_MAX_LOADED_MODELS OLLAMA_HOST OLLAMA_MODELS OLLAMA_NO_CLOUD \
+  OLLAMA_VULKAN OLLAMA_IGPU_ENABLE GGML_VK_VISIBLE_DEVICES; do
   value="$(grep -oE "${key}=[^ ]+" <<< "$ollama_env" | tail -1 || true)"
   [[ -n "$value" ]] && info "$value" || warn "$key is not visible in the effective service environment"
 done
@@ -678,6 +679,13 @@ if grep -qE '(^| )OLLAMA_NO_CLOUD=1( |$)' <<< "$ollama_env"; then
 else
   bad "main Ollama is missing OLLAMA_NO_CLOUD=1"
 fi
+for required in OLLAMA_VULKAN=1 OLLAMA_IGPU_ENABLE=1 GGML_VK_VISIBLE_DEVICES=0; do
+  if grep -qE "(^| )${required}( |$)" <<< "$ollama_env"; then
+    ok "main Ollama BC-250 Vulkan contract: $required"
+  else
+    bad "main Ollama BC-250 Vulkan contract is missing $required"
+  fi
+done
 
 if command -v journalctl >/dev/null 2>&1; then
   ollama_log="$(journalctl -b --no-pager -n 1000 \

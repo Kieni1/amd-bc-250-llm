@@ -28,6 +28,20 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
         )
 
 
+    def test_missing_cargo_prep_macro_fails_early_with_provisioning_hint(self) -> None:
+        result = subprocess.CompletedProcess(["rpm"], 0, b"%{cargo_prep}\n", b"")
+        with patch.object(mesa_check, "require_command", return_value="rpm"), patch.object(
+            mesa_check, "run", return_value=result
+        ), self.assertRaisesRegex(mesa_check.ValidationError, "provision-gfx1013-mesa-builddeps"):
+            mesa_check.require_rpm_macro("cargo_prep")
+
+    def test_available_cargo_prep_macro_is_accepted(self) -> None:
+        result = subprocess.CompletedProcess(["rpm"], 0, b"/usr/bin/true\n", b"")
+        with patch.object(mesa_check, "require_command", return_value="rpm"), patch.object(
+            mesa_check, "run", return_value=result
+        ):
+            mesa_check.require_rpm_macro("cargo_prep")
+
     def test_source_rpm_identity_uses_sourcepackage_not_arch(self) -> None:
         metadata = mesa_check.read_metadata()
         query = subprocess.CompletedProcess(
@@ -191,60 +205,25 @@ class Gfx1013MesaSourceGateTests(unittest.TestCase):
             with self.assertRaisesRegex(mesa_check.ValidationError, "headless RADV Meson options"):
                 mesa_check.validate_headless_meson_schema(root)
 
-    def test_release_gate_builds_headless_radv_with_real_production_builder(self) -> None:
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        gfx = (ROOT / "cmd/system/gfx1013.sh").read_text(encoding="utf-8")
-        self.assertIn("gfx1013-mesa-build-check", makefile)
-        self.assertIn('source "$$1/cmd/system/gfx1013.sh"; build_mesa', makefile)
-        release_gate = makefile[makefile.index("release-gate:"): makefile.index("\n\nclean:")]
-        self.assertIn("$(MAKE) gfx1013-mesa-build-check", release_gate)
-        self.assertIn("-Dplatforms=[]", gfx)
-        self.assertNotIn("-Dplatforms=x11,wayland", gfx)
-
-
-    def test_release_gate_builds_and_abi_checks_real_fedora_kernel_module(self) -> None:
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
-        ci_local = (ROOT / "scripts/ci-local.sh").read_text(encoding="utf-8")
-        kernel_gate = (ROOT / "scripts/check-gfx1013-kernel-build.sh").read_text(encoding="utf-8")
-        self.assertIn("gfx1013-kernel-build-check", makefile)
-        self.assertIn("./scripts/check-gfx1013-kernel-build.sh", makefile)
-        for token in (
-            "kernel_build_owner",
-            "build_kernel_module",
-            "verify_module_abi",
-            "modinfo -F vermagic",
-            "kernel-source-provenance.txt",
-            "amdgpu.ko.zst",
-            "mode=fedora-prepared-source",
-        ):
-            self.assertIn(token, kernel_gate)
-        release_gate = makefile[makefile.index("release-gate:") : makefile.index("\n\nclean:")]
-        self.assertLess(
-            release_gate.index("$(MAKE) gfx1013-kernel-build-check"),
-            release_gate.index("$(MAKE) gfx1013-mesa-build-check"),
-        )
-        for dependency in ("kernel-devel", "kmod", "kernel-srpm-macros", "redhat-rpm-config"):
-            self.assertIn(dependency, workflow)
-            self.assertIn(dependency, ci_local)
 
     def test_fedora_prep_dependencies_are_declared(self) -> None:
         gfx = (ROOT / "cmd/system/gfx1013.sh").read_text(encoding="utf-8")
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
-        ci_local = (ROOT / "scripts/ci-local.sh").read_text(encoding="utf-8")
+        local_build = (ROOT / "build-local.sh").read_text(encoding="utf-8")
+        kernel_provision = (ROOT / "scripts/provision-gfx1013-kernel-builddeps.sh").read_text(encoding="utf-8")
+        mesa_provision = (ROOT / "scripts/provision-gfx1013-mesa-builddeps.sh").read_text(encoding="utf-8")
         self.assertIn("cargo-rpm-macros", gfx)
         self.assertIn("git-core", gfx)
         self.assertIn("redhat-rpm-config", gfx)
         self.assertIn("kernel-srpm-macros", gfx)
-        self.assertIn("cargo-rpm-macros", workflow)
-        self.assertIn("cargo-rpm-macros", ci_local)
-        self.assertIn("bzip2", workflow)
-        self.assertIn("zstd", workflow)
-        self.assertIn("bzip2", ci_local)
-        self.assertIn("zstd", ci_local)
-        for requirement in ("meson", "ninja-build", "gcc-c++", "vulkan-headers", "systemd-devel", "spirv-tools-devel", "pkgconf-pkg-config"):
-            self.assertIn(requirement, workflow)
-            self.assertIn(requirement, ci_local)
+        self.assertNotIn("cargo-rpm-macros", workflow)
+        self.assertIn("provision-gfx1013-kernel-builddeps.sh", local_build)
+        self.assertIn("provision-gfx1013-mesa-builddeps.sh", local_build)
+        self.assertIn('dnf --disable-repo=fedora-cisco-openh264 -y builddep --srpm "$srpm"', kernel_provision)
+        self.assertIn('dnf --disable-repo=fedora-cisco-openh264 -y builddep --srpm "$srpm"', mesa_provision)
+        packages = gfx[gfx.index("GFX_BUILD_PACKAGES=("): gfx.index("build_requirement_provider() {")]
+        for requirement in ("cargo-rpm-macros", "bzip2", "meson", "ninja-build", "gcc-c++", "vulkan-headers", "systemd-devel", "spirv-tools-devel", "pkgconf-pkg-config"):
+            self.assertIn(requirement, packages)
         packages = gfx[gfx.index("GFX_BUILD_PACKAGES=("): gfx.index("build_requirement_provider() {")]
         for gui_requirement in ("libX11-devel", "libxcb-devel", "wayland-devel", "libdisplay-info-devel"):
             self.assertNotIn(gui_requirement, packages)

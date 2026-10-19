@@ -4,7 +4,7 @@ This package profile is based on DryhoppedIPA/bc250-gfx1013-fix release
 `0.2.0-alpha`, pinned at commit
 `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`.
 
-Package profile `v0.2.4-alpha` intentionally carries only the compute-queue
+Package profile `v0.2.5-alpha` intentionally carries only the compute-queue
 subset needed by the BC-250 LLM appliance:
 
 - kernel V33 patch 0001: MMIO PASID route;

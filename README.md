@@ -4,9 +4,9 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.13.1-1.12` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.13.1-2.2` (Ollama 0.40.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
 
-GFX1013 remains experimental/default-off as package profile `v0.2.4-alpha`; its private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`, built as headless AMD-Vulkan-only Mesa with no X11/Wayland/EGL/GBM/OpenGL stack in the private prefix. The Fedora release gate compiles both production GFX paths: exact Fedora kernel-SRPM `%prep` + patched external `amdgpu` with vermagic/ABI verification, and the same headless private RADV builder. Prepare uses an isolated dracut module tree and never replaces the authoritative stock `amdgpu` path.
+GFX1013 remains experimental/default-off as package profile `v0.2.5-alpha`; its private RADV baseline is exact Fedora 44 `mesa-26.2.4-1.fc44`, built as headless AMD-Vulkan-only Mesa. The Fedora release gate compiles the exact kernel-SRPM `%prep` + patched external `amdgpu` and the same private RADV path. Device preflight now requires the actual Fedora RPM capability `rpm_macro(py3_shebang_fix)` (normally provided by `python3-rpm-macros`) before source/build work. Source acquisition is resumable, `prepare` is build-only, `stage-boot` separately creates the one-shot patched boot without replacing the authoritative stock `amdgpu` path, and detailed provider/provenance output is available through the GFX `--verbose` modes.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -65,7 +65,7 @@ CU expansion uses the packaged live WGP manager on the stock Fedora AMDGPU path;
 ```bash
 sudo bc250 status
 sudo bc250 status --json    # machine-readable appliance/GFX state
-sudo bc250 doctor           # read-only integrated diagnostics
+sudo bc250 health           # read-only integrated diagnostics
 bc250 version               # exact package/runtime/GFX identity
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
@@ -186,7 +186,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Component | Purpose |
 |---|---|
 | Cyan Skillfish governor v0.4.13 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.34.4 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Ollama v0.40.4 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
 | Open WebUI v0.11.4 and Tika v4.1.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
@@ -194,10 +194,16 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for release 0.13.1-1.12. Exact-device 0.12.2-0.8 qualification
-passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
-whole-appliance revalidation with this runtime; 0.13.1 does not change the Ollama pin.
-Runtime updates remain deliberately pinned rather than following upstream automatically.
+Ollama 0.40.4 is the package-pinned runtime for release 0.13.1-2.2. The previous 0.34.4
+pin has exact-device qualification evidence; the 0.40.4 pin retains the healthy 1.17 stock-install baseline and 2.0 requires fresh exact-package device qualification
+before release acceptance. Runtime updates remain deliberately pinned rather than following upstream
+automatically.
+
+Long-context allocation ceilings are not production-context recommendations. The
+package carries the corrected October 2026 BC-250 methodology conclusion as guidance
+only: no production/model context limit, TTM/swap policy or governor default is raised
+from the external stress results. See [`docs/HARDWARE.md`](docs/HARDWARE.md) and
+[`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md). See [`docs/OLLAMA.md`](docs/OLLAMA.md)
@@ -211,17 +217,39 @@ unauthenticated Ollama APIs blocked from untrusted networks.
 
 ## Source and build
 
-`make validate` is the deterministic repository check. The normal RPM build is
-the Fedora 44 GitHub Actions workflow in `.github/workflows/build-rpm.yml`; it
-produces binary and source RPM artifacts. Maintainers can still use `make rpm`
-in a matching Fedora build environment. Third-party governor and CU sources are
-pinned in `packaging/upstreams.toml`.
+`make validate` is the deterministic repository check. Release RPM/SRPM artifacts are
+built authoritatively on the Fedora 44 workstation with `./build-local.sh --full`; GitHub
+runs source/static validation only. The local full driver is fail-fast: it cleans/prepares
+sources and runs lint plus repository preflight before privileged dependency provisioning
+or the expensive exact-kernel/Mesa builds. A full run requests sudo authentication once at startup
+so the password prompt is immediate rather than appearing after preflight. Repository preflight includes the host release-
+pipeline contract tests, then freezes the validated source tarball and RPM spec so edits or
+overlays during later heavy work cannot change what RPM consumes. The authenticated sudo ticket is kept alive non-interactively while preflight runs; after
+preflight, it is used only for exact kernel/Mesa dependency provisioning, and the heavy release
+phase remains unprivileged. All generated
+local-build state is contained under `.build/`: reusable cache under `.build/cache/`, and
+per-run artifacts/logs/result metadata under `.build/runs/<run-id>/`. A full build asks for sudo authentication immediately after startup/tool checks, refreshes that
+ticket non-interactively for the duration of the full run, and uses non-interactive sudo for
+dependency provisioning so a later credential expiry fails immediately instead of stalling
+on an unseen password prompt. Foreground builds
+use all detected CPUs at normal priority; `--background` restores lower CPU/I/O priority,
+and an installed `sccache` is reused from `.build/cache/sccache` with before/after cache
+statistics reported for each run. Major build stages print ISO-8601 timestamps, total elapsed
+time and per-stage elapsed time so slow checkpoints are obvious in logs. Successful runs discard
+temporary work/rpmbuild trees.
+A dirty-tree full run is rejected by default; `--allow-dirty` (or the compatibility
+`BC250_ALLOW_DIRTY_FULL=1` environment override) permits an engineering-only full pass, but `result.json` and the terminal summary keep it explicitly
+not release-qualified. RPM `%check` runs package/SRPM contracts only; host release-orchestration contracts run in
+preflight instead of recursively validating the build driver from inside the RPM build. The final
+SRPM rebuild proves self-containment/buildability from a clean temporary RPM topdir; it is not a
+bit-for-bit reproducibility claim. Third-party
+governor and CU sources are pinned in `packaging/upstreams.toml`.
 
-For repeated local builds, `make clean` keeps the verified `sources/` cache; use
-`make clean-sources` only when an upstream refresh is actually wanted. `scripts/ci-local.sh`
-defaults to Podman `--pull=missing` and accepts `BC250_BUILD_IMAGE` /
-`BC250_BUILD_PULL_POLICY` overrides, so a maintainer can use a prebuilt Fedora builder image
-without changing appliance/runtime code. Source integrity checks still run during the normal build.
+Release identity and stage ordering are declared in `release-contract.json`. Full builds authenticate sudo first, then preflight freezes the source tarball and RPM spec and runs the complete package/SRPM deterministic suite from that exact extracted archive before kernel/Mesa compilation. Dependency provisioning and the heavy kernel/Mesa/RPM phase then execute from that frozen source tree rather than the mutable checkout; later RPM `%check` and clean SRPM rebuild remain independent proofs in their real packaging contexts.
+
+Direct `make` targets remain available in a matching Fedora environment and retain their
+configurable output defaults. Source integrity checks run as part of both fast and full local
+builds.
 
 Repository groups:
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -36,6 +37,7 @@ class Gfx1013KernelProvenanceTests(unittest.TestCase):
         root_output = root / "prepared-root.txt"
         result = subprocess.run(
             [
+                sys.executable,
                 str(CHECK),
                 "--prepared-build-root",
                 str(build),

@@ -10,6 +10,7 @@ readonly MEMORY_PROFILE="$LIBEXEC_DIR/memory-profile.sh"
 readonly SWAP_PROFILE="$LIBEXEC_DIR/swap-profile.sh"
 readonly CU_STATUS="$LIBEXEC_DIR/cu-status.sh"
 readonly INSTALL_OLLAMA="$LIBEXEC_DIR/install-ollama.sh"
+readonly GFX1013_HELPER="$LIBEXEC_DIR/gfx1013.sh"
 readonly ORIGINAL_ARGS=("$@")
 readonly LOG_FILE="${BC250_INSTALL_LOG:-/var/log/bc250-llm-install.log}"
 runtime_env="${BC250_RUNTIME_ENV:-/usr/share/bc250-llm-server/runtime.env}"
@@ -30,6 +31,16 @@ COMPANION_STATE="NOT CONFIGURED (optional)"
 BACKUP_EXPORT_STATE="NOT CONFIGURED (optional)"
 HF_SESSION_FILE="/run/bc250-llm-server/install-hf-session"
 OWUI_SETUP_STATE="not-run"
+GFX1013_STOCK_REBOOT_PENDING=0
+
+terminal_color_enabled() { [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR:-} ]]; }
+completion_emphasis_begin() {
+  terminal_color_enabled && printf '\033[1;33m' || true
+}
+completion_emphasis_end() {
+  terminal_color_enabled && printf '\033[0m' || true
+}
+
 OWUI_UPGRADE_BACKUP=""
 
 usage() {
@@ -321,9 +332,23 @@ step_3_install_ollama() {
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
   remove_fedora_ollama
+  local observed_before observed_after
+  observed_before="not installed"
+  if [[ -x /usr/local/bin/ollama ]]; then
+    observed_before="$(ollama_version /usr/local/bin/ollama 2>/dev/null || true)"
+    [[ -n "$observed_before" ]] || observed_before="unknown"
+  fi
+  echo "Ollama desired:  $requested"
+  echo "Ollama observed: $observed_before"
   echo "Reconciling package-qualified Ollama ${requested} with the package-owned service topology."
   BC250_ASSUME_YES=1 OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" "$INSTALL_OLLAMA"
   hash -r
+  observed_after="$(ollama_version /usr/local/bin/ollama 2>/dev/null || true)"
+  echo "Ollama observed after reconciliation: ${observed_after:-unknown}"
+  if [[ "$observed_after" != "$requested" ]]; then
+    echo "ERROR: Ollama observed version ${observed_after:-unknown} does not match package desired version $requested" >&2
+    return 1
+  fi
 }
 
 step_4_memory_and_swap() {
@@ -1116,6 +1141,17 @@ print_40cu_completion_status() {
 }
 
 
+gfx1013_status_payload() {
+  [[ -x "$GFX1013_HELPER" ]] || return 1
+  "$GFX1013_HELPER" status --json 2>/dev/null
+}
+
+gfx1013_stock_reboot_pending() {
+  local payload
+  payload="$(gfx1013_status_payload)" || return 1
+  jq -e '.state == "STOCK_REBOOT_REQUIRED"' <<< "$payload" >/dev/null 2>&1
+}
+
 print_setup_summary() {
   local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED" restart_state="not evaluated (optional helper unavailable)"
   curl -fsS --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && owui_state="BACKEND READY"
@@ -1125,6 +1161,11 @@ print_setup_summary() {
   curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && ollama_state="READY"
   [[ -n "$(pending_kernel || true)" ]] && reboot_state="YES"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || reboot_state="YES"
+  GFX1013_STOCK_REBOOT_PENDING=0
+  if gfx1013_stock_reboot_pending; then
+    GFX1013_STOCK_REBOOT_PENDING=1
+    reboot_state="YES — GFX1013 stock restoration"
+  fi
   if command -v needs-restarting >/dev/null 2>&1; then
     if needs-restarting -r >/dev/null 2>&1; then restart_state="PASS"; else restart_state="RECOMMENDED"; fi
   fi
@@ -1163,6 +1204,16 @@ print_setup_summary() {
   print_40cu_completion_status "  "
   printf '  BC-250 configuration reboot : %s
 ' "$reboot_state"
+  if ((GFX1013_STOCK_REBOOT_PENDING)); then
+    printf '  Experimental GFX1013         : stock reboot pending
+'
+    printf '  Current GFX runtime          : previous patched boot
+'
+    printf '  Verified next GFX boot       : stock
+'
+    printf '  GFX1013 reboot required      : YES
+'
+  fi
   printf '  OS/package restart check     : %s
 ' "$restart_state"
   printf '  Quality revalidation         : NOT RUN
@@ -1224,36 +1275,45 @@ main() {
   echo "OVERVIEW"
   echo
   echo "Administration"
-  echo "  Open WebUI:    sudo bc250 openwebui-setup status"
-  echo "  Models:        sudo bc250 model status"
-  echo "  RAG:           bc250 rag --help"
-  echo "  Maintenance:   sudo bc250 maintenance --help"
-  echo "  Documentation: /usr/share/doc/bc250-llm-server/"
+  echo "  Open WebUI:     sudo bc250 openwebui-setup status"
+  echo "  Models:         sudo bc250 model install"
+  echo "  RAG:            bc250 rag --help"
+  echo "  Maintenance:    sudo bc250 maintenance --help"
+  echo "  Documentation:  /usr/share/doc/bc250-llm-server/docs/OPERATIONS.md"
   echo
-  echo "Storage"
+  echo "Storage & cleanup"
   echo "  sudo bc250 storage --help"
   echo
-  local completion_amber="" completion_reset=""
-  if [[ -t 1 && ${TERM:-dumb} != dumb ]]; then
-    completion_amber=$'\033[1;33m'
-    completion_reset=$'\033[0m'
-  fi
-  printf '%s' "$completion_amber"
+  completion_emphasis_begin
   echo "NEXT STEPS"
   echo
-  echo "CU routing (optional)"
-  echo "  sudo bc250-cu-live-manager"
+  if ((GFX1013_STOCK_REBOOT_PENDING)); then
+    echo "Required reboot"
+    echo "  Complete GFX1013 stock restoration: sudo reboot"
+    echo
+  fi
+  echo "System status / validation"
+  echo "  Status:              sudo bc250 status"
+  echo "  Health:              sudo bc250 health"
+  echo "  Verify:              sudo bc250 verify"
+  echo "  Quality validation:  sudo bc250 revalidate start"
+  echo "  Benchmarking:        bc250 benchmark --help"
   echo
-  echo "Status / validation"
-  echo "  sudo bc250 status"
-  echo "  sudo bc250-40cu status"
+  echo "Setup / repair"
+  echo "  Rerun installation:  sudo bc250 install"
   echo
-  echo "Full quality revalidation"
-  echo "  sudo bc250 revalidate start"
+  echo "Models"
+  echo "  Install/manage:      sudo bc250 model install"
+  echo "  Status:              sudo bc250 model status"
   echo
-  echo "Benchmark"
-  echo "  bc250 benchmark --help"
-  printf '%s' "$completion_reset"
+  echo "Optional improvements"
+  echo "  CU routing:          sudo bc250-cu-live-manager"
+  if ((GFX1013_STOCK_REBOOT_PENDING)); then
+    echo "  GFX1013 check:       after reboot: sudo bc250 gfx1013 prepare --check"
+  else
+    echo "  GFX1013 check:       sudo bc250 gfx1013 prepare --check"
+  fi
+  completion_emphasis_end
   ((verify_rc == 0)) || return "$verify_rc"
   [[ "$OWUI_SETUP_STATE" != "retry-required" ]] || return 2
 }

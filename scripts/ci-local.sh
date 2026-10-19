@@ -20,7 +20,7 @@ podman run --rm --pull="$pull_policy" \
   "$build_image" \
   bash -Eeuxo pipefail -c '
     build_packages=(
-      bash binutils bison bzip2 cargo cargo-rpm-macros cpio curl elfutils-libelf-devel
+      bash binutils bison bzip2 cargo cargo-rpm-macros cpio curl dnf5-plugins elfutils-libelf-devel
       expat-devel findutils flex gcc gcc-c++ git-core glslang glslang-devel gzip kernel-devel kernel-srpm-macros kmod libdrm-devel
       libzstd-devel make meson ninja-build openssl-devel patch pkgconf-pkg-config python3
       python3-mako python3-packaging python3-pycparser python3-pyyaml redhat-rpm-config rpm-build rpmlint ruff
@@ -36,6 +36,12 @@ podman run --rm --pull="$pull_policy" \
       --home-dir /tmp/bc250-builder --shell /bin/bash bc250-builder
     mkdir -p /tmp/bc250-builder
     chown "$BC250_HOST_UID:$BC250_HOST_GID" /tmp/bc250-builder
+
+    # Provision exact Fedora SRPM BuildRequires for both authoritative GFX1013
+    # source paths while the disposable container still has root authority.
+    # The release gate itself remains entirely unprivileged.
+    ./scripts/provision-gfx1013-kernel-builddeps.sh
+    ./scripts/provision-gfx1013-mesa-builddeps.sh
 
     runuser -u bc250-builder -- env \
       HOME=/tmp/bc250-builder LANG=C LC_ALL=C \

@@ -7,19 +7,21 @@ _bc250_complete() {
   command="${COMP_WORDS[1]:-}"
 
   if (( COMP_CWORD == 1 )); then
-    COMPREPLY=( $(compgen -W 'agent-mode benchmark code code-commit compare-mtp doctor fetch-mtp gfx1013 gitea-review install maintenance model ocr ollama-profile openwebui-setup package-gate qualification rag reset resilience run-mtp status storage support-bundle verify version help --help --version' -- "$cur") )
+    COMPREPLY=( $(compgen -W 'agent-mode benchmark code code-commit compare-mtp doctor health fetch-mtp gfx1013 gitea-review install maintenance model ocr ollama-profile openwebui-setup package-gate qualification rag reset resilience run-mtp status storage support-bundle verify version help --help --version' -- "$cur") )
     return 0
   fi
 
   case "$command" in
     gfx1013)
       if (( COMP_CWORD == 2 )); then
-        COMPREPLY=( $(compgen -W 'status prepare enable disable reset benchmark help' -- "$cur") )
+        COMPREPLY=( $(compgen -W 'status prepare stage-boot enable disable reset benchmark help' -- "$cur") )
       elif [[ "${COMP_WORDS[2]:-}" == benchmark && $COMP_CWORD -eq 3 ]]; then
         COMPREPLY=( $(compgen -W 'stock gfx restored status report' -- "$cur") )
       elif [[ "${COMP_WORDS[2]:-}" == status ]]; then
-        COMPREPLY=( $(compgen -W '--json' -- "$cur") )
-      elif [[ "${COMP_WORDS[2]:-}" =~ ^(prepare|disable|reset)$ ]]; then
+        COMPREPLY=( $(compgen -W '--brief --verbose --json' -- "$cur") )
+      elif [[ "${COMP_WORDS[2]:-}" == prepare ]]; then
+        COMPREPLY=( $(compgen -W '--check --download-only --verbose' -- "$cur") )
+      elif [[ "${COMP_WORDS[2]:-}" =~ ^(disable|reset)$ ]]; then
         COMPREPLY=( $(compgen -W '--check' -- "$cur") )
       elif [[ "${COMP_WORDS[2]:-}" == benchmark && "${COMP_WORDS[3]:-}" == status ]]; then
         COMPREPLY=( $(compgen -W '--campaign-dir --json' -- "$cur") )
@@ -41,7 +43,7 @@ _bc250_complete() {
     version)
       COMPREPLY=( $(compgen -W '--json --short' -- "$cur") )
       ;;
-    status|doctor)
+    status|health|doctor)
       COMPREPLY=( $(compgen -W '--json' -- "$cur") )
       ;;
     benchmark)

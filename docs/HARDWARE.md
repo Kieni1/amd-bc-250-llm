@@ -56,6 +56,29 @@ The package-managed zram/disk-swap profile remains a pressure safety net; it is 
 to make an oversized model GPU-resident. Watch `MemAvailable`, swap growth and
 `ollama ps` during long-context tests.
 
+### Benchmark allocation ceiling is not a safe service context
+
+An October 2026 external BC-250 context-ceiling campaign corrected an important
+measurement artifact in `llama-bench`: after a depth fill it copied sequence state
+to host memory even when the copy was unused. On ROCm that copy is roughly KV-cache
+sized, is pinned and counts against KFD's memory budget. Re-running without the copy
+materially raised the measured ROCm allocation ceilings; in the same campaign Vulkan
+still generally reached deeper allocation ceilings.
+
+Those results are **not** a reason to raise this appliance's service limits. The same
+stress corpus reports Vulkan runs that pushed the host into up to about 13.7 GiB of
+swap writes, and a few extreme fills completed while logging thousands of gfx-ring
+timeouts. Several measured ceilings also exceeded the models' trained context lengths.
+A successful allocation therefore proves only that one benchmark invocation fit; it
+does not prove useful model output, thermal margin, low swap pressure, recovery safety
+or unattended service stability.
+
+The package consequently keeps the current model `num_ctx` values, 32K balanced
+profile, explicit 65,536 max-context profile, TTM limits, swap policy and governor
+settings unchanged. Treat any future ceiling experiment as destructive/edge
+qualification and keep production promotion tied to bounded service-like evidence.
+The external evidence is linked, not packaged: [commit `bd897ec`](https://github.com/akandr/bc250-rocm/commit/bd897eccac05cb02f1c0c1e3cb9d4e6a490f58b2) and its [context-ceiling report](https://github.com/akandr/bc250-rocm/blob/bd897eccac05cb02f1c0c1e3cb9d4e6a490f58b2/logs/context-ceilings-2026-09-30/README.md).
+
 ### External BC-250 setup references
 
 Community guidance remains useful, but kernel-specific recipes age quickly. The

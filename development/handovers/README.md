@@ -50,9 +50,13 @@ retired after their durable evidence was integrated into model-run and decision 
 
 ## Current main-integration continuity
 
+- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-2.2.md` — current 2.2 corrective boundary: represent the safe patched-current/verified-stock-next transition consistently as a stock reboot requirement across status/reset/prepare/install without reopening proven GFX architecture.
+- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.18.md` — historical 1.18 build/device evidence through successful prepare and the first deterministic stage-boot/dracut hierarchy failure; superseded by 2.0 for current source behavior.
 - `../DEVELOPMENT-SCOPE.json` + `../scope.py` — first-stop current development scope and frozen-domain guard.
 - `MAIN-INTEGRATION-HANDOVER.md` — durable project state/history.
 - `MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md` — current procedural authority and implemented contracts.
-- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.3.md` — current release implementation/device-qualification boundary.
-- `RELEASE-TESTING-HANDOVER-0.13.1-1.3.md` — exact-package delta acceptance sequence.
-- The 0.12.2-0.8 handovers remain historical evidence for the qualified predecessor.
+- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.17.md` — historical 1.17 release/device evidence, including the clean full-build baseline and first exact-device GFX prepare findings; superseded for current source behavior by the 1.18 handover.
+- `TESTING-HANDOVER-0.13.1-1.17.md` — detailed 1.17 test authority retained as historical evidence; fresh 1.18 build/device qualification is required.
+- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.16.md` — historical accepted 1.16 build-pipeline handover retained verbatim; do not treat it as current 1.18 authority.
+- `RELEASE-TESTING-HANDOVER-0.13.1-1.3.md` — historical exact-package delta sequence; do not treat it as current 1.18 build authority.
+- The 0.13.1-1.3 and 0.12.2-0.8 handovers remain historical evidence.

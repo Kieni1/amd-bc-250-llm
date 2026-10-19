@@ -213,16 +213,21 @@ class PackagingTests(unittest.TestCase):
                     project.chmod(0o2775)
                     keep.chmod(0o664)
                     (project / "sources/cache.sha256").write_text("changed local cache\n", encoding="utf-8")
+                fixture_build_dir = project / "local-build" / "work"
                 result = subprocess.run(
                     ["bash", str(script)],
                     cwd=project,
-                    env={**os.environ, "TZ": timezone},
+                    env={
+                        **os.environ,
+                        "TZ": timezone,
+                        "BC250_BUILD_DIR": str(fixture_build_dir),
+                    },
                     text=True,
                     capture_output=True,
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                archive = project / "build/bc250-llm-server-0.13.1.tar.gz"
+                archive = fixture_build_dir / "bc250-llm-server-0.13.1.tar.gz"
                 hashes.append(hashlib.sha256(archive.read_bytes()).hexdigest())
 
             self.assertEqual(hashes[0], hashes[1])
@@ -231,7 +236,7 @@ class PackagingTests(unittest.TestCase):
 
         self.assertTrue(any(name.endswith("nested/keep.txt") for name in members))
         self.assertFalse(any("/sources/" in name for name in members))
-        forbidden = ("/.pytest_cache/", "/.ruff_cache/", "/__pycache__/", ".pyc", ".pyo")
+        forbidden = ("/local-build/", "/.pytest_cache/", "/.ruff_cache/", "/__pycache__/", ".pyc", ".pyo")
         for name in members:
             self.assertFalse(any(token in name for token in forbidden), name)
         keep_member = next(member for name, member in members.items() if name.endswith("nested/keep.txt"))
@@ -390,6 +395,43 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('echo "  sudo bc250 install"', posttrans)
         pre_and_post = scriptlets[: scriptlets.index("%posttrans")]
         self.assertNotIn("sudo bc250 install", pre_and_post)
+        pre = scriptlets[scriptlets.index("%pre\n"):scriptlets.index("%post\n")]
+        self.assertIn("disable --package-upgrade", pre)
+        filter_expr = r"/^Next action:[[:space:]]+sudo bc250 gfx1013([[:space:]]|$)/d"
+        self.assertIn(f"sed -E '{filter_expr}'", pre)
+        self.assertIn(
+            'if gfx_pre_output="$(%{project_libexec}/gfx1013.sh disable --package-upgrade 2>&1)"; then',
+            pre,
+        )
+        self.assertIn('printf \'%s\\n\' "$gfx_pre_output"', pre)
+        self.assertNotIn("mktemp", pre)
+        self.assertNotIn("/tmp", pre)
+
+        # Exercise the compatibility filter against plausible output from an older
+        # installed helper. The transaction must preserve safety reporting while
+        # suppressing every subordinate GFX workflow handoff.
+        old_helper_output = (
+            "Disable: PASS\n"
+            "Boot state changed: yes — verified stock saved + next path restored\n"
+            "Runtime/service state changed: yes\n"
+            "Next action: sudo bc250 gfx1013 status\n"
+            "Next action:   sudo bc250 gfx1013 status --verbose\n"
+            "Next action: sudo bc250 gfx1013 reset --check\n"
+            "Experimental GFX1013 remains disabled.\n"
+        )
+        filtered = subprocess.run(
+            ["sed", "-E", filter_expr],
+            input=old_helper_output,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(filtered.returncode, 0, filtered.stderr)
+        self.assertIn("Disable: PASS", filtered.stdout)
+        self.assertIn("Boot state changed:", filtered.stdout)
+        self.assertIn("Runtime/service state changed:", filtered.stdout)
+        self.assertNotIn("Next action:", filtered.stdout)
+        self.assertNotIn("sudo bc250 gfx1013", filtered.stdout)
 
     def test_package_standard_ollama_uses_runtime_authority(self) -> None:
         helper = (ROOT / "cmd/system/install-ollama.sh").read_text(encoding="utf-8")
@@ -399,8 +441,10 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('source "$runtime_env"', installer)
         self.assertNotIn('BC250_OLLAMA_VERSION="0.34.0"', installer)
         self.assertIn('requested="$BC250_OLLAMA_VERSION"', installer)
-        self.assertIn("BC250_OLLAMA_VERSION=0.34.4", (ROOT / "config/runtime.env").read_text())
+        self.assertIn("BC250_OLLAMA_VERSION=0.40.4", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
+        self.assertIn("OLLAMA_IGPU_ENABLE=1", verify)
+        self.assertIn("main Ollama BC-250 Vulkan contract", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
         units = {
@@ -411,6 +455,9 @@ class PackagingTests(unittest.TestCase):
         preset = (ROOT / "packaging/90-bc250-llm-server.preset").read_text(encoding="utf-8")
         for name, unit in units.items():
             self.assertIn('Environment="OLLAMA_NO_CLOUD=1"', unit)
+            self.assertIn('Environment="OLLAMA_VULKAN=1"', unit)
+            self.assertIn('Environment="OLLAMA_IGPU_ENABLE=1"', unit)
+            self.assertIn('Environment="GGML_VK_VISIBLE_DEVICES=0"', unit)
             self.assertIn("/usr/local/bin/ollama serve", unit)
             self.assertIn(name, manifest)
         for name in ("ollama.service", "ollama-task.service", "ollama-embedding.service"):
@@ -714,48 +761,13 @@ class PackagingTests(unittest.TestCase):
             self.assertIn(expected, source)
         self.assertIn('qualification evidence is incomplete', source)
 
-    def test_ci_runs_on_push_and_pull_request_with_static_linters(self) -> None:
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
-            encoding="utf-8"
-        )
-        self.assertRegex(workflow, r"(?m)^  push:$")
-        self.assertRegex(workflow, r"(?m)^  pull_request:$")
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn("make release-gate", workflow)
-        self.assertIn("ruff check .", makefile)
-        self.assertIn("shellcheck", makefile)
-        self.assertIn("ruff rust ShellCheck", workflow)
 
-    def test_ci_release_gate_is_non_root_and_avoids_unrelated_codec_repo(self) -> None:
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
-        ci_local = (ROOT / "scripts/ci-local.sh").read_text(encoding="utf-8")
-        self.assertIn("--disable-repo=fedora-cisco-openh264", workflow)
-        self.assertIn("--disable-repo=fedora-cisco-openh264", ci_local)
-        self.assertIn("useradd --create-home", workflow)
-        self.assertIn("runuser -u bc250-builder", workflow)
-        self.assertIn("runuser -u bc250-builder", ci_local)
-        self.assertNotRegex(workflow, r"(?m)^\s+run: make release-gate$")
+    def test_gfx1013_completion_tracks_current_lifecycle_and_options(self) -> None:
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        self.assertIn("status prepare stage-boot enable disable reset benchmark help", completion)
+        self.assertIn("--brief --verbose --json", completion)
+        self.assertIn("--check --download-only --verbose", completion)
 
-    def test_ci_split_artifacts_have_closed_checksum_manifests(self) -> None:
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn("dist/SHA256SUMS.binary", workflow)
-        self.assertIn("dist/SHA256SUMS.source", workflow)
-        self.assertIn('sha256sum "$${binary_rpms[@]}" > SHA256SUMS.binary', makefile)
-        self.assertIn('sha256sum "$${source_rpms[@]}" > SHA256SUMS.source', makefile)
-        self.assertIn("sha256sum -c SHA256SUMS.binary", makefile)
-        self.assertIn("sha256sum -c SHA256SUMS.source", makefile)
-
-    def test_build_environment_uses_portable_c_locale(self) -> None:
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
-            encoding="utf-8"
-        )
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertRegex(workflow, r"(?m)^  LANG: C$")
-        self.assertRegex(workflow, r"(?m)^  LC_ALL: C$")
-        self.assertIn("export LANG := C", makefile)
-        self.assertIn("export LC_ALL := C", makefile)
-        self.assertNotIn("en_US.UTF-8", workflow + makefile)
 
     def test_main_rpm_description_respects_rpmlint_line_limit(self) -> None:
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
@@ -765,15 +777,6 @@ class PackagingTests(unittest.TestCase):
         too_long = [line for line in match.group(1).splitlines() if len(line) > 79]
         self.assertEqual(too_long, [])
 
-    def test_build_outputs_share_one_dist_directory(self) -> None:
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
-            encoding="utf-8"
-        )
-        self.assertNotIn("dist/RPMS", makefile + workflow)
-        self.assertNotIn("dist/SRPMS", makefile + workflow)
-        self.assertIn("dist/*.x86_64.rpm", workflow)
-        self.assertIn("dist/*.src.rpm", workflow)
 
     def test_progress_terminal_dependency_is_explicit(self) -> None:
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
@@ -847,14 +850,14 @@ class PackagingTests(unittest.TestCase):
                 values[key] = value
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.34.4")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.40.4")
         self.assertEqual(
             values["BC250_OLLAMA_PAYLOAD_URL"],
-            "https://github.com/ollama/ollama/releases/download/v0.34.4/ollama-linux-amd64.tar.zst",
+            "https://github.com/ollama/ollama/releases/download/v0.40.4/ollama-linux-amd64.tar.zst",
         )
         self.assertEqual(
             values["BC250_OLLAMA_PAYLOAD_SHA256"],
-            "c238986e61d40c0cc5f4a9b9e40b9eea104350b77efa34741fc134e105cb9533",
+            "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a",
         )
         self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.11.4")
         self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.11.4")
@@ -908,6 +911,15 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('u      ollama -  "Runs Ollama"', sysusers)
         self.assertEqual(sum(1 for line in sysusers.splitlines() if line.split()[1:2] == ["ollama"]), 1)
 
+    def test_gfx1013_provenance_helper_is_non_executable_data_and_post_rpm_checked(self) -> None:
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("file\t0644\tgfx1013/upstream/check-kernel-provenance.py", manifest)
+        self.assertIn('rpm2cpio "$$main_rpm_abs" | cpio -idm --quiet', makefile)
+        self.assertIn("sha256sum -c SOURCE-SHA256SUMS", makefile)
+        self.assertIn("helper_mode", makefile)
+        self.assertIn("BC250_OLLAMA_VERSION", makefile)
+
     def test_makefile_checks_actual_greenfield_rpm_payload(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("check-rpm-payload", makefile)
@@ -923,15 +935,6 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("ollama_group_provides", makefile)
         self.assertIn("expected exactly one generated group(ollama) provide", makefile)
 
-    def test_ci_runs_configured_rpmlint_after_rpm_build(self) -> None:
-        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
-        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
-        self.assertIn("rpmlint", workflow)
-        self.assertIn("make release-gate", workflow)
-        release_gate = makefile[makefile.index("release-gate:"):makefile.index("\n\nclean:")]
-        self.assertLess(release_gate.index("$(MAKE) rpm"), release_gate.index("rpmlint -c"))
-        self.assertIn("rpmlint -c packaging/rpmlint.toml $(DISTDIR)/*.rpm", release_gate)
-        self.assertIn("$(MAKE) check-srpm-rebuild", release_gate)
 
     def test_rpmlint_policy_filters_only_intentional_appliance_findings(self) -> None:
         import tomllib
@@ -971,13 +974,6 @@ class PackagingTests(unittest.TestCase):
             spec,
         )
 
-    def test_repository_validation_runs_test_modules_in_isolation(self) -> None:
-        validate = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
-        self.assertIn('for test_file in "$ROOT"/tests/test_*.py', validate)
-        self.assertIn('python3 -m unittest "$test_file"', validate)
-        self.assertNotIn("python3 -m unittest discover -s tests -v", validate)
-        self.assertIn('BC250_TEST_MODULE_TIMEOUT:-120', validate)
-        self.assertIn('timeout --kill-after=5s "${test_module_timeout}s"', validate)
 
     def test_internal_rag_importer_is_not_packaged_as_an_executable_script(self) -> None:
         source_path = ROOT / "models/rag/rag_import.py"
@@ -989,8 +985,6 @@ class PackagingTests(unittest.TestCase):
             "file\t0644\tmodels/rag/rag_import.py\t{libexec}/rag_import.py",
             manifest,
         )
-
-
 
 
 if __name__ == "__main__":

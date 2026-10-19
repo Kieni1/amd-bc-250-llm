@@ -1,7 +1,115 @@
 # Changelog
 
+## 0.13.1-2.2 - 2026-10-16
+
+- Add an explicit safe stock-reboot-pending GFX lifecycle state for upgrades/reinstalls performed while a previously enabled patched kernel is still running but verified stock saved/default and next boot have already been restored.
+- Make `status`, machine-readable GFX status, `reset --check`, `reset`, `disable`, `prepare --check` and `prepare` consume the same stock-boot/runtime readiness semantics so they no longer disagree about the required reboot.
+- Populate machine-readable `boot.stock_entry` from the same verified stock-BLS resolver even after the old package lifecycle state has been removed.
+- Make `bc250 install` surface the pending GFX stock reboot as a non-core-failure requirement and put `sudo reboot` ahead of the next optional GFX prepare check.
+- Preserve the 2.1 verified-stock `next_entry` replacement/fail-closed unknown-entry rules, workflow-oriented GFX help, completed installer/model UX, rpmlint-safe RPM pre-scriptlet and Ruff-clean packaging tests.
+- Strengthen 2.2 qualification proof: require an ENABLED 2.1 predecessor for the primary device transition test, assert reboot-pending command return codes/non-mutation, independently exercise model-install cancel/no-mutation, identify the actual stage-boot branch, and capture the disable transition before A2.
+
+## 0.13.1-2.1 - 2026-10-15
+
+- Complete the agreed installer completion UX: direct `model install`, validation grouping, setup/repair rerun, and a single safe GFX preflight entry under `Optional improvements`.
+- Make RPM upgrades preserve one authoritative post-transaction action even when an older installed GFX helper prints its own workflow handoff.
+- Let `gfx1013 stage-boot` replace an existing one-shot entry only when it is the already-verified stock entry; unknown administrator-selected one-shot entries remain fail-closed and unchanged.
+- Reorganize GFX help around activation, return-to-stock, inspection, recovery and qualification roles; simplify normal state/action wording while preserving raw lifecycle enums in verbose/JSON interfaces.
+- Keep successful `enable` and completed stock rollback from adding unnecessary status hops; qualification harnesses remain free to capture explicit status snapshots.
+- Retain the 2.0 dracut hierarchy repair, exact-kernel/ABI/provenance attestation, supplemental `srcversion` policy and rollback invariants unchanged.
+
+## 0.13.1-2.0 - 2026-10-15
+- Prevent non-root GFX status/health probes from misclassifying protected lifecycle state as missing/rollback-required, and keep important terminal highlights NO_COLOR-safe.
+
+- Fix the exact-device GFX1013 `stage-boot` dracut integration by staging the private exact-kernel module tree under the required `lib/modules/<kernel>/` hierarchy without weakening stock-module/initramfs immutability or failure rollback.
+- Add deterministic regression coverage that exercises the dracut kmod path and rejects the legacy hierarchy.
+- Add `bc250 health` as the user-facing health command while retaining `bc250 doctor` as a compatibility alias; separate core appliance health from experimental GFX action-required state and surface that state in `bc250 status`.
+- Add `sudo bc250 model install` as the state-rich interactive combined-catalog workflow while keeping `model apply` for advanced reconciliation/scripting.
+- Enforce the RPM one-next-action upgrade flow, retain the fuller technical-installer completion overview, and point operator documentation at `docs/OPERATIONS.md`.
+- Carry forward the 1.18 shared module-attestation contract and the two nounset-safe helper fixes.
+
+## 0.13.1-1.18 - 2026-10-15
+
+- Unify release/device GFX module validation: exact vermagic, module SHA-256 and ABI evidence remain mandatory while `srcversion` is supplemental.
+- Separate package qualification kernel `7.2.10-200.fc44.x86_64` from historical patch/profile reference `7.2.9-200.fc44.x86_64` and the running device target.
+- Fix GFX preflight blocker accounting, exact-kernel stock-module discovery and module-identity failure evidence.
+- Confirm clean Fedora 44 full release build and exact-device stock/prepare success before the stage-boot dracut hierarchy defect was discovered.
+
+## 0.13.1-1.17 - 2026-10-14
+
+- Advance the package-standard Ollama runtime from 0.40.3 to 0.40.4 using the exact generic Linux AMD64 payload and pinned SHA-256 `15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a`; keep fresh exact-device BC-250 qualification mandatory.
+- Add `rpm_macro(py3_shebang_fix)` as a first-class GFX1013 prepare capability requirement, resolved through RPM provider semantics (normally `python3-rpm-macros`), so `prepare --check` and actual `prepare` block before source acquisition/build when the Fedora kernel `%prep` macro is unavailable.
+- Add behavioral regressions for the missing-macro blocker, positive capability-provider resolution, exception-focused dependency output, exact kernel-`%prep` failure classification and real gzip evidence archives.
+- Replace `First authoritative failure: unknown` with one structured prepare-failure summary carrying the exact active stage, classified cause or first meaningful error line, evidence path and explicit boot/runtime/cache safety impact.
+- Produce prepare failure evidence as an actually gzip-compressed, self-verified `.tar.gz` archive whose filename matches its format.
+- Make default `gfx1013 status` and `prepare --check` operator-focused; keep hashes, URLs, boot internals and complete dependency/provider tables under `--verbose`, while `status --brief` remains harness/handover-oriented.
+- Keep the numbered prepare stages, exact-running-kernel source/provenance policy, source-cache preservation, stock-first rollback and default-off lifecycle behavior unchanged.
+- Print the generated main RPM path as the final line of a successful `build-local.sh` invocation for direct operator handoff.
+- Remove the two inherited rpmlint `macro-in-%changelog` warnings by describing historical RPM check sections without literal RPM macro expansion syntax.
+- Bump the RPM release to 1.17.
+
+## 0.13.1-1.16 - 2026-10-14
+
+- Make `release-contract.json` the machine-readable authority for package identity, Fedora target, Ollama pin, GFX1013 baseline and declared fast/full stage graphs; validate all duplicated release metadata against it during preflight.
+- Drive `build-local.sh --plan` and Fedora-target selection from that contract so release orchestration and tests consume the same declared stage/target data instead of independently embedding it.
+- Extend fail-fast release preflight to run the complete package/SRPM deterministic suite from the exact frozen source tarball before sudo authentication or expensive kernel/Mesa compilation.
+- Execute privileged dependency helpers and all heavy post-provision kernel/Mesa/RPM gates from the persistent frozen source snapshot rather than the mutable live checkout, so validation and packaged inputs cannot diverge mid-run.
+- Re-check Git commit/cleanliness immediately after the release snapshot is frozen; release qualification now requires a verified clean snapshot, while non-clean or non-Git runs require explicit `--allow-dirty` engineering mode.
+- Exclude the configured local build root from source validation and from source tarballs even when it is placed at a nonstandard path inside the repository; prune generated empty directories from source archives.
+- Verify the source archive and frozen RPM spec checksums, require the spec embedded in the archive to match the frozen spec, and clear inherited build/cache path overrides for extracted-source validation.
+- Keep host release-pipeline tests separate from package `%check`; RPM `%check` and the clean SRPM rebuild remain independent package-context proofs after the early frozen-source gate.
+- Retain explicit `--allow-dirty` engineering builds and clean-tree-only release qualification; no runtime, GFX, model, context, memory, swap or governor production setting changes in this release.
+- Bump the RPM release to 1.16 for the release-pipeline and release-contract hardening.
+
+## 0.13.1-1.15 - 2026-10-13
+
+- Refactor release validation so host build-pipeline contracts run in fail-fast preflight before sudo or GFX compilation, while RPM `%check` runs package/SRPM contracts only; this removes the self-referential late failure mode that repeatedly surfaced build-driver/Makefile assertion drift after expensive work.
+- Freeze the validated source tarball and RPM spec before exact-kernel/Mesa builds and consume those frozen inputs in the later RPM stage, preventing mid-run source edits or incremental overlays from changing what is packaged after preflight.
+- Add `build-local.sh --plan` and `--allow-dirty`; the latter replaces the need to edit the build script when an engineering-only dirty-tree full run is intentional.
+- Make full local builds authenticate sudo once before preflight, refresh the ticket only for the build lifetime, and use non-interactive sudo for later dependency provisioning so an expired/missed prompt fails early instead of stalling mid-gate.
+- Adopt the corrected context-ceiling conclusions from akandr/bc250-rocm commit `bd897eccac05cb02f1c0c1e3cb9d4e6a490f58b2` without importing its large benchmark corpus or extreme settings.
+- Document that removing llama-bench's unnecessary post-fill sequence-state copy materially raises the measured allocation ceiling, while Vulkan still generally reaches deeper contexts than ROCm in that campaign.
+- Treat those figures strictly as benchmark allocation ceilings, not safe service contexts: the same stress corpus records up to about 13.7 GiB written to swap, thousands of gfx ring timeouts on extreme Vulkan fills and contexts beyond model training limits.
+- Keep all package production/model context limits, the 32K balanced profile, explicit 65,536 max-context profile, TTM/swap policy and governor settings unchanged; link the external evidence instead of packaging it.
+- Bump the RPM release to 1.15 because the packaged operator/qualification guidance changes.
+- Align GFX release-gate tests with the split preflight/post-provision topology and add a regression that forbids hard-coding the dirty-tree full-gate override.
+
+## 0.13.1-1.14 - 2026-10-13
+
+- Consolidate local Fedora build output into per-run `.build/` workspaces with persistent shared source cache, logs, final artifacts, structured `result.json`, strict artifact identity, bytecode suppression and successful temporary-tree cleanup.
+- Keep validation logs concise on success: each deterministic module reports a PASS/test count, while full captured stdout/stderr is emitted only for a real module failure.
+- Keep the authoritative release path local on Fedora 44 while making kernel/Mesa dependency provisioning reuse resumable cached SRPMs instead of creating separate throwaway downloads.
+- Make GFX1013 kernel/Mesa source acquisition resumable and cache-aware; expose cache readiness in `prepare --check`, name large downloads before transfer, add seven explicit prepare stages, and print elapsed-time heartbeats for long build phases.
+- Treat Ctrl-C as operator interruption (exit 130), preserve valid partial/completed source cache, terminate long build process groups safely, and never commit partial preparation or boot state.
+- Separate build-only `gfx1013 prepare` from explicit `gfx1013 stage-boot`; keep exact-running-kernel provenance, stock module/initramfs immutability and one-shot patched-boot safety.
+- Remove forced `amdgpu.sched_policy=2`, verify the loaded patched amdgpu identity and a dedicated compute-only private RADV queue, and smoke Ollama before promoting the patched boot to the saved default.
+- Expand canonical `gfx1013 status`, mutating-command result summaries and installer guidance while preserving separate carried-source and installed-RPM integrity reporting.
+- Add deterministic fixed-seed A1/B/A2 inference-output identity as a GFX1013 promotion blocker so performance gains cannot qualify with changed model output.
+- Harden the local Fedora driver after real fast/full runs: make RPM `%check` non-interactive, isolate source-tarball tests from inherited build directories, fix two `set -u`-unsafe GFX1013 local declarations, and keep successful dependency provisioning concise while retaining full failure output.
+- Use all detected CPUs at normal priority for foreground local builds, provide `--background` for the previous low-priority behavior, and enable a persistent `.build/cache/sccache` Rust compiler cache when `sccache` is installed.
+- Reorder the authoritative full local build into a fail-fast source/lint/preflight phase before privileged dependency provisioning and exact kernel/Mesa production builds.
+- Distinguish dirty-source engineering passes from release-qualified full builds in terminal output and `result.json`; dirty full runs remain opt-in only.
+- Report before/after `sccache` statistics so cache effectiveness is observable, and clarify that the clean SRPM rebuild proves self-containment rather than bit-for-bit reproducibility.
+- Clarify release-build GFX progress: package validation exercises prepare stages 1-6, while stage 7 commits lifecycle state only on the target device.
+- Fix GFX1013 dependency-provider qualification so RPM query exit status, not non-empty failure text, is authoritative; missing requirements now report `<none>`/`NOT INSTALLED`, block `prepare --check`, and are covered by behavioral fake-RPM regressions including compatibility providers such as `zlib-devel`.
+- Make `prepare --check` advertise resumable `prepare --download-only` prefetch whenever the exact kernel or Mesa source cache is missing/partial.
+- Reconfirm Ollama 0.40.3 as the current package pin and harden its BC-250 Vulkan contract: all packaged lanes require `OLLAMA_IGPU_ENABLE=1`, verification checks the effective main-lane Vulkan/iGPU/device-selection environment, and package docs no longer recommend `cap_perfmon` while an upstream GPU-discovery regression remains open.
+
+## 0.13.1-1.13 - 2026-10-13
+
+- Fix the device-found GFX1013 package-integrity blocker: `check-kernel-provenance.py` is invoked explicitly with Python and is now installed as non-executable data, so RPM BRP shebang normalization cannot change bytes covered by `SOURCE-SHA256SUMS`.
+- Extend the RPM payload gate to unpack the built binary RPM and verify the installed GFX1013 source/patch manifests, helper mode and package-pinned Ollama metadata after RPM transformations.
+- Split GFX1013 reporting into carried-source integrity and installed-RPM payload integrity, with the first failing file/digest surfaced directly in preflight output.
+- Make GFX1013 prepare dependencies explicitly required, report installed-provider state accurately, aggregate dependency blockers by remediation action and print a final fix/rerun summary.
+- Add lifecycle-derived `Next action` guidance and `status --brief`; add experimental GFX1013 guidance to installer completion output and show desired versus observed Ollama runtime during convergence.
+- Make Fedora 44 local `./build-local.sh --full` the sole authoritative release-build path. GitHub remains a source/static validation path and no longer pays the heavyweight kernel/Mesa production-build cost.
+- Refresh active validation/build documentation so pending evidence is not described as an exact-current full-suite or release-gate PASS.
+
 ## 0.13.1-1.12 - 2026-10-12
 
+- Advance the package-standard Ollama runtime candidate from 0.34.4 to 0.40.3 using the exact generic Linux AMD64 release payload and pinned SHA-256; retain 0.34.4 as the last exact-device-qualified comparison baseline until 0.40.3 completes fresh BC-250 qualification.
+- Remove redundant source/preflight/payload work from the orchestrated local/release path while keeping standalone `make rpm` self-validating and retaining the clean SRPM rebuild as an intentional second independent `%build/%check` proof.
+- Tune the local workstation wrapper to 14/16 logical CPUs by default with low CPU/I/O priority, based on observed headroom on the Ryzen 7 5800X build host.
 - Harden the greenfield GFX1013 lifecycle into five authoritative states (`DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`, `ROLLBACK_REQUIRED`), with any stale kernel, invalid metadata, interrupted phase, boot-authority mismatch or patched boot without state collapsing to fail-closed `ROLLBACK_REQUIRED`.
 - Serialize every mutating GFX1013 lifecycle command with one nonblocking package lock, including RPM upgrade rollback; make `enable` require the exact `PATCHED_BOOT_UNVERIFIED` classifier state and make the Ollama `ExecCondition` accept only coherent `ENABLED` state.
 - Reorder enable so private-RADV state is durably committed before Ollama restart/smoke, while rollback restores saved/default and `next_entry`, rewrites state to PREPARED, and continues boot restoration even when cleanup operations fail.
@@ -11,6 +119,8 @@
 - Stage only `libvulkan_radeon.so` plus `radeon_icd.x86_64.json`, reject private RADV with direct X11/Wayland/related WSI linkage or RPATH/RUNPATH, and verify the BC-250 Vulkan device with graphical session variables unset before enable.
 - Add a Fedora release-gate build of the exact production headless RADV builder and install its explicit headless build dependencies in GitHub/local container CI so Meson option or dependency drift is caught before RPM publication.
 - Add a Fedora release-gate build of the production exact-kernel path: discover one installed Fedora `kernel-devel` tree, fetch/run `%prep` for its exact matching kernel SRPM, fingerprint the Fedora-prepared patch targets, adapt allowed AMD trace include paths, apply V33 with zero fuzz, build/compress `amdgpu`, then require exact vermagic and ABI verification.
+- Provision the exact Fedora kernel SRPM BuildRequires in the privileged CI setup before switching to the non-root builder; require the `%py3_shebang_fix` macro before `%prep` so missing buildroot macros fail explicitly instead of reaching `/bin/sh` as `fg: no job control`.
+- Limit kernel-gate failure output to checker-owned top-level build logs so unpacked upstream KUnit fixture `.log` files cannot swamp the actual Fedora `%prep` error.
 - Make Mesa SRPM spec selection fail closed (`mesa.spec` preferred, otherwise exactly one `mesa*.spec`), broaden AMD trace adaptation to all explicitly matching in-tree AMD trace headers while rejecting unresolved relative paths, and make the staged RADV ICD point at the final private library before CI payload audit.
 - Keep `git-core` and `vulkan-tools` explicit/verified prerequisites: both were already RPM runtime dependencies; GFX build preflight now also names `git-core` plus Fedora RPM macro packages used by `%prep`.
 - Correct the GFX1013 upstream notice to describe Fedora kernel `%prep` as source authority rather than the superseded target-equivalence heuristic.

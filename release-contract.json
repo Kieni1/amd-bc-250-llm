@@ -1,0 +1,66 @@
+{
+  "schema": "bc250.release-contract.v1",
+  "package": {
+    "name": "bc250-llm-server",
+    "version": "0.13.1",
+    "rpm_release": "2.2",
+    "fedora": "44"
+  },
+  "runtime": {
+    "ollama": "0.40.4"
+  },
+  "gfx1013": {
+    "package_profile": "0.2.5-alpha",
+    "upstream_version": "0.2.0-alpha",
+    "upstream_commit": "d3e6dc062c34d2523db0abe5741d1f5b0dea00d9",
+    "mesa_srpm_nevra": "mesa-26.2.4-1.fc44.src",
+    "patch_reference_kernel": "7.2.9-200.fc44.x86_64",
+    "qualification_kernel": "7.2.10-200.fc44.x86_64"
+  },
+  "validation": {
+    "release_pipeline_test": "tests/test_release_pipeline.py",
+    "package_excludes": [
+      "tests/test_release_pipeline.py"
+    ],
+    "full_plan": [
+      {
+        "id": "sudo authentication",
+        "description": "one interactive authentication at full-build startup; credential refreshed non-interactively for the run"
+      },
+      {
+        "id": "release-gate-preflight",
+        "description": "non-root source/lint/release-contract validation, frozen RPM inputs and frozen-source package tests before expensive GFX work"
+      },
+      {
+        "id": "provision exact Fedora kernel + Mesa build dependencies",
+        "description": "privileged dependency provisioning only"
+      },
+      {
+        "id": "release-gate-postprovision",
+        "description": "non-root exact kernel/Mesa production builds and RPM/package gates executed from the frozen source snapshot"
+      }
+    ],
+    "fast_plan": [
+      {
+        "id": "sources",
+        "description": "prepare pinned source inputs"
+      },
+      {
+        "id": "lint",
+        "description": "Ruff and ShellCheck"
+      },
+      {
+        "id": "preflight",
+        "description": "source plus host release-pipeline contracts"
+      },
+      {
+        "id": "RPM build / package %check",
+        "description": "binary/source RPM build with package contracts"
+      },
+      {
+        "id": "rpmlint",
+        "description": "configured RPM lint"
+      }
+    ]
+  }
+}

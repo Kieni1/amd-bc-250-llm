@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -17,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 UPSTREAMS = ROOT / "packaging/upstreams.toml"
 NOTICES = ROOT / "licenses/THIRD_PARTY_NOTICES.md"
 PATCH = ROOT / "patches/cu-live-manager-rpm-paths.patch"
-SOURCES = ROOT / "sources"
+SOURCES = Path(os.environ.get("BC250_SOURCE_DIR", ROOT / "sources")).resolve()
 
 
 class ValidationError(RuntimeError):
@@ -136,7 +137,7 @@ def validate_live_manager(root: Path = ROOT, sources_dir: Path | None = None) ->
     validate_notice_revision(root, commit)
 
     archive_name = str(pin["archive"]).format(commit=commit)
-    archive_path = (sources_dir or root / "sources") / archive_name
+    archive_path = (sources_dir or (SOURCES if root == ROOT else root / "sources")) / archive_name
     patch_path = root / "patches/cu-live-manager-rpm-paths.patch"
     if not archive_path.is_file():
         raise ValidationError(f"pinned live-manager source archive is missing: {archive_path}")

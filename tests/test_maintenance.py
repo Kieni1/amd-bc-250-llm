@@ -160,7 +160,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_interactive_maintenance_values_reprompt_instead_of_aborting(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
         command = (
-            "source <(sed '$d' " + str(script) + "); "
+            "source " + str(script) + "; "
             "if ask_yes_no 'Continue' yes; then echo YES; else echo NO; fi; "
             "action=$(ask_power_action poweroff); "
             "when=$(ask_power_time 18:30); "
@@ -197,7 +197,7 @@ class MaintenanceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             command = (
-                "source <(sed '$d' " + str(script) + "); "
+                "source " + str(script) + "; "
                 "enable_units() { :; }; "
                 "setup_pruning; "
                 "printf 'TOKEN=%s\n' \"$(get_setting OWUI_API_KEY '')\""
@@ -222,7 +222,7 @@ class MaintenanceTests(unittest.TestCase):
     def test_wol_interface_prompt_explains_ip_address_and_reprompts(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
         command = (
-            "source <(sed '$d' " + str(script) + "); "
+            "source " + str(script) + "; "
             "default_route_interface() { echo enp0s16f0u1; }; "
             "interface_ipv4_address() { echo 192.168.1.191; }; "
             "network_interface_exists() { [[ $1 == enp0s16f0u1 ]]; }; "
@@ -280,7 +280,7 @@ class MaintenanceTests(unittest.TestCase):
             systemctl.chmod(0o755)
             journalctl.chmod(0o755)
             command = (
-                "source <(sed '$d' " + str(script) + " ); "
+                "source " + str(script) + "; "
                 "systemd_available() { return 0; }; run_task backup-config"
             )
             result = subprocess.run(
@@ -310,7 +310,7 @@ class MaintenanceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             command = (
-                "source <(sed '$d' " + str(script) + " ); CONFIG="
+                "source " + str(script) + "; CONFIG="
                 + str(config) + "; preflight_prune"
             )
             result = subprocess.run(
@@ -590,7 +590,7 @@ class MaintenanceTests(unittest.TestCase):
             )
             helper.chmod(0o755)
             result = subprocess.run(
-                [str(script), "request-shutdown-companion"],
+                ["bash", "-c", 'source "$1"; require_root(){ :; }; request_companion_shutdown', "bash", str(script)],
                 env=os.environ | {
                     "BC250_MAINTENANCE_CONFIG": str(config),
                     "BC250_SAFE_POWER_HELPER": str(helper),
@@ -617,7 +617,7 @@ class MaintenanceTests(unittest.TestCase):
             helper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             helper.chmod(0o755)
             result = subprocess.run(
-                [str(script), "request-shutdown-companion"],
+                ["bash", "-c", 'source "$1"; require_root(){ :; }; request_companion_shutdown', "bash", str(script)],
                 env=os.environ | {
                     "BC250_SAFE_POWER_HELPER": str(helper),
                     "SUDO_USER": "llm_admin",
@@ -916,7 +916,7 @@ class MaintenanceTests(unittest.TestCase):
                     "POST_INTEGRITY": post_integrity,
                 }
                 result = subprocess.run(
-                    [str(script), str(backup)],
+                    ["bash", "-c", 'source "$1"; require_root(){ :; }; main "$2"', "bash", str(script), str(backup)],
                     env=env,
                     text=True,
                     stdout=subprocess.PIPE,

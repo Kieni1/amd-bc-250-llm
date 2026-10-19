@@ -18,8 +18,10 @@ ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging/bc250-llm-server.spec"
 MANIFEST = ROOT / "packaging/install-manifest.tsv"
 UPSTREAMS = ROOT / "packaging/upstreams.toml"
+RELEASE_CONTRACT = ROOT / "release-contract.json"
 EXCLUDED_TREES = {
     ".git",
+    ".build",
     "build",
     "dist",
     "rpmbuild",
@@ -38,20 +40,47 @@ def fail(message: str) -> None:
     print(f"ERROR: {message}", file=sys.stderr)
 
 
+def dynamic_excluded_roots() -> tuple[Path, ...]:
+    roots: list[Path] = []
+    for name in (
+        "BC250_LOCAL_BUILD_ROOT",
+        "BC250_BUILD_DIR",
+        "BC250_SOURCE_DIR",
+        "BC250_GFX1013_CACHE_ROOT",
+    ):
+        value = os.environ.get(name)
+        if not value:
+            continue
+        try:
+            path = Path(value).expanduser().resolve()
+            relative = path.relative_to(ROOT)
+        except (OSError, ValueError):
+            continue
+        if relative.parts and relative not in roots:
+            roots.append(relative)
+    return tuple(roots)
+
+
 def included_files():
+    dynamic = dynamic_excluded_roots()
     for path in ROOT.rglob("*"):
         relative = path.relative_to(ROOT)
-        if path.is_file() and not any(
-            part in EXCLUDED_TREES for part in relative.parts
-        ):
-            yield relative, path
+        if not path.is_file():
+            continue
+        if any(part in EXCLUDED_TREES for part in relative.parts):
+            continue
+        if any(relative == excluded or excluded in relative.parents for excluded in dynamic):
+            continue
+        yield relative, path
 
 
 def check_required_inputs() -> None:
     required = (
         "VERSION",
+        "release-contract.json",
         "MODELS.md",
         "Makefile",
+        "build-local.sh",
         "install",
         "uninstall.sh",
         ".github/workflows/build-rpm.yml",
@@ -79,11 +108,12 @@ def check_required_inputs() -> None:
         "docs/SECURITY.md",
         "docs/RAG.md",
         "scripts/check-gfx1013-mesa.py",
-        "gfx1013/upstream/check-kernel-provenance.py",
         "scripts/check-upstream-patches.py",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
         "scripts/prepare-sources.py",
+        "scripts/release-contract.py",
+        "tests/test_release_pipeline.py",
         "licenses/LICENSE",
     )
     for relative in required:
@@ -98,7 +128,6 @@ def check_required_inputs() -> None:
         "cmd/monitoring/support-bundle.sh",
         "cmd/maintenance/maintenance.sh",
         "scripts/check-gfx1013-mesa.py",
-        "gfx1013/upstream/check-kernel-provenance.py",
         "scripts/check-upstream-patches.py",
         "scripts/install-manifest.py",
         "scripts/make-source-tarball.sh",
@@ -150,6 +179,117 @@ def check_version() -> None:
         fail("RPM %description contains a line longer than 79 characters")
     if re.search(r"(?m)^Requires:\s+git\s*$", spec):
         fail("runtime dependency must use git-core instead of the larger git meta-package")
+
+
+def check_release_contract() -> None:
+    try:
+        contract = json.loads(RELEASE_CONTRACT.read_text(encoding="utf-8"))
+        spec = SPEC.read_text(encoding="utf-8")
+        scope = json.loads((ROOT / "development/DEVELOPMENT-SCOPE.json").read_text(encoding="utf-8"))
+        runtime_lines = (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines()
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read release contract metadata: {error}")
+        return
+
+    if contract.get("schema") != "bc250.release-contract.v1":
+        fail("release-contract.json has an unsupported schema")
+        return
+    package = contract.get("package", {})
+    runtime = contract.get("runtime", {})
+    gfx = contract.get("gfx1013", {})
+    validation = contract.get("validation", {})
+
+    def spec_value(field: str) -> str:
+        match = re.search(rf"^{re.escape(field)}:\s*([^%\s]+)", spec, re.MULTILINE)
+        return match.group(1) if match else ""
+
+    expected_name = package.get("name", "")
+    expected_version = package.get("version", "")
+    expected_release = package.get("rpm_release", "")
+    expected_fedora = str(package.get("fedora", ""))
+    if expected_name != spec_value("Name"):
+        fail("release contract package.name differs from RPM spec Name")
+    if expected_version != (ROOT / "VERSION").read_text(encoding="utf-8").strip():
+        fail("release contract package.version differs from VERSION")
+    if expected_version != spec_value("Version"):
+        fail("release contract package.version differs from RPM spec Version")
+    if expected_release != spec_value("Release"):
+        fail("release contract package.rpm_release differs from RPM spec Release")
+    if expected_fedora != "44":
+        fail("release contract Fedora target must remain 44 for this package line")
+
+    release = scope.get("release", {}) if isinstance(scope, dict) else {}
+    if release.get("version") != expected_version or release.get("rpm_release") != expected_release:
+        fail("development scope release identity differs from release contract")
+    if release.get("nvr") != f"{expected_name}-{expected_version}-{expected_release}":
+        fail("development scope NVR differs from release contract")
+
+    runtime_values: dict[str, str] = {}
+    for raw in runtime_lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        runtime_values[key] = value
+    if runtime_values.get("BC250_OLLAMA_VERSION") != runtime.get("ollama"):
+        fail("runtime Ollama pin differs from release contract")
+
+    try:
+        gfx_cli = (ROOT / "cmd/system/gfx1013.sh").read_text(encoding="utf-8")
+    except OSError as error:
+        fail(f"cannot read GFX1013 CLI metadata: {error}")
+        gfx_cli = ""
+    for field, shell_name in (
+        ("patch_reference_kernel", "PATCH_REFERENCE_KERNEL"),
+        ("qualification_kernel", "PACKAGE_QUALIFICATION_KERNEL"),
+    ):
+        expected = gfx.get(field, "")
+        if not isinstance(expected, str) or not re.fullmatch(r"[0-9][0-9A-Za-z._+-]*\.x86_64", expected):
+            fail(f"GFX {field} is missing or malformed in release contract")
+            continue
+        match = re.search(rf"(?m)^{shell_name}=([^\s]+)$", gfx_cli)
+        actual = match.group(1).strip('\"\'') if match else ""
+        if actual != expected:
+            fail(f"GFX {field} differs from {shell_name} in cmd/system/gfx1013.sh")
+
+    checks = (
+        ("package_profile", ROOT / "gfx1013/upstream/PACKAGE-PROFILE-VERSION"),
+        ("upstream_version", ROOT / "gfx1013/upstream/VERSION"),
+        ("upstream_commit", ROOT / "gfx1013/upstream/SOURCE-REVISION"),
+    )
+    for field, path in checks:
+        try:
+            actual = path.read_text(encoding="utf-8").strip()
+        except OSError as error:
+            fail(f"cannot read GFX release metadata {path.relative_to(ROOT)}: {error}")
+            continue
+        if actual != gfx.get(field):
+            fail(f"GFX {field} differs from release contract")
+    try:
+        mesa_fields = {}
+        for raw in (ROOT / "gfx1013/upstream/MESA-SOURCE").read_text(encoding="utf-8").splitlines():
+            if "=" in raw:
+                key, value = raw.split("=", 1)
+                mesa_fields[key.strip()] = value.strip()
+        if mesa_fields.get("srpm_nevra") != gfx.get("mesa_srpm_nevra"):
+            fail("GFX Mesa SRPM identity differs from release contract")
+    except OSError as error:
+        fail(f"cannot read GFX Mesa source metadata: {error}")
+
+    release_test = validation.get("release_pipeline_test")
+    excludes = validation.get("package_excludes")
+    if release_test != "tests/test_release_pipeline.py":
+        fail("release contract must identify tests/test_release_pipeline.py as the host release test")
+    if excludes != [release_test]:
+        fail("release contract package exclusions must contain only the host release-pipeline test")
+    for plan_name in ("full_plan", "fast_plan"):
+        stages = validation.get(plan_name)
+        if not isinstance(stages, list) or not stages:
+            fail(f"release contract {plan_name} must be a non-empty stage list")
+            continue
+        ids = [stage.get("id") for stage in stages if isinstance(stage, dict)]
+        if len(ids) != len(stages) or any(not value for value in ids) or len(set(ids)) != len(ids):
+            fail(f"release contract {plan_name} has missing or duplicate stage ids")
 
 
 def check_configuration() -> None:
@@ -231,7 +371,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
     dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
     routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
-        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "doctor",
+        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "doctor", "health",
         "fetch-mtp", "gfx1013", "gitea-review", "install", "maintenance", "model", "ocr",
         "package-gate", "rag", "reset", "resilience", "revalidate", "ollama-profile",
         "openwebui-setup", "qualification", "run-mtp", "status", "support-bundle", "storage", "verify", "version",
@@ -259,7 +399,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "request_primary_reboot_if_needed",
         ),
         "cmd/system/gfx1013.sh": (
-            "PACKAGE_PROFILE=v0.2.4-alpha",
+            "PACKAGE_PROFILE=v0.2.5-alpha",
             "PINNED_COMMIT=d3e6dc062c34d2523db0abe5741d1f5b0dea00d9",
             "SOURCE-SHA256SUMS",
             "PATCH-SHA256SUMS",
@@ -417,7 +557,7 @@ def check_greenfield_command_surface() -> None:
     prefixed_pattern = re.compile(
         r"\bbc250-(?:" + "|".join(re.escape(name) for name in names) + r")\b(?=[\s`'\"),;:]|$)"
     )
-    removed_model_verbs = ("install", "cleanup", "cleanup" + "-retired", "resolve")
+    removed_model_verbs = ("cleanup", "cleanup" + "-retired", "resolve")
     model_pattern = re.compile(
         r"\bbc250\s+model\s+(?:"
         + "|".join(re.escape(name) for name in removed_model_verbs)
@@ -553,6 +693,7 @@ def main() -> int:
     check_required_inputs()
     check_syntax()
     check_version()
+    check_release_contract()
     check_configuration()
     check_layout_and_docs()
     check_repository_safety()

@@ -1,6 +1,6 @@
 # RPM packaging and release maintenance
 
-This is maintainer documentation. **GitHub is the authoritative RPM/package build
+This is maintainer documentation. **The local Fedora 44 workstation is the authoritative RPM/package build
 path for this project.** Do not ask the appliance operator to build RPMs locally.
 Developer environments may run the checks they actually provide; hardware/runtime
 qualification belongs on the real BC-250.
@@ -29,15 +29,29 @@ instead of creating a general packaging language.
 
 ## Validation and build boundary
 
-The normal release build runs through GitHub. `make validate` is the deterministic
-repository check and can be run wherever its required tools are present. The `make rpm`
-target describes the Fedora/GitHub build step; a successful source edit must not be
-reported as an RPM build unless that build actually ran. GitHub CI runs Ruff, ShellCheck and rpmlint; none are runtime dependencies.
+The authoritative release build is local Fedora 44 via `./build-local.sh --full`.
+`make validate` is the deterministic repository check and can be run wherever its
+required tools are present. GitHub runs source/static validation only; it is not an
+RPM artifact authority. A successful source edit must not be reported as an RPM build
+unless the local Fedora build actually ran. Ruff/ShellCheck, `%check`, post-RPM payload
+validation, configured rpmlint and clean SRPM rebuild remain release gates, not runtime dependencies.
 `rpmlint` uses `packaging/rpmlint.toml`, which filters only documented appliance
 policy choices and known false positives; unfiltered findings remain build failures.
 
-GitHub writes binary/source RPMs and checksums under `dist/`; the `*.x86_64.rpm` is
-the installable package and the `*.src.rpm` is rebuild input.
+`build-local.sh` owns one generated surface under `.build/`. Each run gets
+`.build/runs/<run-id>/` containing artifacts, logs and `result.json`; reusable source
+cache lives under `.build/cache/`. Full builds run source preparation, Ruff/ShellCheck and
+preflight before privileged dependency provisioning and the exact kernel/Mesa production
+builds, so cheap source failures stop before expensive work. Foreground builds default to
+all detected CPUs at normal priority; `--background` opts into low CPU/I/O priority, and
+`sccache` is used from the shared cache when installed with before/after statistics printed for each
+run. Successful runs remove temporary work/rpmbuild trees and empty directories.
+Dirty full runs are rejected unless `BC250_ALLOW_DIRTY_FULL=1` is explicit; even then they
+are recorded as engineering passes rather than release-qualified results. The generated
+SRPM is rebuilt from a clean temporary topdir to prove self-containment, not binary
+bit-for-bit reproducibility. The `*.x86_64.rpm` is the installable package and the
+`*.src.rpm` is rebuild input. Direct `make` targets retain configurable legacy output
+defaults for developer use.
 
 ### Runtime dependency footprint
 
@@ -80,7 +94,7 @@ make distclean      # remove both
 3. Align the source macro in `bc250-llm-server.spec`.
 4. Update third-party notices and affected documentation.
 5. Refresh `sources/`, run `make sources-check`, and require carried patches to apply
-   against the exact pinned input before the GitHub/Fedora build.
+   against the exact pinned input before the local Fedora release build.
 6. Install the resulting binary RPM on the BC-250 and test the affected feature.
 
 The governor vendor archive is generated from its `Cargo.lock` with
@@ -112,7 +126,7 @@ rebuild artifact.
 - Keep the top spec changelog entry aligned with the resulting Version-Release.
 - Review pinned revisions, licenses, source-RPM contents and the binary payload.
 - Run only checks available in the editing environment and report them exactly.
-- Build through GitHub/Fedora and require Ruff, ShellCheck, RPM payload-contract checks and `rpmlint` to pass.
+- Build locally on Fedora 44 with `./build-local.sh --full` and require Ruff, ShellCheck, RPM payload-contract checks and `rpmlint` to pass.
 - On the BC-250 test clean install or upgrade as appropriate, guided reboot/resume,
   models, affected runtime features and both removal paths.
 - Confirm scriptlets still do not enable CUs, replace AMDGPU, change memory/swap or
