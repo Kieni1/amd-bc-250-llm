@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.14.1-1.2 - 2026-10-19
+
+- Reconcile current release policy and operator guidance with the real blocking gate: Ruff, ShellCheck, scope/current-guidance, package `%check`, configured rpmlint, source/payload evidence and selected-artifact identity remain release blockers, while the broad deterministic suite remains additional quality evidence.
+- Derive current NVR from authoritative release sources in validation scripts/tests, populate focused checks for active components, remove the editable handover checksum manifest, and add product-roadmap/release-candidate handovers.
+- Keep the stock Fedora graphics architecture and runtime/model pins unchanged; no GFX1013/private-RADV/custom-kernel work is reintroduced.
+- Strengthen RAG synchronization with behavior-level fake-API transaction tests, preserving upload-before-cleanup ordering and explicit `--prune` deletion semantics.
+- Make RAG ingestion loopback-only by default; remote Open WebUI synchronization now requires `--allow-remote`, and confidential-corpus remote synchronization requires the additional `--allow-confidential-remote` acknowledgement.
+- Reject symlink token/credential files across RAG, model, Open WebUI, benchmark, installer and verification surfaces while preserving private regular non-empty file requirements.
+- Remove the duplicate internal `rag_import.py` command-line surface and the obsolete `bc250 doctor` compatibility alias; keep `bc250 rag` and `bc250 health` as the canonical public interfaces, with matching completion/documentation.
+- Clarify the SRPM gate as an isolated-topdir rebuild in the release environment rather than overclaiming full dependency-closure/self-contained build proof.
+- Expand the deterministic suite from 641 to 651 tests across 24 modules; exact GitHub/Fedora 44 build and selected-RPM device acceptance remain separate later evidence states.
+- Close the remaining package-gate token-file symlink bypass by preserving path identity through qualification handoff.
+- Promote the changed RAG/privacy and qualification tests into the bounded blocking RPM package-critical gate for this release line.
+- Align active guidance on the product roadmap immediately after the stock-core baseline; simplification is opportunistic risk reduction, not a prerequisite phase.
+
 ## 0.14.1-1 - 2026-10-19
 
 - Return the clean-core line to the normal RPM naming convention: `Version: 0.14.1`, first package `Release: 1`; future package-only revisions increment the integer Release.

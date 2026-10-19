@@ -4,7 +4,7 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.14.1-1.2` (Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -64,7 +64,6 @@ CU expansion uses the packaged live WGP manager on the stock Fedora AMDGPU path.
 sudo bc250 status
 sudo bc250 status --json    # machine-readable appliance state
 sudo bc250 health           # read-only integrated diagnostics
-sudo bc250 doctor           # compatibility alias for health
 bc250 version               # exact package/runtime identity
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
@@ -185,7 +184,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.34.4 is the package-pinned runtime for release 0.14.1-1. Exact-device 0.12.2-0.8 qualification
+Ollama 0.34.4 is the package-pinned runtime for release 0.14.1-1.2. Exact-device 0.12.2-0.8 qualification
 passed core verification, Open WebUI/RAG/product-path testing, live-CU saved-profile restoration and
 whole-appliance revalidation with this runtime; 0.14.1 does not change the Ollama pin.
 Runtime updates remain deliberately pinned rather than following upstream automatically.

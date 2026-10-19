@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1` (Tika 4.1.0-full; Secure Boot detector and non-root identity UX fixes).
+Current release source: `bc250-llm-server-0.14.1-1.2` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.34.4, Open WebUI 0.11.4, Tika 4.1.0-full, governor 0.4.13; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
 
 ## Install
 
@@ -38,7 +38,6 @@ package-owned four-lane topology.
 sudo bc250 status
 sudo bc250 status --json
 sudo bc250 health
-sudo bc250 doctor   # compatibility alias
 bc250 version
 sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
@@ -69,8 +68,7 @@ sudo bc250 rag validate public COLLECTION
 sudo bc250 rag ingest --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
-See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use
-[`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
+RAG ingestion is loopback-only by default and token-file symlinks are rejected. Remote Open WebUI requires explicit opt-in, with a separate override whenever an active confidential collection could participate in the sync. See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use [`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
 
 ## Models
 
