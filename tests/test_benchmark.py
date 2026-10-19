@@ -3337,6 +3337,7 @@ printf 'run-1\n' > "$RUN_ID_FILE"
 printf '4.7\n' > "$RUN_HARNESS_VERSION_FILE"
 printf '2026-09-07T00:00:01+02:00\tagent\tagent-add-on\tcoverage\tskipped\toptional Agent not installed\n' > "$EVENTS"
 systemctl() {{ echo inactive; }}
+need_root() {{ :; }}
 follow_run
 printf '%s\n' '---STATUS---'
 status_run status

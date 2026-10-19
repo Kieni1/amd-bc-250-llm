@@ -86,7 +86,14 @@ def source_probe(body: str) -> subprocess.CompletedProcess[str]:
         env = os.environ.copy()
         env["PATH"] = f"{fake_bin}:{env.get('PATH', '')}"
         return subprocess.run(
-            ["bash", "-c", f'source "$1"\n{body}', "installer-test", str(INSTALLER)],
+            [
+                "bash",
+                "-c",
+                f'source "$1"\nOWUI_VERIFY_TOKEN_FILE="$2/install-openwebui-token"\nHF_SESSION_FILE="$2/install-hf-session"\n{body}',
+                "installer-test",
+                str(INSTALLER),
+                tmp,
+            ],
             stdin=subprocess.DEVNULL,
             text=True,
             stdout=subprocess.PIPE,
@@ -572,14 +579,23 @@ step_8_application_services
 '''
             fake_bin = tmpdir / "bin"
             _write_fake_jq(fake_bin)
+            test_run = tmpdir / "run"
+            test_run.mkdir()
             env = {
                 "PATH": f"{fake_bin}:/usr/bin:/bin",
                 "BC250_TEST_LOG": str(log),
+                "BC250_TEST_RUN_DIR": str(test_run),
                 "BC250_OWUI_ENABLE_SOURCE": str(enable_source),
                 "BC250_OWUI_ENABLE_DROPIN": str(enable_target),
             }
             resumed = subprocess.run(
-                ["bash", "-c", 'source "$1"\n' + body, "lifecycle-test", str(INSTALLER)],
+                [
+                    "bash",
+                    "-c",
+                    'source "$1"\nOWUI_VERIFY_TOKEN_FILE="$BC250_TEST_RUN_DIR/install-openwebui-token"\nHF_SESSION_FILE="$BC250_TEST_RUN_DIR/install-hf-session"\n' + body,
+                    "lifecycle-test",
+                    str(INSTALLER),
+                ],
                 stdin=subprocess.DEVNULL,
                 text=True,
                 stdout=subprocess.PIPE,

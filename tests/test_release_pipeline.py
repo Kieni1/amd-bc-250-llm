@@ -277,7 +277,7 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
         bad = subprocess.run(
             ["make", "-s", "help"], cwd=ROOT,
-            env={**clean_env, "BC250_BUILD_DIR": "/tmp/bc250-unsupported-build"}, 
+            env={**clean_env, "BC250_BUILD_DIR": "/tmp/bc250-unsupported-build"},
             text=True, capture_output=True, check=False,
         )
         self.assertNotEqual(bad.returncode, 0)

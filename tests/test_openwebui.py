@@ -1277,6 +1277,11 @@ class OpenWebUIStatusTests(unittest.TestCase):
             path = Path(temporary) / "openwebui-admin.key"
             with (
                 mock.patch.object(OPENWEBUI, "DEFAULT_TOKEN_FILE", path),
+                mock.patch.object(
+                    OPENWEBUI,
+                    "read_token_file",
+                    side_effect=lambda token_path: Path(token_path).read_text(encoding="utf-8").strip(),
+                ),
                 mock.patch.object(OPENWEBUI, "verify_token") as verify,
             ):
                 OPENWEBUI.save_default_maintenance_api_key(

@@ -590,7 +590,11 @@ class MaintenanceTests(unittest.TestCase):
             )
             helper.chmod(0o755)
             result = subprocess.run(
-                [str(script), "request-shutdown-companion"],
+                [
+                    "bash", "-c",
+                    'source "$1"; require_root() { :; }; main request-shutdown-companion',
+                    "maintenance-test", str(script),
+                ],
                 env=os.environ | {
                     "BC250_MAINTENANCE_CONFIG": str(config),
                     "BC250_SAFE_POWER_HELPER": str(helper),
@@ -617,7 +621,11 @@ class MaintenanceTests(unittest.TestCase):
             helper.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
             helper.chmod(0o755)
             result = subprocess.run(
-                [str(script), "request-shutdown-companion"],
+                [
+                    "bash", "-c",
+                    'source "$1"; require_root() { :; }; main request-shutdown-companion',
+                    "maintenance-test", str(script),
+                ],
                 env=os.environ | {
                     "BC250_SAFE_POWER_HELPER": str(helper),
                     "SUDO_USER": "llm_admin",
@@ -928,7 +936,11 @@ class MaintenanceTests(unittest.TestCase):
                     "POST_INTEGRITY": post_integrity,
                 }
                 result = subprocess.run(
-                    [str(script), str(backup)],
+                    [
+                        "bash", "-c",
+                        'source "$1"; require_root() { :; }; main "$2"',
+                        "restore-users-test", str(script), str(backup),
+                    ],
                     env=env,
                     text=True,
                     stdout=subprocess.PIPE,
