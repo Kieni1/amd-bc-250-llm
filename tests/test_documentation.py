@@ -34,6 +34,14 @@ def package_markdown_paths():
         yield path, relative
 
 
+
+def current_identity() -> tuple[str, str, str]:
+    contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
+    version = contract["package"]["version"]
+    release = contract["package"]["rpm_release"]
+    return version, release, f"{contract['package']['name']}-{version}-{release}"
+
+
 def dispatcher_routes() -> set[str]:
     source = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
     return set(re.findall(r'^  "([a-z0-9-]+)\|', source, re.MULTILINE))
@@ -56,11 +64,12 @@ class DocumentationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_current_guidance_gate_rejects_release_continuity_regressions(self) -> None:
+        _version, _release, nvr = current_identity()
         cases = {
             "release identity drifts": (
                 "development/handovers/00_README_START_HERE.md",
-                "bc250-llm-server-0.14.1-1",
-                "bc250-llm-server-0.13.1-1.9",
+                nvr,
+                nvr + "-drift",
             ),
             "next core check disappears": (
                 "development/handovers/01_CURRENT_STATE_AND_NEXT_WORK.md",
@@ -89,8 +98,8 @@ class DocumentationTests(unittest.TestCase):
             ),
             "workbench NVR drifts": (
                 "WORKBENCH-STATE.json",
-                '"nvr": "bc250-llm-server-0.14.1-1"',
-                '"nvr": "bc250-llm-server-0.14.1-2"',
+                f'"nvr": "{nvr}"',
+                f'"nvr": "{nvr}-drift"',
             ),
         }
         for label, (relative, old, new) in cases.items():
@@ -309,7 +318,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertNotIn("0.13.1-1.9", joined)
 
         validation = (ROOT / "development/VALIDATION-MATRIX.md").read_text(encoding="utf-8")
-        self.assertIn("Current release identity: `bc250-llm-server-0.14.1-1`", validation)
+        _version, _release, nvr = current_identity()
+        self.assertIn(f"Current release identity: `{nvr}`", validation)
         self.assertIn("Exact-RPM core functionality", validation)
 
         strategy = (ROOT / "development/TESTING-STRATEGY.md").read_text(encoding="utf-8")
@@ -320,7 +330,8 @@ class DocumentationTests(unittest.TestCase):
         workbench = json.loads((ROOT / "WORKBENCH-STATE.json").read_text(encoding="utf-8"))
         self.assertEqual(workbench["schema"], 2)
         self.assertEqual(workbench["kind"], "release-workbench")
-        self.assertEqual(workbench["release"]["nvr"], "bc250-llm-server-0.14.1-1")
+        _version, _release, nvr = current_identity()
+        self.assertEqual(workbench["release"]["nvr"], nvr)
         self.assertEqual(workbench["release"]["state"], "source-ready-build-pending")
         self.assertNotIn("checkpoint", workbench)
         self.assertIn("core functionality", workbench["next_work"]["device"])
@@ -330,10 +341,45 @@ class DocumentationTests(unittest.TestCase):
 
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
-        self.assertIn("current 0.14.1-1 release keeps the pin unchanged", ollama)
+        version, release, _nvr = current_identity()
+        self.assertIn(f"current {version}-{release} release keeps the pin unchanged", ollama)
         self.assertNotIn("0.13.1-1.2", ollama)
         for assignment in ("OLLAMA_VULKAN=1", "OLLAMA_IGPU_ENABLE=1", "GGML_VK_VISIBLE_DEVICES=0"):
             self.assertIn(assignment, ollama)
+
+    def test_release_guidance_matches_blocking_gate_and_product_roadmap(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        self.assertIn("Run blocking Ruff and ShellCheck release preflight", makefile)
+        self.assertNotIn("developer quality; not release-blocking", makefile)
+
+        scope = json.loads((ROOT / "development/DEVELOPMENT-SCOPE.json").read_text(encoding="utf-8"))
+        note = scope["policy"]["full_release_gate"]["note"]
+        for required in ("Ruff", "ShellCheck", "configured rpmlint", "blocking"):
+            self.assertIn(required, note)
+        for name, component in scope["components"].items():
+            if component["status"] in {"active", "boundary_active"}:
+                self.assertTrue(
+                    component.get("focused_tests") or component.get("focused_tests_reason"),
+                    f"{name} has no focused-test mapping or explicit reason",
+                )
+
+        matrix = (ROOT / "development/VALIDATION-MATRIX.md").read_text(encoding="utf-8")
+        for required in (
+            "Ruff or ShellCheck failure",
+            "configured rpmlint failure",
+            "current operator/release guidance contract drift",
+            "development-scope consistency failure",
+        ):
+            self.assertIn(required, matrix)
+        self.assertNotIn("Do not stop artifact production solely for:\n\n- documentation wording drift", matrix)
+
+        roadmap = (ROOT / "development/handovers/16_PRODUCT_GOAL_AND_ROADMAP.md").read_text(encoding="utf-8")
+        self.assertIn("bounded cleanup only where it removes real ownership/risk", roadmap)
+        self.assertIn("RAG/document workflow quality", roadmap)
+        self.assertIn("German ↔ French", roadmap)
+        working = (ROOT / "development/handovers/10_WORKING_METHOD_AND_EVIDENCE.md").read_text(encoding="utf-8")
+        self.assertNotIn("simplification has priority over feature accumulation", working)
+        self.assertFalse((ROOT / "development/handovers/SHA256SUMS.txt").exists())
 
     def test_active_handover_names_are_release_oriented(self) -> None:
         handovers = ROOT / "development/handovers"

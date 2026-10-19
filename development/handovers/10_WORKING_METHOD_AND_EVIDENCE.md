@@ -96,4 +96,4 @@ Current durable decisions:
 - hard release gate stays small;
 - Ruff/ShellCheck and configured rpmlint are blocking candidate gates; broad behavioral quality remains aggregated/advisory by default;
 - exact artifacts cross source/build/device boundaries;
-- simplification has priority over feature accumulation for the next engineering cycle.
+- simplification is bounded risk/ownership reduction; the product roadmap prioritizes RAG/document quality, German–French translation UX and polished local-assistant operation.

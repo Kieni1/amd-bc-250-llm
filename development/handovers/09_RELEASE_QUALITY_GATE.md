@@ -20,7 +20,7 @@ After GitHub builds, require:
 - configured rpmlint PASS with no unfiltered findings;
 - payload contract PASS;
 - closed checksum manifests PASS;
-- clean SRPM rebuild PASS;
+- isolated SRPM-topdir rebuild PASS;
 - release-evidence record;
 - explicit release-selection record for the chosen workflow-dispatch run;
 - exact RPM/SRPM hashes.
@@ -29,7 +29,7 @@ Only then call the build selected for device acceptance.
 
 ## Device-smoke-ready
 
-For `0.14.1-1`, use the small core functionality check. Broad historical qualification is not a prerequisite.
+For `0.14.1-1.2`, use the small core functionality check. Broad historical qualification is not a prerequisite.
 
 ## Advisory finding classification
 
@@ -49,7 +49,7 @@ Promote an advisory finding to a blocker when it demonstrates one of:
 - data-loss/recovery risk;
 - security exposure or secret leakage;
 - package identity/payload corruption;
-- non-reproducible or non-self-contained release artifact;
+- non-reproducible release artifact or isolated SRPM-topdir rebuild failure;
 - core public command unusable in normal supported operation;
 - install/upgrade/reboot cannot converge safely.
 

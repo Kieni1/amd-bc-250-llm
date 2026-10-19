@@ -30,7 +30,7 @@ The release path is intentionally small:
 6. RPM `%check` runs the package-critical module list declared in `release-contract.json`;
 7. validate binary payload and package metadata;
 8. create closed binary/source checksum manifests;
-9. run clean self-contained SRPM rebuild;
+9. run the isolated SRPM-topdir rebuild in the release environment;
 10. emit release evidence;
 11. emit a release-selection record only for the explicitly selected authority run.
 
@@ -40,8 +40,8 @@ Ruff/ShellCheck are blocking before freeze/build, and configured `rpmlint` is bl
 
 ```text
 release preflight:       22/22 PASS
-package-critical %check: 83/83 PASS across 5 modules
-full source suite:       641/641 PASS across 24 modules (advisory path)
+package-critical %check: 126/126 PASS across 8 modules
+full source suite:       651/651 PASS across 24 modules (advisory path)
 ```
 
 The full-suite count is current evidence only; the release contract, not a historical count, defines future hard-gate membership.

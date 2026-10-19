@@ -10,7 +10,7 @@ Use:
 - `VALIDATION-MATRIX.md` — current release evidence state;
 - `DEVELOPMENT-SCOPE.json` + `scope.py` — development ownership/freeze hints;
 - `DECISIONS.md` — durable engineering decisions;
-- `handovers/` — current `0.14.1-1` integration, release, testing and long-term simplification guidance.
+- `handovers/` — current `0.14.1-1.2` integration, release, testing and product-roadmap guidance.
 
 The active handover entry point is `handovers/00_README_START_HERE.md`.
 

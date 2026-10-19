@@ -21,9 +21,9 @@ The hard candidate path covers Ruff/ShellCheck, current guidance/scope, core pac
 
 ```text
 24 source test modules
-641/641 source tests PASS using isolated module execution
+651/651 source tests PASS using isolated module execution
 22/22 release-preflight tests PASS
-83/83 package-critical tests PASS across 5 modules, including unprivileged execution
+126/126 package-critical tests PASS across 8 modules, including unprivileged execution
 ```
 
 Keep these as checkpoint evidence, not as a target test count. Tests may be added as supported behavior grows or new failure classes are discovered.
@@ -54,6 +54,6 @@ Do not serially patch product code just to drive advisory output to zero.
 
 ## Exact-artifact testing
 
-Source PASS is not device PASS. The selected `0.14.1-1` RPM must be bound by exact filename/SHA-256 and selected GitHub run identity before device testing.
+Source PASS is not device PASS. The selected `0.14.1-1.2` RPM must be bound by exact filename/SHA-256 and selected GitHub run identity before device testing.
 
 Start with `03_CORE_FUNCTIONALITY_CHECK.md`. Use the resilience/recovery/security playbook only when the changed area or observed defect justifies it.

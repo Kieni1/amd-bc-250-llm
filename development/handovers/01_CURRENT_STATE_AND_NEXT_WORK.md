@@ -1,13 +1,13 @@
-# Current state and next work — 0.14.1-1
+# Current state and next work — 0.14.1-1.2
 
 ## Current source/release identity
 
-The active line is `bc250-llm-server-0.14.1-1`.
+The active line is `bc250-llm-server-0.14.1-1.2`.
 
 RPM naming rule:
 
 - new product version -> `Release: 1`;
-- package-only correction -> increment integer Release (`2`, `3`, ...);
+- package-only correction may use a dotted numeric release (`1.1`, `1.2`, ...) while the product version stays fixed;
 - next product version -> reset Release to `1`.
 
 Never publish changed bytes under an already-used NVR.
@@ -39,7 +39,7 @@ Treat these as current package choices, not permanent architectural commitments.
 
 The next device round answers only:
 
-> Does the exact selected `0.14.1-1` RPM behave like a usable stock BC-250 appliance?
+> Does the exact selected `0.14.1-1.2` RPM behave like a usable stock BC-250 appliance?
 
 Use `03_CORE_FUNCTIONALITY_CHECK.md`. Do not reopen broad benchmarking, tuning, GFX qualification or full resilience campaigns during this round.
 
@@ -52,7 +52,7 @@ Freeze:
 - device/kernel identity;
 - short PASS/FAIL evidence for the core smoke.
 
-Then use `08_GREENFIELD_SIMPLIFICATION_PLAN.md` only for bounded cleanup that clearly reduces ownership/failure surface. After that, shift directly to the product roadmap: excellent local RAG/document workflows, German–French translation UX and polished ordinary-user assistant operation.
+Then shift directly to the product roadmap: excellent local RAG/document workflows, German–French translation UX and polished ordinary-user assistant operation. Use `08_GREENFIELD_SIMPLIFICATION_PLAN.md` only opportunistically for bounded cleanup that clearly removes concrete ownership or failure risk; cleanup is not a prerequisite phase.
 
 ## Bounded simplification target
 

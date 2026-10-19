@@ -1,4 +1,4 @@
-# BC-250 handover bundle — current release line 0.14.1-1
+# BC-250 handover bundle — current release line 0.14.1-1.2
 
 ## Purpose
 
@@ -9,8 +9,8 @@ Current source/release identity:
 ```text
 package:  bc250-llm-server
 version:  0.14.1
-release:  1
-NEVRA:    bc250-llm-server-0.14.1-1.fc44.x86_64
+release:  1.2
+NEVRA:    bc250-llm-server-0.14.1-1.2.fc44.x86_64
 ```
 
 Use normal RPM identity from here forward. Engineering iteration labels belong in commits, issues and handovers, not in Version/Release.
@@ -19,10 +19,10 @@ Use normal RPM identity from here forward. Engineering iteration labels belong i
 
 The reconstruction era is closed. The active work is simpler:
 
-1. produce and select the authoritative Fedora 44 GitHub build for `0.14.1-1`;
+1. produce and select the authoritative Fedora 44 GitHub build for `0.14.1-1.2`;
 2. run a deliberately small exact-RPM core-functionality check;
 3. freeze that result as the known-good stock-core baseline if it passes;
-4. do only the bounded simplification needed to remove obsolete ownership/risk, then shift directly to office RAG/document quality, German–French translation UX and polished local-assistant workflows;
+4. shift directly to office RAG/document quality, German–French translation UX and polished local-assistant workflows; perform bounded simplification only opportunistically where it removes concrete obsolete ownership/risk;
 5. keep supported product behavior stable while reducing implementation surface.
 
 The selected device candidate must be identified by exact RPM SHA-256. Source tests or an earlier package do not substitute for exact-artifact evidence.
@@ -36,10 +36,10 @@ Greenfield means implementation freedom, not data loss or contract amnesia: pres
 ## Current validation snapshot
 
 ```text
-full source suite:       641/641 PASS across 24 modules
+full source suite:       651/651 PASS across 24 modules
 release preflight:       22/22 PASS
-RPM package-critical:    83/83 PASS across 5 modules (verified unprivileged)
-device acceptance:       pending exact selected 0.14.1-1 RPM
+RPM package-critical:    126/126 PASS across 8 modules (verified unprivileged)
+device acceptance:       pending exact selected 0.14.1-1.2 RPM
 ```
 
 These counts describe the current cleaned-source snapshot; they are evidence, not permanent architecture.
@@ -75,7 +75,9 @@ Read these first:
 13. `13_RESILIENCE_RECOVERY_AND_SECURITY_PLAYBOOK.md`
 14. `14_EVALUATOR_AND_RESULT_SEMANTICS.md`
 15. `15_SPECIALIST_WORK_AND_RETURN_CONTRACT.md`
+16. `16_PRODUCT_GOAL_AND_ROADMAP.md`
+17. `17_RELEASE_CANDIDATE_EXECUTION_GATE.md`
 
-The last four restore high-value engineering discipline from the older handover set without reviving its large qualification program.
+The final specialist/evidence files preserve high-value engineering discipline while the product-goal and release-gate files define the current roadmap and acceptance method.
 
 `archive/` is rationale/history only and cannot override current files.

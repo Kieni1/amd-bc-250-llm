@@ -9,7 +9,7 @@ Tika         4.1.0-full
 Governor     0.4.13
 ```
 
-Do not upgrade these incidentally during the upcoming simplification round.
+Do not upgrade these incidentally during unrelated cleanup or product-roadmap work. Runtime/model upgrades require their own reason and evidence.
 
 ## Normal topology
 

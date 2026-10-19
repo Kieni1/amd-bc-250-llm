@@ -1,4 +1,4 @@
-# Core functionality check — exact 0.14.1-1 RPM
+# Core functionality check — exact 0.14.1-1.2 RPM
 
 ## Goal
 
@@ -32,7 +32,7 @@ Do not mutate user state just to make the starting state look cleaner.
 ## Required package/install checks
 
 - install or supported upgrade succeeds;
-- `rpm -q bc250-llm-server` reports `0.14.1-1` with the expected Fedora dist tag/arch;
+- `rpm -q bc250-llm-server` reports `0.14.1-1.2` with the expected Fedora dist tag/arch;
 - package services/configuration converge without manual repair;
 - no experimental GFX/private-RADV/patched-boot requirement appears;
 - one ordinary service restart succeeds.
@@ -48,7 +48,6 @@ bc250 health
 bc250 verify
 ```
 
-`doctor` compatibility may be checked if retained, but the test should focus on the supported public path.
 
 Confirm output is coherent and does not depend on stale reconstruction-era state. Non-root status must not claim privileged identity was inspected when it was not.
 
