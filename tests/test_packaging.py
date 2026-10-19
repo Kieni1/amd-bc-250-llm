@@ -972,7 +972,8 @@ class PackagingTests(unittest.TestCase):
 
     def test_repository_validation_runs_test_modules_in_isolation(self) -> None:
         validate = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
-        self.assertIn('for test_file in "$ROOT"/tests/test_*.py', validate)
+        self.assertIn('mapfile -t all_tests', validate)
+        self.assertIn('run_test_set "${all_tests[@]}"', validate)
         self.assertIn('python3 -m unittest "$test_file"', validate)
         self.assertNotIn("python3 -m unittest discover -s tests -v", validate)
         self.assertIn('BC250_TEST_MODULE_TIMEOUT:-120', validate)

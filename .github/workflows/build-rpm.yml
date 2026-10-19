@@ -61,6 +61,27 @@ jobs:
             GITHUB_REF="$GITHUB_REF" \
             make release-gate
 
+      - name: Run advisory full quality report
+        if: always()
+        continue-on-error: true
+        run: |
+          runuser -u bc250-builder -- env \
+            HOME=/tmp/bc250-builder \
+            LANG="$LANG" LC_ALL="$LC_ALL" \
+            BC250_REQUIRE_GIT_SOURCE=0 \
+            BC250_RELEASE_AUTHORITY=false \
+            make quality-report
+
+      - name: Upload advisory quality report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bc250-llm-server-quality-report
+          if-no-files-found: ignore
+          path: |
+            build/quality-report.txt
+            build/rpmlint-report.txt
+
       - name: Upload binary RPM evidence
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

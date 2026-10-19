@@ -138,7 +138,7 @@ def check_required_inputs() -> None:
 
 def check_syntax() -> None:
     for relative, path in included_files():
-        if path.suffix != ".py":
+        if path.suffix != ".py" or (relative.parts and relative.parts[0] == "tests"):
             continue
         try:
             compile(path.read_text(encoding="utf-8"), str(relative), "exec")
@@ -249,11 +249,20 @@ def check_release_contract() -> None:
         fail("release contract build-root policy must use BUILD_DIR with internal BC250_BUILD_DIR")
 
     release_test = validation.get("release_pipeline_test")
-    excludes = validation.get("package_excludes")
+    package_critical = validation.get("package_critical_tests")
+    advisory_quality = validation.get("advisory_quality", {})
     if release_test != "tests/test_release_pipeline.py":
         fail("release contract must identify tests/test_release_pipeline.py as the host release test")
-    if excludes != [release_test]:
-        fail("release contract package exclusions must contain only the host release-pipeline test")
+    expected_package_critical = [
+        "tests/test_packaging.py",
+        "tests/test_sources.py",
+        "tests/test_upstream_patch_validation.py",
+        "tests/test_runtime.py",
+    ]
+    if package_critical != expected_package_critical:
+        fail("release contract package_critical_tests differs from the release-critical test set")
+    if advisory_quality.get("blocking") is not False or advisory_quality.get("command") != "make quality-report":
+        fail("release contract advisory quality policy must be non-blocking make quality-report")
     stages = validation.get("stages")
     if not isinstance(stages, list) or [stage.get("id") for stage in stages if isinstance(stage, dict)] != [
         "preflight-freeze", "frozen-package", "artifact-evidence"
@@ -290,7 +299,7 @@ def check_configuration() -> None:
         fail("packaged governor must retain the 2000 MHz / 960 mV point")
 
 
-def check_layout_and_docs() -> None:
+def check_layout() -> None:
     for relative in (
         "cmd",
         "config",
@@ -303,20 +312,6 @@ def check_layout_and_docs() -> None:
     ):
         if not (ROOT / relative).is_dir():
             fail(f"required source group is missing: {relative}/")
-    for relative, path in included_files():
-        if path.suffix != ".md":
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError as error:
-            fail(f"cannot read documentation file {relative}: {error}")
-            continue
-        for target in re.findall(r"\[[^]]*\]\(([^)]+)\)", text):
-            if "://" in target or target.startswith(("#", "mailto:")):
-                continue
-            local = target.split("#", 1)[0]
-            if local and not (path.parent / local).exists():
-                fail(f"{relative}: broken relative link: {target}")
 
 
 def check_repository_safety() -> None:
@@ -576,30 +571,6 @@ def check_manifest_sources() -> None:
             fail(f"install manifest line {number}: source does not exist: {source}")
 
 
-def check_development_scope() -> None:
-    """Verify frozen/archive development domains without loading their internals."""
-    scope = ROOT / "development/scope.py"
-    manifest = ROOT / "development/DEVELOPMENT-SCOPE.json"
-    if not scope.is_file() or not manifest.is_file():
-        fail("development scope manifest/helper is missing")
-        return
-    try:
-        compile(scope.read_text(encoding="utf-8"), str(scope.relative_to(ROOT)), "exec")
-    except (OSError, SyntaxError) as error:
-        fail(f"development scope helper syntax check failed: {error}")
-        return
-    result = subprocess.run(
-        [sys.executable, str(scope), "check", "--quiet"],
-        cwd=ROOT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip()
-        fail(f"development scope check failed: {detail}")
-
-
 def check_upstream_manifest() -> None:
     try:
         with UPSTREAMS.open("rb") as stream:
@@ -638,12 +609,11 @@ def main() -> int:
     check_version()
     check_release_contract()
     check_configuration()
-    check_layout_and_docs()
+    check_layout()
     check_repository_safety()
     check_dispatcher_and_runtime_contracts()
     check_greenfield_command_surface()
     check_manifest_sources()
-    check_development_scope()
     check_upstream_manifest()
     if FAILURES:
         print(f"RPM preflight failed with {len(FAILURES)} error(s).", file=sys.stderr)

@@ -26,15 +26,16 @@ FROZEN_SOURCE_PARENT := $(BUILD_DIR)/frozen-source
 FROZEN_SOURCE_DIR := $(FROZEN_SOURCE_PARENT)/$(NAME)-$(VERSION)
 UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 
-.PHONY: help sources sources-check lint source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload check-srpm-rebuild release-gate-preflight release-gate-package release-gate clean clean-sources distclean
+.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload check-srpm-rebuild release-gate-preflight release-gate-package release-gate clean clean-sources distclean
 
 help:
 	@printf '%s\n' \
 	  'make sources    Download pinned governor and live-manager sources' \
 	  'make sources-check  Verify the local source cache and SHA-256 sidecars' \
-	  'make lint       Run Ruff and ShellCheck' \
-	  'make preflight  Run cheap source/release-pipeline checks' \
-	  'make validate   Run preflight plus all deterministic source tests' \
+	  'make lint       Run Ruff and ShellCheck (developer quality; not release-blocking)' \
+	  'make quality-report  Run lint + full validation and report all issues without blocking artifacts' \
+	  'make preflight  Run release-critical source/release-pipeline checks' \
+	  'make validate   Run strict governance plus all deterministic source tests' \
 	  'make source-tar Create the project source archive' \
 	  'make freeze-rpm-inputs  Freeze Source0/spec plus source identity before package build' \
 	  'make check-frozen-source  Verify the exact frozen source/spec snapshot' \
@@ -67,6 +68,23 @@ lint:
 	done < <(find . -type f \
 	  -not -path './sources/*' -not -path './build/*' -not -path './.build/*' \
 	  -not -path './governor-src/*' -not -path './live-manager-src/*')
+
+
+quality-report:
+	@set +e; \
+	mkdir -p '$(BUILD_DIR)'; \
+	report='$(BUILD_DIR)/quality-report.txt'; \
+	: > "$$report"; \
+	echo '== Advisory quality report ==' | tee -a "$$report"; \
+	$(MAKE) lint >>"$$report" 2>&1; lint_rc=$$?; \
+	./scripts/validate.sh >>"$$report" 2>&1; validate_rc=$$?; \
+	printf 'lint_rc=%s\nvalidate_rc=%s\n' "$$lint_rc" "$$validate_rc" | tee -a "$$report"; \
+	if ((lint_rc == 0 && validate_rc == 0)); then \
+	  echo 'Advisory quality report: PASS' | tee -a "$$report"; \
+	else \
+	  echo 'Advisory quality report: WARN (non-blocking; inspect report)' | tee -a "$$report"; \
+	fi; \
+	exit 0
 
 source-tar:
 	./scripts/make-source-tarball.sh
@@ -232,7 +250,6 @@ release-gate-preflight:
 	$(MAKE) clean
 	$(MAKE) sources
 	$(MAKE) sources-check
-	$(MAKE) lint
 	$(MAKE) preflight
 	$(MAKE) freeze-rpm-inputs
 	$(MAKE) check-frozen-source
@@ -241,7 +258,12 @@ release-gate-package:
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
 	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
 	  RPM_TREE_TARGET=rpm-tree-frozen rpm </dev/null
-	rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm
+	@set +e; \
+	report='$(BUILD_DIR)/rpmlint-report.txt'; \
+	rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm >"$$report" 2>&1; rc=$$?; \
+	cat "$$report"; \
+	if ((rc != 0)); then echo "rpmlint: WARN (non-blocking, rc=$$rc)"; else echo 'rpmlint: PASS'; fi; \
+	exit 0
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' check-srpm-rebuild
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
 	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \

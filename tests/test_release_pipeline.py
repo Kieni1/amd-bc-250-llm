@@ -73,6 +73,7 @@ class ReleasePipelineTests(unittest.TestCase):
         preflight = make_recipe("release-gate-preflight")
         package = make_recipe("release-gate-package")
         gate = make_recipe("release-gate")
+        self.assertNotIn("$(MAKE) lint", preflight)
         self.assertLess(preflight.index("$(MAKE) preflight"), preflight.index("$(MAKE) freeze-rpm-inputs"))
         self.assertLess(preflight.index("$(MAKE) freeze-rpm-inputs"), preflight.index("$(MAKE) check-frozen-source"))
         self.assertIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
@@ -91,13 +92,40 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("cmp -s", check)
         self.assertIn("validate.sh --preflight", check)
 
-    def test_package_check_excludes_only_host_release_contract_tests(self) -> None:
+    def test_package_check_runs_only_release_critical_tests(self) -> None:
+        contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
         validator = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         self.assertIn("all|--preflight|--package", validator)
-        self.assertIn("release_pipeline_test", validator)
-        self.assertIn('if [[ "$mode" == "--package" && "$test_file" == "$release_pipeline_test" ]]', validator)
+        self.assertEqual(
+            contract["validation"]["package_critical_tests"],
+            [
+                "tests/test_packaging.py",
+                "tests/test_sources.py",
+                "tests/test_upstream_patch_validation.py",
+                "tests/test_runtime.py",
+            ],
+        )
+        self.assertIn('validation"]["package_critical_tests"]', validator)
         self.assertIn("bash scripts/validate.sh --package </dev/null", spec)
+        self.assertNotIn("tests/test_benchmark.py", json.dumps(contract["validation"]["package_critical_tests"]))
+
+    def test_release_gate_keeps_governance_and_full_suite_advisory(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        validator = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        preflight = make_recipe("release-gate-preflight")
+        self.assertNotIn("$(MAKE) lint", preflight)
+        self.assertIn("quality-report:", makefile)
+        self.assertIn("Advisory quality report: WARN", makefile)
+        self.assertIn("development/scope.py check --quiet", validator)
+        self.assertIn("check-current-guidance.sh", validator)
+        self.assertIn("Run advisory full quality report", workflow)
+        self.assertIn("continue-on-error: true", workflow)
+        self.assertIn("Upload advisory quality report", workflow)
+        package = make_recipe("release-gate-package")
+        self.assertIn("rpmlint-report.txt", package)
+        self.assertIn("rpmlint: WARN (non-blocking", package)
 
     def test_source_tar_supports_custom_build_root_and_prunes_empty_dirs(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")

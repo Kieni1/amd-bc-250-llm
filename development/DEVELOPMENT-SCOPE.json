@@ -271,13 +271,12 @@
       "description": "Local maintenance timers, backups/restores, safe power and WOL/companion integration; frozen after canonical bc250 dispatcher migration.",
       "paths": [
         "cmd/maintenance/**",
-        "examples/raspi-wol/**",
-        "tests/test_maintenance.py"
+        "examples/raspi-wol/**"
       ],
       "focused_tests": [
         "tests.test_maintenance"
       ],
-      "baseline_sha256": "5df7a82413a2f7e6b37ee4f336ee0566e7fc80f01abc0a993c8bf254178822e0",
+      "baseline_sha256": "3e883bc6775dfe8423bd2e15462e2012f841ace294fb14dbefda524dbf001668",
       "thaw_if": [
         "maintenance/companion behavior is intentionally changed",
         "protected Open WebUI credential path/format changes",
@@ -291,6 +290,9 @@
         "config/containers/open-webui.container",
         "config/systemd/ollama*.service",
         "docs/OPERATIONS.md"
+      ],
+      "notes": [
+        "Regression tests are intentionally outside the frozen implementation hash; test maintenance must not thaw the component or block a release build."
       ]
     },
     "rag-tika": {

@@ -1,0 +1,23 @@
+BC250 C8 testing/release-gate overhaul
+
+Hard release gate:
+- release-critical source/preflight checks
+- clean-core absence check
+- 22 host release-pipeline tests
+- Source0/spec freeze and equivalence
+- RPM build
+- RPM %check: 76 tests across packaging, sources, upstream patch validation, runtime
+- RPM payload validation
+- checksum manifests
+- clean SRPM rebuild
+- release evidence / selection
+
+Advisory only (does not block RPM artifacts):
+- Ruff / ShellCheck
+- current-guidance check
+- development-scope frozen hashes
+- full deterministic test suite
+- rpmlint
+
+The full validation runner aggregates module failures so one run exposes all failing modules.
+The maintenance frozen component hash now covers implementation only, not test_maintenance.py.
