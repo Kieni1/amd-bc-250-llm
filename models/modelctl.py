@@ -999,6 +999,8 @@ def remote_file_sha256(model: dict, token: str = "") -> str:
 
 def read_protected_token_file(token_file: Path) -> str:
     """Read an explicitly supplied Hugging Face token only from a private file."""
+    if token_file.is_symlink():
+        raise ModelError(f"token file must not be a symlink: {token_file}")
     try:
         info = token_file.stat()
     except OSError as error:

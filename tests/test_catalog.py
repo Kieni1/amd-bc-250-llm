@@ -1063,6 +1063,11 @@ class StatusTests(unittest.TestCase):
             token_file.write_text("\n", encoding="utf-8")
             with self.assertRaisesRegex(modelctl.ModelError, "token file is empty"):
                 modelctl.status_token(token_file)
+            token_file.write_text("secret\n", encoding="utf-8")
+            link = Path(tmp) / "hf-link"
+            link.symlink_to(token_file)
+            with self.assertRaisesRegex(modelctl.ModelError, "must not be a symlink"):
+                modelctl.status_token(link)
 
     def test_coding_agent_outer_fence_detector_rejects_only_wrapped_output(self) -> None:
         helper = (ROOT / "models/coding-agent/coding-agent.sh").read_text(encoding="utf-8")

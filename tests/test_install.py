@@ -105,6 +105,29 @@ def source_probe(body: str) -> subprocess.CompletedProcess[str]:
 
 
 class InstallerTests(unittest.TestCase):
+    def test_openwebui_token_validator_rejects_symlink(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        start = source.index("validate_owui_token_file() {")
+        end = source.index("\ncleanup_sensitive_runtime() {", start)
+        function = source[start:end]
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "token"
+            target.write_text("secret\n", encoding="utf-8")
+            target.chmod(0o600)
+            link = Path(tmp) / "token-link"
+            link.symlink_to(target)
+            command = (
+                "DEFAULT_OWUI_TOKEN_FILE=/var/lib/bc250-llm-server/secrets/openwebui-admin.key\n"
+                + function
+                + '\nvalidate_owui_token_file "$1"'
+            )
+            result = subprocess.run(
+                ["bash", "-c", command, "test", str(link)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must not be a symlink", result.stderr)
+
     def test_bootstrap_only_installs_rpm_and_hands_off(self) -> None:
         source = BOOTSTRAP.read_text()
         self.assertNotIn("dnf upgrade", source)

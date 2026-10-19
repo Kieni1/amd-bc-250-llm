@@ -58,6 +58,10 @@ if [[ -z "$OWUI_TOKEN_FILE" && -s "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
 fi
 
 if [[ -n "$OWUI_TOKEN_FILE" ]]; then
+  [[ ! -L "$OWUI_TOKEN_FILE" ]] || {
+    echo "ERROR: Open WebUI API key file must not be a symlink: $OWUI_TOKEN_FILE" >&2
+    exit 2
+  }
   [[ -f "$OWUI_TOKEN_FILE" && -r "$OWUI_TOKEN_FILE" && -s "$OWUI_TOKEN_FILE" ]] || {
     echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $OWUI_TOKEN_FILE" >&2
     exit 2

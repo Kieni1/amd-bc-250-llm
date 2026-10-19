@@ -243,6 +243,10 @@ load_settings() {
 
 validate_protected_token_file() {
   local path="$1" mode
+  [[ ! -L $path ]] || {
+    echo "ERROR: Open WebUI API key file must not be a symlink: $path" >&2
+    return 2
+  }
   [[ -f $path && -r $path && -s $path ]] || {
     echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $path" >&2
     return 2

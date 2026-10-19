@@ -987,6 +987,8 @@ def status(client: Client, authenticated: bool, *, verbose: bool = False) -> int
 
 def read_token_file(path: str) -> str:
     token_path = Path(path).expanduser()
+    if token_path.is_symlink():
+        raise ApiError(f"API key file must not be a symlink: {token_path}")
     try:
         st = token_path.stat()
     except OSError as exc:

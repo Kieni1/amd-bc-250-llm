@@ -13,6 +13,7 @@ QUALIFICATION = ROOT / "cmd/qualification"
 if str(QUALIFICATION) not in sys.path:
     sys.path.insert(0, str(QUALIFICATION))
 
+import package_gate_capture as package_gate_module
 import resilience_common as common
 import resilience_manager as manager_module
 
@@ -257,6 +258,17 @@ class QualificationTests(unittest.TestCase):
         source = (QUALIFICATION / "package_gate_capture.py").read_text(encoding="utf-8")
         self.assertNotIn('add_argument("--result"', source)
         self.assertIn("result derived from package-owned live checks", source)
+        self.assertNotIn("args.token_file.resolve()", source)
+        self.assertIn("token_file.is_symlink()", source)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "token.txt"
+            target.write_text("secret\n", encoding="utf-8")
+            link = root / "token-link.txt"
+            link.symlink_to(target)
+            observed = package_gate_module._absolute_without_resolving(link)
+            self.assertEqual(observed, link)
+            self.assertTrue(observed.is_symlink())
 
     def test_release_wires_tika_410_and_qualification_commands(self) -> None:
         runtime = (ROOT / "config/runtime.env").read_text(encoding="utf-8")

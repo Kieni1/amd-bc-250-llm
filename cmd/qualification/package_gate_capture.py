@@ -64,6 +64,14 @@ def _check_payload(status: str, detail: str, **extra: object) -> dict[str, objec
     return payload
 
 
+def _absolute_without_resolving(path: Path) -> Path:
+    """Return an absolute path without following symlinks."""
+    candidate = path.expanduser()
+    if candidate.is_absolute():
+        return candidate
+    return Path.cwd() / candidate
+
+
 def _write_text(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text.rstrip("\n") + "\n", encoding="utf-8")
@@ -260,9 +268,11 @@ def capture(args: argparse.Namespace) -> int:
     checks["tika_4_1_smoke"] = {"status": tika_status, "checks": tika_checks}
     statuses.append(tika_status)
 
-    token_file = args.token_file.resolve() if args.token_file is not None else DEFAULT_OWUI_TOKEN
+    token_file = _absolute_without_resolving(args.token_file) if args.token_file is not None else DEFAULT_OWUI_TOKEN
     rag_status = "INCOMPLETE"
-    if token_file.is_file():
+    if token_file.is_symlink():
+        rag_detail = f"Open WebUI token file must not be a symlink: {token_file}"
+    elif token_file.is_file():
         benchmark = args.libexec / "benchmark.sh"
         if benchmark.is_file():
             rag_output = evidence / "owui-rag-smoke"

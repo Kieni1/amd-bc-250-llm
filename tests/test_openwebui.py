@@ -1261,6 +1261,16 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(key, "sk-" + "b" * 32)
         self.assertEqual(client.posts, [("/api/v1/auths/api_key", None)])
 
+    def test_token_file_rejects_symlink_even_to_private_regular_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            target = Path(temporary) / "token"
+            target.write_text("sk-" + "a" * 32 + "\n", encoding="utf-8")
+            target.chmod(0o600)
+            link = Path(temporary) / "token-link"
+            link.symlink_to(target)
+            with self.assertRaisesRegex(OPENWEBUI.ApiError, "must not be a symlink"):
+                OPENWEBUI.read_token_file(str(link))
+
     def test_saved_maintenance_credential_is_real_api_key_not_session_jwt(self) -> None:
         class KeyClient:
             def get(self, path: str) -> Any:

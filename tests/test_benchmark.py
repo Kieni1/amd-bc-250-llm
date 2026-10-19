@@ -37,6 +37,36 @@ runtime_workflow = load_module("runtime_benchmark_test", BENCH / "runtime-benchm
 openwebui_workflow = load_module("openwebui_benchmark_test", BENCH / "openwebui-benchmark.py")
 
 
+class CredentialHardeningTests(unittest.TestCase):
+    def test_openwebui_benchmark_token_rejects_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "token"
+            target.write_text("secret\n", encoding="utf-8")
+            target.chmod(0o600)
+            link = Path(tmp) / "token-link"
+            link.symlink_to(target)
+            with self.assertRaisesRegex(openwebui_workflow.Failure, "must not be a symlink"):
+                openwebui_workflow.token_from(str(link))
+
+    def test_revalidate_token_validator_rejects_symlink(self) -> None:
+        source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
+        start = source.index("validate_protected_token_file() {")
+        end = source.index("\nvalidate_owui_token_file() {", start)
+        function = source[start:end]
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "token"
+            target.write_text("secret\n", encoding="utf-8")
+            target.chmod(0o600)
+            link = Path(tmp) / "token-link"
+            link.symlink_to(target)
+            result = subprocess.run(
+                ["bash", "-c", function + '\nvalidate_protected_token_file "$1"', "test", str(link)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("must not be a symlink", result.stderr)
+
+
 class BenchmarkResourceResolutionTests(unittest.TestCase):
     def test_fixture_resolution_prefers_source_tree_without_explicit_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

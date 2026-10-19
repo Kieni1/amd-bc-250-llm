@@ -167,6 +167,8 @@ class JsonClient:
 
 def token_from(path: str) -> str:
     token_path = Path(path).expanduser()
+    if token_path.is_symlink():
+        raise Failure(f"Open WebUI API key file must not be a symlink: {token_path}")
     try:
         info = token_path.stat()
     except OSError as exc:
