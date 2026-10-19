@@ -1,137 +1,64 @@
-# BC-250 operations boundary handover — 0.13.1-1.3
+# Operations boundary handover — clean core
 
-## Status
+## 1. Operator mental model
 
-Maintenance/companion remains frozen for routine work.
+The normal user should see an appliance, not an engineering console.
 
-RAG/Tika is no longer in this frozen set; it is active product scope.
+The core should boot stock, expose the web interface, run the AI runtime, manage models/documents and clearly report problems/actions.
 
-This handover preserves operations interfaces that current greenfield/package work must not accidentally break.
+## 2. GFX removal from operator surface
 
-## Current canonical command style
+After clean-core reconstruction there should be no current operator instructions for:
 
-Operations documentation should use:
+- `bc250 gfx1013 ...`;
+- patched boot staging;
+- private RADV;
+- GFX stock rollback;
+- GFX benchmark A1/B/A2.
 
-```text
-bc250 maintenance ...
-bc250 status
-bc250 verify
-bc250 support-bundle
-bc250 storage
-bc250 reset
-```
+Historical docs may retain them only in clearly archived material.
 
-Do not restore removed per-command `bc250-*` compatibility aliases.
+## 3. Installer completion
 
-## Protected Open WebUI credential
+Preserve the useful one-next-action hierarchy from later work where applicable.
 
-```text
-/var/lib/bc250-llm-server/secrets/openwebui-admin.key
+Do not add optional experimental guidance that competes with required core actions.
 
-parent 0700 root:root
-file   0600 root:root
-content verified real Open WebUI sk-... API key
-```
+## 4. Status / doctor-or-health / verify
 
-No token contents in logs/evidence/support bundles.
+During reconstruction preserve the existing 1.9 contract first. Later generic 2.2 monitoring improvements may be selectively reimplemented.
 
-Temporary JWTs are bootstrap/convergence credentials, not the durable maintenance authority.
+Do not import GFX state abstractions.
 
-## Normal topology boundary
+General intent:
 
-```text
-main       11434 active
-task       11435 active
-embedding  11437 active
-agent      11436 inactive unless optional Agent mode entered
-```
+- `status`: current informational state;
+- health/doctor: operator-facing health/action gate according to the chosen public command contract;
+- `verify`: deeper systematic package/config/runtime validation.
 
-Agent missing is optional coverage unavailable, not normal-topology damage.
+## 5. Human wording
 
-## CU operations boundary
+Accepted generic UX direction:
 
-Current normal product workflow:
+- `Web interface` rather than `front door`;
+- concise user-visible cause before implementation detail;
+- one required next action;
+- exact internals remain available in diagnostic/machine output.
 
-```bash
-sudo bc250-cu-live-manager
-sudo bc250-40cu status
-```
+## 6. Color
 
-The replacement-module/kernel-patch workflow was removed.
+TTY-only, `NO_COLOR` aware, text-complete without color.
 
-Operations/maintenance should not depend on:
+Use consistent semantic colors as documented in the main working rules.
 
-```text
-bc250-40cu prepare
-enable
-disable
-restore
-module patch state
-```
+## 7. Model UX
 
-Live routing and saved profile are the current authority.
+Forward-port safe cancel/no-mutation wording and clearer selection prompts.
 
-## Safe-power boundary
+Do not rename product categories automatically.
 
-The BC-250 owns the shutdown decision.
+## 8. Documentation entry points
 
-A companion/Pi may request safe shutdown but should not infer idleness and issue raw remote poweroff as the normal product contract.
+Keep README/TLDR focused on normal core operation. Topic docs hold deeper maintenance/rationale.
 
-Protected activity uncertainty must fail safe.
-
-## Backup/restore boundary
-
-Stable principles:
-
-- package backups are local and private;
-- backup creation is not enough; integrity/retention matter;
-- restore validates data and preserves rollback material;
-- Open WebUI state ownership must remain correct;
-- secrets must not be exposed.
-
-Do not rerun destructive restore campaigns unless a current change crosses this boundary.
-
-## Storage/model lifecycle
-
-Canonical model lifecycle is through:
-
-```text
-bc250 model ...
-```
-
-Prefer unregister/reapply with verified source reuse for support testing.
-
-Do not manually delete Ollama blobs just because temporary storage looks large.
-
-Destructive removal/purge needs explicit selection.
-
-## Public/private helpers
-
-Private memory/swap/Ollama/CU helpers moved to libexec.
-
-Operations should call supported product commands, not treat those helpers as user API.
-
-## Thaw conditions
-
-Reopen maintenance/companion only when one of these changes:
-
-- durable credential path/format;
-- Open WebUI DB/backup path;
-- maintenance-owned service names;
-- backup/restore semantics;
-- shutdown/power policy;
-- user explicitly resumes maintenance work.
-
-Do not thaw it merely because source documentation or command dispatch was cleaned up, unless an actual maintenance invocation changed.
-
-## Current release smoke
-
-Final exact RPM closure should confirm that existing maintenance status commands still work through the canonical dispatcher, but broad Pi/WOL/S5/restore/prune campaigns are not required unless the smoke exposes a regression.
-
-## 0.12.2-0.8 exact-RPM note
-
-Exact 0.12.2-0.7 fresh installation proved the smaller public API, live-CU-only package footprint, 53/53 core verification and 40/40 saved-profile reboot restoration. 0.8 keeps the topology unchanged and corrects operator semantics: completed revalidation remains completed with optional PARTIAL Agent coverage, successful translation withholding is a product-integrity PASS, CU state uses live-routing/profile/boot-restore terminology, and optional Agent is described as inactive in normal mode.
-
-## 0.13.1-1.3 operations note
-
-The release adds no new service topology or maintenance behavior. Normal dispatcher-launched Python helpers must not write bytecode under package-owned `/usr`; guided install/upgrade convergence removes stale BC-250 package-tree bytecode left by older releases. Optional models are not maintenance failures merely because they are absent/cached, and retired model residue is lifecycle cleanup rather than Open WebUI configuration drift.
+Do not make users read archived GFX documentation to understand the normal appliance.

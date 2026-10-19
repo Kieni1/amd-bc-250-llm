@@ -35,7 +35,7 @@ every record. `results.jsonl` remains the canonical per-case evidence.
 
 ```text
 result_type   measurement | qualification
-outcome       pass | quality-fail | infra-fail | skipped
+outcome       pass | quality-fail | infra-fail | skipped | incomplete
 failure_kinds actual qualification failures
 diagnostics   useful warnings that are not automatically failures
 checks        case-specific booleans/scores
@@ -100,25 +100,13 @@ registered Modelfile sampling. `--mode production`
 preserves the packaged model policy. `--think` can explicitly select a supported
 thinking policy for a comparison.
 
-## GFX1013 same-package A/B screen
-
-Use the lifecycle-owned benchmark when evaluating the experimental compute-queue path:
-
-```bash
-sudo bc250 gfx1013 benchmark stock
-# prepare -> patched reboot -> enable
-sudo bc250 gfx1013 benchmark gfx
-# disable -> stock reboot
-sudo bc250 gfx1013 benchmark restored
-sudo bc250 gfx1013 benchmark report
-```
-
-This is intentionally separate from generic model benchmarking. A1/B/A2 must use the
-same package, running kernel, prompt and exact model digests, so the primary comparison
-measures stock versus GFX1013 rather than a package/model change. Standard and Advanced
-are the default screen; `--include-deep` adds a bounded Deep confirmation. The helper
-never calls prepare/enable/disable/reboot itself. See `docs/GFX1013.md` for evidence and
-promotion-candidate rules.
+For thinking-capable generation, visible-answer identity and hidden thinking are separate evidence.
+Every generation measurement records `visible_response_identity` with a state, a
+`determinism_eligible` flag and a SHA-256 only when a non-empty visible `response` exists. A
+thinking-only completion therefore has `sha256: null` and cannot be presented as deterministic
+visible-output evidence. If a run completes without any visible answer, the measurement is recorded
+as `INCOMPLETE`; output/thinking budget diagnostics remain explicit and no throughput or quality
+threshold is weakened.
 
 ## Embeddings
 
@@ -341,7 +329,3 @@ criteria; severe early truncation remains an infrastructure qualification failur
 same section also reports tight resource headroom when MemAvailable falls below 512 MiB
 while remaining above the unchanged 128 MiB hard floor, and accepted use cases that reach
 their output budget. These are visibility signals, not relaxed acceptance criteria.
-
-## Read-only status guarantee
-
-`bc250 gfx1013 benchmark status` and `status --json` are queries only. If no campaign exists they return a valid "no active campaign" result without creating the benchmark root, active pointer, campaign directory, or changing package-owned directory modes. Only capture/report commands that explicitly create evidence may create benchmark state.

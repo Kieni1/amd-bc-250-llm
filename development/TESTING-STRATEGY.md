@@ -1,5 +1,16 @@
 # BC-250 testing strategy
 
+## Current clean-core execution plan
+
+Current accepted predecessor evidence is the immutable C5-D freeze: `amd-bc-250-llm-clean-core-C5-D.zip`, SHA-256 `25be3783716451c84f54209ae16a38c5de1ef1675c4b579fd02cfff08865c710`, canonical manifest `e43ab0244de09bc4fc1981db36d956860e6d01715566fe91a9597c869b59e651`, 362 files, and 613/613 deterministic tests across 20 modules (594/594 package-context across 19 modules plus 19/19 host release-pipeline).
+
+C6 secondary-file/documentation QC and C7 integrated source validation are complete at 617/617 tests across 20 modules. C8 source validation is complete at 619/619 (598/598 package-context + 21/21 host release-pipeline) for `bc250-llm-server-0.14.1-1`. The C5-D freeze numbers above remain immutable predecessor evidence. The current execution order is:
+
+1. **C8 authoritative Fedora build** — the regular release identity `bc250-llm-server-0.14.1-1` is already assigned across authoritative surfaces; use the selected Fedora 44 GitHub Actions run as artifact authority. Local Fedora execution reproduces the same gate only as backup.
+2. **C9 device acceptance** — install exactly the selected C8 RPM and perform stock-core BC-250 acceptance.
+
+Do not execute the historical GFX A1/B/rollback/A2 campaign. Historical qualification narratives below remain evidence only and do not transfer PASS status to changed bytes.
+
 This is the development plan for continuing BC-250 qualification without repeatedly
 running one giant hardware campaign. The package already separates health,
 measurement, and qualification; the testing process should preserve that separation.
@@ -59,7 +70,7 @@ and skip the known-inactive agent lane, combined `apply all` / `refresh all` mus
 and unchanged required models may collapse to concise category summaries without hiding any real
 repair/download action. Do not make this fast by weakening GGUF provenance/SHA behavior.
 
-The current 0.13.1-1.9 source is a narrow corrective release over exact-device-tested 1.8. Exact-device 1.8 proved the Tika convergence/package-gate/provider/read-only benchmark fixes and captured a clean stock A1, then exposed two remaining issues before any GFX mutation: `mokutil` explicitly reported Secure Boot unsupported while the package classified the state as unknown, and ordinary non-root status/version treated inability to inspect root-owned Podman metadata as runtime uncertainty. Release 1.9 recognizes that explicit unsupported state as `disabled-unsupported` while retaining fail-closed behavior for enabled/unknown states, and labels non-root runtime identity `NOT INSPECTED` without degrading appliance health solely for missing privilege. Runtime/model/CU defaults, GFX1013 profile v0.2.1-alpha and A1/B/A2 policy remain unchanged. Because package identity changes, capture a fresh 1.9 A1 before B/A2. Configured Ruff/ShellCheck, `%check`, rpmlint, RPM payload validation and clean SRPM rebuild remain grouped under the authoritative Fedora `make release-gate`; Agent remains optional and broad model/runtime discovery stays closed.
+The current engineering phase establishes the stock-first core appliance from the frozen 0.13.1-1.9 source. Source-side qualification must prove stock Fedora AMDGPU/live-CU, runtime identity, package-gate/resilience, model, RAG and operations paths before later donor improvements are forward-ported. Configured Ruff/ShellCheck, `%check`, rpmlint, RPM payload validation and clean SRPM rebuild remain grouped under the authoritative Fedora release gate; Agent remains optional and broad model/runtime discovery stays closed.
 
 
 Revalidation diagnostics are evidence visibility, not new acceptance gates. Keep the 128 MiB
@@ -121,17 +132,17 @@ state changes. Restore state before moving to another lane.
 - RAG hidden-reasoning exhaustion with empty visible output is INCOMPLETE/retry only when no independent retrieval/semantic defect exists; repetition remains a quality failure.
 - Verification must distinguish a configured/initialized zram device from a `/dev/zramN` that is actually active swap, and must parse actual failed systemd unit rows.
 
-## Current 0.13.1-1.9 qualification boundary
+## Historical 0.13.1-1.9 qualification boundary — pre-clean-core evidence only
 
 Exact 0.12.2-0.8 device evidence is qualified and is the immediate predecessor baseline: upgrade/convergence PASS, `bc250 verify` 53/0/0/0, 40/40 live CU with exact saved-profile boot restoration, clean Open WebUI desired state, revalidation Infrastructure/Restoration PASS, RAG direct + OWUI product PASS, ordinary-user ACL/product journeys PASS, and correct optional-Agent PARTIAL coverage. The only layout REVIEW was runtime Python bytecode written under package-owned `/usr`.
 
 The pre-0.13.1 investigation attributed those writes to dispatcher-launched RAG/benchmark Python imports and proved `PYTHONDONTWRITEBYTECODE=1` prevents them. It also proved optional absent/cached models were semantically healthy despite `MISSING`/false `DRIFT` labels, and that graveyard source content must stay inert while an operator-manually registered historical model still follows normal Open WebUI testing-policy visibility. Those hygiene/model-state fixes shipped in the final 0.13.1-1.0 logic checkpoint and remain protected in 1.2. The 1.1 delta was the closed Sidechat 15–19 RAG/tooling/readiness/verification work described above; the 1.2 corrective delta narrows semantic substitution and hardens HTTP/swap diagnostics without changing qualified defaults; exact-device testing should therefore upgrade the exact 1.0 baseline to 1.2 and exercise only that bounded delta unless it exposes a regression.
 
-Exact-device 1.8 closed the four 1.7 blockers: upgrade/package convergence, Tika 4.1 gate extraction, provider-aware GFX dependencies and pristine benchmark-status read-only behavior all passed, package gate passed, and a fresh 1.8 stock A1 was captured with clean RPM/GRUB/service integrity. Stage 1B then found `mokutil` returning `This system doesn't support Secure Boot` on an EFI platform that kernel/boot evidence identifies as disabled/unsupported; 1.8 incorrectly returned `unknown` and correctly blocked mutation. The same device also proved ordinary users cannot inspect root-owned Podman container digests, causing false runtime-identity warnings while sudo status/doctor/verify were clean. Release 1.9 fixes only those boundaries. The 1.8 A1 remains useful historical performance evidence but is not authority for rebuilt 1.9; capture a fresh A1 before B/A2.
+Exact-device 1.8 closed the four 1.7 blockers: upgrade/package convergence, Tika 4.1 gate extraction, provider-aware GFX dependencies and pristine benchmark-status read-only behavior all passed, package gate passed, and a fresh 1.8 stock A1 was captured with clean RPM/GRUB/service integrity. Stage 1B then found `mokutil` returning `This system doesn't support Secure Boot` on an EFI platform that kernel/boot evidence identifies as disabled/unsupported; 1.8 incorrectly returned `unknown` and correctly blocked mutation. The same device also proved ordinary users cannot inspect root-owned Podman container digests, causing false runtime-identity warnings while sudo status/doctor/verify were clean. Release 1.9 fixes only those boundaries. The 1.8 A1 remains useful historical performance evidence only; do not execute the old B/A2 sequence for the clean-core line.
 
-For 1.6, the package-build gate is intentionally separate from device qualification. The operator-provided Fedora workstation sequence is authoritative for source cache, Ruff/ShellCheck, preflight, RPM `%check`, configured rpmlint, binary payload and clean SRPM rebuild. Device work should then focus on the changed safety boundary: 1.5 -> 1.6 upgrade with GFX disabled and, when applicable, prepared/enabled-state rollback; `bc250 doctor`; JSON status schemas; Secure Boot refusal; `prepare --check`; one-shot patched boot; exact BC-250 RADV identity; stale/new-stock-kernel Ollama guard; disable/reset; and final stock saved + next boot restoration. Do not turn this into another broad model tournament.
+Historical 1.6 device qualification covered the now-archived experimental GPU lifecycle in addition to the ordinary package/build boundary. Those experiment-specific procedures are not current clean-core work; consult archived release evidence only when investigating that historical artifact. Current qualification remains stock-core focused and follows the clean-core release handover.
 
-## 6. Recommended current work order
+## 6. Historical product-qualification lane reference — not the current clean-core milestone order
 
 ### Lane A — general operations / office availability / power
 
@@ -188,6 +199,7 @@ Use a **small production control set**, not every model:
 - one stateful benchmark only if its subsystem is about to be tested;
 - verify canonical `meta.json`, `results.jsonl`, `summary.json`, `summary.txt`;
 - verify result isolation and refusal to merge into a non-empty output directory;
+- for thinking-capable generation, require visible-response identity to hash only a non-empty visible `response`; thinking-only output is `INCOMPLETE` and never valid visible-output determinism evidence;
 - for mutating OWUI benchmarks, verify exact restoration and no secret leakage.
 
 Once the benchmark substrate is trusted, specialist lanes can reuse it without
@@ -306,7 +318,7 @@ Candidate qualification follows this funnel:
 load / resource / backend-aware completion integrity
 -> tiny semantic sanity (`bc250 benchmark usecase`)
 -> optional 4K/16K context performance where useful
--> gfx1013/runtime stability
+-> GPU/runtime stability
 -> optional sustained thermal/CU testing for finalists
 -> full semantic + product-path + coexistence qualification
 -> restoration/integrity verification
@@ -319,9 +331,7 @@ correctness reference; compare compressed KV types model-by-model rather than ch
 global default. Do not force F16 or 32K when they make the candidate's intended envelope
 infeasible.
 
-For affected hybrid/SSM/direct-llama paths on gfx1013, compare runtime-default ubatch
-against `384` as a conservative control only when warranted by the path. Do not set 384
-globally from external GFX10 reports. Current CU/governor policy remains unchanged.
+Current CU/governor policy remains unchanged; runtime tuning changes require direct BC-250 evidence rather than external GPU-family assumptions.
 
 First establish current production `usecase` and representative generation/resource
 metrics with normal task+embedding topology present. Only candidates that survive the

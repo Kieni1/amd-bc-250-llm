@@ -1,5 +1,24 @@
 # BC-250 validation matrix
 
+## Current clean-core execution summary
+
+This section is current authority. The older qualification table below is preserved as historical evidence and must not be read as an instruction to recreate the removed GFX campaign.
+
+| Area | Current status | Next authority |
+|---|---|---|
+| Clean-core source through C5-D | PASS — immutable C5-D freeze `25be3783…`, canonical manifest `e43ab024…`, 362 files | do not redefine C5-D |
+| Deterministic source gate | PASS — C8 619/619 across 20 modules; package-context 598/598 + host release-pipeline 21/21 | authoritative Fedora 44 GitHub build next |
+| RPM package-context lane | PASS — C7 598/598 across 19 modules; immutable C5-D predecessor 594/594 | remains part of C8 build validation |
+| Host release-pipeline lane | PASS — 19/19 | remains preflight/build-host evidence |
+| C6 secondary documentation/QC | PASS | C7 integrated source gate — PASS |
+| C7 integrated source gate | PASS | C8 authoritative Fedora build |
+| Fedora RPM/SRPM build | PENDING | identity `0.14.1-1` assigned; selected Fedora 44 GitHub Actions workflow-dispatch run becomes artifact authority |
+| BC-250 device acceptance | PENDING | C9, on the exact selected C8 RPM |
+
+Current clean-core order is `C8 authoritative build -> C9 exact-RPM device acceptance`. Do not run historical 1.9 GFX A1/B/rollback/A2 instructions. GitHub Actions is the primary RPM artifact path; matching local Fedora execution is backup/reproduction only.
+
+## Historical qualification matrix — evidence only
+
 This file tracks **what kind of evidence exists** and what still needs qualification.
 It is development memory, not an installed operator contract. Do not convert `historical`
 into `current` merely because a past run was successful.
@@ -19,7 +38,7 @@ Status vocabulary:
 - **PENDING** — no sufficient evidence yet.
 - **N/A** — that validation class does not apply.
 
-Current source baseline while this file was refreshed: `0.13.1-1.9`. The exact-device optimization baseline is installed `bc250-llm-server-0.13.1-1.0.fc44.x86_64`: the 0.12.2-0.8 -> 0.13.1-1.0 upgrade/convergence passed, `bc250 verify` was 53/0/0/0, Open WebUI desired state and RAG were clean, the board-specific saved/live CU routing profile matched at 40/40 with no `D!` cells, operator-added registrations were preserved, settled swap/PSI were zero, and final `rpm -V` was clean. Forty routed CUs are evidence for this board, not a universal product-health threshold.
+Historical source baseline when this section was originally refreshed: `0.13.1-1.9`. The exact-device optimization baseline is installed `bc250-llm-server-0.13.1-1.0.fc44.x86_64`: the 0.12.2-0.8 -> 0.13.1-1.0 upgrade/convergence passed, `bc250 verify` was 53/0/0/0, Open WebUI desired state and RAG were clean, the board-specific saved/live CU routing profile matched at 40/40 with no `D!` cells, operator-added registrations were preserved, settled swap/PSI were zero, and final `rpm -V` was clean. Forty routed CUs are evidence for this board, not a universal product-health threshold.
 
 The optimization program is closed through Sidechat 19. Sidechat 15 found no residency/keep-alive/swappiness change worth packaging. Sidechat 16 kept 32K context and advanced q4_0 only as a candidate. Sidechat 17 kept parallel=1, flash attention enabled, automatic `num_batch`, full GPU offload and current governor policy. Sidechat 18 found `TOP_K=4` independently valid. Sidechat 19 rejected the combined q4_0 + TOP_K=4 arm because Advanced/Qwen repeatedly exhausted the 6144-token reasoning budget with empty visible output under q4_0, including one repetition defect; memory/OOM/GPU/kernel safety did not explain the failure. Therefore 1.1 selected production `q8_0` + `TOP_K=4`, and 1.2 preserves that exact runtime/RAG decision.
 
@@ -29,7 +48,7 @@ The 1.1 source delta was tooling/product-hygiene focused: semantic optional/defa
 | Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
 |---|---|---|---|---|
 | repository/unit validation | SOURCE CANDIDATE — 1.7 adds focused regressions for reboot-aware GFX A/B evidence, conservative promotion screening, evidence inventory/cleanup, version reporting and completion packaging; no RPM build claim is made in this workspace | OPERATOR FEDORA GATE | exact 0.13.1-1.5 remains the last operator-confirmed built package checkpoint; 1.6 is the source predecessor | run the operator-provided Fedora release gate, then preserve its exact log/artifact hashes |
-| RPM build/install | source metadata targets 0.13.1-1.9; authoritative RPM/SRPM build, `%check`, rpmlint, payload validation and clean SRPM rebuild are intentionally external | PENDING/EXTERNAL | exact 0.13.1-1.7 reached healthy stock state after remediation but was HOLD due D1-D4; A1 was captured but is package-identity-bound | build exact 0.13.1-1.9; retain the passed 1.8 Tika/package/provider/read-only regressions, verify disabled-unsupported Secure Boot detection and non-root NOT INSPECTED UX, then capture fresh 1.9 A1 before GFX B/rollback/A2 |
+| RPM build/install | source metadata targets 0.13.1-1.9; authoritative RPM/SRPM build, `%check`, rpmlint, payload validation and clean SRPM rebuild are intentionally external | PENDING/EXTERNAL | exact 0.13.1-1.7 reached healthy stock state after remediation but was HOLD due D1-D4; A1 was captured but is package-identity-bound | HISTORICAL ONLY — this was the old 1.9/GFX sequence and must not be executed for clean-core releases |
 | normal service topology | SOURCE PASS — canonical normal/degraded/stopped/agent classifier retained; status version probing follows an active lane | external | EXACT 2.3 — normal/degraded/agent convergence UX accepted; final failed units 0 and verifier clean | preserve; next work is OWUI application behavior rather than topology replay |
 | office HTTP readiness | SOURCE PASS — installer/verifier/revalidation/OWUI benchmarks distinguish HTTP/API readiness from mere service activity | external | EXACT 2.2 — Open WebUI/nginx recovered after restart and after supported reboot; Open WebUI service became active before HTTP readiness by ~20 s | preserve HTTP-based readiness; no new health framework required |
 | Open WebUI product surface / desired state | SOURCE PASS — graveyard source content is inert; a manually registered historical model follows its normal testing-policy visibility (admin/hidden where defined) without becoming a default-product requirement | external | EXACT 0.12.2-0.8 — desired state/auth/ordinary-user ACL and product journeys PASS | exact 1.2 corrective delta: preserve operator registrations, require default mappings clean, and verify historical/testing-policy visibility without treating extras as package drift |

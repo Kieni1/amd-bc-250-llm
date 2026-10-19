@@ -1,3 +1,5 @@
+> **HISTORICAL RELEASE EVIDENCE — NOT CURRENT CLEAN-CORE AUTHORITY.** Preserve for provenance; do not execute these instructions unless a current authority file explicitly reopens them.
+
 # BC-250 0.12.1-0.4 RAG lifecycle testing handover
 
 ## Purpose

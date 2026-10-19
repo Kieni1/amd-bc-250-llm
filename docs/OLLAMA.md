@@ -72,11 +72,15 @@ identity: those strings can change while canonical model names, sizes and digest
 checks therefore use the supported runtime version and stable model/digest provenance rather than old textual
 serialization.
 
-The package continues to use the experimental Vulkan backend on BC-250. Current
-Ollama Linux guidance still supports `OLLAMA_VULKAN=1` and
-`GGML_VK_VISIBLE_DEVICES`. For more accurate Vulkan free-memory information the
-upstream docs suggest `cap_perfmon`; this package does **not** grant that capability
-automatically. An operator may test it deliberately after locating the real binary:
+The package continues to use the experimental Vulkan backend on BC-250. The stock clean-core verifier requires the effective main Ollama service environment to contain all three package settings:
+
+```text
+OLLAMA_VULKAN=1
+OLLAMA_IGPU_ENABLE=1
+GGML_VK_VISIBLE_DEVICES=0
+```
+
+These settings select the intended stock Vulkan/iGPU path and are part of the normal appliance configuration. For more accurate Vulkan free-memory information the upstream docs suggest `cap_perfmon`; this package does **not** grant that capability automatically. An operator may test it deliberately after locating the real binary:
 
 ```bash
 command -v ollama

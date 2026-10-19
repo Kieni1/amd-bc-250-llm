@@ -1,9 +1,9 @@
 # Package gate and resilience qualification
 
-Release 0.13.1-1.8 retains the package-owned qualification control added in 1.4 without reopening the
-closed model/runtime optimization program. Release 1.6 additionally binds gate/resume authority to the
-running kernel, qualification-relevant configuration and stable GFX1013 identity so evidence cannot be
-silently reused after those inputs change. The authoritative result taxonomy is:
+Package-gate and resilience authority is bound to the exact installed package, running kernel and
+qualification-relevant generic configuration so evidence cannot be silently reused after those inputs
+change. Evidence created under an incompatible schema is not resume-compatible. The authoritative
+result taxonomy is:
 
 ```text
 0    PASS / ACCEPT
@@ -33,15 +33,11 @@ Tika 4.1 service/version/extraction checks, one bounded authenticated Open WebUI
 RAG ingest/retrieve smoke with cleanup, and a high-confidence secret scan.
 
 The gate directory contains `gate.json`, raw evidence, and a closed
-`SHA256SUMS`. Release 1.6 uses `bc250.package-gate.v2` and records a
-`qualification_identity` containing the exact installed RPM, running kernel,
-qualification-relevant configuration-tree hashes and a stable subset of
-`bc250 gfx1013 status --json`. GFX1013 `DISABLED` and `ENABLED` are stable gate
-states; `PREPARED`, `PATCHED_BOOT_UNVERIFIED` and `STALE_KERNEL` are controlled
-`INCOMPLETE` states, while broken/rollback-required GFX state is a product
-defect. Any unlisted/missing file, checksum mismatch, unknown schema, non-PASS
-authoritative result, or later identity drift is rejected by the resilience
-manager.
+`SHA256SUMS`. The clean core uses `bc250.package-gate.v3` and records a
+`qualification_identity` containing the exact installed RPM, running kernel and
+qualification-relevant configuration-tree hashes. Any unlisted/missing file,
+checksum mismatch, unknown schema, non-PASS authoritative result, or later
+package/kernel/configuration identity drift is rejected by the resilience manager.
 
 ## Tika 4.1 qualification boundary
 
@@ -104,9 +100,9 @@ package-managed normal topology/swap state, persists campaign state, and exits
 
 On `resume`, source/tool hashes, the installed RPM identity, package-gate closed
 manifest, plan hash and the recorded qualification identity are checked before
-lane execution. A package change, kernel change, relevant configuration change
-or stable GFX1013 identity change invalidates the old evidence and produces a
-controlled `INCOMPLETE` evidence gap instead of continuing a stale campaign.
+lane execution. A package change, kernel change or relevant configuration change
+invalidates the old evidence and produces a controlled `INCOMPLETE` evidence gap
+instead of continuing a stale campaign.
 Missing artifacts likewise produce controlled `INCOMPLETE` evidence-gap state
 rather than tracebacks.
 `DEFECT` and `SAFETY` are terminal and require a new candidate/campaign. After
@@ -128,12 +124,11 @@ sudo bc250 qualification clean --older-than-days 30 --keep-latest 2
 sudo bc250 qualification clean --older-than-days 30 --keep-latest 2 --apply
 ```
 
-The inventory covers package-gate artifacts, resilience campaigns and GFX1013 A/B
-campaigns. It reports result, current/stale applicability, size and path. Applicability
-is derived from the same package/kernel/config/GFX identity authorities where those
-artifacts provide them; GFX A/B applicability also rechecks the currently registered
-Ollama model digests. If the model service/identity cannot be established, applicability
-is `UNKNOWN`, never promoted to current by assumption.
+The inventory covers package-gate artifacts and resilience campaigns. It reports result,
+current/stale applicability, size and path. Applicability is derived from the exact
+package/kernel/configuration qualification identity recorded by those artifacts. If the
+current qualification identity cannot be established, applicability is `UNKNOWN`, never
+promoted to current by assumption.
 
 Cleanup is dry-run by default. `--apply` requires root, operates only on direct,
 non-symlink children of package-owned evidence roots, preserves nonterminal evidence,

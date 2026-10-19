@@ -13,8 +13,9 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250` | Canonical appliance dispatcher |
 | `bc250 install` | Apply/resume appliance setup |
 | `bc250 status` | Concise read-only appliance status; `--json` is machine-readable |
-| `bc250 version` | Exact installed package/runtime/GFX identity; `--json` is machine-readable |
-| `bc250 doctor` | Read-only appliance diagnostics; `--json` is machine-readable |
+| `bc250 version` | Exact installed package/runtime identity; `--json` is machine-readable |
+| `bc250 health` | Read-only appliance health diagnostics; `--json` is machine-readable |
+| `bc250 doctor` | Compatibility alias for `bc250 health` |
 | `bc250 verify` | Detailed local verification |
 | `bc250 support-bundle` | Redacted support evidence archive |
 | `bc250 storage` | Report/dedupe/prune package-owned storage |
@@ -30,7 +31,6 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250 package-gate` | Capture a closed authoritative release gate |
 | `bc250 resilience` | Run/resume bounded resilience lanes 20–26 |
 | `bc250 qualification` | Inventory or conservatively prune package-owned qualification evidence |
-| `bc250 gfx1013` | Opt-in exact-kernel GFX1013 compute lifecycle |
 | `bc250 agent-mode` | Enter/leave/status exclusive Agent mode |
 | `bc250 code`, `bc250 code-commit`, `bc250 gitea-review` | Optional coding-agent workflows |
 | `bc250 compare-mtp`, `bc250 fetch-mtp`, `bc250 run-mtp` | Optional MTP workflows |
@@ -42,9 +42,9 @@ Use `bc250 --help` for the grouped command list. Commands that modify host or se
 
 ### Qualification evidence inventory
 
-Use `bc250 qualification list [--json]` to inventory package-gate, resilience and
-GFX1013 benchmark evidence. `bc250 qualification clean` is dry-run by default and
-selects only old terminal evidence while retaining the newest records per class; add
+Use `bc250 qualification list [--json]` to inventory package-gate and resilience
+evidence. `bc250 qualification clean` is dry-run by default and selects only old terminal
+evidence while retaining the newest records per class; add
 `--apply` only after reviewing the exact paths. Symlinked or out-of-root paths are
 refused.
 
@@ -104,52 +104,6 @@ core installation/verification from package-owned Open WebUI state and reports t
 longer hidden behind an unconditional whole-install success message. Completion then prints a plain
 `OVERVIEW` followed by an amber `NEXT STEPS` block for CU routing, model reconciliation and validation.
 
-### Experimental GFX1013 compute profile
-
-The supported operator lifecycle is `bc250 gfx1013 {status|prepare|enable|disable|reset|benchmark}`.
-It ships default-off as profile `v0.2.1-alpha`, pinned to upstream `0.2.0-alpha`
-commit `d3e6dc062c34d2523db0abe5741d1f5b0dea00d9`. Use the non-destructive checks
-before making boot changes:
-
-```bash
-sudo bc250 gfx1013 status
-sudo bc250 gfx1013 status --json
-sudo bc250 gfx1013 prepare --check
-sudo bc250 gfx1013 disable --check
-sudo bc250 gfx1013 reset --check
-```
-
-Preparation is exact-kernel and refuses enabled/unknown Secure Boot because this
-package does not sign or enroll the locally built `amdgpu` module. Stock boot
-remains the saved default while a verified patched entry is staged for one boot
-only. `enable` is permitted only after that marked patched boot; it proves that
-the private ICD exposes the exact BC-250 `1002:13fe` through RADV and scopes the
-override to `ollama.service`. A systemd boot-marker condition plus privileged runtime guard fails `ollama.service`
-closed after a later stock/stale-kernel boot until the operator rolls back or
-reprepares, preventing that private RADV path from reaching the wrong kernel.
-
-
-Release 1.7 also exposes a reboot-aware evidence screen without automating lifecycle
-transitions:
-
-```bash
-sudo bc250 gfx1013 benchmark stock
-# prepare -> patched reboot -> enable
-sudo bc250 gfx1013 benchmark gfx
-# disable -> stock reboot
-sudo bc250 gfx1013 benchmark restored
-sudo bc250 gfx1013 benchmark report
-```
-
-A2 is required before the helper can emit `PROMOTION_CANDIDATE`. The result remains
-advisory and never changes the default-off policy.
-
-`status` reports `DISABLED`, `PREPARED`, `PATCHED_BOOT_UNVERIFIED`, `ENABLED`,
-`STALE_KERNEL`, `ROLLBACK_REQUIRED` or `BROKEN`. `disable`, recovery `reset`, RPM
-upgrade and final erase all fail closed until a safe stock saved/default **and
-next** boot path is restored and verified. See [`GFX1013.md`](GFX1013.md) for
-the complete state machine, recovery and Secure Boot policy.
-
 ### Models
 
 The model manager deliberately separates read-only discovery/state inspection from
@@ -205,10 +159,16 @@ lifecycle action.
 #### Lifecycle operations
 
 `apply` means **make the selected model match the current catalog definition**. `all` has
-two different positions by design: the category `all` means the combined catalog, and the
+two different positions by design: the category `all` means the combined catalog, while the
 selection `all` means every eligible entry. Therefore `sudo bc250 model apply all` displays
 the combined catalog and prompts, while `sudo bc250 model apply all all` explicitly selects
-every eligible non-MTP model. It reuses
+every eligible non-MTP model.
+
+For routine interactive model management, use `sudo bc250 model install`; it shows the
+combined non-MTP catalog with current state, accepts model numbers, ranges, or groups, and
+pressing Enter cancels with no changes.
+
+It reuses
 a verified existing GGUF when source identity and recorded state still match, repairs
 Modelfile/registration drift without an unnecessary download, and downloads only when the
 source is missing or invalid. Agentic selections temporarily enter exclusive agent mode
@@ -421,8 +381,9 @@ See [`HARDWARE.md`](HARDWARE.md) before changing GPU routing.
 ```bash
 sudo bc250 status
 sudo bc250 status --json
-sudo bc250 doctor
-sudo bc250 doctor --json
+sudo bc250 health
+sudo bc250 health --json
+sudo bc250 doctor          # compatibility alias
 sudo bc250 support-bundle
 sudo bc250 verify
 sudo bc250 verify --summary
@@ -443,10 +404,10 @@ sudo bc250 package-gate capture --candidate-rpm /path/to/candidate.rpm --token-f
 sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
 
-`sudo bc250 status --json` emits schema `bc250.status.v2` with installed package, kernel,
-service topology, memory/swap/PSI, failed-unit, restart-diagnostic and GFX1013
-state. `bc250 doctor` layers read-only PASS/WARN/FAIL diagnostics over that state,
-including `rpm -V`, runtime topology, memory headroom, GFX/Secure-Boot state and
+`sudo bc250 status --json` emits schema `bc250.status.v3` with installed package, kernel,
+service topology, runtime identity, memory/swap/PSI, failed-unit and restart-diagnostic
+state. `bc250 health` layers read-only PASS/WARN/FAIL diagnostics over that state (`bc250 doctor` remains a compatibility alias),
+including `rpm -V`, runtime topology, runtime identity, memory headroom and
 exact running-kernel `kernel-devel` availability; run it with `sudo` to include
 the full package verifier.
 
@@ -1211,7 +1172,5 @@ Release 1.8 distinguishes package configuration from live container identity. `b
 Release 1.9 keeps that privileged verification unchanged but fixes the non-root view. Because the package-owned Podman containers live in root's store, an ordinary user cannot authoritatively inspect their image digests. Non-root status/version therefore report `NOT INSPECTED (requires sudo)` and do not degrade appliance health solely for missing privilege. Run the same command with `sudo` when exact observed version/digest identity is required.
 
 `sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
-
-`bc250 doctor` reports **Overall appliance health** separately from **Optional GFX1013 readiness**. Secure-Boot/kernel-devel uncertainty for the default-off experimental path does not by itself make a healthy stock appliance unhealthy.
 
 When the optional `needs-restarting` helper is absent, status reports `Restart advisory: not evaluated (optional helper unavailable)` rather than treating that absence as a health failure.

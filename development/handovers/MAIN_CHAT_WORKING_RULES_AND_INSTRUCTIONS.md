@@ -1,439 +1,279 @@
-# BC-250 main integration — working rules and operating instructions
+# BC-250 main-chat working rules and instructions — clean-core reconstruction
 
-Current release target: `bc250-llm-server-0.13.1-1.3`
+## 1. Start from current authority
 
-These rules are intentionally currentized for the greenfield-clean package.
+The frozen 1.9 ZIP is the reconstruction base. The 2.2 line is donor/reference evidence. Do not let older momentum redefine current scope.
 
-## 1. Authority
+## 2. One canonical working tree
+
+At any moment there is exactly one current clean-core source tree.
+
+Tests, patches, generated archives, documentation and handovers must all derive from that tree.
+
+Do not patch one ZIP while validating another.
+
+## 3. Freeze before editing
+
+For every externally supplied baseline or donor artifact:
+
+- record filename/commit/tag;
+- calculate SHA-256 where practical;
+- extract once into a working tree;
+- do not mutate the frozen original;
+- state which artifact is authority for each claim.
+
+## 4. Work in explicit phases
+
+Current phases:
+
+```text
+BASELINE
+REMOVE-GFX
+CORE-REGRESSION
+DONOR-PORT
+QC
+SOURCE-FREEZE
+FEDORA-BUILD
+DEVICE-ACCEPTANCE
+```
+
+Do not mix GFX removal and a large donor feature port in the same unreviewable change.
+
+## 5. Current clean-core checkpoint rule
+
+Accepted immutable C5-D freeze:
+
+```text
+amd-bc-250-llm-clean-core-C5-D.zip
+SHA-256: 25be3783716451c84f54209ae16a38c5de1ef1675c4b579fd02cfff08865c710
+canonical manifest: e43ab0244de09bc4fc1981db36d956860e6d01715566fe91a9597c869b59e651
+source files: 362
+613/613 deterministic tests across 20 modules
+```
+
+Immediate accepted source predecessor: **C7 — PASS** (integrated source gate complete). Current C8 source identity: **bc250-llm-server-0.14.1-1 — SOURCE-READY; authoritative GitHub build pending**.
+
+C7 source predecessor: **C6**. Immutable behavioral predecessor: **C5-D**. Release-hardening predecessor: **C5-C**. Classification predecessor: **C4**. Clean-core structural predecessor: **C3-R1**. C5-D adds only the ledger's benchmark-semantics correction; HOLD/DROP work remains unimplemented.
+
+```text
+C0: PASS
+C1: PASS
+C2: PASS
+C3: PASS
+C4: PASS
+C5-A: PASS
+C5-B: PASS
+C5-C: PASS
+C5-D: PASS
+C6: PASS
+C7: PASS
+C8: SOURCE-READY (0.14.1-1; GitHub build pending)
+```
+
+The original C3 proposition is rejected historical review evidence only. Do not resume correction work from it, and do not redo the structural GFX removal. C3-R1 closes the reviewed blockers: the public `version` command is execution-tested, `kmod` is restored for stock verification, current guidance is reconciled, and the refined structural gates are part of preflight.
+
+C4 is complete in `04_DONOR_DELTA_1.9_TO_2.2_AND_FORWARD_PORT_LEDGER.md`: every exact 1.9 -> 2.2 changed path is classified as KEEP / REWORK / DROP / HOLD. C5-A is complete with the low-risk correctness/supportability cluster. C5-B is complete with the classified model/installer UX cluster: interactive combined-catalog `model install` with hard no-mutation cancellation; grouped installer completion; desired/observed Ollama reconciliation; one RPM next action; TTY/`NO_COLOR` handling; and a `health` compatibility surface reworked onto the current doctor v3 contract. C5-C is complete with the GitHub-primary release/build-hardening cluster: frozen Source0/spec inputs, Git-tracked-only Source0 authority in worktrees, clean-source identity recheck with `HEAD == GITHUB_SHA` on authoritative Actions runs, deterministic build/cache exclusions, a core-only release contract, unprivileged Fedora builds, package-context test layering, split checksum manifests, transformed payload proof, and machine-readable release evidence. C5-D is complete with the benchmark-semantics correction: visible response identity is separate from hidden thinking, thinking-only/empty visible output is not hashable determinism evidence, and no-visible-answer generation measurements are `INCOMPLETE` without weakening thresholds.
+
+Current C8 source deterministic baseline: **619/619** across 20 modules (598/598 package-context across 19 modules + 21/21 host release-pipeline). C7 remains the frozen 617/617 source predecessor; the accepted C5-D freeze remains 613/613 and is not redefined.
+
+Active next action: **C8 — authoritative Fedora 44 GitHub Actions build.** The new unused identity **0.14.1-1** is assigned across source authority. Ordinary push/PR runs are CI evidence; only an explicitly selected workflow-dispatch run becomes release artifact authority and emits the C9 selection record. Do not import HOLD/DROP work, runtime upgrades, context-ceiling conclusions, or device work. Keep source/build/device evidence separate and do not inherit 2.2 qualification.
+
+## 6. KEEP / DROP / REWORK is mandatory
+
+Every meaningful later-line change considered for forward-port must be classified before implementation.
+
+A useful idea implemented inside GFX code is `REWORK`, not `KEEP by cherry-pick`.
+
+## 7. Exact regression before fix
+
+When a defect is known, reproduce it or encode its exact state before changing code where practical.
+
+For removal work, preserve before/after evidence for important package surfaces and public commands.
+
+## 8. Test behavior, not only strings
+
+For stateful commands assert:
+
+```text
+starting state
+command/action
+return code
+resulting state
+human output
+machine output if applicable
+mutation/no-mutation
+```
+
+## 9. Test the next failure before handoff
+
+After the requested change passes, ask what the operator will do next and test the likely deterministic failure class before handing off.
+
+This rule caught multiple avoidable 2.x external iterations and remains binding.
+
+## 10. Secondary-file audit is part of implementation
+
+A code change is incomplete until relevant secondary surfaces are reviewed:
+
+- README/TLDR;
+- topic docs;
+- changelog/current workbench state;
+- development scope;
+- release/build contracts;
+- RPM spec/manifests;
+- help/completion;
+- tests/fixtures;
+- handovers/scripts.
+
+Historical evidence must not be rewritten to pretend it originally emitted new behavior.
+
+## 11. First-failure discipline
+
+Preserve the first authoritative failure and classify it before stacking speculative fixes.
+
+Do not turn a reviewer-script false failure into a product fix. The GFX PREPARED queue-attestation incident is the canonical reminder.
+
+## 12. Source/build/device authority are distinct
 
 Use:
 
 ```text
-current explicit user instruction
-  >
-newest source/workbench archive or Git commit
-  >
-exact installed-device evidence for that exact revision
-  >
-current validation/build evidence
-  >
-current handovers
-  >
-older logs/chats/history
+SOURCE-VALIDATED
+BUILD-VALIDATED
+DEVICE-VALIDATED
 ```
 
-Do not let an old handover reintroduce removed compatibility interfaces.
+Never inherit an exact-artifact PASS across changed bytes.
 
-## 2. Greenfield is a product rule
+## 13. Timeouts are not failures or passes
 
-This package does not need to preserve obsolete command/API surfaces merely because older releases exposed them.
+If a monolithic suite exceeds the environment window:
 
-Compatibility has to justify its maintenance cost.
+- report the timeout honestly;
+- rerun deterministic modules in bounded batches;
+- record actual module/test outcomes;
+- do not label the timeout as a product regression.
 
-Current examples of deliberate removals:
+This bounded-batch method proved useful during the 2.2 UX QC pass and should remain standard.
 
-- public per-command `bc250-*` alias forest;
-- legacy public RAG importer alias;
-- old RAG plan/sync compatibility commands;
-- replacement-AMDGPU 40-CU module/patch workflow;
-- trivial model setup wrappers;
-- installed engineering candidate-screen tree;
-- standalone temperature and LAN wrappers;
-- redundant uninstall/reset aliases;
-- duplicate installed documentation hierarchy.
+## 14. Public/private output boundary
 
-If an old caller breaks, first ask whether the caller should be updated to the canonical interface rather than restoring the alias.
+Human-facing output should be readable and action-oriented.
 
-## 3. Canonical public/private boundary
+Machine-readable/diagnostic output must preserve exact identifiers.
 
-Public:
+TTY color rules:
 
-```text
-bc250 COMMAND
-bc250-cu-live-manager
-bc250-40cu status
-llm-run-diagnose
-```
+- green: successful/ready/verified;
+- amber: warning/action required;
+- red: failure/blocked/recovery;
+- cyan: informational/off/no-change/cancelled;
+- respect `NO_COLOR`;
+- do not emit ANSI escapes to JSON, pipes or non-TTY captures.
 
-Private implementation:
+Color is supplemental; text must remain sufficient without it.
 
-```text
-/usr/libexec/bc250-llm-server/
-```
+## 15. One-next-action rule
 
-Do not expose private helpers simply to make source code easier to call.
+When operator action is required, normal output should end with one authoritative next action wherever possible.
 
-Source/runtime code that needs a private helper should call the package-owned libexec path or use its own internal resolution mechanism.
+Do not present optional work as if it competes with a required step.
 
-## 4. RAG is product-relevant
+## 16. Return codes are API
 
-RAG/Tika is active scope.
+Tests and docs must agree with command return codes. A friendly message cannot silently change script semantics.
 
-Do not treat it as an optional historical experiment.
+## 17. No-mutation promises require proof
 
-Canonical user path:
+If output says `No changes were made`, compare relevant files/state/service/boot metadata in tests.
 
-```text
-bc250 rag
-```
+## 18. Package changes trigger package review
 
-Retain:
+Any spec/install/uninstall change requires at least:
 
-- extraction;
-- ingestion;
-- embedding;
-- retrieval;
-- answer generation;
-- cleanup/restoration;
-- product docs;
-- benchmark/revalidation coverage appropriate to the product.
+- packaging tests;
+- source/install manifest checks;
+- scriptlet review;
+- syntax/static checks;
+- release-pipeline/preflight checks;
+- current docs/handovers update.
 
-Do not restore the old public importer alias.
+## 18A. RPM build authority
 
-## 5. Structured output is role-specific
+The primary RPM build path is the Fedora 44 GitHub Actions workflow in `.github/workflows/build-rpm.yml`, which runs the repository release gate and publishes binary/source RPM artifacts.
 
-Do not create one global structured policy.
+Local builds are backup/reproduction only. Use `scripts/ci-local.sh` or the same `make release-gate` in a matching Fedora 44 environment when GitHub is unavailable or when reproducing a CI failure. Do not reintroduce the 2.2 local-only `build-local.sh --full` authority model.
 
-Current decision:
+## 19. Lint is real evidence
 
-```text
-Standard:
-  schema format + temperature 0.0 + normal thinking
+Run Ruff/ShellCheck when available. If unavailable locally, say so and leave the authoritative Fedora lint gate pending.
 
-Documents:
-  schema format + temperature 0.0 + normal thinking
+Do not convert missing tooling into a green lint claim.
 
-Advanced Structured:
-  explicit preset + think=false
+## 20. Greenfield freedom is intentional
 
-Advanced normal:
-  think=true
+The project may remove previously engineered complexity when the product tradeoff is poor.
 
-Deep:
-  unchanged
-```
+Deep qualification is evidence, not a sunk-cost mandate.
 
-Do not implement prompt-text heuristics such as `"return JSON" -> think=false`.
+## 21. GFX policy for the core
 
-## 6. OWUI payload layer is not the policy layer
+Current mainline policy:
 
-OWUI already correctly supports the effective parameter types needed by the product.
+> The core package is being reconstructed with no GFX1013 ownership.
 
-Do not patch generic `payload.py` to encode BC-250 role policy.
+Do not add compatibility shims, dormant enums or optional GFX fields “just in case” unless the operator explicitly requests a core/extension integration contract later.
 
-Correctly placed request/model params can override workspace baseline in the investigated merge path.
+The standalone GFX repository is separate.
 
-Product policy should be explicit in the product request/preset construction.
+## 22. Preserve normal AMD functionality
 
-## 7. Translation is closed unless new product evidence appears
+Do not equate `amdgpu`, Vulkan or CU-routing references with GFX1013 automatically.
 
-Keep Translate-Gemma.
+Stock AMDGPU and existing live CU routing remain core features when they do not rely on the experimental replacement module/private RADV path.
 
-Keep the fail-closed modality guard.
+## 23. Model workflow rules
 
-Document the known raw-model `sollten -> doivent` limitation.
+Keep production defaults conservative while allowing explicit experimentation.
 
-EuroLLM Round 1 met the stop criterion because `muss nicht` reproducibly switched to English.
+For `model install` forward-port the accepted safe-cancel UX:
 
-Do not run Round 2.
+- Enter can cancel;
+- cancellation does not mutate model state;
+- final output should confirm `Cancelled — no changes made.`;
+- use `Experimental models:` rather than the grammatical error `Experiments models:`.
 
-Do not promote the EuroLLM model.
+Do not automatically rename the established `Agentic` category.
 
-## 8. Agent is optional
+## 24. Benchmark output semantics
 
-Missing Agent:
+Thinking-capable model APIs may separate `thinking` from visible `response`.
 
-```text
-coverage unavailable / skipped / partial
-```
+A determinism test must explicitly define what identity is being checked. Do not hash an empty `response` and call it visible-output stability when the model consumed its budget in `thinking`.
 
-not:
+Do not weaken thresholds to make a benchmark pass; fix the measurement definition.
 
-```text
-core infrastructure failure
-```
+## 25. Documentation truth
 
-If installed, it must still work correctly.
+Current docs describe current behavior. Historical docs describe historical behavior and are clearly labeled.
 
-## 9. CU normal workflow is only two public actions
+When removing GFX, do not leave current docs telling operators to run GFX commands that no longer exist.
 
-Configure:
+## 26. Artifact delivery
 
-```bash
-sudo bc250-cu-live-manager
-```
+For substantial checkpoints provide:
 
-Verify:
+- exact source archive;
+- SHA-256;
+- concise handover;
+- patch/diff when useful;
+- explicit confidence level and remaining gates.
 
-```bash
-sudo bc250-40cu status
-```
+## 27. No background promises
 
-The old patched-module architecture is removed.
+Do the work in the current interaction. Do not promise future completion outside a scheduled automation.
 
-Do not restore `prepare`, `enable`, `disable`, `restore`, `mask`, `unmask`, `live-*` or module patch packaging unless a new hardware requirement justifies it.
+## 28. Candidate handoff rule
 
-## 10. Documentation has canonical topic homes
+A candidate is not ready because the requested line changed successfully.
 
-Do not re-fragment the installed docs.
-
-Use:
-
-```text
-INSTALLATION
-HARDWARE
-OPERATIONS
-OPENWEBUI
-OLLAMA
-RAG
-QUALITY-CHECKS
-BENCHMARKING
-SECURITY
-HTTPS
-FILESTRUCTURE
-UNINSTALL
-```
-
-Repository-only packaging/development documentation should stay repository-only.
-
-## 11. Scope first
-
-Before broad source work:
-
-```bash
-python3 development/scope.py map <changed paths>
-python3 development/scope.py check
-```
-
-Frozen/archived trees are not routine reading material.
-
-If a greenfield cleanup intentionally crosses a frozen boundary, explicitly thaw/rebaseline it; do not silently modify the hash just to get green output.
-
-## 12. Existing code/harness first
-
-Before creating a new tester:
-
-1. inspect the current package implementation;
-2. inspect the existing authoritative harness/pattern;
-3. determine whether the requested question is already answered;
-4. extend proven auth/evidence/cleanup/archive behavior where possible;
-5. write a new harness only when there is a demonstrated gap.
-
-Do not create another HTTP client merely because writing one is easy.
-
-## 13. Evidence taxonomy
-
-Keep these separate:
-
-```text
-infrastructure/API
-routing/parameter propagation
-model behavior
-product policy
-harness/evaluator defect
-operator/environment state
-```
-
-A model-quality failure does not automatically mean runtime failure.
-
-A harness failure does not automatically mean product failure.
-
-## 14. Installed evidence vs source evidence
-
-Never say exact installed behavior is proved by source tests.
-
-Never say source semantics are proved merely because one installed run passed.
-
-Record exact NVR/source revision with real-device evidence.
-
-## 15. Model-output failures should normally be evidence
-
-For qualification runners:
-
-```text
-semantic mismatch
-invalid JSON
-budget exhaustion
-format failure
-wrong language
-```
-
-should normally be recorded as test results.
-
-They should not kill the whole harness unless the test explicitly defines the condition as infrastructure/safety failure.
-
-Harness/config/safety/cleanup/archive failures remain non-zero.
-
-## 16. Preserve raw evidence
-
-For meaningful runtime requests retain, where safe:
-
-- timestamp;
-- host/package/model/preset;
-- request path;
-- effective params;
-- response status;
-- raw response or safe raw stream;
-- parsed answer/reasoning;
-- usage/tokens;
-- timing;
-- routing/residency;
-- resource telemetry;
-- classification;
-- cleanup state.
-
-A later evaluator correction should be possible without rerunning the model.
-
-## 17. Secret hygiene
-
-Never include:
-
-- Open WebUI admin key;
-- user tokens;
-- passwords;
-- private environment secrets
-
-in evidence archives.
-
-Use exact-secret scans where the harness already supports them.
-
-The durable Open WebUI key belongs at:
-
-```text
-/var/lib/bc250-llm-server/secrets/openwebui-admin.key
-```
-
-## 18. User artifact preferences
-
-When the user asks for code/files:
-
-- prefer a single directly downloadable file when one file is sufficient;
-- if a change necessarily touches secondary tests/docs, provide all necessary changed files;
-- do not add unrelated files;
-- for a workbench/release/handover refresh, return one coherent ZIP;
-- do not create RPM/ZIP/release bundles unless explicitly requested.
-
-When the user asks for Git commits:
-
-- return only `git commit ...` commands if requested;
-- prefer fine-grained commits over broad commits;
-- include functional change with its directly related tests.
-
-When the user asks to review a script and says only return a fixed version if necessary:
-
-- thoroughly check it;
-- return a corrected file only if a functional/reliability issue exists;
-- otherwise say it is okay.
-
-## 19. No background promises
-
-Do the work in the current response/tool execution.
-
-Do not tell the user to wait for background work.
-
-For a large task, provide concise progress updates while working.
-
-## 20. Build/validation ownership
-
-Typical ownership:
-
-```text
-Fedora/GitHub build environment:
-  RPM/SRPM/package build with pinned upstream sources
-
-Developer workstation:
-  Ruff and local developer tooling
-
-BC-250:
-  hardware/CU
-  services
-  Ollama/models
-  Open WebUI
-  Tika/RAG
-  exact runtime qualification
-```
-
-If a tool/environment is unavailable, state that boundary rather than claiming it passed.
-
-## 21. Current external lint rule
-
-Ruff remains a workstation/CI gate when unavailable in the artifact execution environment.
-
-Known lessons include:
-
-```text
-F507 quote/% formatting mistakes
-UP031 stale %-format patterns
-F821 undefined names
-RUF100 stale noqa
-TRY004 wrong exception class
-SIM117 nested with
-I001 import ordering
-SIM114 duplicate branches
-FURB188/FURB192 modernization issues
-```
-
-Do not knowingly hand back a file with an obvious lint/syntax failure.
-
-## 22. Release closure rule
-
-After source changes that alter installed payload, public CLI, package sources or device behavior:
-
-- re-run deterministic/source/package gates;
-- rebuild the exact RPM;
-- install that exact RPM;
-- repeat only the device gates affected by the change plus final whole-appliance verification/revalidation.
-
-Do not replay historical model campaigns unrelated to the change.
-
-## 23. Current next main-chat objective
-
-The source design is largely settled.
-
-The next main-chat objective is exact final-RPM closure, not more model discovery.
-
-Focus on:
-
-```text
-build
-install/upgrade
-public/private CLI
-live-CU-only fresh behavior
-OWUI convergence
-RAG product smoke
-structured policy regression where final request construction changed
-revalidation
-final freeze/tag
-```
-
-## 24. 0.12.2-0.7 packaging/UX rule
-
-The 0.7 release intentionally turns the greenfield interface into a build-time contract. Do not add compatibility aliases back to satisfy an old caller. Update the caller, keep private helpers under libexec, and make actual RPM payload checks prove the installed surface. CI also owns configured `rpmlint` after build. Use the repo-local filter only for documented appliance policy/known false positives; fix new unfiltered findings instead of broadening the filter casually. The no-license-file state of the pinned live CU manager is a consciously unchanged project constraint for this release.
-
-## 25. 0.12.2-0.8 result-semantics rule
-
-Do not conflate execution completion, optional coverage, diagnostics, model quality and product safety controls. A six-phase revalidation that finishes normally is `completed` even when optional Agent coverage is PARTIAL. A raw translation can remain a model quality failure while the finalized Open WebUI product path passes because the integrity outlet detected and withheld unsafe output. Report both layers explicitly. Current CU UX names only live routing, saved boot profile and boot-restore service; do not revive performance-profile or patched-module terminology.
-
-## 26. 0.13.1 release hygiene rule
-
-Treat exact 0.12.2-0.8 as the qualified predecessor. For 0.13.1, keep `/usr` immutable during normal runtime, treat intentionally unselected optional models as OPTIONAL rather than broken, preserve DRIFT for selected models whose desired runtime state is unmet, and keep graveyard source assets inert while allowing an operator-manually registered historical model to follow its normal Open WebUI testing-policy visibility. Cleanup of retired registrations remains explicit through `bc250 model purge-retired`. Do not broaden the release into model/CU/RAG/dependency discovery.
-
-
-## 27. 0.13.1-1.3 Sidechat integration rule
-
-The Sidechat 15–19 optimization program is closed. Production remains 32K/q8_0,
-parallel=1, flash attention enabled, automatic `num_batch`, current full offload and
-existing keep-alives/Deep admission; only Documents/Open WebUI `TOP_K=4` is promoted.
-Do not reintroduce q4_0 as a default.
-
-Package evaluators must preserve the validated distinctions: grouped citations are
-member-aware; `INV-YYYY-NNNN` and `Invoice YYYY-NNNN` are equivalent office identifiers;
-semantic date/time and required numeric-value matching avoid literal/last-number false
-negatives; clean hidden-reasoning budget exhaustion with empty visible output is
-INCOMPLETE/retry when no independent defect exists; repetition remains a quality defect;
-and task persistence is authoritative over a missed transient residency sample.
-
-Verification must inspect the active swap set for zram and actual failed-systemd-unit
-rows. An initialized zram device is not healthy swap merely because `zramctl` can see it.
-Exact 1.2 device qualification starts only after the exact 1.2 RPM is built; until then,
-exact 1.0 device evidence remains the installed baseline rather than silently transferring.
+It is ready when implementation, direct tests, neighboring regressions, secondary files, source identity, packaging/static gates and the likely next external failure have all been reviewed.

@@ -1,3 +1,5 @@
+> **HISTORICAL RELEASE EVIDENCE — NOT CURRENT CLEAN-CORE AUTHORITY.** Preserve for provenance; do not execute these instructions unless a current authority file explicitly reopens them.
+
 # BC-250 exact RPM build / device closure specialist handover — 0.12.2-0.8
 
 ## Purpose

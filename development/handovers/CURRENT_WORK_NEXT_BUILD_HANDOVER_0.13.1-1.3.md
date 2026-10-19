@@ -1,3 +1,5 @@
+> **HISTORICAL RELEASE EVIDENCE — NOT CURRENT CLEAN-CORE AUTHORITY.** Preserve for provenance; do not execute these instructions unless a current authority file explicitly reopens them.
+
 # BC-250 current work / next-build handover — 0.13.1-1.3
 
 ## Identity

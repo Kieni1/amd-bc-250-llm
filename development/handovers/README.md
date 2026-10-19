@@ -1,58 +1,31 @@
 # Development handovers
 
-These handovers are Git/source-only coordination documents. They are not installed by
-the binary RPM and are not package API contracts.
+These files coordinate source development; they are not installed package API contracts.
 
-## Read scope before handovers
+## Current authority — only these five files may direct new main-chat work
 
-`development/DEVELOPMENT-SCOPE.json` is the first file for routine development. It identifies current
-active, boundary-active, frozen and archive-only domains. Historical release handovers and model-run
-evidence remain in the tree, but archive-only material should not be loaded into a normal current batch.
-Use `python3 development/scope.py check` to prove frozen/archive trees are unchanged and `scope.py map`
-to select the smallest relevant handover/test surface.
+Read `development/DEVELOPMENT-SCOPE.json` first. Then use, in this order as applicable:
 
-Maintain three durable roles:
+1. `MAIN-INTEGRATION-HANDOVER.md` — whole-product clean-core integration authority.
+2. `MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md` — current engineering/evidence rules.
+3. `CURRENT_WORK_CLEAN_CORE_RECONSTRUCTION.md` — C0-C9 state and next milestone.
+4. `RELEASE_BUILD_AND_VALIDATION_HANDOVER.md` — source/build/device evidence boundary.
+5. `TESTING-HANDOVER.md` — current clean-core test responsibilities.
 
-- `DEVELOPMENT-WORKFLOW.md` — stable rules for how development/review chats work;
-- `MAIN-INTEGRATION-HANDOVER.md` — long durable technical state and integration memory;
-- `OPERATIONS-HANDOVER.md` — current real-device/support state and next bounded hardware
-  qualification.
+If any other handover disagrees with these five, the five-file current authority wins.
 
-Use `SPECIALIST-TESTING-HANDOVER.md` as a template when opening a temporary quality
-specialist chat. Do not keep seven parallel specialist bibles permanently synchronized.
-A specialist should read the newest source plus the relevant current docs and return a
-bounded handoff to main integration.
+## Supporting reference — not independent authority
 
-Authority when information disagrees:
+- `DEVELOPMENT-WORKFLOW.md` — durable workflow reference.
+- `OPERATIONS-HANDOVER.md` — stock-core operations/device boundary reference.
+- `SPECIALIST-TESTING-HANDOVER.md` — bounded specialist-return format.
+- `04_DONOR_DELTA_1.9_TO_2.2_AND_FORWARD_PORT_LEDGER.md` — frozen C4 donor-classification evidence.
+- `C3_PROPOSITION_REVIEW_AND_REQUIRED_REWORK.md` — preserved review evidence for the rejected first C3 proposition.
 
-1. user's current instruction;
-2. newest supplied source/package;
-3. real-device evidence from the exact installed revision;
-4. current test evidence;
-5. these handovers;
-6. older chats/logs/patches.
+Supporting references may explain history or a specialized boundary but must not advance or redefine the active checkpoint.
 
-The main handover intentionally remains detailed about current hardware/software contracts,
-resource constraints, model roles, current evidence boundaries and proven negative results.
-Superseded release-by-release narration belongs in the changelog, `development/DECISIONS.md`,
-and `development/model-runs/` rather than being copied indefinitely into every prompt.
+## Historical release material
 
-Dated specialist handovers are evidence/method snapshots, not automatically current
-workflow policy. When their procedural advice conflicts with `DEVELOPMENT-WORKFLOW.md`,
-`development/DECISIONS.md`, current operator docs or newer source behavior, preserve the
-historical handover but follow the newer authority. In particular, current experiment
-scripts may print an evidence archive SHA-256 without creating `.sha256` sidecar files.
+Every version-numbered handover in this directory, and everything under `development/handovers/archive/`, is historical evidence only. Historical documents may contain GFX instructions, old releases, `front-door` terminology, old build-authority wording, or superseded test counts. Preserve that evidence, but **do not execute it as current clean-core guidance**.
 
-Dated specialist evidence handovers may also be retained here as source-only `.txt`
-references when they capture a large campaign that should not be collapsed into the
-operator documentation. The 2026-09-17 task/translation specialist snapshots were
-retired after their durable evidence was integrated into model-run and decision records.
-
-## Current main-integration continuity
-
-- `../DEVELOPMENT-SCOPE.json` + `../scope.py` — first-stop current development scope and frozen-domain guard.
-- `MAIN-INTEGRATION-HANDOVER.md` — durable project state/history.
-- `MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md` — current procedural authority and implemented contracts.
-- `CURRENT_WORK_NEXT_BUILD_HANDOVER_0.13.1-1.3.md` — current release implementation/device-qualification boundary.
-- `RELEASE-TESTING-HANDOVER-0.13.1-1.3.md` — exact-package delta acceptance sequence.
-- The 0.12.2-0.8 handovers remain historical evidence for the qualified predecessor.
+The accepted immutable C5-D freeze is recorded in the current authority files and `WORKBENCH-STATE.json`; C6 documentation/QC does not redefine that predecessor.

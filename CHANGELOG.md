@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.1-1 - 2026-10-19
+
+- Return the clean-core line to the normal RPM naming convention: `Version: 0.14.1`, first package `Release: 1`; future package-only revisions increment the integer Release.
+
+- Assign the first clean-core release identity after the C7 integrated source gate; Ollama remains pinned at 0.34.4 and no device acceptance is implied by the source bump.
+- Separate GitHub CI production from explicit release selection: normal push/PR runs remain CI evidence, while a deliberately selected workflow-dispatch run can emit `release-selection.json` as C9 artifact authority.
+- Extend release evidence with Fedora/container/build-tool provenance without pinning the Fedora toolchain.
+- Define `BUILD_DIR=/path` as the supported Make-level custom build-root interface; `BC250_BUILD_DIR` is internal to helper scripts.
+
 ## 0.13.1-1.9 - 2026-10-11
 
 - Fix the exact-device Secure Boot detector for EFI systems where `mokutil --sb-state` explicitly reports `This system doesn't support Secure Boot`: expose `disabled-unsupported`, allow GFX1013 preparation for that explicit disabled/unsupported state, and keep enabled or genuinely unknown states fail-closed.

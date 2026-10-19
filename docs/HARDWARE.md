@@ -43,7 +43,7 @@ remains outside the appliance baseline.
 
 The appliance follows the current Fedora-supported kernel rather than maintaining historical
 release-number warning ranges. CU routing now uses the live manager on the stock Fedora AMDGPU path;
-verification checks live saved/routed WGP state rather than maintaining a package-built replacement module.
+verification checks the live saved/routed WGP state on that stock driver path.
 No newer BC-250 evidence justifies changing TTM sizing, `ppfeaturemask`, the governor or Mesa defaults.
 
 The two TTM values describe a 16-GiB ceiling at 4-KiB pages. They do **not**
