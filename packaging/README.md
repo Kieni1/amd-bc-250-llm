@@ -32,28 +32,18 @@ instead of creating a general packaging language.
 Use the normal RPM `Version` / integer `Release` convention for new core releases.
 For a new product version, start at `Release: 1`; packaging-only rebuilds or revisions
 increment the integer release (`2`, `3`, ...). A later product-version bump resets
-`Release` to `1`. Engineering checkpoint names such as C7/C8 are evidence labels only
-and must not appear in the installable NEVRA. The first clean-core candidate is therefore
-`bc250-llm-server-0.14.1-1.fc44.x86_64`.
+`Release` to `1`. Development iteration names belong in commits/issues/handovers and must not appear in the installable NEVRA. The current clean-core candidate is therefore `bc250-llm-server-0.14.1-1.fc44.x86_64`.
 
 ## Validation and build boundary
 
 The primary release build runs through the Fedora 44 GitHub Actions workflow and its
 `make release-gate`. Local Fedora execution through `scripts/ci-local.sh` reproduces the
 same gate but is backup/debug evidence only; it does not silently become release authority.
-`make validate` remains the full deterministic repository check and can be run wherever
-its required tools are present. A successful source edit must not be reported as an RPM
-build unless the Fedora gate actually ran. GitHub CI runs Ruff, ShellCheck and rpmlint;
-none are runtime dependencies. `rpmlint` uses `packaging/rpmlint.toml`, which filters
-only documented appliance policy choices and known false positives.
+`make validate` runs current guidance/scope checks plus the complete repository regression suite and can be run wherever its required tools are present. A successful source edit must not be reported as an RPM build unless the Fedora gate actually ran. GitHub runs Ruff and ShellCheck as blocking pre-build checks and configured `rpmlint` as a blocking post-build package check, so predictable source/package defects do not consume another authoritative RPM iteration. The broad repository suite remains additional advisory quality evidence. `rpmlint` uses `packaging/rpmlint.toml`, which filters only documented appliance policy choices and known false positives.
 
 `release-contract.json` is the machine-readable core release contract. The release gate
 first verifies source identity and cheap pipeline contracts, then freezes Source0 plus the
-RPM spec and records `RPM-INPUTS.sha256`. The package build consumes those exact frozen
-bytes as an unprivileged builder. RPM `%check` runs the package-context deterministic
-suite from Source0, while the host-only release-pipeline test remains outside `%check`.
-After the build, transformed payload checks, configured rpmlint and a clean SRPM rebuild
-must pass.
+RPM spec and records `RPM-INPUTS.sha256`. The package build consumes those exact frozen bytes as an unprivileged builder. RPM `%check` runs the package-critical module list from `release-contract.json`; the release-pipeline contract tests remain in preflight. After the build, configured `rpmlint`, transformed payload checks and a clean SRPM rebuild are hard gates.
 
 GitHub writes the installable `*.x86_64.rpm`, rebuild-input `*.src.rpm`, separate
 `SHA256SUMS.binary` / `SHA256SUMS.source`, frozen-input `SHA256SUMS.inputs`, and
@@ -138,7 +128,7 @@ rebuild artifact.
 - Keep the top spec changelog entry aligned with the resulting Version-Release.
 - Review pinned revisions, licenses, source-RPM contents and the binary payload.
 - Run only checks available in the editing environment and report them exactly.
-- Build through GitHub/Fedora and require frozen-input verification, Ruff, ShellCheck, RPM payload-contract checks, `rpmlint`, clean SRPM rebuild and closed checksum manifests to pass.
+- Build through GitHub/Fedora and require frozen-input verification, package-critical `%check`, RPM payload-contract checks, clean SRPM rebuild and closed checksum manifests to pass. Require Ruff, ShellCheck and configured `rpmlint` to pass; review the broad full-suite advisory report separately.
 - Record the selected GitHub Actions run and retain its `release-evidence.json`; a PR build is CI evidence until deliberately selected for device acceptance.
 - On the BC-250 test clean install or upgrade as appropriate, guided reboot/resume,
   models, affected runtime features and both removal paths.

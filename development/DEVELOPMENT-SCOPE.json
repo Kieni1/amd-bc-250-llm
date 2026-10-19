@@ -191,7 +191,7 @@
     },
     "global-docs-coordination": {
       "status": "boundary_active",
-      "description": "Current operator docs, validation strategy and current integration handovers. Historical evidence remains archive-only.",
+      "description": "Current operator/development guidance for the 0.14.1-1 release line. Historical rationale is archive-only.",
       "paths": [
         "WORKBENCH-STATE.json",
         "README.md",
@@ -204,22 +204,29 @@
         "development/scope.py",
         "development/TESTING-STRATEGY.md",
         "development/VALIDATION-MATRIX.md",
-        "development/handovers/DEVELOPMENT-WORKFLOW.md",
-        "development/handovers/MAIN-INTEGRATION-HANDOVER.md",
-        "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
-        "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
-        "development/handovers/README.md",
-        "docs/FILESTRUCTURE.md",
         "development/README.md",
         "development/DECISIONS.md",
-        "development/handovers/OPERATIONS-HANDOVER.md",
-        "development/handovers/CURRENT_WORK_CLEAN_CORE_RECONSTRUCTION.md",
-        "development/handovers/RELEASE_BUILD_AND_VALIDATION_HANDOVER.md",
-        "development/handovers/TESTING-HANDOVER.md",
-        "development/handovers/C3_PROPOSITION_REVIEW_AND_REQUIRED_REWORK.md",
-        "development/handovers/04_DONOR_DELTA_1.9_TO_2.2_AND_FORWARD_PORT_LEDGER.md",
+        "docs/FILESTRUCTURE.md",
         "scripts/check-clean-core-absence.sh",
-        "scripts/check-current-guidance.sh"
+        "scripts/check-current-guidance.sh",
+        "development/handovers/00_README_START_HERE.md",
+        "development/handovers/01_CURRENT_STATE_AND_NEXT_WORK.md",
+        "development/handovers/02_MAIN_CHAT_WORKING_RULES.md",
+        "development/handovers/03_CORE_FUNCTIONALITY_CHECK.md",
+        "development/handovers/04_RELEASE_BUILD_AND_VALIDATION.md",
+        "development/handovers/05_TESTING_STRATEGY.md",
+        "development/handovers/06_RUNTIME_AND_MODELS.md",
+        "development/handovers/07_OPERATIONS_AND_PACKAGE_BOUNDARY.md",
+        "development/handovers/08_GREENFIELD_SIMPLIFICATION_PLAN.md",
+        "development/handovers/09_RELEASE_QUALITY_GATE.md",
+        "development/handovers/10_WORKING_METHOD_AND_EVIDENCE.md",
+        "development/handovers/11_LONG_TERM_ENGINEERING_GUIDELINES.md",
+        "development/handovers/12_ENGINEERING_AND_TEST_HARNESS_RULES.md",
+        "development/handovers/13_RESILIENCE_RECOVERY_AND_SECURITY_PLAYBOOK.md",
+        "development/handovers/14_EVALUATOR_AND_RESULT_SEMANTICS.md",
+        "development/handovers/15_SPECIALIST_WORK_AND_RETURN_CONTRACT.md",
+        "development/handovers/scripts/**",
+        "development/handovers/SHA256SUMS.txt"
       ],
       "focused_tests": [],
       "boundary_interfaces": [
@@ -227,7 +234,7 @@
         "scope/freeze policy"
       ],
       "notes": [
-        "WORKBENCH-STATE.json is checkpoint-only continuity metadata and is intentionally absent from clean release/source-package payloads."
+        "WORKBENCH-STATE.json is release/workflow continuity metadata and is intentionally absent from the installed appliance payload."
       ]
     },
     "maintenance-companion": {
@@ -360,19 +367,16 @@
     },
     "historical-development": {
       "status": "archive_only",
-      "description": "Historical model runs, references, patch notes and superseded release handovers retained for provenance only.",
+      "description": "Historical model runs, references, patch notes and compact handover rationale retained for provenance only.",
       "paths": [
         "development/model-runs/**",
         "development/patchnotes/**",
         "development/references/**",
-        "development/handovers/CURRENT_WORK_NEXT_BUILD_HANDOVER_*.md",
-        "development/handovers/RELEASE-TESTING-HANDOVER-*.md",
-        "development/handovers/RAG-TESTING-HANDOVER-*.md",
         "development/SOURCE-REFRESH-*.md",
         "development/handovers/archive/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "9d30e16aac8e82043367bb944c74c98db3c5a6c2bd7373731b170277c87697f0"
+      "baseline_sha256": "4e98cc6271e4c3d4ba4b99434d10737d821887576281c1c0b1520c8fca1a309b"
     },
     "quality-history": {
       "status": "archive_only",
@@ -406,17 +410,18 @@
     },
     "test-suite": {
       "status": "active",
-      "description": "Lean pre-1.0 contract and smoke tests. Tests protect supported public behavior and release integrity without pinning internal script structure.",
+      "description": "Broad pre-1.0 regression suite. Preserve existing behavior coverage while allowing implementation cleanup.",
       "paths": [
         "tests/**"
       ],
       "focused_tests": [
-        "python3 -m unittest discover -s tests -p test_*.py"
+        "scripts/validate.sh",
+        "scripts/validate.sh --package"
       ],
       "notes": [
-        "RPM %check runs only tests/test_core.py.",
-        "The complete five-module suite is advisory quality evidence.",
-        "Prefer deleting brittle implementation-detail tests over preserving compatibility with obsolete internals."
+        "All tests/test_*.py modules remain part of advisory repository validation.",
+        "RPM %check runs the package-critical list declared in release-contract.json.",
+        "Fix brittle fixtures/isolation when implementation changes; do not delete tests solely to reduce noise."
       ]
     }
   }

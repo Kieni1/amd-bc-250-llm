@@ -45,14 +45,21 @@
     "advisory_quality": {
       "blocking": false,
       "command": "make quality-report",
-      "policy": "Run Ruff/ShellCheck, governance/current-guidance checks, the lean five-module suite, and rpmlint for visibility without blocking RPM artifact production."
+      "policy": "Run the full repository test suite for additional visibility after the hard release-candidate gates. Ruff, ShellCheck, current-guidance/scope checks, package-critical tests and configured rpmlint are blocking elsewhere in make release-gate."
     },
     "package_critical_tests": [
-      "tests/test_core.py"
+      "tests/test_core.py",
+      "tests/test_packaging.py",
+      "tests/test_sources.py",
+      "tests/test_upstream_patch_validation.py",
+      "tests/test_runtime.py"
+    ],
+    "preflight_tests": [
+      "tests/test_release_pipeline.py"
     ],
     "stages": [
       {
-        "description": "verify release-critical source identity/contracts and pinned sources, then freeze Source0 and spec",
+        "description": "run blocking Ruff/ShellCheck and current-guidance/scope/release contracts, verify pinned sources, then freeze Source0 and spec",
         "id": "preflight-freeze"
       },
       {
@@ -60,9 +67,18 @@
         "id": "frozen-package"
       },
       {
-        "description": "verify payload/SRPM rebuild and emit closed binary/source manifests plus release-evidence.json",
+        "description": "run configured blocking rpmlint, verify payload/SRPM rebuild, then emit closed binary/source manifests plus release-evidence.json",
         "id": "artifact-evidence"
       }
-    ]
+    ],
+    "blocking_static": {
+      "blocking": true,
+      "command": "make lint",
+      "policy": "Ruff and ShellCheck run before freeze/build so predictable source defects cannot consume an authoritative GitHub RPM iteration."
+    },
+    "rpmlint": {
+      "blocking": true,
+      "policy": "Configured rpmlint runs on the built RPMs and blocks artifact evidence on any unfiltered finding; only documented appliance-specific false positives belong in packaging/rpmlint.toml."
+    }
   }
 }

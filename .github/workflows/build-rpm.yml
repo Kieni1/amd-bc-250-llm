@@ -31,7 +31,7 @@ jobs:
       - name: Install build tools
         run: |
           dnf --disable-repo=fedora-cisco-openh264 install -y \
-            bash cargo cpio curl findutils gcc git-core gzip make \
+            bash cargo coreutils cpio curl diffutils findutils gawk gcc git-core grep gzip make sed \
             libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck shadow-utils \
             systemd systemd-rpm-macros tar util-linux xz
 

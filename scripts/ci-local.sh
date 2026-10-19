@@ -20,7 +20,7 @@ podman run --rm --pull="$pull_policy" \
   "$build_image" \
   bash -Eeuxo pipefail -c '
     build_packages=(
-      bash cargo cpio curl findutils gcc git-core gzip make
+      bash cargo coreutils cpio curl diffutils findutils gawk gcc git-core grep gzip make sed
       libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck shadow-utils
       systemd systemd-rpm-macros tar util-linux xz
     )

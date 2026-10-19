@@ -35,7 +35,7 @@ help:
 	  'make lint       Run Ruff and ShellCheck (developer quality; not release-blocking)' \
 	  'make quality-report  Run lint + full validation and report all issues without blocking artifacts' \
 	  'make preflight  Run release-critical source/release-pipeline checks' \
-	  'make validate   Run governance plus the lean advisory test suite' \
+	  'make validate   Run current guidance/scope plus the full advisory repository test suite' \
 	  'make source-tar Create the project source archive' \
 	  'make freeze-rpm-inputs  Freeze Source0/spec plus source identity before package build' \
 	  'make check-frozen-source  Verify the exact frozen source/spec snapshot' \
@@ -66,8 +66,10 @@ lint:
 	    shellcheck --severity=error "$$file"; \
 	  fi; \
 	done < <(find . -type f \
-	  -not -path './sources/*' -not -path './build/*' -not -path './.build/*' -not -path './rpmbuild/*' \
-	  -not -path './governor-src/*' -not -path './live-manager-src/*' -not -path './quality-checks/history/*')
+	  -not -path './.git/*' -not -path './sources/*' -not -path './build/*' -not -path './.build/*' -not -path './dist/*' -not -path './rpmbuild/*' \
+	  -not -path './vendor/*' -not -path './governor-src/*' -not -path './live-manager-src/*' \
+	  -not -path './development/handovers/archive/*' -not -path './development/model-runs/*' -not -path './development/patchnotes/*' \
+	  -not -path './quality-checks/history/*')
 
 
 quality-report:
@@ -248,9 +250,10 @@ check-srpm-rebuild:
 
 release-gate-preflight:
 	$(MAKE) clean
+	$(MAKE) lint
+	$(MAKE) preflight
 	$(MAKE) sources
 	$(MAKE) sources-check
-	$(MAKE) preflight
 	$(MAKE) freeze-rpm-inputs
 	$(MAKE) check-frozen-source
 
@@ -262,8 +265,8 @@ release-gate-package:
 	report='$(BUILD_DIR)/rpmlint-report.txt'; \
 	rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm >"$$report" 2>&1; rc=$$?; \
 	cat "$$report"; \
-	if ((rc != 0)); then echo "rpmlint: WARN (non-blocking, rc=$$rc)"; else echo 'rpmlint: PASS'; fi; \
-	exit 0
+	if ((rc != 0)); then echo "rpmlint: FAIL (blocking, rc=$$rc)" >&2; exit "$$rc"; fi; \
+	echo 'rpmlint: PASS'
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' check-srpm-rebuild
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
 	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \

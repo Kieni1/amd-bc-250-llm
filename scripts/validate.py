@@ -250,7 +250,13 @@ def check_release_contract() -> None:
 
     package_critical = validation.get("package_critical_tests")
     advisory_quality = validation.get("advisory_quality", {})
-    expected_package_critical = ["tests/test_core.py"]
+    expected_package_critical = [
+        "tests/test_core.py",
+        "tests/test_packaging.py",
+        "tests/test_sources.py",
+        "tests/test_upstream_patch_validation.py",
+        "tests/test_runtime.py",
+    ]
     if package_critical != expected_package_critical:
         fail("release contract package_critical_tests differs from the release-critical test set")
     if advisory_quality.get("blocking") is not False or advisory_quality.get("command") != "make quality-report":

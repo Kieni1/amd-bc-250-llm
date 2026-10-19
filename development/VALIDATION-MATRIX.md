@@ -1,100 +1,42 @@
-# BC-250 validation matrix
+# BC-250 validation matrix — current release line
 
-## Current clean-core execution summary
+Current release identity: `bc250-llm-server-0.14.1-1`.
 
-This section is current authority. The older qualification table below is preserved as historical evidence and must not be read as an instruction to recreate the removed GFX campaign.
+This matrix tracks only the evidence needed to move the current line forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
 
-| Area | Current status | Next authority |
+| Area | Current state | Next evidence |
 |---|---|---|
-| Clean-core source through C5-D | PASS — immutable C5-D freeze `25be3783…`, canonical manifest `e43ab024…`, 362 files | do not redefine C5-D |
-| Deterministic source gate | PASS — C8 619/619 across 20 modules; package-context 598/598 + host release-pipeline 21/21 | authoritative Fedora 44 GitHub build next |
-| RPM package-context lane | PASS — C7 598/598 across 19 modules; immutable C5-D predecessor 594/594 | remains part of C8 build validation |
-| Host release-pipeline lane | PASS — 19/19 | remains preflight/build-host evidence |
-| C6 secondary documentation/QC | PASS | C7 integrated source gate — PASS |
-| C7 integrated source gate | PASS | C8 authoritative Fedora build |
-| Fedora RPM/SRPM build | PENDING | identity `0.14.1-1` assigned; selected Fedora 44 GitHub Actions workflow-dispatch run becomes artifact authority |
-| BC-250 device acceptance | PENDING | C9, on the exact selected C8 RPM |
+| Release identity | `0.14.1-1` assigned consistently | keep unchanged until package-only revision or next product version |
+| Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during simplification |
+| Release preflight | source/release-pipeline gate available | rerun on final source before authoritative build |
+| Full source suite | broad existing suite retained | all modules should pass or have explicit advisory classification |
+| RPM `%check` | bounded package-critical subset | must pass unprivileged in Fedora 44 build |
+| Source0/spec freeze | tracked-source contract implemented | freeze exact inputs in selected build |
+| RPM payload | package contract implemented | must pass on built RPM |
+| rpmlint | blocking configured package gate | any unfiltered finding blocks artifact evidence; fix the package or document a genuine appliance-specific false positive |
+| SRPM self-rebuild | hard release gate | must pass |
+| GitHub authority | explicit selected `workflow_dispatch` run | capture `release-evidence.json` + `release-selection.json` |
+| Exact-RPM core functionality | pending | run small BC-250 smoke on selected RPM |
+| Greenfield simplification baseline | pending device smoke | freeze known-good stock-core baseline, then simplify |
 
-Current clean-core order is `C8 authoritative build -> C9 exact-RPM device acceptance`. Do not run historical 1.9 GFX A1/B/rollback/A2 instructions. GitHub Actions is the primary RPM artifact path; matching local Fedora execution is backup/reproduction only.
+## Current stop conditions
 
-## Historical qualification matrix — evidence only
+Stop the release build for:
 
-This file tracks **what kind of evidence exists** and what still needs qualification.
-It is development memory, not an installed operator contract. Do not convert `historical`
-into `current` merely because a past run was successful.
+- inconsistent Version/Release/source identity;
+- dirty/unbound authoritative Git source;
+- Source0/spec integrity failure;
+- package-critical `%check` failure;
+- RPM payload mismatch;
+- non-self-contained SRPM rebuild;
+- missing/ambiguous artifact identity.
 
-Routine-development scope is separately controlled by `development/DEVELOPMENT-SCOPE.json`. A row can
-remain part of the package/release matrix while its implementation component is **frozen** for current
-iteration. Frozen means tree-hash verification instead of routine internal review/tests; it does not mean
-removed, unsupported, or accepted for a new release without the final full gate.
+Do not stop artifact production solely for:
 
-Status vocabulary:
+- documentation wording drift;
+- historical development-scope hashes;
+- broad-suite advisory findings after blocking Ruff/ShellCheck/rpmlint gates have passed;
+- noncritical behavioral tests unrelated to package integrity;
+- historical campaign expectations.
 
-- **SOURCE PASS** — source-side/unit/static validation exists for the current source.
-- **SOURCE IN PROGRESS** — focused source checks exist, but the current source has not completed release/package closure.
-- **HISTORICAL REAL DEVICE** — useful BC-250 evidence exists, but not necessarily from
-  the current source release.
-- **CURRENT REAL DEVICE PASS** — explicitly requalified on the installed current release.
-- **PENDING** — no sufficient evidence yet.
-- **N/A** — that validation class does not apply.
-
-Historical source baseline when this section was originally refreshed: `0.13.1-1.9`. The exact-device optimization baseline is installed `bc250-llm-server-0.13.1-1.0.fc44.x86_64`: the 0.12.2-0.8 -> 0.13.1-1.0 upgrade/convergence passed, `bc250 verify` was 53/0/0/0, Open WebUI desired state and RAG were clean, the board-specific saved/live CU routing profile matched at 40/40 with no `D!` cells, operator-added registrations were preserved, settled swap/PSI were zero, and final `rpm -V` was clean. Forty routed CUs are evidence for this board, not a universal product-health threshold.
-
-The optimization program is closed through Sidechat 19. Sidechat 15 found no residency/keep-alive/swappiness change worth packaging. Sidechat 16 kept 32K context and advanced q4_0 only as a candidate. Sidechat 17 kept parallel=1, flash attention enabled, automatic `num_batch`, full GPU offload and current governor policy. Sidechat 18 found `TOP_K=4` independently valid. Sidechat 19 rejected the combined q4_0 + TOP_K=4 arm because Advanced/Qwen repeatedly exhausted the 6144-token reasoning budget with empty visible output under q4_0, including one repetition defect; memory/OOM/GPU/kernel safety did not explain the failure. Therefore 1.1 selected production `q8_0` + `TOP_K=4`, and 1.2 preserves that exact runtime/RAG decision.
-
-The 1.1 source delta was tooling/product-hygiene focused: semantic optional/default model handling, normalized date/time/invoice/numeric evaluator comparisons, grouped-citation membership, three-stage front-door readiness, active-swap zram and actual failed-unit verification, non-interactive generation benchmark controls, and starting swap/PSI/residency evidence. Clean output-limit exhaustion remains `INCOMPLETE` when no independent defect exists; repetition at the same ceiling remains a quality signal. Task title/tag qualification is based on the persisted result/contract rather than requiring a transient task-residency sample.
- The 1.2 corrective delta further limits semantic equivalence to standalone date/time/invoice values, recognizes HTTP publication through direct/range/custom-service firewalld forms, distinguishes unavailable swap inspection from a proven empty set, and removes the reported Ruff style/SIM103/I001 violations without suppressions.
-
-| Area | Source/static | GitHub RPM | Real BC-250 | Current interpretation / next gate |
-|---|---|---|---|---|
-| repository/unit validation | SOURCE CANDIDATE — 1.7 adds focused regressions for reboot-aware GFX A/B evidence, conservative promotion screening, evidence inventory/cleanup, version reporting and completion packaging; no RPM build claim is made in this workspace | OPERATOR FEDORA GATE | exact 0.13.1-1.5 remains the last operator-confirmed built package checkpoint; 1.6 is the source predecessor | run the operator-provided Fedora release gate, then preserve its exact log/artifact hashes |
-| RPM build/install | source metadata targets 0.13.1-1.9; authoritative RPM/SRPM build, `%check`, rpmlint, payload validation and clean SRPM rebuild are intentionally external | PENDING/EXTERNAL | exact 0.13.1-1.7 reached healthy stock state after remediation but was HOLD due D1-D4; A1 was captured but is package-identity-bound | HISTORICAL ONLY — this was the old 1.9/GFX sequence and must not be executed for clean-core releases |
-| normal service topology | SOURCE PASS — canonical normal/degraded/stopped/agent classifier retained; status version probing follows an active lane | external | EXACT 2.3 — normal/degraded/agent convergence UX accepted; final failed units 0 and verifier clean | preserve; next work is OWUI application behavior rather than topology replay |
-| office HTTP readiness | SOURCE PASS — installer/verifier/revalidation/OWUI benchmarks distinguish HTTP/API readiness from mere service activity | external | EXACT 2.2 — Open WebUI/nginx recovered after restart and after supported reboot; Open WebUI service became active before HTTP readiness by ~20 s | preserve HTTP-based readiness; no new health framework required |
-| Open WebUI product surface / desired state | SOURCE PASS — graveyard source content is inert; a manually registered historical model follows its normal testing-policy visibility (admin/hidden where defined) without becoming a default-product requirement | external | EXACT 0.12.2-0.8 — desired state/auth/ordinary-user ACL and product journeys PASS | exact 1.2 corrective delta: preserve operator registrations, require default mappings clean, and verify historical/testing-policy visibility without treating extras as package drift |
-| structured-output role policy | SOURCE PASS — Standard exact schema + temperature 0; Documents exact schema + temperature 0; explicit Advanced Structured preset think=false while ordinary Advanced remains think=true; Deep unchanged | external | focused evidence: Standard 200/200 strict exact; Documents 25/25; Advanced nothink 25/25; Deep 25/25 unchanged | run one integrated production-trigger qualification with effective-param evidence and non-structured controls |
-| Tika restart semantics | SOURCE PASS — Quadlet accepts only expected SIGTERM exit 143 as successful; other abnormal exits remain failures | external | EXACT 2.3 — routine restart PASS; Result=success and no false failed-result telemetry | preserve; no further source change |
-| Tika DOCX Markdown structure | SOURCE PASS — no package rewrite; Tika 4 remains the extractor | external | EXACT 0.12.2-0.4 focused real-office evidence — genuine LibreOffice bullets emit `· item`; heading/table/list ordering and bullet/table identifiers survive OWUI extraction and Documents retrieval | CLOSED for this RPM; reopen only if canonical `-` markers become a product requirement |
-| external LAN isolation | SOURCE PASS — verifier detects protected-port exposure through exact entries, numeric ranges, active custom services and accepting rich rules; external LAN probe still required | external | EXACT 2.2 — external Fedora host reached only intended SSH :22 / office HTTP :80; 3000/9998/11434-11437 filtered | preserve current firewalld boundary; source tests do not substitute for external network evidence |
-| reboot persistence / invocation | SOURCE PASS — repository-native 40-CU paths use `/usr/sbin/reboot`; 2.4 also patches the pinned live-manager CPU-unlock interactive reboot path to `/usr/sbin/reboot` | external | EXACT 2.3 — supported `sudo reboot` reconstructed SSH/HTTP/topology/timers/firewall/40/40 and final 54/0/0; installed live manager still exposed one reachable `systemctl reboot` CPU-unlock prompt | do not reproduce known-bad invocation; verify built 2.4 live-manager path contains the patched command |
-| maintenance companion | SOURCE PASS — forced-command identity preserves `SSH_CONNECTION` only for an exact internal companion request; second SSH remains protected | external | PENDING — exact 1.7 companion path was not exercised after safe-power failure | companion remains conditional; prove companion-only allow plus second-SSH defer before real idle poweroff if deploying it |
-| WOL NIC configuration | SOURCE PASS | external | PENDING on current maintenance contract | inspect read-only first |
-| real S5 Wake-on-LAN | N/A | N/A | PENDING | run only when unattended power is being enabled; active-admin-SSH defer is already proven on exact 2.2 |
-| safe shutdown defer/allow | SOURCE PASS — final-two-field endpoint parsing, exact companion tuple exemption, second-SSH guard and non-blocking power action covered behaviorally | external | EXACT 2.2 — active administrator SSH defer PASS; exact 2.3 protected-endpoint defer remained healthy | companion/idle allow remain conditional follow-up; dedicated 2.3 SSH-message-only rerun is low priority |
-| optional backup export | SOURCE PASS | external | PENDING | lower priority; no need to gate agent/source qualification |
-| model lifecycle/reconciliation | SOURCE PASS — explicit category/selection grammar clarified; malformed operator overlay filenames fail visibly; MTP still excluded from generic convergence | external | EXACT 1.7 installer showed required/optional/MTP separation; later unregister/re-apply support blocks were NOT RUN because the external wrapper lacked permission to stat protected GGUF paths | optional operator-lifecycle acceptance: if exercised, use privileged source existence/stat and unregister/apply only; it is not a 2.2 code-release gate |
-| storage transient-import behavior | N/A | N/A | HISTORICAL REAL DEVICE | preserve prior Ollama cleanup/dedupe lessons |
-| XFS dedupe correctness | SOURCE PASS | external | HISTORICAL/PARTIAL | preserve GGUFs; batched implementation still deserves performance qualification |
-| benchmark result contract | SOURCE PASS — deterministic scorer, structural completeness, fail-early OWUI preset resolution, residency-set restoration and resident-session MemAvailable/swap-peak-delta reporting are covered by source regressions | external | HISTORICAL REAL DEVICE — final RAG finalist campaign ran on exact installed 0.11.3-0.4; the newer scorer/lifecycle source is not itself device-qualified | preserve the final model-role decision, but re-run exact-source qualification only when a current-release hardware claim is needed |
-| whole-appliance revalidation v4.8 | SOURCE PASS — completion/coverage semantics preserved; starting memory PSI evidence added without changing quality policy | external | EXACT 0.13.1-1.0 baseline healthy; Sidechat evidence restored normal topology cleanly | focused 1.2 smoke is sufficient unless the changed delta exposes a regression |
-| task default: LFM2.5 1.2B | SOURCE PASS — strict single-object contract and narrow OCR synonym correction retained | external | EXACT 1.7 — whole-appliance quality 8/8, closing the prior task false negative | no task retuning required |
-| translation production Translate-Gemma | SOURCE PASS — ordered clause-local/polarity guard remains fail-closed; native `sollten -> doivent` strengthening is an accepted raw-model limitation; EuroLLM Round 1 fixed the anchor but reproducibly emitted English for German `muss nicht` and is retired/graveyard | external | exact 0.12.2-0.5 production path reproduced the recommendation-strengthening defect; focused EuroLLM Round 1 hit the pre-agreed stop rule | keep Translate-Gemma; no EuroLLM Round 2; preserve fail-closed curated behavior |
-| RAG direct quality | SOURCE PASS — corrected deterministic scorer/restoration coverage retained; Open WebUI token files use the private non-empty regular-file contract | external | HISTORICAL REAL DEVICE — corrected finalist conclusion: Gemma 94/96 overall vs Qwen 93/96 with both 36/36 on short OWUI RAG; Qwen3.8 IQ3_XXS 16K was only 5/5 partial before memory abort | Gemma remains production RAG default; do not compare the partial 27B run to the full finalist corpus or reopen the tournament without a new product reason |
-| Open WebUI RAG path | SOURCE PASS — active preset/base-model resolution occurs before temporary KB/upload state and readiness is HTTP-based with a bounded slow-start allowance | external | HISTORICAL REAL DEVICE — final 0.11.3-0.4 RAG campaign: 36/36 short-path turns per finalist; Gemma 42/42 continuous-residency turns with ~2.7 GiB headroom, while Qwen reached the campaign 512 MiB safety floor after a few resident subruns | keep Gemma E4B / bc250-office-documents as the long-lived RAG default on 16 GiB; real arbitrary-document acceptance remains pending |
-| embeddings | SOURCE PASS — embedding-only restore probe uses non-empty input | external | EXACT 1.7 — full revalidation restoration PASS | preserve model/default |
-| standard/general office roles | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 production use-case 5/5; one accepted office draft reached output budget | diagnostics remain visible; no model acceptance change in 1.5 |
-| large main-lane / deep-reasoning quality | SOURCE PASS for existing usecase/runtime machinery | external | EVIDENCE GAP — GPT-OSS is runtime-qualified but substantive semantic comparison against Qwen3.5 9B is still weak | run one bounded 12–16 case GPT-OSS vs Qwen9B office/deep-reasoning fixture before opening 27B/35B candidate work |
-| agent default Ornith static benchmark | SOURCE PASS — reasoning leakage remains an explicit format failure | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 canonical agent 3/3 | keep Ornith baseline; static success is not product-path completion proof |
-| `bc250 code` product route | SOURCE PASS — route/default/truncation/reasoning/outer-fence fail-closed and atomic-update contract asserted from source | external | PENDING bounded direct product-route smoke | first live helper check remains separate from support/power work |
-| new Qwen3.5 4B / Gemma E4B agent challengers | SOURCE PASS — Modelfiles discoverable/strict | external | PENDING | compare only after baseline product route is proven; no promotion claims yet |
-| agent mode restoration | SOURCE PASS | external | HISTORICAL REAL DEVICE — 0.11.3-0.4 restoration PASS | 1.6 does not alter lane topology; rerun only if the bounded changed-path qualification exposes a regression |
-| OCR comparison | SOURCE PASS | external | HISTORICAL REAL DEVICE | GLM leads current small fidelity baseline; unchanged |
-| MTP lifecycle/runner/catalog | SOURCE PASS — standalone/non-selectable inventory, direct snapshot/drain/restore, compare drain-only isolation and catalog policy metadata retained | external llama.cpp | HISTORICAL REAL DEVICE — all three active choices have qualifying evidence; Qwen3.6 27B also passed historically but is now superseded; 35B-A3B remains a fit failure | broad MTP qualification stays closed; exact-source direct smoke is optional rather than a release gate |
-| MTP speedup/acceptance | SOURCE PASS — active catalog pins Qwen3.5 16K/d2, YMQ 8K/d1 and HauhauCS 8K/d2; list output exposes primary/alternative role metadata without enabling models | N/A | HISTORICAL REAL DEVICE — Qwen3.5 d2 confirmation and YMQ d1 optimization support the final package selection; HauhauCS retains the specialist niche | no further broad campaign; symmetric YMQ d1 repeats are optional only if future policy requires them |
-
-| Sidechat 19 integrated acceptance | CLOSED — q8_0 retained; TOP_K=4 promoted | exact-device evidence supplied | combined q4_0+TOP_K=4 rejected because Advanced exhausted/repeated at 6144 under q4_0; TOP_K=4 RAG/OWUI A/B passed | carry forward unchanged in 0.13.1-1.9; no new discovery |
-
-## How to update this matrix
-
-After a meaningful real-device batch, change only the affected rows. Record the exact
-installed NEVRA and evidence artifact in the corresponding model-run/decision record;
-do not turn this table into a long run log.
-
-A package change does **not** automatically invalidate every historical row. Requalify
-by impact:
-
-- runtime/service/package topology change → operations + affected integration lanes;
-- model/Modelfile/prompt change → affected quality lane + resource/coexistence if needed;
-- benchmark implementation change → benchmark-operation baseline before trusting new scores;
-- documentation/test-only change → source gate is normally sufficient;
-- milestone or pre-v1.0 release candidate → full `bc250 revalidate` plus selected human-use cases.
+Those remain quality evidence and should be fixed when they indicate a real current defect.

@@ -259,9 +259,14 @@ fi
 
 %changelog
 * Mon Oct 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1
-- Promote the accepted clean-core C7 source gate to the first unused 0.14.1 release identity without changing the Ollama 0.34.4 runtime pin or device-acceptance status.
+- Promote the validated clean-core source to the first unused 0.14.1 release identity without changing the Ollama 0.34.4 runtime pin or device-acceptance status.
 - Distinguish ordinary GitHub CI evidence from an explicitly selected workflow-dispatch release-authority run; emit a separate release-selection record for that selected run.
 - Record Fedora/container and key build-tool versions in release evidence, and make BUILD_DIR the supported Make-level build-root override while BC250_BUILD_DIR remains an internal helper variable.
+- Clean reconstruction-era active guidance, retain the full regression suite (including the restored 175-test benchmark module), and keep a bounded package-critical RPM %check separate from advisory full-suite quality.
+- Make installer scratch runtime state testable via an override while preserving the production /run/bc250-llm-server default, and isolate source-tarball fixtures from inherited build-helper state.
+- Run Ruff/ShellCheck and current-guidance/scope checks before source preparation/freeze, make configured rpmlint a hard post-build gate, and keep the broad behavioral suite advisory.
+- Make release-gate command dependencies explicit in both GitHub and local Fedora bootstrap paths instead of relying on base-image composition.
+- Refresh current operator/development guidance after removing the experimental GFX path: keep cleanup bounded and return product work to office RAG/document, German–French translation and local-assistant UX.
 
 * Sun Oct 11 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.13.1-1.9
 - Recognize mokutil's explicit unsupported Secure Boot state as disabled-unsupported so unsigned GFX1013 preparation is allowed only when the platform explicitly reports Secure Boot unsupported/disabled; enabled and genuinely unknown states remain fail-closed.
