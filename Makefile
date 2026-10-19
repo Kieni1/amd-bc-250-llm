@@ -35,7 +35,7 @@ help:
 	  'make lint       Run Ruff and ShellCheck (developer quality; not release-blocking)' \
 	  'make quality-report  Run lint + full validation and report all issues without blocking artifacts' \
 	  'make preflight  Run release-critical source/release-pipeline checks' \
-	  'make validate   Run strict governance plus all deterministic source tests' \
+	  'make validate   Run governance plus the lean advisory test suite' \
 	  'make source-tar Create the project source archive' \
 	  'make freeze-rpm-inputs  Freeze Source0/spec plus source identity before package build' \
 	  'make check-frozen-source  Verify the exact frozen source/spec snapshot' \
@@ -66,8 +66,8 @@ lint:
 	    shellcheck --severity=error "$$file"; \
 	  fi; \
 	done < <(find . -type f \
-	  -not -path './sources/*' -not -path './build/*' -not -path './.build/*' \
-	  -not -path './governor-src/*' -not -path './live-manager-src/*')
+	  -not -path './sources/*' -not -path './build/*' -not -path './.build/*' -not -path './rpmbuild/*' \
+	  -not -path './governor-src/*' -not -path './live-manager-src/*' -not -path './quality-checks/history/*')
 
 
 quality-report:

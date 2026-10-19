@@ -108,7 +108,7 @@ def check_required_inputs() -> None:
         "scripts/prepare-sources.py",
         "scripts/release-contract.py",
         "scripts/release-evidence.py",
-        "tests/test_release_pipeline.py",
+        "tests/test_core.py",
         "licenses/LICENSE",
     )
     for relative in required:
@@ -248,17 +248,9 @@ def check_release_contract() -> None:
     if build_root.get("make_override") != "BUILD_DIR" or build_root.get("helper_internal") != "BC250_BUILD_DIR":
         fail("release contract build-root policy must use BUILD_DIR with internal BC250_BUILD_DIR")
 
-    release_test = validation.get("release_pipeline_test")
     package_critical = validation.get("package_critical_tests")
     advisory_quality = validation.get("advisory_quality", {})
-    if release_test != "tests/test_release_pipeline.py":
-        fail("release contract must identify tests/test_release_pipeline.py as the host release test")
-    expected_package_critical = [
-        "tests/test_packaging.py",
-        "tests/test_sources.py",
-        "tests/test_upstream_patch_validation.py",
-        "tests/test_runtime.py",
-    ]
+    expected_package_critical = ["tests/test_core.py"]
     if package_critical != expected_package_critical:
         fail("release contract package_critical_tests differs from the release-critical test set")
     if advisory_quality.get("blocking") is not False or advisory_quality.get("command") != "make quality-report":

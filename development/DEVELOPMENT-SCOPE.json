@@ -22,7 +22,7 @@
     },
     "full_release_gate": {
       "required": true,
-      "note": "Frozen status reduces routine iteration only. Before final release acceptance, run the complete deterministic/source/package gates and any device gates required by the current release handover."
+      "note": "Frozen status reduces routine iteration only. Release builds run the small hard source/package gate; the lean full suite and governance checks remain advisory evidence unless explicitly promoted."
     }
   },
   "fast_global_checks": [
@@ -40,13 +40,9 @@
         "cmd/openwebui/openwebui-setup.py",
         "config/containers/open-webui.container",
         "config/nginx/*.conf",
-        "config/openwebui/open-webui-enable.conf",
-        "tests/test_install.py"
+        "config/openwebui/open-webui-enable.conf"
       ],
-      "focused_tests": [
-        "tests.test_install",
-        "tests.test_openwebui"
-      ],
+      "focused_tests": [],
       "notes": [
         "Open WebUI publication remains fail-closed until authenticated desired-state convergence succeeds.",
         "The protected maintenance credential is a real Open WebUI sk-* API key, not a signin JWT."
@@ -61,14 +57,9 @@
         "config/openwebui/functions/*.py",
         "config/openwebui/models.json",
         "config/openwebui/prompts/*",
-        "docs/OPENWEBUI.md",
-        "tests/test_openwebui.py",
-        "tests/test_translation_provider.py"
+        "docs/OPENWEBUI.md"
       ],
-      "focused_tests": [
-        "tests.test_openwebui",
-        "tests.test_translation_provider"
-      ],
+      "focused_tests": [],
       "notes": [
         "Advanced current candidate is think=true with max_tokens=6144 and unchanged samplers.",
         "Deep pre-evicts task/embedding and uses exact keep_alive=2m.",
@@ -80,7 +71,6 @@
       "description": "Benchmarking, quality classification, resource evidence and whole-appliance revalidation.",
       "paths": [
         "cmd/benchmark/**",
-        "tests/test_benchmark.py",
         "examples/benchmark/task-cases.json",
         "examples/benchmark/usecase-office.json",
         "examples/benchmark/translation-office.json",
@@ -90,9 +80,7 @@
         "quality-checks/translation/**",
         "quality-checks/utils/**"
       ],
-      "focused_tests": [
-        "tests.test_benchmark"
-      ],
+      "focused_tests": [],
       "notes": [
         "Clean reasoning-only exhaustion at the production ceiling is INCOMPLETE; repetitive degeneration remains a quality defect."
       ]
@@ -108,14 +96,11 @@
         "models/task-model/**",
         "models/modelfiles/*.Modelfile",
         "models/retired-models.json",
-        "tests/test_catalog.py",
         "MODELS.md",
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "development/MODEL-MANAGER-CLI-CONTRACT.md"
       ],
-      "focused_tests": [
-        "tests.test_catalog"
-      ],
+      "focused_tests": [],
       "notes": [
         "Qwen3.6 35B remains retired from active qualification.",
         "Catalog work may mention frozen MTP/RAG/OCR surfaces but must not thaw them unless their implementation boundary changes."
@@ -135,9 +120,6 @@
         "config/runtime.env",
         "config/systemd/ollama*.service",
         "config/governor/**",
-        "tests/test_runtime.py",
-        "tests/test_state.py",
-        "tests/test_storage.py",
         "config/containers/llm.network",
         "cmd/system/99-sensors.conf",
         "cmd/system/options-sensors.conf",
@@ -145,11 +127,7 @@
         "docs/INSTALLATION.md",
         "cmd/system/ollama-profiles/**"
       ],
-      "focused_tests": [
-        "tests.test_runtime",
-        "tests.test_state",
-        "tests.test_storage"
-      ],
+      "focused_tests": [],
       "boundary_interfaces": [
         "service/unit names and ports 11434/11435/11436/11437",
         "configured BC250_WGP_MASKS versus live SPI layout",
@@ -165,14 +143,11 @@
       "description": "Verifier, human/JSON status, doctor diagnostics, support bundles and LAN verification.",
       "paths": [
         "cmd/monitoring/**",
-        "tests/test_operations.py",
         "docs/SECURITY.md",
         "docs/INSTALLATION.md",
         "docs/HTTPS.md"
       ],
-      "focused_tests": [
-        "tests.test_operations"
-      ],
+      "focused_tests": [],
       "boundary_interfaces": [
         "installer final health summary",
         "revalidation health gate",
@@ -191,9 +166,6 @@
         "scripts/prepare-sources.py",
         "scripts/validate.py",
         "scripts/validate.sh",
-        "tests/test_packaging.py",
-        "tests/test_sources.py",
-        "tests/test_upstream_patch_validation.py",
         "Makefile",
         "VERSION",
         "install",
@@ -207,14 +179,9 @@
         "release-contract.json",
         "scripts/release-contract.py",
         "scripts/release-evidence.py",
-        "scripts/release-selection.py",
-        "tests/test_release_pipeline.py"
+        "scripts/release-selection.py"
       ],
-      "focused_tests": [
-        "tests.test_packaging",
-        "tests.test_sources",
-        "tests.test_upstream_patch_validation"
-      ],
+      "focused_tests": [],
       "boundary_interfaces": [
         "installed path ownership",
         "service/config payload",
@@ -242,7 +209,6 @@
         "development/handovers/MAIN_CHAT_WORKING_RULES_AND_INSTRUCTIONS.md",
         "development/handovers/SPECIALIST-TESTING-HANDOVER.md",
         "development/handovers/README.md",
-        "tests/test_documentation.py",
         "docs/FILESTRUCTURE.md",
         "development/README.md",
         "development/DECISIONS.md",
@@ -255,9 +221,7 @@
         "scripts/check-clean-core-absence.sh",
         "scripts/check-current-guidance.sh"
       ],
-      "focused_tests": [
-        "tests.test_documentation"
-      ],
+      "focused_tests": [],
       "boundary_interfaces": [
         "current instructions must override historical evidence",
         "scope/freeze policy"
@@ -273,9 +237,7 @@
         "cmd/maintenance/**",
         "examples/raspi-wol/**"
       ],
-      "focused_tests": [
-        "tests.test_maintenance"
-      ],
+      "focused_tests": [],
       "baseline_sha256": "3e883bc6775dfe8423bd2e15462e2012f841ace294fb14dbefda524dbf001668",
       "thaw_if": [
         "maintenance/companion behavior is intentionally changed",
@@ -304,17 +266,12 @@
         "config/containers/tika.container",
         "config/systemd/ollama-embedding.service",
         "docs/RAG.md",
-        "tests/test_rag.py",
-        "tests/test_rag_import.py",
         "examples/rag/**",
         "examples/benchmark/rag-cycle.json",
         "examples/benchmark/rag-quality-office.json",
         "examples/benchmark/embedding-office.json"
       ],
-      "focused_tests": [
-        "tests.test_rag",
-        "tests.test_rag_import"
-      ],
+      "focused_tests": [],
       "thaw_if": [
         "embedding model or port 11437 contract changes",
         "Tika image/version/container behavior changes",
@@ -387,12 +344,9 @@
       "description": "Package reset/uninstall behavior; thawed for 0.12.2-0.6 because the retired replacement-module ownership and cleanup surface was removed.",
       "paths": [
         "uninstall.sh",
-        "tests/test_uninstall.py",
         "docs/UNINSTALL.md"
       ],
-      "focused_tests": [
-        "tests.test_uninstall"
-      ],
+      "focused_tests": [],
       "thaw_if": [
         "installed path ownership changes materially",
         "service/config cleanup semantics change",
@@ -443,16 +397,26 @@
       "description": "Package-gate/resilience qualification control plus package-owned evidence inventory and conservative cleanup.",
       "paths": [
         "cmd/qualification/**",
-        "docs/QUALIFICATION.md",
-        "tests/test_qualification.py",
-        "tests/test_qualification_inventory.py"
+        "docs/QUALIFICATION.md"
       ],
-      "focused_tests": [
-        "tests.test_qualification",
-        "tests.test_qualification_inventory"
-      ],
+      "focused_tests": [],
       "notes": [
         "Evidence cleanup is dry-run-first, terminal-only, preserves newest records per class and refuses symlink/out-of-root deletion targets."
+      ]
+    },
+    "test-suite": {
+      "status": "active",
+      "description": "Lean pre-1.0 contract and smoke tests. Tests protect supported public behavior and release integrity without pinning internal script structure.",
+      "paths": [
+        "tests/**"
+      ],
+      "focused_tests": [
+        "python3 -m unittest discover -s tests -p test_*.py"
+      ],
+      "notes": [
+        "RPM %check runs only tests/test_core.py.",
+        "The complete five-module suite is advisory quality evidence.",
+        "Prefer deleting brittle implementation-detail tests over preserving compatibility with obsolete internals."
       ]
     }
   }

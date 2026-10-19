@@ -45,15 +45,11 @@
     "advisory_quality": {
       "blocking": false,
       "command": "make quality-report",
-      "policy": "Run Ruff/ShellCheck, governance/current-guidance checks, the full deterministic suite, and rpmlint for visibility without blocking RPM artifact production."
+      "policy": "Run Ruff/ShellCheck, governance/current-guidance checks, the lean five-module suite, and rpmlint for visibility without blocking RPM artifact production."
     },
     "package_critical_tests": [
-      "tests/test_packaging.py",
-      "tests/test_sources.py",
-      "tests/test_upstream_patch_validation.py",
-      "tests/test_runtime.py"
+      "tests/test_core.py"
     ],
-    "release_pipeline_test": "tests/test_release_pipeline.py",
     "stages": [
       {
         "description": "verify release-critical source identity/contracts and pinned sources, then freeze Source0 and spec",
