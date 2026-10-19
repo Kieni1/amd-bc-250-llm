@@ -269,14 +269,15 @@ class ReleasePipelineTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("BC250_BUILD_DIR is internal to helper scripts; use BUILD_DIR=/path", makefile)
         self.assertIn("override BC250_BUILD_DIR := $(BUILD_DIR)", makefile)
+        clean_env = {key: value for key, value in os.environ.items() if key != "BC250_BUILD_DIR"}
         ok = subprocess.run(
             ["make", "-s", "BUILD_DIR=/tmp/bc250-test-build", "help"],
-            cwd=ROOT, text=True, capture_output=True, check=False,
+            cwd=ROOT, env=clean_env, text=True, capture_output=True, check=False,
         )
         self.assertEqual(ok.returncode, 0, ok.stdout + ok.stderr)
         bad = subprocess.run(
             ["make", "-s", "help"], cwd=ROOT,
-            env={**os.environ, "BC250_BUILD_DIR": "/tmp/bc250-unsupported-build"},
+            env={**clean_env, "BC250_BUILD_DIR": "/tmp/bc250-unsupported-build"}, 
             text=True, capture_output=True, check=False,
         )
         self.assertNotEqual(bad.returncode, 0)
