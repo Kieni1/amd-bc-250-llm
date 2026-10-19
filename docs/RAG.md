@@ -344,12 +344,7 @@ schema can evolve without accepting arbitrary YAML.
 and one active revision per document-family/language. `currentness-not-verified` is deliberately a warning,
 not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
 
-Inspect the complete ingestion plan without contacting Open WebUI:
-
-```bash
-```
-
-Then sync only reviewed `active/*.md` files:
+Before ingestion, use `bc250 rag validate`/`status` to review the local lifecycle state without contacting Open WebUI. Then sync only reviewed `active/*.md` files:
 
 ```bash
 sudo install -m 0600 -o root -g root /PATH/TO/KEY /etc/bc250-llm-server/rag-api-key
@@ -358,8 +353,10 @@ sudo bc250 rag ingest --token-file /etc/bc250-llm-server/rag-api-key
 
 `ingest` validates the lifecycle schema before using the package-pinned Open WebUI incremental
 knowledge API. Unchanged files are skipped and changed Markdown is uploaded before the stale remote copy is
-removed. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
-credential must be a non-empty private regular file (normally `0600`); it is never stored in the corpus.
+removed. If stale cleanup fails after a successful replacement upload, ingestion stops with the new copy preserved and reports that the old copy may still exist; fix the API/permission problem and rerun ingestion. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
+credential must be a non-empty private regular file (normally `0600`) and must not be a symlink; it is never stored in the corpus.
+
+Ingestion is loopback-only by default (`127.0.0.1`, `localhost`, or `::1`). A non-loopback Open WebUI endpoint requires the explicit `--allow-remote` override because the API credential, document content and knowledge metadata leave the appliance. If the corpus contains a `confidential/` collection with an active lane, remote ingest requires `--allow-confidential-remote` as a second explicit override, including an empty active lane that may participate in prune convergence.
 
 The former compatibility interface is removed. All corpora use the `bc250 rag`
 lifecycle commands above.

@@ -208,11 +208,11 @@ class RagImportTests(unittest.TestCase):
             stderr = io.StringIO()
             with (
                 patch.object(
-                    rag, "sync", side_effect=TypeError("invalid sync diff response")
+                    lifecycle, "run_ingest", side_effect=TypeError("invalid sync diff response")
                 ),
                 redirect_stderr(stderr),
             ):
-                result = rag.main(["sync", tmp])
+                result = lifecycle.main(["--root", tmp, "ingest"])
         self.assertEqual(result, 2)
         self.assertIn("ERROR: invalid sync diff response", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
@@ -231,25 +231,202 @@ class RagImportTests(unittest.TestCase):
             token_file.write_text("\n", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "API key file is empty"):
                 rag.token_from(args)
+            token_file.write_text("secret\n", encoding="utf-8")
+            link = Path(tmp) / "owui-link"
+            link.symlink_to(token_file)
+            link_args = type("Args", (), {"token_file": str(link)})()
+            with self.assertRaisesRegex(ValueError, "must not be a symlink"):
+                rag.token_from(link_args)
+            directory = Path(tmp) / "token-dir"
+            directory.mkdir()
+            dir_args = type("Args", (), {"token_file": str(directory)})()
+            with self.assertRaisesRegex(ValueError, "regular file"):
+                rag.token_from(dir_args)
+
+    def test_sync_endpoint_is_loopback_default_with_explicit_remote_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
+            public_docs, _ = rag.discover(root)
+            for url in (
+                "http://127.0.0.1:3000",
+                "http://localhost:3000",
+                "http://[::1]:3000",
+            ):
+                rag.validate_sync_endpoint(url, public_docs)
+            with self.assertRaisesRegex(ValueError, "loopback-only by default"):
+                rag.validate_sync_endpoint("https://owui.example.invalid", public_docs)
+            rag.validate_sync_endpoint(
+                "https://owui.example.invalid", public_docs, allow_remote=True
+            )
+
+            self.make_doc(
+                root,
+                "confidential",
+                "secret.md",
+                "de-CH",
+                "de-CH",
+                "secret.pdf",
+            )
+            mixed_docs, _ = rag.discover(root)
+            with self.assertRaisesRegex(ValueError, "confidential documents"):
+                rag.validate_sync_endpoint(
+                    "https://owui.example.invalid", mixed_docs, allow_remote=True
+                )
+            rag.validate_sync_endpoint(
+                "https://owui.example.invalid",
+                mixed_docs,
+                allow_remote=True,
+                allow_confidential_remote=True,
+            )
+
+            empty_root = Path(tmp) / "empty-confidential"
+            (empty_root / "confidential" / "EMPTY" / "active").mkdir(parents=True)
+            with self.assertRaisesRegex(ValueError, "confidential documents"):
+                rag.validate_sync_endpoint(
+                    "https://owui.example.invalid",
+                    [],
+                    root=empty_root,
+                    allow_remote=True,
+                )
+
+    def test_sync_transactions_preserve_replacement_before_cleanup_and_prune_boundary(self) -> None:
+        class FakeApi:
+            def __init__(self, diff_result, *, fail_upload=False, fail_cleanup=False):
+                self.diff_result = diff_result
+                self.fail_upload = fail_upload
+                self.fail_cleanup = fail_cleanup
+                self.calls = []
+
+            def knowledge(self, name, description):
+                self.calls.append(("knowledge", name))
+                return {"id": "kb"}
+
+            def find_knowledge(self, name):
+                self.calls.append(("find", name))
+                return {"id": "kb"}
+
+            def diff(self, knowledge_id, docs):
+                self.calls.append(("diff", knowledge_id, tuple(d.path.name for d in docs)))
+                return self.diff_result
+
+            def upload(self, knowledge_id, doc):
+                self.calls.append(("upload", doc.path.name))
+                if self.fail_upload:
+                    raise RuntimeError("upload failed")
+
+            def cleanup(self, knowledge_id, file_ids):
+                self.calls.append(("cleanup", tuple(file_ids)))
+                if self.fail_cleanup:
+                    raise RuntimeError("cleanup failed")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
+            docs, warnings = rag.discover(root)
+            self.assertEqual(warnings, [])
+
+            def run(fake, *, prune=False):
+                args = type(
+                    "Args",
+                    (),
+                    {
+                        "url": "http://127.0.0.1:3000",
+                        "token_file": None,
+                        "timeout": 5,
+                        "prune": prune,
+                        "allow_remote": False,
+                        "allow_confidential_remote": False,
+                    },
+                )()
+                with (
+                    patch.object(rag, "OpenWebUI", return_value=fake),
+                    patch.object(rag, "token_from", return_value="secret"),
+                    redirect_stdout(io.StringIO()),
+                ):
+                    rag.sync(root, docs, [], args)
+
+            added = FakeApi({"added": [{"filename": path.name}], "modified": [], "deleted": []})
+            run(added)
+            self.assertEqual([c[0] for c in added.calls if c[0] in {"upload", "cleanup"}], ["upload"])
+
+            modified = FakeApi({"added": [], "modified": [{"filename": path.name, "stale_file_id": "old"}], "deleted": []})
+            run(modified)
+            self.assertEqual([c[0] for c in modified.calls if c[0] in {"upload", "cleanup"}], ["upload", "cleanup"])
+            self.assertIn(("cleanup", ("old",)), modified.calls)
+
+            failed_upload = FakeApi({"added": [], "modified": [{"filename": path.name, "stale_file_id": "old"}], "deleted": []}, fail_upload=True)
+            with self.assertRaisesRegex(RuntimeError, "upload failed"):
+                run(failed_upload)
+            self.assertFalse(any(c[0] == "cleanup" for c in failed_upload.calls))
+
+            stale = {"added": [], "modified": [], "deleted": [{"file_id": "gone"}]}
+            no_prune = FakeApi(stale)
+            run(no_prune, prune=False)
+            self.assertFalse(any(c[0] == "cleanup" for c in no_prune.calls))
+
+            prune = FakeApi(stale)
+            run(prune, prune=True)
+            self.assertIn(("cleanup", ("gone",)), prune.calls)
+
+            cleanup_failure = FakeApi({"added": [], "modified": [{"filename": path.name, "stale_file_id": "old"}], "deleted": []}, fail_cleanup=True)
+            with self.assertRaisesRegex(RuntimeError, "replacement upload succeeded"):
+                run(cleanup_failure)
+            events = [c[0] for c in cleanup_failure.calls if c[0] in {"upload", "cleanup"}]
+            self.assertEqual(events, ["upload", "cleanup"])
+
+    def test_empty_local_lane_prune_converges_remote_lane(self) -> None:
+        class FakeApi:
+            def __init__(self):
+                self.cleanups = []
+            def find_knowledge(self, _name):
+                return {"id": "kb"}
+            def diff(self, _knowledge_id, _docs):
+                return {"added": [], "modified": [], "deleted": [{"file_id": "stale"}]}
+            def cleanup(self, _knowledge_id, file_ids):
+                self.cleanups.append(tuple(file_ids))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "public" / "COLLECTION" / "active").mkdir(parents=True)
+            args = type(
+                "Args",
+                (),
+                {
+                    "url": "http://127.0.0.1:3000",
+                    "token_file": None,
+                    "timeout": 5,
+                    "prune": True,
+                    "allow_remote": False,
+                    "allow_confidential_remote": False,
+                },
+            )()
+            fake = FakeApi()
+            with (
+                patch.object(rag, "OpenWebUI", return_value=fake),
+                patch.object(rag, "token_from", return_value="secret"),
+                redirect_stdout(io.StringIO()),
+            ):
+                rag.sync(root, [], [], args)
+            self.assertEqual(fake.cleanups, [("stale",), ("stale",)])
 
     def test_plan_needs_no_api_key_and_sync_contract_is_incremental(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "plan", str(root)],
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("[PUBLIC] COLLECTION — Originals", result.stdout)
+            docs, warnings = rag.discover(root)
+            output = io.StringIO()
+            with redirect_stdout(output):
+                rag.print_plan(root, docs, warnings)
+            self.assertIn("[PUBLIC] COLLECTION — Originals", output.getvalue())
         source = SCRIPT.read_text(encoding="utf-8")
         self.assertIn("/sync/diff", source)
         self.assertIn("process_in_background=false", source)
         self.assertIn("/process/status", source)
         self.assertIn("--prune", source)
         self.assertNotIn("sqlite", source.lower())
+        self.assertNotIn("argparse.ArgumentParser", source)
+        self.assertNotIn('prog="bc250 rag ingest"', source)
 
     def test_prune_knows_both_generated_lanes_even_when_one_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

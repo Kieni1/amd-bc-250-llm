@@ -889,6 +889,16 @@ def parser() -> argparse.ArgumentParser:
     ingest = sub.add_parser("ingest", help="validate and incrementally sync all active Markdown to Open WebUI")
     ingest.add_argument("--url", default=importer.DEFAULT_URL)
     ingest.add_argument("--token-file")
+    ingest.add_argument(
+        "--allow-remote",
+        action="store_true",
+        help="explicitly permit non-loopback Open WebUI; credentials and document content leave the appliance",
+    )
+    ingest.add_argument(
+        "--allow-confidential-remote",
+        action="store_true",
+        help="also permit confidential-scope documents on an explicitly enabled remote endpoint",
+    )
     ingest.add_argument("--prune", action="store_true")
     ingest.add_argument("--timeout", type=int, default=600)
 

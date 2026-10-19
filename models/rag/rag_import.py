@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import mimetypes
@@ -14,7 +13,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 from urllib.request import Request, urlopen
 
 DEFAULT_ROOT = Path(os.environ.get("BC250_RAG_ROOT", "/srv/bc250-documents"))
@@ -495,8 +494,49 @@ class OpenWebUI:
             )
 
 
+def is_loopback_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme in {"http", "https"} and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+
+
+def validate_sync_endpoint(
+    url: str,
+    docs: list[Document],
+    *,
+    root: Path | None = None,
+    allow_remote: bool = False,
+    allow_confidential_remote: bool = False,
+) -> None:
+    if is_loopback_url(url):
+        return
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError(f"invalid Open WebUI URL: {url!r}")
+    if not allow_remote:
+        raise ValueError(
+            "RAG ingest is loopback-only by default; remote Open WebUI requires --allow-remote "
+            "because API credentials, document content and knowledge metadata leave the appliance"
+        )
+    has_confidential = any(doc.scope == "confidential" for doc in docs)
+    if root is not None:
+        confidential_root = root / "confidential"
+        if confidential_root.is_dir():
+            has_confidential = has_confidential or any(
+                (collection / "active").is_dir()
+                for collection in confidential_root.iterdir()
+                if collection.is_dir() and not collection.is_symlink()
+            )
+    if has_confidential and not allow_confidential_remote:
+        raise ValueError(
+            "remote RAG ingest includes confidential documents; add --allow-confidential-remote "
+            "together with --allow-remote only after explicitly accepting off-appliance disclosure"
+        )
+
+
 def read_protected_token_file(path: Path) -> str:
-    """Read a credential file only when its filesystem permissions are private."""
+    """Read a credential file only when it is private, regular and not a symlink."""
+    if path.is_symlink():
+        raise ValueError(f"Open WebUI API key file must not be a symlink: {path}")
     try:
         info = path.stat()
     except OSError as exc:
@@ -517,7 +557,7 @@ def read_protected_token_file(path: Path) -> str:
     return token
 
 
-def token_from(args: argparse.Namespace) -> str:
+def token_from(args: object) -> str:
     if args.token_file:
         return read_protected_token_file(Path(args.token_file))
     token = os.environ.get("OPEN_WEBUI_API_KEY", "").strip()
@@ -527,9 +567,22 @@ def token_from(args: argparse.Namespace) -> str:
 
 
 def sync(
-    root: Path, docs: list[Document], warnings: list[str], args: argparse.Namespace
+    root: Path, docs: list[Document], warnings: list[str], args: object
 ) -> None:
+    validate_sync_endpoint(
+        args.url,
+        docs,
+        root=root,
+        allow_remote=bool(getattr(args, "allow_remote", False)),
+        allow_confidential_remote=bool(getattr(args, "allow_confidential_remote", False)),
+    )
     print_plan(root, docs, warnings)
+    if not is_loopback_url(args.url):
+        print(
+            "WARNING: remote RAG ingest explicitly enabled; API credentials, document content and "
+            "knowledge metadata will leave this appliance.",
+            file=sys.stderr,
+        )
     api = OpenWebUI(args.url, token_from(args), args.timeout)
     grouped = groups(docs)
     expected = expected_knowledge(root)
@@ -570,7 +623,14 @@ def sync(
             doc = by_key[(name, str(item["filename"]))]
             print(f"  replace: {doc.path.name}")
             api.upload(kb_id, doc)
-            api.cleanup(kb_id, [str(item["stale_file_id"])])
+            try:
+                api.cleanup(kb_id, [str(item["stale_file_id"])])
+            except RuntimeError as exc:
+                raise RuntimeError(
+                    f"replacement upload succeeded for {doc.path.name}, but stale remote cleanup failed; "
+                    "the new copy was kept and the old copy may still exist. Fix the API/permission problem "
+                    "and rerun ingest; do not use --prune unless unrelated local deletions should also be removed."
+                ) from exc
 
         if deleted:
             if args.prune:
@@ -589,54 +649,3 @@ def sync(
     print(
         "\nSync complete. Review Open WebUI Knowledge permissions before exposing any collection to other users."
     )
-
-
-def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(
-        prog="bc250 rag ingest",
-        description="Validate and sync active Markdown documents into language/authority-separated Open WebUI knowledge bases.",
-    )
-    sub = p.add_subparsers(dest="command", required=True)
-    plan = sub.add_parser(
-        "plan",
-        help="validate metadata/source provenance and show routing without contacting Open WebUI",
-    )
-    plan.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT)
-    apply = sub.add_parser(
-        "sync", help="incrementally upload changed active Markdown documents"
-    )
-    apply.add_argument("root", nargs="?", type=Path, default=DEFAULT_ROOT)
-    apply.add_argument(
-        "--url", default=DEFAULT_URL, help=f"Open WebUI URL (default: {DEFAULT_URL})"
-    )
-    apply.add_argument(
-        "--token-file", help="root-readable file containing an Open WebUI API key"
-    )
-    apply.add_argument(
-        "--prune",
-        action="store_true",
-        help="remove remote files no longer present locally",
-    )
-    apply.add_argument(
-        "--timeout", type=int, default=600, help="per-request timeout in seconds"
-    )
-    return p
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = parser().parse_args(argv)
-    root = args.root.resolve()
-    try:
-        docs, warnings = discover(root)
-        if args.command == "plan":
-            print_plan(root, docs, warnings)
-        else:
-            sync(root, docs, warnings, args)
-    except (OSError, TypeError, ValueError, RuntimeError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 2
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())

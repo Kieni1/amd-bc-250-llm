@@ -9,6 +9,13 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class RagBaselineTests(unittest.TestCase):
+    def test_bash_completion_exposes_current_rag_lifecycle_and_remote_safety_flags(self) -> None:
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        for command in ("init", "prepare-batch", "review", "validate", "activate", "supersede", "status", "ingest"):
+            self.assertIn(command, completion)
+        self.assertIn("--allow-remote", completion)
+        self.assertIn("--allow-confidential-remote", completion)
+
     def test_packaged_open_webui_rag_defaults(self) -> None:
         desired = json.loads(
             (ROOT / "config/openwebui/desired-state.json").read_text(encoding="utf-8")
