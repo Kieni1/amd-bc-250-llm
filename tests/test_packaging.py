@@ -190,9 +190,9 @@ class PackagingTests(unittest.TestCase):
             script = project / "scripts/make-source-tarball.sh"
             script.write_text(source, encoding="utf-8")
             script.chmod(0o755)
-            (project / "VERSION").write_text("0.13.1\n", encoding="utf-8")
+            (project / "VERSION").write_text("0.14.1\n", encoding="utf-8")
             (project / "packaging/bc250-llm-server.spec").write_text(
-                "%changelog\n* Thu Oct 08 2026 Test <test@example.invalid> - 0.13.1-1.1\n",
+                "%changelog\n* Mon Oct 19 2026 Test <test@example.invalid> - 0.14.1-1\n",
                 encoding="utf-8",
             )
             (project / "sources/cache.sha256").write_text("local cache\n", encoding="utf-8")
@@ -216,13 +216,17 @@ class PackagingTests(unittest.TestCase):
                 result = subprocess.run(
                     ["bash", str(script)],
                     cwd=project,
-                    env={**os.environ, "TZ": timezone},
+                    env={
+                        key: value
+                        for key, value in {**os.environ, "TZ": timezone}.items()
+                        if key not in {"BC250_BUILD_DIR", "BC250_SOURCE_DIR"}
+                    },
                     text=True,
                     capture_output=True,
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                archive = project / "build/bc250-llm-server-0.13.1.tar.gz"
+                archive = project / "build/bc250-llm-server-0.14.1.tar.gz"
                 hashes.append(hashlib.sha256(archive.read_bytes()).hexdigest())
 
             self.assertEqual(hashes[0], hashes[1])
@@ -928,6 +932,8 @@ class PackagingTests(unittest.TestCase):
         package_gate = makefile[makefile.index("release-gate-package:"):makefile.index("\n\nrelease-gate:")]
         self.assertLess(package_gate.index("RPM_TREE_TARGET=rpm-tree-frozen rpm"), package_gate.index("rpmlint -c"))
         self.assertIn("rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm", package_gate)
+        self.assertIn("rpmlint: FAIL (blocking", package_gate)
+        self.assertNotIn("rpmlint: WARN (non-blocking", package_gate)
         self.assertIn("check-srpm-rebuild", package_gate)
         self.assertIn("-C '$(FROZEN_SOURCE_DIR)'", package_gate)
         self.assertIn("release-evidence", package_gate)

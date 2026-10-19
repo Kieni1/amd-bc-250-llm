@@ -242,15 +242,12 @@ ollama_version_line
         with tempfile.TemporaryDirectory() as temporary:
             share = Path(temporary)
             (share / "runtime.env").write_text(
-                "\n".join(
-                    [
-                        "BC250_OPEN_WEBUI_VERSION=0.11.4",
-                        "BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:" + "1" * 64,
-                        "BC250_TIKA_VERSION=4.1.0-full",
-                        "BC250_TIKA_IMAGE_DIGEST=sha256:" + "2" * 64,
-                    ]
-                )
-                + "\n",
+                (
+                    "BC250_OPEN_WEBUI_VERSION=0.11.4\n"
+                    f"BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:{'1' * 64}\n"
+                    "BC250_TIKA_VERSION=4.1.0-full\n"
+                    f"BC250_TIKA_IMAGE_DIGEST=sha256:{'2' * 64}\n"
+                ),
                 encoding="utf-8",
             )
             with (

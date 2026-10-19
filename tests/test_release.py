@@ -28,7 +28,16 @@ class ReleaseContractTests(unittest.TestCase):
     def test_release_gate_keeps_quality_advisory(self) -> None:
         contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
         self.assertFalse(contract["validation"]["advisory_quality"]["blocking"])
-        self.assertEqual(contract["validation"]["package_critical_tests"], ["tests/test_core.py"])
+        self.assertEqual(
+            contract["validation"]["package_critical_tests"],
+            [
+                "tests/test_core.py",
+                "tests/test_packaging.py",
+                "tests/test_sources.py",
+                "tests/test_upstream_patch_validation.py",
+                "tests/test_runtime.py",
+            ],
+        )
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
         self.assertIn("make release-gate", workflow)
         self.assertIn("continue-on-error: true", workflow)
@@ -44,7 +53,7 @@ class ReleaseContractTests(unittest.TestCase):
 
     def test_lint_ignores_generated_and_vendored_trees(self) -> None:
         lint = make_recipe("lint")
-        for ignored in ("./sources/*", "./build/*", "./.build/*", "./rpmbuild/*", "./governor-src/*", "./live-manager-src/*"):
+        for ignored in ("./sources/*", "./build/*", "./.build/*", "./dist/*", "./rpmbuild/*", "./vendor/*", "./governor-src/*", "./live-manager-src/*"):
             self.assertIn(ignored, lint)
 
     def test_source_tar_uses_tracked_git_files(self) -> None:

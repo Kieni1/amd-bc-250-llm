@@ -35,6 +35,9 @@ class ReleasePipelineTests(unittest.TestCase):
             [stage["id"] for stage in contract["validation"]["stages"]],
             ["preflight-freeze", "frozen-package", "artifact-evidence"],
         )
+        self.assertTrue(contract["validation"]["blocking_static"]["blocking"])
+        self.assertEqual(contract["validation"]["blocking_static"]["command"], "make lint")
+        self.assertTrue(contract["validation"]["rpmlint"]["blocking"])
 
     def test_contract_matches_current_package_and_runtime_identity(self) -> None:
         contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
@@ -56,6 +59,8 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("BC250_RELEASE_AUTHORITY", workflow)
         self.assertIn("Upload selected release authority record", workflow)
         self.assertIn("--disable-repo=fedora-cisco-openh264", workflow)
+        for package in ("coreutils", "diffutils", "gawk", "grep", "sed"):
+            self.assertIn(package, workflow)
         self.assertNotIn("build-local.sh", workflow)
 
     def test_local_ci_is_backup_and_builds_unprivileged(self) -> None:
@@ -67,14 +72,21 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("BC250_RELEASE_AUTHORITY=false", local)
         self.assertIn("BC250_BUILD_IMAGE_REF", local)
         self.assertIn("--disable-repo=fedora-cisco-openh264", local)
+        for package in ("coreutils", "diffutils", "gawk", "grep", "sed"):
+            self.assertIn(package, local)
         self.assertNotIn("gfx" + "1013", local.lower())
 
     def test_release_gate_freezes_inputs_before_package_build(self) -> None:
         preflight = make_recipe("release-gate-preflight")
         package = make_recipe("release-gate-package")
         gate = make_recipe("release-gate")
-        self.assertNotIn("$(MAKE) lint", preflight)
-        self.assertLess(preflight.index("$(MAKE) preflight"), preflight.index("$(MAKE) freeze-rpm-inputs"))
+        self.assertIn("$(MAKE) lint", preflight)
+        lint = make_recipe("lint")
+        self.assertIn("-not -path './.git/*'", lint)
+        self.assertIn("-not -path './development/patchnotes/*'", lint)
+        self.assertLess(preflight.index("$(MAKE) lint"), preflight.index("$(MAKE) preflight"))
+        self.assertLess(preflight.index("$(MAKE) preflight"), preflight.index("$(MAKE) sources"))
+        self.assertLess(preflight.index("$(MAKE) sources-check"), preflight.index("$(MAKE) freeze-rpm-inputs"))
         self.assertLess(preflight.index("$(MAKE) freeze-rpm-inputs"), preflight.index("$(MAKE) check-frozen-source"))
         self.assertIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
         self.assertIn("$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml", package)
@@ -100,22 +112,24 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertEqual(
             contract["validation"]["package_critical_tests"],
             [
+                "tests/test_core.py",
                 "tests/test_packaging.py",
                 "tests/test_sources.py",
                 "tests/test_upstream_patch_validation.py",
                 "tests/test_runtime.py",
             ],
         )
-        self.assertIn('validation"]["package_critical_tests"]', validator)
+        self.assertIn('package_critical_tests', validator)
         self.assertIn("bash scripts/validate.sh --package </dev/null", spec)
         self.assertNotIn("tests/test_benchmark.py", json.dumps(contract["validation"]["package_critical_tests"]))
 
-    def test_release_gate_keeps_governance_and_full_suite_advisory(self) -> None:
+    def test_release_gate_blocks_static_governance_and_rpmlint_but_keeps_full_suite_advisory(self) -> None:
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         validator = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
         preflight = make_recipe("release-gate-preflight")
-        self.assertNotIn("$(MAKE) lint", preflight)
+        self.assertIn("$(MAKE) lint", preflight)
+        self.assertLess(preflight.index("$(MAKE) lint"), preflight.index("$(MAKE) freeze-rpm-inputs"))
         self.assertIn("quality-report:", makefile)
         self.assertIn("Advisory quality report: WARN", makefile)
         self.assertIn("development/scope.py check --quiet", validator)
@@ -125,7 +139,8 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("Upload advisory quality report", workflow)
         package = make_recipe("release-gate-package")
         self.assertIn("rpmlint-report.txt", package)
-        self.assertIn("rpmlint: WARN (non-blocking", package)
+        self.assertIn("rpmlint: FAIL (blocking", package)
+        self.assertNotIn("rpmlint: WARN (non-blocking", package)
 
     def test_source_tar_supports_custom_build_root_and_prunes_empty_dirs(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
@@ -145,7 +160,7 @@ class ReleasePipelineTests(unittest.TestCase):
                 encoding="utf-8",
             )
             source_script.chmod(0o755)
-            (root / "VERSION").write_text("0.13.1\n", encoding="utf-8")
+            (root / "VERSION").write_text("0.14.1\n", encoding="utf-8")
             (root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
             (root / ".gitignore").write_text(".DS_Store\n/build/\n", encoding="utf-8")
             subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -175,10 +190,10 @@ class ReleasePipelineTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-            archive = build / "bc250-llm-server-0.13.1.tar.gz"
+            archive = build / "bc250-llm-server-0.14.1.tar.gz"
             with tarfile.open(archive, "r:gz") as tf:
                 names = set(tf.getnames())
-            prefix = "bc250-llm-server-0.13.1/"
+            prefix = "bc250-llm-server-0.14.1/"
             self.assertIn(prefix + "tracked.txt", names)
             self.assertIn(prefix + ".gitignore", names)
             self.assertNotIn(prefix + ".DS_Store", names)

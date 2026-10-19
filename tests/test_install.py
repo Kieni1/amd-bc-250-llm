@@ -85,6 +85,7 @@ def source_probe(body: str) -> subprocess.CompletedProcess[str]:
         _write_fake_jq(fake_bin)
         env = os.environ.copy()
         env["PATH"] = f"{fake_bin}:{env.get('PATH', '')}"
+        env["BC250_RUNTIME_DIR"] = tmp
         return subprocess.run(
             [
                 "bash",
