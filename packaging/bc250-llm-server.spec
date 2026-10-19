@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1%{?dist}
+Release:        1.2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -258,6 +258,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Mon Oct 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.2
+- Align release-policy/current-guidance semantics with the blocking gate, derive current identity in validators, populate focused checks and remove editable handover checksums.
+- Add behavior-level RAG transaction/privacy regressions, loopback-default ingestion with explicit remote opt-in, and consistent credential symlink rejection.
+- Remove duplicate/obsolete compatibility surface: the internal rag_import CLI and bc250 doctor alias; keep canonical bc250 rag and bc250 health.
+- Clarify SRPM rebuild evidence as an isolated topdir rebuild in the release environment and expand the deterministic suite to 651 tests across 24 modules.
+- Keep stock-core runtime/model pins unchanged; device acceptance remains bound to the exact selected GitHub artifact.
+
 * Mon Oct 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1
 - Promote the validated clean-core source to the first unused 0.14.1 release identity without changing the Ollama 0.34.4 runtime pin or device-acceptance status.
 - Distinguish ordinary GitHub CI evidence from an explicitly selected workflow-dispatch release-authority run; emit a separate release-selection record for that selected run.

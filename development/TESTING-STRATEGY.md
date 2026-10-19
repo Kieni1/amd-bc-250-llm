@@ -1,8 +1,8 @@
-# BC-250 testing strategy — 0.14.1-1
+# BC-250 testing strategy — 0.14.1-1.2
 
 ## Current objective
 
-The current source/release identity is `bc250-llm-server-0.14.1-1`.
+The current source/release identity is `bc250-llm-server-0.14.1-1.2`.
 
 Testing now has three jobs:
 
@@ -76,7 +76,7 @@ Ruff/ShellCheck are blocking release-candidate checks and run before Source0 fre
 
 Source tests do not substitute for exact-RPM device evidence.
 
-For the first `0.14.1-1` device round, use `development/handovers/03_CORE_FUNCTIONALITY_CHECK.md` and keep it intentionally small:
+For the first `0.14.1-1.2` device round, use `development/handovers/03_CORE_FUNCTIONALITY_CHECK.md` and keep it intentionally small:
 
 - exact RPM identity;
 - install/upgrade completion;
@@ -86,7 +86,7 @@ For the first `0.14.1-1` device round, use `development/handovers/03_CORE_FUNCTI
 - model-install cancel/no-mutation;
 - one reboot/persistence check.
 
-If that passes, freeze the exact RPM SHA-256 and selected GitHub run identity as the stock-core baseline before starting the next simplification round.
+If that passes, freeze the exact RPM SHA-256 and selected GitHub run identity as the stock-core baseline, then move directly into the product roadmap. Perform bounded simplification opportunistically only where it removes concrete ownership or failure risk; it is not a prerequisite phase.
 
 ## Deeper tests are risk-driven
 

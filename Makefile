@@ -32,7 +32,7 @@ help:
 	@printf '%s\n' \
 	  'make sources    Download pinned governor and live-manager sources' \
 	  'make sources-check  Verify the local source cache and SHA-256 sidecars' \
-	  'make lint       Run Ruff and ShellCheck (developer quality; not release-blocking)' \
+	  'make lint       Run blocking Ruff and ShellCheck release preflight' \
 	  'make quality-report  Run lint + full validation and report all issues without blocking artifacts' \
 	  'make preflight  Run release-critical source/release-pipeline checks' \
 	  'make validate   Run current guidance/scope plus the full advisory repository test suite' \
@@ -45,7 +45,7 @@ help:
 	  'make release-evidence  Emit CI/build evidence and, when explicitly selected, release-selection.json' \
 	  'make BUILD_DIR=/path release-gate  Supported custom Make-level build root (BC250_BUILD_DIR is internal)' \
 	  'make check-rpm-payload  Verify transformed binary RPM content and metadata' \
-	  'make check-srpm-rebuild  Rebuild the generated SRPM from a clean temporary topdir' \
+	  'make check-srpm-rebuild  Rebuild the generated SRPM in an isolated topdir inside the release environment' \
 	  'make release-gate  Fedora RPM release gate; GitHub artifact is release authority, local execution reproduces the gate' \
 	  'make clean      Remove disposable build output; keep downloaded sources' \
 	  'make clean-sources  Remove the reusable third-party source cache'
@@ -209,7 +209,7 @@ check-rpm-payload:
 	  /usr/bin/llm-run-diagnose \
 	  /usr/libexec/bc250-llm-server/install-ollama.sh \
 	  /usr/libexec/bc250-llm-server/status-json.py \
-	  /usr/libexec/bc250-llm-server/doctor.py \
+	  /usr/libexec/bc250-llm-server/health.py \
 	  /usr/libexec/bc250-llm-server/qualification/package_gate_capture.py \
 	  /usr/libexec/bc250-llm-server/qualification/resilience_manager.py \
 	  /usr/libexec/bc250-llm-server/qualification/qualification_inventory.py \
@@ -246,7 +246,7 @@ check-srpm-rebuild:
 	top="$$(mktemp -d)"; trap 'rm -rf "$$top"' EXIT; \
 	mkdir -p "$$top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}; \
 	CARGO_NET_OFFLINE=true rpmbuild --define "_topdir $$top" --rebuild "$${srpms[0]}"; \
-	echo "SRPM self-contained rebuild passed: $$(basename "$${srpms[0]}")"
+	echo "SRPM isolated-topdir rebuild passed: $$(basename "$${srpms[0]}")"
 
 release-gate-preflight:
 	$(MAKE) clean

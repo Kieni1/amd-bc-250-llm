@@ -2,8 +2,8 @@
   "schema_version": 1,
   "release": {
     "version": "0.14.1",
-    "rpm_release": "1",
-    "nvr": "bc250-llm-server-0.14.1-1"
+    "rpm_release": "1.2",
+    "nvr": "bc250-llm-server-0.14.1-1.2"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
@@ -22,7 +22,7 @@
     },
     "full_release_gate": {
       "required": true,
-      "note": "Frozen status reduces routine iteration only. Release builds run the small hard source/package gate; the lean full suite and governance checks remain advisory evidence unless explicitly promoted."
+      "note": "Frozen status reduces routine iteration only. Current-release governance, Ruff, ShellCheck, package-critical tests, configured rpmlint, payload/source integrity and artifact identity are blocking. The broad behavioral suite remains additional/advisory evidence unless a finding is promoted to a release-critical defect."
     }
   },
   "fast_global_checks": [
@@ -42,7 +42,11 @@
         "config/nginx/*.conf",
         "config/openwebui/open-webui-enable.conf"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_install.py",
+        "tests/test_openwebui.py",
+        "tests/test_operations.py"
+      ],
       "notes": [
         "Open WebUI publication remains fail-closed until authenticated desired-state convergence succeeds.",
         "The protected maintenance credential is a real Open WebUI sk-* API key, not a signin JWT."
@@ -59,7 +63,11 @@
         "config/openwebui/prompts/*",
         "docs/OPENWEBUI.md"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_openwebui.py",
+        "tests/test_translation_provider.py",
+        "tests/test_catalog.py"
+      ],
       "notes": [
         "Advanced current candidate is think=true with max_tokens=6144 and unchanged samplers.",
         "Deep pre-evicts task/embedding and uses exact keep_alive=2m.",
@@ -80,7 +88,10 @@
         "quality-checks/translation/**",
         "quality-checks/utils/**"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_benchmark.py",
+        "tests/test_qualification.py"
+      ],
       "notes": [
         "Clean reasoning-only exhaustion at the production ceiling is INCOMPLETE; repetitive degeneration remains a quality defect."
       ]
@@ -100,7 +111,10 @@
         "models/modelfiles/MODEL-TEMPLATE.Modelfile.example",
         "development/MODEL-MANAGER-CLI-CONTRACT.md"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_catalog.py",
+        "tests/test_models.py"
+      ],
       "notes": [
         "Qwen3.6 35B remains retired from active qualification.",
         "Catalog work may mention frozen MTP/RAG/OCR surfaces but must not thaw them unless their implementation boundary changes."
@@ -127,7 +141,11 @@
         "docs/INSTALLATION.md",
         "cmd/system/ollama-profiles/**"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_runtime.py",
+        "tests/test_operations.py",
+        "tests/test_state.py"
+      ],
       "boundary_interfaces": [
         "service/unit names and ports 11434/11435/11436/11437",
         "configured BC250_WGP_MASKS versus live SPI layout",
@@ -140,14 +158,17 @@
     },
     "verification-diagnostics": {
       "status": "active",
-      "description": "Verifier, human/JSON status, doctor diagnostics, support bundles and LAN verification.",
+      "description": "Verifier, human/JSON status, health diagnostics, support bundles and LAN verification.",
       "paths": [
         "cmd/monitoring/**",
         "docs/SECURITY.md",
         "docs/INSTALLATION.md",
         "docs/HTTPS.md"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_operations.py",
+        "tests/test_state.py"
+      ],
       "boundary_interfaces": [
         "installer final health summary",
         "revalidation health gate",
@@ -181,7 +202,12 @@
         "scripts/release-evidence.py",
         "scripts/release-selection.py"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_packaging.py",
+        "tests/test_sources.py",
+        "tests/test_release_pipeline.py",
+        "tests/test_upstream_patch_validation.py"
+      ],
       "boundary_interfaces": [
         "installed path ownership",
         "service/config payload",
@@ -191,7 +217,7 @@
     },
     "global-docs-coordination": {
       "status": "boundary_active",
-      "description": "Current operator/development guidance for the 0.14.1-1 release line. Historical rationale is archive-only.",
+      "description": "Current operator/development guidance for the 0.14.1-1.2 release line. Historical rationale is archive-only.",
       "paths": [
         "WORKBENCH-STATE.json",
         "README.md",
@@ -226,9 +252,14 @@
         "development/handovers/14_EVALUATOR_AND_RESULT_SEMANTICS.md",
         "development/handovers/15_SPECIALIST_WORK_AND_RETURN_CONTRACT.md",
         "development/handovers/scripts/**",
-        "development/handovers/SHA256SUMS.txt"
+        "development/handovers/16_PRODUCT_GOAL_AND_ROADMAP.md",
+        "development/handovers/17_RELEASE_CANDIDATE_EXECUTION_GATE.md"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_documentation.py",
+        "tests/test_release_pipeline.py",
+        "python3 development/scope.py check"
+      ],
       "boundary_interfaces": [
         "current instructions must override historical evidence",
         "scope/freeze policy"
@@ -278,7 +309,11 @@
         "examples/benchmark/rag-quality-office.json",
         "examples/benchmark/embedding-office.json"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_rag.py",
+        "tests/test_rag_import.py",
+        "tests/test_benchmark.py"
+      ],
       "thaw_if": [
         "embedding model or port 11437 contract changes",
         "Tika image/version/container behavior changes",
@@ -353,7 +388,10 @@
         "uninstall.sh",
         "docs/UNINSTALL.md"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_uninstall.py",
+        "tests/test_packaging.py"
+      ],
       "thaw_if": [
         "installed path ownership changes materially",
         "service/config cleanup semantics change",
@@ -403,7 +441,10 @@
         "cmd/qualification/**",
         "docs/QUALIFICATION.md"
       ],
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_qualification.py",
+        "tests/test_qualification_inventory.py"
+      ],
       "notes": [
         "Evidence cleanup is dry-run-first, terminal-only, preserves newest records per class and refuses symlink/out-of-root deletion targets."
       ]

@@ -258,11 +258,11 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("uninstall.sh\t{libexec}/uninstall.sh", manifest)
         self.assertIn("cmd/monitoring/status.sh\t{libexec}/status.sh", manifest)
         self.assertIn("cmd/monitoring/status-json.py\t{libexec}/status-json.py", manifest)
-        self.assertIn("cmd/monitoring/doctor.py\t{libexec}/doctor.py", manifest)
+        self.assertIn("cmd/monitoring/health.py\t{libexec}/health.py", manifest)
         self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        for route in ("model", "status", "health", "doctor", "version", "support-bundle", "fetch-mtp", "ocr", "rag", "package-gate", "qualification", "resilience"):
+        for route in ("model", "status", "health", "version", "support-bundle", "fetch-mtp", "ocr", "rag", "package-gate", "qualification", "resilience"):
             self.assertRegex(dispatcher, rf'(?m)^  "{route}\|', route)
         self.assertNotIn('--list-aliases', dispatcher)
         self.assertNotIn('"uninstall|', dispatcher)
@@ -307,13 +307,13 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("gfx" + "1013", completion.lower())
         self.assertIn("--older-than-days --keep-latest --apply", completion)
 
-    def test_c5b_health_alias_model_completion_and_one_next_action_are_packaged(self) -> None:
+    def test_c5b_health_model_completion_and_one_next_action_are_packaged(self) -> None:
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
         completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        self.assertIn('"health|$LIBEXEC/doctor.py"', dispatcher)
-        self.assertIn("doctor (health compatibility alias)", dispatcher)
-        self.assertIn("doctor health", completion)
+        self.assertIn('"health|$LIBEXEC/health.py"', dispatcher)
+        self.assertNotIn('"doctor|', dispatcher)
+        self.assertNotIn(" doctor ", f" {completion} ")
         self.assertIn("list status path install apply refresh", completion)
         posttrans = spec[spec.index("%posttrans"):spec.index("%preun")]
         self.assertIn('echo "Next action:"', posttrans)
@@ -915,7 +915,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("/usr/bin/bc250-40cu", makefile)
         self.assertIn("/usr/bin/bc250-cu-live-manager", makefile)
         self.assertIn("/usr/libexec/bc250-llm-server/status-json.py", makefile)
-        self.assertIn("/usr/libexec/bc250-llm-server/doctor.py", makefile)
+        self.assertIn("/usr/libexec/bc250-llm-server/health.py", makefile)
         self.assertIn("/usr/libexec/bc250-llm-server/qualification/package_gate_capture.py", makefile)
         self.assertIn("/usr/libexec/bc250-llm-server/qualification/resilience_manager.py", makefile)
         self.assertIn("grep '^/usr/bin/bc250-'", makefile)

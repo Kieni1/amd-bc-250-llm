@@ -117,6 +117,9 @@ class ReleasePipelineTests(unittest.TestCase):
                 "tests/test_sources.py",
                 "tests/test_upstream_patch_validation.py",
                 "tests/test_runtime.py",
+                "tests/test_rag.py",
+                "tests/test_rag_import.py",
+                "tests/test_qualification.py",
             ],
         )
         self.assertIn('package_critical_tests', validator)

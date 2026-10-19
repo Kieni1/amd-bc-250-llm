@@ -36,6 +36,9 @@ class ReleaseContractTests(unittest.TestCase):
                 "tests/test_sources.py",
                 "tests/test_upstream_patch_validation.py",
                 "tests/test_runtime.py",
+                "tests/test_rag.py",
+                "tests/test_rag_import.py",
+                "tests/test_qualification.py",
             ],
         )
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")

@@ -34,7 +34,7 @@
   "package": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "rpm_release": "1",
+    "rpm_release": "1.2",
     "version": "0.14.1"
   },
   "runtime": {
@@ -52,7 +52,10 @@
       "tests/test_packaging.py",
       "tests/test_sources.py",
       "tests/test_upstream_patch_validation.py",
-      "tests/test_runtime.py"
+      "tests/test_runtime.py",
+      "tests/test_rag.py",
+      "tests/test_rag_import.py",
+      "tests/test_qualification.py"
     ],
     "preflight_tests": [
       "tests/test_release_pipeline.py"

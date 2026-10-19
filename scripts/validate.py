@@ -256,6 +256,9 @@ def check_release_contract() -> None:
         "tests/test_sources.py",
         "tests/test_upstream_patch_validation.py",
         "tests/test_runtime.py",
+        "tests/test_rag.py",
+        "tests/test_rag_import.py",
+        "tests/test_qualification.py",
     ]
     if package_critical != expected_package_critical:
         fail("release contract package_critical_tests differs from the release-critical test set")
@@ -333,7 +336,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
     dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
     routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
-        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "doctor", "health",
+        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "health",
         "fetch-mtp", "gitea-review", "install", "maintenance", "model", "ocr",
         "package-gate", "rag", "reset", "resilience", "revalidate", "ollama-profile",
         "openwebui-setup", "qualification", "run-mtp", "status", "support-bundle", "storage", "verify", "version",

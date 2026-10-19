@@ -119,6 +119,16 @@ def cmd_check(manifest: dict, quiet: bool) -> int:
         digest, files = component_hash(component)
         if not files:
             failures.append(f"{name}: path patterns match no files")
+        focused = component.get("focused_tests", [])
+        if status in {"active", "boundary_active"} and not focused and not component.get("focused_tests_reason"):
+            failures.append(
+                f"{name}: {status} component must declare focused_tests or focused_tests_reason"
+            )
+        for entry in focused:
+            candidate = entry.split()[0]
+            if candidate.endswith((".py", ".sh")) and not (ROOT / candidate).exists():
+                failures.append(f"{name}: focused test path does not exist: {candidate}")
+
         expected = component.get("baseline_sha256")
         if status in HASHED_STATUSES:
             if not expected or expected == "TO_BE_FILLED":
@@ -197,7 +207,7 @@ def cmd_map(manifest: dict, paths: list[str]) -> int:
                 print(f"    thaw if: {trigger}")
 
     if tests:
-        print("\nFocused test modules:")
+        print("\nFocused checks:")
         for test in sorted(tests):
             print(f"  {test}")
     if unclassified:
