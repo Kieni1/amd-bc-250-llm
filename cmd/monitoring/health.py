@@ -212,7 +212,7 @@ def main(argv: list[str] | None = None) -> int:
     warnings = sum(item["status"] == "WARN" for item in checks)
     overall = "FAIL" if failures else ("WARN" if warnings else "PASS")
     payload = {
-        "schema": "bc250.doctor.v3",
+        "schema": "bc250.health.v1",
         "overall": overall,
         "failures": failures,
         "warnings": warnings,

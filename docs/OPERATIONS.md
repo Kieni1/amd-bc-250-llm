@@ -15,7 +15,6 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250 status` | Concise read-only appliance status; `--json` is machine-readable |
 | `bc250 version` | Exact installed package/runtime identity; `--json` is machine-readable |
 | `bc250 health` | Read-only appliance health diagnostics; `--json` is machine-readable |
-| `bc250 doctor` | Compatibility alias for `bc250 health` |
 | `bc250 verify` | Detailed local verification |
 | `bc250 support-bundle` | Redacted support evidence archive |
 | `bc250 storage` | Report/dedupe/prune package-owned storage |
@@ -268,7 +267,7 @@ sudo bc250 rag review public COLLECTION
 sudo bc250 rag validate public COLLECTION --include-working
 sudo bc250 rag activate public COLLECTION --all-ready
 sudo bc250 rag status
-sudo bc250 rag ingest --token-file FILE [--prune]
+sudo bc250 rag ingest --token-file FILE [--prune] [--url URL --allow-remote [--allow-confidential-remote]]
 ```
 
 The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
@@ -277,8 +276,7 @@ local-only and stops at `working/`; reviewed Markdown must be explicitly activat
 
 `validate` checks provenance, review state, document identity, active revision conflicts and obvious native-reasoning marker contamination. `ingest` sends
 only `active/*.md` through the existing incremental Open WebUI knowledge API. The API key is never packaged;
-`--token-file` must be a non-empty private regular file. Use `--prune` only when stale remote documents should
-be removed. The former compatibility interface is removed; new and existing corpora use the product lifecycle above.
+`--token-file` must be a non-empty private regular file and must not be a symlink. Ingestion is loopback-only by default. `--allow-remote` is required for a non-loopback Open WebUI endpoint; when the corpus contains a confidential collection with an active lane, remote ingest additionally requires `--allow-confidential-remote`, including for an empty lane that may be pruned. These overrides mean API credentials, document content and knowledge metadata leave the appliance. Use `--prune` only when stale remote documents should be removed. The former compatibility interface is removed; new and existing corpora use the product lifecycle above.
 
 ### Experimental OCR
 
@@ -383,7 +381,6 @@ sudo bc250 status
 sudo bc250 status --json
 sudo bc250 health
 sudo bc250 health --json
-sudo bc250 doctor          # compatibility alias
 sudo bc250 support-bundle
 sudo bc250 verify
 sudo bc250 verify --summary
@@ -406,7 +403,7 @@ sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience
 
 `sudo bc250 status --json` emits schema `bc250.status.v3` with installed package, kernel,
 service topology, runtime identity, memory/swap/PSI, failed-unit and restart-diagnostic
-state. `bc250 health` layers read-only PASS/WARN/FAIL diagnostics over that state (`bc250 doctor` remains a compatibility alias),
+state. `bc250 health` layers read-only PASS/WARN/FAIL diagnostics over that state,
 including `rpm -V`, runtime topology, runtime identity, memory headroom and
 exact running-kernel `kernel-devel` availability; run it with `sudo` to include
 the full package verifier.

@@ -7,7 +7,7 @@ _bc250_complete() {
   command="${COMP_WORDS[1]:-}"
 
   if (( COMP_CWORD == 1 )); then
-    COMPREPLY=( $(compgen -W 'agent-mode benchmark code code-commit compare-mtp doctor health fetch-mtp gitea-review install maintenance model ocr ollama-profile openwebui-setup package-gate qualification rag reset resilience run-mtp status storage support-bundle verify version help --help --version' -- "$cur") )
+    COMPREPLY=( $(compgen -W 'agent-mode benchmark code code-commit compare-mtp health fetch-mtp gitea-review install maintenance model ocr ollama-profile openwebui-setup package-gate qualification rag reset resilience run-mtp status storage support-bundle verify version help --help --version' -- "$cur") )
     return 0
   fi
 
@@ -24,7 +24,7 @@ _bc250_complete() {
     version)
       COMPREPLY=( $(compgen -W '--json --short' -- "$cur") )
       ;;
-    status|health|doctor)
+    status|health)
       COMPREPLY=( $(compgen -W '--json' -- "$cur") )
       ;;
     model)
@@ -35,6 +35,15 @@ _bc250_complete() {
     benchmark)
       if (( COMP_CWORD == 2 )); then
         COMPREPLY=( $(compgen -W 'generation embeddings ocr task agent usecase translation rag-cycle rag-quality concurrency num-batch owui-translation owui-rag owui-embedding-batch owui-chunk-min owui-system-context' -- "$cur") )
+      fi
+      ;;
+    rag)
+      if (( COMP_CWORD == 2 )); then
+        COMPREPLY=( $(compgen -W 'init prepare-batch review validate activate supersede status ingest' -- "$cur") )
+      elif [[ "${COMP_WORDS[2]:-}" == ingest ]]; then
+        COMPREPLY=( $(compgen -W '--url --token-file --prune --timeout --allow-remote --allow-confidential-remote' -- "$cur") )
+      elif [[ "${COMP_WORDS[2]:-}" == prepare-batch ]]; then
+        COMPREPLY=( $(compgen -W '--model --agent-url --max-chars --dry-run' -- "$cur") )
       fi
       ;;
     package-gate)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import subprocess
 import tempfile
@@ -9,9 +10,27 @@ from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
+CONTRACT = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
+CURRENT_VERSION = CONTRACT["package"]["version"]
+CURRENT_RELEASE = CONTRACT["package"]["rpm_release"]
+CURRENT_NEVRA = f"{CONTRACT['package']['name']}-{CURRENT_VERSION}-{CURRENT_RELEASE}.fc44.x86_64"
 
 
 class StatusTests(unittest.TestCase):
+    def test_verify_rejects_symlink_openwebui_token_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "token"
+            target.write_text("secret\n", encoding="utf-8")
+            target.chmod(0o600)
+            link = Path(tmp) / "token-link"
+            link.symlink_to(target)
+            result = subprocess.run(
+                [str(ROOT / "cmd/monitoring/verify-server.sh"), "--owui-token-file", str(link)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("must not be a symlink", result.stderr)
+
     def test_status_help_is_available_without_host_changes(self) -> None:
         result = subprocess.run(
             [str(ROOT / "cmd/monitoring/status.sh"), "--help"],
@@ -157,42 +176,43 @@ ollama_version_line
         self.assertIn("Restart advisory: not evaluated (optional helper unavailable)", source)
 
 
-    def test_machine_readable_status_and_doctor_are_packaged_interfaces(self) -> None:
+    def test_machine_readable_status_and_health_are_packaged_interfaces(self) -> None:
         status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
-        doctor = ROOT / "cmd/monitoring/doctor.py"
+        health = ROOT / "cmd/monitoring/health.py"
         self.assertIn("Usage: bc250 status [--json]", status)
         self.assertIn('"schema": "bc250.status.v3"', status_json)
         self.assertNotIn("gfx" + "1013", status_json.lower())
         result = subprocess.run(
-            [str(doctor), "--help"],
+            [str(health), "--help"],
             text=True,
             capture_output=True,
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("read-only appliance health diagnostics", result.stdout)
-        doctor_source = doctor.read_text(encoding="utf-8")
-        self.assertIn('"schema": "bc250.doctor.v3"', doctor_source)
-        self.assertIn('["rpm", "-V", PACKAGE]', doctor_source)
-        self.assertIn("diagnostic headroom TIGHT", doctor_source)
+        health_source = health.read_text(encoding="utf-8")
+        self.assertIn('"schema": "bc250.health.v1"', health_source)
+        self.assertIn('["rpm", "-V", PACKAGE]', health_source)
+        self.assertIn("diagnostic headroom TIGHT", health_source)
         self.assertIn("runtime_identity", status_json)
-        self.assertIn("Overall appliance health:", doctor_source)
-        self.assertNotIn("gfx" + "1013", doctor_source.lower())
+        self.assertIn("Overall appliance health:", health_source)
+        self.assertNotIn("gfx" + "1013", health_source.lower())
 
-    def test_health_alias_and_doctor_color_contract_preserve_v3_semantics(self) -> None:
+    def test_health_contract_has_no_obsolete_doctor_alias(self) -> None:
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
         completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
-        doctor = ROOT / "cmd/monitoring/doctor.py"
-        doctor_source = doctor.read_text(encoding="utf-8")
-        self.assertIn('"health|$LIBEXEC/doctor.py"', dispatcher)
-        self.assertIn('"doctor|$LIBEXEC/doctor.py"', dispatcher)
-        self.assertIn("status|health|doctor", completion)
-        self.assertIn('"schema": "bc250.doctor.v3"', doctor_source)
-        self.assertIn('prog="bc250 health"', doctor_source)
-        self.assertIn('"NO_COLOR" not in os.environ', doctor_source)
+        health = ROOT / "cmd/monitoring/health.py"
+        health_source = health.read_text(encoding="utf-8")
+        self.assertIn('"health|$LIBEXEC/health.py"', dispatcher)
+        self.assertNotIn('"doctor|', dispatcher)
+        self.assertIn("status|health", completion)
+        self.assertNotIn(" doctor ", f" {completion} ")
+        self.assertIn('"schema": "bc250.health.v1"', health_source)
+        self.assertIn('prog="bc250 health"', health_source)
+        self.assertIn('"NO_COLOR" not in os.environ', health_source)
 
-        spec = importlib.util.spec_from_file_location("bc250_doctor_color_test", doctor)
+        spec = importlib.util.spec_from_file_location("bc250_health_color_test", health)
         self.assertIsNotNone(spec)
         self.assertIsNotNone(spec.loader)
         module = importlib.util.module_from_spec(spec)
@@ -270,12 +290,12 @@ ollama_version_line
 
         status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         version = (ROOT / "cmd/monitoring/version.py").read_text(encoding="utf-8")
-        doctor = (ROOT / "cmd/monitoring/doctor.py").read_text(encoding="utf-8")
+        health = (ROOT / "cmd/monitoring/health.py").read_text(encoding="utf-8")
         self.assertIn('runtime_inspection" != not_inspected', status)
         self.assertIn("observed not inspected (requires sudo) — NOT INSPECTED", status)
         self.assertIn('row.get("inspection") == "not_inspected"', version)
-        self.assertIn('"INFO"', doctor)
-        self.assertNotIn("secure-boot", doctor.lower())
+        self.assertIn('"INFO"', health)
+        self.assertNotIn("secure-boot", health.lower())
 
     def test_public_runtime_identity_and_package_identity_are_unambiguous(self) -> None:
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
@@ -445,7 +465,7 @@ bc250_failed_systemd_units
             bindir.mkdir()
             share.mkdir()
             libexec.mkdir()
-            (share / "VERSION").write_text("0.14.1\n", encoding="utf-8")
+            (share / "VERSION").write_text(CURRENT_VERSION + "\n", encoding="utf-8")
             (share / "runtime.env").write_text(
                 "BC250_OLLAMA_VERSION=0.34.4\n"
                 "BC250_OPEN_WEBUI_VERSION=0.11.4\n"
@@ -458,7 +478,7 @@ bc250_failed_systemd_units
             rpm = bindir / "rpm"
             rpm.write_text(
                 "#!/usr/bin/env bash\n"
-                "printf 'bc250-llm-server|0|0.14.1|1.fc44|x86_64\\n'\n",
+                f"printf 'bc250-llm-server|0|{CURRENT_VERSION}|{CURRENT_RELEASE}.fc44|x86_64\\n'\n",
                 encoding="utf-8",
             )
             rpm.chmod(0o755)
@@ -484,16 +504,16 @@ bc250_failed_systemd_units
             short = subprocess.run([str(version), "--short"], env=env, text=True, capture_output=True, check=False)
 
         self.assertEqual(normal.returncode, 0, normal.stderr)
-        self.assertIn("Package:      bc250-llm-server-0.14.1-1.fc44.x86_64", normal.stdout)
+        self.assertIn(f"Package:      {CURRENT_NEVRA}", normal.stdout)
         self.assertIn("Open WebUI:", normal.stdout)
         self.assertIn("MATCH", normal.stdout)
         self.assertEqual(machine.returncode, 0, machine.stderr)
         payload = __import__("json").loads(machine.stdout)
         self.assertEqual(payload["schema"], "bc250.version.v3")
-        self.assertEqual(payload["package"]["nevra"], "bc250-llm-server-0.14.1-1.fc44.x86_64")
+        self.assertEqual(payload["package"]["nevra"], CURRENT_NEVRA)
         self.assertTrue(payload["runtime_identity"]["open_webui"]["match"])
         self.assertEqual(short.returncode, 0, short.stderr)
-        self.assertEqual(short.stdout.strip(), "bc250-llm-server-0.14.1-1.fc44.x86_64")
+        self.assertEqual(short.stdout.strip(), CURRENT_NEVRA)
 
     def test_version_executes_without_installed_rpm_identity(self) -> None:
         version = ROOT / "cmd/monitoring/version.py"
@@ -505,7 +525,7 @@ bc250_failed_systemd_units
             bindir.mkdir()
             share.mkdir()
             libexec.mkdir()
-            (share / "VERSION").write_text("0.14.1\n", encoding="utf-8")
+            (share / "VERSION").write_text(CURRENT_VERSION + "\n", encoding="utf-8")
             (share / "runtime.env").write_text("BC250_OLLAMA_VERSION=0.34.4\n", encoding="utf-8")
             rpm = bindir / "rpm"
             rpm.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
@@ -531,7 +551,7 @@ bc250_failed_systemd_units
         self.assertIsNone(payload["package"]["nevra"])
         self.assertEqual(payload["runtime_identity"], {})
         self.assertEqual(short.returncode, 2, short.stderr)
-        self.assertEqual(short.stdout.strip(), "0.14.1")
+        self.assertEqual(short.stdout.strip(), CURRENT_VERSION)
 
 
 class VerifyTests(unittest.TestCase):

@@ -15,8 +15,7 @@ ROUTES=(
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
-  "health|$LIBEXEC/doctor.py"
-  "doctor|$LIBEXEC/doctor.py"
+  "health|$LIBEXEC/health.py"
   "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install|$LIBEXEC/install.sh"
@@ -48,7 +47,7 @@ Models and product workflows:
   model, rag, ocr, openwebui-setup, ollama-profile
 
 Validation and maintenance:
-  doctor (health compatibility alias), benchmark, revalidate, package-gate, qualification, resilience, maintenance, agent-mode
+  benchmark, revalidate, package-gate, qualification, resilience, maintenance, agent-mode
 
 Optional specialist workflows:
   code, code-commit, gitea-review, compare-mtp, fetch-mtp, run-mtp

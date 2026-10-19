@@ -60,7 +60,7 @@ class CoreContractTests(unittest.TestCase):
             ("bash", "cmd/system/install.sh", "--help"),
             ("python3", "models/modelctl.py", "--help"),
             ("bash", "cmd/monitoring/status.sh", "--help"),
-            ("python3", "cmd/monitoring/doctor.py", "--help"),
+            ("python3", "cmd/monitoring/health.py", "--help"),
             ("bash", "cmd/monitoring/verify-server.sh", "--help"),
             ("python3", "cmd/monitoring/version.py", "--help"),
             ("python3", "cmd/system/storage.py", "--help"),
@@ -82,7 +82,7 @@ class CoreContractTests(unittest.TestCase):
         manifest = ROOT / "packaging/install-manifest.tsv"
         required_destinations = {
             "{bindir}/bc250", "{libexec}/install.sh", "{libexec}/status.sh",
-            "{libexec}/doctor.py", "{libexec}/verify.sh", "{libexec}/version.py",
+            "{libexec}/health.py", "{libexec}/verify.sh", "{libexec}/version.py",
             "{libexec}/modelctl", "{share}/VERSION", "{share}/runtime.env",
         }
         destinations: set[str] = set()

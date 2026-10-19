@@ -17,7 +17,6 @@ class WorkflowSmokeTests(unittest.TestCase):
             ["python3", "cmd/qualification/qualification_inventory.py", "--help"],
             ["python3", "cmd/qualification/resilience_manager.py", "--help"],
             ["python3", "models/rag/rag.py", "--help"],
-            ["python3", "models/rag/rag_import.py", "--help"],
             ["bash", "models/ocr/bc250-ocr.sh", "--help"],
             ["bash", "cmd/system/ollama-profile.sh", "--help"],
             ["bash", "cmd/system/agent-mode.sh", "--help"],
