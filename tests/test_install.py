@@ -12,6 +12,34 @@ BOOTSTRAP = ROOT / "install"
 INSTALLER = ROOT / "cmd/system/install.sh"
 
 
+def _run_tty_bash(body: str, *, extra_env: dict[str, str] | None = None) -> tuple[int, str]:
+    env = os.environ.copy()
+    env.update(extra_env or {})
+    master, slave = os.openpty()
+    proc = subprocess.Popen(
+        ["bash", "-c", body],
+        stdin=subprocess.DEVNULL,
+        stdout=slave,
+        stderr=slave,
+        env=env,
+        close_fds=True,
+    )
+    os.close(slave)
+    chunks: list[bytes] = []
+    try:
+        while True:
+            try:
+                chunk = os.read(master, 4096)
+            except OSError:
+                break
+            if not chunk:
+                break
+            chunks.append(chunk)
+    finally:
+        os.close(master)
+    return proc.wait(timeout=10), b"".join(chunks).decode("utf-8", errors="replace")
+
+
 def _write_fake_jq(fake_bin: Path) -> None:
     fake_bin.mkdir(exist_ok=True)
     jq = fake_bin / "jq"
@@ -686,36 +714,93 @@ step_8_application_services
         for heading in (
             'echo "OVERVIEW"',
             'echo "Administration"',
-            'echo "Storage"',
+            'echo "Storage & cleanup"',
             'echo "NEXT STEPS"',
-            'echo "CU routing (optional)"',
-            'echo "Status / validation"',
-            'echo "Full quality revalidation"',
-            'echo "Benchmark"',
+            'echo "System status / validation"',
+            'echo "Setup / repair"',
+            'echo "Models"',
+            'echo "Optional improvements"',
+        ):
+            self.assertIn(heading, main)
+        self.assertIn("completion_emphasis_begin", main)
+        self.assertIn("completion_emphasis_end", main)
+        self.assertLess(main.index('echo "OVERVIEW"'), main.index("completion_emphasis_begin"))
+        self.assertLess(main.index("completion_emphasis_begin"), main.index('echo "NEXT STEPS"'))
+        self.assertNotIn('echo "Further setup"', main)
+        self.assertNotIn('echo "Validation / benchmark"', main)
+        self.assertNotIn('echo "Models / runtime lanes"', main)
+
+    def test_c5b_installer_completion_is_grouped_and_model_oriented(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        main = source[source.index("main() {"): ]
+        for heading in (
+            'echo "OVERVIEW"',
+            'echo "Administration"',
+            'echo "Storage & cleanup"',
+            'echo "NEXT STEPS"',
+            'echo "System status / validation"',
+            'echo "Setup / repair"',
+            'echo "Models"',
+            'echo "Optional improvements"',
         ):
             self.assertIn(heading, main)
         for item in (
             "sudo bc250 openwebui-setup status",
+            "sudo bc250 model install",
             "sudo bc250 model status",
             "bc250 rag --help",
             "sudo bc250 maintenance --help",
             "sudo bc250 storage --help",
             "sudo bc250-cu-live-manager",
             "sudo bc250 status",
+            "sudo bc250 health",
+            "sudo bc250 verify",
             "sudo bc250 revalidate start",
-            "sudo bc250-40cu status",
             "bc250 benchmark --help",
+            "sudo bc250 install",
         ):
             self.assertIn(item, main)
-        self.assertNotIn('echo "Further setup"', main)
-        self.assertNotIn('echo "Models"', main)
-        self.assertNotIn('echo "  Open WebUI:    sudo bc250 openwebui-setup init"', main)
-        self.assertNotIn('echo "  sudo bc250 install --models-only"', main)
-        self.assertIn("completion_amber=$'\\033[1;33m'", main)
-        self.assertLess(main.index('echo "OVERVIEW"'), main.index("completion_amber=$'\\033[1;33m'"))
-        self.assertLess(main.index("completion_amber=$'\\033[1;33m'"), main.index('echo "NEXT STEPS"'))
-        self.assertNotIn('echo "Validation / benchmark"', main)
-        self.assertNotIn('echo "Models / runtime lanes"', main)
+        next_steps = main[main.index('echo "NEXT STEPS"'):]
+        self.assertLess(next_steps.index('echo "System status / validation"'), next_steps.index('echo "Setup / repair"'))
+        self.assertLess(next_steps.index('echo "Setup / repair"'), next_steps.index('echo "Models"'))
+        self.assertLess(next_steps.index('echo "Models"'), next_steps.index('echo "Optional improvements"'))
+        self.assertIn("/usr/share/doc/bc250-llm-server/docs/OPERATIONS.md", main)
+        self.assertIn("completion_emphasis_begin", main)
+        self.assertIn("completion_emphasis_end", main)
+        self.assertNotIn("gfx" + "1013", next_steps.lower())
+
+    def test_c5b_installer_next_steps_color_is_tty_only_and_no_color_safe(self) -> None:
+        body = f'source "{INSTALLER}"; completion_emphasis_begin; printf "NEXT STEPS"; completion_emphasis_end'
+        plain = subprocess.run(
+            ["bash", "-c", body],
+            text=True,
+            capture_output=True,
+            env={**os.environ, "TERM": "xterm"},
+            check=False,
+        )
+        self.assertEqual(plain.returncode, 0, plain.stderr)
+        self.assertEqual(plain.stdout, "NEXT STEPS")
+        self.assertNotIn("\x1b", plain.stdout)
+
+        rc, tty = _run_tty_bash(body, extra_env={"TERM": "xterm"})
+        self.assertEqual(rc, 0, tty)
+        self.assertIn("\x1b[1;33m", tty)
+        self.assertIn("NEXT STEPS", tty)
+        self.assertIn("\x1b[0m", tty)
+
+        rc, no_color = _run_tty_bash(body, extra_env={"TERM": "xterm", "NO_COLOR": "1"})
+        self.assertEqual(rc, 0, no_color)
+        self.assertIn("NEXT STEPS", no_color)
+        self.assertNotIn("\x1b", no_color)
+
+    def test_c5b_installer_reconciles_and_verifies_desired_ollama_version(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        block = source[source.index("step_3_install_ollama() {"):source.index("step_4_memory_and_swap() {")]
+        self.assertIn('echo "Ollama desired:  $requested"', block)
+        self.assertIn('echo "Ollama observed: $observed_before"', block)
+        self.assertIn('echo "Ollama observed after reconciliation: ${observed_after:-unknown}"', block)
+        self.assertIn('if [[ "$observed_after" != "$requested" ]]; then', block)
+        self.assertIn("does not match package desired version", block)
 
     def test_installer_distinguishes_backend_from_usable_front_door(self) -> None:
         source = INSTALLER.read_text()
@@ -723,7 +808,10 @@ step_8_application_services
         self.assertIn("127.0.0.1:3000/api/version", source)
         self.assertIn("127.0.0.1:80/api/version", source)
         self.assertIn("HTTP 502/other proxy errors are not readiness", source)
-        self.assertIn('owui_state="FRONT DOOR READY"', source)
+        self.assertIn('owui_state="WEB INTERFACE READY"', source)
+        self.assertIn("Open WebUI web interface is not yet usable", source)
+        self.assertIn("backend and usable web interface are ready", source)
+        self.assertNotIn("Open WebUI front door is not yet usable", source)
 
     def test_installer_final_summary_reports_openwebui_completion_state(self) -> None:
         source = INSTALLER.read_text()

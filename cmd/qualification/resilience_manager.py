@@ -148,7 +148,7 @@ class CampaignManager:
         observed_qualification = qualification_identity()
         if observed_qualification != gate_qualification:
             raise QualificationError(
-                "current kernel/configuration/GFX1013 identity no longer matches the package gate",
+                "current package/kernel/configuration identity no longer matches the package gate",
                 "INCOMPLETE",
             )
         plan = load_plan(plan_source)
@@ -232,7 +232,7 @@ class CampaignManager:
         except QualificationError as exc:
             return self.mark_gap(f"current qualification identity unavailable: {exc}")
         if observed_qualification != expected_qualification:
-            return self.mark_gap("kernel/configuration/GFX1013 identity changed since campaign start")
+            return self.mark_gap("package/kernel/configuration identity changed since campaign start")
 
         expected_source = self.state.get("source_identity")
         try:

@@ -15,6 +15,28 @@ DEFAULT_LIBEXEC = Path("/usr/libexec/bc250-llm-server")
 PACKAGE = "bc250-llm-server"
 
 
+def color_enabled() -> bool:
+    return (
+        sys.stdout.isatty()
+        and os.environ.get("TERM", "dumb") != "dumb"
+        and "NO_COLOR" not in os.environ
+    )
+
+
+def color_verdict(text: str) -> str:
+    if not color_enabled():
+        return text
+    if text in {"PASS", "OK"}:
+        code = "\033[1;32m"
+    elif text in {"FAIL", "FAILED", "ERROR"}:
+        code = "\033[1;31m"
+    elif text in {"WARN", "WARNING", "DEGRADED", "ATTENTION"}:
+        code = "\033[1;33m"
+    else:
+        return text
+    return f"{code}{text}\033[0m"
+
+
 def run(argv: list[str], timeout: int = 300) -> subprocess.CompletedProcess[str] | None:
     try:
         return subprocess.run(argv, text=True, capture_output=True, timeout=timeout, check=False)
@@ -58,7 +80,7 @@ def rpm_verify(checks: list[dict[str, Any]]) -> None:
 def verify_product(checks: list[dict[str, Any]], libexec: Path) -> None:
     helper = libexec / "verify.sh"
     if os.geteuid() != 0:
-        add(checks, "package-verifier", "INFO", "not run without root; rerun doctor with sudo for full verification")
+        add(checks, "package-verifier", "INFO", "not run without root; rerun health with sudo for full verification")
         return
     if not helper.is_file():
         add(checks, "package-verifier", "FAIL", f"missing verifier: {helper}")
@@ -71,38 +93,6 @@ def verify_product(checks: list[dict[str, Any]], libexec: Path) -> None:
     else:
         add(checks, "package-verifier", "FAIL", f"package verifier returned rc={result.returncode}")
 
-
-def kernel_devel(checks: list[dict[str, Any]], kernel: str) -> None:
-    build = Path("/lib/modules") / kernel / "build"
-    if not build.exists():
-        add(
-            checks,
-            "gfx-kernel-devel",
-            "WARN",
-            f"exact kernel build tree missing: {build}; GFX1013 prepare is unavailable",
-            category="gfx_readiness",
-        )
-        return
-    makefile = build.resolve() / "Makefile"
-    result = run(["rpm", "-qf", "--qf", "%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n", str(makefile)])
-    expected = f"kernel-devel-{kernel}"
-    observed = result.stdout.strip() if result and result.returncode == 0 else "unavailable"
-    if observed == expected:
-        add(
-            checks,
-            "gfx-kernel-devel",
-            "PASS",
-            f"exact build tree is owned by {observed}",
-            category="gfx_readiness",
-        )
-    else:
-        add(
-            checks,
-            "gfx-kernel-devel",
-            "WARN",
-            f"expected {expected}, observed {observed}; GFX1013 prepare is unavailable",
-            category="gfx_readiness",
-        )
 
 
 def topology(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
@@ -131,41 +121,6 @@ def topology(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
     else:
         add(checks, "runtime-topology", "WARN", "runtime topology could not be classified")
 
-
-def gfx(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
-    payload = status.get("gfx1013")
-    if not isinstance(payload, dict):
-        add(checks, "gfx1013", "FAIL", "GFX1013 status is unavailable")
-        return
-    state = str(payload.get("state", "UNAVAILABLE"))
-    reason = str(payload.get("reason", "no reason supplied"))
-    if state in {"DISABLED", "ENABLED"}:
-        add(checks, "gfx1013", "PASS", f"{state}: {reason}", category="gfx_readiness")
-    elif state in {"PREPARED", "PATCHED_BOOT_UNVERIFIED"}:
-        add(checks, "gfx1013", "WARN", f"{state}: {reason}", category="gfx_readiness")
-    elif state == "STALE_KERNEL":
-        add(checks, "gfx1013", "FAIL", f"{state}: {reason}")
-    else:
-        add(checks, "gfx1013", "FAIL", f"{state}: {reason}")
-    secure = str(payload.get("secure_boot", "unknown"))
-    if secure == "enabled":
-        add(
-            checks,
-            "secure-boot",
-            "WARN",
-            "enabled; optional GFX1013 preparation is blocked for unsigned local amdgpu",
-            category="gfx_readiness",
-        )
-    elif secure in {"disabled", "disabled-non-efi", "disabled-unsupported"}:
-        add(checks, "secure-boot", "PASS", secure, category="gfx_readiness")
-    else:
-        add(
-            checks,
-            "secure-boot",
-            "WARN",
-            "state unknown; optional GFX1013 prepare will fail closed",
-            category="gfx_readiness",
-        )
 
 
 def runtime_identities(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
@@ -222,7 +177,7 @@ def resources(checks: list[dict[str, Any]], status: dict[str, Any]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="bc250 doctor", description="Run read-only appliance diagnostics.")
+    parser = argparse.ArgumentParser(prog="bc250 health", description="Run read-only appliance health diagnostics.")
     parser.add_argument("--json", action="store_true", help="emit machine-readable diagnostics")
     args = parser.parse_args(argv)
     libexec = Path(os.environ.get("BC250_LIBEXEC", DEFAULT_LIBEXEC))
@@ -251,41 +206,26 @@ def main(argv: list[str] | None = None) -> int:
     topology(checks, status)
     runtime_identities(checks, status)
     resources(checks, status)
-    gfx(checks, status)
-    kernel = status.get("kernel")
-    if isinstance(kernel, str) and kernel:
-        kernel_devel(checks, kernel)
     verify_product(checks, libexec)
 
-    appliance = [item for item in checks if item.get("category") == "appliance"]
-    gfx_readiness = [item for item in checks if item.get("category") == "gfx_readiness"]
-    failures = sum(item["status"] == "FAIL" for item in appliance)
-    warnings = sum(item["status"] == "WARN" for item in appliance)
+    failures = sum(item["status"] == "FAIL" for item in checks)
+    warnings = sum(item["status"] == "WARN" for item in checks)
     overall = "FAIL" if failures else ("WARN" if warnings else "PASS")
-    gfx_failures = sum(item["status"] == "FAIL" for item in gfx_readiness)
-    gfx_warnings = sum(item["status"] == "WARN" for item in gfx_readiness)
-    gfx_overall = "FAIL" if gfx_failures else ("WARN" if gfx_warnings else "PASS")
     payload = {
-        "schema": "bc250.doctor.v2",
+        "schema": "bc250.doctor.v3",
         "overall": overall,
         "failures": failures,
         "warnings": warnings,
-        "gfx1013_readiness": {
-            "overall": gfx_overall,
-            "failures": gfx_failures,
-            "warnings": gfx_warnings,
-        },
         "checks": checks,
     }
     if args.json:
         json.dump(payload, sys.stdout, indent=2, sort_keys=True)
         sys.stdout.write("\n")
     else:
-        print(f"Overall appliance health: {overall}")
-        print(f"Optional GFX1013 readiness: {gfx_overall}")
+        print(f"Overall appliance health: {color_verdict(overall)}")
         for item in checks:
-            prefix = "GFX" if item.get("category") == "gfx_readiness" else "APP"
-            print(f"[{item['status']:<4}] {prefix} {item['name']}: {item['detail']}")
+            prefix = "APP"
+            print(f"[{color_verdict(item['status']):<4}] {prefix} {item['name']}: {item['detail']}")
         if os.geteuid() != 0:
             print("Run with sudo for the full bc250 verify portion.")
     return 2 if failures else 0

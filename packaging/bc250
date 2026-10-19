@@ -15,9 +15,9 @@ ROUTES=(
   "code|$LIBEXEC/coding-agent/coding-agent.sh"
   "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
   "compare-mtp|$LIBEXEC/compare-mtp.sh"
+  "health|$LIBEXEC/doctor.py"
   "doctor|$LIBEXEC/doctor.py"
   "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
-  "gfx1013|$LIBEXEC/gfx1013.sh"
   "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install|$LIBEXEC/install.sh"
   "maintenance|$LIBEXEC/maintenance.sh"
@@ -42,13 +42,13 @@ usage() {
 Usage: bc250 COMMAND [ARGUMENTS...]
 
 Core appliance:
-  install, status, doctor, verify, version, support-bundle, storage, reset
+  install, status, health, verify, version, support-bundle, storage, reset
 
 Models and product workflows:
   model, rag, ocr, openwebui-setup, ollama-profile
 
 Validation and maintenance:
-  benchmark, revalidate, package-gate, qualification, resilience, maintenance, agent-mode, gfx1013
+  doctor (health compatibility alias), benchmark, revalidate, package-gate, qualification, resilience, maintenance, agent-mode
 
 Optional specialist workflows:
   code, code-commit, gitea-review, compare-mtp, fetch-mtp, run-mtp

@@ -8,8 +8,6 @@ import json
 import os
 import shutil
 import sys
-import urllib.error
-import urllib.request
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -18,20 +16,17 @@ try:
     from resilience_common import (
         QualificationError,
         qualification_identity,
-        query_installed_rpm,
     )
 except ImportError as exc:  # pragma: no cover - packaged bootstrap path
     print(f"ERROR: qualification common module unavailable: {exc}", file=sys.stderr)
     raise SystemExit(2) from None
 
-SCHEMA = "bc250.qualification-inventory.v1"
+SCHEMA = "bc250.qualification-inventory.v2"
 PACKAGE_GATE_ROOT = Path(os.environ.get("BC250_PACKAGE_GATE_ROOT", "/var/lib/bc250-llm-server/package-gates"))
 RESILIENCE_ROOT = Path(os.environ.get("BC250_RESILIENCE_ROOT", "/var/lib/bc250-llm-server/resilience"))
-GFX_BENCH_ROOT = Path(os.environ.get("BC250_GFX1013_BENCH_ROOT", "/var/lib/bc250-llm-server/gfx1013/benchmarks"))
 KNOWN_ROOTS = {
     "package-gate": PACKAGE_GATE_ROOT,
     "resilience": RESILIENCE_ROOT,
-    "gfx1013-benchmark": GFX_BENCH_ROOT,
 }
 
 
@@ -67,38 +62,12 @@ def directory_size(path: Path) -> int:
     return total
 
 
-def current_model_digests() -> dict[str, str] | None:
-    request = urllib.request.Request(
-        "http://127.0.0.1:11434/api/tags",
-        headers={"Accept": "application/json"},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=3) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (OSError, urllib.error.URLError, UnicodeError, json.JSONDecodeError):
-        return None
-    models = payload.get("models") if isinstance(payload, dict) else None
-    if not isinstance(models, list):
-        return None
-    result: dict[str, str] = {}
-    for row in models:
-        if not isinstance(row, dict):
-            continue
-        name = str(row.get("name") or row.get("model") or "")
-        digest = str(row.get("digest") or "")
-        if name and digest:
-            result[name] = digest
-    return result
 
-
-def current_context() -> tuple[dict[str, Any] | None, str | None, dict[str, str] | None]:
-    model_digests = current_model_digests()
+def current_context() -> dict[str, Any] | None:
     try:
-        identity = qualification_identity()
-        installed = query_installed_rpm()
-        return identity, installed.get("nevra"), model_digests
+        return qualification_identity()
     except QualificationError:
-        return None, None, model_digests
+        return None
 
 
 def app_identity_match(recorded: Any, current: dict[str, Any] | None) -> str:
@@ -165,78 +134,6 @@ def scan_resilience(current: dict[str, Any] | None) -> list[dict[str, Any]]:
     return rows
 
 
-def benchmark_applicability(
-    campaign: dict[str, Any],
-    current_nevra: str | None,
-    model_digests: dict[str, str] | None,
-) -> str:
-    if current_nevra is None:
-        return "UNKNOWN"
-    identity = campaign.get("identity") if isinstance(campaign.get("identity"), dict) else {}
-    recorded = str(identity.get("package_nevra") or "")
-    # Benchmark campaigns use the human rpm -q NEVRA without an explicit epoch,
-    # while qualification common uses an epoch-bearing normalized identity.
-    current_short = current_nevra.replace("-0:", "-")
-    if recorded != current_short or identity.get("kernel") != os.uname().release:
-        return "STALE"
-    models = campaign.get("models") if isinstance(campaign.get("models"), dict) else {}
-    if not models:
-        return "UNKNOWN"
-    if model_digests is None:
-        return "UNKNOWN"
-    for row in models.values():
-        if not isinstance(row, dict):
-            return "UNKNOWN"
-        model = str(row.get("model") or "")
-        digest = str(row.get("digest") or "")
-        if not model or not digest:
-            return "UNKNOWN"
-        if model_digests.get(model) != digest:
-            return "STALE"
-    return "CURRENT"
-
-
-def scan_gfx_benchmarks(
-    current_nevra: str | None,
-    model_digests: dict[str, str] | None,
-) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
-    root = GFX_BENCH_ROOT
-    if not root.is_dir():
-        return rows
-    for path in sorted(root.glob("campaign-*")):
-        if not path.is_dir() or path.is_symlink():
-            continue
-        campaign = load_json(path / "campaign.json")
-        if campaign is None:
-            rows.append(base_row("gfx1013-benchmark", path, None, "UNKNOWN", "BROKEN", False, "campaign.json unreadable"))
-            continue
-        phases = campaign.get("phases") if isinstance(campaign.get("phases"), dict) else {}
-        report = load_json(path / "report.json")
-        result = "INCOMPLETE"
-        terminal = False
-        detail = "phases=" + ",".join(f"{key}:{phases.get(key, 'PENDING')}" for key in ("stock", "gfx", "restored"))
-        if report is not None:
-            rec = report.get("recommendation") if isinstance(report.get("recommendation"), dict) else {}
-            result = str(rec.get("state") or "COMPLETE")
-            terminal = bool(
-                phases.get("stock") == "CAPTURED"
-                and phases.get("gfx") == "CAPTURED"
-                and phases.get("restored") == "CAPTURED"
-            )
-        rows.append(
-            base_row(
-                "gfx1013-benchmark",
-                path,
-                campaign.get("created_at"),
-                benchmark_applicability(campaign, current_nevra, model_digests),
-                result,
-                terminal,
-                detail,
-            )
-        )
-    return rows
-
 
 def base_row(
     kind: str,
@@ -261,11 +158,10 @@ def base_row(
 
 
 def inventory() -> list[dict[str, Any]]:
-    current, current_nevra, model_digests = current_context()
+    current = current_context()
     rows = [
         *scan_package_gates(current),
         *scan_resilience(current),
-        *scan_gfx_benchmarks(current_nevra, model_digests),
     ]
     return sorted(rows, key=lambda row: str(row["created_at"]), reverse=True)
 

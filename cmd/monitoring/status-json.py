@@ -9,7 +9,6 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 PACKAGE = "bc250-llm-server"
 DEFAULT_LIBEXEC = Path("/usr/libexec/bc250-llm-server")
@@ -139,21 +138,6 @@ def memory_psi() -> dict[str, float | None]:
             result["full_avg10"] = avg10
     return result
 
-
-def gfx_status(libexec: Path) -> dict[str, Any]:
-    helper = libexec / "gfx1013.sh"
-    if not helper.is_file():
-        return {"state": "UNAVAILABLE", "reason": f"missing {helper}"}
-    result = run([str(helper), "status", "--json"], timeout=30)
-    if result is None:
-        return {"state": "UNAVAILABLE", "reason": "gfx1013 status invocation failed"}
-    if result.returncode != 0:
-        return {"state": "BROKEN", "reason": result.stderr.strip() or f"status rc={result.returncode}"}
-    try:
-        payload = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return {"state": "BROKEN", "reason": "gfx1013 status returned invalid JSON"}
-    return payload if isinstance(payload, dict) else {"state": "BROKEN", "reason": "gfx1013 JSON is not an object"}
 
 
 def failed_units() -> list[str] | None:
@@ -334,7 +318,7 @@ def main() -> int:
         )
     }
     payload = {
-        "schema": "bc250.status.v2",
+        "schema": "bc250.status.v3",
         "package": rpm_identity(),
         "kernel": os.uname().release,
         "command_line": (
@@ -349,7 +333,6 @@ def main() -> int:
         "memory_psi": memory_psi(),
         "failed_units": failed_units(),
         "os_package_restart_check": restart_status(),
-        "gfx1013": gfx_status(libexec),
     }
     json.dump(payload, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")

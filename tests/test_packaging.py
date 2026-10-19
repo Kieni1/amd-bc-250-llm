@@ -25,7 +25,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIsNotNone(spec_release)
         self.assertEqual(spec_version.group(1), version)
         expected = f"bc250-llm-server-{version}-{spec_release.group(1)}"
-        self.assertEqual(state["release_identity"], expected)
+        self.assertEqual(state["release"]["nvr"], expected)
         self.assertIn(expected, (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn(expected, (ROOT / "TLDR.md").read_text(encoding="utf-8"))
 
@@ -239,6 +239,12 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(keep_member.mode & 0o777, 0o644)
         self.assertEqual(tool_member.mode & 0o777, 0o755)
 
+    def test_generic_verifier_dependency_keeps_kmod(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn("lsmod", verify)
+        self.assertRegex(spec, r"(?m)^Requires:\s+kmod\s*$")
+
     def test_model_package_and_public_dispatcher_are_installed(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("models/modelctl.py\t{libexec}/modelctl", manifest)
@@ -252,7 +258,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
         self.assertNotIn("bc250_model", manifest)
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        for route in ("model", "status", "doctor", "version", "support-bundle", "fetch-mtp", "gfx1013", "ocr", "rag", "package-gate", "qualification", "resilience"):
+        for route in ("model", "status", "health", "doctor", "version", "support-bundle", "fetch-mtp", "ocr", "rag", "package-gate", "qualification", "resilience"):
             self.assertRegex(dispatcher, rf'(?m)^  "{route}\|', route)
         self.assertNotIn('--list-aliases', dispatcher)
         self.assertNotIn('"uninstall|', dispatcher)
@@ -269,7 +275,6 @@ class PackagingTests(unittest.TestCase):
             "cmd/benchmark/runtime-benchmark.py\t{libexec}/runtime-benchmark.py",
             "cmd/benchmark/openwebui-benchmark.py\t{libexec}/openwebui-benchmark.py",
             "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
-            "cmd/benchmark/gfx1013-ab.py\t{libexec}/gfx1013-ab.py",
             "cmd/qualification/qualification_inventory.py\t{libexec}/qualification/qualification_inventory.py",
             "cmd/monitoring/version.py\t{libexec}/version.py",
             "packaging/completions/bc250.bash\t{bashcompletiondir}/bc250",
@@ -291,12 +296,26 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('"qualification|$LIBEXEC/qualification/qualification_inventory.py"', dispatcher)
         self.assertIn('"version|$LIBEXEC/version.py"', dispatcher)
         self.assertIn('--version) exec "$LIBEXEC/version.py" --short', dispatcher)
-        self.assertIn("gfx1013-ab.py\t{libexec}/gfx1013-ab.py", manifest)
+        self.assertNotIn("gfx" + "1013", manifest.lower())
         self.assertIn("qualification_inventory.py\t{libexec}/qualification/qualification_inventory.py", manifest)
         self.assertIn("packaging/completions/bc250.bash\t{bashcompletiondir}/bc250", manifest)
         self.assertIn("qualification", completion)
-        self.assertIn("stock gfx restored status report", completion)
+        self.assertNotIn("gfx" + "1013", completion.lower())
         self.assertIn("--older-than-days --keep-latest --apply", completion)
+
+    def test_c5b_health_alias_model_completion_and_one_next_action_are_packaged(self) -> None:
+        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn('"health|$LIBEXEC/doctor.py"', dispatcher)
+        self.assertIn("doctor (health compatibility alias)", dispatcher)
+        self.assertIn("doctor health", completion)
+        self.assertIn("list status path install apply refresh", completion)
+        posttrans = spec[spec.index("%posttrans"):spec.index("%preun")]
+        self.assertIn('echo "Next action:"', posttrans)
+        self.assertEqual(posttrans.count("sudo bc250 install"), 1)
+        self.assertIn('[ -z "${NO_COLOR:-}" ]', posttrans)
+        self.assertNotIn("gfx" + "1013", posttrans.lower())
 
     def test_dispatcher_suppresses_python_bytecode_in_package_helpers(self) -> None:
         dispatcher = ROOT / "packaging/bc250"
@@ -386,8 +405,10 @@ class PackagingTests(unittest.TestCase):
         scriptlets = spec[spec.index("%pre\n"): spec.index("%preun")]
         self.assertEqual(scriptlets.count("sudo bc250 install"), 1)
         posttrans = scriptlets[scriptlets.index("%posttrans"):]
-        self.assertIn('echo "Next step:"', posttrans)
+        self.assertIn('echo "Next action:"', posttrans)
         self.assertIn('echo "  sudo bc250 install"', posttrans)
+        self.assertIn('echo "BC-250 LLM appliance package transaction completed."', posttrans)
+        self.assertNotIn('echo "BC-250 LLM appliance package upgraded."', posttrans)
         pre_and_post = scriptlets[: scriptlets.index("%posttrans")]
         self.assertNotIn("sudo bc250 install", pre_and_post)
 
@@ -904,10 +925,12 @@ class PackagingTests(unittest.TestCase):
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("rpmlint", workflow)
         self.assertIn("make release-gate", workflow)
-        release_gate = makefile[makefile.index("release-gate:"):makefile.index("\n\nclean:")]
-        self.assertLess(release_gate.index("$(MAKE) rpm"), release_gate.index("rpmlint -c"))
-        self.assertIn("rpmlint -c packaging/rpmlint.toml $(DISTDIR)/*.rpm", release_gate)
-        self.assertIn("$(MAKE) check-srpm-rebuild", release_gate)
+        package_gate = makefile[makefile.index("release-gate-package:"):makefile.index("\n\nrelease-gate:")]
+        self.assertLess(package_gate.index("RPM_TREE_TARGET=rpm-tree-frozen rpm"), package_gate.index("rpmlint -c"))
+        self.assertIn("rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm", package_gate)
+        self.assertIn("check-srpm-rebuild", package_gate)
+        self.assertIn("-C '$(FROZEN_SOURCE_DIR)'", package_gate)
+        self.assertIn("release-evidence", package_gate)
 
     def test_rpmlint_policy_filters_only_intentional_appliance_findings(self) -> None:
         import tomllib

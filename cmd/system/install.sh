@@ -32,6 +32,14 @@ HF_SESSION_FILE="/run/bc250-llm-server/install-hf-session"
 OWUI_SETUP_STATE="not-run"
 OWUI_UPGRADE_BACKUP=""
 
+terminal_color_enabled() { [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR:-} ]]; }
+completion_emphasis_begin() {
+  terminal_color_enabled && printf '\033[1;33m' || true
+}
+completion_emphasis_end() {
+  terminal_color_enabled && printf '\033[0m' || true
+}
+
 usage() {
   cat <<'USAGE'
 Usage: sudo bc250 install [--models-only] [--owui-token-file FILE]
@@ -316,14 +324,27 @@ ollama_version() {
 
 step_3_install_ollama() {
   heading "3. INSTALL PACKAGE-QUALIFIED OLLAMA"
-  local requested
+  local requested observed_before observed_after
   requested="$BC250_OLLAMA_VERSION"
   export PATH="/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:$PATH"
   hash -r
   remove_fedora_ollama
+  observed_before="not installed"
+  if [[ -x /usr/local/bin/ollama ]]; then
+    observed_before="$(ollama_version /usr/local/bin/ollama 2>/dev/null || true)"
+    [[ -n "$observed_before" ]] || observed_before="unknown"
+  fi
+  echo "Ollama desired:  $requested"
+  echo "Ollama observed: $observed_before"
   echo "Reconciling package-qualified Ollama ${requested} with the package-owned service topology."
   BC250_ASSUME_YES=1 OLLAMA_REINSTALL="${BC250_UPDATE_OLLAMA:-0}" "$INSTALL_OLLAMA"
   hash -r
+  observed_after="$(ollama_version /usr/local/bin/ollama 2>/dev/null || true)"
+  echo "Ollama observed after reconciliation: ${observed_after:-unknown}"
+  if [[ "$observed_after" != "$requested" ]]; then
+    echo "ERROR: Ollama observed version ${observed_after:-unknown} does not match package desired version $requested" >&2
+    return 1
+  fi
 }
 
 step_4_memory_and_swap() {
@@ -496,12 +517,12 @@ publish_openwebui_after_convergence() {
     return 1
   fi
   if ! wait_for_openwebui_front_door; then
-    echo "ERROR: nginx is listening but the Open WebUI front door is not yet usable; HTTP 502/other proxy errors are not readiness." >&2
+    echo "ERROR: nginx is listening but the Open WebUI web interface is not yet usable; HTTP 502/other proxy errors are not readiness." >&2
     hold_open_webui_publication
     systemctl stop open-webui.service >/dev/null 2>&1 || true
     return 1
   fi
-  echo "Open WebUI desired state verified; backend and usable HTTP front door are ready."
+  echo "Open WebUI desired state verified; backend and usable web interface are ready."
 }
 
 
@@ -1120,7 +1141,7 @@ print_setup_summary() {
   local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED" restart_state="not evaluated (optional helper unavailable)"
   curl -fsS --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && owui_state="BACKEND READY"
   if [[ "$owui_state" == "BACKEND READY" ]] && curl -fsS --max-time 3 http://127.0.0.1:80/api/version >/dev/null 2>&1; then
-    owui_state="FRONT DOOR READY"
+    owui_state="WEB INTERFACE READY"
   fi
   curl -fsS --max-time 3 http://127.0.0.1:11434/api/version >/dev/null 2>&1 && ollama_state="READY"
   [[ -n "$(pending_kernel || true)" ]] && reboot_state="YES"
@@ -1224,36 +1245,35 @@ main() {
   echo "OVERVIEW"
   echo
   echo "Administration"
-  echo "  Open WebUI:    sudo bc250 openwebui-setup status"
-  echo "  Models:        sudo bc250 model status"
-  echo "  RAG:           bc250 rag --help"
-  echo "  Maintenance:   sudo bc250 maintenance --help"
-  echo "  Documentation: /usr/share/doc/bc250-llm-server/"
+  echo "  Open WebUI:     sudo bc250 openwebui-setup status"
+  echo "  Models:         sudo bc250 model install"
+  echo "  RAG:            bc250 rag --help"
+  echo "  Maintenance:    sudo bc250 maintenance --help"
+  echo "  Documentation:  /usr/share/doc/bc250-llm-server/docs/OPERATIONS.md"
   echo
-  echo "Storage"
+  echo "Storage & cleanup"
   echo "  sudo bc250 storage --help"
   echo
-  local completion_amber="" completion_reset=""
-  if [[ -t 1 && ${TERM:-dumb} != dumb ]]; then
-    completion_amber=$'\033[1;33m'
-    completion_reset=$'\033[0m'
-  fi
-  printf '%s' "$completion_amber"
+  completion_emphasis_begin
   echo "NEXT STEPS"
   echo
-  echo "CU routing (optional)"
-  echo "  sudo bc250-cu-live-manager"
+  echo "System status / validation"
+  echo "  Status:              sudo bc250 status"
+  echo "  Health:              sudo bc250 health"
+  echo "  Verify:              sudo bc250 verify"
+  echo "  Quality validation:  sudo bc250 revalidate start"
+  echo "  Benchmarking:        bc250 benchmark --help"
   echo
-  echo "Status / validation"
-  echo "  sudo bc250 status"
-  echo "  sudo bc250-40cu status"
+  echo "Setup / repair"
+  echo "  Rerun installation:  sudo bc250 install"
   echo
-  echo "Full quality revalidation"
-  echo "  sudo bc250 revalidate start"
+  echo "Models"
+  echo "  Install/manage:      sudo bc250 model install"
+  echo "  Status:              sudo bc250 model status"
   echo
-  echo "Benchmark"
-  echo "  bc250 benchmark --help"
-  printf '%s' "$completion_reset"
+  echo "Optional improvements"
+  echo "  CU routing:          sudo bc250-cu-live-manager"
+  completion_emphasis_end
   ((verify_rc == 0)) || return "$verify_rc"
   [[ "$OWUI_SETUP_STATE" != "retry-required" ]] || return 2
 }

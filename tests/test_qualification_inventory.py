@@ -44,13 +44,12 @@ class QualificationInventoryTests(unittest.TestCase):
         self.assertEqual([row["path"] for row in chosen], ["/tmp/gate-2", "/tmp/gate-3", "/tmp/gate-4"])
         self.assertNotIn("/tmp/incomplete", [row["path"] for row in chosen])
 
-    def test_inventory_scans_all_three_package_owned_evidence_classes(self) -> None:
+    def test_inventory_scans_package_gate_and_resilience_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)
             gate_root = base / "gates"
             res_root = base / "resilience"
-            gfx_root = base / "gfx"
-            for path in (gate_root, res_root, gfx_root):
+            for path in (gate_root, res_root):
                 path.mkdir()
             gate = gate_root / "gate-a"
             gate.mkdir()
@@ -65,59 +64,17 @@ class QualificationInventoryTests(unittest.TestCase):
                 json.dumps({"created_at": "2026-10-02T00:00:00Z", "result": "PASS", "phase": "complete", "qualification_identity": identity}),
                 encoding="utf-8",
             )
-            gfx = gfx_root / "campaign-a"
-            gfx.mkdir()
-            (gfx / "campaign.json").write_text(
-                json.dumps(
-                    {
-                        "created_at": "2026-10-03T00:00:00Z",
-                        "identity": {"package_nevra": "pkg", "kernel": "kernel"},
-                        "models": {"standard": {"model": "model:latest", "digest": "sha256:abc"}},
-                        "phases": {"stock": "CAPTURED", "gfx": "CAPTURED", "restored": "PENDING"},
-                    }
-                ),
-                encoding="utf-8",
-            )
-            (gfx / "report.json").write_text(json.dumps({"recommendation": {"state": "KEEP_OPTIONAL"}}), encoding="utf-8")
-            old = (MODULE.PACKAGE_GATE_ROOT, MODULE.RESILIENCE_ROOT, MODULE.GFX_BENCH_ROOT, MODULE.KNOWN_ROOTS, MODULE.current_context, MODULE.os.uname)
+            old = (MODULE.PACKAGE_GATE_ROOT, MODULE.RESILIENCE_ROOT, MODULE.KNOWN_ROOTS, MODULE.current_context)
             try:
                 MODULE.PACKAGE_GATE_ROOT = gate_root
                 MODULE.RESILIENCE_ROOT = res_root
-                MODULE.GFX_BENCH_ROOT = gfx_root
-                MODULE.KNOWN_ROOTS = {"package-gate": gate_root, "resilience": res_root, "gfx1013-benchmark": gfx_root}
-                MODULE.current_context = lambda: (identity, "pkg", {"model:latest": "sha256:abc"})
-                MODULE.os.uname = lambda: type("U", (), {"release": "kernel"})()
+                MODULE.KNOWN_ROOTS = {"package-gate": gate_root, "resilience": res_root}
+                MODULE.current_context = lambda: identity
                 rows = MODULE.inventory()
             finally:
-                (MODULE.PACKAGE_GATE_ROOT, MODULE.RESILIENCE_ROOT, MODULE.GFX_BENCH_ROOT, MODULE.KNOWN_ROOTS, MODULE.current_context, MODULE.os.uname) = old
-            self.assertEqual({row["kind"] for row in rows}, {"package-gate", "resilience", "gfx1013-benchmark"})
+                (MODULE.PACKAGE_GATE_ROOT, MODULE.RESILIENCE_ROOT, MODULE.KNOWN_ROOTS, MODULE.current_context) = old
+            self.assertEqual({row["kind"] for row in rows}, {"package-gate", "resilience"})
             self.assertTrue(all(row["applicability"] == "CURRENT" for row in rows))
-            gfx_row = next(row for row in rows if row["kind"] == "gfx1013-benchmark")
-            self.assertFalse(gfx_row["terminal"], "A1/B evidence remains resumable until A2 is captured")
-
-    def test_gfx_benchmark_applicability_includes_exact_model_digest(self) -> None:
-        campaign = {
-            "identity": {"package_nevra": "pkg", "kernel": "kernel"},
-            "models": {"standard": {"model": "model:latest", "digest": "sha256:abc"}},
-        }
-        old_uname = MODULE.os.uname
-        try:
-            MODULE.os.uname = lambda: type("U", (), {"release": "kernel"})()
-            self.assertEqual(
-                MODULE.benchmark_applicability(
-                    campaign, "pkg", {"model:latest": "sha256:abc"}
-                ),
-                "CURRENT",
-            )
-            self.assertEqual(
-                MODULE.benchmark_applicability(
-                    campaign, "pkg", {"model:latest": "sha256:def"}
-                ),
-                "STALE",
-            )
-            self.assertEqual(MODULE.benchmark_applicability(campaign, "pkg", None), "UNKNOWN")
-        finally:
-            MODULE.os.uname = old_uname
 
     def test_cleanup_path_must_be_direct_child_of_owned_root_and_not_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

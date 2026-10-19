@@ -56,6 +56,32 @@ class StatusTests(unittest.TestCase):
             self.assertIn(expected, source)
 
 
+    def test_status_human_platform_includes_installed_package_identity(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        self.assertIn('section "Platform"', source)
+        self.assertIn("Package:", source)
+        self.assertIn("bc250-llm-server 2>/dev/null", source)
+
+    def test_ollama_profile_apply_is_nounset_safe(self) -> None:
+        source = (ROOT / "cmd/system/ollama-profile.sh").read_text(encoding="utf-8")
+        start = source.index("apply_profile() {")
+        end = source.index("\n}", start) + 2
+        function = source[start:end]
+        command = (
+            "set -u\n"
+            "PROFILE_DIR=/definitely/missing\n"
+            "require_root(){ :; }\n"
+            + function
+            + "\napply_profile balanced"
+        )
+        result = subprocess.run(
+            ["bash", "-c", command],
+            text=True, capture_output=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing profile /definitely/missing/balanced.conf", result.stderr)
+        self.assertNotIn("unbound variable", result.stderr)
+
     def test_status_surfaces_topology_aware_overall_state(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         self.assertIn('Overall: HEALTHY', source)
@@ -116,9 +142,17 @@ ollama_version_line
         self.assertIn("openwebui_readiness()", source)
         self.assertIn("listener=", source)
         self.assertIn("backend=", source)
-        self.assertIn("front-door=", source)
+        self.assertIn("web-interface=", source)
+        self.assertNotIn("front-door=", source)
         self.assertIn("listener-only", source)
         self.assertIn("Open WebUI application readiness", source)
+        self.assertIn("resident:", source)
+        verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn("Open WebUI web interface usable through nginx", verify)
+        self.assertNotIn("Open WebUI front door usable through nginx", verify)
+        self.assertIn("main Ollama BC-250 Vulkan contract", verify)
+        for required in ("OLLAMA_VULKAN=1", "OLLAMA_IGPU_ENABLE=1", "GGML_VK_VISIBLE_DEVICES=0"):
+            self.assertIn(required, verify)
         self.assertIn("resident:", source)
         self.assertIn("Restart advisory: not evaluated (optional helper unavailable)", source)
 
@@ -128,8 +162,8 @@ ollama_version_line
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
         doctor = ROOT / "cmd/monitoring/doctor.py"
         self.assertIn("Usage: bc250 status [--json]", status)
-        self.assertIn('"schema": "bc250.status.v2"', status_json)
-        self.assertIn('"gfx1013": gfx_status(libexec)', status_json)
+        self.assertIn('"schema": "bc250.status.v3"', status_json)
+        self.assertNotIn("gfx" + "1013", status_json.lower())
         result = subprocess.run(
             [str(doctor), "--help"],
             text=True,
@@ -137,15 +171,61 @@ ollama_version_line
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("read-only appliance diagnostics", result.stdout)
+        self.assertIn("read-only appliance health diagnostics", result.stdout)
         doctor_source = doctor.read_text(encoding="utf-8")
-        self.assertIn('"schema": "bc250.doctor.v2"', doctor_source)
+        self.assertIn('"schema": "bc250.doctor.v3"', doctor_source)
         self.assertIn('["rpm", "-V", PACKAGE]', doctor_source)
         self.assertIn("diagnostic headroom TIGHT", doctor_source)
-        self.assertIn("STALE_KERNEL", doctor_source)
         self.assertIn("runtime_identity", status_json)
         self.assertIn("Overall appliance health:", doctor_source)
-        self.assertIn("Optional GFX1013 readiness:", doctor_source)
+        self.assertNotIn("gfx" + "1013", doctor_source.lower())
+
+    def test_health_alias_and_doctor_color_contract_preserve_v3_semantics(self) -> None:
+        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        doctor = ROOT / "cmd/monitoring/doctor.py"
+        doctor_source = doctor.read_text(encoding="utf-8")
+        self.assertIn('"health|$LIBEXEC/doctor.py"', dispatcher)
+        self.assertIn('"doctor|$LIBEXEC/doctor.py"', dispatcher)
+        self.assertIn("status|health|doctor", completion)
+        self.assertIn('"schema": "bc250.doctor.v3"', doctor_source)
+        self.assertIn('prog="bc250 health"', doctor_source)
+        self.assertIn('"NO_COLOR" not in os.environ', doctor_source)
+
+        spec = importlib.util.spec_from_file_location("bc250_doctor_color_test", doctor)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        class TtyStream:
+            @staticmethod
+            def isatty() -> bool:
+                return True
+
+        class PlainStream:
+            @staticmethod
+            def isatty() -> bool:
+                return False
+
+        with mock.patch.object(module.sys, "stdout", TtyStream()), mock.patch.dict(
+            module.os.environ, {"TERM": "xterm"}, clear=False
+        ):
+            module.os.environ.pop("NO_COLOR", None)
+            self.assertIn("\x1b[1;32mPASS\x1b[0m", module.color_verdict("PASS"))
+            self.assertIn("\x1b[1;31mFAIL\x1b[0m", module.color_verdict("FAIL"))
+            self.assertIn("\x1b[1;33mWARN\x1b[0m", module.color_verdict("WARN"))
+
+        with mock.patch.object(module.sys, "stdout", PlainStream()), mock.patch.dict(
+            module.os.environ, {"TERM": "xterm"}, clear=False
+        ):
+            module.os.environ.pop("NO_COLOR", None)
+            self.assertEqual(module.color_verdict("PASS"), "PASS")
+
+        with mock.patch.object(module.sys, "stdout", TtyStream()), mock.patch.dict(
+            module.os.environ, {"TERM": "xterm", "NO_COLOR": "1"}, clear=False
+        ):
+            self.assertEqual(module.color_verdict("FAIL"), "FAIL")
 
     def test_status_json_normalizes_the_known_tika_version_prefix(self) -> None:
         source = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
@@ -198,7 +278,7 @@ ollama_version_line
         self.assertIn("observed not inspected (requires sudo) — NOT INSPECTED", status)
         self.assertIn('row.get("inspection") == "not_inspected"', version)
         self.assertIn('"INFO"', doctor)
-        self.assertIn('"disabled-unsupported"', doctor)
+        self.assertNotIn("secure-boot", doctor.lower())
 
     def test_public_runtime_identity_and_package_identity_are_unambiguous(self) -> None:
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
@@ -358,6 +438,105 @@ bc250_failed_systemd_units
 
 
 
+    def test_version_executes_all_output_modes_with_installed_rpm_identity(self) -> None:
+        version = ROOT / "cmd/monitoring/version.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            bindir = base / "bin"
+            share = base / "share"
+            libexec = base / "libexec"
+            bindir.mkdir()
+            share.mkdir()
+            libexec.mkdir()
+            (share / "VERSION").write_text("0.14.1\n", encoding="utf-8")
+            (share / "runtime.env").write_text(
+                "BC250_OLLAMA_VERSION=0.34.4\n"
+                "BC250_OPEN_WEBUI_VERSION=0.11.4\n"
+                "BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:" + "1" * 64 + "\n"
+                "BC250_TIKA_VERSION=4.1.0-full\n"
+                "BC250_TIKA_IMAGE_DIGEST=sha256:" + "2" * 64 + "\n"
+                "BC250_GOVERNOR_VERSION=0.4.13\n",
+                encoding="utf-8",
+            )
+            rpm = bindir / "rpm"
+            rpm.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf 'bc250-llm-server|0|0.14.1|1.fc44|x86_64\\n'\n",
+                encoding="utf-8",
+            )
+            rpm.chmod(0o755)
+            status = libexec / "status-json.py"
+            status.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "json.dump({'runtime_identity': {"
+                "'open_webui': {'expected': {'version': '0.11.4', 'digest': 'sha256:' + '1'*64}, 'observed': {'version': '0.11.4', 'digest': 'sha256:' + '1'*64}, 'match': True}, "
+                "'tika': {'expected': {'version': '4.1.0-full', 'digest': 'sha256:' + '2'*64}, 'observed': {'version': '4.1.0-full', 'digest': 'sha256:' + '2'*64}, 'match': True}"
+                "}}, __import__('sys').stdout)\n",
+                encoding="utf-8",
+            )
+            status.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": str(bindir) + os.pathsep + os.environ.get("PATH", ""),
+                "BC250_SHARE": str(share),
+                "BC250_LIBEXEC": str(libexec),
+            }
+            normal = subprocess.run([str(version)], env=env, text=True, capture_output=True, check=False)
+            machine = subprocess.run([str(version), "--json"], env=env, text=True, capture_output=True, check=False)
+            short = subprocess.run([str(version), "--short"], env=env, text=True, capture_output=True, check=False)
+
+        self.assertEqual(normal.returncode, 0, normal.stderr)
+        self.assertIn("Package:      bc250-llm-server-0.14.1-1.fc44.x86_64", normal.stdout)
+        self.assertIn("Open WebUI:", normal.stdout)
+        self.assertIn("MATCH", normal.stdout)
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = __import__("json").loads(machine.stdout)
+        self.assertEqual(payload["schema"], "bc250.version.v3")
+        self.assertEqual(payload["package"]["nevra"], "bc250-llm-server-0.14.1-1.fc44.x86_64")
+        self.assertTrue(payload["runtime_identity"]["open_webui"]["match"])
+        self.assertEqual(short.returncode, 0, short.stderr)
+        self.assertEqual(short.stdout.strip(), "bc250-llm-server-0.14.1-1.fc44.x86_64")
+
+    def test_version_executes_without_installed_rpm_identity(self) -> None:
+        version = ROOT / "cmd/monitoring/version.py"
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            bindir = base / "bin"
+            share = base / "share"
+            libexec = base / "libexec"
+            bindir.mkdir()
+            share.mkdir()
+            libexec.mkdir()
+            (share / "VERSION").write_text("0.14.1\n", encoding="utf-8")
+            (share / "runtime.env").write_text("BC250_OLLAMA_VERSION=0.34.4\n", encoding="utf-8")
+            rpm = bindir / "rpm"
+            rpm.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
+            rpm.chmod(0o755)
+            status = libexec / "status-json.py"
+            status.write_text("#!/usr/bin/env python3\nprint('{}')\n", encoding="utf-8")
+            status.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": str(bindir) + os.pathsep + os.environ.get("PATH", ""),
+                "BC250_SHARE": str(share),
+                "BC250_LIBEXEC": str(libexec),
+            }
+            normal = subprocess.run([str(version)], env=env, text=True, capture_output=True, check=False)
+            machine = subprocess.run([str(version), "--json"], env=env, text=True, capture_output=True, check=False)
+            short = subprocess.run([str(version), "--short"], env=env, text=True, capture_output=True, check=False)
+
+        self.assertEqual(normal.returncode, 2, normal.stderr)
+        self.assertIn("Package:      unavailable", normal.stdout)
+        self.assertIn("Open WebUI:", normal.stdout)
+        self.assertEqual(machine.returncode, 0, machine.stderr)
+        payload = __import__("json").loads(machine.stdout)
+        self.assertIsNone(payload["package"]["nevra"])
+        self.assertEqual(payload["runtime_identity"], {})
+        self.assertEqual(short.returncode, 2, short.stderr)
+        self.assertEqual(short.stdout.strip(), "0.14.1")
+
+
 class VerifyTests(unittest.TestCase):
     def test_verify_reports_kernel_module_and_governor_compatibility(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
@@ -373,7 +552,7 @@ class VerifyTests(unittest.TestCase):
         self.assertNotIn("6.15.0", source)
         self.assertNotIn("6.17.8", source)
         self.assertNotIn("bc250_cc_write_mode", source)
-        self.assertNotIn("legacy patched AMDGPU module detected", source)
+        self.assertNotIn("legacy patched " + "AMDGPU module detected", source)
         runtime_sources = source + (ROOT / "install").read_text(encoding="utf-8")
         self.assertNotRegex(
             runtime_sources,
