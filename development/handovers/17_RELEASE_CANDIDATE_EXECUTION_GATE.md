@@ -29,7 +29,7 @@ Optimize for one successful external GitHub/device iteration, not for producing 
 
 ## Blocking source/build policy
 
-Blocking candidate gates include Ruff, ShellCheck, current-guidance/scope consistency, package-critical `%check`, configured rpmlint, payload/source integrity, isolated SRPM topdir rebuild evidence and artifact identity. The broad behavioral suite is additional evidence unless a finding exposes a release-critical defect.
+Blocking candidate gates include Ruff, ShellCheck, current-guidance/scope consistency, package-critical `%check`, the single authoritative isolated SRPM rebuild, configured rpmlint on those exact rebuilt binaries, payload/source integrity and artifact identity. The broad behavioral suite is additional evidence unless a finding exposes a release-critical defect.
 
 ## Release-candidate ledger
 
