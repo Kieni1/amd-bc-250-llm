@@ -227,6 +227,8 @@ def check_release_contract() -> None:
             runtime_values[key] = value
     if runtime_values.get("BC250_OLLAMA_VERSION") != runtime.get("ollama"):
         fail("runtime Ollama pin differs from release contract")
+    if runtime_values.get("BC250_OPEN_WEBUI_VERSION") != runtime.get("open_webui"):
+        fail("runtime Open WebUI pin differs from release contract")
 
     primary = authority.get("primary", {}) if isinstance(authority, dict) else {}
     secondary = authority.get("secondary", {}) if isinstance(authority, dict) else {}
