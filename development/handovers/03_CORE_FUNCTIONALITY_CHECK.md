@@ -1,4 +1,4 @@
-# Core functionality check — exact 0.14.1-1.2 RPM
+# Core functionality check — exact 0.14.1-1.3 RPM
 
 ## Goal
 
@@ -32,7 +32,7 @@ Do not mutate user state just to make the starting state look cleaner.
 ## Required package/install checks
 
 - install or supported upgrade succeeds;
-- `rpm -q bc250-llm-server` reports `0.14.1-1.2` with the expected Fedora dist tag/arch;
+- `rpm -q bc250-llm-server` reports `0.14.1-1.3` with the expected Fedora dist tag/arch;
 - package services/configuration converge without manual repair;
 - no experimental GFX/private-RADV/patched-boot requirement appears;
 - one ordinary service restart succeeds.
@@ -77,6 +77,27 @@ Keep this light:
 - run one short normal inference and require a non-empty visible answer.
 
 Hidden thinking is not a substitute for a visible answer.
+
+## Runtime upgrade checks for 1.3
+
+This RPM changes both Ollama and Open WebUI, so the normally-small smoke must include the changed boundaries.
+
+For Ollama 0.40.6:
+
+- all normal lanes (`11434`, `11435`, `11437`) report exactly `0.40.6`;
+- a package-owned locally registered GGUF model remains represented by one expected logical model name in `/api/tags`;
+- no unexpected `llamacpp:` shadow/duplicate registration is exposed;
+- `/api/show` and one generation work before and after an Ollama service restart;
+- existing package registrations are not silently deleted or renamed.
+
+For Open WebUI 0.12.3:
+
+- the stopped-state rollback snapshot is created and verified before migration of an existing database;
+- login, package model presets, title/tag task lane and document/RAG retrieval still work;
+- new tool-server/search, direct-integration, channel, Apps, subagent, realtime-voice, web-search and cloud-drive surfaces remain disabled unless deliberately adopted later;
+- the Advanced 6144 path is captured outbound and reaches Ollama as `options.num_predict=6144`; also verify an explicit API `max_tokens` override behaves as documented by Open WebUI 0.12 rather than being confused with the saved preset ceiling.
+
+Do not automatically clean model-store migration artifacts during this smoke. Record unexpected registry state first so rollback remains possible.
 
 ## Reboot persistence
 
