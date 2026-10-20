@@ -96,6 +96,16 @@
     "code_execution.enable": false,
     "code_interpreter.enable": false,
     "memories.enable": false,
-    "ui.enable_community_sharing": false
+    "ui.enable_community_sharing": false,
+    "direct.integrations.enable": false,
+    "channels.enable": false,
+    "channels.encryption.enable": false,
+    "apps.enable": false,
+    "subagents.enable": false,
+    "chat.tool_search.enable": false,
+    "audio.realtime.enabled": false,
+    "web.search.enable": false,
+    "google_drive.enable": false,
+    "onedrive.enable": false
   }
 }
