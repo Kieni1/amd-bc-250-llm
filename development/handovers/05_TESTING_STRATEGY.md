@@ -21,9 +21,9 @@ The hard candidate path covers Ruff/ShellCheck, current guidance/scope, core pac
 
 ```text
 24 source test modules
-651/651 source tests PASS using isolated module execution
+653/653 source tests PASS using isolated module execution
 22/22 release-preflight tests PASS
-126/126 package-critical tests PASS across 8 modules, including unprivileged execution
+127/127 package-critical tests PASS across 8 modules, including unprivileged execution
 ```
 
 Keep these as checkpoint evidence, not as a target test count. Tests may be added as supported behavior grows or new failure classes are discovered.
