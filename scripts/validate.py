@@ -268,9 +268,9 @@ def check_release_contract() -> None:
         fail("release contract advisory quality policy must be non-blocking make quality-report")
     stages = validation.get("stages")
     if not isinstance(stages, list) or [stage.get("id") for stage in stages if isinstance(stage, dict)] != [
-        "preflight-freeze", "frozen-package", "artifact-evidence"
+        "preflight-freeze", "frozen-srpm", "authoritative-srpm-rebuild", "artifact-evidence"
     ]:
-        fail("release contract stage order must be preflight-freeze, frozen-package, artifact-evidence")
+        fail("release contract stage order must be preflight-freeze, frozen-srpm, authoritative-srpm-rebuild, artifact-evidence")
 
 
 def check_configuration() -> None:
