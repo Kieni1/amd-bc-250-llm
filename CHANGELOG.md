@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.14.1-1.3 - 2026-10-20
+
+- Update Ollama from 0.34.4 to 0.40.6 using the pinned generic Linux AMD64 payload and SHA-256; keep the package's stock Vulkan/iGPU topology unchanged.
+- Update Open WebUI from 0.11.4 to 0.12.3 using the pinned standard OCI index digest.
+- Extend the release contract so both Ollama and Open WebUI runtime versions are checked against `config/runtime.env`.
+- Explicitly keep new Open WebUI 0.12 network/tool surfaces disabled by default: direct integrations, tool servers/search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations.
+- Preserve unknown/unowned task-configuration fields when converging package task settings so Open WebUI 0.12 schema additions are not erased.
+- Retain the pre-existing stopped-state verified Open WebUI backup before migration; Open WebUI 0.12.1 introduced database schema changes, so device qualification must use that rollback boundary.
+- Add exact-device upgrade evidence for Ollama 0.40 local-GGUF registration/registry uniqueness across restart, Open WebUI 0.12.3 knowledge/RAG behavior, and the 6144-token Advanced path reaching Ollama as `options.num_predict=6144`.
+- Do not enable Open WebUI Skills/Tool Search merely because upstream added them; Skills can consume substantial prompt context in 0.12.3 and Tool Search remains outside the appliance contract.
+
 ## 0.14.1-1.2 - 2026-10-19
 
 - Reconcile current release policy and operator guidance with the real blocking gate: Ruff, ShellCheck, scope/current-guidance, package `%check`, configured rpmlint, source/payload evidence and selected-artifact identity remain release blockers, while the broad deterministic suite remains additional quality evidence.
