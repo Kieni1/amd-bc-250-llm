@@ -3,8 +3,8 @@
 ## Current package baseline
 
 ```text
-Ollama       0.34.4
-Open WebUI   0.11.4
+Ollama       0.40.6
+Open WebUI   0.12.3
 Tika         4.1.0-full
 Governor     0.4.13
 ```
