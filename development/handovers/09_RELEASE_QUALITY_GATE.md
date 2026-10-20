@@ -20,7 +20,7 @@ After GitHub builds, require:
 - configured rpmlint PASS with no unfiltered findings;
 - payload contract PASS;
 - closed checksum manifests PASS;
-- isolated SRPM-topdir rebuild PASS;
+- authoritative frozen-SRPM rebuild/publish PASS;
 - release-evidence record;
 - explicit release-selection record for the chosen workflow-dispatch run;
 - exact RPM/SRPM hashes.
@@ -49,7 +49,7 @@ Promote an advisory finding to a blocker when it demonstrates one of:
 - data-loss/recovery risk;
 - security exposure or secret leakage;
 - package identity/payload corruption;
-- non-reproducible release artifact or isolated SRPM-topdir rebuild failure;
+- non-reproducible release artifact or authoritative frozen-SRPM rebuild/publish failure;
 - core public command unusable in normal supported operation;
 - install/upgrade/reboot cannot converge safely.
 
