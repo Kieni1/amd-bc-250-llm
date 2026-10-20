@@ -342,7 +342,8 @@ class DocumentationTests(unittest.TestCase):
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
         version, release, _nvr = current_identity()
-        self.assertIn(f"current {version}-{release} release keeps the pin unchanged", ollama)
+        self.assertIn(f"runtime change in {version}-{release}", ollama)
+        self.assertIn("0.34.4 remains the last exact-device-qualified runtime", ollama)
         self.assertNotIn("0.13.1-1.2", ollama)
         for assignment in ("OLLAMA_VULKAN=1", "OLLAMA_IGPU_ENABLE=1", "GGML_VK_VISIBLE_DEVICES=0"):
             self.assertIn(assignment, ollama)
