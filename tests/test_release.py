@@ -50,9 +50,12 @@ class ReleaseContractTests(unittest.TestCase):
         preflight = make_recipe("release-gate-preflight")
         package = make_recipe("release-gate-package")
         self.assertLess(preflight.index("freeze-rpm-inputs"), preflight.index("check-frozen-source"))
-        self.assertIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
-        self.assertIn("check-srpm-rebuild", package)
-        self.assertIn("release-evidence", package)
+        self.assertIn("RPM_TREE_TARGET=rpm-tree-frozen srpm", package)
+        self.assertIn("rebuild-srpm", package)
+        self.assertIn("check-rpm-payload", package)
+        self.assertNotIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
+        self.assertLess(package.index("rebuild-srpm"), package.index("check-rpm-payload"))
+        self.assertLess(package.index("check-rpm-payload"), package.index("release-evidence"))
 
     def test_lint_ignores_generated_and_vendored_trees(self) -> None:
         lint = make_recipe("lint")
