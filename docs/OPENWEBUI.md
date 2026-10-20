@@ -1,6 +1,6 @@
 # Open WebUI
 
-Package candidate baseline: **Open WebUI v0.11.4** with **Ollama v0.34.4** and **Apache Tika v4.1.0-full**. Runtime pins
+Package candidate baseline: **Open WebUI v0.12.3** with **Ollama v0.40.6** and **Apache Tika v4.1.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -159,9 +159,9 @@ Open WebUI translation preset plus direction filter.
 Open WebUI's `/api/chat/completions` endpoint is used internally by package product-path tests, but
 the Open WebUI OpenAI-style adapter is **not** an advertised external BC-250 API contract. Exact-device
 attribution on the preceding v0.11.3 baseline found three limitations that must be rechecked rather than
-assumed fixed merely because the candidate pin is v0.11.4:
+assumed fixed merely because the candidate pin is v0.12.3:
 
-- a root OpenAI-style `max_tokens=N` is not reliably propagated as an Ollama generation cap;
+- on the older v0.11.3 evidence, a root OpenAI-style `max_tokens=N` was not reliably propagated as an Ollama generation cap; Open WebUI 0.12 documents this as fixed and 1.3 must requalify the behavior;
 - `completion_tokens_details.reasoning_tokens` can be `0` even when `reasoning_content` is present;
 - an Ollama `done_reason=length` can be surfaced as OpenAI-style `finish_reason=stop`.
 
@@ -174,6 +174,8 @@ OpenAI-style client field above remains outside the advertised product contract.
 of reasoning or truncation from the adapter metadata fields alone.
 `/openai/responses` workspace aliases likewise remain outside the qualified product path unless they are
 explicitly adopted and tested.
+
+Open WebUI 0.12 also adds several network/tool surfaces that are outside the appliance contract. The package explicitly keeps direct integrations, external tool servers, Tool Search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations disabled at bootstrap and persisted where supported. Skills are not enabled/adopted by this release; in 0.12.3 model-attached skills can add their full instructions to each message, so they require a separate context/privacy qualification before adoption.
 
 ## Package model presets
 
@@ -228,7 +230,7 @@ The Qwen3.5 general Advanced preset carries `think=true` and `max_tokens=6144`; 
 `Office - Advanced Structured` preset uses the same base model, 6144-token ceiling and sampler set with
 only `think=false`. This is intentionally visible product policy rather than prompt-based automatic switching.
 Strict machine-consumed Advanced extraction should use the Structured preset; normal reasoning stays on
-General / Higher Quality. Open WebUI 0.11.4 already translates the stored/request parameter path correctly,
+General / Higher Quality. Open WebUI 0.12.3 retains the package-owned stored/request parameter path,
 including `think` at the Ollama root and `max_tokens` as `options.num_predict`; no package patch to generic
 `payload.py` is required.
 
@@ -264,8 +266,8 @@ task-lfm25-1.2b-instruct-liquidai-q6-k:latest
 
 and keeps title/tag generation on while follow-up, autocomplete, search-query and
 retrieval-query generation remain off. `TASK_MODEL_PARAMS` stays `{}` so Open
-WebUI v0.11.4 retains its upstream task-token behavior. The helper first reads the
-complete v0.11.4 task configuration and then updates only reviewed fields. Those
+WebUI v0.12.3 retains upstream ownership of unreviewed task behavior. The helper first reads the
+complete v0.12.3 task configuration and then updates only reviewed fields, preserving new/unowned fields. Those
 reviewed fields now include package-owned title, tag and retrieval-query prompt
 templates so live Open WebUI and direct task qualification share one prompt policy. The
 0.11.3-0.3 tag prompt keeps broad themes and specific subtopics in one `tags` array and
@@ -329,7 +331,7 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250 maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database, RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database—including the 0.12.3 upgrade, whose 0.12.1 lineage includes database schema changes—RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and
