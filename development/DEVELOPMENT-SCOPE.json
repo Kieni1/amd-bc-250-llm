@@ -2,8 +2,8 @@
   "schema_version": 1,
   "release": {
     "version": "0.14.1",
-    "rpm_release": "1.3",
-    "nvr": "bc250-llm-server-0.14.1-1.3"
+    "rpm_release": "1.4",
+    "nvr": "bc250-llm-server-0.14.1-1.4"
   },
   "policy": {
     "description": "Keep the complete package source, but narrow routine integration work to active components. Frozen and archive-only components are verified by baseline tree hash and are not routinely reread or retested unless explicitly thawed or a boundary dependency changes.",
