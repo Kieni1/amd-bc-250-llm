@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.6**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. This is a runtime change in 0.14.1-1.3, so the earlier 0.34.4 exact-device result does not transfer; the exact selected 1.3 RPM must requalify the package-owned local-GGUF registrations and all normal lanes.
+Package standard: **Ollama v0.40.6**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. This is a runtime change in 0.14.1-1.4, so the earlier 0.34.4 exact-device result does not transfer; the exact selected 1.3 RPM must requalify the package-owned local-GGUF registrations and all normal lanes.
 
 ## Install and verify
 
