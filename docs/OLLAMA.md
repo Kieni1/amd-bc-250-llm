@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.34.4**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Exact-device 0.12.2-0.8 qualification passed with this runtime; the current 0.14.1-1.2 release keeps the pin unchanged.
+Package standard: **Ollama v0.40.6**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. This is a runtime change in 0.14.1-1.3, so the earlier 0.34.4 exact-device result does not transfer; the exact selected 1.3 RPM must requalify the package-owned local-GGUF registrations and all normal lanes.
 
 ## Install and verify
 
@@ -57,15 +57,15 @@ general comparison. GPT-OSS 20B with warm Jina remains the production memory-edg
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 
-## 0.34.4 qualified runtime notes
+## 0.40.6 candidate runtime and 0.34.4 historical evidence
 
-Ollama 0.34.4 is the package-pinned runtime and is qualified on the exact-device 0.12.2-0.8 baseline. Ollama 0.34.2 remains useful only as the immediate historical comparison baseline from the original runtime-upgrade campaign.
+Ollama 0.40.6 is the package-pinned candidate runtime. Ollama 0.34.4 remains the last exact-device-qualified runtime from the 0.12.2-0.8 baseline, and 0.34.2 is only an older comparison point. The 0.40 line changed upstream GGUF/runtime handling, so the 1.3 device round must prove package-created registrations remain unique and usable before and after restart and that no unexpected `llamacpp:` shadow names appear in `/api/tags`. Do not delete or rewrite model-store state merely to make that check pass.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
 transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Because 0.14.1-1.2 does not change the Ollama pin, do not replay that campaign unless the runtime or request path changes.
+The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Those results are historical evidence only for 1.3 because the runtime changes. Re-run the bounded runtime boundaries that can regress: all normal lanes, local GGUF registration/show/run/restart, embedding, representative long generation, Deep/task transition and memory headroom.
 
 The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
@@ -112,7 +112,7 @@ Both enable flash attention. `balanced` is the production default. `max-context`
 
 ## Benchmark API baseline
 
-`bc250 benchmark` targets the package-pinned Ollama **0.34.4** candidate request schema. Neutral generation
+`bc250 benchmark` targets the package-pinned Ollama **0.40.6** candidate request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
@@ -138,7 +138,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.34.4** as the package-standard qualified runtime for this release. Before changing that pin, review
+Treat **0.40.6** as the package-standard candidate runtime for this release. Before accepting the selected RPM, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;
