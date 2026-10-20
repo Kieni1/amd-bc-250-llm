@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.3%{?dist}
+Release:        1.4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -258,6 +258,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Tue Oct 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.4
+- Make the frozen SRPM the single authoritative binary build: create it with rpmbuild -bs, rebuild it once in an isolated topdir, publish those exact rebuilt RPMs, then run payload validation, blocking rpmlint and release evidence.
+- Upload authoritative RPM/SRPM/selection artifacts before the advisory full quality report in GitHub Actions.
+- Remove the remaining Ruff F841 unused RAG test assignment.
+
 * Tue Oct 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.3
 - Update the package-pinned runtime to Ollama 0.40.6 and Open WebUI 0.12.3 without changing the stock Fedora/Vulkan architecture or model catalog.
 - Pin the Ollama Linux AMD64 payload SHA-256 and Open WebUI OCI index digest, and include both runtime versions in the release contract.
