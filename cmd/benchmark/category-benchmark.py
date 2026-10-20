@@ -390,7 +390,7 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
 # are consumed by both Open WebUI and this direct benchmark. This prevents a model
 # from qualifying against one prompt contract and then regressing on the live route.
 TASK_NUM_PREDICT = {
-    # Open WebUI v0.11.4 falls back to max_tokens=1000 for title generation
+    # The package-pinned Open WebUI falls back to max_tokens=1000 for title generation
     # when TASK_MODEL_PARAMS is empty. The other packaged task paths inherit
     # the model's 128-token generation limit.
     "title": 1000,
