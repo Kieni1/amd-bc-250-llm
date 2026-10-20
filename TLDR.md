@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.3` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.6, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.13; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Current release source: `bc250-llm-server-0.14.1-1.4` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.6, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.13; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
 
 ## Install
 
