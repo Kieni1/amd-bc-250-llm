@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.2%{?dist}
+Release:        1.3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -258,6 +258,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Tue Oct 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.3
+- Update the package-pinned runtime to Ollama 0.40.6 and Open WebUI 0.12.3 without changing the stock Fedora/Vulkan architecture or model catalog.
+- Pin the Ollama Linux AMD64 payload SHA-256 and Open WebUI OCI index digest, and include both runtime versions in the release contract.
+- Keep newly introduced Open WebUI network/tool surfaces fail-closed by package policy: tool servers/search, direct integrations, channels/encrypted channels, Apps, subagents, web search, realtime voice and cloud-drive integrations remain disabled by default.
+- Preserve unowned Open WebUI task fields across the 0.12 schema expansion and retain the verified stopped-state backup before database migration.
+- Add runtime-upgrade qualification requirements for Ollama 0.40 local-GGUF/registry behavior, Open WebUI 0.12 RAG/knowledge behavior and Advanced 6144 outbound num_predict propagation.
+
 * Mon Oct 19 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.2
 - Align release-policy/current-guidance semantics with the blocking gate, derive current identity in validators, populate focused checks and remove editable handover checksums.
 - Add behavior-level RAG transaction/privacy regressions, loopback-default ingestion with explicit remote opt-in, and consistent credential symlink rejection.
