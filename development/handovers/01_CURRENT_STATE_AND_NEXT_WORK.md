@@ -2,7 +2,7 @@
 
 ## Current source/release identity
 
-The active line is `bc250-llm-server-0.14.1-1.3`.
+The active line is `bc250-llm-server-0.14.1-1.4`.
 
 RPM naming rule:
 
@@ -39,7 +39,7 @@ Treat these as current package choices, not permanent architectural commitments.
 
 The next device round answers only:
 
-> Does the exact selected `0.14.1-1.3` RPM behave like a usable stock BC-250 appliance?
+> Does the exact selected `0.14.1-1.4` RPM behave like a usable stock BC-250 appliance?
 
 Use `03_CORE_FUNCTIONALITY_CHECK.md`. Do not reopen broad benchmarking, tuning, GFX qualification or full resilience campaigns during this round.
 
