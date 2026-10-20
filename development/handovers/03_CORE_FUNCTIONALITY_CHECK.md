@@ -1,4 +1,4 @@
-# Core functionality check — exact 0.14.1-1.3 RPM
+# Core functionality check — exact 0.14.1-1.4 RPM
 
 ## Goal
 
@@ -32,7 +32,7 @@ Do not mutate user state just to make the starting state look cleaner.
 ## Required package/install checks
 
 - install or supported upgrade succeeds;
-- `rpm -q bc250-llm-server` reports `0.14.1-1.3` with the expected Fedora dist tag/arch;
+- `rpm -q bc250-llm-server` reports `0.14.1-1.4` with the expected Fedora dist tag/arch;
 - package services/configuration converge without manual repair;
 - no experimental GFX/private-RADV/patched-boot requirement appears;
 - one ordinary service restart succeeds.
