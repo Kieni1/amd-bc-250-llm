@@ -40,8 +40,8 @@ Ruff/ShellCheck are blocking before freeze/build, and configured `rpmlint` is bl
 
 ```text
 release preflight:       22/22 PASS
-package-critical %check: 126/126 PASS across 8 modules
-full source suite:       651/651 PASS across 24 modules (advisory path)
+package-critical %check: 127/127 PASS across 8 modules
+full source suite:       653/653 PASS across 24 modules (advisory path)
 ```
 
 The full-suite count is current evidence only; the release contract, not a historical count, defines future hard-gate membership.
