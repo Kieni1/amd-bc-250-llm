@@ -2,7 +2,7 @@
 
 ## Current source/release identity
 
-The active line is `bc250-llm-server-0.14.1-1.2`.
+The active line is `bc250-llm-server-0.14.1-1.3`.
 
 RPM naming rule:
 
@@ -27,8 +27,8 @@ The supported core is:
 Current runtime pins in source:
 
 ```text
-Ollama       0.34.4
-Open WebUI   0.11.4
+Ollama       0.40.6
+Open WebUI   0.12.3
 Tika         4.1.0-full
 Governor     0.4.13
 ```
@@ -39,7 +39,7 @@ Treat these as current package choices, not permanent architectural commitments.
 
 The next device round answers only:
 
-> Does the exact selected `0.14.1-1.2` RPM behave like a usable stock BC-250 appliance?
+> Does the exact selected `0.14.1-1.3` RPM behave like a usable stock BC-250 appliance?
 
 Use `03_CORE_FUNCTIONALITY_CHECK.md`. Do not reopen broad benchmarking, tuning, GFX qualification or full resilience campaigns during this round.
 
@@ -70,7 +70,7 @@ Do not let cleanup become the roadmap. Keep it bounded and stop when the stock b
 
 ## Deferred until deliberately reopened
 
-- Ollama upgrade beyond 0.34.4;
+- Ollama/Open WebUI upgrade beyond the 0.40.6/0.12.3 release pins;
 - context-ceiling changes;
 - performance tuning campaigns;
 - broad model tournaments;
