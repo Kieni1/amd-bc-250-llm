@@ -10,7 +10,7 @@ Current source/release identity:
 package:  bc250-llm-server
 version:  0.14.1
 release:  1.3
-NEVRA:    bc250-llm-server-0.14.1-1.3.fc44.x86_64
+NEVRA:    bc250-llm-server-0.14.1-1.4.fc44.x86_64
 ```
 
 Use normal RPM identity from here forward. Engineering iteration labels belong in commits, issues and handovers, not in Version/Release.
@@ -19,7 +19,7 @@ Use normal RPM identity from here forward. Engineering iteration labels belong i
 
 The reconstruction era is closed. The active work is simpler:
 
-1. produce and select the authoritative Fedora 44 GitHub build for `0.14.1-1.3`;
+1. produce and select the authoritative Fedora 44 GitHub build for `0.14.1-1.4`;
 2. run a deliberately small exact-RPM core-functionality check;
 3. freeze that result as the known-good stock-core baseline if it passes;
 4. shift directly to office RAG/document quality, German–French translation UX and polished local-assistant workflows; perform bounded simplification only opportunistically where it removes concrete obsolete ownership/risk;
@@ -36,10 +36,10 @@ Greenfield means implementation freedom, not data loss or contract amnesia: pres
 ## Current validation snapshot
 
 ```text
-full source suite:       653/653 PASS across 24 modules
-release preflight:       22/22 PASS
+full source suite:       656/656 PASS across 24 modules
+release preflight:       25/25 PASS
 RPM package-critical:    127/127 PASS across 8 modules (verified unprivileged)
-device acceptance:       pending exact selected 0.14.1-1.3 RPM
+device acceptance:       pending exact selected 0.14.1-1.4 RPM
 ```
 
 These counts describe the current cleaned-source snapshot; they are evidence, not permanent architecture.
