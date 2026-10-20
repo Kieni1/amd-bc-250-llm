@@ -958,11 +958,13 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("rpmlint", workflow)
         self.assertIn("make release-gate", workflow)
         package_gate = makefile[makefile.index("release-gate-package:"):makefile.index("\n\nrelease-gate:")]
-        self.assertLess(package_gate.index("RPM_TREE_TARGET=rpm-tree-frozen rpm"), package_gate.index("rpmlint -c"))
+        self.assertLess(package_gate.index("RPM_TREE_TARGET=rpm-tree-frozen srpm"), package_gate.index("rebuild-srpm"))
+        self.assertLess(package_gate.index("rebuild-srpm"), package_gate.index("check-rpm-payload"))
+        self.assertLess(package_gate.index("check-rpm-payload"), package_gate.index("rpmlint -c"))
         self.assertIn("rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm", package_gate)
         self.assertIn("rpmlint: FAIL (blocking", package_gate)
         self.assertNotIn("rpmlint: WARN (non-blocking", package_gate)
-        self.assertIn("check-srpm-rebuild", package_gate)
+        self.assertNotIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package_gate)
         self.assertIn("-C '$(FROZEN_SOURCE_DIR)'", package_gate)
         self.assertIn("release-evidence", package_gate)
 
