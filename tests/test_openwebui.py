@@ -207,6 +207,23 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertTrue(all(model["is_active"] for model in base_overrides.values()))
         self.assertTrue(all((model.get("meta") or {}).get("hidden") is False for model in base_overrides.values()))
 
+    def test_apply_preserves_unowned_task_fields_across_openwebui_012_schema(self) -> None:
+        client = FakeApplyClient()
+        client.responses["/api/v1/tasks/config"] = {
+            "unrelated": "preserved",
+            "openwebui_012_extra": {"nested": [1, 2, 3]},
+        }
+        OPENWEBUI.apply(client)
+        task_payload = next(
+            payload
+            for method, path, payload in client.calls
+            if method == "POST" and path == "/api/v1/tasks/config/update"
+        )
+        self.assertEqual(task_payload["unrelated"], "preserved")
+        self.assertEqual(task_payload["openwebui_012_extra"], {"nested": [1, 2, 3]})
+        for key, value in OPENWEBUI.desired_task().items():
+            self.assertEqual(task_payload[key], value)
+
     def test_persisted_application_policy_matches_local_offline_contract(self) -> None:
         self.assertEqual(
             OPENWEBUI.desired_application(),
@@ -218,6 +235,16 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "code_interpreter.enable": False,
                 "memories.enable": False,
                 "ui.enable_community_sharing": False,
+                "direct.integrations.enable": False,
+                "channels.enable": False,
+                "channels.encryption.enable": False,
+                "apps.enable": False,
+                "subagents.enable": False,
+                "chat.tool_search.enable": False,
+                "audio.realtime.enabled": False,
+                "web.search.enable": False,
+                "google_drive.enable": False,
+                "onedrive.enable": False,
             },
         )
 
