@@ -33,7 +33,7 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertNotIn("gfx", json.dumps(contract).lower())
         self.assertEqual(
             [stage["id"] for stage in contract["validation"]["stages"]],
-            ["preflight-freeze", "frozen-package", "artifact-evidence"],
+            ["preflight-freeze", "frozen-srpm", "authoritative-srpm-rebuild", "artifact-evidence"],
         )
         self.assertTrue(contract["validation"]["blocking_static"]["blocking"])
         self.assertEqual(contract["validation"]["blocking_static"]["command"], "make lint")
@@ -89,7 +89,14 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertLess(preflight.index("$(MAKE) preflight"), preflight.index("$(MAKE) sources"))
         self.assertLess(preflight.index("$(MAKE) sources-check"), preflight.index("$(MAKE) freeze-rpm-inputs"))
         self.assertLess(preflight.index("$(MAKE) freeze-rpm-inputs"), preflight.index("$(MAKE) check-frozen-source"))
-        self.assertIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
+        self.assertIn("RPM_TREE_TARGET=rpm-tree-frozen srpm", package)
+        self.assertIn("rebuild-srpm", package)
+        self.assertIn("check-rpm-payload", package)
+        self.assertNotIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
+        self.assertLess(package.index("RPM_TREE_TARGET=rpm-tree-frozen srpm"), package.index("rebuild-srpm"))
+        self.assertLess(package.index("rebuild-srpm"), package.index("check-rpm-payload"))
+        self.assertLess(package.index("check-rpm-payload"), package.index("rpmlint -c"))
+        self.assertLess(package.index("rpmlint -c"), package.index("release-evidence"))
         self.assertIn("$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml", package)
         self.assertIn("-C '$(FROZEN_SOURCE_DIR)'", package)
         self.assertLess(gate.index("release-gate-preflight"), gate.index("release-gate-package"))
@@ -104,6 +111,25 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("$(FROZEN_SPEC)", frozen)
         self.assertIn("cmp -s", check)
         self.assertIn("validate.sh --preflight", check)
+
+    def test_srpm_target_can_consume_frozen_rpm_tree(self) -> None:
+        srpm = make_recipe("srpm")
+        self.assertTrue(srpm.startswith("srpm: $(RPM_TREE_TARGET)"))
+        self.assertIn("rpmbuild --define '_topdir $(TOPDIR)' -bs", srpm)
+
+    def test_authoritative_rebuild_publishes_the_rebuilt_binary_rpms(self) -> None:
+        rebuild = make_recipe("rebuild-srpm")
+        self.assertIn('rpmbuild --define "_topdir $$top" --rebuild', rebuild)
+        self.assertIn("find \"$$top/RPMS\" -type f -name '*.rpm'", rebuild)
+        self.assertIn("cp -f \"$${rebuilt_rpms[@]}\" '$(DISTDIR)/'", rebuild)
+
+    def test_github_uploads_release_artifacts_before_advisory_quality(self) -> None:
+        workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
+        quality = workflow.index("Run advisory full quality report")
+        self.assertLess(workflow.index("Upload binary RPM evidence"), quality)
+        self.assertLess(workflow.index("Upload source RPM evidence"), quality)
+        self.assertLess(workflow.index("Upload selected release authority record"), quality)
+        self.assertLess(quality, workflow.index("Upload advisory quality report"))
 
     def test_package_check_runs_only_release_critical_tests(self) -> None:
         contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
