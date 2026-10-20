@@ -325,7 +325,6 @@ class RagImportTests(unittest.TestCase):
             path = self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
             docs, warnings = rag.discover(root)
             self.assertEqual(warnings, [])
-
             def run(fake, *, prune=False):
                 args = type(
                     "Args",
