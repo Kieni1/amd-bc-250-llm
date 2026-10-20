@@ -34,7 +34,7 @@
   "package": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "rpm_release": "1.3",
+    "rpm_release": "1.4",
     "version": "0.14.1"
   },
   "runtime": {
@@ -63,16 +63,20 @@
     ],
     "stages": [
       {
-        "description": "run blocking Ruff/ShellCheck and current-guidance/scope/release contracts, verify pinned sources, then freeze Source0 and spec",
-        "id": "preflight-freeze"
+        "id": "preflight-freeze",
+        "description": "run blocking Ruff/ShellCheck and current-guidance/scope/release contracts, verify pinned sources, then freeze Source0 and spec"
       },
       {
-        "description": "build binary/source RPMs from the exact frozen source/spec snapshot; RPM %check runs the small release-critical package test set",
-        "id": "frozen-package"
+        "id": "frozen-srpm",
+        "description": "build the source RPM from the exact frozen Source0/spec snapshot without compiling the binary payload"
       },
       {
-        "description": "run configured blocking rpmlint, verify payload/SRPM rebuild, then emit closed binary/source manifests plus release-evidence.json",
-        "id": "artifact-evidence"
+        "id": "authoritative-srpm-rebuild",
+        "description": "rebuild that frozen SRPM once in an isolated temporary topdir; RPM %check runs the package-critical set, and those exact rebuilt binary RPMs are published to dist for payload validation and blocking rpmlint"
+      },
+      {
+        "id": "artifact-evidence",
+        "description": "emit closed binary/source manifests plus release-evidence.json from the exact SRPM and rebuilt binaries that become GitHub artifacts"
       }
     ],
     "blocking_static": {
