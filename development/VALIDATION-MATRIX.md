@@ -1,12 +1,12 @@
 # BC-250 validation matrix — current release line
 
-Current release identity: `bc250-llm-server-0.14.1-1.3`.
+Current release identity: `bc250-llm-server-0.14.1-1.4`.
 
 This matrix tracks only the evidence needed to move the current line forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
 
 | Area | Current state | Next evidence |
 |---|---|---|
-| Release identity | `0.14.1-1.3` assigned consistently | keep unchanged until package-only revision or next product version |
+| Release identity | `0.14.1-1.4` assigned consistently | keep unchanged until package-only revision or next product version |
 | Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during product work and any bounded cleanup |
 | Release preflight | source/release-pipeline gate available | rerun on final source before authoritative build |
 | Full source suite | broad existing suite retained | all modules should pass or have explicit advisory classification |
@@ -14,7 +14,7 @@ This matrix tracks only the evidence needed to move the current line forward. De
 | Source0/spec freeze | tracked-source contract implemented | freeze exact inputs in selected build |
 | RPM payload | package contract implemented | must pass on built RPM |
 | rpmlint | blocking configured package gate | any unfiltered finding blocks artifact evidence; fix the package or document a genuine appliance-specific false positive |
-| SRPM isolated-topdir rebuild | hard release gate | must pass in the release environment |
+| Authoritative SRPM rebuild | hard release gate | frozen SRPM must rebuild once in an isolated topdir; those exact rebuilt binaries become the artifacts |
 | GitHub authority | explicit selected `workflow_dispatch` run | capture `release-evidence.json` + `release-selection.json` |
 | Runtime/UI upgrade | Ollama `0.40.6` + Open WebUI `0.12.3` pinned in source | exact selected-RPM lane/registry, migration, RAG and 6144 outbound evidence |
 | Exact-RPM core functionality | pending | run small BC-250 smoke on selected RPM |
@@ -35,7 +35,7 @@ Stop release creation for:
 - package-critical `%check` failure;
 - configured rpmlint failure;
 - RPM payload mismatch;
-- isolated SRPM topdir rebuild failure in the release environment;
+- authoritative frozen-SRPM rebuild failure, or failure to publish its exact rebuilt binaries, in the release environment;
 - missing/ambiguous artifact identity.
 
 ### Advisory/historical material
