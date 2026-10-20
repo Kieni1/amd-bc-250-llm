@@ -248,7 +248,7 @@ sudo bc250 benchmark owui-system-context MODEL --token-file FILE
 Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
 group/world access (normally mode `0600`), matching the package credential-file boundary.
 
-The pinned Open WebUI v0.11.4 OpenAI-style adapter is not an external BC-250 compatibility
+The pinned Open WebUI v0.12.3 OpenAI-style adapter is not an external BC-250 compatibility
 contract. A client-supplied root `max_tokens` field on that external-style endpoint is not advertised
 as a reliable hard cap for Ollama-backed requests. The package-owned Advanced model record is a
 different package-owned internal path: externally supplied exact-device evidence accepted by integration
