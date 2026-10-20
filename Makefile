@@ -26,7 +26,7 @@ FROZEN_SOURCE_PARENT := $(BUILD_DIR)/frozen-source
 FROZEN_SOURCE_DIR := $(FROZEN_SOURCE_PARENT)/$(NAME)-$(VERSION)
 UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 
-.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload check-srpm-rebuild release-gate-preflight release-gate-package release-gate clean clean-sources distclean
+.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload rebuild-srpm release-gate-preflight release-gate-package release-gate clean clean-sources distclean
 
 help:
 	@printf '%s\n' \
@@ -45,7 +45,7 @@ help:
 	  'make release-evidence  Emit CI/build evidence and, when explicitly selected, release-selection.json' \
 	  'make BUILD_DIR=/path release-gate  Supported custom Make-level build root (BC250_BUILD_DIR is internal)' \
 	  'make check-rpm-payload  Verify transformed binary RPM content and metadata' \
-	  'make check-srpm-rebuild  Rebuild the generated SRPM in an isolated topdir inside the release environment' \
+	  'make rebuild-srpm  Rebuild the generated SRPM in an isolated topdir and publish those exact binary RPMs' \
 	  'make release-gate  Fedora RPM release gate; GitHub artifact is release authority, local execution reproduces the gate' \
 	  'make clean      Remove disposable build output; keep downloaded sources' \
 	  'make clean-sources  Remove the reusable third-party source cache'
@@ -146,7 +146,7 @@ rpm-tree-frozen: prepare-rpm-output
 	cp $(UPSTREAM_SOURCES) $(TOPDIR)/SOURCES/
 	cp $(FROZEN_SPEC) $(TOPDIR)/SPECS/$(NAME).spec
 
-srpm: rpm-tree
+srpm: $(RPM_TREE_TARGET)
 	rpmbuild --define '_topdir $(TOPDIR)' -bs $(TOPDIR)/SPECS/$(NAME).spec
 	cp -f $(TOPDIR)/SRPMS/*.src.rpm $(DISTDIR)/
 	cd $(DISTDIR) && sha256sum *.src.rpm > SHA256SUMS.source && cp SHA256SUMS.source SHA256SUMS
@@ -239,14 +239,18 @@ check-rpm-payload:
 	echo "Transformed RPM payload integrity passed: runtime/version/mode contract"; \
 	echo "RPM payload contract passed: $$(basename "$$main_rpm")"
 
-check-srpm-rebuild:
+rebuild-srpm:
 	@set -Eeuo pipefail; \
 	mapfile -t srpms < <(find '$(DISTDIR)' -maxdepth 1 -type f -name '$(NAME)-$(VERSION)-*.src.rpm' -print | sort); \
 	[[ "$${#srpms[@]}" -eq 1 ]] || { echo "ERROR: expected exactly one current SRPM, found $${#srpms[@]}." >&2; exit 1; }; \
 	top="$$(mktemp -d)"; trap 'rm -rf "$$top"' EXIT; \
 	mkdir -p "$$top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}; \
 	CARGO_NET_OFFLINE=true rpmbuild --define "_topdir $$top" --rebuild "$${srpms[0]}"; \
-	echo "SRPM isolated-topdir rebuild passed: $$(basename "$${srpms[0]}")"
+	mapfile -t rebuilt_rpms < <(find "$$top/RPMS" -type f -name '*.rpm' -print | sort); \
+	[[ "$${#rebuilt_rpms[@]}" -gt 0 ]] || { echo 'ERROR: isolated SRPM rebuild produced no binary RPMs.' >&2; exit 1; }; \
+	rm -f '$(DISTDIR)'/*.x86_64.rpm '$(DISTDIR)'/*.noarch.rpm; \
+	cp -f "$${rebuilt_rpms[@]}" '$(DISTDIR)/'; \
+	echo "Authoritative SRPM rebuild published $${#rebuilt_rpms[@]} binary RPM(s): $$(basename "$${srpms[0]}")"
 
 release-gate-preflight:
 	$(MAKE) clean
@@ -260,14 +264,19 @@ release-gate-preflight:
 release-gate-package:
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
 	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
-	  RPM_TREE_TARGET=rpm-tree-frozen rpm </dev/null
+	  RPM_TREE_TARGET=rpm-tree-frozen srpm </dev/null
+	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
+	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
+	  rebuild-srpm
+	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
+	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
+	  check-rpm-payload
 	@set +e; \
 	report='$(BUILD_DIR)/rpmlint-report.txt'; \
 	rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm >"$$report" 2>&1; rc=$$?; \
 	cat "$$report"; \
 	if ((rc != 0)); then echo "rpmlint: FAIL (blocking, rc=$$rc)" >&2; exit "$$rc"; fi; \
 	echo 'rpmlint: PASS'
-	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' check-srpm-rebuild
 	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
 	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
 	  release-evidence
