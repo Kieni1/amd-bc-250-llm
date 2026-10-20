@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure the package-owned Open WebUI 0.11.4 baseline through supported APIs."""
+"""Configure the package-owned Open WebUI 0.12.3 baseline through supported APIs."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ LEGACY_TOKEN_FILE = Path("/root/owui-test.key")
 SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
 # The model-view/access contract below is qualified against the packaged Open WebUI pin.
-OPENWEBUI_MODEL_API_VERSION = "0.11.4"
+OPENWEBUI_MODEL_API_VERSION = "0.12.3"
 AUTO_VISIBLE_TAG = "bc250-auto-visible"
 NORMAL_PROVIDER_LANES = {
     "main": "http://127.0.0.1:11434",
@@ -656,7 +656,7 @@ def model_view_map(
 def load_live_model_views(
     client: Client,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    # Open WebUI v0.11.4 represents curated presets and raw-model overrides in
+    # Open WebUI v0.12.3 represents curated presets and raw-model overrides in
     # separate API views. Keep this explicit so a future pin change fails as an
     # inspection-compatibility issue instead of looking like mass desired-state drift.
     presets = model_view_map(
