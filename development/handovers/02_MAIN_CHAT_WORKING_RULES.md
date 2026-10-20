@@ -65,7 +65,7 @@ Fix the correct layer. Do not weaken product behavior to satisfy a bad harness, 
 
 ## Hard gate vs advisory quality
 
-A hard release failure means artifact identity, buildability, payload integrity, isolated SRPM-topdir rebuild or another release-critical invariant is broken. Predictable static/package defects are also hard candidate failures: Ruff/ShellCheck run before freeze/build, and configured rpmlint runs after RPM construction.
+A hard release failure means artifact identity, buildability, payload integrity, the authoritative frozen-SRPM rebuild/publish path or another release-critical invariant is broken. Predictable static/package defects are also hard candidate failures: Ruff/ShellCheck run before freeze/build, and configured rpmlint runs after RPM construction.
 
 The broad behavioral suite remains advisory and should be reviewed as a set. Noncritical long-running product-test findings are not automatically permission to block RPM evidence, but known deterministic release defects must be fixed before artifact selection.
 
