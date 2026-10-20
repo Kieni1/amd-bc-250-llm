@@ -880,7 +880,7 @@ snapshot() {
     curl -fsS "http://127.0.0.1:$port/api/tags" > "$dir/ollama-$port-tags.json" 2>&1 || true
     curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
   done
-  # Ollama 0.34.4 exposes model thinking metadata through /api/show when the
+  # The package-pinned Ollama exposes model thinking metadata through /api/show when the
   # implementation provides it. Capture it as diagnostic evidence; absence is
   # never interpreted here as a hard non-reasoning result.
   local show_model show_port show_name
