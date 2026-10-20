@@ -29,7 +29,7 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.3.fc44.x86_64`.
+Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.4.fc44.x86_64`.
 
 ## Validation and build boundary
 
@@ -40,7 +40,7 @@ same gate but is backup/debug evidence only; it does not silently become release
 
 `release-contract.json` is the machine-readable core release contract. The release gate
 first verifies source identity and cheap pipeline contracts, then freezes Source0 plus the
-RPM spec and records `RPM-INPUTS.sha256`. The package build consumes those exact frozen bytes as an unprivileged builder. RPM `%check` runs the package-critical module list from `release-contract.json`; the release-pipeline contract tests remain in preflight. After the build, configured `rpmlint`, transformed payload checks and an isolated SRPM-topdir rebuild in the release environment are hard gates.
+RPM spec and records `RPM-INPUTS.sha256`. The package build consumes those exact frozen bytes as an unprivileged builder. The release path first creates the frozen SRPM with `rpmbuild -bs`, then rebuilds that SRPM once in an isolated temporary topdir. RPM `%check` runs the package-critical module list from `release-contract.json` during that rebuild; the exact rebuilt binary/debug RPMs are copied to `dist/` and become the GitHub artifacts. Payload checks and configured blocking `rpmlint` run on those same binaries before closed manifests/evidence are emitted.
 
 GitHub writes the installable `*.x86_64.rpm`, rebuild-input `*.src.rpm`, separate
 `SHA256SUMS.binary` / `SHA256SUMS.source`, frozen-input `SHA256SUMS.inputs`, and
@@ -125,7 +125,7 @@ rebuild artifact.
 - Keep the top spec changelog entry aligned with the resulting Version-Release.
 - Review pinned revisions, licenses, source-RPM contents and the binary payload.
 - Run only checks available in the editing environment and report them exactly.
-- Build through GitHub/Fedora and require frozen-input verification, package-critical `%check`, RPM payload-contract checks, isolated SRPM-topdir rebuild and closed checksum manifests to pass. Require Ruff, ShellCheck and configured `rpmlint` to pass; review the broad full-suite advisory report separately.
+- Build through GitHub/Fedora and require frozen-input verification, frozen-SRPM creation, the single isolated SRPM rebuild with package-critical `%check`, RPM payload-contract checks and closed checksum manifests to pass. Require Ruff, ShellCheck and configured `rpmlint` to pass; review the broad full-suite advisory report separately. The rebuilt binaries from that one SRPM rebuild are the distributed artifacts.
 - Record the selected GitHub Actions run and retain its `release-evidence.json`; a PR build is CI evidence until deliberately selected for device acceptance.
 - On the BC-250 test clean install or upgrade as appropriate, guided reboot/resume,
   models, affected runtime features and both removal paths.
