@@ -4,16 +4,17 @@
   "release": {
     "name": "bc250-llm-server",
     "version": "0.14.1",
-    "rpm_release": "1.2",
-    "nvr": "bc250-llm-server-0.14.1-1.2",
+    "rpm_release": "1.3",
+    "nvr": "bc250-llm-server-0.14.1-1.3",
     "fedora": "44",
-    "runtime_ollama": "0.34.4",
-    "state": "source-ready-build-pending"
+    "runtime_ollama": "0.40.6",
+    "state": "source-ready-build-pending",
+    "runtime_open_webui": "0.12.3"
   },
   "next_work": {
-    "build": "Run/select the authoritative Fedora 44 GitHub workflow_dispatch build for 0.14.1-1.2 and freeze exact RPM/SRPM/evidence identities.",
-    "device": "Run the low-cost core functionality check on exactly the selected 0.14.1-1.2 RPM, including Open WebUI 0.11.4 RAG and Advanced 6144 propagation evidence.",
-    "after_pass": "Freeze the stock-core baseline, then follow the product roadmap: office RAG/document quality, German\u2013French translation UX and polished local-assistant operation; simplify only where it removes real ownership/risk."
+    "build": "Run/select the authoritative Fedora 44 GitHub workflow_dispatch build for 0.14.1-1.3 and freeze exact RPM/SRPM/evidence identities.",
+    "device": "Run the exact selected 0.14.1-1.3 RPM core functionality smoke plus Ollama 0.40.6 local-GGUF/registry migration checks, Open WebUI 0.12.3 RAG/knowledge checks, and Advanced 6144 outbound num_predict evidence.",
+    "after_pass": "Freeze the stock-core baseline, then follow the product roadmap: office RAG/document quality, German–French translation UX and polished local-assistant operation; simplify only where it removes real ownership/risk."
   },
   "build_authority": {
     "primary": "GitHub Actions / Fedora 44",
@@ -23,13 +24,13 @@
     "local": "scripts/ci-local.sh or matching Fedora 44 execution for reproduction/debug only"
   },
   "validation": {
-    "full_source_suite": "PASS \u2014 651/651 across 24 modules using isolated module execution",
-    "release_preflight": "PASS \u2014 22/22 release-pipeline contract tests",
-    "rpm_package_check": "PASS \u2014 126/126 across 8 package-critical modules; verified unprivileged",
-    "device_acceptance": "PENDING exact selected 0.14.1-1.2 RPM"
+    "full_source_suite": "PASS — 653/653 across 24 modules using isolated module execution",
+    "release_preflight": "PASS — 22/22 release-pipeline contract tests",
+    "rpm_package_check": "PASS — 127/127 across 8 package-critical modules; verified unprivileged",
+    "device_acceptance": "PENDING exact selected 0.14.1-1.3 RPM; runtime-upgrade evidence required"
   },
   "long_term": {
-    "direction": "stock-first local office AI appliance; after the stock-core baseline, prioritize RAG/document quality, German\u2013French translation and ordinary-user UX; perform bounded simplification opportunistically only where it removes concrete ownership/risk before optional expert-layer expansion",
+    "direction": "stock-first local office AI appliance; after the stock-core baseline, prioritize RAG/document quality, German–French translation and ordinary-user UX; perform bounded simplification opportunistically only where it removes concrete ownership/risk before optional expert-layer expansion",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM",
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses"
   },
