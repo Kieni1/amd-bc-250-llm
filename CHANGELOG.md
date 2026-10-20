@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.1-1.4 - 2026-10-20
+
+- Eliminate the duplicate authoritative Rust/governor compilation in GitHub release builds: build the frozen SRPM first, rebuild that SRPM once in an isolated temporary RPM topdir, and publish those exact rebuilt binary/debug RPMs to `dist/`.
+- Make the distributed binary RPMs provably the outputs of the published SRPM instead of building one binary set for distribution and a second disposable set only for rebuild evidence.
+- Preserve package `%check`, frozen Source0/spec verification, payload validation, blocking configured rpmlint, closed manifests, release evidence and explicit workflow-dispatch release selection.
+- Make `make srpm` honor `RPM_TREE_TARGET` so the release path can create an SRPM from the frozen source/spec inputs without a preceding binary build.
+- Move GitHub binary/SRPM/release-selection artifact uploads immediately after the hard release gate; run the advisory full quality report afterward so usable artifacts are exposed earlier without weakening validation.
+- Remove the remaining Ruff `F841` unused assignment in the RAG transaction regression fixture.
+
 ## 0.14.1-1.3 - 2026-10-20
 
 - Update Ollama from 0.34.4 to 0.40.6 using the pinned generic Linux AMD64 payload and SHA-256; keep the package's stock Vulkan/iGPU topology unchanged.
