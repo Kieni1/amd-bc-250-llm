@@ -7,8 +7,8 @@ Wants=network-online.target tika.service
 
 [Container]
 ContainerName=open-webui
-# v0.11.4, pinned OCI index digest.
-Image=ghcr.io/open-webui/open-webui@sha256:9591b13f13843c7721c2b8eaf7382846c81b3ffe126526d1888d1fed50c6a33f
+# v0.12.3, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:a537bbe1e6b428820f52ed4a029d7fff97062e24d5cf32c365fba36fd0542def
 Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
@@ -35,6 +35,19 @@ Environment=ENABLE_CODE_EXECUTION=false
 Environment=ENABLE_CODE_INTERPRETER=false
 Environment=ENABLE_MEMORIES=false
 Environment=ENABLE_DIRECT_CONNECTIONS=false
+# Open WebUI 0.12 adds several network/tool surfaces. Keep them explicit and
+# fail-closed until the appliance deliberately adopts and qualifies them.
+Environment=ENABLE_DIRECT_INTEGRATIONS=false
+Environment=ENABLE_TOOL_SERVERS=false
+Environment=ENABLE_TOOL_SEARCH=false
+Environment=ENABLE_CHANNELS=false
+Environment=ENABLE_ENCRYPTED_CHANNELS=false
+Environment=ENABLE_APPS=false
+Environment=ENABLE_SUBAGENTS=false
+Environment=AUDIO_REALTIME_ENABLED=false
+Environment=ENABLE_WEB_SEARCH=false
+Environment=ENABLE_GOOGLE_DRIVE_INTEGRATION=false
+Environment=ENABLE_ONEDRIVE_INTEGRATION=false
 Environment=ENABLE_PIP_INSTALL_FRONTMATTER_REQUIREMENTS=false
 
 # Bootstrap defaults for upload/residency controls. Upload limits/extensions are
