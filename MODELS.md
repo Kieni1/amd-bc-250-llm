@@ -325,9 +325,7 @@ Other older graveyard entries remain documented by their Modelfiles, decision hi
 retired catalog. Do not resurrect them because of an isolated benchmark score; require a
 new role, changed hardware/runtime envelope or other explicit retest condition.
 
-Active experiments must retain a current comparison purpose. LFM and Gemma4 26B are now retired;
-TIR remains a broader office/RAG comparison, while general-main, OCR, embedding and agent
-experiments keep their separate lanes.
+Active experiments must retain a current comparison purpose. The former production LFM translation identity and Gemma4 26B remain retired, but 1.5 adds a new LFM2.5 8B A1B fast-office challenger and a separate LFM2.5 24B A2B exclusive-agent challenger. TIR remains a broader office/RAG comparison, while general-main, OCR, embedding, document-vision and agent experiments keep their separate lanes.
 
 Use the role-specific lanes before changing defaults:
 
@@ -352,6 +350,8 @@ separately below.
 exp-gemma4-12b-google-qat-q4-0
 exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
 exp-glm-ocr-ggml-q8-0
+exp-lfm25-8b-a1b-unsloth-q6-k-xl
+exp-minicpm-v47-1b-openbmb-q4-k-m
 exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
@@ -367,6 +367,17 @@ exp-qwen38-9b-empero-q6-k
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
 ```
 <!-- ACTIVE_EXPERIMENTS:END -->
+
+## 2026-10-21 optional challenger additions
+
+Release 1.5 adds comparison profiles only; no production/default role changes.
+
+- `exp-lfm25-8b-a1b-unsloth-q6-k-xl`: checksum-pinned local GGUF, 8K first-pass context, explicit `lfm2` renderer/parser. Treat thinking/tool capability as unproven for this imported quant until device qualification.
+- `agentic-lfm25-24b-a2b-unsloth-q3-k-xl`: checksum-pinned 10.9 GB-class local GGUF on the exclusive agent lane, `lfm2-thinking`, bounded 8K context / 3072 output. It is an always-reasoning/tool-oriented challenger, not a normal chat-lane model.
+- `exp-gemma4-12b-hauhaucs-uncensored-q4-k-m`: existing challenger retained, now with exact source commit/SHA-256 plus explicit `gemma4-large` renderer, `gemma4` parser and thinking capability metadata. Q4_K_M is intentional for this QAT-oriented release.
+- `exp-minicpm-v47-1b-openbmb-q4-k-m`: Ollama-managed HF document-vision/OCR experiment so multimodal/projector assets stay paired. It is not a Tika replacement.
+
+Promotion requires BC-250 evidence for registration/capabilities, visible output, memory/load/throughput, office DE↔FR integrity, grounded RAG behavior and the role-specific vision/tool tests. Generic leaderboard scores are insufficient.
 
 ## Agent/coding lifecycle
 
