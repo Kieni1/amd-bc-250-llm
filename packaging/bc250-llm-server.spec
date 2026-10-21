@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.4%{?dist}
+Release:        1.5%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -107,7 +107,12 @@ cargo build --release --frozen --offline
 popd
 
 %check
-bash scripts/validate.sh --package </dev/null
+check_start=$(date +%s)
+check_rc=0
+bash scripts/validate.sh --package </dev/null || check_rc=$?
+check_end=$(date +%s)
+echo "BC250_TIMING stage=rpm-check seconds=$((check_end - check_start)) rc=${check_rc}"
+exit "${check_rc}"
 
 %install
 python3 scripts/install-manifest.py \
@@ -258,6 +263,9 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Wed Oct 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.5
+- Refine pre-convergence status semantics, harden Ollama version parsing, add optional model challengers, and instrument release-stage timing.
+
 * Tue Oct 20 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.4
 - Make the frozen SRPM the single authoritative binary build: create it with rpmbuild -bs, rebuild it once in an isolated topdir, publish those exact rebuilt RPMs, then run payload validation, blocking rpmlint and release evidence.
 - Upload authoritative RPM/SRPM/selection artifacts before the advisory full quality report in GitHub Actions.
