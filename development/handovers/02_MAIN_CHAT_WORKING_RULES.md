@@ -89,3 +89,7 @@ Operator-added model registrations are supported state. Tests must not delete th
 ## Documentation truth
 
 Current docs describe current behavior. Historical detail belongs in repository history or `archive/`, not in active operating instructions.
+
+## Current 1.5 release-architecture rule
+
+Keep the SRPM-first single authoritative rebuild architecture. Do not reintroduce a preceding full binary `rpmbuild -ba` merely as a convenience: it recreates duplicate compilation and weakens the simple provenance statement that the distributed binaries are exactly those rebuilt from the published SRPM. Further optimization should start with stage timing and measured evidence, not another structural rewrite.
