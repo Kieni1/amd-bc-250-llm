@@ -1,13 +1,17 @@
 # BC250 category: experimental
 # Ollama model: exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
-# Source: HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced @ latest
+# Source: HauhauCS/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced @ ae8045ac2bd216293ca49a3065da2c942dde4b68
 # GGUF: Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf
+# SHA256: 59656d7494d6376ca97e9e20b64ea2e16cd97f12ec6d47bfccba91cb785b5134
 FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-12b-hauhaucs-uncensored-q4-k-m/Gemma4-12B-QAT-Uncensored-HauhauCS-Balanced-Q4_K_M.gguf
 
 # BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
 PARAMETER num_gpu 99
 # Preserve the SYSTEM prefix when old context is evicted.
 PARAMETER num_keep 256
+RENDERER gemma4-large
+PARSER gemma4
+CAPABILITY thinking
 PARAMETER num_ctx 16384
 PARAMETER temperature 0.6
 PARAMETER top_p 0.9
