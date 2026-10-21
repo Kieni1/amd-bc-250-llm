@@ -227,6 +227,26 @@ def identity_match(
     return observed_version == expected_version and observed_digest == expected_digest
 
 
+def setup_state() -> dict[str, str | None]:
+    publication_dropin = Path(
+        os.environ.get(
+            "BC250_OWUI_ENABLE_DROPIN",
+            "/etc/containers/systemd/open-webui.container.d/90-enable.conf",
+        )
+    )
+    if publication_dropin.is_file():
+        return {
+            "state": "published",
+            "open_webui_publication": "published",
+            "reason": None,
+        }
+    return {
+        "state": "convergence_pending",
+        "open_webui_publication": "held",
+        "reason": "Open WebUI public/boot publication is held until package convergence completes",
+    }
+
+
 def runtime_identity(share: Path) -> dict[str, object]:
     runtime = key_values(share / "runtime.env")
     tika_expected_version = (runtime.get("BC250_TIKA_VERSION") or "").removesuffix("-full") or None
@@ -318,7 +338,7 @@ def main() -> int:
         )
     }
     payload = {
-        "schema": "bc250.status.v3",
+        "schema": "bc250.status.v4",
         "package": rpm_identity(),
         "kernel": os.uname().release,
         "command_line": (
@@ -327,6 +347,7 @@ def main() -> int:
             else None
         ),
         "runtime_mode": runtime_mode(libexec),
+        "setup": setup_state(),
         "services": services,
         "runtime_identity": runtime_identity(share),
         "memory": memory_status(),
