@@ -27,42 +27,9 @@ After GitHub builds, require:
 
 Only then call the build selected for device acceptance.
 
-## Device-smoke-ready
+## Current 1.5 build status
 
-For `0.14.1-1.2`, use the small core functionality check. Broad historical qualification is not a prerequisite.
+The 1.5 source candidate retains the proven 1.4 SRPM-first authority chain and adds stage-timing/log instrumentation without changing build authority. A selected 1.5 GitHub `workflow_dispatch` build is still required before BUILD-VALIDATED status.
 
-## Advisory finding classification
+Prior 1.4 authority evidence remains useful: payload validation passed, configured rpmlint reported zero errors, and the job completed in 5m58s with a 4m29s release gate and one 2m49s Rust/governor compilation. Do not transfer those artifact hashes or BUILD PASS status to 1.5.
 
-```text
-FIX-NOW   evidence indicates current product/release risk
-DEFER     valid issue outside this iteration
-REMOVE    obsolete check or no longer-supported invariant
-INFO      useful observation with no required change
-```
-
-A WARN quality report is not itself a release failure. Its contents still need conscious review.
-
-## Safety escalation
-
-Promote an advisory finding to a blocker when it demonstrates one of:
-
-- data-loss/recovery risk;
-- security exposure or secret leakage;
-- package identity/payload corruption;
-- non-reproducible release artifact or authoritative frozen-SRPM rebuild/publish failure;
-- core public command unusable in normal supported operation;
-- install/upgrade/reboot cannot converge safely.
-
-## Confidence language
-
-Use precise labels:
-
-```text
-source-ready
-authoritative build selected
-package checks passed
-device smoke passed
-known-good baseline
-```
-
-Do not say “fully qualified” when only the small smoke was performed.
