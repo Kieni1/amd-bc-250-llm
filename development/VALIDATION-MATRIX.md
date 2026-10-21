@@ -1,12 +1,12 @@
 # BC-250 validation matrix — current release line
 
-Current release identity: `bc250-llm-server-0.14.1-1.4`.
+Current release identity: `bc250-llm-server-0.14.1-1.5`.
 
 This matrix tracks only the evidence needed to move the current line forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
 
 | Area | Current state | Next evidence |
 |---|---|---|
-| Release identity | `0.14.1-1.4` assigned consistently | keep unchanged until package-only revision or next product version |
+| Release identity | `0.14.1-1.5` assigned consistently | keep unchanged until package-only revision or next product version |
 | Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during product work and any bounded cleanup |
 | Release preflight | source/release-pipeline gate available | rerun on final source before authoritative build |
 | Full source suite | broad existing suite retained | all modules should pass or have explicit advisory classification |
@@ -16,8 +16,8 @@ This matrix tracks only the evidence needed to move the current line forward. De
 | rpmlint | blocking configured package gate | any unfiltered finding blocks artifact evidence; fix the package or document a genuine appliance-specific false positive |
 | Authoritative SRPM rebuild | hard release gate | frozen SRPM must rebuild once in an isolated topdir; those exact rebuilt binaries become the artifacts |
 | GitHub authority | explicit selected `workflow_dispatch` run | capture `release-evidence.json` + `release-selection.json` |
-| Runtime/UI upgrade | Ollama `0.40.6` + Open WebUI `0.12.3` pinned in source | exact selected-RPM lane/registry, migration, RAG and 6144 outbound evidence |
-| Exact-RPM core functionality | pending | run small BC-250 smoke on selected RPM |
+| Runtime/UI baseline | Ollama `0.40.6` + Open WebUI `0.12.3` retained; exact 1.4 Blocks 1-3 passed their changed runtime/product boundaries | run low-cost exact-1.5 smoke for changed package bytes; do not claim transferred DEVICE PASS |
+| Exact-RPM core functionality | 1.4 Blocks 1-3 device-proven; 1.5 pending | run small 1.5 smoke focused on setup/status/version parsing plus reboot/ordinary-user persistence |
 | Product-roadmap baseline | pending device smoke | freeze known-good stock-core baseline, then proceed directly to RAG/document, DE↔FR translation and local-assistant work; simplify only where it removes concrete risk |
 
 ## Current stop conditions
