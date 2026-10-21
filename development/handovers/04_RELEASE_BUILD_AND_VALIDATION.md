@@ -36,14 +36,38 @@ The release path is intentionally small:
 
 The release path intentionally does not run a preceding `rpmbuild -ba`: the distributed binary is the exact binary rebuilt from the published SRPM.
 
+## Measured 1.4 GitHub result and 1.5 observability
+
+The architecture above has now completed successfully in GitHub Actions. Observed timing:
+
+```text
+1.3-era successful run:
+  total job     8m45s
+  release gate  7m31s
+  Rust compile  ~2m31s + ~2m33s
+
+1.4 successful run:
+  total job     5m58s
+  release gate  4m29s
+  Rust compile  2m49s once
+```
+
+Observed improvement is about 2m47s overall (~32%) and about 3m02s in the release gate (~40%). The point is not the exact percentage; the durable conclusion is that the redundant Rust build was real and has been removed without weakening the evidence chain.
+
+The successful run also confirmed that the rebuilt RPM payload passed validation and configured rpmlint completed with zero errors. The workflow uploads authoritative binary RPM/SRPM/release-selection/evidence artifacts before starting the advisory full quality report, so advisory execution no longer delays access to usable release artifacts.
+
+Release 1.5 keeps that architecture and adds only measurement/reporting: machine-greppable `BC250_TIMING` records cover preflight/static checks, source preparation, Source0 freeze/check, `rpmbuild -bs`, authoritative SRPM rebuild, payload validation, rpmlint and release evidence; RPM `%check` reports its own duration from inside the authoritative rebuild. The rebuild summary also identifies the source SRPM and prints the actual rebuilt binary RPM filenames. These changes add no second build and do not weaken any gate.
+
+Use successful 1.5 authority-run timing before considering Cargo source/cache work, non-authoritative `sccache`, or a prebuilt builder image. For an explicitly selected authority run, preserve the meaning of one clean authoritative Rust compilation unless policy is deliberately changed.
+
 Ruff/ShellCheck are blocking before freeze/build, and configured `rpmlint` is blocking after RPM construction. The broader full-suite quality report remains advisory unless a specific finding is deliberately promoted to a release blocker.
 
 ## Current cleaned-source validation snapshot
 
 ```text
-release preflight:       25/25 PASS
+release preflight:       26/26 PASS
 package-critical %check: 127/127 PASS across 8 modules
-full source suite:       656/656 PASS across 24 modules (advisory path)
+full source suite:       661/661 PASS across 24 modules (advisory path)
 ```
 
 The full-suite count is current evidence only; the release contract, not a historical count, defines future hard-gate membership.
