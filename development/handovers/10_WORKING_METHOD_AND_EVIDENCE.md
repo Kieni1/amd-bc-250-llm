@@ -97,3 +97,7 @@ Current durable decisions:
 - Ruff/ShellCheck and configured rpmlint are blocking candidate gates; broad behavioral quality remains aggregated/advisory by default;
 - exact artifacts cross source/build/device boundaries;
 - simplification is bounded risk/ownership reduction; the product roadmap prioritizes RAG/document quality, German–French translation UX and polished local-assistant operation.
+
+## Current 1.5 release-architecture rule
+
+Keep the SRPM-first single authoritative rebuild architecture. Do not reintroduce a preceding full binary `rpmbuild -ba` merely as a convenience: it recreates duplicate compilation and weakens the simple provenance statement that the distributed binaries are exactly those rebuilt from the published SRPM. Further optimization should start with stage timing and measured evidence, not another structural rewrite.
