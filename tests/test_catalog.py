@@ -170,6 +170,47 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             text,
         )
 
+    def test_optional_2026_10_model_challengers_are_bounded_and_not_recommended(self) -> None:
+        names = {
+            "exp-lfm25-8b-a1b-unsloth-q6-k-xl",
+            "agentic-lfm25-24b-a2b-unsloth-q3-k-xl",
+            "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m",
+            "exp-minicpm-v47-1b-openbmb-q4-k-m",
+        }
+        discovered = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
+        self.assertTrue(names <= discovered.keys())
+        self.assertTrue(names.isdisjoint(modelctl.RECOMMENDED_MODELS))
+
+        lfm8 = (MODELFILES / "exp-lfm25-8b-a1b-unsloth-q6-k-xl.Modelfile").read_text()
+        self.assertIn("# SHA256: de2718c45e69587a0589ebe5f531ed4a99bccf341b2c122b6479ffe28929a9be", lfm8)
+        self.assertIn("RENDERER lfm2", lfm8)
+        self.assertIn("PARSER lfm2", lfm8)
+        self.assertIn("PARAMETER num_ctx 8192", lfm8)
+        self.assertNotIn("CAPABILITY thinking", lfm8)
+
+        lfm24 = (MODELFILES / "agentic-lfm25-24b-a2b-unsloth-q3-k-xl.Modelfile").read_text()
+        self.assertIn("# SHA256: d54834c785c7e265f1cb7375e47aa6f55a0b7cfab75816254c4d2e0c82fd5efc", lfm24)
+        self.assertIn("RENDERER lfm2-thinking", lfm24)
+        self.assertIn("PARSER lfm2-thinking", lfm24)
+        self.assertIn("CAPABILITY thinking", lfm24)
+        self.assertIn("PARAMETER num_ctx 8192", lfm24)
+        self.assertIn("PARAMETER num_predict 3072", lfm24)
+        self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["category"], "agentic")
+
+        gemma = (MODELFILES / "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m.Modelfile").read_text()
+        self.assertIn("# SHA256: 59656d7494d6376ca97e9e20b64ea2e16cd97f12ec6d47bfccba91cb785b5134", gemma)
+        self.assertIn("RENDERER gemma4-large", gemma)
+        self.assertIn("PARSER gemma4", gemma)
+        self.assertIn("CAPABILITY thinking", gemma)
+
+        minicpm = discovered["exp-minicpm-v47-1b-openbmb-q4-k-m"]
+        self.assertEqual(minicpm["provider"], "ollama-hf")
+        self.assertIn("hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M", (MODELFILES / minicpm["modelfile"]).read_text())
+
+        profiles = json.loads((ROOT / "models" / "model-profiles.json").read_text())["profiles"]
+        self.assertEqual(profiles["agentic-lfm25-24b-a2b-unsloth-q3-k-xl:latest"]["residency_policy"], "agent-mode-only")
+        self.assertEqual(profiles["exp-minicpm-v47-1b-openbmb-q4-k-m:latest"]["profile_class"], "specialized-vision")
+
     def test_embedding_modelfiles_are_bounded_to_dedicated_4k_lane(self) -> None:
         for name in (
             "embed-jina-v5-small-retrieval-q4-k-m.Modelfile",
