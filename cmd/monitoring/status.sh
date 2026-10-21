@@ -66,23 +66,29 @@ runtime_mode() {
 
 
 topology_summary() {
-  local mode="$1" runtime_identity_warning="${2:-0}" unit label missing=()
+  local mode="$1" runtime_identity_state="${2:-unavailable}" setup_state="${3:-unknown}" unit label missing=()
   case "$mode" in
-    normal)
-      if [[ "$runtime_identity_warning" == 1 ]]; then
-        echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch/unavailable"
+    normal|agent)
+      case "$runtime_identity_state" in
+        mismatch)
+          echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch"
+          ;;
+        unavailable)
+          if [[ "$setup_state" == convergence_pending ]]; then
+            echo "Overall: SETUP INCOMPLETE — package runtime convergence pending"
+          else
+            echo "Overall: HEALTHY WITH WARNINGS — package runtime identity unavailable"
+          fi
+          ;;
+        *)
+          echo "Overall: HEALTHY"
+          ;;
+      esac
+      if [[ "$mode" == agent ]]; then
+        echo "Runtime mode: exclusive agent"
       else
-        echo "Overall: HEALTHY"
+        echo "Runtime mode: normal"
       fi
-      echo "Runtime mode: normal"
-      ;;
-    agent)
-      if [[ "$runtime_identity_warning" == 1 ]]; then
-        echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch/unavailable"
-      else
-        echo "Overall: HEALTHY"
-      fi
-      echo "Runtime mode: exclusive agent"
       ;;
     degraded)
       for unit in ollama.service ollama-task.service ollama-embedding.service; do
@@ -250,20 +256,26 @@ echo "BC-250 appliance status"
 mode="$(runtime_mode)"
 STATUS_JSON="$(status_json_path)"
 status_payload=''
-runtime_identity_warning=0
+runtime_identity_state=unavailable
+setup_state=unknown
 if [[ -x "$STATUS_JSON" ]]; then
   status_payload="$("$STATUS_JSON" 2>/dev/null || true)"
 fi
 if [[ -n "$status_payload" ]]; then
   runtime_match="$(jq -r 'if .runtime_identity.match == true then "true" elif .runtime_identity.match == false then "false" else "unknown" end' <<< "$status_payload" 2>/dev/null || true)"
   runtime_inspection="$(jq -r '.runtime_identity.inspection // "unknown"' <<< "$status_payload" 2>/dev/null || true)"
-  if [[ "$runtime_inspection" != not_inspected && "$runtime_match" != true ]]; then
-    runtime_identity_warning=1
+  setup_state="$(jq -r '.setup.state // "unknown"' <<< "$status_payload" 2>/dev/null || true)"
+  if [[ "$runtime_inspection" == not_inspected ]]; then
+    runtime_identity_state=not_inspected
+  elif [[ "$runtime_match" == true ]]; then
+    runtime_identity_state=match
+  elif [[ "$runtime_match" == false ]]; then
+    runtime_identity_state=mismatch
+  else
+    runtime_identity_state=unavailable
   fi
-else
-  runtime_identity_warning=1
 fi
-topology_summary "$mode" "$runtime_identity_warning"
+topology_summary "$mode" "$runtime_identity_state" "$setup_state"
 
 section "Platform"
 package_nevra="$(rpm -q --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' bc250-llm-server 2>/dev/null | head -1 || true)"
