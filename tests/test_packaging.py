@@ -960,10 +960,13 @@ class PackagingTests(unittest.TestCase):
         package_gate = makefile[makefile.index("release-gate-package:"):makefile.index("\n\nrelease-gate:")]
         self.assertLess(package_gate.index("RPM_TREE_TARGET=rpm-tree-frozen srpm"), package_gate.index("rebuild-srpm"))
         self.assertLess(package_gate.index("rebuild-srpm"), package_gate.index("check-rpm-payload"))
-        self.assertLess(package_gate.index("check-rpm-payload"), package_gate.index("rpmlint -c"))
-        self.assertIn("rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm", package_gate)
-        self.assertIn("rpmlint: FAIL (blocking", package_gate)
-        self.assertNotIn("rpmlint: WARN (non-blocking", package_gate)
+        self.assertLess(package_gate.index("check-rpm-payload"), package_gate.index("check-rpmlint"))
+        self.assertLess(package_gate.index("check-rpmlint"), package_gate.index("release-evidence"))
+        rpmlint_target = makefile[makefile.index("check-rpmlint:"):makefile.index("\n\nrelease-gate-preflight:")]
+        self.assertIn("rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm", rpmlint_target)
+        self.assertIn("rpmlint: FAIL (blocking", rpmlint_target)
+        self.assertNotIn("rpmlint: WARN (non-blocking", rpmlint_target)
+        self.assertIn("$(TIME_STAGE) rpmlint", package_gate)
         self.assertNotIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package_gate)
         self.assertIn("-C '$(FROZEN_SOURCE_DIR)'", package_gate)
         self.assertIn("release-evidence", package_gate)
