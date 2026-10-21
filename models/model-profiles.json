@@ -101,6 +101,39 @@
       "residency_policy": "experimental",
       "context_target": 16384,
       "specialized": true
+    },
+    "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest": {
+      "intended_role": "fast-office-rag-translation-challenger",
+      "profile_class": "experimental-quality",
+      "reasoning_policy": "nonthinking-first-pass",
+      "residency_policy": "experimental",
+      "context_target": 8192,
+      "specialized": true
+    },
+    "agentic-lfm25-24b-a2b-unsloth-q3-k-xl:latest": {
+      "intended_role": "agentic-tool-use-challenger",
+      "profile_class": "agentic-experimental",
+      "reasoning_policy": "always-reasoning",
+      "residency_policy": "agent-mode-only",
+      "context_target": 8192,
+      "output_token_expectation": 3072,
+      "specialized": true
+    },
+    "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m:latest": {
+      "intended_role": "office-document-quality-challenger",
+      "profile_class": "experimental-quality",
+      "reasoning_policy": "native-thinking-capable",
+      "residency_policy": "experimental",
+      "context_target": 16384,
+      "specialized": true
+    },
+    "exp-minicpm-v47-1b-openbmb-q4-k-m:latest": {
+      "intended_role": "document-vision-ocr-challenger",
+      "profile_class": "specialized-vision",
+      "reasoning_policy": "specialized",
+      "residency_policy": "experimental",
+      "context_target": 8192,
+      "specialized": true
     }
   }
 }
