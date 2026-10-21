@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.1-1.5 - 2026-10-21
+
+- Refine `bc250 status` so a package-owned pre-convergence/publication hold is reported as `SETUP INCOMPLETE — package runtime convergence pending` instead of being collapsed into runtime mismatch/unavailable; retain strict warnings for real observed version/digest mismatches and expose the setup state in machine-readable `bc250.status.v4`.
+- Fix guided-installer Ollama version parsing so multi-line `ollama --version` output cannot turn transient connection wording such as `instance` into a fake observed version; accept only one normalized semantic version or report `unknown`.
+- Add four optional challenger profiles without changing production/recommended defaults: LFM2.5 8B A1B Q6_K_XL, LFM2.5 24B A2B Q3_K_XL on the exclusive agent lane, the existing HauhauCS Gemma 4 12B Q4_K_M with pinned provenance/explicit renderer-parser metadata, and MiniCPM-V 4.7 1B as an Ollama-managed document-vision experiment.
+- Keep Tika as the supported production document parser; the new vision challenger is experimental and does not replace the reviewed RAG/extraction path.
+- Keep the 1.4 SRPM-first authoritative build architecture unchanged, improve its rebuild summary to show actual published binary RPM names, and add machine-greppable per-stage timing for preflight/source/freeze/SRPM/rebuild/payload/rpmlint/evidence plus RPM `%check`.
+- Carry forward the exact 1.4 device campaign as baseline evidence: Blocks 1-3 proved install/reboot convergence, 40/40 routing, Ollama 0.40.6 lane/registration persistence, Open WebUI 0.12.3 desired-state/idempotence, managed RAG lifecycle, 3/3 packaged RAG, 12/12 canonical DE↔FR translation, 6/6 production use cases and raw Advanced `6144 -> options.num_predict=6144`; those PASS results do not transfer to changed 1.5 bytes.
+- Preserve Ollama 0.40.6, Open WebUI 0.12.3, Tika 4.1.0-full and governor 0.4.13; no core runtime upgrade or graphics architecture change is part of this release.
+
 ## 0.14.1-1.4 - 2026-10-20
 
 - Eliminate the duplicate authoritative Rust/governor compilation in GitHub release builds: build the frozen SRPM first, rebuild that SRPM once in an isolated temporary RPM topdir, and publish those exact rebuilt binary/debug RPMs to `dist/`.
