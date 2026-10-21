@@ -2,7 +2,7 @@
 
 ## Goal
 
-After the exact `0.14.1-1.2` RPM passes the small core smoke, move directly into the office-intelligence roadmap. Perform cleanup only when it clearly reduces obsolete ownership, release risk or duplicated state without changing the supported appliance contract.
+After the exact `0.14.1-1.5` RPM passes the small core smoke, move directly into the office-intelligence roadmap. Perform cleanup only when it clearly reduces obsolete ownership, release risk or duplicated state without changing the supported appliance contract.
 
 Success means fewer concepts, owners, scripts and states — not a larger abstraction layer. Simplification is a bounded, opportunistic risk-reduction activity, not a transition phase and not the product roadmap. Product work on RAG/document quality, German–French translation UX and polished local-assistant workflows proceeds without waiting for cleanup to finish.
 
