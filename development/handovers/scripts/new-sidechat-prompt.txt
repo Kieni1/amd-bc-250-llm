@@ -1,3 +1,6 @@
-Use the current BC-250 handover bundle as authority.
+BC-250 exact-RPM testing sidechat — start with development/handovers/18_TESTING_SIDECHAT_HANDOVER.md.
 
-State the exact objective and exact source/RPM identity first. Keep the task within one ownership area. Distinguish source/build/device evidence and product defects from harness/environment failures. Preserve raw evidence before interpretation for stateful/device work. Do not reopen unrelated tuning, model policy or architecture. Prefer a small direct test over a new harness. Return exact findings, cleanup/restoration status, produced files/patches, and one recommended next action.
+Candidate line: bc250-llm-server 0.14.1-1.5 / Fedora 44.
+Bind testing to the exact selected GitHub RPM/SRPM hashes before device mutation. Use development/handovers/20_DEVICE_QUALIFICATION_1_4.md only as non-transferable regression baseline and development/handovers/21_RELEASE_1_5_SCOPE_AND_ACCEPTANCE.md for the changed-surface acceptance contract.
+
+Do not reopen GFX/private-RADV work or rerun broad 1.4 campaigns without new evidence. Prioritize 1.5 status/parser fixes, bounded challenger/catalog checks, real reboot persistence and the ordinary-user Open WebUI boundary.
