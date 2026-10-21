@@ -104,11 +104,57 @@ class StatusTests(unittest.TestCase):
     def test_status_surfaces_topology_aware_overall_state(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         self.assertIn('Overall: HEALTHY', source)
+        self.assertIn('Overall: SETUP INCOMPLETE — package runtime convergence pending', source)
+        self.assertIn('Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch', source)
+        self.assertIn('Overall: HEALTHY WITH WARNINGS — package runtime identity unavailable', source)
+        self.assertNotIn('package runtime identity mismatch/unavailable', source)
         self.assertIn('Runtime mode: exclusive agent', source)
         self.assertIn('Overall: DEGRADED', source)
         self.assertIn('Recovery: sudo bc250 agent-mode normal', source)
         self.assertIn('Overall: UNAVAILABLE', source)
         self.assertIn('Restart advisory: not evaluated (optional helper unavailable)', source)
+
+    def test_status_overall_state_distinguishes_pending_mismatch_and_unavailable(self) -> None:
+        source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
+        start = source.index("topology_summary() {")
+        end = source.index("\n}\n\nollama_status() {", start) + 2
+        function = source[start:end]
+        cases = (
+            (("normal", "unavailable", "convergence_pending"), "Overall: SETUP INCOMPLETE — package runtime convergence pending\nRuntime mode: normal"),
+            (("normal", "mismatch", "published"), "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch\nRuntime mode: normal"),
+            (("normal", "unavailable", "published"), "Overall: HEALTHY WITH WARNINGS — package runtime identity unavailable\nRuntime mode: normal"),
+            (("normal", "match", "published"), "Overall: HEALTHY\nRuntime mode: normal"),
+        )
+        for arguments, expected in cases:
+            command = function + "\ntopology_summary " + " ".join(arguments)
+            result = subprocess.run(
+                ["bash", "-c", command],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), expected)
+
+    def test_status_json_uses_publication_hold_as_setup_convergence_signal(self) -> None:
+        module_path = ROOT / "cmd/monitoring/status-json.py"
+        spec = importlib.util.spec_from_file_location("bc250_status_setup_test", module_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as temporary:
+            dropin = Path(temporary) / "90-enable.conf"
+            with mock.patch.dict(module.os.environ, {"BC250_OWUI_ENABLE_DROPIN": str(dropin)}, clear=False):
+                held = module.setup_state()
+                dropin.write_text("[Install]\nWantedBy=multi-user.target\n", encoding="utf-8")
+                published = module.setup_state()
+        self.assertEqual(held["state"], "convergence_pending")
+        self.assertEqual(held["open_webui_publication"], "held")
+        self.assertIn("convergence", held["reason"])
+        self.assertEqual(published["state"], "published")
+        self.assertEqual(published["open_webui_publication"], "published")
+        self.assertIsNone(published["reason"])
 
     def test_status_reports_protected_storage_instead_of_zero_size(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -181,7 +227,8 @@ ollama_version_line
         status_json = (ROOT / "cmd/monitoring/status-json.py").read_text(encoding="utf-8")
         health = ROOT / "cmd/monitoring/health.py"
         self.assertIn("Usage: bc250 status [--json]", status)
-        self.assertIn('"schema": "bc250.status.v3"', status_json)
+        self.assertIn('"schema": "bc250.status.v4"', status_json)
+        self.assertIn('"setup": setup_state()', status_json)
         self.assertNotIn("gfx" + "1013", status_json.lower())
         result = subprocess.run(
             [str(health), "--help"],
@@ -291,7 +338,8 @@ ollama_version_line
         status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         version = (ROOT / "cmd/monitoring/version.py").read_text(encoding="utf-8")
         health = (ROOT / "cmd/monitoring/health.py").read_text(encoding="utf-8")
-        self.assertIn('runtime_inspection" != not_inspected', status)
+        self.assertIn('runtime_inspection" == not_inspected', status)
+        self.assertIn('runtime_identity_state=not_inspected', status)
         self.assertIn("observed not inspected (requires sudo) — NOT INSPECTED", status)
         self.assertIn('row.get("inspection") == "not_inspected"', version)
         self.assertIn('"INFO"', health)
