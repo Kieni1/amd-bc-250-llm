@@ -1,4 +1,4 @@
-# BC-250 handover bundle — current release line 0.14.1-1.2
+# BC-250 handover bundle — current release line 0.14.1-1.5
 
 ## Purpose
 
@@ -9,23 +9,23 @@ Current source/release identity:
 ```text
 package:  bc250-llm-server
 version:  0.14.1
-release:  1.3
-NEVRA:    bc250-llm-server-0.14.1-1.4.fc44.x86_64
+release:  1.5
+NEVRA:    bc250-llm-server-0.14.1-1.5.fc44.x86_64
 ```
 
 Use normal RPM identity from here forward. Engineering iteration labels belong in commits, issues and handovers, not in Version/Release.
 
 ## Current position
 
-The reconstruction era is closed. The active work is simpler:
+The reconstruction era is closed. Release 1.5 is a controlled package-quality increment on the proven 1.4 stock-core/runtime baseline.
 
-1. produce and select the authoritative Fedora 44 GitHub build for `0.14.1-1.4`;
-2. run a deliberately small exact-RPM core-functionality check;
-3. freeze that result as the known-good stock-core baseline if it passes;
-4. shift directly to office RAG/document quality, German–French translation UX and polished local-assistant workflows; perform bounded simplification only opportunistically where it removes concrete obsolete ownership/risk;
-5. keep supported product behavior stable while reducing implementation surface.
+1. preserve the successful 1.4 Fedora 44 SRPM-first build evidence and exact-RPM Blocks 1-3 device evidence as **baseline/history**, not transferable PASS status;
+2. build/select the exact `0.14.1-1.5` GitHub Fedora 44 artifact and bind all further acceptance to its hashes;
+3. recheck the changed 1.5 surfaces: pre-convergence status semantics, installer Ollama version parsing, catalog integrity/optional challenger registration and release timing/log evidence;
+4. complete the reboot-persistence / ordinary-user Open WebUI boundary that remained pending after the 1.4 Block 3 milestone;
+5. keep the stock-core/runtime pins and SRPM-first release architecture unchanged unless new evidence requires a change.
 
-The selected device candidate must be identified by exact RPM SHA-256. Source tests or an earlier package do not substitute for exact-artifact evidence.
+The selected 1.5 device candidate must be identified by exact RPM SHA-256. Source tests and the exact 1.4 device campaign do not substitute for acceptance of changed 1.5 bytes.
 
 ## Product direction
 
@@ -36,13 +36,27 @@ Greenfield means implementation freedom, not data loss or contract amnesia: pres
 ## Current validation snapshot
 
 ```text
-full source suite:       656/656 PASS across 24 modules
-release preflight:       25/25 PASS
+full source suite:       661/661 PASS across 24 modules
+release preflight:       26/26 PASS
 RPM package-critical:    127/127 PASS across 8 modules (verified unprivileged)
-device acceptance:       pending exact selected 0.14.1-1.4 RPM
+device acceptance:       PENDING exact selected 1.5 RPM; exact 1.4 Blocks 1–3 are regression baseline only
 ```
 
 These counts describe the current cleaned-source snapshot; they are evidence, not permanent architecture.
+
+## Inherited 1.4 GitHub build evidence; 1.5 build pending
+
+The SRPM-first architecture was exercised successfully by the 1.4 GitHub authority run and is intentionally retained for 1.5. The 1.5 selected GitHub build is still pending. The observed authority-path timing was:
+
+```text
+total job:    5m58s
+release gate: 4m29s
+Rust compile: 2m49s once
+```
+
+The comparable 1.3-era successful run was 8m45s total with a 7m31s release gate and two governor/Rust compilations of roughly 2m31s and 2m33s. The 1.4 change therefore removed the duplicate authoritative compilation and reduced the observed total job by about 32% and the release gate by about 40%, while retaining frozen Source0/spec verification, `%check`, isolated SRPM rebuild, payload validation, blocking rpmlint, hashes and release evidence.
+
+The successful build reported payload validation PASS and rpmlint with zero errors. The exact selected GitHub run ID and artifact hashes are not embedded in this standalone handover bundle; the testing sidechat must record them before device mutation.
 
 ## Current test philosophy
 
@@ -77,6 +91,10 @@ Read these first:
 15. `15_SPECIALIST_WORK_AND_RETURN_CONTRACT.md`
 16. `16_PRODUCT_GOAL_AND_ROADMAP.md`
 17. `17_RELEASE_CANDIDATE_EXECUTION_GATE.md`
+18. `18_TESTING_SIDECHAT_HANDOVER.md`
+19. `19_BUILD_TIME_OPTIMIZATION_AND_TIMING.md`
+20. `20_DEVICE_QUALIFICATION_1_4.md`
+21. `21_RELEASE_1_5_SCOPE_AND_ACCEPTANCE.md`
 
 The final specialist/evidence files preserve high-value engineering discipline while the product-goal and release-gate files define the current roadmap and acceptance method.
 
