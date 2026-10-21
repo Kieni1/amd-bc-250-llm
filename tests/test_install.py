@@ -842,6 +842,30 @@ step_8_application_services
         self.assertIn('if [[ "$observed_after" != "$requested" ]]; then', block)
         self.assertIn("does not match package desired version", block)
 
+    def test_installer_ollama_version_ignores_multiline_connection_wording(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        start = source.index("ollama_version() {")
+        end = source.index("\n}", start) + 2
+        function = source[start:end]
+        with tempfile.TemporaryDirectory() as tmp:
+            fake = Path(tmp) / "ollama"
+            fake.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\n' 'Warning: could not connect to a running Ollama instance'\n"
+                "printf '%s\n' 'Warning: client version is 0.40.6'\n",
+                encoding="utf-8",
+            )
+            fake.chmod(0o755)
+            result = subprocess.run(
+                ["bash", "-c", f"{function}\nollama_version {fake!s}"],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "0.40.6")
+        self.assertNotIn("instance", result.stdout)
+
     def test_installer_distinguishes_backend_from_usable_front_door(self) -> None:
         source = INSTALLER.read_text()
         self.assertIn("wait_for_openwebui_front_door()", source)
