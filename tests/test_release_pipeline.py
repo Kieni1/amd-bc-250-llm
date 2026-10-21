@@ -95,9 +95,10 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertNotIn("RPM_TREE_TARGET=rpm-tree-frozen rpm", package)
         self.assertLess(package.index("RPM_TREE_TARGET=rpm-tree-frozen srpm"), package.index("rebuild-srpm"))
         self.assertLess(package.index("rebuild-srpm"), package.index("check-rpm-payload"))
-        self.assertLess(package.index("check-rpm-payload"), package.index("rpmlint -c"))
-        self.assertLess(package.index("rpmlint -c"), package.index("release-evidence"))
-        self.assertIn("$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml", package)
+        self.assertLess(package.index("check-rpm-payload"), package.index("check-rpmlint"))
+        self.assertLess(package.index("check-rpmlint"), package.index("release-evidence"))
+        rpmlint = make_recipe("check-rpmlint")
+        self.assertIn("$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml", rpmlint)
         self.assertIn("-C '$(FROZEN_SOURCE_DIR)'", package)
         self.assertLess(gate.index("release-gate-preflight"), gate.index("release-gate-package"))
 
@@ -130,6 +131,18 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertLess(workflow.index("Upload source RPM evidence"), quality)
         self.assertLess(workflow.index("Upload selected release authority record"), quality)
         self.assertLess(quality, workflow.index("Upload advisory quality report"))
+
+    def test_release_gate_emits_machine_greppable_stage_timings(self) -> None:
+        preflight = make_recipe("release-gate-preflight")
+        package = make_recipe("release-gate-package")
+        timer = (ROOT / "scripts/time-stage.sh").read_text(encoding="utf-8")
+        for stage in ("preflight", "prepare-sources", "freeze-source0", "check-frozen-inputs"):
+            self.assertIn(f"$(TIME_STAGE) {stage}", preflight)
+        for stage in ("rpmbuild-bs", "authoritative-srpm-rebuild", "payload-check", "rpmlint", "release-evidence"):
+            self.assertIn(f"$(TIME_STAGE) {stage}", package)
+        self.assertIn("BC250_TIMING stage=%s seconds=%d rc=%d", timer)
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        self.assertIn("BC250_TIMING stage=rpm-check", spec)
 
     def test_package_check_runs_only_release_critical_tests(self) -> None:
         contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
@@ -167,10 +180,10 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("Run advisory full quality report", workflow)
         self.assertIn("continue-on-error: true", workflow)
         self.assertIn("Upload advisory quality report", workflow)
-        package = make_recipe("release-gate-package")
-        self.assertIn("rpmlint-report.txt", package)
-        self.assertIn("rpmlint: FAIL (blocking", package)
-        self.assertNotIn("rpmlint: WARN (non-blocking", package)
+        rpmlint = make_recipe("check-rpmlint")
+        self.assertIn("rpmlint-report.txt", rpmlint)
+        self.assertIn("rpmlint: FAIL (blocking", rpmlint)
+        self.assertNotIn("rpmlint: WARN (non-blocking", rpmlint)
 
     def test_source_tar_supports_custom_build_root_and_prunes_empty_dirs(self) -> None:
         source = (ROOT / "scripts/make-source-tarball.sh").read_text(encoding="utf-8")
