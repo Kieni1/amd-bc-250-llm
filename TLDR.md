@@ -3,7 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.4` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.6, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.13; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Current release source: `bc250-llm-server-0.14.1-1.5` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.6, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.13; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+
+Release 1.5 keeps the 1.4 SRPM-first build/runtime baseline and folds in device-driven UX fixes: explicit pre-convergence status state, robust semantic Ollama version parsing, optional checksum-bounded model challengers, and release-stage timing. Exact 1.4 device PASS evidence is historical/baseline evidence only; 1.5 still requires its own selected-build/device binding.
 
 ## Install
 
