@@ -1,0 +1,19 @@
+# BC250 category: experimental
+# Ollama model: exp-lfm25-8b-a1b-unsloth-q6-k-xl
+# Source: unsloth/LFM2.5-8B-A1B-GGUF @ 2fec5095fc6c228eb66eaa7e4afd54f6ade4e46c
+# GGUF: LFM2.5-8B-A1B-UD-Q6_K_XL.gguf
+# SHA256: de2718c45e69587a0589ebe5f531ed4a99bccf341b2c122b6479ffe28929a9be
+#
+# Experimental fast assistant / RAG / translation challenger. Keep optional until
+# exact-device BC-250 qualification proves quality, memory, latency and tool behavior.
+FROM /var/lib/bc250-llm-server/gguf/experiments/exp-lfm25-8b-a1b-unsloth-q6-k-xl/LFM2.5-8B-A1B-UD-Q6_K_XL.gguf
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+RENDERER lfm2
+PARSER lfm2
+PARAMETER num_ctx 8192
+PARAMETER temperature 0.2
+PARAMETER top_k 80
+PARAMETER repeat_penalty 1.05
+SYSTEM """You are an experimental office assistant. Be concise, preserve names, numbers, dates and modality, use retrieval evidence when supplied, and answer in the user's language."""
