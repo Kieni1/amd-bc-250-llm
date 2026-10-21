@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.6**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. This is a runtime change in 0.14.1-1.4, so the earlier 0.34.4 exact-device result does not transfer; the exact selected 1.3 RPM must requalify the package-owned local-GGUF registrations and all normal lanes.
+Package standard: **Ollama v0.40.6**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. The 0.40.6 runtime was introduced before the 1.4 exact-device campaign. That campaign proved main/task/embedding lane identity, package-owned local-GGUF uniqueness, semantic `/api/show`, visible generation and supported restart persistence on the exact 1.4 RPM. Release 1.5 keeps the same runtime pin; those observations guide the focused 1.5 smoke but do not transfer DEVICE acceptance to changed RPM bytes.
 
 ## Install and verify
 
@@ -59,13 +59,13 @@ headroom.
 
 ## 0.40.6 candidate runtime and 0.34.4 historical evidence
 
-Ollama 0.40.6 is the package-pinned candidate runtime. Ollama 0.34.4 remains the last exact-device-qualified runtime from the 0.12.2-0.8 baseline, and 0.34.2 is only an older comparison point. The 0.40 line changed upstream GGUF/runtime handling, so the 1.3 device round must prove package-created registrations remain unique and usable before and after restart and that no unexpected `llamacpp:` shadow names appear in `/api/tags`. Do not delete or rewrite model-store state merely to make that check pass.
+Ollama 0.40.6 is the package-pinned runtime. The exact 1.4 device campaign proved package-created registrations remained unique and usable before and after supported restart, with no unexpected `llamacpp:` shadow name for the main package-owned registration. Keep those invariants in future focused smoke tests and do not delete or rewrite model-store state merely to make a check pass.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
 transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
 envelope. `/api/tags` was measurably slower on this device but only by tens of milliseconds.
 
-The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Those results are historical evidence only for 1.3 because the runtime changes. Re-run the bounded runtime boundaries that can regress: all normal lanes, local GGUF registration/show/run/restart, embedding, representative long generation, Deep/task transition and memory headroom.
+The focused Vulkan/UMA, `/api/show`, structured-output and large-library lookup checks were part of the runtime promotion campaign and later exact-device qualification. Those results plus the 1.4 device campaign are historical/baseline evidence for later changed package bytes. Re-run the bounded runtime boundaries that can regress: all normal lanes, local GGUF registration/show/run/restart, embedding, representative long generation, Deep/task transition and memory headroom.
 
 The earlier runtime upgrade also demonstrated why serialized `/api/show` Modelfile/parameter text is not immutable model
 identity: those strings can change while canonical model names, sizes and digests remain unchanged. Package
