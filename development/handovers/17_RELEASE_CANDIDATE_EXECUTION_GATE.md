@@ -49,3 +49,7 @@ Do not return a candidate while a required source-side cell is blank. Hardware-o
 ## Authority
 
 GitHub Actions / Fedora 44 is primary release authority. Only an explicitly selected `workflow_dispatch` run, with `release-evidence.json` and `release-selection.json`, defines the authoritative RPM. Workstation execution is reproduction/debug evidence only.
+
+## Current 1.5 release-architecture rule
+
+Keep the SRPM-first single authoritative rebuild architecture. Do not reintroduce a preceding full binary `rpmbuild -ba` merely as a convenience: it recreates duplicate compilation and weakens the simple provenance statement that the distributed binaries are exactly those rebuilt from the published SRPM. Further optimization should start with stage timing and measured evidence, not another structural rewrite.
