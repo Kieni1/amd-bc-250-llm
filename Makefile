@@ -25,8 +25,9 @@ SOURCE_IDENTITY := $(BUILD_DIR)/SOURCE-IDENTITY.json
 FROZEN_SOURCE_PARENT := $(BUILD_DIR)/frozen-source
 FROZEN_SOURCE_DIR := $(FROZEN_SOURCE_PARENT)/$(NAME)-$(VERSION)
 UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
+TIME_STAGE := ./scripts/time-stage.sh
 
-.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload rebuild-srpm release-gate-preflight release-gate-package release-gate clean clean-sources distclean
+.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload rebuild-srpm check-rpmlint release-gate-preflight release-gate-package release-gate clean clean-sources distclean
 
 help:
 	@printf '%s\n' \
@@ -250,34 +251,40 @@ rebuild-srpm:
 	[[ "$${#rebuilt_rpms[@]}" -gt 0 ]] || { echo 'ERROR: isolated SRPM rebuild produced no binary RPMs.' >&2; exit 1; }; \
 	rm -f '$(DISTDIR)'/*.x86_64.rpm '$(DISTDIR)'/*.noarch.rpm; \
 	cp -f "$${rebuilt_rpms[@]}" '$(DISTDIR)/'; \
-	echo "Authoritative SRPM rebuild published $${#rebuilt_rpms[@]} binary RPM(s): $$(basename "$${srpms[0]}")"
+	echo "Authoritative SRPM rebuild published $${#rebuilt_rpms[@]} binary RPM(s) from SRPM: $$(basename "$${srpms[0]}")"; \
+	printf '  %s\n' "$${rebuilt_rpms[@]##*/}"
 
-release-gate-preflight:
-	$(MAKE) clean
-	$(MAKE) lint
-	$(MAKE) preflight
-	$(MAKE) sources
-	$(MAKE) sources-check
-	$(MAKE) freeze-rpm-inputs
-	$(MAKE) check-frozen-source
-
-release-gate-package:
-	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
-	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
-	  RPM_TREE_TARGET=rpm-tree-frozen srpm </dev/null
-	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
-	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
-	  rebuild-srpm
-	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
-	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
-	  check-rpm-payload
+check-rpmlint:
 	@set +e; \
 	report='$(BUILD_DIR)/rpmlint-report.txt'; \
 	rpmlint -c '$(FROZEN_SOURCE_DIR)/packaging/rpmlint.toml' $(DISTDIR)/*.rpm >"$$report" 2>&1; rc=$$?; \
 	cat "$$report"; \
 	if ((rc != 0)); then echo "rpmlint: FAIL (blocking, rc=$$rc)" >&2; exit "$$rc"; fi; \
 	echo 'rpmlint: PASS'
-	$(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
+
+release-gate-preflight:
+	$(MAKE) clean
+	$(TIME_STAGE) preflight-static $(MAKE) lint
+	$(TIME_STAGE) preflight $(MAKE) preflight
+	$(TIME_STAGE) prepare-sources $(MAKE) sources
+	$(TIME_STAGE) source-check $(MAKE) sources-check
+	$(TIME_STAGE) freeze-source0 $(MAKE) freeze-rpm-inputs
+	$(TIME_STAGE) check-frozen-inputs $(MAKE) check-frozen-source
+
+release-gate-package:
+	$(TIME_STAGE) rpmbuild-bs $(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
+	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
+	  RPM_TREE_TARGET=rpm-tree-frozen srpm </dev/null
+	$(TIME_STAGE) authoritative-srpm-rebuild $(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
+	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
+	  rebuild-srpm
+	$(TIME_STAGE) payload-check $(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
+	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
+	  check-rpm-payload
+	$(TIME_STAGE) rpmlint $(MAKE) \
+	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
+	  check-rpmlint
+	$(TIME_STAGE) release-evidence $(MAKE) -C '$(FROZEN_SOURCE_DIR)' \
 	  BUILD_DIR='$(BUILD_DIR)' TOPDIR='$(TOPDIR)' DISTDIR='$(DISTDIR)' SOURCE_CACHE_DIR='$(SOURCE_CACHE_DIR)' \
 	  release-evidence
 
