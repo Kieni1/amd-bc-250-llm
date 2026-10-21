@@ -1,0 +1,13 @@
+# BC250 category: experimental
+# Ollama model: exp-minicpm-v47-1b-openbmb-q4-k-m
+# Source: openbmb/MiniCPM-V-4.7-1B-gguf @ latest
+# GGUF: MiniCPM-V-4_7-1B-Q4_K_M.gguf
+#
+# Experimental document-vision/OCR helper. Ollama manages the HF model/projector
+# assets; this is not a Tika replacement and is not installed by default.
+FROM hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M
+
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 8192
+PARAMETER temperature 0.2
