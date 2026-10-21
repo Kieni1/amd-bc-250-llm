@@ -1,8 +1,8 @@
-# Current state and next work — 0.14.1-1.2
+# Current state and next work — 0.14.1-1.5
 
 ## Current source/release identity
 
-The active line is `bc250-llm-server-0.14.1-1.4`.
+The active line is `bc250-llm-server-0.14.1-1.5`.
 
 RPM naming rule:
 
@@ -35,13 +35,41 @@ Governor     0.4.13
 
 Treat these as current package choices, not permanent architectural commitments.
 
-## Immediate next iteration — low-cost core functionality
+## 1.4 authoritative-build result
 
-The next device round answers only:
+The SRPM-first release architecture is now proven by a successful Fedora 44 GitHub run:
 
-> Does the exact selected `0.14.1-1.4` RPM behave like a usable stock BC-250 appliance?
+```text
+previous 1.3-era total:        8m45s
+previous release gate:         7m31s
+previous Rust compilations:    ~2m31s + ~2m33s
 
-Use `03_CORE_FUNCTIONALITY_CHECK.md`. Do not reopen broad benchmarking, tuning, GFX qualification or full resilience campaigns during this round.
+1.4 total:                     5m58s
+1.4 release gate:              4m29s
+1.4 Rust compilation:          2m49s once
+```
+
+This is the architecture to keep. Do not restore the old `rpmbuild -ba` plus proof-rebuild chain. The binaries distributed by 1.4 are the exact outputs of the isolated rebuild of the published SRPM. Payload validation and blocking rpmlint passed in the successful run.
+
+Release 1.5 keeps this SRPM-first architecture and folds in the queued low-risk observability cleanup: the rebuild summary now identifies the source SRPM and prints the actual rebuilt binary RPM filenames, and the release path emits machine-greppable `BC250_TIMING` records for the major stages. `%check` timing is measured inside the authoritative rebuild; no extra build was added.
+
+Use the new timing data from successful 1.5 authority runs before proposing another build optimization. Do not add sccache, a custom builder image or other caching to authority runs without measured justification and an explicit evidence-policy decision.
+
+## Exact 1.4 device baseline carried forward
+
+The exact selected `0.14.1-1.4` RPM completed Blocks 1-3 on the real BC-250 with no Block 3 product defect. Device-proven baseline evidence includes guided install/reboot convergence, 40/40 routing/save, healthy status/health/verify, Ollama 0.40.6 lane and registration persistence, Open WebUI 0.12.3 desired-state/idempotence/local-first policy, managed RAG lifecycle, package RAG 3/3, canonical DE↔FR translation 12/12, production use cases 6/6 and raw Advanced `6144 -> options.num_predict=6144`.
+
+Two device-driven package issues are included in 1.5: the pre-convergence status presentation and the guided-installer multiline Ollama version parser. Two earlier test stops were harness defects only (thinking-budget exhaustion and incidental `/api/show` parameter ordering) and must not be encoded as product workarounds.
+
+Block 4 reboot persistence / broader ordinary-user Open WebUI qualification was still pending when 1.5 source scope froze. The 1.4 device PASS set is valuable regression guidance but cannot be transferred to changed 1.5 RPM bytes. See `20_DEVICE_QUALIFICATION_1_4.md` and `21_RELEASE_1_5_SCOPE_AND_ACCEPTANCE.md`.
+
+## Immediate next iteration — authoritative 1.5 build then exact-artifact device testing
+
+The successful 1.4 GitHub build validated the optimized authoritative build path. First run/select the exact 1.5 authority build, then answer:
+
+> Do the exact selected `0.14.1-1.5` bytes preserve the proven stock-core appliance behavior while correctly implementing the reviewed 1.5 package changes?
+
+Use `03_CORE_FUNCTIONALITY_CHECK.md` together with `18_TESTING_SIDECHAT_HANDOVER.md`. Focus first on changed surfaces and reboot/ordinary-user persistence; do not replay already-proven 1.4 campaigns unless a 1.5 observation invalidates them. This is the next **low-cost core functionality** round: changed-surface proof first, then the still-unproven persistence/ordinary-user boundary.
 
 ## If the core check passes
 
