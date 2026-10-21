@@ -324,7 +324,10 @@ remove_fedora_ollama() {
 }
 
 ollama_version() {
-  "$1" --version 2>/dev/null | awk '{print $NF}' | sed 's/^v//'
+  # Ollama can emit informational connection text alongside the client version
+  # when no server instance is reachable. Extract only a semantic version token
+  # so transient wording can never become the displayed/compared version.
+  "$1" --version 2>/dev/null | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z][0-9A-Za-z.-]*)?' | head -n 1 | sed 's/^v//'
 }
 
 step_3_install_ollama() {
