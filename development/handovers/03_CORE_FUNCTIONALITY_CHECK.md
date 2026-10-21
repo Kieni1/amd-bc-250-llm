@@ -1,4 +1,19 @@
-# Core functionality check — exact 0.14.1-1.4 RPM
+# Core functionality check — exact 0.14.1-1.5 RPM
+
+
+## 1.4 baseline and 1.5 focus
+
+The exact 1.4 RPM already proved the expensive stock-core/runtime/product boundaries through device Block 3. Do not replay that entire campaign merely because the RPM Release changed. The 1.5 round must still bind to exact new bytes and prove the changed package surfaces plus the previously pending reboot/ordinary-user boundary.
+
+Start from a supported install/upgrade state and require:
+
+- exact 1.5 RPM identity/hash and clean `rpm -V`;
+- guided installer renders exactly one semantic Ollama observed version (or `unknown`), never connection prose;
+- at the intentional publication/convergence hold, `status` reports setup incomplete rather than a false runtime mismatch;
+- after convergence, `status`, `health` and `verify` are green and runtime identities still match;
+- model catalog discovers the new optional challengers without selecting/promoting them by default;
+- one representative Ollama local registration/restart smoke remains stable;
+- final reboot persistence and ordinary-user Open WebUI paths complete the boundary left pending after 1.4 Block 3.
 
 ## Goal
 
@@ -32,7 +47,7 @@ Do not mutate user state just to make the starting state look cleaner.
 ## Required package/install checks
 
 - install or supported upgrade succeeds;
-- `rpm -q bc250-llm-server` reports `0.14.1-1.4` with the expected Fedora dist tag/arch;
+- `rpm -q bc250-llm-server` reports `0.14.1-1.5` with the expected Fedora dist tag/arch;
 - package services/configuration converge without manual repair;
 - no experimental GFX/private-RADV/patched-boot requirement appears;
 - one ordinary service restart succeeds.
@@ -78,9 +93,9 @@ Keep this light:
 
 Hidden thinking is not a substitute for a visible answer.
 
-## Runtime upgrade checks for 1.3
+## Runtime baseline checks retained for 1.5
 
-This RPM changes both Ollama and Open WebUI, so the normally-small smoke must include the changed boundaries.
+Ollama 0.40.6 and Open WebUI 0.12.3 were device-proven on the exact 1.4 artifact through Block 3. Release 1.5 does not upgrade them. Use bounded representative checks to detect packaging regressions, but do not treat the old runtime migration campaign as unproven.
 
 For Ollama 0.40.6:
 
