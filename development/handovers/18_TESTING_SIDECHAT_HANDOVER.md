@@ -1,4 +1,4 @@
-# Exact-RPM testing sidechat handover — 0.14.1-1.6
+# Exact-RPM testing sidechat handover — 0.14.1-1.7
 
 ## Purpose
 
@@ -6,7 +6,7 @@ This file is the start point for exact-artifact testing of the next release. It 
 
 The objective is:
 
-> Determine whether the exact selected Fedora 44 GitHub RPM for `bc250-llm-server-0.14.1-1.6` preserves the device-proven 1.4 stock-core appliance behavior, correctly implements the reviewed 1.5 fixes/additions, and completes the reboot-persistence / ordinary-user boundary that remained pending after the 1.4 Block 3 milestone.
+> Determine whether the exact selected Fedora 44 GitHub RPM for `bc250-llm-server-0.14.1-1.7` preserves the device-proven stock-core appliance behavior, correctly carries the 1.6 Ollama/governor maintenance update, correctly implements the 1.7 managed-RAG integrity/UX corrections, and completes the reboot-persistence / ordinary-user boundary.
 
 The exact 1.4 device campaign is a high-value regression baseline. It is **not** acceptance of different 1.5 bytes.
 
@@ -38,22 +38,22 @@ ACCEPTED
 Expected state when this sidechat starts:
 
 ```text
-source:  0.14.1-1.6 source candidate validated by the integration chat
-build:   exact selected 1.5 GitHub authority run must be recorded
+source:  0.14.1-1.7 source candidate validated by the integration chat
+build:   exact selected 1.7 GitHub authority run must be recorded
 1.4 device baseline: Blocks 1-3 device-proven on its exact RPM hash
-1.5 device: pending; no 1.4 PASS transfers automatically
+1.7 device: pending; no prior PASS transfers automatically
 ```
 
-Before device mutation, record the selected 1.6 workflow run, source commit, RPM/SRPM hashes and release evidence. Never infer them from filenames.
+Before device mutation, record the selected 1.7 workflow run, source commit, RPM/SRPM hashes and release evidence. Never infer them from filenames.
 
 ## Current package identity
 
 ```text
 Name:          bc250-llm-server
 Version:       0.14.1
-RPM Release:   1.6
+RPM Release:   1.7
 Target:        Fedora 44
-Expected NVR:  bc250-llm-server-0.14.1-1.6
+Expected NVR:  bc250-llm-server-0.14.1-1.7
 ```
 
 Current runtime pins remain:
@@ -67,7 +67,9 @@ Governor:      0.4.14
 
 Graphics/runtime architecture remains stock Fedora AMDGPU/Mesa. There is no package-owned GFX1013 patched-kernel/private-RADV path to qualify.
 
-Release 1.6 changes the runtime boundary. In addition to the normal core smoke, capture `renderer`, `parser` and `template_source` from representative Ollama 0.40.8 `/api/show` responses, verify package-owned registration uniqueness across a supported restart, and run one small plus one memory-edge production model on Vulkan. For governor 0.4.14, verify the exact version, service stability, packaged 350–1850 MHz policy, temperature reporting and bounded load response. Do not retune the governor merely because its version changed.
+Release 1.7 carries the 1.6 runtime-boundary changes and additionally changes the managed-RAG lifecycle. In addition to the normal core smoke, capture `renderer`, `parser` and `template_source` from representative Ollama 0.40.8 `/api/show` responses, verify package-owned registration uniqueness across a supported restart, and run one small plus one memory-edge production model on Vulkan. For governor 0.4.14, verify the exact version, service stability, packaged 350–1850 MHz policy, temperature reporting and bounded load response. Do not retune the governor merely because its version changed.
+
+For the 1.7 RAG delta, use a disposable managed collection and capture the pre/post filesystem state. Require projected-state validation before mutation, no mutation on invalid/ambiguous activation, successful rollback evidence for an injected/real move failure when practical, exact DE-authority/FR-translation revision linkage, review/status health output, successful Open WebUI sync, one grounded cited answer and one unsupported abstention. Managed preparation remains PDF-only; do not expand qualification into DOCX lifecycle work in this release.
 
 ## Device/testing working assumptions
 
@@ -180,7 +182,7 @@ freeze exact Source0/spec
 
 Do not treat timing instrumentation as permission to weaken/restructure the release gate.
 
-## Before touching the device — bind exact 1.6 artifact identity
+## Before touching the device — bind exact 1.7 artifact identity
 
 Record:
 
@@ -268,7 +270,7 @@ This is the major acceptance surface left open after the 1.4 Block 3 milestone.
 
 Record pre-reboot boot ID, then perform a real supported reboot and prove the boot ID changed. After reboot require:
 
-- exact 1.6 RPM hash/NEVRA remains installed;
+- exact 1.7 RPM hash/NEVRA remains installed;
 - required TTM kernel arguments are active;
 - 40/40 live routing is restored and matches the saved profile;
 - required services recover with no package-attributable failed units;
@@ -368,7 +370,7 @@ Return one evidence-rich handback containing:
 
 ```text
 1. selected GitHub run / source commit
-2. exact 1.6 RPM NEVRA + SHA-256
+2. exact 1.7 RPM NEVRA + SHA-256
 3. exact SRPM + SHA-256
 4. device/Fedora/kernel identity
 5. install/upgrade + changed UX/parser verdict
