@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.6` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Current release source: `bc250-llm-server-0.14.1-1.7` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
 
-Release 1.6 is a bounded maintenance/runtime update: Ollama 0.40.8, governor 0.4.14 and actions/checkout v7.0.1. The proven four-lane Vulkan settings, Open WebUI/Tika pins, production model policy and SRPM-first release authority remain unchanged; exact 1.6 build/device binding is still required.
+Release 1.7 keeps the 1.6 runtime maintenance pins and adds managed-RAG integrity/UX fixes: atomic activation with rollback, stable DE→FR revision provenance, stricter source/fidelity validation and clearer review/status health. Model/retrieval tuning, four-lane Vulkan settings, Open WebUI/Tika pins and SRPM-first release authority remain unchanged; exact 1.7 build/device binding is required.
 
 ## Install
 
@@ -70,7 +70,7 @@ sudo bc250 rag validate public COLLECTION
 sudo bc250 rag ingest --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
-RAG ingestion is loopback-only by default and token-file symlinks are rejected. Remote Open WebUI requires explicit opt-in, with a separate override whenever an active confidential collection could participate in the sync. See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use [`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
+RAG ingestion is loopback-only by default and token-file symlinks are rejected. `rag status` reports review/currentness/fidelity state plus lifecycle validation health. Remote Open WebUI requires explicit opt-in, with a separate override whenever confidential-scope knowledge state could participate in the sync. See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use [`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
 
 ## Models
 
