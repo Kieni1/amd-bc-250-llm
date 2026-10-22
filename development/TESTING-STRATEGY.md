@@ -1,8 +1,8 @@
-# BC-250 testing strategy — 0.14.1-1.2
+# BC-250 testing strategy — 0.14.1-1.7
 
 ## Current objective
 
-The current source/release identity is `bc250-llm-server-0.14.1-1.6`.
+The current source/release identity is `bc250-llm-server-0.14.1-1.7`.
 
 Testing now has three jobs:
 
@@ -76,7 +76,7 @@ Ruff/ShellCheck are blocking release-candidate checks and run before Source0 fre
 
 Source tests do not substitute for exact-RPM device evidence.
 
-For the first `0.14.1-1.6` device round, use `development/handovers/03_CORE_FUNCTIONALITY_CHECK.md` and keep it intentionally small:
+For the first `0.14.1-1.7` device round, use `development/handovers/03_CORE_FUNCTIONALITY_CHECK.md` and keep it intentionally small:
 
 - exact RPM identity;
 - install/upgrade completion;
