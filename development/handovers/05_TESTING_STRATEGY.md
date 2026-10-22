@@ -54,7 +54,7 @@ Do not serially patch product code just to drive advisory output to zero.
 
 ## Exact-artifact testing
 
-Source PASS is not device PASS. The selected `0.14.1-1.5` RPM must be bound by exact filename/SHA-256 and selected GitHub run identity before device testing.
+Source PASS is not device PASS. The selected `0.14.1-1.6` RPM must be bound by exact filename/SHA-256 and selected GitHub run identity before device testing.
 
 Start with `03_CORE_FUNCTIONALITY_CHECK.md` and the dedicated `18_TESTING_SIDECHAT_HANDOVER.md`. Use the resilience/recovery/security playbook only when the changed area or observed defect justifies it.
 
@@ -92,7 +92,7 @@ Broad quality findings should be reviewed together and classified rather than tr
 
 Device tests validate the exact selected GitHub RPM, not the source tree in the abstract and not a locally rebuilt approximation.
 
-For `0.14.1-1.5`, use the bounded core smoke plus the runtime-upgrade checks in `18_TESTING_SIDECHAT_HANDOVER.md`. Deeper resilience, security or recovery work remains available when a changed area or observed risk justifies it; it is not a mandatory ritual for every package bump.
+For `0.14.1-1.6`, use the bounded core smoke plus the runtime-upgrade checks in `18_TESTING_SIDECHAT_HANDOVER.md`. Deeper resilience, security or recovery work remains available when a changed area or observed risk justifies it; it is not a mandatory ritual for every package bump.
 
 ## Test result taxonomy
 
