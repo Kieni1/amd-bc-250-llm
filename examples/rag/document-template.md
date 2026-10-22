@@ -1,5 +1,6 @@
 ---
-document_id: "[DOCUMENT_ID]"
+document_id: "[STABLE_DOCUMENT_ID]"
+revision_id: "[EXACT_REVISION_ID]"
 document_family: "[DOCUMENT_FAMILY]"
 title: "[DOCUMENT_TITLE]"
 organisation: "[ORGANISATION]"
@@ -13,6 +14,8 @@ review_required: true
 source_file: "[SOURCE_PDF_FILENAME]"
 source_sha256: "[SOURCE_PDF_SHA256]"
 normalization: "[EXTRACTION_OR_OCR_NOTES]"
+bc250_fidelity_status: "not-scored"
+bc250_fidelity_note: "Manual/template document; automated critical-token coverage was not run"
 ---
 
 # [DOCUMENT_TITLE]
