@@ -342,10 +342,10 @@ class DocumentationTests(unittest.TestCase):
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
         _version, release, _nvr = current_identity()
-        self.assertIn("Package standard: **Ollama v0.40.6**", ollama)
-        self.assertIn(f"Release {release} keeps the same runtime pin", ollama)
-        self.assertIn("exact 1.4 device campaign proved", ollama)
-        self.assertIn("do not transfer DEVICE acceptance", ollama)
+        self.assertIn("Package standard: **Ollama v0.40.8**", ollama)
+        self.assertIn(f"Release {release} updates the runtime pin", ollama)
+        self.assertIn("0.40.8 keeps the established four-lane settings", ollama)
+        self.assertIn("does not transfer DEVICE acceptance", ollama)
         self.assertNotIn("0.34.4 remains the last exact-device-qualified runtime", ollama)
         self.assertNotIn("0.13.1-1.2", ollama)
         for assignment in ("OLLAMA_VULKAN=1", "OLLAMA_IGPU_ENABLE=1", "GGML_VK_VISIBLE_DEVICES=0"):
