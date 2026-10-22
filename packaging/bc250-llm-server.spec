@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.6%{?dist}
+Release:        1.7%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -263,6 +263,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Thu Oct 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.7
+- Make managed RAG activation transaction-safe and validate the complete proposed corpus before mutation, with duplicate-target rejection and rollback on filesystem failure.
+- Enforce German-authoritative/French-translation provenance with stable document/revision IDs, stronger metadata/date/source validation, symlink hardening and persisted extraction-fidelity review state.
+- Improve RAG review/status operator feedback, truthful failure exits and Open WebUI sync diagnostics without changing the pinned runtime/model/retrieval policy.
+
 * Thu Oct 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.6
 - Update Ollama to 0.40.8 with the exact generic Linux AMD64 payload hash; keep the proven four-lane Vulkan/iGPU settings and add renderer/parser/template-source diagnostics for the new /api/show metadata.
 - Update Cyan Skillfish governor to 0.4.14 without changing the package frequency, thermal, load-target or safe-point policy; require focused exact-device governor/thermal smoke.
