@@ -1,18 +1,19 @@
-# Core functionality check — exact 0.14.1-1.6 RPM
+# Core functionality check — exact 0.14.1-1.7 RPM
 
 
-## 1.4 baseline and 1.5 focus
+## 1.4 baseline and 1.7 focus
 
-The exact 1.4 RPM already proved the expensive stock-core/runtime/product boundaries through device Block 3. Do not replay that entire campaign merely because the RPM Release changed. The 1.5 round must still bind to exact new bytes and prove the changed package surfaces plus the previously pending reboot/ordinary-user boundary.
+The exact 1.4 RPM already proved the expensive stock-core/runtime/product boundaries through device Block 3. Do not replay that entire campaign merely because the RPM Release changed. The 1.7 round must still bind to exact new bytes and prove the carried runtime changes, changed managed-RAG surfaces and the previously pending reboot/ordinary-user boundary.
 
 Start from a supported install/upgrade state and require:
 
-- exact 1.6 RPM identity/hash and clean `rpm -V`;
+- exact 1.7 RPM identity/hash and clean `rpm -V`;
 - guided installer renders exactly one semantic Ollama observed version (or `unknown`), never connection prose;
 - at the intentional publication/convergence hold, `status` reports setup incomplete rather than a false runtime mismatch;
 - after convergence, `status`, `health` and `verify` are green and runtime identities still match;
-- model catalog discovers the new optional challengers without selecting/promoting them by default;
+- model catalog remains coherent and no production/recommended role changes unexpectedly;
 - one representative Ollama local registration/restart smoke remains stable;
+- one managed-RAG replacement path proves atomic activation/provenance plus grounded/unsupported ordinary-user behavior;
 - final reboot persistence and ordinary-user Open WebUI paths complete the boundary left pending after 1.4 Block 3.
 
 ## Goal
@@ -47,7 +48,7 @@ Do not mutate user state just to make the starting state look cleaner.
 ## Required package/install checks
 
 - install or supported upgrade succeeds;
-- `rpm -q bc250-llm-server` reports `0.14.1-1.6` with the expected Fedora dist tag/arch;
+- `rpm -q bc250-llm-server` reports `0.14.1-1.7` with the expected Fedora dist tag/arch;
 - package services/configuration converge without manual repair;
 - no experimental GFX/private-RADV/patched-boot requirement appears;
 - one ordinary service restart succeeds.
@@ -93,9 +94,9 @@ Keep this light:
 
 Hidden thinking is not a substitute for a visible answer.
 
-## Runtime baseline checks retained for 1.5
+## Runtime and RAG checks retained for 1.7
 
-Ollama 0.40.6 and Open WebUI 0.12.3 were device-proven on the exact 1.4 artifact through Block 3. Release 1.6 updates Ollama to 0.40.8 while keeping Open WebUI 0.12.3; use the old results as regression baseline, then re-prove representative Vulkan generation, registration/restart persistence and lane identity on the exact 1.6 RPM.
+Ollama 0.40.6 and Open WebUI 0.12.3 were device-proven on the exact 1.4 artifact through Block 3. Release 1.7 keeps Ollama 0.40.8 and Open WebUI 0.12.3 from the 1.6 source baseline; use the old results as regression baseline, then re-prove representative Vulkan generation, registration/restart persistence and lane identity on the exact 1.7 RPM.
 
 For Ollama 0.40.8:
 
@@ -114,6 +115,16 @@ For Open WebUI 0.12.3:
 
 Do not automatically clean model-store migration artifacts during this smoke. Record unexpected registry state first so rollback remains possible.
 
+For the changed managed-RAG path, use a disposable test collection and require:
+
+- `bc250 rag status` reports review/currentness/fidelity state and lifecycle validation health coherently;
+- one reviewed German authoritative revision activates successfully and one French translation points to the exact German `revision_id`;
+- an invalid replacement or duplicate same-family/language `--all-ready` set makes no active-corpus mutation;
+- a valid replacement supersedes the prior revision while preserving audit evidence;
+- Open WebUI sync of the resulting active Markdown succeeds, then one grounded question cites the expected source and one unsupported question does not invent a document fact.
+
+Do not turn this into a document/model tournament. The managed preparation input remains PDF-only for this release.
+
 ## Reboot persistence
 
 Perform one supported reboot and confirm:
@@ -128,7 +139,7 @@ Perform one supported reboot and confirm:
 
 - browser login/use through the Web interface;
 - one short translation request;
-- one tiny document/RAG extraction/retrieval smoke if the environment is already prepared.
+- one additional document/RAG extraction/retrieval smoke only if it adds evidence beyond the required managed-RAG replacement check.
 
 These are not required for the first stock-core baseline unless the source delta touched them.
 
