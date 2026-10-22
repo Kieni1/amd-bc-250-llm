@@ -47,6 +47,9 @@ class RagImportTests(unittest.TestCase):
         source_language: str,
         source_name: str,
         authority: str = "",
+        *,
+        family: str = "family",
+        translation_of: str = "",
     ) -> Path:
         base = root / scope / "COLLECTION"
         active = base / "active"
@@ -56,13 +59,19 @@ class RagImportTests(unittest.TestCase):
         source = sources / source_name
         source.write_bytes((name + " source").encode())
         digest = hashlib.sha256(source.read_bytes()).hexdigest()
-        authority_line = f'authority: "{authority}"\n' if authority else ""
+        role = authority or ("authoritative" if language.lower().startswith("de") else "translation")
+        document_id = f"{family}_{language}"
+        revision_id = f"{document_id}_{digest[:16]}"
+        translation_line = f'translation_of: "{translation_of}"\n' if translation_of else ""
         doc = active / name
         doc.write_text(
             "---\n"
-            f'document_id: "{name}"\n'
+            f'document_id: "{document_id}"\n'
+            f'revision_id: "{revision_id}"\n'
+            f'document_family: "{family}"\n'
             f'language: "{language}"\n'
-            f"{authority_line}"
+            f'authority_role: "{role}"\n'
+            f"{translation_line}"
             f'source_file: "{source_name}"\n'
             f'source_sha256: "{digest}"\n'
             "relation:\n"
@@ -77,8 +86,12 @@ class RagImportTests(unittest.TestCase):
     def test_de_original_and_fr_translation_route_to_separate_knowledge(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
-            self.make_doc(root, "public", "fr.md", "fr-CH", "de-CH", "fr.pdf")
+            de = self.make_doc(root, "public", "de.md", "de-CH", "de-CH", "de.pdf")
+            de_revision = rag.revision_identity(rag.front_matter(de))
+            self.make_doc(
+                root, "public", "fr.md", "fr-CH", "de-CH", "fr.pdf",
+                translation_of=de_revision,
+            )
             docs, warnings = rag.discover(root)
             self.assertEqual(warnings, [])
             self.assertEqual({doc.lane for doc in docs}, {"original", "translation"})
@@ -87,17 +100,17 @@ class RagImportTests(unittest.TestCase):
                 {"[PUBLIC] COLLECTION — Originals", "[PUBLIC] COLLECTION — Français"},
             )
 
-    def test_explicit_english_original_is_allowed(self) -> None:
+    def test_non_german_authoritative_document_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self.make_doc(
-                root, "public", "en.md", "en", "en", "en.pdf", authority="original"
+                root, "public", "en.md", "en", "en", "en.pdf", authority="authoritative"
             )
-            docs, warnings = rag.discover(root)
-            self.assertEqual(warnings, [])
-            self.assertEqual(len(docs), 1)
-            self.assertEqual(docs[0].lane, "original")
-            self.assertEqual(docs[0].kb_name, "[PUBLIC] COLLECTION — Originals")
+            with self.assertRaisesRegex(
+                ValueError, "authoritative managed-corpus documents must be German"
+            ):
+                rag.discover(root)
+
 
     def test_source_filename_drift_is_tolerated_only_when_sha_matches(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -269,7 +282,7 @@ class RagImportTests(unittest.TestCase):
                 "secret.pdf",
             )
             mixed_docs, _ = rag.discover(root)
-            with self.assertRaisesRegex(ValueError, "confidential documents"):
+            with self.assertRaisesRegex(ValueError, "confidential-scope knowledge state"):
                 rag.validate_sync_endpoint(
                     "https://owui.example.invalid", mixed_docs, allow_remote=True
                 )
@@ -282,7 +295,7 @@ class RagImportTests(unittest.TestCase):
 
             empty_root = Path(tmp) / "empty-confidential"
             (empty_root / "confidential" / "EMPTY" / "active").mkdir(parents=True)
-            with self.assertRaisesRegex(ValueError, "confidential documents"):
+            with self.assertRaisesRegex(ValueError, "confidential-scope knowledge state"):
                 rag.validate_sync_endpoint(
                     "https://owui.example.invalid",
                     [],
@@ -481,8 +494,8 @@ class RagImportTests(unittest.TestCase):
                 [sys.executable, str(LIFECYCLE), "--root", str(root), "status", "public", "MISSING"],
                 text=True, capture_output=True, check=False,
             )
-            self.assertEqual(missing.returncode, 0, missing.stderr)
-            self.assertIn("RAG collection not found: public/MISSING", missing.stdout)
+            self.assertEqual(missing.returncode, 2, missing.stdout + missing.stderr)
+            self.assertIn("RAG collection not found: public/MISSING", missing.stderr)
             invalid = subprocess.run(
                 [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "public", "bad/name"],
                 text=True, capture_output=True, check=False,
@@ -532,6 +545,391 @@ class RagImportTests(unittest.TestCase):
             )
             self.assertEqual(status.returncode, 0, status.stderr)
             self.assertIn("working awaiting review: 1", status.stdout)
+
+    def test_activation_preflight_failure_preserves_active_and_working_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"authoritative source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            template = (
+                "---\n"
+                'document_id: "family_de-CH"\n'
+                'revision_id: "{revision}"\n'
+                'document_family: "family"\n'
+                'title: "{title}"\n'
+                'language: "de-CH"\n'
+                'authority_role: "authoritative"\n'
+                'effective_from: "{date}"\n'
+                'status: "active"\n'
+                'review_required: false\n'
+                'source_file: "reglement.pdf"\n'
+                'source_sha256: "{digest}"\n'
+                "---\n\n# {title}\n"
+            )
+            old = base / "active" / "family_de-CH_2025-01-01.md"
+            old.write_text(
+                template.format(
+                    revision="family_de-CH_old",
+                    title="Old",
+                    date="2025-01-01",
+                    digest=digest,
+                ),
+                encoding="utf-8",
+            )
+            replacement = base / "working" / "family_de-CH_2026-01-01.md"
+            replacement.write_text(
+                template.format(
+                    revision="family_de-CH_new",
+                    title="New",
+                    date="2026-01-01",
+                    digest="0" * 64,
+                ),
+                encoding="utf-8",
+            )
+            old_bytes = old.read_bytes()
+            replacement_bytes = replacement.read_bytes()
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "files": [replacement.name],
+                    "all_ready": False,
+                    "yes": True,
+                },
+            )()
+            with self.assertRaisesRegex(RuntimeError, "no files were changed"):
+                lifecycle.cmd_activate(args)
+            self.assertEqual(old.read_bytes(), old_bytes)
+            self.assertEqual(replacement.read_bytes(), replacement_bytes)
+            self.assertEqual(list((base / "superseded").iterdir()), [])
+
+    def test_activate_all_ready_rejects_duplicate_logical_target_before_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            for index in (1, 2):
+                source = base / "sources" / f"source-{index}.pdf"
+                source.write_bytes(f"source {index}".encode())
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                draft = base / "working" / f"candidate-{index}.md"
+                draft.write_text(
+                    "---\n"
+                    'document_id: "family_de-CH"\n'
+                    f'revision_id: "family_de-CH_{index}"\n'
+                    'document_family: "family"\n'
+                    f'title: "Candidate {index}"\n'
+                    'language: "de-CH"\n'
+                    'authority_role: "authoritative"\n'
+                    'effective_from: "2026-01-01"\n'
+                    'review_required: false\n'
+                    f'source_file: "source-{index}.pdf"\n'
+                    f'source_sha256: "{digest}"\n'
+                    "---\n\n# Candidate\n",
+                    encoding="utf-8",
+                )
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "files": [],
+                    "all_ready": True,
+                    "yes": True,
+                },
+            )()
+            with self.assertRaisesRegex(ValueError, "activation is ambiguous"):
+                lifecycle.cmd_activate(args)
+            self.assertEqual(len(list((base / "working").glob("*.md"))), 2)
+            self.assertEqual(list((base / "active").glob("*.md")), [])
+            self.assertEqual(list((base / "superseded").iterdir()), [])
+
+    def test_activation_runtime_failure_rolls_back_prior_moves(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"authoritative source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            template = (
+                "---\n"
+                'document_id: "family_de-CH"\n'
+                'revision_id: "{revision}"\n'
+                'document_family: "family"\n'
+                'title: "{title}"\n'
+                'language: "de-CH"\n'
+                'authority_role: "authoritative"\n'
+                'effective_from: "{date}"\n'
+                'review_required: false\n'
+                'source_file: "reglement.pdf"\n'
+                f'source_sha256: "{digest}"\n'
+                "---\n\n# {title}\n"
+            )
+            old = base / "active" / "old.md"
+            new = base / "working" / "new.md"
+            old.write_text(
+                template.format(revision="old-revision", title="Old", date="2025-01-01"),
+                encoding="utf-8",
+            )
+            new.write_text(
+                template.format(revision="new-revision", title="New", date="2026-01-01"),
+                encoding="utf-8",
+            )
+            original_move = lifecycle.transaction_move
+
+            def fail_on_second_move(source_path, destination_path, journal):
+                if journal:
+                    raise OSError("simulated activation move failure")
+                return original_move(source_path, destination_path, journal)
+
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "files": [new.name],
+                    "all_ready": False,
+                    "yes": True,
+                },
+            )()
+            with patch.object(lifecycle, "transaction_move", side_effect=fail_on_second_move), \
+                 self.assertRaisesRegex(RuntimeError, "all filesystem moves were rolled back"):
+                lifecycle.cmd_activate(args)
+            self.assertTrue(old.is_file())
+            self.assertTrue(new.is_file())
+            self.assertEqual(list((base / "superseded").iterdir()), [])
+
+    def test_french_authority_policy_is_shared_by_validation_and_import(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "fr.pdf"
+            source.write_bytes(b"french source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            bad = base / "active" / "fr.md"
+            bad.write_text(
+                "---\n"
+                'document_id: "family_fr-CH"\n'
+                'revision_id: "family_fr-CH_revision"\n'
+                'document_family: "family"\n'
+                'title: "FR"\n'
+                'language: "fr-CH"\n'
+                'authority_role: "authoritative"\n'
+                'review_required: false\n'
+                'source_file: "fr.pdf"\n'
+                f'source_sha256: "{digest}"\n'
+                "---\n\n# FR\n",
+                encoding="utf-8",
+            )
+            out = io.StringIO()
+            with redirect_stdout(out):
+                errors, _warnings = lifecycle.validate_collection(base)
+            self.assertEqual(errors, 1)
+            self.assertIn("authoritative managed-corpus documents must be German", out.getvalue())
+            with self.assertRaisesRegex(
+                ValueError, "authoritative managed-corpus documents must be German"
+            ):
+                rag.discover(root)
+
+    def test_activation_rejects_legacy_translation_filename_that_would_retarget(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            de_source = base / "sources" / "de.pdf"
+            fr_source = base / "sources" / "fr.pdf"
+            de_source.write_bytes(b"de source")
+            fr_source.write_bytes(b"fr source")
+            de_digest = hashlib.sha256(de_source.read_bytes()).hexdigest()
+            fr_digest = hashlib.sha256(fr_source.read_bytes()).hexdigest()
+
+            old_de = base / "active" / "family_de-CH.md"
+            old_de.write_text(
+                "---\n"
+                'document_id: "family_de-CH"\n'
+                'revision_id: "de-old"\n'
+                'document_family: "family"\n'
+                'title: "DE old"\n'
+                'language: "de-CH"\n'
+                'authority_role: "authoritative"\n'
+                'review_required: false\n'
+                'source_file: "de.pdf"\n'
+                f'source_sha256: "{de_digest}"\n'
+                "---\n\n# DE old\n",
+                encoding="utf-8",
+            )
+            fr = base / "active" / "family_fr-CH.md"
+            fr.write_text(
+                "---\n"
+                'document_id: "family_fr-CH"\n'
+                'revision_id: "fr-current"\n'
+                'document_family: "family"\n'
+                'title: "FR"\n'
+                'language: "fr-CH"\n'
+                'authority_role: "translation"\n'
+                'translation_of: "family_de-CH.md"\n'
+                'review_required: false\n'
+                'source_file: "fr.pdf"\n'
+                f'source_sha256: "{fr_digest}"\n'
+                "---\n\n# FR\n",
+                encoding="utf-8",
+            )
+            replacement = base / "working" / "family_de-CH.md"
+            replacement.write_text(
+                "---\n"
+                'document_id: "family_de-CH"\n'
+                'revision_id: "de-new"\n'
+                'document_family: "family"\n'
+                'title: "DE new"\n'
+                'language: "de-CH"\n'
+                'authority_role: "authoritative"\n'
+                'review_required: false\n'
+                'source_file: "de.pdf"\n'
+                f'source_sha256: "{de_digest}"\n'
+                "---\n\n# DE new\n",
+                encoding="utf-8",
+            )
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "files": [replacement.name],
+                    "all_ready": False,
+                    "yes": True,
+                },
+            )()
+            with self.assertRaisesRegex(RuntimeError, "no files were changed"):
+                lifecycle.cmd_activate(args)
+            self.assertTrue(old_de.is_file())
+            self.assertTrue(fr.is_file())
+            self.assertTrue(replacement.is_file())
+
+    def test_supersede_rejects_removing_german_revision_with_active_translation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            de_source = base / "sources" / "de.pdf"
+            fr_source = base / "sources" / "fr.pdf"
+            de_source.write_bytes(b"de source")
+            fr_source.write_bytes(b"fr source")
+            de_digest = hashlib.sha256(de_source.read_bytes()).hexdigest()
+            fr_digest = hashlib.sha256(fr_source.read_bytes()).hexdigest()
+            de_revision = "family_de-CH_sha256_" + de_digest
+            de = base / "active" / "de.md"
+            de.write_text(
+                "---\n"
+                'document_id: "family_de-CH"\n'
+                f'revision_id: "{de_revision}"\n'
+                'document_family: "family"\n'
+                'title: "DE"\n'
+                'language: "de-CH"\n'
+                'authority_role: "authoritative"\n'
+                'review_required: false\n'
+                'source_file: "de.pdf"\n'
+                f'source_sha256: "{de_digest}"\n'
+                "---\n\n# DE\n",
+                encoding="utf-8",
+            )
+            fr = base / "active" / "fr.md"
+            fr.write_text(
+                "---\n"
+                'document_id: "family_fr-CH"\n'
+                'revision_id: "family_fr-CH_revision"\n'
+                'document_family: "family"\n'
+                'title: "FR"\n'
+                'language: "fr-CH"\n'
+                'authority_role: "translation"\n'
+                f'translation_of: "{de_revision}"\n'
+                'review_required: false\n'
+                'source_file: "fr.pdf"\n'
+                f'source_sha256: "{fr_digest}"\n'
+                "---\n\n# FR\n",
+                encoding="utf-8",
+            )
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "file": de.name,
+                },
+            )()
+            with self.assertRaisesRegex(RuntimeError, "no files were changed"):
+                lifecycle.cmd_supersede(args)
+            self.assertTrue(de.is_file())
+            self.assertTrue(fr.is_file())
+            self.assertEqual(list((base / "superseded").iterdir()), [])
+
+    def test_prepare_batch_failure_and_restore_failure_are_nonzero_contracts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            inbox = base / "inbox" / "german" / "scan.pdf"
+            inbox.write_bytes(b"scan")
+            argv = [
+                "--root", str(root), "prepare-batch", "public", "COLLECTION"
+            ]
+            with patch.object(lifecycle, "enter_agent_if_needed", return_value=False), \
+                 patch.object(lifecycle, "agent_models", return_value={lifecycle.DEFAULT_AGENT_MODEL}), \
+                 patch.object(lifecycle, "prepare_one", side_effect=ValueError("broken input")), \
+                 redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(lifecycle.main(argv), 2)
+
+            with patch.object(lifecycle, "enter_agent_if_needed", return_value=True), \
+                 patch.object(lifecycle, "agent_models", return_value={lifecycle.DEFAULT_AGENT_MODEL}), \
+                 patch.object(lifecycle, "prepare_one", return_value=[]), \
+                 patch.object(lifecycle, "restore_normal_if_needed", return_value="restore failed"), \
+                 redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                self.assertEqual(lifecycle.main(argv), 2)
+
+    def test_existing_working_draft_is_never_overwritten_by_reprepare(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            draft, created = lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Original\n\nBody\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+            )
+            self.assertTrue(created)
+            reviewed = draft.read_text(encoding="utf-8") + "\nHUMAN EDIT\n"
+            draft.write_text(reviewed, encoding="utf-8")
+            same, created_again = lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Regenerated\n\nDifferent body\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+            )
+            self.assertEqual(same, draft)
+            self.assertFalse(created_again)
+            self.assertEqual(draft.read_text(encoding="utf-8"), reviewed)
+            meta = lifecycle.importer.front_matter(draft)
+            self.assertEqual(meta["document_id"], "reglement_de-CH")
+            self.assertEqual(
+                meta["revision_id"], f"reglement_de-CH_sha256_{digest}"
+            )
 
     def test_lifecycle_agent_output_integrity_and_deferral_taxonomy(self) -> None:
         lifecycle_source = LIFECYCLE.read_text(encoding="utf-8")
@@ -606,7 +1004,8 @@ class RagImportTests(unittest.TestCase):
             with patch.object(lifecycle, "enter_agent_if_needed", return_value=False), \
                  patch.object(lifecycle, "agent_models", return_value={"agentic-ornith15-9b-ornith-q5-k-m"}), \
                  patch.object(lifecycle, "prepare_one", side_effect=lifecycle.DeferredPreparation("OCR required", "little/no selectable text")), \
-                 redirect_stdout(out), redirect_stderr(err):
+                 redirect_stdout(out), redirect_stderr(err), \
+                 self.assertRaisesRegex(RuntimeError, "batch preparation incomplete"):
                 lifecycle.cmd_prepare(args)
             self.assertIn("DEFERRED — OCR required: scan.pdf", err.getvalue())
             self.assertIn("deferred/manual:  1", out.getvalue())
@@ -622,6 +1021,338 @@ class RagImportTests(unittest.TestCase):
         self.assertIn("models/rag/rag.py\t{libexec}/rag", manifest)
         self.assertIn('"rag|$LIBEXEC/rag"', dispatcher)
         self.assertIn("d /srv/bc250-documents 0750 root root -", tmpfiles)
+
+
+    def test_batch2_front_matter_round_trip_preserves_escaped_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "roundtrip.md"
+            meta = {
+                "document_id": "family_de-CH",
+                "revision_id": "family_de-CH_revision",
+                "document_family": "family",
+                "title": ' A "quoted" title \\ path: #tag ',
+                "organisation": "Biel/Bienne – Département",
+                "language": "de-CH",
+                "authority_role": "authoritative",
+                "review_required": True,
+                "source_file": "source.pdf",
+                "source_sha256": "a" * 64,
+                "bc250_fidelity_status": "not-scored",
+                "bc250_fidelity_note": "line one\\line two: # literal",
+            }
+            path.write_text(
+                lifecycle.render_markdown(meta, "# Body\n"), encoding="utf-8"
+            )
+            parsed = rag.front_matter(path)
+            for key, value in meta.items():
+                if key == "review_required":
+                    self.assertEqual(parsed[key], "true")
+                else:
+                    self.assertEqual(parsed[key], value)
+
+    def test_batch2_metadata_rejects_impossible_dates_and_bad_translation_relation(self) -> None:
+        base = {
+            "document_id": "family_de-CH",
+            "revision_id": "family_de-CH_revision",
+            "document_family": "family",
+            "language": "de-CH",
+            "authority_role": "authoritative",
+        }
+        for field in ("effective_from", "approved_on"):
+            bad = dict(base)
+            bad[field] = "2026-99-31"
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, field):
+                rag.validate_document_metadata(bad)
+
+        translation = dict(base)
+        translation.update(
+            {
+                "document_id": "family_fr-CH",
+                "revision_id": "family_fr-CH_revision",
+                "language": "fr-CH",
+                "authority_role": "translation",
+                "translation_of": "family_de-CH_revision",
+                "relation": {"type": "translation-pair", "source_language": "en"},
+            }
+        )
+        with self.assertRaisesRegex(ValueError, "source_language must be German"):
+            rag.validate_document_metadata(translation, active=True)
+
+    def test_batch2_openwebui_sync_schema_validation_is_fail_closed(self) -> None:
+        invalid = (
+            ({"added": {}}, "must be a list"),
+            ({"added": [{}]}, "missing a valid filename"),
+            ({"modified": [{"filename": "doc.md"}]}, "missing a valid stale_file_id"),
+            ({"deleted": [{}]}, "missing a valid file_id"),
+            ({"unmodified_count": -1}, "must not be negative"),
+        )
+        for result, message in invalid:
+            with self.subTest(result=result), self.assertRaisesRegex(
+                (RuntimeError, TypeError), message
+            ):
+                rag.validate_diff_result(result)
+
+        api = rag.OpenWebUI("http://example.invalid", "token")
+        with patch.object(api, "_request", return_value=[]), self.assertRaisesRegex(
+            TypeError, "search response must be an object"
+        ):
+            api.find_knowledge("Wanted")
+        with patch.object(
+            api,
+            "_request",
+            return_value={
+                "items": [{"name": "Wanted", "write_access": True}],
+                "total": 1,
+            },
+        ), self.assertRaisesRegex(RuntimeError, "missing a valid id"):
+            api.find_knowledge("Wanted")
+
+    def test_batch2_inbox_and_working_symlinks_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            outside_pdf = root / "outside.pdf"
+            outside_pdf.write_bytes(b"outside")
+            inbox_link = base / "inbox" / "german" / "linked.pdf"
+            inbox_link.symlink_to(outside_pdf)
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                result = lifecycle.main(
+                    [
+                        "--root",
+                        str(root),
+                        "prepare-batch",
+                        "public",
+                        "COLLECTION",
+                        "--dry-run",
+                    ]
+                )
+            self.assertEqual(result, 2)
+            self.assertIn("inbox entries must not be symlinks", stderr.getvalue())
+
+            inbox_link.unlink()
+            outside_md = root / "outside.md"
+            outside_md.write_text("---\n---\n", encoding="utf-8")
+            working_link = base / "working" / "linked.md"
+            working_link.symlink_to(outside_md)
+            with self.assertRaisesRegex(ValueError, "Markdown must not be a symlink"):
+                lifecycle.docs_in(base / "working")
+
+    def test_batch2_fidelity_metadata_persists_and_review_status_requires_ack(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            draft, created = lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Reglement\n\nBody\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+                fidelity_status="review",
+                fidelity_note_text=(
+                    "critical-token coverage REVIEW (0/1); missing examples: Art. 17"
+                ),
+            )
+            self.assertTrue(created)
+            meta = rag.front_matter(draft)
+            self.assertEqual(meta["bc250_fidelity_status"], "review")
+            self.assertIn("Art. 17", str(meta["bc250_fidelity_note"]))
+            meta["review_required"] = False
+            with self.assertRaisesRegex(ValueError, "requires explicit"):
+                rag.validate_document_metadata(meta, active=True)
+            meta["bc250_fidelity_acknowledged"] = "true"
+            rag.validate_document_metadata(meta, active=True)
+
+    def test_batch2_review_persists_explicit_fidelity_acknowledgement(self) -> None:
+        class Tty:
+            @staticmethod
+            def isatty() -> bool:
+                return True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            _draft, _ = lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Reglement\n\nBody\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+                fidelity_status="review",
+                fidelity_note_text="manual source comparison required",
+            )
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "all": False,
+                },
+            )()
+            answers = iter(["", "", "2026-01-01", "", "", "y", "y"])
+            with patch.object(lifecycle.sys, "stdin", Tty()), patch(
+                "builtins.input", side_effect=lambda _prompt="": next(answers)
+            ), redirect_stdout(io.StringIO()):
+                lifecycle.cmd_review(args)
+            reviewed = base / "working" / "reglement_de-CH_2026-01-01.md"
+            self.assertTrue(reviewed.is_file())
+            meta = rag.front_matter(reviewed)
+            self.assertEqual(meta["review_required"], "false")
+            self.assertEqual(meta["bc250_fidelity_acknowledged"], "true")
+
+    def test_batch2_prepare_one_records_automated_fidelity_result(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "inbox" / "german" / "reglement.pdf"
+            source.write_bytes(b"fake pdf")
+            extracted = "Art. 17 applies. " + ("text " * 100)
+            with patch.object(lifecycle, "source_text", return_value=(1, extracted)), patch.object(
+                lifecycle,
+                "call_agent",
+                return_value="# Reglement\n\nThe article was omitted.\n",
+            ):
+                drafts = lifecycle.prepare_one(
+                    base,
+                    source,
+                    "german",
+                    "http://127.0.0.1:11436",
+                    lifecycle.DEFAULT_AGENT_MODEL,
+                    lifecycle.DEFAULT_MAX_CHARS,
+                )
+            self.assertEqual(len(drafts), 1)
+            meta = rag.front_matter(drafts[0])
+            self.assertEqual(meta["bc250_fidelity_status"], "review")
+            self.assertIn("Art. 17", str(meta["bc250_fidelity_note"]))
+
+
+    def test_batch3_status_reports_review_currentness_and_validation_health(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lifecycle.ensure_collection(root, "public", "COLLECTION")
+            active = self.make_doc(
+                root,
+                "public",
+                "reglement.md",
+                "de-CH",
+                "de-CH",
+                "reglement.pdf",
+            )
+            active_text = active.read_text(encoding="utf-8").replace(
+                'authority_role: "authoritative"\n',
+                'authority_role: "authoritative"\nstatus: "currentness-not-verified"\n',
+            )
+            active.write_text(active_text, encoding="utf-8")
+            base = active.parent.parent
+            source = base / "sources" / "draft.pdf"
+            source.write_bytes(b"draft source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            draft, _created = lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Draft\n\nBody\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+                fidelity_status="review",
+                fidelity_note_text="manual comparison required",
+            )
+            draft_meta, draft_body = lifecycle.split_markdown(draft)
+            draft_meta["effective_from"] = "2026-01-01"
+            draft_meta["review_required"] = False
+            draft_meta["bc250_fidelity_acknowledged"] = "true"
+            draft.write_text(
+                lifecycle.render_markdown(draft_meta, draft_body), encoding="utf-8"
+            )
+
+            stdout = io.StringIO()
+            with redirect_stdout(stdout):
+                rc = lifecycle.main(
+                    ["--root", str(root), "status", "public", "COLLECTION"]
+                )
+            self.assertEqual(rc, 0)
+            output = stdout.getvalue()
+            self.assertIn("working awaiting review: 0", output)
+            self.assertIn("working ready:           1", output)
+            self.assertIn("fidelity review pending: 0", output)
+            self.assertIn("active currentness unverified: 1", output)
+            self.assertIn("lifecycle validation: WARN", output)
+
+            stderr = io.StringIO()
+            with redirect_stderr(stderr):
+                missing_rc = lifecycle.main(
+                    ["--root", str(root), "status", "public", "MISSING"]
+                )
+            self.assertEqual(missing_rc, 2)
+            self.assertIn("RAG collection not found: public/MISSING", stderr.getvalue())
+
+    def test_batch3_review_surfaces_provenance_and_blocks_bad_source(self) -> None:
+        class Tty:
+            @staticmethod
+            def isatty() -> bool:
+                return True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            draft, _created = lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Reglement\n\nBody\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+                fidelity_status="not-scored",
+                fidelity_note_text="manual fixture",
+            )
+            meta, body = lifecycle.split_markdown(draft)
+            meta["source_sha256"] = "0" * 64
+            draft.write_text(lifecycle.render_markdown(meta, body), encoding="utf-8")
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "all": False,
+                },
+            )()
+            answers = iter(["", "", "2026-01-01", "", "", "y"])
+            stdout = io.StringIO()
+            with (
+                patch.object(lifecycle.sys, "stdin", Tty()),
+                patch("builtins.input", side_effect=lambda _prompt="": next(answers)),
+                redirect_stdout(stdout),
+            ):
+                lifecycle.cmd_review(args)
+            output = stdout.getvalue()
+            self.assertIn("source SHA:  FAIL", output)
+            self.assertIn("currentness: currentness-not-verified", output)
+            self.assertIn(
+                "Source provenance must be repaired before this draft can be marked ready.",
+                output,
+            )
+            reviewed = base / "working" / "reglement_de-CH_2026-01-01.md"
+            reviewed_meta = rag.front_matter(reviewed)
+            self.assertEqual(reviewed_meta["review_required"], "true")
 
 
 if __name__ == "__main__":
