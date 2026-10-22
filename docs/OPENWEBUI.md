@@ -1,6 +1,6 @@
 # Open WebUI
 
-Package candidate baseline: **Open WebUI v0.12.3** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
+Current package baseline: **Open WebUI v0.12.3** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -135,7 +135,7 @@ This is intentional on the BC-250 unified-memory pool.
 
 ### Curated role tool policy
 
-Open WebUI 0.11.x injects built-in knowledge/chat tools into native-tool-capable models unless model
+Open WebUI can inject built-in knowledge/chat tools into native-tool-capable models unless model
 metadata disables them. The package therefore makes the role boundary explicit:
 
 - `Office - Standard`, `Office - General / Higher Quality`, `Office - Advanced Structured`,
@@ -157,19 +157,16 @@ Open WebUI translation preset plus direction filter.
 ## OpenAI-style API compatibility boundary
 
 Open WebUI's `/api/chat/completions` endpoint is used internally by package product-path tests, but
-the Open WebUI OpenAI-style adapter is **not** an advertised external BC-250 API contract. Exact-device
-attribution on the preceding v0.11.3 baseline found three limitations that must be rechecked rather than
-assumed fixed merely because the candidate pin is v0.12.3:
+the Open WebUI OpenAI-style adapter is **not** an advertised external BC-250 API contract. Historical
+exact-device attribution found metadata/compatibility limitations that remain useful interpretation cautions:
 
-- on the older v0.11.3 evidence, a root OpenAI-style `max_tokens=N` was not reliably propagated as an Ollama generation cap; Open WebUI 0.12 documents this as fixed and 1.3 must requalify the behavior;
+- a client-supplied root OpenAI-style `max_tokens=N` is outside the advertised BC-250 contract for Ollama-backed requests;
 - `completion_tokens_details.reasoning_tokens` can be `0` even when `reasoning_content` is present;
 - an Ollama `done_reason=length` can be surfaced as OpenAI-style `finish_reason=stop`.
 
 Package-owned direct callers that require a hard Ollama generation cap use native nested
 `options.num_predict`. Separately, the package-owned Advanced Open WebUI record stores
-`params.max_tokens=6144`; the immediately preceding exact-device run proved that this supported internal Open WebUI path translated the prior 4096 value to outbound Ollama `options.num_predict=4096`. The 6144 candidate must be reconfirmed as outbound Ollama `options.num_predict=6144`
-without forwarding a root-level `max_tokens`. The raw outbound capture is not retained in this source tree,
-so exact-device qualification keeps this as a no-regression observation. The external
+`params.max_tokens=6144`; the exact 1.4 device campaign captured the supported internal Open WebUI path forwarding that setting to Ollama as `options.num_predict=6144`, with no root-level Ollama `max_tokens`. Later releases treat this as a bounded regression observation when the Open WebUI/Ollama request path changes rather than as an unresolved 4096→6144 migration. The raw outbound capture is not retained in this source tree. The external
 OpenAI-style client field above remains outside the advertised product contract. Do not infer absence
 of reasoning or truncation from the adapter metadata fields alone.
 `/openai/responses` workspace aliases likewise remain outside the qualified product path unless they are
