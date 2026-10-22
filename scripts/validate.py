@@ -291,7 +291,7 @@ def check_configuration() -> None:
     if gpu_usage.get("method") != "busy-flag":
         fail("packaged governor usage method must remain busy-flag")
     if gpu_usage.get("temp-read") != "sysfs":
-        fail("packaged governor v0.4.13 temperature source must be sysfs")
+        fail("packaged governor v0.4.14 temperature source must be sysfs")
     points = governor.get("safe-points", [])
     if not any(
         isinstance(point, dict)
