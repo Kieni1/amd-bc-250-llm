@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.1-1.7 - 2026-10-22
+
+- Make managed RAG activation all-or-nothing for the requested batch: validate the projected active corpus before mutation, reject ambiguous same-family/language replacements, and roll back filesystem moves if activation fails.
+- Make German the sole managed-corpus authority language for now; French is a translation of an exact German revision. New drafts use stable logical `document_id` plus source-derived `revision_id`, while legacy filename translation links remain readable only for upgrade compatibility.
+- Harden managed RAG preparation/review/ingestion with truthful nonzero failure exits, topology-restoration failure reporting, draft-overwrite protection, real calendar validation, safe metadata round-tripping, symlink rejection, Open WebUI response-schema validation and persisted fidelity-review evidence.
+- Improve `bc250 rag review`/`status` operator feedback with source-provenance, effective-date/edition/currentness/fidelity visibility and lifecycle validation health. Clarify that the curated managed intake remains PDF-only for now; Open WebUI/Tika continues to handle supported ad-hoc office-document extraction.
+- Keep Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14, model/retrieval tuning and the SRPM-first Fedora 44 release architecture unchanged.
+
 ## 0.14.1-1.6 - 2026-10-22
 
 - Update Ollama from 0.40.6 to 0.40.8 using the exact generic Linux AMD64 payload SHA-256. Keep the established four-lane Vulkan/iGPU, context, concurrency, keep-alive, Flash Attention and KV-cache policies unchanged after reviewing the 0.40.7/0.40.8 upstream changes.
