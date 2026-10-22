@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1-1.6 - 2026-10-22
+
+- Update Ollama from 0.40.6 to 0.40.8 using the exact generic Linux AMD64 payload SHA-256. Keep the established four-lane Vulkan/iGPU, context, concurrency, keep-alive, Flash Attention and KV-cache policies unchanged after reviewing the 0.40.7/0.40.8 upstream changes.
+- Treat Ollama 0.40.7+ `renderer`, `parser` and `template_source` `/api/show` fields as additional diagnostic evidence for package/custom-model qualification; retain exact-device Vulkan and registration/restart smoke because the runtime also updates llama.cpp.
+- Update Cyan Skillfish governor from 0.4.13 to 0.4.14 at commit `7b08fdcf542d1edd82f3a9077c902038019c9842`; retain the package's existing frequency/thermal/load/safe-point policy because upstream 0.4.14 is an error-handling/graceful-shutdown cleanup rather than a configuration-policy change.
+- Update the pinned GitHub `actions/checkout` action from v6.1.0 to v7.0.1 (`3d3c42e5aac5ba805825da76410c181273ba90b1`) for the current safer fork-checkout behavior and dependency maintenance.
+
 ## 0.14.1-1.5 - 2026-10-21
 
 - Refine `bc250 status` so a package-owned pre-convergence/publication hold is reported as `SETUP INCOMPLETE — package runtime convergence pending` instead of being collapsed into runtime mismatch/unavailable; retain strict warnings for real observed version/digest mismatches and expose the setup state in machine-readable `bc250.status.v4`.
