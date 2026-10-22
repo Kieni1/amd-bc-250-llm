@@ -20,7 +20,7 @@ Keep internal helpers private unless there is a durable operator need for them.
 
 ## Package identity
 
-Current line: `bc250-llm-server-0.14.1-1.5`.
+Current line: `bc250-llm-server-0.14.1-1.6`.
 
 Never reuse an already-published NVR for changed bytes.
 
