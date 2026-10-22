@@ -1,6 +1,6 @@
 BC-250 exact-RPM testing sidechat — start with development/handovers/18_TESTING_SIDECHAT_HANDOVER.md.
 
-Candidate line: bc250-llm-server 0.14.1-1.6 / Fedora 44.
+Candidate line: bc250-llm-server 0.14.1-1.7 / Fedora 44.
 Bind testing to the exact selected GitHub RPM/SRPM hashes before device mutation. Use development/handovers/20_DEVICE_QUALIFICATION_1_4.md only as non-transferable regression baseline and development/handovers/22_RELEASE_1_6_SCOPE_AND_ACCEPTANCE.md for the changed-surface acceptance contract.
 
 Do not reopen GFX/private-RADV work or rerun broad 1.4 campaigns without new evidence. Prioritize 1.5 status/parser fixes, bounded challenger/catalog checks, real reboot persistence and the ordinary-user Open WebUI boundary.
