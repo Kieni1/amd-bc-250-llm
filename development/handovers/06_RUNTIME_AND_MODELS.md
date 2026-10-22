@@ -3,15 +3,15 @@
 ## Current package baseline
 
 ```text
-Ollama       0.40.6
+Ollama       0.40.8
 Open WebUI   0.12.3
 Tika         4.1.0-full
-Governor     0.4.13
+Governor     0.4.14
 ```
 
 Do not upgrade these incidentally during unrelated cleanup or product-roadmap work. Runtime/model upgrades require their own reason and evidence.
 
-Ollama 0.40.6 and Open WebUI 0.12.3 were extensively device-proven on the exact 1.4 RPM through Blocks 1–3, including lane/registration restart persistence, Open WebUI desired-state/idempotence/local-first policy, managed RAG, translation/use-case benchmarks and raw Advanced 6144 forwarding. That evidence is the regression baseline, not transferable acceptance for changed 1.5 bytes. The exact selected 1.5 RPM must re-establish the changed-surface smoke and reboot/ordinary-user boundary before DEVICE-VALIDATED status. See `18_TESTING_SIDECHAT_HANDOVER.md` and `20_DEVICE_QUALIFICATION_1_4.md`.
+Ollama 0.40.6 and Open WebUI 0.12.3 were extensively device-proven on the exact 1.4 RPM through Blocks 1–3, including lane/registration restart persistence, Open WebUI desired-state/idempotence/local-first policy, managed RAG, translation/use-case benchmarks and raw Advanced 6144 forwarding. That evidence is the regression baseline, not transferable acceptance for changed 1.6 runtime bytes. The exact selected 1.6 RPM must re-establish representative Ollama Vulkan/lane/registration behavior, governor service/thermal behavior and the remaining reboot/ordinary-user boundary before DEVICE-VALIDATED status. See `18_TESTING_SIDECHAT_HANDOVER.md` and `20_DEVICE_QUALIFICATION_1_4.md`.
 
 ## Normal topology
 
