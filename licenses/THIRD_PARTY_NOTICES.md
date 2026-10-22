@@ -6,8 +6,8 @@ are licensed under GNU GPL version 2 only, as provided in `licenses/LICENSE`.
 The RPM also contains or refers to separately licensed components:
 
 - **cyan-skillfish-governor-smu** is sourced from
-  `filippor/cyan-skillfish-governor`, release `v0.4.13`, commit
-  `aaed42535622aee1a93df8b22860c409539f67f8`, under the MIT License. The
+  `filippor/cyan-skillfish-governor`, release `v0.4.14`, commit
+  `7b08fdcf542d1edd82f3a9077c902038019c9842`, under the MIT License. The
   project is based on `Magnap/cyan-skillfish-governor`; its upstream license is
   retained in the RPM.
 - **Ollama**, Open WebUI, Apache Tika, Podman, nginx, Mesa and other runtime
