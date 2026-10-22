@@ -107,8 +107,8 @@ journalctl -u cyan-skillfish-governor-smu.service -b
 sudo bc250 verify
 ```
 
-The RPM pins `filippor/cyan-skillfish-governor` v0.4.13 at commit
-`aaed42535622aee1a93df8b22860c409539f67f8`. Fresh installations use a
+The RPM pins `filippor/cyan-skillfish-governor` v0.4.14 at commit
+`7b08fdcf542d1edd82f3a9077c902038019c9842`. Fresh installations use a
 350–1850 MHz range. The 2000 MHz / 960 mV point remains in the curve only for
 deliberate operator testing. `%config(noreplace)` preserves local tuning on
 upgrades.
