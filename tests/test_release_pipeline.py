@@ -59,6 +59,7 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn('release_authority:', workflow)
         self.assertIn("BC250_RELEASE_AUTHORITY", workflow)
         self.assertIn("Upload selected release authority record", workflow)
+        self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", workflow)
         self.assertIn("--disable-repo=fedora-cisco-openh264", workflow)
         for package in ("coreutils", "diffutils", "gawk", "grep", "sed"):
             self.assertIn(package, workflow)
