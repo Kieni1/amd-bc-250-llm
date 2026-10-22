@@ -4328,11 +4328,11 @@ raise SystemExit(module.entrypoint())
 
 
 
-    def test_revalidation_captures_ollama_show_thinking_metadata_as_diagnostic(self) -> None:
+    def test_revalidation_captures_ollama_show_runtime_metadata_as_diagnostic(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         self.assertIn('/api/show', source)
-        self.assertIn('thinking metadata', source)
-        self.assertIn('absence is', source)
+        self.assertIn('renderer, parser and template_source', source)
+        self.assertIn('absence of an optional field is not a hard product failure', source)
         self.assertIn('$QWEN_MODEL', source)
         self.assertIn('$GPT_OSS_MODEL', source)
 
