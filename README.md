@@ -4,7 +4,7 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1.6` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+Current release source: `bc250-llm-server-0.14.1-1.7` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -186,9 +186,8 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Release 0.14.1-1.6 updates the package-pinned Ollama runtime to 0.40.8 and the Cyan Skillfish governor to 0.4.14 while keeping Open WebUI 0.12.3, Tika 4.1.0-full, the four-lane Vulkan topology and production model policy unchanged.
-The older Ollama 0.34.4 / Open WebUI 0.11.4 exact-device evidence remains historical evidence only;
-the selected 1.6 RPM must requalify Ollama registration/Vulkan behavior, governor service/thermal behavior and the representative Open WebUI RAG/product path.
+Release 0.14.1-1.7 keeps the 1.6 runtime maintenance baseline (Ollama 0.40.8, governor 0.4.14, Open WebUI 0.12.3 and Tika 4.1.0-full) and hardens the managed RAG lifecycle: atomic activation/rollback, stable revision provenance, DE-authority/FR-translation policy, fidelity/source validation and clearer review/status health. Model/retrieval tuning and the four-lane Vulkan topology are unchanged.
+Prior exact-device evidence remains regression context only; the selected 1.7 RPM must requalify the carried Ollama/governor changes plus the changed managed-RAG lifecycle and ordinary-user Open WebUI boundary.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in
