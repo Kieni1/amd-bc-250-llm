@@ -1,4 +1,4 @@
-# BC-250 handover bundle — current release line 0.14.1-1.6
+# BC-250 handover bundle — current release line 0.14.1-1.7
 
 ## Purpose
 
@@ -9,23 +9,23 @@ Current source/release identity:
 ```text
 package:  bc250-llm-server
 version:  0.14.1
-release:  1.6
-NEVRA:    bc250-llm-server-0.14.1-1.6.fc44.x86_64
+release:  1.7
+NEVRA:    bc250-llm-server-0.14.1-1.7.fc44.x86_64
 ```
 
 Use normal RPM identity from here forward. Engineering iteration labels belong in commits, issues and handovers, not in Version/Release.
 
 ## Current position
 
-The reconstruction era is closed. Release 1.6 is a bounded runtime/maintenance increment on the proven stock-core baseline: Ollama 0.40.8, governor 0.4.14 and actions/checkout v7.0.1.
+The reconstruction era is closed. Release 1.7 is a RAG correctness/robustness increment on the 1.6 runtime-maintenance source baseline. Runtime/model/retrieval tuning remains unchanged.
 
 1. preserve the successful 1.4 Fedora 44 SRPM-first build evidence and exact-RPM Blocks 1-3 device evidence as **baseline/history**, not transferable PASS status;
-2. build/select the exact `0.14.1-1.6` GitHub Fedora 44 artifact and bind all further acceptance to its hashes;
-3. recheck the changed 1.6 surfaces: Ollama 0.40.8 Vulkan/lane/registration behavior and new `/api/show` renderer/parser/template-source metadata, governor 0.4.14 service/thermal/power behavior, and the checkout v7 workflow;
-4. retain 1.5 status/parser/challenger/timing work as source baseline and complete the reboot-persistence / ordinary-user Open WebUI boundary on the new bytes;
-5. keep the stock-core architecture and SRPM-first release authority unchanged unless new evidence requires a change.
+2. build/select the exact `0.14.1-1.7` GitHub Fedora 44 artifact and bind all further acceptance to its hashes;
+3. recheck the carried 1.6 runtime surfaces: Ollama 0.40.8 Vulkan/lane/registration behavior and `/api/show` renderer/parser/template-source metadata plus governor 0.4.14 service/thermal/power behavior;
+4. prove the changed 1.7 managed-RAG surfaces: all-or-nothing activation/rollback, duplicate-target rejection, DE-authority/FR-translation revision provenance, source/fidelity validation, truthful failure exits, review/status UX and Open WebUI synchronization;
+5. complete reboot-persistence / ordinary-user Open WebUI grounding/abstention on the exact new bytes while keeping the stock-core architecture and SRPM-first release authority unchanged.
 
-The selected 1.6 device candidate must be identified by exact RPM SHA-256. Prior source/device evidence does not substitute for acceptance of changed 1.6 runtime bytes.
+The selected 1.7 device candidate must be identified by exact RPM SHA-256. Prior source/device evidence does not substitute for acceptance of changed 1.7 package/RAG bytes.
 
 ## Product direction
 
@@ -36,17 +36,17 @@ Greenfield means implementation freedom, not data loss or contract amnesia: pres
 ## Current validation snapshot
 
 ```text
-full source suite:       661/661 PASS across 24 modules
+full source suite:       678/678 PASS across 24 modules
 release preflight:       26/26 PASS
-RPM package-critical:    127/127 PASS across 8 modules (verified unprivileged)
-device acceptance:       PENDING exact selected 1.6 RPM; prior exact-device results are regression baseline only
+package-critical source: 144/144 PASS across 8 modules; authoritative unprivileged RPM `%check` pending
+device acceptance:       PENDING exact selected 1.7 RPM; prior exact-device results are regression baseline only
 ```
 
 These counts describe the current cleaned-source snapshot; they are evidence, not permanent architecture.
 
-## Inherited 1.4 GitHub build evidence; 1.5 build pending
+## Inherited 1.4 GitHub build evidence; 1.7 build pending
 
-The SRPM-first architecture was exercised successfully by the 1.4 GitHub authority run and remains authoritative for 1.6. The 1.6 selected GitHub build is still pending. The observed authority-path timing was:
+The SRPM-first architecture was exercised successfully by the 1.4 GitHub authority run and remains authoritative for 1.7. The 1.7 selected GitHub build is still pending. The observed authority-path timing was:
 
 ```text
 total job:    5m58s
@@ -96,6 +96,7 @@ Read these first:
 20. `20_DEVICE_QUALIFICATION_1_4.md`
 21. `21_RELEASE_1_5_SCOPE_AND_ACCEPTANCE.md`
 22. `22_RELEASE_1_6_SCOPE_AND_ACCEPTANCE.md`
+23. `23_RELEASE_1_7_SCOPE_AND_ACCEPTANCE.md`
 
 The final specialist/evidence files preserve high-value engineering discipline while the product-goal and release-gate files define the current roadmap and acceptance method.
 
