@@ -11,6 +11,7 @@ import stat
 import sys
 import uuid
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlparse
@@ -22,6 +23,7 @@ SCOPES = ("public", "confidential")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 TOP_LEVEL_KEYS = {
     "document_id",
+    "revision_id",
     "document_family",
     "title",
     "organisation",
@@ -53,7 +55,7 @@ def knowledge_description(scope: str, collection: str, lane: str) -> str:
     if lane == "original":
         return (
             base
-            + " Authoritative German/English originals; use for German and English queries."
+            + " Authoritative German originals; use for German and English queries."
         )
     return (
         base
@@ -82,9 +84,39 @@ class Document:
 
 def _unquote(value: str) -> str:
     value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
-        return value[1:-1]
+    if not value:
+        return value
+    if value.startswith('"'):
+        if not value.endswith('"'):
+            raise ValueError("unterminated double-quoted front-matter scalar")
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"invalid double-quoted front-matter scalar: {exc.msg}") from exc
+        if not isinstance(decoded, str):
+            raise ValueError("front-matter quoted scalar must decode to a string")
+        return decoded
+    if value.startswith("'"):
+        if not value.endswith("'"):
+            raise ValueError("unterminated single-quoted front-matter scalar")
+        return value[1:-1].replace("''", "'")
+    if value.endswith(('"', "'")):
+        raise ValueError("mismatched quote in front-matter scalar")
     return value
+
+
+def validate_iso_date(value: object, field: str) -> str:
+    """Return a real ISO calendar date or raise a metadata error."""
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = date.fromisoformat(text)
+    except ValueError as exc:
+        raise ValueError(f"{field} must be a real YYYY-MM-DD calendar date") from exc
+    if parsed.isoformat() != text:
+        raise ValueError(f"{field} must use canonical YYYY-MM-DD form")
+    return text
 
 
 def front_matter(path: Path) -> dict[str, object]:
@@ -140,7 +172,18 @@ def front_matter(path: Path) -> dict[str, object]:
     return data
 
 
+def revision_identity(meta: dict[str, object]) -> str:
+    """Return the exact revision identity, accepting legacy metadata on upgrade."""
+    return str(meta.get("revision_id") or meta.get("document_id") or "").strip()
+
+
 def route(meta: dict[str, object]) -> tuple[str, str]:
+    """Return managed-corpus lane/language using the package authority policy.
+
+    German is the sole authoritative source language for the managed corpus.
+    French documents are translations.  Legacy ``authority: original`` remains
+    readable, but it is subject to the same language policy.
+    """
     language = str(meta.get("language", "")).strip()
     authority = str(meta.get("authority_role", meta.get("authority", ""))).strip().lower()
     relation = meta.get("relation") if isinstance(meta.get("relation"), dict) else {}
@@ -156,13 +199,16 @@ def route(meta: dict[str, object]) -> tuple[str, str]:
     )
     lang = language.lower()
 
+    if not language:
+        raise ValueError("language is required")
+
     if authority:
-        if authority not in {"original", "translation"}:
-            if authority == "authoritative":
-                authority = "original"
-            else:
-                raise ValueError("authority_role must be authoritative/original or translation")
-        lane = authority
+        if authority in {"original", "authoritative"}:
+            lane = "original"
+        elif authority == "translation":
+            lane = "translation"
+        else:
+            raise ValueError("authority_role must be authoritative/original or translation")
     elif lang.startswith("de"):
         lane = "original"
     elif (
@@ -172,12 +218,66 @@ def route(meta: dict[str, object]) -> tuple[str, str]:
     ):
         lane = "translation"
     else:
-        raise ValueError("cannot infer authority; add authority: original|translation")
+        raise ValueError(
+            "cannot infer managed-corpus authority; German must be authoritative and French must be translation"
+        )
 
-    if lane == "original" and lang.startswith("fr"):
-        raise ValueError("French documents must use authority: translation")
+    if lane == "original" and not lang.startswith("de"):
+        raise ValueError("authoritative managed-corpus documents must be German")
     if lane == "translation" and not lang.startswith("fr"):
-        raise ValueError("translation documents must be French in this branch")
+        raise ValueError("translation managed-corpus documents must be French")
+    return lane, language
+
+
+def validate_document_metadata(
+    meta: dict[str, object], *, active: bool = False
+) -> tuple[str, str]:
+    """Validate metadata rules shared by lifecycle validation and ingestion."""
+    lane, language = route(meta)
+    document_id = str(meta.get("document_id", "")).strip()
+    family = str(meta.get("document_family", "")).strip()
+    if not document_id or not family:
+        raise ValueError("document_id and document_family are required")
+    if not revision_identity(meta):
+        raise ValueError("revision_id (or legacy document_id) is required")
+    for field in ("approved_on", "effective_from"):
+        if str(meta.get(field, "")).strip():
+            validate_iso_date(meta[field], field)
+    if active and str(meta.get("review_required", "false")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        raise ValueError("active Markdown must not have review_required=true")
+    translation_of = str(meta.get("translation_of", "")).strip()
+    if lane == "translation" and active and not translation_of:
+        raise ValueError("active French translation must reference a German revision ID in translation_of")
+    if lane == "original" and translation_of:
+        raise ValueError("authoritative German document must not set translation_of")
+    relation = meta.get("relation") if isinstance(meta.get("relation"), dict) else {}
+    if lane == "translation" and relation:
+        relation_type = str(relation.get("type", "")).strip().lower()
+        source_language = str(relation.get("source_language", "")).strip().lower()
+        if relation_type and relation_type != "translation-pair":
+            raise ValueError("French translation relation.type must be translation-pair")
+        if source_language and not (
+            source_language.startswith("de") or source_language == "german"
+        ):
+            raise ValueError("French translation relation.source_language must be German")
+    fidelity_status = str(meta.get("bc250_fidelity_status", "")).strip().lower()
+    fidelity_note = str(meta.get("bc250_fidelity_note", "")).strip()
+    if fidelity_status and fidelity_status not in {"pass", "review", "not-scored"}:
+        raise ValueError("bc250_fidelity_status must be pass, review or not-scored")
+    if fidelity_status and not fidelity_note:
+        raise ValueError("bc250_fidelity_note is required when bc250_fidelity_status is set")
+    if active and fidelity_status == "review":
+        acknowledged = str(meta.get("bc250_fidelity_acknowledged", "")).strip().lower()
+        if acknowledged not in {"1", "true", "yes", "on"}:
+            raise ValueError(
+                "active document with bc250_fidelity_status=review requires explicit "
+                "bc250_fidelity_acknowledged=true"
+            )
     return lane, language
 
 
@@ -255,9 +355,7 @@ def discover(root: Path) -> tuple[list[Document], list[str]]:
                     if path.is_symlink():
                         raise ValueError("active Markdown must not be a symlink")
                     meta = front_matter(path)
-                    lane, language = route(meta)
-                    if str(meta.get("review_required", "false")).strip().lower() in {"1", "true", "yes", "on"}:
-                        raise ValueError("active Markdown must not have review_required=true")
+                    lane, language = validate_document_metadata(meta, active=True)
                     source_file = str(meta.get("source_file", "")).strip()
                     source_sha256 = str(meta.get("source_sha256", "")).strip().lower()
                     if not source_file:
@@ -289,6 +387,44 @@ def groups(docs: list[Document]) -> dict[str, list[Document]]:
     result: dict[str, list[Document]] = {}
     for doc in docs:
         result.setdefault(doc.kb_name, []).append(doc)
+    return result
+
+
+def validate_diff_result(result: object) -> dict[str, object]:
+    """Validate the Open WebUI incremental-sync response before using it."""
+    if not isinstance(result, dict):
+        raise TypeError("invalid sync diff response")
+    for key in ("added", "modified", "deleted"):
+        value = result.get(key, [])
+        if not isinstance(value, list):
+            raise TypeError(f"Open WebUI sync diff field {key!r} must be a list")
+        for index, item in enumerate(value):
+            if not isinstance(item, dict):
+                raise TypeError(f"Open WebUI sync diff {key}[{index}] must be an object")
+            if key in {"added", "modified"}:
+                filename = item.get("filename")
+                if not isinstance(filename, str) or not filename:
+                    raise RuntimeError(
+                        f"Open WebUI sync diff {key}[{index}] is missing a valid filename"
+                    )
+            id_key = "stale_file_id" if key == "modified" else "file_id"
+            if key in {"modified", "deleted"}:
+                file_id = item.get(id_key)
+                if not isinstance(file_id, str) or not file_id:
+                    raise RuntimeError(
+                        f"Open WebUI sync diff {key}[{index}] is missing a valid {id_key}"
+                    )
+    if "unmodified_count" in result:
+        try:
+            unchanged = int(result["unmodified_count"])
+        except (TypeError, ValueError) as exc:
+            raise RuntimeError(
+                "Open WebUI sync diff unmodified_count must be an integer"
+            ) from exc
+        if unchanged < 0:
+            raise RuntimeError(
+                "Open WebUI sync diff unmodified_count must not be negative"
+            )
     return result
 
 
@@ -363,7 +499,14 @@ class OpenWebUI:
             raise RuntimeError(
                 f"Open WebUI is unreachable at {self.base}: {exc.reason}"
             ) from exc
-        return json.loads(raw) if raw else {}
+        if not raw:
+            return {}
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Open WebUI {method} {path} returned invalid JSON"
+            ) from exc
 
     def find_knowledge(self, name: str) -> dict[str, object] | None:
         exact: list[dict[str, object]] = []
@@ -373,16 +516,22 @@ class OpenWebUI:
             result = self._request(
                 "GET", f"/api/v1/knowledge/search?query={quote(name)}&page={page}"
             )
-            items = result.get("items", []) if isinstance(result, dict) else []
+            if not isinstance(result, dict):
+                raise TypeError("Open WebUI knowledge search response must be an object")
+            items = result.get("items", [])
             if not isinstance(items, list):
-                raise TypeError("invalid knowledge search response")
+                raise TypeError(
+                    "Open WebUI knowledge search response field 'items' must be a list"
+                )
+            if any(not isinstance(item, dict) for item in items):
+                raise TypeError("Open WebUI knowledge search response items must be objects")
             exact.extend(
                 item
                 for item in items
-                if isinstance(item, dict) and item.get("name") == name
+                if item.get("name") == name
             )
             seen += len(items)
-            total_raw = result.get("total") if isinstance(result, dict) else None
+            total_raw = result.get("total")
             try:
                 total = int(total_raw) if total_raw is not None else seen
             except (TypeError, ValueError):
@@ -398,6 +547,8 @@ class OpenWebUI:
             return None
         if exact[0].get("write_access") is False:
             raise RuntimeError(f"API-key owner does not have write access to {name!r}")
+        if not isinstance(exact[0].get("id"), str) or not str(exact[0]["id"]).strip():
+            raise RuntimeError(f"Open WebUI knowledge search response for {name!r} is missing a valid id")
         return exact[0]
 
     def knowledge(self, name: str, description: str) -> dict[str, object]:
@@ -409,7 +560,11 @@ class OpenWebUI:
             "/api/v1/knowledge/create",
             {"name": name, "description": description},
         )
-        if not isinstance(created, dict) or not created.get("id"):
+        if (
+            not isinstance(created, dict)
+            or not isinstance(created.get("id"), str)
+            or not str(created["id"]).strip()
+        ):
             raise RuntimeError(f"failed to create knowledge base {name!r}")
         print(f"  created knowledge base: {name}")
         return created
@@ -429,9 +584,7 @@ class OpenWebUI:
             f"/api/v1/knowledge/{knowledge_id}/sync/diff",
             {"manifest": manifest},
         )
-        if not isinstance(result, dict):
-            raise TypeError("invalid sync diff response")
-        return result
+        return validate_diff_result(result)
 
     def upload(self, knowledge_id: str, doc: Document) -> None:
         content = doc.path.read_bytes()
@@ -459,7 +612,7 @@ class OpenWebUI:
         )
         try:
             with urlopen(request, timeout=self.timeout) as response:
-                result = json.loads(response.read() or b"{}")
+                raw = response.read()
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")
             raise RuntimeError(
@@ -469,17 +622,23 @@ class OpenWebUI:
             raise RuntimeError(
                 f"Open WebUI is unreachable at {self.base}: {exc.reason}"
             ) from exc
+        try:
+            result = json.loads(raw or b"{}")
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(
+                f"Open WebUI upload returned invalid JSON for {doc.path.name}"
+            ) from exc
         file_id = str(result.get("id", "")) if isinstance(result, dict) else ""
         if not file_id:
             raise RuntimeError(f"Open WebUI returned no file id for {doc.path.name}")
         status_result = self._request("GET", f"/api/v1/files/{file_id}/process/status")
-        status = (
-            status_result.get("status") if isinstance(status_result, dict) else None
-        )
-        if status != "completed":
-            detail = (
-                status_result.get("error") if isinstance(status_result, dict) else None
+        if not isinstance(status_result, dict):
+            raise TypeError(
+                f"Open WebUI returned an invalid processing-status response for {doc.path.name}"
             )
+        status = status_result.get("status")
+        if status != "completed":
+            detail = status_result.get("error")
             suffix = f": {detail}" if detail else ""
             raise RuntimeError(
                 f"Open WebUI processing did not complete for {doc.path.name} (status={status!r}){suffix}"
@@ -528,8 +687,9 @@ def validate_sync_endpoint(
             )
     if has_confidential and not allow_confidential_remote:
         raise ValueError(
-            "remote RAG ingest includes confidential documents; add --allow-confidential-remote "
-            "together with --allow-remote only after explicitly accepting off-appliance disclosure"
+            "remote RAG ingest may access or modify confidential-scope knowledge state; "
+            "add --allow-confidential-remote together with --allow-remote only after explicitly "
+            "accepting off-appliance disclosure"
         )
 
 
@@ -580,7 +740,7 @@ def sync(
     if not is_loopback_url(args.url):
         print(
             "WARNING: remote RAG ingest explicitly enabled; API credentials, document content and "
-            "knowledge metadata will leave this appliance.",
+            "knowledge metadata may leave this appliance, and remote knowledge state may be modified.",
             file=sys.stderr,
         )
     api = OpenWebUI(args.url, token_from(args), args.timeout)
@@ -601,26 +761,40 @@ def sync(
                     "  empty local lane and no remote knowledge base; nothing to prune"
                 )
                 continue
-        kb_id = str(kb["id"])
-        diff = api.diff(kb_id, members)
-        added = diff.get("added", []) if isinstance(diff.get("added"), list) else []
-        modified = (
-            diff.get("modified", []) if isinstance(diff.get("modified"), list) else []
-        )
-        deleted = (
-            diff.get("deleted", []) if isinstance(diff.get("deleted"), list) else []
-        )
+        kb_id_raw = kb.get("id") if isinstance(kb, dict) else None
+        if not isinstance(kb_id_raw, str) or not kb_id_raw.strip():
+            raise RuntimeError(
+                f"Open WebUI knowledge response for {name!r} is missing a valid id"
+            )
+        kb_id = kb_id_raw
+        diff = validate_diff_result(api.diff(kb_id, members))
+        added = diff.get("added", [])
+        modified = diff.get("modified", [])
+        deleted = diff.get("deleted", [])
+        assert isinstance(added, list) and isinstance(modified, list) and isinstance(deleted, list)
         unchanged = int(diff.get("unmodified_count", 0) or 0)
         print(
             f"  {len(added)} added, {len(modified)} changed, {unchanged} unchanged, {len(deleted)} stale remote"
         )
 
         for item in added:
-            doc = by_key[(name, str(item["filename"]))]
+            assert isinstance(item, dict)
+            filename = str(item["filename"])
+            doc = by_key.get((name, filename))
+            if doc is None:
+                raise RuntimeError(
+                    f"Open WebUI sync diff added references unknown local file {filename!r} in {name!r}"
+                )
             print(f"  upload:  {doc.path.name}")
             api.upload(kb_id, doc)
         for item in modified:
-            doc = by_key[(name, str(item["filename"]))]
+            assert isinstance(item, dict)
+            filename = str(item["filename"])
+            doc = by_key.get((name, filename))
+            if doc is None:
+                raise RuntimeError(
+                    f"Open WebUI sync diff modified references unknown local file {filename!r} in {name!r}"
+                )
             print(f"  replace: {doc.path.name}")
             api.upload(kb_id, doc)
             try:
