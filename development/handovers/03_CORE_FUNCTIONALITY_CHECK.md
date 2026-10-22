@@ -1,4 +1,4 @@
-# Core functionality check — exact 0.14.1-1.5 RPM
+# Core functionality check — exact 0.14.1-1.6 RPM
 
 
 ## 1.4 baseline and 1.5 focus
@@ -7,7 +7,7 @@ The exact 1.4 RPM already proved the expensive stock-core/runtime/product bounda
 
 Start from a supported install/upgrade state and require:
 
-- exact 1.5 RPM identity/hash and clean `rpm -V`;
+- exact 1.6 RPM identity/hash and clean `rpm -V`;
 - guided installer renders exactly one semantic Ollama observed version (or `unknown`), never connection prose;
 - at the intentional publication/convergence hold, `status` reports setup incomplete rather than a false runtime mismatch;
 - after convergence, `status`, `health` and `verify` are green and runtime identities still match;
@@ -47,7 +47,7 @@ Do not mutate user state just to make the starting state look cleaner.
 ## Required package/install checks
 
 - install or supported upgrade succeeds;
-- `rpm -q bc250-llm-server` reports `0.14.1-1.5` with the expected Fedora dist tag/arch;
+- `rpm -q bc250-llm-server` reports `0.14.1-1.6` with the expected Fedora dist tag/arch;
 - package services/configuration converge without manual repair;
 - no experimental GFX/private-RADV/patched-boot requirement appears;
 - one ordinary service restart succeeds.
@@ -95,11 +95,11 @@ Hidden thinking is not a substitute for a visible answer.
 
 ## Runtime baseline checks retained for 1.5
 
-Ollama 0.40.6 and Open WebUI 0.12.3 were device-proven on the exact 1.4 artifact through Block 3. Release 1.5 does not upgrade them. Use bounded representative checks to detect packaging regressions, but do not treat the old runtime migration campaign as unproven.
+Ollama 0.40.6 and Open WebUI 0.12.3 were device-proven on the exact 1.4 artifact through Block 3. Release 1.6 updates Ollama to 0.40.8 while keeping Open WebUI 0.12.3; use the old results as regression baseline, then re-prove representative Vulkan generation, registration/restart persistence and lane identity on the exact 1.6 RPM.
 
-For Ollama 0.40.6:
+For Ollama 0.40.8:
 
-- all normal lanes (`11434`, `11435`, `11437`) report exactly `0.40.6`;
+- all normal lanes (`11434`, `11435`, `11437`) report exactly `0.40.8`;
 - a package-owned locally registered GGUF model remains represented by one expected logical model name in `/api/tags`;
 - no unexpected `llamacpp:` shadow/duplicate registration is exposed;
 - `/api/show` and one generation work before and after an Ollama service restart;
