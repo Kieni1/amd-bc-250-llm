@@ -4,7 +4,7 @@ Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
 package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1.5` (Ollama 0.40.6, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.13).
+Current release source: `bc250-llm-server-0.14.1-1.6` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -177,8 +177,8 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 | Component | Purpose |
 |---|---|
-| Cyan Skillfish governor v0.4.13 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.40.6 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Cyan Skillfish governor v0.4.14 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
+| Ollama v0.40.8 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
 | Open WebUI v0.12.3 and Tika v4.1.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
@@ -186,9 +186,9 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Ollama 0.40.6 and Open WebUI 0.12.3 remain the package-pinned runtime/UI for release 0.14.1-1.5; 1.5 changes package UX/catalog/release instrumentation rather than those runtime pins.
+Release 0.14.1-1.6 updates the package-pinned Ollama runtime to 0.40.8 and the Cyan Skillfish governor to 0.4.14 while keeping Open WebUI 0.12.3, Tika 4.1.0-full, the four-lane Vulkan topology and production model policy unchanged.
 The older Ollama 0.34.4 / Open WebUI 0.11.4 exact-device evidence remains historical evidence only;
-the selected 1.3 RPM must requalify runtime registration/residency plus the Open WebUI RAG/product path.
+the selected 1.6 RPM must requalify Ollama registration/Vulkan behavior, governor service/thermal behavior and the representative Open WebUI RAG/product path.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in
