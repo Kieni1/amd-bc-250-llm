@@ -1,11 +1,18 @@
 # Office documents and RAG
 
-This is the product-relevant **local, privacy-oriented RAG workflow** for searchable German,
-French and English office documents. It uses the package's existing Open WebUI
+This is the product-relevant **local, privacy-oriented RAG workflow** for searchable office-document
+knowledge with German authoritative sources, French translations, and German/English query use. It uses
+the package's existing Open WebUI
 and Tika, the main answer lane on `11434`, and the dedicated embedding lane on
-`11437`. The current package uses Apache Tika 4.0.0 for extraction and tells
+`11437`. The current package uses Apache Tika 4.1.0-full for Open WebUI document extraction and tells
 Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
+
+There are two intentionally separate document paths. The **managed curated corpus** currently accepts
+PDF input only: PDF → local extraction/agent normalization → human review → active Markdown → Open
+WebUI Knowledge. This keeps the authoritative lifecycle narrow and auditable. Supported ad-hoc office
+documents such as DOCX continue to use Open WebUI/Tika directly. A future DOCX managed-corpus
+adapter can feed the same review/activation contract without changing its provenance model.
 
 **Never put confidential documents in this repository.** Keep authoritative
 source files under `/srv/bc250-documents/`, Open WebUI-managed copies under
@@ -261,10 +268,9 @@ authoritative inputs, `working/` contains drafts needing review, `active/` conta
 eligible for ingestion, and `superseded/` retains previous revisions for audit. Never index both a
 source PDF and its normalized Markdown.
 
-For this appliance the supplied German document is treated as the authoritative/main version and a
-French counterpart as its translation unless the source itself establishes different legal authority.
-The importer creates separate knowledge bases so parallel DE/FR chunks do not consume the same Top-K
-slots:
+For the managed corpus, German is the sole authoritative source language for now. French documents
+are translations of an identified German revision. The importer creates separate knowledge bases so
+parallel DE/FR chunks do not consume the same Top-K slots:
 
 ```text
 [PUBLIC] COLLECTION — Originals
@@ -304,13 +310,19 @@ Inbox semantics:
 - `bilingual/`: produce separate DE and FR drafts sharing the source; do not index mixed-language output.
 
 The local transformation prompt preserves complete substantive wording, original legal numbering, dates,
-amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. This avoids growing `bc250 rag` into a fragile OCR/chunking engine.
+amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. A batch with deferred or failed inputs exits nonzero, and failure to restore the normal Ollama topology also makes the command fail with a recovery instruction. This avoids growing `bc250 rag` into a fragile OCR/chunking engine while keeping automation exit status truthful.
 
-The review step is where the operator confirms titles, stable `document_family`, effective date or edition,
-authority role, and DE/FR counterpart. Review numbering covers only drafts that still need review, and the prompts make the effective-date-or-edition requirement explicit. For legal, financial or technical sources, visually compare representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an authoritative transformation until reviewed.
+`prepare-batch` also persists its automated fidelity result in each new draft as
+`bc250_fidelity_status` plus `bc250_fidelity_note`. `pass` means the conservative
+critical-token coverage check found no missing token; `not-scored` means that check had
+no useful tokens to score; `review` means the operator must visually compare the source
+and explicitly acknowledge the warning during `bc250 rag review` before activation.
+Existing documents without these package metadata fields remain valid.
 
-Activation is explicit and atomic at the collection level: a reviewed replacement supersedes the previous
-active revision for the same `document_family` and language, retaining old evidence.
+The review step shows source SHA/provenance status, title, stable `document_family`, language/authority, exact revision identity, effective date/edition, currentness, DE/FR linkage and persisted fidelity state before asking for edits. A source SHA failure blocks readiness immediately. Review numbering covers only drafts that still need review, and the prompts make the effective-date-or-edition requirement explicit. For legal, financial or technical sources, visually compare representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an authoritative transformation until reviewed.
+
+Activation is explicit and all-or-nothing for the requested batch. The complete projected active corpus is
+validated before any filesystem mutation; ambiguous multiple replacements for the same `document_family` and language are rejected. A reviewed replacement supersedes the previous active revision while retaining old evidence, and a runtime move failure rolls back the activation transaction.
 
 ## 6. Markdown metadata, validation and ingestion
 
@@ -318,7 +330,8 @@ Use compact front matter like the packaged template:
 
 ```yaml
 ---
-document_id: "biel_ortspolizeireglement_de-CH_2023-01-01"
+document_id: "biel_ortspolizeireglement_de-CH"
+revision_id: "biel_ortspolizeireglement_de-CH_sha256_[SOURCE_SHA256]"
 document_family: "biel_ortspolizeireglement"
 title: "Ortspolizeireglement der Stadt Biel (OPolR)"
 organisation: "Stadt Biel"
@@ -332,17 +345,18 @@ review_required: false
 source_file: "130101_Ortspolizeireglement_der_Stadt_Biel.pdf"
 source_sha256: "[64-HEX-SHA256]"
 normalization: "Mechanical/local-agent extraction cleanup; source wording preserved"
+bc250_fidelity_status: "not-scored"
+bc250_fidelity_note: "No automated critical-token result recorded for this manual example"
 ---
 ```
 
-For a French translation, use `authority_role: "translation"` and `translation_of` naming the reviewed
-German Markdown counterpart. Preserve source article/paragraph identifiers exactly; never invent replacement
-legal numbering merely to make retrieval IDs unique. Extra package metadata may use `bc250_*` keys so the
-schema can evolve without accepting arbitrary YAML.
+`document_id` is the stable logical identity for one language representation; `revision_id` identifies the exact source revision and is source-SHA-derived for new managed drafts. For a French translation, use `authority_role: "translation"` and set `translation_of` to the exact reviewed German `revision_id`, not a filename. Legacy filename references remain readable for upgrade compatibility, but they are not allowed to silently retarget a replaced German revision and should be converted during review. Preserve source article/paragraph identifiers exactly; never invent replacement legal numbering merely to make retrieval IDs unique. Extra package metadata may use `bc250_*` keys so the schema can evolve without accepting arbitrary YAML.
 
-`bc250 rag validate` verifies source-file confinement, SHA-256 provenance, review state, unique document IDs,
-and one active revision per document-family/language. `currentness-not-verified` is deliberately a warning,
-not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
+`bc250 rag validate` verifies source-file confinement, SHA-256 provenance, shared DE-authority/FR-translation rules, review state, unique revision identities, translation linkage, real calendar dates, persisted fidelity state, and one active revision per document-family/language. `bc250 rag status [SCOPE [COLLECTION]]` adds an operator summary of inbox/source/working/active/superseded counts, working drafts awaiting review versus ready, pending fidelity acknowledgement, active currentness warnings, DE/FR pairing and overall lifecycle validation `PASS`/`WARN`/`FAIL`. An explicitly requested collection that does not exist is an error rather than a successful empty status. `effective_from` and `approved_on`, when present, must be real canonical `YYYY-MM-DD` dates rather than merely matching the character shape. A French translation may additionally carry `relation.type: translation-pair` and `relation.source_language: de-*`; contradictory relation metadata is rejected. `currentness-not-verified` is deliberately a warning, not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
+
+The managed lifecycle rejects symlinked inbox entries, working/active Markdown and source
+files instead of following them as root. This keeps preparation and activation confined to
+the package-owned corpus tree.
 
 Before ingestion, use `bc250 rag validate`/`status` to review the local lifecycle state without contacting Open WebUI. Then sync only reviewed `active/*.md` files:
 
@@ -355,6 +369,10 @@ sudo bc250 rag ingest --token-file /etc/bc250-llm-server/rag-api-key
 knowledge API. Unchanged files are skipped and changed Markdown is uploaded before the stale remote copy is
 removed. If stale cleanup fails after a successful replacement upload, ingestion stops with the new copy preserved and reports that the old copy may still exist; fix the API/permission problem and rerun ingestion. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
 credential must be a non-empty private regular file (normally `0600`) and must not be a symlink; it is never stored in the corpus.
+
+Incremental-sync responses are validated before filenames or remote file IDs are used. A
+missing/malformed knowledge ID, filename, stale-file ID, deletion ID or count is treated as
+an API-contract failure and stops ingestion rather than being silently interpreted.
 
 Ingestion is loopback-only by default (`127.0.0.1`, `localhost`, or `::1`). A non-loopback Open WebUI endpoint requires the explicit `--allow-remote` override because the API credential, document content and knowledge metadata leave the appliance. If the corpus contains a `confidential/` collection with an active lane, remote ingest requires `--allow-confidential-remote` as a second explicit override, including an empty active lane that may participate in prune convergence.
 
