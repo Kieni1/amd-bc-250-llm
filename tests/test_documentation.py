@@ -343,7 +343,7 @@ class DocumentationTests(unittest.TestCase):
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
         _version, release, _nvr = current_identity()
         self.assertIn("Package standard: **Ollama v0.40.8**", ollama)
-        self.assertIn(f"Release {release} updates the runtime pin", ollama)
+        self.assertIn(f"release {release} carries it unchanged", ollama)
         self.assertIn("0.40.8 keeps the established four-lane settings", ollama)
         self.assertIn("does not transfer DEVICE acceptance", ollama)
         self.assertNotIn("0.34.4 remains the last exact-device-qualified runtime", ollama)
