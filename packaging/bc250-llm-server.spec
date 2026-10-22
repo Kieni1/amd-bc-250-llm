@@ -1,5 +1,5 @@
-%global governor_version 0.4.13
-%global governor_commit aaed42535622aee1a93df8b22860c409539f67f8
+%global governor_version 0.4.14
+%global governor_commit 7b08fdcf542d1edd82f3a9077c902038019c9842
 %global live_manager_commit a929085d791f126ce76a60eb609610820fb08066
 %global source_date_epoch_from_changelog 1
 %global project_libexec %{_libexecdir}/bc250-llm-server
@@ -10,12 +10,12 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.5%{?dist}
+Release:        1.6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
 Source0:        %{name}-%{version}.tar.gz
-# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.13
+# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.14
 Source1:        cyan-skillfish-governor-%{governor_commit}.tar.gz
 Source2:        cyan-skillfish-governor-vendor-%{governor_commit}.tar.xz
 # WinnieLV/bc250-cu-live-manager, pinned revision; upstream has no license file
@@ -263,6 +263,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Thu Oct 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.6
+- Update Ollama to 0.40.8 with the exact generic Linux AMD64 payload hash; keep the proven four-lane Vulkan/iGPU settings and add renderer/parser/template-source diagnostics for the new /api/show metadata.
+- Update Cyan Skillfish governor to 0.4.14 without changing the package frequency, thermal, load-target or safe-point policy; require focused exact-device governor/thermal smoke.
+- Update actions/checkout from the pinned v6.1.0 commit to the pinned v7.0.1 commit.
+
 * Wed Oct 21 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.5
 - Refine pre-convergence status semantics, harden Ollama version parsing, add optional model challengers, and instrument release-stage timing.
 
