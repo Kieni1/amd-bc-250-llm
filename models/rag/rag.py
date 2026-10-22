@@ -113,7 +113,7 @@ def split_markdown(path: Path) -> tuple[dict[str, object], str]:
 
 def render_markdown(meta: dict[str, object], body: str) -> str:
     ordered = (
-        "document_id", "document_family", "title", "organisation", "language",
+        "document_id", "revision_id", "document_family", "title", "organisation", "language",
         "authority_role", "document_type", "edition", "approved_on", "effective_from",
         "status", "review_required", "translation_of", "source_file", "source_sha256",
         "normalization",
@@ -204,16 +204,22 @@ def enter_agent_if_needed(url: str) -> bool:
     return True
 
 
-def restore_normal_if_needed(switched: bool) -> None:
+def restore_normal_if_needed(switched: bool) -> str | None:
     if not switched:
-        return
+        return None
     command = shutil.which("bc250")
     if not command:
-        print("WARNING: bc250 dispatcher is unavailable; normal Ollama topology could not be restored automatically", file=sys.stderr)
-        return
+        return (
+            "bc250 dispatcher is unavailable; normal Ollama topology was not restored. "
+            "Run sudo bc250 agent-mode normal before continuing."
+        )
     result = subprocess.run([command, "agent-mode", "normal"], text=True, check=False)
     if result.returncode != 0:
-        print("WARNING: automatic restoration of normal Ollama topology failed; run sudo bc250 agent-mode normal", file=sys.stderr)
+        return (
+            "automatic restoration of normal Ollama topology failed. "
+            "Run sudo bc250 agent-mode normal before continuing."
+        )
+    return None
 
 
 def normalize_prompt(text: str, language: str, bilingual: bool) -> str:
@@ -316,36 +322,87 @@ def critical_tokens(text: str) -> set[str]:
 
 
 def fidelity_note(source: str, body: str, bilingual: bool) -> str:
+    return fidelity_assessment(source, body, bilingual)[1]
+
+
+def fidelity_assessment(source: str, body: str, bilingual: bool) -> tuple[str, str]:
     if bilingual:
-        return "bilingual source: automated whole-source token coverage not scored; visual/manual review required"
+        return (
+            "review",
+            "bilingual source: automated whole-source token coverage not scored; visual/manual review required",
+        )
     expected = critical_tokens(source)
     missing = sorted(token for token in expected if token not in body)
     if not expected:
-        return "no critical numeric/legal tokens detected for automated coverage check"
+        return (
+            "not-scored",
+            "no critical numeric/legal tokens detected for automated coverage check",
+        )
     if not missing:
-        return f"critical-token coverage PASS ({len(expected)}/{len(expected)})"
+        return "pass", f"critical-token coverage PASS ({len(expected)}/{len(expected)})"
     preview = ", ".join(missing[:5])
-    return f"critical-token coverage REVIEW ({len(expected)-len(missing)}/{len(expected)}); missing examples: {preview}"
+    return (
+        "review",
+        f"critical-token coverage REVIEW ({len(expected)-len(missing)}/{len(expected)}); missing examples: {preview}",
+    )
 
 
 def provisional_family(source: Path) -> str:
     return slug(source.stem)
 
 
-def unique_working_path(working: Path, family: str, language: str, digest: str) -> Path:
-    base = f"{family}_{language}_review.md"
-    candidate = working / base
-    if not candidate.exists():
-        return candidate
-    return working / f"{family}_{language}_{digest[:8]}_review.md"
+def stable_document_id(family: str, language: str) -> str:
+    return f"{family}_{language}"
 
 
-def write_draft(base: Path, source: Path, source_sha: str, body: str, language: str, role: str, *, bilingual: bool, translation_of: str = "") -> Path:
+def revision_id_for(document_id: str, source_sha: str) -> str:
+    return f"{document_id}_sha256_{source_sha.lower()}"
+
+
+def unique_working_path(working: Path, family: str, language: str, digest: str) -> tuple[Path, bool]:
+    candidates = (
+        working / f"{family}_{language}_review.md",
+        working / f"{family}_{language}_{digest[:8]}_review.md",
+    )
+    for candidate in candidates:
+        if not candidate.exists():
+            return candidate, False
+        if candidate.is_symlink() or not candidate.is_file():
+            die(f"working draft path is not a regular file: {candidate.name}")
+        try:
+            meta = importer.front_matter(candidate)
+        except (OSError, ValueError) as exc:
+            die(f"cannot safely reuse existing working draft {candidate.name}: {exc}")
+        if str(meta.get("source_sha256", "")).lower() == digest.lower():
+            return candidate, True
+    die(
+        "working draft collision: both the normal and digest-qualified review filenames "
+        f"already contain different source material for {family}/{language}"
+    )
+
+
+def write_draft(
+    base: Path,
+    source: Path,
+    source_sha: str,
+    body: str,
+    language: str,
+    role: str,
+    *,
+    bilingual: bool,
+    translation_of: str = "",
+    fidelity_status: str = "",
+    fidelity_note_text: str = "",
+) -> tuple[Path, bool]:
     family = provisional_family(source)
-    path = unique_working_path(base / "working", family, language, source_sha)
+    path, existed = unique_working_path(base / "working", family, language, source_sha)
+    if existed:
+        return path, False
     title = title_from_body(body, source.stem)
+    document_id = stable_document_id(family, language)
     meta: dict[str, object] = {
-        "document_id": f"{family}_{language}",
+        "document_id": document_id,
+        "revision_id": revision_id_for(document_id, source_sha),
         "document_family": family,
         "title": title,
         "language": language,
@@ -358,9 +415,12 @@ def write_draft(base: Path, source: Path, source_sha: str, body: str, language: 
     }
     if translation_of:
         meta["translation_of"] = translation_of
+    if fidelity_status:
+        meta["bc250_fidelity_status"] = fidelity_status
+        meta["bc250_fidelity_note"] = fidelity_note_text
     path.write_text(render_markdown(meta, body), encoding="utf-8")
     path.chmod(0o640)
-    return path
+    return path, True
 
 
 def store_source(base: Path, source: Path, digest: str) -> Path:
@@ -404,18 +464,47 @@ def prepare_one(base: Path, source: Path, lane: str, url: str, model: str, max_c
         outputs.append(("de-CH", "authoritative", call_agent(url, model, normalize_prompt(text, "de-CH", True))))
         outputs.append(("fr-CH", "translation", call_agent(url, model, normalize_prompt(text, "fr-CH", True))))
 
+    for language, _role, _body in outputs:
+        unique_working_path(base / "working", provisional_family(source), language, digest)
+
     stored = store_source(base, source, digest)
     drafts: list[Path] = []
-    german_name = ""
+    german_revision_id = ""
     for language, role, body in outputs:
+        fidelity_status, fidelity_note_text = fidelity_assessment(
+            text, body, lane == "bilingual"
+        )
         if language == "de-CH":
-            draft = write_draft(base, stored, digest, body, language, role, bilingual=lane == "bilingual")
-            german_name = draft.name
+            draft, created = write_draft(
+                base,
+                stored,
+                digest,
+                body,
+                language,
+                role,
+                bilingual=lane == "bilingual",
+                fidelity_status=fidelity_status,
+                fidelity_note_text=fidelity_note_text,
+            )
+            german_revision_id = importer.revision_identity(importer.front_matter(draft))
         else:
-            draft = write_draft(base, stored, digest, body, language, role, bilingual=lane == "bilingual", translation_of=german_name)
+            draft, created = write_draft(
+                base,
+                stored,
+                digest,
+                body,
+                language,
+                role,
+                bilingual=lane == "bilingual",
+                translation_of=german_revision_id,
+                fidelity_status=fidelity_status,
+                fidelity_note_text=fidelity_note_text,
+            )
         drafts.append(draft)
-        print(f"  draft:      {draft.name}")
-        print(f"  integrity:  {fidelity_note(text, body, lane == 'bilingual')}")
+        suffix = "" if created else " (existing draft; unchanged)"
+        print(f"  draft:      {draft.name}{suffix}")
+        if created:
+            print(f"  integrity:  {fidelity_note_text}")
     return drafts
 
 
@@ -436,7 +525,14 @@ def cmd_init(args: argparse.Namespace) -> None:
 def cmd_prepare(args: argparse.Namespace) -> None:
     require_local_agent_url(args.agent_url)
     base = ensure_collection(args.root.resolve(), args.scope, args.collection)
-    pending = [(lane, path) for lane in INBOX_LANES for path in sorted((base / "inbox" / lane).iterdir()) if path.is_file()]
+    pending: list[tuple[str, Path]] = []
+    for lane in INBOX_LANES:
+        folder = base / "inbox" / lane
+        for path in sorted(folder.iterdir()):
+            if path.is_symlink():
+                die(f"RAG inbox entries must not be symlinks: {path}")
+            if path.is_file():
+                pending.append((lane, path))
     print(f"RAG batch preparation: {args.scope}/{args.collection}")
     print(f"Pending inbox files: {len(pending)}")
     if not pending:
@@ -447,18 +543,25 @@ def cmd_prepare(args: argparse.Namespace) -> None:
             print(f"  {lane:9s} {path.name}")
         print("\nDry run only; no files or runtime state changed.")
         return
+
     switched = enter_agent_if_needed(args.agent_url)
+    restore_error: str | None = None
+    deferred = 0
+    failed = 0
     try:
         available = agent_models(args.agent_url)
         if args.model.removesuffix(":latest") not in available:
-            die(f"agent model is not registered on :11436: {args.model}; install it with sudo bc250 model apply agentic {args.model}")
+            die(
+                f"agent model is not registered on :11436: {args.model}; "
+                f"install it with sudo bc250 model apply agentic {args.model}"
+            )
         prepared_files = 0
         drafts = 0
-        deferred = 0
-        failed = 0
         for lane, path in pending:
             try:
-                created = prepare_one(base, path, lane, args.agent_url, args.model, args.max_chars)
+                created = prepare_one(
+                    base, path, lane, args.agent_url, args.model, args.max_chars
+                )
                 prepared_files += 1
                 drafts += len(created)
             except DeferredPreparation as exc:
@@ -479,7 +582,21 @@ def cmd_prepare(args: argparse.Namespace) -> None:
         print("\nAutomation stops here by design. Review metadata/content before activation.")
         print(f"Next: sudo bc250 rag review {args.scope} {args.collection}")
     finally:
-        restore_normal_if_needed(switched)
+        restore_error = restore_normal_if_needed(switched)
+        if restore_error and sys.exc_info()[0] is not None:
+            print(f"ERROR: {restore_error}", file=sys.stderr)
+
+    if restore_error:
+        raise RuntimeError(restore_error)
+    if failed or deferred:
+        parts = []
+        if failed:
+            parts.append(f"{failed} failed")
+        if deferred:
+            parts.append(f"{deferred} deferred/manual")
+        raise RuntimeError(
+            "batch preparation incomplete (" + ", ".join(parts) + "); resolve the listed inputs and retry"
+        )
 
 
 def find_counterpart(base: Path, family: str, language: str, source_sha: str = "") -> str:
@@ -488,17 +605,21 @@ def find_counterpart(base: Path, family: str, language: str, source_sha: str = "
     family_matches: list[str] = []
     source_matches: list[str] = []
     for folder in (base / "working", base / "active"):
-        for path in folder.glob("*.md"):
+        for path in docs_in(folder):
             try:
                 meta = importer.front_matter(path)
+                lane, _ = importer.route(meta)
             except (OSError, ValueError):
                 continue
-            if not str(meta.get("language", "")).lower().startswith("de"):
+            if lane != "original":
+                continue
+            revision_id = importer.revision_identity(meta)
+            if not revision_id:
                 continue
             if str(meta.get("document_family", "")) == family:
-                family_matches.append(path.name)
+                family_matches.append(revision_id)
             if source_sha and str(meta.get("source_sha256", "")) == source_sha:
-                source_matches.append(path.name)
+                source_matches.append(revision_id)
     if len(family_matches) == 1:
         return family_matches[0]
     return source_matches[0] if len(source_matches) == 1 else ""
@@ -509,12 +630,60 @@ def ask(label: str, current: str) -> str:
     return value or current
 
 
+def known_revisions(base: Path) -> dict[str, Path]:
+    result: dict[str, Path] = {}
+    for folder in (base / "working", base / "active"):
+        for path in docs_in(folder):
+            try:
+                meta = importer.front_matter(path)
+            except (OSError, ValueError):
+                continue
+            revision_id = importer.revision_identity(meta)
+            if revision_id:
+                result[revision_id] = path
+    return result
+
+
+def normalize_translation_reference(base: Path, value: str) -> str:
+    """Convert legacy filename references to revision IDs when they are unambiguous."""
+    value = value.strip()
+    if not value:
+        return ""
+    revisions = known_revisions(base)
+    if value in revisions:
+        return value
+    matches = [path for path in revisions.values() if path.name == value]
+    if len(matches) == 1:
+        return importer.revision_identity(importer.front_matter(matches[0]))
+    return value
+
+
+def source_integrity_status(base: Path, meta: dict[str, object]) -> tuple[bool, str]:
+    """Return a concise provenance result for the source referenced by one draft."""
+    source_file = str(meta.get("source_file", "")).strip()
+    source_sha = str(meta.get("source_sha256", "")).strip()
+    if not source_file:
+        return False, "FAIL (source_file is missing)"
+    if not importer.SHA256_RE.fullmatch(source_sha):
+        return False, "FAIL (source_sha256 is missing or invalid)"
+    try:
+        resolved, warning = importer._resolve_source(
+            base / "active" / "_review-provenance.md", source_file, source_sha
+        )
+    except (OSError, ValueError) as exc:
+        return False, f"FAIL ({exc})"
+    detail = f"MATCH ({source_sha[:12]}…; {resolved.name})"
+    if warning:
+        detail += f" — {warning}"
+    return True, detail
+
+
 def cmd_review(args: argparse.Namespace) -> None:
     base = collection_path(args.root.resolve(), args.scope, args.collection)
     working = base / "working"
     if not sys.stdin.isatty():
         die("review is interactive; run it from a terminal")
-    docs = sorted(working.glob("*.md"))
+    docs = docs_in(working)
     if not docs:
         print("No working Markdown drafts to review.")
         return
@@ -529,11 +698,29 @@ def cmd_review(args: argparse.Namespace) -> None:
     for index, path in enumerate(review_docs, 1):
         meta, body = split_markdown(path)
         print(f"\n[{index}/{len(review_docs)}] {path.name}")
-        print(f"  source:     {meta.get('source_file', '')}")
-        print(f"  language:   {meta.get('language', '')}")
-        print(f"  title:      {meta.get('title', '')}")
-        print(f"  family:     {meta.get('document_family', '')}")
-        print(f"  authority:  {meta.get('authority_role', meta.get('authority', ''))}")
+        source_ok, source_state = source_integrity_status(base, meta)
+        print(f"  source:      {meta.get('source_file', '')}")
+        print(f"  source SHA:  {source_state}")
+        print(f"  language:    {meta.get('language', '')}")
+        print(f"  title:       {meta.get('title', '')}")
+        print(f"  family:      {meta.get('document_family', '')}")
+        print(f"  authority:   {meta.get('authority_role', meta.get('authority', ''))}")
+        print(f"  document:    {meta.get('document_id', '')}")
+        print(f"  revision:    {importer.revision_identity(meta)}")
+        print(f"  effective:   {meta.get('effective_from', '') or '(not set)'}")
+        print(f"  edition:     {meta.get('edition', '') or '(not set)'}")
+        print(f"  currentness: {meta.get('status', '') or '(not set)'}")
+        translation_ref = str(meta.get("translation_of", "")).strip()
+        if translation_ref:
+            print(f"  translated:  {translation_ref}")
+        fidelity_status = str(meta.get("bc250_fidelity_status", "")).strip().lower()
+        fidelity_note_text = str(meta.get("bc250_fidelity_note", "")).strip()
+        if fidelity_status == "review":
+            meta.pop("bc250_fidelity_acknowledged", None)
+        if fidelity_status:
+            print(f"  fidelity:   {fidelity_status}")
+            if fidelity_note_text:
+                print(f"              {fidelity_note_text}")
         title = ask("Title", str(meta.get("title", "")))
         family = ask("Document family", str(meta.get("document_family", "")))
         effective = ask(
@@ -544,33 +731,84 @@ def cmd_review(args: argparse.Namespace) -> None:
             "Edition/version (required when effective date is blank)",
             str(meta.get("edition", "")),
         )
-        role = ask("Authority role (authoritative|translation)", str(meta.get("authority_role", meta.get("authority", ""))))
+        role = ask(
+            "Authority role (authoritative|translation)",
+            str(meta.get("authority_role", meta.get("authority", ""))),
+        )
         if role == "original":
             role = "authoritative"
-        metadata_valid = True
+        metadata_valid = source_ok
+        if not source_ok:
+            print("  Source provenance must be repaired before this draft can be marked ready.")
         if not title.strip():
             print("  Title may not be empty; keeping review_required=true.")
             metadata_valid = False
         if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", family):
-            print("  Document family must use only letters, numbers, dot, underscore or hyphen; keeping review_required=true.")
+            print(
+                "  Document family must use only letters, numbers, dot, underscore or hyphen; "
+                "keeping review_required=true."
+            )
             metadata_valid = False
         if role not in {"authoritative", "translation"}:
             print("  Authority role must be authoritative or translation; keeping review_required=true.")
             metadata_valid = False
-        translation = str(meta.get("translation_of", ""))
-        if role == "translation":
-            known_names = {p.name for folder in (base / "working", base / "active") for p in docs_in(folder)}
-            suggested = find_counterpart(
-                base, family, str(meta.get("language", "")), str(meta.get("source_sha256", ""))
-            )
-            if translation not in known_names:
-                translation = suggested
-            translation = ask("Translation of", translation)
-        meta.update({"title": title, "document_family": family, "authority_role": role})
+
+        language = str(meta.get("language", "und"))
+        safe_family = (
+            family
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", family)
+            else slug(family)
+        )
+        source_sha = str(meta.get("source_sha256", ""))
+        document_id = stable_document_id(safe_family, language)
+        revision_id = (
+            revision_id_for(document_id, source_sha)
+            if importer.SHA256_RE.fullmatch(source_sha)
+            else importer.revision_identity(meta)
+        )
+        meta.update(
+            {
+                "title": title,
+                "document_family": family,
+                "authority_role": role,
+                "document_id": document_id,
+                "revision_id": revision_id,
+            }
+        )
         meta.pop("authority", None)
+
+        try:
+            lane, _ = importer.route(meta)
+        except ValueError as exc:
+            print(f"  {exc}; keeping review_required=true.")
+            metadata_valid = False
+            lane = ""
+
+        translation = normalize_translation_reference(
+            base, str(meta.get("translation_of", ""))
+        )
+        if lane == "translation":
+            revisions = known_revisions(base)
+            suggested = find_counterpart(base, family, language, source_sha)
+            if translation not in revisions:
+                translation = suggested
+            translation = ask("German revision ID translated from", translation)
+            translation = normalize_translation_reference(base, translation)
+            if not translation:
+                print("  A French translation must reference its German revision ID; keeping review_required=true.")
+                metadata_valid = False
+            elif translation not in known_revisions(base):
+                print("  Referenced German revision ID was not found; keeping review_required=true.")
+                metadata_valid = False
+            meta["translation_of"] = translation
+        else:
+            meta.pop("translation_of", None)
+
         if effective:
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", effective):
-                print("  Invalid date format; keeping review_required=true.")
+            try:
+                importer.validate_iso_date(effective, "effective_from")
+            except ValueError as exc:
+                print(f"  {exc}; keeping review_required=true.")
                 metadata_valid = False
             else:
                 meta["effective_from"] = effective
@@ -578,19 +816,33 @@ def cmd_review(args: argparse.Namespace) -> None:
             meta.pop("effective_from")
         if edition:
             meta["edition"] = edition
-        if translation:
-            meta["translation_of"] = translation
+
+        try:
+            importer.validate_document_metadata(meta, active=False)
+        except ValueError as exc:
+            print(f"  Metadata validation: {exc}; keeping review_required=true.")
+            metadata_valid = False
+
         ready = input("Mark reviewed and ready for activation? [y/N]: ").strip().lower() in {"y", "yes"}
         if ready and not metadata_valid:
             ready = False
         if ready and not (effective or edition):
             print("  Cannot mark ready without an effective date or edition/version.")
             ready = False
+        if ready and fidelity_status == "review":
+            acknowledged = input(
+                "Fidelity check requires manual review. Confirm you compared the source and accept this draft? [y/N]: "
+            ).strip().lower() in {"y", "yes"}
+            if not acknowledged:
+                print("  Fidelity review was not acknowledged; keeping review_required=true.")
+                meta.pop("bc250_fidelity_acknowledged", None)
+                ready = False
+            else:
+                meta["bc250_fidelity_acknowledged"] = "true"
+        elif fidelity_status != "review":
+            meta.pop("bc250_fidelity_acknowledged", None)
         meta["review_required"] = not ready
         identity = effective or (slug(edition, "edition") if edition else "review")
-        language = str(meta.get("language", "und"))
-        safe_family = family if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", family) else slug(family)
-        meta["document_id"] = f"{safe_family}_{language}_{identity}"
         target = working / f"{safe_family}_{language}_{identity}.md"
         path.write_text(render_markdown(meta, body), encoding="utf-8")
         if target != path:
@@ -602,61 +854,149 @@ def cmd_review(args: argparse.Namespace) -> None:
 
 
 def docs_in(folder: Path) -> list[Path]:
-    return sorted(path for path in folder.glob("*.md") if path.is_file() and not path.is_symlink())
+    if folder.is_symlink():
+        die(f"RAG document directory must not be a symlink: {folder}")
+    result: list[Path] = []
+    for path in sorted(folder.glob("*.md")):
+        if path.is_symlink():
+            die(f"RAG Markdown must not be a symlink: {path}")
+        if path.is_file():
+            result.append(path)
+    return result
 
 
-def validate_collection(base: Path, *, include_working: bool = False) -> tuple[int, int]:
+def validate_entries(
+    base: Path,
+    entries: list[tuple[Path, str]],
+    *,
+    emit: bool = True,
+    forbidden_legacy_names: set[str] | None = None,
+) -> tuple[int, int]:
+    """Validate a real or projected corpus state without mutating it."""
     errors: list[str] = []
     warnings: list[str] = []
-    seen_ids: dict[str, Path] = {}
+    records: list[dict[str, object]] = []
+    seen_revisions: dict[str, Path] = {}
     seen_active: dict[tuple[str, str], Path] = {}
-    folders = [base / "active"] + ([base / "working"] if include_working else [])
-    for folder in folders:
-        for path in docs_in(folder):
-            try:
-                meta, body = split_markdown(path)
-                if REASONING_MARKER_RE.search(body):
-                    die("document body contains native reasoning markers (<think>/thinking delimiters)")
-                source_file = str(meta.get("source_file", ""))
-                source_digest = str(meta.get("source_sha256", ""))
-                if not source_file or not importer.SHA256_RE.fullmatch(source_digest):
-                    die("missing/invalid source_file or source_sha256")
-                importer._resolve_source(path if folder.name == "active" else base / "active" / path.name, source_file, source_digest)
-                document_id = str(meta.get("document_id", ""))
-                family = str(meta.get("document_family", ""))
-                language = str(meta.get("language", ""))
-                if not document_id or not family or not language:
-                    die("document_id, document_family and language are required")
-                previous = seen_ids.get(document_id)
+    seen_active_names: dict[str, Path] = {}
+
+    for path, state in entries:
+        try:
+            meta, body = split_markdown(path)
+            if REASONING_MARKER_RE.search(body):
+                die("document body contains native reasoning markers (<think>/thinking delimiters)")
+            lane, language = importer.validate_document_metadata(
+                meta, active=state == "active"
+            )
+            source_file = str(meta.get("source_file", ""))
+            source_digest = str(meta.get("source_sha256", ""))
+            if not source_file or not importer.SHA256_RE.fullmatch(source_digest):
+                die("missing/invalid source_file or source_sha256")
+            importer._resolve_source(
+                base / "active" / path.name, source_file, source_digest
+            )
+            family = str(meta.get("document_family", ""))
+            revision_id = importer.revision_identity(meta)
+            previous_revision = seen_revisions.get(revision_id)
+            if previous_revision:
+                die(
+                    f"duplicate revision identity also used by {previous_revision.name}: {revision_id}"
+                )
+            seen_revisions[revision_id] = path
+            if state == "active":
+                key = (family, language)
+                previous = seen_active.get(key)
                 if previous:
-                    die(f"duplicate document_id also used by {previous.name}")
-                seen_ids[document_id] = path
-                if folder.name == "active":
-                    if bool_value(meta.get("review_required", False)):
-                        die("active document still has review_required=true")
-                    key = (family, language)
-                    previous = seen_active.get(key)
-                    if previous:
-                        die(f"multiple active revisions for document_family/language; also {previous.name}")
-                    seen_active[key] = path
-                if str(meta.get("status", "")) == "currentness-not-verified":
-                    warnings.append(f"{path.name}: currentness has not been independently verified")
-                role = str(meta.get("authority_role", meta.get("authority", "")))
-                if role == "translation":
-                    counterpart = str(meta.get("translation_of", ""))
-                    if not counterpart:
-                        warnings.append(f"{path.name}: translation has no translation_of counterpart yet")
-                    else:
-                        counterpart_paths = (base / "active" / counterpart, base / "working" / counterpart)
-                        if not any(candidate.is_file() for candidate in counterpart_paths):
-                            warnings.append(f"{path.name}: translation_of target does not exist: {counterpart}")
-            except (OSError, ValueError) as exc:
-                errors.append(f"{path}: {exc}")
-    for item in errors:
-        print(f"FAIL: {item}")
-    for item in warnings:
-        print(f"WARN: {item}")
+                    die(
+                        "multiple active revisions for document_family/language; "
+                        f"also {previous.name}"
+                    )
+                seen_active[key] = path
+                prior_name = seen_active_names.get(path.name)
+                if prior_name:
+                    die(f"duplicate active filename also used by {prior_name}")
+                seen_active_names[path.name] = path
+            if str(meta.get("status", "")) == "currentness-not-verified":
+                warnings.append(
+                    f"{path.name}: currentness has not been independently verified"
+                )
+            records.append(
+                {
+                    "path": path,
+                    "state": state,
+                    "meta": meta,
+                    "lane": lane,
+                    "language": language,
+                    "family": family,
+                    "revision_id": revision_id,
+                }
+            )
+        except (OSError, ValueError) as exc:
+            errors.append(f"{path}: {exc}")
+
+    by_revision = {str(record["revision_id"]): record for record in records}
+    by_name = {Path(record["path"]).name: record for record in records}
+    for record in records:
+        if record["lane"] != "translation":
+            continue
+        path = Path(record["path"])
+        meta = record["meta"]
+        assert isinstance(meta, dict)
+        counterpart = str(meta.get("translation_of", "")).strip()
+        must_resolve = record["state"] == "active" or not bool_value(
+            meta.get("review_required", True)
+        )
+        if not counterpart:
+            message = f"{path.name}: French translation has no German revision ID in translation_of"
+            (errors if must_resolve else warnings).append(message)
+            continue
+        target = by_revision.get(counterpart)
+        if target is None and counterpart in by_name:
+            if forbidden_legacy_names and counterpart in forbidden_legacy_names:
+                errors.append(
+                    f"{path.name}: legacy translation_of filename {counterpart!r} would "
+                    "retarget a changed revision; re-review the translation and store the "
+                    "German revision ID"
+                )
+                continue
+            target = by_name[counterpart]
+            warnings.append(
+                f"{path.name}: translation_of uses legacy filename {counterpart!r}; "
+                "re-review it to store the German revision ID"
+            )
+        if target is None:
+            message = (
+                f"{path.name}: translation_of target does not exist in the proposed corpus: "
+                f"{counterpart}"
+            )
+            (errors if must_resolve else warnings).append(message)
+            continue
+        if target["lane"] != "original" or not str(target["language"]).lower().startswith("de"):
+            errors.append(
+                f"{path.name}: translation_of must reference an authoritative German revision"
+            )
+            continue
+        if target["family"] != record["family"]:
+            errors.append(
+                f"{path.name}: translation_of references a different document_family "
+                f"({target['family']} != {record['family']})"
+            )
+
+    if emit:
+        for item in errors:
+            print(f"FAIL: {item}")
+        for item in warnings:
+            print(f"WARN: {item}")
     return len(errors), len(warnings)
+
+
+def validate_collection(
+    base: Path, *, include_working: bool = False, emit: bool = True
+) -> tuple[int, int]:
+    entries = [(path, "active") for path in docs_in(base / "active")]
+    if include_working:
+        entries.extend((path, "working") for path in docs_in(base / "working"))
+    return validate_entries(base, entries, emit=emit)
 
 
 def cmd_validate(args: argparse.Namespace) -> None:
@@ -683,21 +1023,42 @@ def referenced_sources(base: Path, exclude: Path | None = None) -> set[str]:
     return result
 
 
-def supersede_path(base: Path, path: Path) -> None:
-    meta = importer.front_matter(path)
+def unique_superseded_target(base: Path, path: Path, reserved: set[Path]) -> Path:
     target = base / "superseded" / path.name
-    if target.exists():
-        stamp = hashlib.sha256(path.read_bytes()).hexdigest()[:8]
-        target = target.with_name(f"{target.stem}_{stamp}{target.suffix}")
-    path.replace(target)
-    source_name = str(meta.get("source_file", ""))
-    if source_name and source_name not in referenced_sources(base):
-        source = base / "sources" / source_name
-        if source.is_file():
-            destination = base / "superseded" / source.name
-            if not destination.exists():
-                source.replace(destination)
-    print(f"  superseded: {target.name}")
+    if not target.exists() and target not in reserved:
+        return target
+    stamp = hashlib.sha256(path.read_bytes()).hexdigest()[:8]
+    target = target.with_name(f"{target.stem}_{stamp}{target.suffix}")
+    counter = 2
+    while target.exists() or target in reserved:
+        target = target.with_name(f"{path.stem}_{stamp}_{counter}{path.suffix}")
+        counter += 1
+    return target
+
+
+def transaction_move(source: Path, destination: Path, journal: list[tuple[Path, Path]]) -> None:
+    if not source.exists() or source.is_symlink():
+        raise RuntimeError(f"transaction source disappeared or is unsafe: {source}")
+    if destination.exists():
+        raise RuntimeError(f"transaction destination already exists: {destination}")
+    source.rename(destination)
+    journal.append((source, destination))
+
+
+def rollback_moves(journal: list[tuple[Path, Path]]) -> list[str]:
+    failures: list[str] = []
+    for original, moved in reversed(journal):
+        try:
+            if original.exists():
+                failures.append(f"rollback destination unexpectedly exists: {original}")
+                continue
+            if not moved.exists():
+                failures.append(f"rollback source is missing: {moved}")
+                continue
+            moved.rename(original)
+        except OSError as exc:
+            failures.append(f"{moved} -> {original}: {exc}")
+    return failures
 
 
 def cmd_activate(args: argparse.Namespace) -> None:
@@ -711,49 +1072,144 @@ def cmd_activate(args: argparse.Namespace) -> None:
             die("working file(s) not found: " + ", ".join(sorted(missing)))
     elif not args.all_ready:
         die("specify one or more working filenames or use --all-ready")
-    ready: list[tuple[Path, dict[str, object]]] = []
+
+    ready: list[tuple[Path, dict[str, object], tuple[str, str]]] = []
+    targets: dict[tuple[str, str], Path] = {}
     for path in candidates:
         meta = importer.front_matter(path)
         if bool_value(meta.get("review_required", True)):
             if args.files:
                 die(f"{path.name}: review_required=true; run bc250 rag review first")
             continue
-        ready.append((path, meta))
+        _lane, language = importer.validate_document_metadata(meta, active=True)
+        family = str(meta.get("document_family", ""))
+        key = (family, language)
+        previous = targets.get(key)
+        if previous:
+            die(
+                "activation is ambiguous: multiple reviewed working documents target "
+                f"{family}/{language}: {previous.name}, {path.name}; no files changed"
+            )
+        targets[key] = path
+        ready.append((path, meta, key))
+
     if not ready:
         print("No reviewed working documents are ready for activation.")
         return
+
+    active_docs = docs_in(base / "active")
+    active_meta: dict[Path, dict[str, object]] = {
+        path: importer.front_matter(path) for path in active_docs
+    }
+    replaced: list[Path] = []
+    for active in active_docs:
+        meta = active_meta[active]
+        key = (str(meta.get("document_family", "")), str(meta.get("language", "")))
+        if key in targets:
+            replaced.append(active)
+
+    replaced_set = set(replaced)
+    projected = [
+        (path, "active") for path in active_docs if path not in replaced_set
+    ] + [(path, "active") for path, _meta, _key in ready]
+    errors, warnings = validate_entries(
+        base, projected, forbidden_legacy_names={path.name for path in replaced}
+    )
+    if errors:
+        raise RuntimeError(
+            "activation plan validation failed; no files were changed"
+        )
+
     print(f"Activation plan: {len(ready)} document(s)")
-    for path, meta in ready:
-        family = str(meta.get("document_family", ""))
-        language = str(meta.get("language", ""))
-        prior = []
-        for active in docs_in(base / "active"):
-            active_meta = importer.front_matter(active)
-            if str(active_meta.get("document_family", "")) == family and str(active_meta.get("language", "")) == language:
-                prior.append(active)
+    for path, _meta, key in ready:
         print(f"  activate {path.name}")
-        for old in prior:
-            print(f"    replaces {old.name}")
+        for old in replaced:
+            old_meta = active_meta[old]
+            old_key = (
+                str(old_meta.get("document_family", "")),
+                str(old_meta.get("language", "")),
+            )
+            if old_key == key:
+                print(f"    replaces {old.name}")
+    if warnings:
+        print(f"  projected validation warnings: {warnings}")
     if not args.yes:
         if not sys.stdin.isatty():
             die("activation confirmation requires a terminal or --yes")
-        if input("Proceed? [y/N]: ").strip().lower() not in {"y", "yes"}:
-            print("Cancelled.")
+        if input("Proceed with this all-or-nothing activation? [y/N]: ").strip().lower() not in {"y", "yes"}:
+            print("Cancelled; no files changed.")
             return
-    for path, meta in ready:
-        family = str(meta.get("document_family", ""))
-        language = str(meta.get("language", ""))
-        for old in list(docs_in(base / "active")):
-            active_meta = importer.front_matter(old)
-            if str(active_meta.get("document_family", "")) == family and str(active_meta.get("language", "")) == language:
-                supersede_path(base, old)
-        destination = base / "active" / path.name
-        path.replace(destination)
+
+    remaining_working = [
+        path for path in docs_in(base / "working") if path not in {item[0] for item in ready}
+    ]
+    referenced_after: set[str] = set()
+    for path, _state in projected:
+        referenced_after.add(str(importer.front_matter(path).get("source_file", "")))
+    for path in remaining_working:
+        referenced_after.add(str(importer.front_matter(path).get("source_file", "")))
+    referenced_after.discard("")
+
+    reserved: set[Path] = set()
+    old_moves: list[tuple[Path, Path]] = []
+    for old in replaced:
+        destination = unique_superseded_target(base, old, reserved)
+        reserved.add(destination)
+        old_moves.append((old, destination))
+
+    candidate_moves = [
+        (path, base / "active" / path.name) for path, _meta, _key in ready
+    ]
+    source_moves: list[tuple[Path, Path]] = []
+    seen_source_names: set[str] = set()
+    for old in replaced:
+        source_name = str(active_meta[old].get("source_file", ""))
+        if (
+            not source_name
+            or source_name in referenced_after
+            or source_name in seen_source_names
+        ):
+            continue
+        seen_source_names.add(source_name)
+        source = base / "sources" / source_name
+        destination = base / "superseded" / source_name
+        if source.is_file() and not source.is_symlink() and not destination.exists():
+            source_moves.append((source, destination))
+
+    journal: list[tuple[Path, Path]] = []
+    try:
+        for source, destination in old_moves:
+            transaction_move(source, destination, journal)
+        for source, destination in candidate_moves:
+            transaction_move(source, destination, journal)
+        for source, destination in source_moves:
+            transaction_move(source, destination, journal)
+        post_errors, post_warnings = validate_collection(base, emit=False)
+        if post_errors:
+            raise RuntimeError(
+                f"post-activation validation found {post_errors} failure(s)"
+            )
+    except (OSError, RuntimeError, ValueError) as exc:
+        rollback_failures = rollback_moves(journal)
+        if rollback_failures:
+            raise RuntimeError(
+                "activation transaction failed and rollback was incomplete: "
+                + str(exc)
+                + "; "
+                + "; ".join(rollback_failures)
+            ) from exc
+        raise RuntimeError(
+            f"activation transaction failed; all filesystem moves were rolled back: {exc}"
+        ) from exc
+
+    for old, destination in old_moves:
+        print(f"  superseded: {destination.name}")
+    for _source, destination in candidate_moves:
         print(f"  activated:  {destination.name}")
-    errors, warnings = validate_collection(base)
-    print(f"Activation complete: {errors} failure(s), {warnings} warning(s).")
-    if errors:
-        raise RuntimeError("post-activation validation failed")
+    print(
+        f"Activation complete: 0 failure(s), {post_warnings} warning(s). "
+        "The requested batch committed as one transaction."
+    )
 
 
 def cmd_supersede(args: argparse.Namespace) -> None:
@@ -763,7 +1219,54 @@ def cmd_supersede(args: argparse.Namespace) -> None:
     path = base / "active" / args.file
     if not path.is_file() or path.is_symlink():
         die(f"active Markdown not found: {args.file}")
-    supersede_path(base, path)
+
+    projected = [
+        (candidate, "active")
+        for candidate in docs_in(base / "active")
+        if candidate != path
+    ]
+    errors, warnings = validate_entries(base, projected)
+    if errors:
+        raise RuntimeError(
+            "supersede would leave the active corpus invalid; no files were changed"
+        )
+
+    meta = importer.front_matter(path)
+    target = unique_superseded_target(base, path, set())
+    source_name = str(meta.get("source_file", ""))
+    source_move: tuple[Path, Path] | None = None
+    if source_name and source_name not in referenced_sources(base, exclude=path):
+        source = base / "sources" / source_name
+        destination = base / "superseded" / source_name
+        if source.is_file() and not source.is_symlink() and not destination.exists():
+            source_move = (source, destination)
+
+    journal: list[tuple[Path, Path]] = []
+    try:
+        transaction_move(path, target, journal)
+        if source_move:
+            transaction_move(source_move[0], source_move[1], journal)
+        post_errors, post_warnings = validate_collection(base, emit=False)
+        if post_errors:
+            raise RuntimeError(
+                f"post-supersede validation found {post_errors} failure(s)"
+            )
+    except (OSError, RuntimeError, ValueError) as exc:
+        rollback_failures = rollback_moves(journal)
+        if rollback_failures:
+            raise RuntimeError(
+                "supersede transaction failed and rollback was incomplete: "
+                + str(exc)
+                + "; "
+                + "; ".join(rollback_failures)
+            ) from exc
+        raise RuntimeError(
+            f"supersede transaction failed; all filesystem moves were rolled back: {exc}"
+        ) from exc
+
+    print(f"  superseded: {target.name}")
+    if warnings or post_warnings:
+        print(f"  validation warnings: {post_warnings}")
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -771,44 +1274,95 @@ def cmd_status(args: argparse.Namespace) -> None:
     if args.scope and args.collection:
         requested = collection_path(root, args.scope, args.collection)
         if not requested.is_dir():
-            print(f"RAG collection not found: {args.scope}/{args.collection}")
-            return
+            die(f"RAG collection not found: {args.scope}/{args.collection}")
     scopes = [args.scope] if args.scope else list(importer.SCOPES)
     found = False
     for scope in scopes:
         scope_dir = root / scope
         if not scope_dir.is_dir():
             continue
-        collections = [collection_path(root, scope, args.collection)] if args.collection else sorted(p for p in scope_dir.iterdir() if p.is_dir())
+        collections = (
+            [collection_path(root, scope, args.collection)]
+            if args.collection
+            else sorted(p for p in scope_dir.iterdir() if p.is_dir())
+        )
         for base in collections:
             if not base.is_dir():
                 continue
             found = True
+            working_docs = docs_in(base / "working")
+            active_docs = docs_in(base / "active")
             print(f"\n[{scope.upper()}] {base.name}")
-            counts = {name: len([p for p in (base / name).iterdir() if p.is_file()]) if (base / name).is_dir() else 0 for name in ("sources", "working", "active", "superseded")}
-            inbox_counts = {lane: len([p for p in (base / "inbox" / lane).iterdir() if p.is_file()]) if (base / "inbox" / lane).is_dir() else 0 for lane in INBOX_LANES}
+            counts = {
+                name: len([p for p in (base / name).iterdir() if p.is_file()])
+                if (base / name).is_dir()
+                else 0
+                for name in ("sources", "working", "active", "superseded")
+            }
+            inbox_counts = {
+                lane: len([p for p in (base / "inbox" / lane).iterdir() if p.is_file()])
+                if (base / "inbox" / lane).is_dir()
+                else 0
+                for lane in INBOX_LANES
+            }
             print(f"  sources:    {counts['sources']:4d}")
             print(f"  working:    {counts['working']:4d}")
             print(f"  active:     {counts['active']:4d}")
             print(f"  superseded: {counts['superseded']:4d}")
-            print("  inbox:      " + ", ".join(f"{lane}={count}" for lane, count in inbox_counts.items()))
-            review = 0
+            print(
+                "  inbox:      "
+                + ", ".join(f"{lane}={count}" for lane, count in inbox_counts.items())
+            )
+
+            awaiting_review = 0
+            ready = 0
+            fidelity_pending = 0
+            active_currentness_unverified = 0
             families: dict[str, set[str]] = {}
-            for path in docs_in(base / "working"):
+            for path in working_docs:
                 try:
                     meta = importer.front_matter(path)
-                    review += int(bool_value(meta.get("review_required", True)))
                 except (OSError, ValueError):
-                    review += 1
-            for path in docs_in(base / "active"):
+                    awaiting_review += 1
+                    continue
+                if bool_value(meta.get("review_required", True)):
+                    awaiting_review += 1
+                else:
+                    ready += 1
+                fidelity_status = str(meta.get("bc250_fidelity_status", "")).strip().lower()
+                fidelity_ack = bool_value(meta.get("bc250_fidelity_acknowledged", False))
+                if fidelity_status == "review" and not fidelity_ack:
+                    fidelity_pending += 1
+            for path in active_docs:
                 try:
                     meta = importer.front_matter(path)
                 except (OSError, ValueError):
                     continue
-                families.setdefault(str(meta.get("document_family", "")), set()).add(str(meta.get("language", "")))
-            paired = sum(1 for langs in families.values() if any(v.startswith("de") for v in langs) and any(v.startswith("fr") for v in langs))
-            print(f"  working awaiting review: {review}")
-            print(f"  active DE/FR paired families: {paired}")
+                families.setdefault(str(meta.get("document_family", "")), set()).add(
+                    str(meta.get("language", ""))
+                )
+                active_currentness_unverified += int(
+                    str(meta.get("status", "")).strip() == "currentness-not-verified"
+                )
+            paired = sum(
+                1
+                for langs in families.values()
+                if any(v.startswith("de") for v in langs)
+                and any(v.startswith("fr") for v in langs)
+            )
+            errors, warnings = validate_collection(
+                base, include_working=True, emit=False
+            )
+            health = "FAIL" if errors else ("WARN" if warnings else "PASS")
+            print(f"  working awaiting review: {awaiting_review}")
+            print(f"  working ready:           {ready}")
+            print(f"  fidelity review pending: {fidelity_pending}")
+            print(f"  active currentness unverified: {active_currentness_unverified}")
+            print(f"  active DE/FR paired families:  {paired}")
+            print(
+                f"  lifecycle validation: {health} "
+                f"({errors} failure(s), {warnings} warning(s))"
+            )
     if not found:
         print(f"No RAG collections found below {root}.")
 
@@ -860,7 +1414,10 @@ def parser() -> argparse.ArgumentParser:
     prep.add_argument("--max-chars", type=int, default=DEFAULT_MAX_CHARS, help=f"safe single-pass extraction limit (default: {DEFAULT_MAX_CHARS})")
     prep.add_argument("--dry-run", action="store_true")
 
-    review = sub.add_parser("review", help="interactively correct titles/metadata and mark working drafts ready")
+    review = sub.add_parser(
+        "review",
+        help="interactively verify provenance/metadata/fidelity and mark working drafts ready",
+    )
     review.add_argument("scope", choices=importer.SCOPES)
     review.add_argument("collection")
     review.add_argument("--all", action="store_true", help="also revisit drafts already marked reviewed")
@@ -882,7 +1439,10 @@ def parser() -> argparse.ArgumentParser:
     sup.add_argument("collection")
     sup.add_argument("file")
 
-    status = sub.add_parser("status", help="show collection lifecycle counts and DE/FR pairing status")
+    status = sub.add_parser(
+        "status",
+        help="show lifecycle counts, review/currentness state and validation health",
+    )
     status.add_argument("scope", nargs="?", choices=importer.SCOPES)
     status.add_argument("collection", nargs="?")
 
