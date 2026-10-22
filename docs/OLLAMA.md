@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.8**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.6 updates the runtime pin from the device-proven 0.40.6 baseline. Ollama 0.40.7 added explicit `renderer`, `parser` and `template_source` fields to `ollama show` and `/api/show`; 0.40.8 keeps the established four-lane settings and adds no package-required topology or context-policy change. Prior 0.40.6 device evidence remains regression baseline only and does not transfer DEVICE acceptance to the new runtime bytes.
+Package standard: **Ollama v0.40.8**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.6 introduced the current runtime pin from the device-proven 0.40.6 baseline; release 1.7 carries it unchanged while modifying the managed-RAG lifecycle. Ollama 0.40.7 added explicit `renderer`, `parser` and `template_source` fields to `ollama show` and `/api/show`; 0.40.8 keeps the established four-lane settings and adds no package-required topology or context-policy change. Prior 0.40.6 device evidence remains regression baseline only and does not transfer DEVICE acceptance to the new runtime bytes.
 
 ## Install and verify
 
@@ -57,7 +57,7 @@ general comparison. GPT-OSS 20B with warm Jina remains the production memory-edg
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 
-## 0.40.8 candidate runtime and 0.40.6 device baseline
+## 0.40.8 runtime and 0.40.6 device baseline
 
 Ollama 0.40.8 is the package-pinned runtime. The exact 1.4 device campaign on 0.40.6 proved package-created registrations remained unique and usable before and after supported restart, with no unexpected `llamacpp:` shadow name for the main package-owned registration. Keep those invariants for 0.40.8, and additionally record the 0.40.7+ `renderer`, `parser` and `template_source` fields from `/api/show` as semantic diagnostics. Do not delete or rewrite model-store state merely to make a check pass.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
@@ -82,7 +82,7 @@ GGML_VK_VISIBLE_DEVICES=0
 
 These settings select the intended stock Vulkan/iGPU path and are part of the normal appliance configuration. The 0.40.8 review found no upstream change requiring different values for `OLLAMA_VULKAN=1`, `OLLAMA_IGPU_ENABLE=1`, `GGML_VK_VISIBLE_DEVICES=0`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, Flash Attention, keep-alive policy, or the package's q8/q4 KV-cache profiles. Keep those settings unless exact BC-250 evidence shows a regression.
 
-Ollama 0.40.7 updated llama.cpp and 0.40.8 keeps that runner line, so the selected 1.6 RPM must still exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance.
+Ollama 0.40.7 updated llama.cpp and 0.40.8 keeps that runner line, so the selected 1.7 RPM must still exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance.
 
 For more accurate Vulkan free-memory information the upstream docs suggest `cap_perfmon`; this package does **not** grant that capability automatically. An operator may test it deliberately after locating the real binary:
 
@@ -116,7 +116,7 @@ Both enable flash attention. `balanced` is the production default. `max-context`
 
 ## Benchmark API baseline
 
-`bc250 benchmark` targets the package-pinned Ollama **0.40.8** candidate request schema. Neutral generation
+`bc250 benchmark` targets the package-pinned Ollama **0.40.8** request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
@@ -142,7 +142,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.40.8** as the package-standard candidate runtime for this release. Before accepting the selected RPM, review
+Treat **0.40.8** as the package-standard runtime for this release. Before accepting the selected RPM, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;
