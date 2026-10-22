@@ -1,8 +1,8 @@
-# Current state and next work — 0.14.1-1.5
+# Current state and next work — 0.14.1-1.6
 
 ## Current source/release identity
 
-The active line is `bc250-llm-server-0.14.1-1.5`.
+The active line is `bc250-llm-server-0.14.1-1.6`.
 
 RPM naming rule:
 
@@ -27,10 +27,10 @@ The supported core is:
 Current runtime pins in source:
 
 ```text
-Ollama       0.40.6
+Ollama       0.40.8
 Open WebUI   0.12.3
 Tika         4.1.0-full
-Governor     0.4.13
+Governor     0.4.14
 ```
 
 Treat these as current package choices, not permanent architectural commitments.
@@ -57,19 +57,21 @@ Use the new timing data from successful 1.5 authority runs before proposing anot
 
 ## Exact 1.4 device baseline carried forward
 
+Release 1.6 updates Ollama to 0.40.8 and governor to 0.4.14, so the prior exact-device PASS remains regression baseline rather than acceptance for the new runtime bytes. The existing four-lane Vulkan/context/keep-alive policy remains intentionally unchanged after upstream review.
+
 The exact selected `0.14.1-1.4` RPM completed Blocks 1-3 on the real BC-250 with no Block 3 product defect. Device-proven baseline evidence includes guided install/reboot convergence, 40/40 routing/save, healthy status/health/verify, Ollama 0.40.6 lane and registration persistence, Open WebUI 0.12.3 desired-state/idempotence/local-first policy, managed RAG lifecycle, package RAG 3/3, canonical DE↔FR translation 12/12, production use cases 6/6 and raw Advanced `6144 -> options.num_predict=6144`.
 
 Two device-driven package issues are included in 1.5: the pre-convergence status presentation and the guided-installer multiline Ollama version parser. Two earlier test stops were harness defects only (thinking-budget exhaustion and incidental `/api/show` parameter ordering) and must not be encoded as product workarounds.
 
 Block 4 reboot persistence / broader ordinary-user Open WebUI qualification was still pending when 1.5 source scope froze. The 1.4 device PASS set is valuable regression guidance but cannot be transferred to changed 1.5 RPM bytes. See `20_DEVICE_QUALIFICATION_1_4.md` and `21_RELEASE_1_5_SCOPE_AND_ACCEPTANCE.md`.
 
-## Immediate next iteration — authoritative 1.5 build then exact-artifact device testing
+## Immediate next iteration — authoritative 1.6 build then exact-artifact device testing
 
-The successful 1.4 GitHub build validated the optimized authoritative build path. First run/select the exact 1.5 authority build, then answer:
+The successful 1.4 GitHub build validated the optimized authoritative build path. First run/select the exact 1.6 authority build, then answer:
 
-> Do the exact selected `0.14.1-1.5` bytes preserve the proven stock-core appliance behavior while correctly implementing the reviewed 1.5 package changes?
+> Do the exact selected `0.14.1-1.6` bytes preserve the proven stock-core appliance behavior while correctly implementing the reviewed Ollama/governor/CI maintenance update?
 
-Use `03_CORE_FUNCTIONALITY_CHECK.md` together with `18_TESTING_SIDECHAT_HANDOVER.md`. Focus first on changed surfaces and reboot/ordinary-user persistence; do not replay already-proven 1.4 campaigns unless a 1.5 observation invalidates them. This is the next **low-cost core functionality** round: changed-surface proof first, then the still-unproven persistence/ordinary-user boundary.
+Use `03_CORE_FUNCTIONALITY_CHECK.md` together with `18_TESTING_SIDECHAT_HANDOVER.md`. Focus first on changed Ollama/governor surfaces and reboot/ordinary-user persistence; do not replay already-proven product campaigns unless a 1.6 observation invalidates them. This is the next **low-cost core functionality** round: changed-surface proof first, then the still-unproven persistence/ordinary-user boundary.
 
 ## If the core check passes
 
@@ -98,7 +100,7 @@ Do not let cleanup become the roadmap. Keep it bounded and stop when the stock b
 
 ## Deferred until deliberately reopened
 
-- Ollama/Open WebUI upgrade beyond the 0.40.6/0.12.3 release pins;
+- further Ollama/Open WebUI upgrade beyond the 0.40.8/0.12.3 release pins without new evidence;
 - context-ceiling changes;
 - performance tuning campaigns;
 - broad model tournaments;
