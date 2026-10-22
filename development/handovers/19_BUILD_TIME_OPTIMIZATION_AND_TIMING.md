@@ -1,4 +1,4 @@
-# GitHub build-time optimization and timing — 1.5 source state
+# GitHub build-time optimization and timing — 1.6 source state
 
 ## Scope
 
@@ -7,7 +7,7 @@ This file records the current GitHub build-time result and the constraints for f
 Current package/build line:
 
 ```text
-bc250-llm-server 0.14.1-1.5 source candidate
+bc250-llm-server 0.14.1-1.6 source candidate
 Fedora 44
 GitHub Actions = primary release/build authority
 workstation/local CI = secondary reproduction/debugging
