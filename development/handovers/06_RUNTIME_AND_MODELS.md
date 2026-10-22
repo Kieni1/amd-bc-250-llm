@@ -11,7 +11,7 @@ Governor     0.4.14
 
 Do not upgrade these incidentally during unrelated cleanup or product-roadmap work. Runtime/model upgrades require their own reason and evidence.
 
-Ollama 0.40.6 and Open WebUI 0.12.3 were extensively device-proven on the exact 1.4 RPM through Blocks 1–3, including lane/registration restart persistence, Open WebUI desired-state/idempotence/local-first policy, managed RAG, translation/use-case benchmarks and raw Advanced 6144 forwarding. That evidence is the regression baseline, not transferable acceptance for changed 1.6 runtime bytes. The exact selected 1.6 RPM must re-establish representative Ollama Vulkan/lane/registration behavior, governor service/thermal behavior and the remaining reboot/ordinary-user boundary before DEVICE-VALIDATED status. See `18_TESTING_SIDECHAT_HANDOVER.md` and `20_DEVICE_QUALIFICATION_1_4.md`.
+Ollama 0.40.6 and Open WebUI 0.12.3 were extensively device-proven on the exact 1.4 RPM through Blocks 1–3, including lane/registration restart persistence, Open WebUI desired-state/idempotence/local-first policy, managed RAG, translation/use-case benchmarks and raw Advanced 6144 forwarding. That evidence is the regression baseline, not transferable acceptance for changed 1.7 package/runtime/RAG bytes. The exact selected 1.7 RPM must re-establish representative Ollama Vulkan/lane/registration behavior, governor service/thermal behavior, the changed managed-RAG lifecycle and the remaining reboot/ordinary-user boundary before DEVICE-VALIDATED status. See `18_TESTING_SIDECHAT_HANDOVER.md` and `20_DEVICE_QUALIFICATION_1_4.md`.
 
 ## Normal topology
 
