@@ -852,7 +852,7 @@ step_8_application_services
             fake.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\n' 'Warning: could not connect to a running Ollama instance'\n"
-                "printf '%s\n' 'Warning: client version is 0.40.6'\n",
+                "printf '%s\n' 'Warning: client version is 0.40.8'\n",
                 encoding="utf-8",
             )
             fake.chmod(0o755)
@@ -863,7 +863,7 @@ step_8_application_services
                 check=False,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "0.40.6")
+        self.assertEqual(result.stdout.strip(), "0.40.8")
         self.assertNotIn("instance", result.stdout)
 
     def test_installer_distinguishes_backend_from_usable_front_door(self) -> None:
