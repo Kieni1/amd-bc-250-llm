@@ -880,9 +880,9 @@ snapshot() {
     curl -fsS "http://127.0.0.1:$port/api/tags" > "$dir/ollama-$port-tags.json" 2>&1 || true
     curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
   done
-  # The package-pinned Ollama exposes model thinking metadata through /api/show when the
-  # implementation provides it. Capture it as diagnostic evidence; absence is
-  # never interpreted here as a hard non-reasoning result.
+  # Ollama 0.40.7+ exposes renderer, parser and template_source through /api/show,
+  # in addition to model capability/thinking metadata. Capture the complete response
+  # as diagnostic evidence; absence of an optional field is not a hard product failure.
   local show_model show_port show_name
   while IFS='|' read -r show_port show_model; do
     show_name="${show_model//[^A-Za-z0-9._-]/_}"
