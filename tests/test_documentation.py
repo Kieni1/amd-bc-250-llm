@@ -67,34 +67,24 @@ class DocumentationTests(unittest.TestCase):
         _version, _release, nvr = current_identity()
         cases = {
             "release identity drifts": (
-                "development/handovers/00_README_START_HERE.md",
+                "development/VALIDATION-MATRIX.md",
                 nvr,
                 nvr + "-drift",
             ),
-            "next core check disappears": (
-                "development/handovers/01_CURRENT_STATE_AND_NEXT_WORK.md",
-                "low-cost core functionality",
-                "full historical qualification",
-            ),
-            "office-intelligence roadmap follow-up disappears": (
-                "development/handovers/01_CURRENT_STATE_AND_NEXT_WORK.md",
-                "product roadmap",
-                "infrastructure-only roadmap",
-            ),
-            "selected GitHub authority disappears": (
-                "development/handovers/04_RELEASE_BUILD_AND_VALIDATION.md",
-                "workflow_dispatch",
-                "push",
-            ),
             "test retention rule disappears": (
-                "development/handovers/05_TESTING_STRATEGY.md",
+                "development/TESTING-STRATEGY.md",
                 "Do not delete tests merely to make fast-moving development quieter.",
                 "Delete tests merely to make fast-moving development quieter.",
             ),
-            "long-term test rule weakens": (
-                "development/handovers/11_LONG_TERM_ENGINEERING_GUIDELINES.md",
-                "Do not equate fewer tests with simpler product architecture.",
-                "Fewer tests always mean simpler product architecture.",
+            "development memory becomes release authority": (
+                "development/README.md",
+                "do not need to be rewritten for every RPM release",
+                "must be rewritten for every RPM release",
+            ),
+            "ownership boundary disappears": (
+                "development/OWNERSHIP.md",
+                "Public product concepts are intentionally fewer",
+                "Every implementation owner is a public product concept",
             ),
             "workbench NVR drifts": (
                 "WORKBENCH-STATE.json",
@@ -102,24 +92,40 @@ class DocumentationTests(unittest.TestCase):
                 f'"nvr": "{nvr}-drift"',
             ),
         }
-        for label, (relative, old, new) in cases.items():
+        for label, (relative, old, new_value) in cases.items():
             with self.subTest(label=label), tempfile.TemporaryDirectory() as tmp:
                 fixture = Path(tmp)
                 shutil.copytree(ROOT / "development", fixture / "development")
                 shutil.copytree(ROOT / "packaging", fixture / "packaging")
+                shutil.copytree(ROOT / "scripts", fixture / "scripts")
+                shutil.copy2(ROOT / "Makefile", fixture / "Makefile")
+                shutil.copy2(ROOT / "TLDR.md", fixture / "TLDR.md")
                 for source in ("VERSION", "release-contract.json", "WORKBENCH-STATE.json"):
                     shutil.copy2(ROOT / source, fixture / source)
                 target = fixture / relative
                 current = target.read_text(encoding="utf-8")
                 self.assertIn(old, current)
-                target.write_text(current.replace(old, new, 1), encoding="utf-8")
+                target.write_text(current.replace(old, new_value), encoding="utf-8")
                 result = subprocess.run(
                     [str(ROOT / "scripts/check-current-guidance.sh"), str(fixture)],
-                    text=True,
-                    capture_output=True,
-                    check=False,
+                    text=True, capture_output=True, check=False,
                 )
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_current_document_guidance_uses_package_owned_preset_and_current_terms(self) -> None:
+        rag = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")
+        models = (ROOT / "MODELS.md").read_text(encoding="utf-8")
+        openwebui = (ROOT / "docs/OPENWEBUI.md").read_text(encoding="utf-8")
+        scope = (ROOT / "development/DEVELOPMENT-SCOPE.json").read_text(encoding="utf-8")
+
+        self.assertIn("Office - Documents / RAG", rag)
+        self.assertIn("managed document workflow", rag)
+        self.assertNotIn("Office Documents – Pilot", rag)
+        self.assertNotIn("v0.12.3 candidate", rag)
+        self.assertNotIn("Builtin Tools disabled for this first baseline", rag)
+        self.assertNotIn("Graveyard Modelfiles", models)
+        self.assertNotIn("remains only in the retired as historical", openwebui)
+        self.assertNotIn("0.14.1-1.7 release line", scope)
 
     def test_current_operator_reference_is_gfx_free(self) -> None:
         operations = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
@@ -130,7 +136,7 @@ class DocumentationTests(unittest.TestCase):
         reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         for route in sorted(dispatcher_routes()):
             self.assertIn(f"`bc250 {route}`", reference, route)
-        for command in ("`bc250`", "`bc250-cu-live-manager`", "`bc250-40cu`", "`llm-run-diagnose`"):
+        for command in ("`bc250`", "`bc250-cu-live-manager`", "`bc250-40cu`", "`bc250 advanced benchmark parity`"):
             self.assertIn(command, reference)
 
     def test_shell_examples_do_not_invent_bc250_commands(self) -> None:
@@ -145,13 +151,13 @@ class DocumentationTests(unittest.TestCase):
 
     def test_privileged_command_examples_use_sudo(self) -> None:
         privileged = (
-            r"bc250\s+(?:install|maintenance|storage|revalidate|rag|fetch-mtp|reset)(?:\s|$)",
+            r"bc250\s+(?:install|maintenance|storage|document|reset)(?:\s|$)",
             r"bc250\s+ocr\s+install(?:\s|$)",
-            r"bc250\s+openwebui-setup\s+(?:init|apply|save-key)(?:\s|$)",
-            r"bc250\s+agent-mode\s+(?:enter|leave|normal)(?:\s|$)",
+            r"bc250\s+advanced\s+openwebui\s+(?:init|apply|save-key)(?:\s|$)",
+            r"bc250\s+advanced\s+agent\s+(?:enter|leave|normal|prepare)(?:\s|$)",
             r"bc250\s+model\s+(?:status|install|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
-            r"bc250\s+ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
-            r"bc250\s+benchmark\s+owui-system-context(?:\s|$)",
+            r"bc250\s+advanced\s+ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
+            r"bc250\s+advanced\s+benchmark\s+owui-system-context(?:\s|$)",
             r"bc250-40cu(?:\s|$)",
             r"bc250-cu-live-manager(?:\s|$)",
         )
@@ -169,7 +175,7 @@ class DocumentationTests(unittest.TestCase):
     def test_current_docs_use_supported_model_rag_and_storage_subcommands(self) -> None:
         allowed = {
             "model": {"list", "status", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
-            "rag": {"init", "prepare-batch", "review", "validate", "activate", "supersede", "status", "ingest"},
+            "document": {"init", "prepare-batch", "review", "validate", "activate", "supersede", "status", "ingest"},
             "storage": {"status", "dedupe", "prune-sources"},
         }
         patterns = {
@@ -182,21 +188,37 @@ class DocumentationTests(unittest.TestCase):
                 for command in pattern.findall(text):
                     self.assertIn(command, allowed[family], f"{relative}: bc250 {family} {command}")
 
+    def test_ocr_guidance_preserves_managed_document_lifecycle(self) -> None:
+        rag = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")
+        self.assertIn("Managed text-native PDF", rag)
+        self.assertIn("bc250 document prepare-batch", rag)
+        self.assertIn("proper managed working draft with source provenance", rag)
+        self.assertIn("Never write raw", rag)
+        self.assertIn("directly to `active/`", rag)
+        self.assertNotIn("Use Tika for text-native PDFs and office files", rag)
+        self.assertNotIn("save the\ncleaned canonical Markdown under `active/`", rag)
+        self.assertNotIn("For the pilot", rag)
+
+    def test_activate_help_does_not_overclaim_crash_atomicity(self) -> None:
+        lifecycle = (ROOT / "cmd/documents/lifecycle.py").read_text(encoding="utf-8")
+        self.assertIn("transactionally promote a validated batch", lifecycle)
+        self.assertNotIn("atomically promote reviewed working Markdown", lifecycle)
+
     def test_revalidate_reference_covers_public_lifecycle(self) -> None:
         reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         for form in (
-            "sudo bc250 revalidate start",
-            "sudo bc250 revalidate start --skip-owui",
-            "sudo bc250 revalidate status",
-            "sudo bc250 revalidate status --raw",
-            "sudo bc250 revalidate abort",
-            "sudo bc250 revalidate cleanup",
+            "sudo bc250 advanced revalidate start",
+            "sudo bc250 advanced revalidate start --skip-owui",
+            "sudo bc250 advanced revalidate status",
+            "sudo bc250 advanced revalidate status --raw",
+            "sudo bc250 advanced revalidate abort",
+            "sudo bc250 advanced revalidate cleanup",
         ):
             self.assertIn(form, reference)
 
     def test_read_only_profile_examples_do_not_require_sudo(self) -> None:
         forbidden = (
-            "sudo bc250 ollama-profile status",
+            "sudo bc250 advanced ollama-profile status",
         )
         for path, relative in package_markdown_paths():
             text = path.read_text(encoding="utf-8")
@@ -252,8 +274,8 @@ class DocumentationTests(unittest.TestCase):
     def test_secondary_model_docs_expose_explicit_mtp_opt_in(self) -> None:
         for relative in ("README.md", "TLDR.md", "MODELS.md", "models/README.md", "models/mtp/README.md"):
             text = (ROOT / relative).read_text(encoding="utf-8")
-            self.assertIn("bc250 model list mtp --all", text, relative)
-            self.assertIn("bc250 fetch-mtp", text, relative)
+            self.assertIn("bc250 advanced mtp list", text, relative)
+            self.assertIn("bc250 advanced mtp prepare", text, relative)
 
     def test_mtp_command_reference_matches_same_target_contract(self) -> None:
         reference = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
@@ -306,9 +328,9 @@ class DocumentationTests(unittest.TestCase):
 
     def test_current_vs_historical_guidance_boundary(self) -> None:
         handovers = (ROOT / "development/handovers/00_README_START_HERE.md").read_text(encoding="utf-8")
-        self.assertIn("current engineering handover", handovers)
-        self.assertIn("archive/", handovers)
-        self.assertIn("rationale/history only", handovers)
+        self.assertIn("retained engineering memory", handovers)
+        self.assertIn("not current release authority", handovers)
+        self.assertIn("WORKBENCH-STATE.json", handovers)
 
         active = []
         for path in sorted((ROOT / "development/handovers").glob("*.md")):
@@ -335,8 +357,8 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(workbench["release"]["state"], "source-ready-build-pending")
         self.assertNotIn("checkpoint", workbench)
         self.assertIn("core functionality", workbench["next_work"]["device"])
-        self.assertIn("product roadmap", workbench["next_work"]["after_pass"])
-        self.assertIn("German–French translation", workbench["next_work"]["after_pass"])
+        self.assertIn("Managed Documents v2", workbench["next_work"]["after_pass"])
+        self.assertIn("German–French workflow quality", workbench["long_term"]["direction"])
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:
@@ -489,7 +511,7 @@ class DocumentationTests(unittest.TestCase):
 
 
     def test_development_scope_ignores_python_bytecode_in_frozen_trees(self) -> None:
-        cache_dir = ROOT / "models/rag/__pycache__"
+        cache_dir = ROOT / "cmd/documents/__pycache__"
         cache_dir.mkdir(exist_ok=True)
         probe = cache_dir / "scope-test-probe.pyc"
         probe.write_bytes(b"generated-bytecode-probe")
