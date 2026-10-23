@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
 MANAGER="${MODEL_MANAGER:-$LIBEXEC/modelctl}"
-[[ -x "$MANAGER" ]] || MANAGER="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/modelctl.py"
+[[ -x "$MANAGER" ]] || MANAGER="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)/models/modelctl.py"
 ENDPOINT="${OLLAMA_URL:-${OLLAMA_HOST:-http://127.0.0.1:11434}}"
 
 usage() {

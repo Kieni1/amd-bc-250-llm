@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BC-250 local RAG corpus lifecycle and batch-preparation helper.
+"""BC-250 managed document corpus lifecycle and batch-preparation helper.
 
 The human-review boundary is deliberate: automation writes only to working/.
 Only reviewed documents can be activated and only active/*.md is ingested.
@@ -20,7 +20,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
-import rag_import as importer
+import importer
 
 DEFAULT_ROOT = importer.DEFAULT_ROOT
 DEFAULT_AGENT_URL = os.environ.get("BC250_RAG_AGENT_URL", "http://127.0.0.1:11436").rstrip("/")
@@ -63,13 +63,13 @@ def ensure_collection(root: Path, scope: str, collection: str) -> Path:
     mode = 0o700 if scope == "confidential" else 0o750
     for path in (base, *(base / name for name in COLLECTION_DIRS), base / "inbox"):
         if path.is_symlink():
-            die(f"RAG lifecycle directory must not be a symlink: {path}")
+            die(f"document lifecycle directory must not be a symlink: {path}")
         path.mkdir(parents=True, exist_ok=True)
         path.chmod(mode)
     for lane in INBOX_LANES:
         path = base / "inbox" / lane
         if path.is_symlink():
-            die(f"RAG inbox lane must not be a symlink: {path}")
+            die(f"document inbox lane must not be a symlink: {path}")
         path.mkdir(parents=True, exist_ok=True)
         path.chmod(mode)
     return base
@@ -198,7 +198,7 @@ def enter_agent_if_needed(url: str) -> bool:
     command = shutil.which("bc250")
     if not command:
         die("bc250 dispatcher is required to enter exclusive agent mode")
-    result = subprocess.run([command, "agent-mode", "enter"], text=True, check=False)
+    result = subprocess.run([command, "advanced", "agent", "enter"], text=True, check=False)
     if result.returncode != 0 or not agent_ready(url):
         die("exclusive agent mode did not become ready on port 11436")
     return True
@@ -211,13 +211,13 @@ def restore_normal_if_needed(switched: bool) -> str | None:
     if not command:
         return (
             "bc250 dispatcher is unavailable; normal Ollama topology was not restored. "
-            "Run sudo bc250 agent-mode normal before continuing."
+            "Run sudo bc250 advanced agent normal before continuing."
         )
-    result = subprocess.run([command, "agent-mode", "normal"], text=True, check=False)
+    result = subprocess.run([command, "advanced", "agent", "normal"], text=True, check=False)
     if result.returncode != 0:
         return (
             "automatic restoration of normal Ollama topology failed. "
-            "Run sudo bc250 agent-mode normal before continuing."
+            "Run sudo bc250 advanced agent normal before continuing."
         )
     return None
 
@@ -230,7 +230,7 @@ def normalize_prompt(text: str, language: str, bilingual: bool) -> str:
         if bilingual
         else f"The source is expected to be {language_name}. Do not translate it."
     )
-    return f"""You are a careful local document-ingestion editor for a private German/French RAG corpus.
+    return f"""You are a careful local document-ingestion editor for a private German/French managed-document corpus.
 
 Return ONLY normalized Markdown body text, beginning with one '# ' document title. Do not return YAML or a code fence.
 
@@ -269,7 +269,7 @@ def final_agent_content(data: object) -> str:
         die("agent returned no normalized Markdown final content")
     output = content.strip()
     if REASONING_MARKER_RE.search(output):
-        die("agent final content contains native reasoning markers; refusing contaminated RAG draft")
+        die("agent final content contains native reasoning markers; refusing contaminated document draft")
     lines = [line for line in output.splitlines() if line.strip()]
     if lines and re.match(r"^\s*(```|~~~)", lines[0]):
         die(
@@ -514,12 +514,12 @@ def cmd_init(args: argparse.Namespace) -> None:
     existed = requested.is_dir()
     base = ensure_collection(root, args.scope, args.collection)
     state = "already present / converged" if existed else "created"
-    print(f"RAG collection ready: {base} ({state})")
+    print(f"Document collection ready: {base} ({state})")
     print("Inbox lanes:")
     for lane in INBOX_LANES:
         print(f"  {base / 'inbox' / lane}")
     print("\nPlace source PDFs in german/, french/ or bilingual/, then run:")
-    print(f"  sudo bc250 rag prepare-batch {args.scope} {args.collection}")
+    print(f"  sudo bc250 document prepare-batch {args.scope} {args.collection}")
 
 
 def cmd_prepare(args: argparse.Namespace) -> None:
@@ -530,10 +530,10 @@ def cmd_prepare(args: argparse.Namespace) -> None:
         folder = base / "inbox" / lane
         for path in sorted(folder.iterdir()):
             if path.is_symlink():
-                die(f"RAG inbox entries must not be symlinks: {path}")
+                die(f"Document inbox entries must not be symlinks: {path}")
             if path.is_file():
                 pending.append((lane, path))
-    print(f"RAG batch preparation: {args.scope}/{args.collection}")
+    print(f"Document batch preparation: {args.scope}/{args.collection}")
     print(f"Pending inbox files: {len(pending)}")
     if not pending:
         print("Nothing to prepare.")
@@ -580,7 +580,7 @@ def cmd_prepare(args: argparse.Namespace) -> None:
         print(f"  failed:           {failed}")
         print(f"  working folder:   {base / 'working'}")
         print("\nAutomation stops here by design. Review metadata/content before activation.")
-        print(f"Next: sudo bc250 rag review {args.scope} {args.collection}")
+        print(f"Next: sudo bc250 document review {args.scope} {args.collection}")
     finally:
         restore_error = restore_normal_if_needed(switched)
         if restore_error and sys.exc_info()[0] is not None:
@@ -855,11 +855,11 @@ def cmd_review(args: argparse.Namespace) -> None:
 
 def docs_in(folder: Path) -> list[Path]:
     if folder.is_symlink():
-        die(f"RAG document directory must not be a symlink: {folder}")
+        die(f"Managed document directory must not be a symlink: {folder}")
     result: list[Path] = []
     for path in sorted(folder.glob("*.md")):
         if path.is_symlink():
-            die(f"RAG Markdown must not be a symlink: {path}")
+            die(f"Managed document Markdown must not be a symlink: {path}")
         if path.is_file():
             result.append(path)
     return result
@@ -1005,7 +1005,7 @@ def cmd_validate(args: argparse.Namespace) -> None:
     active_count = len(docs_in(base / "active"))
     print(f"\nValidation: {active_count} active document(s), {errors} failure(s), {warnings} warning(s)")
     if errors:
-        raise RuntimeError("RAG collection validation failed")
+        raise RuntimeError("Managed document collection validation failed")
 
 
 def referenced_sources(base: Path, exclude: Path | None = None) -> set[str]:
@@ -1079,7 +1079,7 @@ def cmd_activate(args: argparse.Namespace) -> None:
         meta = importer.front_matter(path)
         if bool_value(meta.get("review_required", True)):
             if args.files:
-                die(f"{path.name}: review_required=true; run bc250 rag review first")
+                die(f"{path.name}: review_required=true; run bc250 document review first")
             continue
         _lane, language = importer.validate_document_metadata(meta, active=True)
         family = str(meta.get("document_family", ""))
@@ -1274,7 +1274,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     if args.scope and args.collection:
         requested = collection_path(root, args.scope, args.collection)
         if not requested.is_dir():
-            die(f"RAG collection not found: {args.scope}/{args.collection}")
+            die(f"Document collection not found: {args.scope}/{args.collection}")
     scopes = [args.scope] if args.scope else list(importer.SCOPES)
     found = False
     for scope in scopes:
@@ -1364,7 +1364,7 @@ def cmd_status(args: argparse.Namespace) -> None:
                 f"({errors} failure(s), {warnings} warning(s))"
             )
     if not found:
-        print(f"No RAG collections found below {root}.")
+        print(f"No document collections found below {root}.")
 
 
 def validate_lifecycle_root(root: Path) -> tuple[int, int, int]:
@@ -1390,14 +1390,14 @@ def cmd_ingest(args: argparse.Namespace) -> None:
     collections, errors, warnings = validate_lifecycle_root(root)
     print(f"Pre-ingestion lifecycle validation: {collections} collection(s), {errors} failure(s), {warnings} warning(s)")
     if errors:
-        die("RAG lifecycle validation failed; no Open WebUI changes were attempted")
+        die("Managed document lifecycle validation failed; no Open WebUI changes were attempted")
     run_ingest(args)
 
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="bc250 rag",
-        description="Prepare, review, validate, activate and ingest the local BC-250 RAG corpus. Automation never promotes working drafts to active without human approval.",
+        prog="bc250 document",
+        description="Prepare, review, validate, activate and sync the local BC-250 managed document corpus. Automation never promotes working drafts to active without human approval.",
     )
     p.add_argument("--root", type=Path, default=DEFAULT_ROOT, help=f"corpus root (default: {DEFAULT_ROOT})")
     sub = p.add_subparsers(dest="command", required=True)
@@ -1406,7 +1406,7 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("scope", choices=importer.SCOPES)
     init.add_argument("collection")
 
-    prep = sub.add_parser("prepare-batch", help="extract and locally normalize PDFs from the German/French/bilingual inboxes into working/")
+    prep = sub.add_parser("prepare-batch", help="extract and locally normalize PDFs into review drafts under working/")
     prep.add_argument("scope", choices=importer.SCOPES)
     prep.add_argument("collection")
     prep.add_argument("--model", default=DEFAULT_AGENT_MODEL)
@@ -1427,14 +1427,14 @@ def parser() -> argparse.ArgumentParser:
     validate.add_argument("collection")
     validate.add_argument("--include-working", action="store_true")
 
-    activate = sub.add_parser("activate", help="atomically promote reviewed working Markdown and supersede prior same-family/language revisions")
+    activate = sub.add_parser("activate", help="transactionally promote a validated batch of reviewed working Markdown and roll back ordinary runtime move failures")
     activate.add_argument("scope", choices=importer.SCOPES)
     activate.add_argument("collection")
     activate.add_argument("files", nargs="*")
     activate.add_argument("--all-ready", action="store_true")
     activate.add_argument("--yes", action="store_true")
 
-    sup = sub.add_parser("supersede", help="remove one active Markdown revision from ingestion while retaining audit evidence")
+    sup = sub.add_parser("supersede", help="supersede one active Markdown revision while retaining audit evidence")
     sup.add_argument("scope", choices=importer.SCOPES)
     sup.add_argument("collection")
     sup.add_argument("file")
@@ -1446,7 +1446,7 @@ def parser() -> argparse.ArgumentParser:
     status.add_argument("scope", nargs="?", choices=importer.SCOPES)
     status.add_argument("collection", nargs="?")
 
-    ingest = sub.add_parser("ingest", help="validate and incrementally sync all active Markdown to Open WebUI")
+    ingest = sub.add_parser("ingest", help="validate and incrementally synchronize active Markdown with Open WebUI Knowledge")
     ingest.add_argument("--url", default=importer.DEFAULT_URL)
     ingest.add_argument("--token-file")
     ingest.add_argument(

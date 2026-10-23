@@ -51,7 +51,7 @@ def knowledge_name(scope: str, collection: str, lane: str) -> str:
 
 
 def knowledge_description(scope: str, collection: str, lane: str) -> str:
-    base = f"BC-250 managed RAG import from {scope}/{collection}/active."
+    base = f"BC-250 managed document sync from {scope}/{collection}/active."
     if lane == "original":
         return (
             base
@@ -524,7 +524,7 @@ class OpenWebUI:
                     "Open WebUI knowledge search response field 'items' must be a list"
                 )
             if any(not isinstance(item, dict) for item in items):
-                raise TypeError("Open WebUI knowledge search response items must be objects")
+                raise RuntimeError("Open WebUI knowledge search response items must be objects")
             exact.extend(
                 item
                 for item in items
@@ -636,9 +636,13 @@ class OpenWebUI:
             raise TypeError(
                 f"Open WebUI returned an invalid processing-status response for {doc.path.name}"
             )
-        status = status_result.get("status")
+        status = (
+            status_result.get("status") if isinstance(status_result, dict) else None
+        )
         if status != "completed":
-            detail = status_result.get("error")
+            detail = (
+                status_result.get("error") if isinstance(status_result, dict) else None
+            )
             suffix = f": {detail}" if detail else ""
             raise RuntimeError(
                 f"Open WebUI processing did not complete for {doc.path.name} (status={status!r}){suffix}"
@@ -673,7 +677,7 @@ def validate_sync_endpoint(
         raise ValueError(f"invalid Open WebUI URL: {url!r}")
     if not allow_remote:
         raise ValueError(
-            "RAG ingest is loopback-only by default; remote Open WebUI requires --allow-remote "
+            "Document synchronization is loopback-only by default; remote Open WebUI requires --allow-remote "
             "because API credentials, document content and knowledge metadata leave the appliance"
         )
     has_confidential = any(doc.scope == "confidential" for doc in docs)
@@ -687,7 +691,7 @@ def validate_sync_endpoint(
             )
     if has_confidential and not allow_confidential_remote:
         raise ValueError(
-            "remote RAG ingest may access or modify confidential-scope knowledge state; "
+            "remote document synchronization may access or modify confidential-scope knowledge state; "
             "add --allow-confidential-remote together with --allow-remote only after explicitly "
             "accepting off-appliance disclosure"
         )
@@ -739,7 +743,7 @@ def sync(
     print_plan(root, docs, warnings)
     if not is_loopback_url(args.url):
         print(
-            "WARNING: remote RAG ingest explicitly enabled; API credentials, document content and "
+            "WARNING: remote document synchronization explicitly enabled; API credentials, document content and "
             "knowledge metadata may leave this appliance, and remote knowledge state may be modified.",
             file=sys.stderr,
         )
