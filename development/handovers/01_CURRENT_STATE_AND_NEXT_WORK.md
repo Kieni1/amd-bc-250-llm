@@ -1,8 +1,11 @@
-# Current state and next work — 0.14.1-1.7
+# Retained current-state snapshot — 0.14.1-1.7
 
-## Current source/release identity
+> Historical development snapshot. It is retained for engineering context and does not override
+> the current release authorities named in `development/README.md`.
 
-The active line is `bc250-llm-server-0.14.1-1.7`.
+## Snapshot source/release identity
+
+The active line at the time of this snapshot was `bc250-llm-server-0.14.1-1.7`.
 
 RPM naming rule:
 

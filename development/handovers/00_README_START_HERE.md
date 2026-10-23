@@ -1,21 +1,16 @@
-# BC-250 handover bundle — current release line 0.14.1-1.7
+# BC-250 retained handover snapshot — 0.14.1-1.7
 
 ## Purpose
 
-This bundle is the current engineering handover for the stock-first BC-250 LLM appliance.
+This directory is **retained engineering memory**, not current release authority. This file and
+the numbered handovers preserve the 1.7-era state, working method, evidence rules and product
+rationale that remain useful to future development. Current release identity/evidence lives in
+`release-contract.json`, `WORKBENCH-STATE.json`, `development/VALIDATION-MATRIX.md` and the RPM spec.
 
-Current source/release identity:
+Historical snapshots do not need to be rewritten for an ordinary RPM bump. Durable engineering
+rules remain useful until deliberately superseded.
 
-```text
-package:  bc250-llm-server
-version:  0.14.1
-release:  1.7
-NEVRA:    bc250-llm-server-0.14.1-1.7.fc44.x86_64
-```
-
-Use normal RPM identity from here forward. Engineering iteration labels belong in commits, issues and handovers, not in Version/Release.
-
-## Current position
+## Snapshot position
 
 The reconstruction era is closed. Release 1.7 is a RAG correctness/robustness increment on the 1.6 runtime-maintenance source baseline. Runtime/model/retrieval tuning remains unchanged.
 
