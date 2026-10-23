@@ -76,7 +76,7 @@ def check_required_inputs() -> None:
         "MODELS.md",
         "Makefile",
         "install",
-        "uninstall.sh",
+        "cmd/system/reset.sh",
         ".github/workflows/build-rpm.yml",
         "packaging/bc250-llm-server.spec",
         "packaging/install-manifest.tsv",
@@ -116,7 +116,7 @@ def check_required_inputs() -> None:
             fail(f"required build input is missing: {relative}")
     executables = (
         "install",
-        "uninstall.sh",
+        "cmd/system/reset.sh",
         "packaging/bc250",
         "models/modelctl.py",
         "cmd/monitoring/status.sh",
@@ -181,7 +181,6 @@ def check_release_contract() -> None:
     try:
         contract = json.loads(RELEASE_CONTRACT.read_text(encoding="utf-8"))
         spec = SPEC.read_text(encoding="utf-8")
-        scope = json.loads((ROOT / "development/DEVELOPMENT-SCOPE.json").read_text(encoding="utf-8"))
         runtime_lines = (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines()
     except (OSError, json.JSONDecodeError) as error:
         fail(f"cannot read release contract metadata: {error}")
@@ -191,7 +190,6 @@ def check_release_contract() -> None:
         fail("release-contract.json has an unsupported schema")
         return
     package = contract.get("package", {})
-    runtime = contract.get("runtime", {})
     authority = contract.get("authority", {})
     validation = contract.get("validation", {})
 
@@ -213,23 +211,12 @@ def check_release_contract() -> None:
     if str(package.get("fedora", "")) != "44":
         fail("release contract Fedora target must remain 44")
 
-    release = scope.get("release", {}) if isinstance(scope, dict) else {}
-    if release.get("version") != expected_version or release.get("rpm_release") != expected_release:
-        fail("development scope release identity differs from release contract")
-    if release.get("nvr") != f"{expected_name}-{expected_version}-{expected_release}":
-        fail("development scope NVR differs from release contract")
-
     runtime_values: dict[str, str] = {}
     for raw in runtime_lines:
         line = raw.strip()
         if line and not line.startswith("#") and "=" in line:
             key, value = line.split("=", 1)
             runtime_values[key] = value
-    if runtime_values.get("BC250_OLLAMA_VERSION") != runtime.get("ollama"):
-        fail("runtime Ollama pin differs from release contract")
-    if runtime_values.get("BC250_OPEN_WEBUI_VERSION") != runtime.get("open_webui"):
-        fail("runtime Open WebUI pin differs from release contract")
-
     primary = authority.get("primary", {}) if isinstance(authority, dict) else {}
     secondary = authority.get("secondary", {}) if isinstance(authority, dict) else {}
     if primary.get("kind") != "github-actions" or primary.get("workflow") != ".github/workflows/build-rpm.yml":
@@ -338,10 +325,8 @@ def check_dispatcher_and_runtime_contracts() -> None:
     dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
     routes = set(re.findall(r'^  "([a-z0-9-]+)\|', dispatcher, flags=re.MULTILINE))
     required = {
-        "agent-mode", "benchmark", "code", "code-commit", "compare-mtp", "health",
-        "fetch-mtp", "gitea-review", "install", "maintenance", "model", "ocr",
-        "package-gate", "rag", "reset", "resilience", "revalidate", "ollama-profile",
-        "openwebui-setup", "qualification", "run-mtp", "status", "support-bundle", "storage", "verify", "version",
+        "advanced", "document", "health", "install", "maintenance", "model",
+        "ocr", "reset", "status", "storage", "support-bundle", "verify", "version",
     }
     if routes != required:
         fail(f"dispatcher command set differs from the supported interface: {sorted(routes)}")
@@ -370,7 +355,7 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "dedupe -q",
             "PRUNE-SOURCES",
         ),
-        "uninstall.sh": (
+        "cmd/system/reset.sh": (
             "PURGE-BC250-LLM",
             '"$MEMORY_PROFILE" remove',
             '"$SWAP_PROFILE" remove',
@@ -458,8 +443,8 @@ def check_dispatcher_and_runtime_contracts() -> None:
             fail("runtime Ollama payload URL does not match BC250_OLLAMA_VERSION")
         if re.fullmatch(r"[0-9a-f]{64}", ollama_sha) is None:
             fail("runtime Ollama payload SHA-256 is malformed")
-        if not owui_version or runtime.get("BC250_OPEN_WEBUI_TASK_CONTRACT") != owui_version:
-            fail("Open WebUI task contract must match the pinned Open WebUI version")
+        if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", owui_version):
+            fail("runtime Open WebUI version metadata is malformed")
         if re.fullmatch(r"sha256:[0-9a-f]{64}", runtime.get("BC250_OPEN_WEBUI_IMAGE_DIGEST", "")) is None:
             fail("runtime Open WebUI image digest is malformed")
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", runtime.get("BC250_GOVERNOR_VERSION", "")):

@@ -10,7 +10,7 @@ patterns='gfx1013|GFX1013|private RADV|/opt/bc250-gfx1013|PATCHED_BOOT_UNVERIFIE
 # name deleted files and historical cleanup work. Validate its active schema/state
 # separately in source tests.
 paths=()
-for p in cmd config tests docs README.md TLDR.md install uninstall.sh Makefile development/DEVELOPMENT-SCOPE.json development/VALIDATION-MATRIX.md development/TESTING-STRATEGY.md; do
+for p in cmd config tests docs README.md TLDR.md install cmd/system/reset.sh Makefile development/DEVELOPMENT-SCOPE.json development/VALIDATION-MATRIX.md development/TESTING-STRATEGY.md; do
   [[ -e "$root/$p" ]] && paths+=("$root/$p")
 done
 

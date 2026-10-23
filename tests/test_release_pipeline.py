@@ -39,7 +39,7 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertEqual(contract["validation"]["blocking_static"]["command"], "make lint")
         self.assertTrue(contract["validation"]["rpmlint"]["blocking"])
 
-    def test_contract_matches_current_package_and_runtime_identity(self) -> None:
+    def test_contract_matches_current_package_identity_and_defers_runtime_pins(self) -> None:
         contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -47,8 +47,9 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertEqual(contract["package"]["version"], version)
         self.assertRegex(spec, rf"(?m)^Version:\s+{re.escape(version)}$")
         self.assertRegex(spec, rf"(?m)^Release:\s+{re.escape(contract['package']['rpm_release'])}%")
-        self.assertIn(f"BC250_OLLAMA_VERSION={contract['runtime']['ollama']}", runtime)
-        self.assertIn(f"BC250_OPEN_WEBUI_VERSION={contract['runtime']['open_webui']}", runtime)
+        self.assertNotIn("runtime", contract)
+        self.assertIn("BC250_OLLAMA_VERSION=0.40.8", runtime)
+        self.assertIn("BC250_OPEN_WEBUI_VERSION=0.12.3", runtime)
 
     def test_workflow_runs_primary_gate_as_unprivileged_builder(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
@@ -113,6 +114,14 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("$(FROZEN_SPEC)", frozen)
         self.assertIn("cmp -s", check)
         self.assertIn("validate.sh --preflight", check)
+
+    def test_duplicate_binary_rpm_target_is_absent(self) -> None:
+        makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotRegex(makefile, r"(?m)^rpm:")
+        self.assertNotIn("rpmbuild -ba", makefile)
+        self.assertNotIn("make rpm", readme)
+        self.assertIn("make release-gate", readme)
 
     def test_srpm_target_can_consume_frozen_rpm_tree(self) -> None:
         srpm = make_recipe("srpm")

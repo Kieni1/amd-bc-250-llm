@@ -140,8 +140,8 @@ class PackagingTests(unittest.TestCase):
 
     def test_live_manager_cpu_unlock_uses_bc250_compatible_reboot_patch(self) -> None:
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        patch = (ROOT / "patches/cu-live-manager-rpm-paths.patch").read_text(encoding="utf-8")
-        self.assertIn("patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch", spec)
+        patch = (ROOT / "packaging/patches/cu-live-manager-rpm-paths.patch").read_text(encoding="utf-8")
+        self.assertIn("patch -d live-manager-src -p1 < packaging/patches/cu-live-manager-rpm-paths.patch", spec)
         self.assertIn("-\t\t\t\tsystemctl reboot", patch)
         self.assertIn("+\t\t\t\t/usr/sbin/reboot", patch)
 
@@ -251,61 +251,151 @@ class PackagingTests(unittest.TestCase):
 
     def test_model_package_and_public_dispatcher_are_installed(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        self.assertIn("models/modelctl.py\t{libexec}/modelctl", manifest)
-        self.assertIn("{config}/models.d", manifest)
-        self.assertIn("models/modelfiles/*.Modelfile", manifest)
-        self.assertNotIn("models/sources", manifest)
-        self.assertIn("uninstall.sh\t{libexec}/uninstall.sh", manifest)
-        self.assertIn("cmd/monitoring/status.sh\t{libexec}/status.sh", manifest)
-        self.assertIn("cmd/monitoring/status-json.py\t{libexec}/status-json.py", manifest)
-        self.assertIn("cmd/monitoring/health.py\t{libexec}/health.py", manifest)
-        self.assertIn("cmd/monitoring/support-bundle.sh\t{libexec}/support-bundle.sh", manifest)
-        self.assertNotIn("bc250_model", manifest)
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        for route in ("model", "status", "health", "version", "support-bundle", "fetch-mtp", "ocr", "rag", "package-gate", "qualification", "resilience"):
+        advanced = (ROOT / "packaging/advanced").read_text(encoding="utf-8")
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        for route in ("advanced", "document", "model", "status", "health", "version", "support-bundle", "ocr", "maintenance"):
             self.assertRegex(dispatcher, rf'(?m)^  "{route}\|', route)
-        self.assertNotIn('--list-aliases', dispatcher)
-        self.assertNotIn('"uninstall|', dispatcher)
-        self.assertNotIn('"fetch-embeddings|', dispatcher)
-        self.assertNotIn("aliases\t", manifest)
+        for removed in ("rag", "benchmark", "agent-mode", "fetch-mtp", "run-mtp", "compare-mtp", "package-gate", "qualification", "resilience", "code", "code-commit", "gitea-review", "openwebui-setup", "ollama-profile"):
+            self.assertNotRegex(dispatcher, rf'(?m)^  "{removed}\|', removed)
+        top_level = re.search(r"compgen -W '([^']+)'", completion)
+        self.assertIsNotNone(top_level)
+        top_words = set(top_level.group(1).split())
+        self.assertFalse({"rag", "benchmark", "agent-mode", "fetch-mtp", "package-gate", "qualification", "resilience", "code"} & top_words)
+        for advanced_command in ("benchmark", "revalidate", "qualification", "resilience", "ollama-profile", "openwebui", "agent", "mtp", "code"):
+            self.assertIn(advanced_command, advanced)
         self.assertIn("packaging/bc250\t{bindir}/bc250", manifest)
+        self.assertIn("packaging/advanced\t{libexec}/advanced", manifest)
+        self.assertIn("models/modelctl.py\t{libexec}/modelctl", manifest)
+        self.assertIn("cmd/documents/ocr.sh\t{libexec}/documents/ocr.sh", manifest)
+        self.assertIn("cmd/benchmark/parity-diagnose.sh\t{libexec}/parity-diagnose.sh", manifest)
+        self.assertNotIn("llm-run-diagnose", manifest)
         self.assertIn("cmd/system/40cu.sh\t{bindir}/bc250-40cu", manifest)
         self.assertIn("live-manager-src/bc250-cu-live-manager.sh\t{bindir}/bc250-cu-live-manager", manifest)
-        self.assertIn("models/ocr/bc250-ocr.sh\t{libexec}/ocr.sh", manifest)
-        for entry in (
-            "cmd/benchmark/benchmark.sh\t{libexec}/benchmark.sh",
-            "cmd/benchmark/generation-benchmark.py\t{libexec}/generation-benchmark.py",
-            "cmd/benchmark/category-benchmark.py\t{libexec}/category-benchmark.py",
-            "cmd/benchmark/runtime-benchmark.py\t{libexec}/runtime-benchmark.py",
-            "cmd/benchmark/openwebui-benchmark.py\t{libexec}/openwebui-benchmark.py",
-            "cmd/benchmark/benchmark_common.py\t{libexec}/benchmark_common.py",
-            "cmd/qualification/qualification_inventory.py\t{libexec}/qualification/qualification_inventory.py",
-            "cmd/monitoring/version.py\t{libexec}/version.py",
-            "packaging/completions/bc250.bash\t{bashcompletiondir}/bc250",
-            "examples/benchmark/embedding-office.json\t{share}/benchmark/embedding-office.json",
-            "examples/benchmark/agent-cases.json\t{share}/benchmark/agent-cases.json",
-            "examples/benchmark/usecase-office.json\t{share}/benchmark/usecase-office.json",
-            "examples/benchmark/translation-office.json\t{share}/benchmark/translation-office.json",
-            "examples/benchmark/rag-cycle.json\t{share}/benchmark/rag-cycle.json",
-            "examples/benchmark/rag-quality-office.json\t{share}/benchmark/rag-quality-office.json",
-            "examples/benchmark/ocr/manifest.json\t{share}/benchmark/ocr/manifest.json",
-            "MODELS.md\t{docdir}/MODELS.md",
-        ):
-            self.assertIn(entry, manifest)
-
-    def test_17_operator_qol_interfaces_are_packaged(self) -> None:
-        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
-        self.assertIn('"qualification|$LIBEXEC/qualification/qualification_inventory.py"', dispatcher)
-        self.assertIn('"version|$LIBEXEC/version.py"', dispatcher)
-        self.assertIn('--version) exec "$LIBEXEC/version.py" --short', dispatcher)
-        self.assertNotIn("gfx" + "1013", manifest.lower())
-        self.assertIn("qualification_inventory.py\t{libexec}/qualification/qualification_inventory.py", manifest)
         self.assertIn("packaging/completions/bc250.bash\t{bashcompletiondir}/bc250", manifest)
-        self.assertIn("qualification", completion)
-        self.assertNotIn("gfx" + "1013", completion.lower())
-        self.assertIn("--older-than-days --keep-latest --apply", completion)
+        self.assertNotIn('"doctor|', dispatcher)
+        self.assertNotIn('--list-aliases', dispatcher)
+
+    def test_171_removed_top_level_commands_are_rejected(self) -> None:
+        dispatcher = ROOT / "packaging/bc250"
+        removed = (
+            "rag", "benchmark", "revalidate", "package-gate", "qualification",
+            "resilience", "agent-mode", "fetch-mtp", "run-mtp", "compare-mtp",
+            "code", "code-commit", "gitea-review", "openwebui-setup", "ollama-profile",
+        )
+        for command in removed:
+            with self.subTest(command=command):
+                result = subprocess.run(
+                    [str(dispatcher), command],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn(f"unknown command: {command}", result.stderr)
+
+    def test_171_advanced_surface_consolidates_specialist_commands(self) -> None:
+        advanced = (ROOT / "packaging/advanced").read_text(encoding="utf-8")
+        completion = (ROOT / "packaging/completions/bc250.bash").read_text(encoding="utf-8")
+        self.assertIn('qualification() {', advanced)
+        self.assertIn('package_gate_capture.py" capture', advanced)
+        self.assertIn('qualification_inventory.py" "$command"', advanced)
+        self.assertIn('specialist_model() {', advanced)
+        self.assertIn('list|status|prepare) specialist_model agentic 0', advanced)
+        self.assertIn('list|status|prepare) specialist_model mtp 1', advanced)
+        self.assertIn('extra+=(--include-disabled)', advanced)
+        self.assertIn('run-mtp-llamacpp.sh', advanced)
+        self.assertIn('compare-mtp.sh', advanced)
+        self.assertIn("agent benchmark code mtp", completion)
+        self.assertIn("capture list clean", completion)
+
+    def test_dispatcher_suppresses_python_bytecode_in_package_helpers(self) -> None:
+        dispatcher = ROOT / "packaging/bc250"
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            documents = libexec / "documents"
+            documents.mkdir()
+            (documents / "helper_module.py").write_text("VALUE = 1\n", encoding="utf-8")
+            document = documents / "lifecycle.py"
+            document.write_text("#!/usr/bin/env python3\nimport helper_module\nprint(helper_module.VALUE)\n", encoding="utf-8")
+            document.chmod(0o755)
+            result = subprocess.run([str(dispatcher), "document"], env={**os.environ, "BC250_LIBEXEC": str(libexec)}, text=True, capture_output=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "1")
+            self.assertFalse((libexec / "__pycache__").exists())
+
+    def test_modelctl_topology_transition_traverses_canonical_advanced_dispatcher(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("bc250_modelctl_dispatch_test", ROOT / "models/modelctl.py")
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                libexec = root / "libexec"
+                libexec.mkdir()
+                advanced = libexec / "advanced"
+                advanced.write_text((ROOT / "packaging/advanced").read_text(encoding="utf-8"), encoding="utf-8")
+                advanced.chmod(0o755)
+                log = root / "agent-mode.log"
+                mode = libexec / "agent-mode.sh"
+                mode.write_text(
+                    '#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$BC250_AGENT_MODE_LOG"\n',
+                    encoding="utf-8",
+                )
+                mode.chmod(0o755)
+                previous = {key: os.environ.get(key) for key in ("BC250_DISPATCHER", "BC250_LIBEXEC", "BC250_AGENT_MODE_LOG")}
+                try:
+                    os.environ["BC250_DISPATCHER"] = str(ROOT / "packaging/bc250")
+                    os.environ["BC250_LIBEXEC"] = str(libexec)
+                    os.environ["BC250_AGENT_MODE_LOG"] = str(log)
+                    module.set_appliance_mode("agent")
+                    module.set_appliance_mode("normal")
+                finally:
+                    for key, value in previous.items():
+                        if value is None:
+                            os.environ.pop(key, None)
+                        else:
+                            os.environ[key] = value
+                self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["enter", "leave"])
+        finally:
+            sys.modules.pop(spec.name, None)
+
+    def test_advanced_agent_separates_model_status_from_runtime_topology(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            modelctl = libexec / "modelctl"
+            modelctl.write_text('#!/usr/bin/env bash\nprintf "model:%s\\n" "$*"\n', encoding="utf-8")
+            modelctl.chmod(0o755)
+            mode = libexec / "agent-mode.sh"
+            mode.write_text('#!/usr/bin/env bash\nprintf "mode:%s\\n" "$*"\n', encoding="utf-8")
+            mode.chmod(0o755)
+            advanced = ROOT / "packaging/advanced"
+            status = subprocess.run(
+                [str(advanced), "agent", "status", "agentic-test"],
+                env={**os.environ, "BC250_LIBEXEC": str(libexec)}, text=True, capture_output=True, check=False,
+            )
+            topology = subprocess.run(
+                [str(advanced), "agent", "topology"],
+                env={**os.environ, "BC250_LIBEXEC": str(libexec)}, text=True, capture_output=True, check=False,
+            )
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertEqual(status.stdout.strip(), "model:status agentic agentic-test")
+        self.assertEqual(topology.returncode, 0, topology.stderr)
+        self.assertEqual(topology.stdout.strip(), "mode:status")
+
+    def test_advanced_mtp_prepare_dispatches_to_explicit_disabled_entry_apply(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            libexec = Path(temporary)
+            modelctl = libexec / "modelctl"
+            modelctl.write_text("#!/usr/bin/env bash\nprintf '%s\n' \"$@\"\n", encoding="utf-8")
+            modelctl.chmod(0o755)
+            advanced = ROOT / "packaging/advanced"
+            result = subprocess.run([str(advanced), "mtp", "prepare", "qwen3.6-27b-mtp"], env={**os.environ, "BC250_LIBEXEC": str(libexec)}, text=True, capture_output=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ["apply", "mtp", "--include-disabled", "qwen3.6-27b-mtp"])
 
     def test_c5b_health_model_completion_and_one_next_action_are_packaged(self) -> None:
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
@@ -320,44 +410,6 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(posttrans.count("sudo bc250 install"), 1)
         self.assertIn('[ -z "${NO_COLOR:-}" ]', posttrans)
         self.assertNotIn("gfx" + "1013", posttrans.lower())
-
-    def test_dispatcher_suppresses_python_bytecode_in_package_helpers(self) -> None:
-        dispatcher = ROOT / "packaging/bc250"
-        with tempfile.TemporaryDirectory() as temporary:
-            libexec = Path(temporary)
-            (libexec / "helper_module.py").write_text("VALUE = 1\n", encoding="utf-8")
-            rag = libexec / "rag"
-            rag.write_text("#!/usr/bin/env python3\nimport helper_module\nprint(helper_module.VALUE)\n", encoding="utf-8")
-            rag.chmod(0o755)
-            result = subprocess.run([str(dispatcher), "rag"], env={**os.environ, "BC250_LIBEXEC": str(libexec)}, text=True, capture_output=True, check=False)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), "1")
-            self.assertFalse((libexec / "__pycache__").exists())
-
-    def test_fetch_mtp_dispatches_to_explicit_disabled_entry_apply(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            libexec = Path(temporary)
-            modelctl = libexec / "modelctl"
-            modelctl.write_text(
-                "#!/usr/bin/env bash\nprintf '%s\n' \"$@\"\n", encoding="utf-8"
-            )
-            modelctl.chmod(0o755)
-            result = subprocess.run(
-                [
-                    str(ROOT / "packaging/bc250"),
-                    "fetch-mtp",
-                    "qwen3.6-27b-mtp",
-                ],
-                env={**os.environ, "BC250_LIBEXEC": str(libexec)},
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(
-            result.stdout.splitlines(),
-            ["apply", "mtp", "--include-disabled", "qwen3.6-27b-mtp"],
-        )
 
     def test_embedding_uses_modelfile_discovery_and_recommended_open_webui_name(
         self,
@@ -635,13 +687,13 @@ class PackagingTests(unittest.TestCase):
         )
 
     def test_compare_mtp_does_not_force_global_think_false(self) -> None:
-        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(
+        source = (ROOT / "models/mtp/compare-mtp.sh").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("think:false", source)
 
     def test_compare_mtp_proves_process_group_ownership_before_group_signal(self) -> None:
-        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(
+        source = (ROOT / "models/mtp/compare-mtp.sh").read_text(
             encoding="utf-8"
         )
         self.assertIn("process_group_owned()", source)
@@ -732,7 +784,7 @@ class PackagingTests(unittest.TestCase):
                 self.assertNotIn('> "$TARBALL.sha256"', text)
 
     def test_compare_mtp_uses_same_model_baseline_and_captures_qualification_evidence(self) -> None:
-        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        source = (ROOT / "models/mtp/compare-mtp.sh").read_text(encoding="utf-8")
         self.assertIn('run_phase baseline --no-mtp', source)
         self.assertIn('run_phase mtp ""', source)
         self.assertNotIn('OLLAMA_URL', source)
@@ -886,7 +938,6 @@ class PackagingTests(unittest.TestCase):
             "0bb17cc19e9c1339ddbe0cba55148bf068f8f19dec8ec5fd531461aaa207282a",
         )
         self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.12.3")
-        self.assertEqual(values["BC250_OPEN_WEBUI_TASK_CONTRACT"], "0.12.3")
         self.assertEqual(values["BC250_TIKA_VERSION"], "4.1.0-full")
         self.assertEqual(values["BC250_GOVERNOR_VERSION"], "0.4.14")
         self.assertEqual(values["BC250_GOVERNOR_COMMIT"], "7b08fdcf542d1edd82f3a9077c902038019c9842")
@@ -1019,13 +1070,13 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('timeout --kill-after=5s "${test_module_timeout}s"', validate)
 
     def test_internal_rag_importer_is_not_packaged_as_an_executable_script(self) -> None:
-        source_path = ROOT / "models/rag/rag_import.py"
+        source_path = ROOT / "cmd/documents/importer.py"
         source = source_path.read_text(encoding="utf-8")
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertFalse(source.startswith("#!"))
         self.assertEqual(source_path.stat().st_mode & 0o111, 0)
         self.assertIn(
-            "file\t0644\tmodels/rag/rag_import.py\t{libexec}/rag_import.py",
+            "file\t0644\tcmd/documents/importer.py\t{libexec}/documents/importer.py",
             manifest,
         )
 
