@@ -20,7 +20,7 @@ Create the ordinary package gate from the exact candidate RPM installed on the
 appliance:
 
 ```bash
-sudo bc250 package-gate capture \
+sudo bc250 advanced qualification capture \
   --candidate-rpm /path/to/candidate.rpm \
   --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
@@ -48,7 +48,7 @@ gate keeps the refresh qualification intentionally small:
 2. Open WebUI must resolve the private `tika` alias.
 3. `http://tika:9998/version` must report Tika 4.1.0.
 4. A deterministic text marker must round-trip through the `/tika` extraction endpoint.
-5. `bc250 benchmark owui-rag bc250-office-documents` performs one synthetic
+5. `bc250 advanced benchmark owui-rag bc250-office-documents` performs one synthetic
    ingest/retrieve path and its built-in cleanup.
 
 Do not restart a broad RAG/model tournament solely for this dependency refresh.
@@ -77,13 +77,13 @@ commands use argv arrays (never shell strings):
 Start and resume with:
 
 ```bash
-sudo bc250 resilience start --plan /root/resilience-plan.json \
+sudo bc250 advanced resilience start --plan /root/resilience-plan.json \
   --package-gate /var/lib/bc250-llm-server/package-gates/gate-...
 
 # after lanes 20-25 and their hygiene barriers pass:
 sudo reboot
-sudo bc250 resilience resume --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
-sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
+sudo bc250 advanced resilience resume --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
+sudo bc250 advanced resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
 
 The manager persists lane results and inter-lane hygiene barriers separately.
@@ -114,14 +114,14 @@ canary when useful and a 24-hour primary only when long-duration evidence is
 needed; use sparse role transitions and a cheap fixed sentinel instead of
 re-running complete model qualification every hour.
 
-## Evidence inventory and conservative cleanup (1.7)
+## Evidence inventory and conservative cleanup
 
 ```bash
-sudo bc250 qualification list
-sudo bc250 qualification list --json
-sudo bc250 qualification clean
-sudo bc250 qualification clean --older-than-days 30 --keep-latest 2
-sudo bc250 qualification clean --older-than-days 30 --keep-latest 2 --apply
+sudo bc250 advanced qualification list
+sudo bc250 advanced qualification list --json
+sudo bc250 advanced qualification clean
+sudo bc250 advanced qualification clean --older-than-days 30 --keep-latest 2
+sudo bc250 advanced qualification clean --older-than-days 30 --keep-latest 2 --apply
 ```
 
 The inventory covers package-gate artifacts and resilience campaigns. It reports result,
@@ -139,4 +139,4 @@ space-management QoL only; it never changes qualification results.
 
 The Tika extraction smoke uses an alphanumeric deterministic marker that is preserved literally by the pinned Tika 4.1 parser. A failed extraction records both the expected marker and observed extracted text so parser-formatting changes are diagnosable rather than reported as a generic RAG failure.
 
-`bc250 verify` validates operational appliance health **and package-owned live runtime identity**. It is still not release authority: package acceptance additionally requires the authoritative `bc250 package-gate` evidence and the applicable release/device gates.
+`bc250 verify` validates operational appliance health **and package-owned live runtime identity**. It is still not release authority: package acceptance additionally requires the authoritative `bc250 advanced qualification` evidence and the applicable release/device gates.

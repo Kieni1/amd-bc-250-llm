@@ -273,12 +273,12 @@ class QualificationTests(unittest.TestCase):
     def test_release_wires_tika_410_and_qualification_commands(self) -> None:
         runtime = (ROOT / "config/runtime.env").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
+        dispatcher = (ROOT / "packaging/advanced").read_text(encoding="utf-8")
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertIn("BC250_TIKA_VERSION=4.1.0-full", runtime)
         self.assertIn("sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7", tika)
-        self.assertIn('"package-gate|$LIBEXEC/qualification/package_gate_capture.py"', dispatcher)
-        self.assertIn('"resilience|$LIBEXEC/qualification/resilience_manager.py"', dispatcher)
+        self.assertIn('capture) exec "$LIBEXEC/qualification/package_gate_capture.py" capture', dispatcher)
+        self.assertIn('resilience) exec "$LIBEXEC/qualification/resilience_manager.py"', dispatcher)
         self.assertIn("cmd/qualification/resilience_common.py", manifest)
 
     def test_reporting_separates_quality_headroom_and_restart_authorities(self) -> None:

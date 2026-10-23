@@ -533,7 +533,7 @@ class CampaignManager:
         self.persist()
         self.event("pre-reboot-complete", boot_id=self.state.get("start_boot_id"))
         print("Pre-reboot resilience lanes 20-25 and hygiene barriers PASS.")
-        print("Reboot the appliance, then run: sudo bc250 resilience resume --campaign-dir " + str(self.campaign))
+        print("Reboot the appliance, then run: sudo bc250 advanced resilience resume --campaign-dir " + str(self.campaign))
         return RESULT_TO_RC["INCOMPLETE"]
 
     def run_post_reboot(self) -> int:
@@ -638,7 +638,7 @@ def default_campaign_dir() -> Path:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="bc250 resilience",
+        prog="bc250 advanced resilience",
         description="Run the bounded resilience lanes with durable resume and cleanup semantics.",
     )
     sub = parser.add_subparsers(dest="command", required=True)

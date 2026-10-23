@@ -38,7 +38,7 @@ TIKA_EXPECTED = "4.1.0"
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        prog="bc250 package-gate",
+        prog="bc250 advanced qualification",
         description=(
             "Create a closed, package-owned qualification gate. The result is derived "
             "from live checks; there is deliberately no --result override."
@@ -346,7 +346,7 @@ def capture(args: argparse.Namespace) -> int:
         "schema": PACKAGE_GATE_SCHEMA,
         "schema_version": 3,
         "created_at": utc_now(),
-        "authority": "bc250 package-gate capture; result derived from package-owned live checks",
+        "authority": "bc250 advanced qualification capture; result derived from package-owned live checks",
         "candidate": {
             **candidate,
             "path": str(candidate_path),

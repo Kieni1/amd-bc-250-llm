@@ -253,7 +253,7 @@ def cmd_clean(args: argparse.Namespace) -> int:
 
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
-        prog="bc250 qualification",
+        prog="bc250 advanced qualification",
         description="Inventory and safely prune package-owned qualification evidence.",
     )
     sub = result.add_subparsers(dest="command", required=True)
