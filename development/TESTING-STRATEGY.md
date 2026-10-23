@@ -1,10 +1,11 @@
-# BC-250 testing strategy — 0.14.1-1.7
+# BC-250 testing strategy
 
 ## Current objective
 
-The current source/release identity is `bc250-llm-server-0.14.1-1.7`.
+This is durable test policy; exact current NVR/evidence lives in `VALIDATION-MATRIX.md` and
+`WORKBENCH-STATE.json`, so an ordinary RPM release does not require rewriting this document.
 
-Testing now has three jobs:
+Testing has three jobs:
 
 1. keep source and packaging regressions visible while pre-v1.0 development moves quickly;
 2. prevent release-critical artifact defects from reaching an RPM candidate;
@@ -51,7 +52,7 @@ These tests must run as an unprivileged RPM builder. Fixtures must not depend on
 
 ### Full repository suite
 
-Keep every existing `tests/test_*.py` module unless the protected behavior itself is deliberately removed. Run modules in isolation so mocks/environment changes do not leak between modules and one slow module is identifiable.
+Keep every existing `tests/test_*.py` module unless the protected behavior itself is deliberately removed. Do not delete tests merely to make fast-moving development quieter. Run modules in isolation so mocks/environment changes do not leak between modules and one slow module is identifiable.
 
 ```bash
 scripts/validate.sh
@@ -76,17 +77,22 @@ Ruff/ShellCheck are blocking release-candidate checks and run before Source0 fre
 
 Source tests do not substitute for exact-RPM device evidence.
 
-For the first `0.14.1-1.7` device round, use `development/handovers/03_CORE_FUNCTIONALITY_CHECK.md` and keep it intentionally small:
+For a structural cleanup release, compare against the most recent accepted RPM and keep the
+device regression deliberately bounded:
 
-- exact RPM identity;
-- install/upgrade completion;
-- `bc250 version`, `status`, `health`, `verify`;
-- normal services/topology;
-- one representative model generation;
-- model-install cancel/no-mutation;
-- one reboot/persistence check.
+- exact RPM install/upgrade and `rpm -V`;
+- `bc250 install` convergence plus `version`, `status`, `health`, and `verify`;
+- 40-CU routing/persistence and governor health;
+- normal Ollama topology and one representative generation;
+- Open WebUI login;
+- managed-document lifecycle smoke plus one grounded query;
+- German/French translation smoke;
+- one representative Advanced/Deep query;
+- reboot, persistence checks, and final status/health/verify;
+- absence of intentionally removed public command aliases.
 
-If that passes, freeze the exact RPM SHA-256 and selected GitHub run identity as the stock-core baseline, then move directly into the product roadmap. Perform bounded simplification opportunistically only where it removes concrete ownership or failure risk; it is not a prerequisite phase.
+The question is whether structural simplification changed supported observable behavior. Deeper
+product campaigns belong to releases that actually change those product surfaces.
 
 ## Deeper tests are risk-driven
 

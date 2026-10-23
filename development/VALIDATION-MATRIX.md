@@ -1,24 +1,24 @@
 # BC-250 validation matrix — current release line
 
-Current release identity: `bc250-llm-server-0.14.1-1.7`.
+Current release identity: `bc250-llm-server-0.14.1-1.7.1`.
 
 This matrix tracks only the evidence needed to move the current line forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
 
 | Area | Current state | Next evidence |
 |---|---|---|
-| Release identity | `0.14.1-1.7` assigned consistently | keep unchanged until package-only revision or next product version |
+| Release identity | `0.14.1-1.7.1` assigned consistently | keep unchanged until package-only revision or next product version |
 | Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during product work and any bounded cleanup |
-| Release preflight | source/release-pipeline gate available | rerun on final source before authoritative build |
-| Full source suite | broad existing suite retained | all modules should pass or have explicit advisory classification |
-| RPM `%check` | bounded package-critical subset | must pass unprivileged in Fedora 44 build |
+| Release preflight | `27/27` source preflight PASS | rerun unchanged in the authoritative build context |
+| Full source suite | `687/687` PASS across 24 module-isolated test modules | keep as source evidence; rerun if source changes |
+| RPM `%check` | `148/148` PASS across the 8 declared source modules | must pass again unprivileged in the Fedora 44 SRPM rebuild |
 | Source0/spec freeze | tracked-source contract implemented | freeze exact inputs in selected build |
 | RPM payload | package contract implemented | must pass on built RPM |
 | rpmlint | blocking configured package gate | any unfiltered finding blocks artifact evidence; fix the package or document a genuine appliance-specific false positive |
 | Authoritative SRPM rebuild | hard release gate | frozen SRPM must rebuild once in an isolated topdir; those exact rebuilt binaries become the artifacts |
 | GitHub authority | explicit selected `workflow_dispatch` run | capture `release-evidence.json` + `release-selection.json` |
-| Runtime/UI baseline | Ollama `0.40.8` + Open WebUI `0.12.3`; prior 0.40.6 device results remain regression baseline only | exact-1.7 Vulkan/lane/registration smoke plus `/api/show` metadata capture and focused managed-RAG lifecycle regression; do not transfer prior DEVICE PASS |
-| Exact-RPM core functionality | 1.4 Blocks 1-3 device-proven; later release bytes still require exact-artifact acceptance | run small 1.7 smoke focused on carried runtime changes, managed-RAG atomic/provenance behavior, reboot and ordinary-user persistence |
-| Product-roadmap baseline | pending device smoke | freeze known-good stock-core baseline, then proceed directly to RAG/document, DE↔FR translation and local-assistant work; simplify only where it removes concrete risk |
+| Runtime/UI baseline | Ollama `0.40.8` + Open WebUI `0.12.3` carried unchanged from 1.7 | bounded exact-1.7.1 runtime/UI smoke; investigate only if structural cleanup changes observable behavior |
+| Exact-RPM core functionality | 1.7 is the source/behavioral regression baseline; 1.7.1 bytes still require exact-artifact acceptance | run the structural cleanup regression from `TESTING-STRATEGY.md`, including removed-command absence and reboot persistence |
+| Product-roadmap baseline | cleanup release pending exact-RPM smoke | after acceptance, proceed to 1.8 Managed Documents v2 rather than extending cleanup scope |
 
 ## Current stop conditions
 

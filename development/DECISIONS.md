@@ -77,7 +77,7 @@ installer exits, or installer verification is redesigned with equivalent protect
 
 **Decision:** Do not run one giant hardware/quality campaign after every source change.
 Use a shared source gate, then qualify only the subsystems affected by the change. Run
-full `bc250 revalidate` for meaningful release/milestone qualification or material
+full `bc250 advanced revalidate` for meaningful release/milestone qualification or material
 runtime/topology changes. Open temporary specialist chats for active quality lanes rather
 than maintaining many permanently synchronized specialist handovers.
 
@@ -343,7 +343,7 @@ path. Do not keep polishing the framework without hardware evidence.
 ordinary-model picker, but install-time state discovery must not turn into an unbounded runtime
 probe or an accidental MTP acquisition path. Generic combined `apply all` / `refresh all`
 therefore never select the MTP category; disabled MTP preparation remains explicit through
-`bc250 fetch-mtp` / `bc250 model apply mtp ... --include-disabled`. The known-inactive agent
+`bc250 advanced mtp prepare` / `bc250 model apply mtp ... --include-disabled`. The known-inactive agent
 Ollama lane is skipped during registration discovery, and remaining local registration probes
 have a short timeout rather than being allowed to stall setup indefinitely. GGUF integrity is
 unchanged: matching schema-3 file identity may use the recorded verified SHA fast path, while
@@ -607,8 +607,8 @@ convergence and is never fetched implicitly.
 
 Before any MTP llama.cpp launch, snapshot every reachable package Ollama lane and drain all resident
 models so unified-memory headroom and performance are not contaminated. A direct operator
-`bc250 run-mtp` owns the temporary lifecycle and restores the exact pre-run residency set on exit,
-using each lane's configured/default keep-alive behavior. `bc250 compare-mtp` and specialist
+`bc250 advanced mtp run` owns the temporary lifecycle and restores the exact pre-run residency set on exit,
+using each lane's configured/default keep-alive behavior. `bc250 advanced mtp compare` and specialist
 qualification use `drain-only` isolation and intentionally leave Ollama cold afterward. Neither path
 changes normal/agent service topology. Restoration failure on the direct path is a command failure.
 
@@ -713,7 +713,7 @@ The 2.3 repository-native source review found and changed the two persistent 40-
 `systemctl reboot` calls. Exact-2.3 installed-package acceptance then found a third reachable call
 inside the pinned upstream CU live manager: its interactive CPU-core-unlock reboot prompt. That
 upstream source is materialized only during RPM prep, so 2.4 corrects it through the existing
-`patches/cu-live-manager-rpm-paths.patch`, replacing only that command with `/usr/sbin/reboot`. The
+`packaging/patches/cu-live-manager-rpm-paths.patch`, replacing only that command with `/usr/sbin/reboot`. The
 interactive prompt remains intact and upstream `--yes` remains non-rebooting.
 
 **Why:** Exact installed 2.2 testing repeatedly distinguished `COMMAND=/usr/sbin/systemctl reboot`
