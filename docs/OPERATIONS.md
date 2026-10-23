@@ -20,29 +20,29 @@ This is the canonical operator reference for day-to-day administration. It combi
 | `bc250 storage` | Report/dedupe/prune package-owned storage |
 | `bc250 reset` | Confirmed greenfield appliance reset |
 | `bc250 model` | Model catalog and lifecycle |
-| `bc250 rag` | Product RAG corpus lifecycle and ingestion |
+| `bc250 document` | Managed document corpus lifecycle and knowledge synchronization |
 | `bc250 ocr` | Experimental office OCR helper |
-| `bc250 openwebui-setup` | Initialize/apply/check package-owned Open WebUI state |
-| `bc250 ollama-profile` | Main Ollama runtime profile |
+| `bc250 advanced` | Advanced/specialist and qualification command namespace |
+| `bc250 advanced openwebui` | Initialize/apply/check package-owned Open WebUI state |
+| `bc250 advanced ollama-profile` | Main Ollama runtime profile |
 | `bc250 maintenance` | Backups, safe power/WOL and optional companion integration |
-| `bc250 benchmark` | Explicit model and appliance benchmarks |
-| `bc250 revalidate` | Whole-appliance qualification harness |
-| `bc250 package-gate` | Capture a closed authoritative release gate |
-| `bc250 resilience` | Run/resume bounded resilience lanes 20–26 |
-| `bc250 qualification` | Inventory or conservatively prune package-owned qualification evidence |
-| `bc250 agent-mode` | Enter/leave/status exclusive Agent mode |
-| `bc250 code`, `bc250 code-commit`, `bc250 gitea-review` | Optional coding-agent workflows |
-| `bc250 compare-mtp`, `bc250 fetch-mtp`, `bc250 run-mtp` | Optional MTP workflows |
+| `bc250 advanced benchmark` | Explicit model and appliance benchmarks |
+| `bc250 advanced revalidate` | Whole-appliance qualification harness |
+| `bc250 advanced qualification` | Capture, inventory, or conservatively prune package-owned qualification evidence |
+| `bc250 advanced resilience` | Run/resume bounded resilience lanes 20–26 |
+| `bc250 advanced agent` | Agent model management plus explicit exclusive-lane topology controls |
+| `bc250 advanced code run`, `bc250 advanced code commit`, `bc250 advanced code review` | Optional coding-agent workflows |
+| `bc250 advanced mtp compare`, `bc250 advanced mtp prepare`, `bc250 advanced mtp run` | Optional MTP workflows |
 | `bc250-cu-live-manager` | Interactive live WGP/CU configuration |
 | `bc250-40cu status` | Compact CU routing verification |
-| `llm-run-diagnose` | Detailed model-run diagnostic |
+| `bc250 advanced benchmark parity` | Detailed model-run diagnostic |
 
 Use `bc250 --help` for the grouped command list. Commands that modify host or service-owned data normally require `sudo`.
 
 ### Qualification evidence inventory
 
-Use `bc250 qualification list [--json]` to inventory package-gate and resilience
-evidence. `bc250 qualification clean` is dry-run by default and selects only old terminal
+Use `bc250 advanced qualification list [--json]` to inventory package-gate and resilience
+evidence. `bc250 advanced qualification clean` is dry-run by default and selects only old terminal
 evidence while retaining the newest records per class; add
 `--apply` only after reviewing the exact paths. Symlinked or out-of-root paths are
 refused.
@@ -89,7 +89,7 @@ compact state for other production/experiment/task/agent/embedding extras. Fully
 lane is shown as deferred without waiting on that stopped Ollama instance. Stage 7 also shows a
 **read-only, non-indexed MTP inventory** so fetched/current standalone llama.cpp artifacts are visible,
 but MTP is not part of the generic picker and is never fetched by installer convergence. Use
-`bc250 fetch-mtp ID` explicitly when preparing one.
+`bc250 advanced mtp prepare ID` explicitly when preparing one.
 Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips
 optional extras only.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
@@ -109,7 +109,7 @@ The model manager deliberately separates read-only discovery/state inspection fr
 mutating lifecycle operations:
 
 ```bash
-bc250 model list [CATEGORY] [--all] [--source PATH] [--modelfile-dir PATH]
+bc250 model list [--include-disabled] [--source PATH] [--modelfile-dir PATH]
 sudo bc250 model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
 bc250 model path CATEGORY ID
 
@@ -120,18 +120,19 @@ sudo bc250 model remove CATEGORY [SELECTION] [--host HOST[:PORT]] [--destination
 sudo bc250 model purge-retired [--yes]
 ```
 
-Categories are `production`, `experiments`, `task`, `agentic`, `embedding`, `mtp`
-and `all`. Legacy aliases are intentionally not accepted. Selections accept a full
+Lifecycle categories are `production`, `experiments`, `task`, `agentic`, `embedding`, `mtp`
+and `all`. Ordinary `bc250 model list` uses the combined `all` view; specialist Agent/MTP list views
+are exposed through `bc250 advanced`. Legacy aliases are intentionally not accepted. Selections accept a full
 model name, displayed global catalog index, comma list, range such as `0,2-4`,
 `recommended`, `production`, or `all`. Prefer full names in long-lived automation.
 
 #### Discovery and state
 
-`list` is catalog-only and does not require `sudo`. It shows definitions and stable
-global indexes without probing protected GGUF/state or Ollama registration state. A
-category filters the same catalog without renumbering it, including the separate MTP
-TOML catalog. `list all` includes enabled MTP entries; add `--all` to include disabled
-MTP definitions.
+`list` is catalog-only and does not require `sudo`. Ordinary display defaults to the combined
+`all` catalog and shows stable global indexes without probing protected GGUF/state or Ollama
+registration state. Specialist agent/MTP filtered views live under `bc250 advanced`; the shared
+manager still accepts category filters internally so those workflows do not duplicate catalog code.
+Add `--include-disabled` only when deliberately inspecting disabled opt-in MTP definitions.
 
 `status` is the read-only runtime inspector and normally runs with `sudo` because
 manager-owned GGUF/state trees are protected. It evaluates the same state contract that
@@ -230,17 +231,17 @@ when `--include-disabled` is supplied. Use the explicit `mtp` category or the
 opt-in helper to select one:
 
 ```bash
-bc250 model list mtp --all
-sudo bc250 fetch-mtp qwen3.5-9b-mtp
+bc250 advanced mtp list
+sudo bc250 advanced mtp prepare qwen3.5-9b-mtp
 sudo bc250 model status mtp qwen3.5-9b-mtp --include-disabled --verbose
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 compare-mtp qwen3.5-9b-mtp
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp compare qwen3.5-9b-mtp
 ```
 
-`bc250 run-mtp` drains resident Ollama models before launching standalone llama.cpp. Direct operator
-runs restore the exact pre-run residency set when llama.cpp exits; `bc250 compare-mtp` uses the
+`bc250 advanced mtp run` drains resident Ollama models before launching standalone llama.cpp. Direct operator
+runs restore the exact pre-run residency set when llama.cpp exits; `bc250 advanced mtp compare` uses the
 qualification `drain-only` policy and intentionally leaves Ollama cold after evidence capture.
 
-Running `sudo bc250 fetch-mtp` without a selection shows the disabled experiment entries
+Running `sudo bc250 advanced mtp prepare` without a selection shows the disabled experiment entries
 and prompts for one. It maps to `bc250 model apply mtp --include-disabled`; the explicit
 helper is therefore safe to use without editing `/etc/bc250-llm-server/mtp-models.toml`.
 `refresh mtp ... --include-disabled` deliberately re-fetches source bytes. MTP has no
@@ -260,14 +261,14 @@ without silently accepting modified source data.
 ### Documents / RAG lifecycle
 
 ```bash
-sudo bc250 rag init public COLLECTION
-sudo bc250 rag prepare-batch public COLLECTION --dry-run
-sudo bc250 rag prepare-batch public COLLECTION
-sudo bc250 rag review public COLLECTION
-sudo bc250 rag validate public COLLECTION --include-working
-sudo bc250 rag activate public COLLECTION --all-ready
-sudo bc250 rag status
-sudo bc250 rag ingest --token-file FILE [--prune] [--url URL --allow-remote [--allow-confidential-remote]]
+sudo bc250 document init public COLLECTION
+sudo bc250 document prepare-batch public COLLECTION --dry-run
+sudo bc250 document prepare-batch public COLLECTION
+sudo bc250 document review public COLLECTION
+sudo bc250 document validate public COLLECTION --include-working
+sudo bc250 document activate public COLLECTION --all-ready
+sudo bc250 document status
+sudo bc250 document ingest --token-file FILE [--prune] [--url URL --allow-remote [--allow-confidential-remote]]
 ```
 
 The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
@@ -300,7 +301,7 @@ The RPM statically owns `ollama.service` on `11434`, `ollama-task.service` on `1
 `ollama-embedding.service` on `11437` and exclusive `ollama-agent.service` on
 `11436`. Normal mode requires main + task + embedding. `bc250 model` switches
 modes automatically for package-managed agent registration and restores normal
-mode afterwards; `bc250 agent-mode enter|leave` is the explicit runtime switch.
+mode afterwards; `bc250 advanced agent enter|leave` is the explicit runtime switch.
 Each lane keeps its own model store. Revision/checksum overrides still require
 one selected model.
 
@@ -352,10 +353,10 @@ resize/removal is fail-closed: if active-swap state cannot be read or an active 
 deactivated, the helper refuses to unlink or replace its backing file. The main Ollama runtime remains explicitly selectable:
 
 ```bash
-bc250 ollama-profile status
-sudo bc250 ollama-profile balanced
-sudo bc250 ollama-profile max-context
-sudo bc250 ollama-profile reset
+bc250 advanced ollama-profile status
+sudo bc250 advanced ollama-profile balanced
+sudo bc250 advanced ollama-profile max-context
+sudo bc250 advanced ollama-profile reset
 ```
 
 ### CU routing
@@ -385,20 +386,20 @@ sudo bc250 support-bundle
 sudo bc250 verify
 sudo bc250 verify --summary
 sudo bc250 verify --owui-token-file FILE
-sudo bc250 openwebui-setup status --verbose --owui-token-file FILE
+sudo bc250 advanced openwebui status --verbose --owui-token-file FILE
 RUN_MODEL_TESTS=1 sudo bc250 verify
-sudo llm-run-diagnose --no-load
-MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo llm-run-diagnose
+sudo bc250 advanced benchmark parity --no-load
+MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo bc250 advanced benchmark parity
 sensors
-bc250 benchmark generation
-sudo bc250 revalidate start
-sudo bc250 revalidate start --skip-owui
-sudo bc250 revalidate status
-sudo bc250 revalidate status --raw  # machine-readable key=value state
-sudo bc250 revalidate abort
-sudo bc250 revalidate cleanup
-sudo bc250 package-gate capture --candidate-rpm /path/to/candidate.rpm --token-file FILE
-sudo bc250 resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
+bc250 advanced benchmark generation
+sudo bc250 advanced revalidate start
+sudo bc250 advanced revalidate start --skip-owui
+sudo bc250 advanced revalidate status
+sudo bc250 advanced revalidate status --raw  # machine-readable key=value state
+sudo bc250 advanced revalidate abort
+sudo bc250 advanced revalidate cleanup
+sudo bc250 advanced qualification capture --candidate-rpm /path/to/candidate.rpm --token-file FILE
+sudo bc250 advanced resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
 
 `sudo bc250 status --json` emits schema `bc250.status.v3` with installed package, kernel,
@@ -409,10 +410,10 @@ exact running-kernel `kernel-devel` availability; run it with `sudo` to include
 the full package verifier.
 
 `bc250 status` derives `normal`, `degraded`, `stopped` and exclusive `agent` topology from the same
-classifier used by `bc250 agent-mode status`; a concise `Overall` / `Runtime mode` summary appears
+classifier used by `bc250 advanced agent topology`; a concise `Overall` / `Runtime mode` summary appears
 near the top. It does not call a machine "normal" merely because the agent unit is inactive.
 Unexpected degraded normal topology also prints the supported convergence command
-`sudo bc250 agent-mode normal` so the status output is directly actionable.
+`sudo bc250 advanced agent normal` so the status output is directly actionable.
 If the optional reboot diagnostic helper is absent, the reboot recommendation is reported as
 `not checked` rather than as uncertain appliance health. `bc250 status` also distinguishes an active
 Open WebUI systemd unit from HTTP application readiness, queries the active Ollama lane's
@@ -429,9 +430,9 @@ the archived checksum set again. It intentionally excludes OWUI credentials, pro
 uploaded document contents, database rows, identity SQL and backup contents. Use `--output-dir DIR`
 when the archive should be written elsewhere.
 
-`bc250 revalidate` harness v4.8 is the root-only systemd-backed package
+`bc250 advanced revalidate` harness v4.8 is the root-only systemd-backed package
 qualification workflow. A full
-`sudo bc250 revalidate start --owui-token-file FILE` follows a compact six-phase
+`sudo bc250 advanced revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly partial Open WebUI coverage
 run. The token file must be a protected readable regular file and is authenticated
 before run state is created. The worker remains systemd-owned; Ctrl-C detaches and
@@ -468,7 +469,7 @@ than rebuilding the Filter contract in the harness. Final bundles remain under
 `systemctl status` results are annotated when the agent lane is intentionally inactive in
 normal mode. Completed work remains inspectable until `cleanup` or a later `start`.
 
-`bc250 revalidate status` is human-readable by default and reports the exact installed package NEVRA
+`bc250 advanced revalidate status` is human-readable by default and reports the exact installed package NEVRA
 separately from the target source version and harness identity. It separates the installed
 harness/worker state from the recorded last-run result; `--raw` preserves the
 key/value form for scripts. `abort` requests termination of the current systemd-owned
@@ -495,33 +496,33 @@ Canonical public benchmark commands are explicit; there is no commandless genera
 default and no legacy alias layer:
 
 ```bash
-bc250 benchmark generation --profile compare MODEL...
-bc250 benchmark generation --profile edge --mode production MODEL...
-bc250 benchmark generation --profile thermal MODEL...
-bc250 benchmark generation --deep-context MODEL...
-bc250 benchmark generation --profile thermal --sustained-seconds 180 MODEL...
-bc250 benchmark embeddings [MODEL ...]
-bc250 benchmark ocr [MODEL ...]
-bc250 benchmark task [MODEL ...]
-bc250 benchmark usecase [MODEL ...]
-bc250 benchmark translation [--think auto|true|false] [MODEL ...]
-bc250 benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
-bc250 benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
-bc250 benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
+bc250 advanced benchmark generation --profile compare MODEL...
+bc250 advanced benchmark generation --profile edge --mode production MODEL...
+bc250 advanced benchmark generation --profile thermal MODEL...
+bc250 advanced benchmark generation --deep-context MODEL...
+bc250 advanced benchmark generation --profile thermal --sustained-seconds 180 MODEL...
+bc250 advanced benchmark embeddings [MODEL ...]
+bc250 advanced benchmark ocr [MODEL ...]
+bc250 advanced benchmark task [MODEL ...]
+bc250 advanced benchmark usecase [MODEL ...]
+bc250 advanced benchmark translation [--think auto|true|false] [MODEL ...]
+bc250 advanced benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
+bc250 advanced benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
+bc250 advanced benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
 
-sudo bc250 agent-mode enter
-bc250 benchmark agent MODEL --ollama-url http://127.0.0.1:11436
-sudo bc250 agent-mode leave
+sudo bc250 advanced agent enter
+bc250 advanced benchmark agent MODEL --ollama-url http://127.0.0.1:11436
+sudo bc250 advanced agent leave
 # explicit idempotent normal-topology convergence/recovery alias:
-sudo bc250 agent-mode normal
+sudo bc250 advanced agent normal
 
-bc250 benchmark concurrency MAIN_MODEL EMBED_MODEL
-bc250 benchmark num-batch MODEL [MODEL ...]
-bc250 benchmark owui-translation --token-file FILE
-bc250 benchmark owui-rag MODEL --token-file FILE
-bc250 benchmark owui-embedding-batch --token-file FILE
-bc250 benchmark owui-chunk-min MODEL --token-file FILE
-sudo bc250 benchmark owui-system-context MODEL --token-file FILE
+bc250 advanced benchmark concurrency MAIN_MODEL EMBED_MODEL
+bc250 advanced benchmark num-batch MODEL [MODEL ...]
+bc250 advanced benchmark owui-translation --token-file FILE
+bc250 advanced benchmark owui-rag MODEL --token-file FILE
+bc250 advanced benchmark owui-embedding-batch --token-file FILE
+bc250 advanced benchmark owui-chunk-min MODEL --token-file FILE
+sudo bc250 advanced benchmark owui-system-context MODEL --token-file FILE
 ```
 
 Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
@@ -552,14 +553,14 @@ for result schema, category contracts and the package-pinned Ollama request poli
 ### Open WebUI setup
 
 ```bash
-sudo bc250 openwebui-setup init
-sudo bc250 openwebui-setup init --token-file FILE
-sudo bc250 openwebui-setup init --owui-token-file FILE  # alias
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup apply
-bc250 openwebui-setup status
-sudo bc250 openwebui-setup status --token-file FILE
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup status
-sudo bc250 openwebui-setup save-key --token-file FILE
+sudo bc250 advanced openwebui init
+sudo bc250 advanced openwebui init --token-file FILE
+sudo bc250 advanced openwebui init --owui-token-file FILE  # alias
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 advanced openwebui apply
+bc250 advanced openwebui status
+sudo bc250 advanced openwebui status --token-file FILE
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 advanced openwebui status
+sudo bc250 advanced openwebui save-key --token-file FILE
 ```
 
 `init` can create the first administrator, sign in an existing administrator or
@@ -582,10 +583,10 @@ archive. See [`OPERATIONS.md`](OPERATIONS.md) for archive semantics and restorat
 Agent mode is separate from Open WebUI:
 
 ```bash
-bc250 agent-mode status
-sudo bc250 agent-mode enter
-sudo bc250 agent-mode leave
-sudo bc250 agent-mode normal
+bc250 advanced agent topology
+sudo bc250 advanced agent enter
+sudo bc250 advanced agent leave
+sudo bc250 advanced agent normal
 ```
 
 Entering agent mode stops main/task/embedding and starts only the 11436 coding
@@ -645,38 +646,38 @@ and [`OPERATIONS.md`](OPERATIONS.md).
 ### Coding and experiments
 
 ```bash
-bc250 code MODE INPUT [OUTPUT] [TASK...]
-bc250 code-commit [--yes]
-bc250 gitea-review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 compare-mtp MTP_ID
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 run-mtp MTP_ID
+bc250 advanced code run MODE INPUT [OUTPUT] [TASK...]
+bc250 advanced code commit [--yes]
+bc250 advanced code review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp compare MTP_ID
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp run MTP_ID
 ```
 
 `MODE` is `generate`, `refactor`, `review`, `document`, `test` or `commit`.
 For file-producing `generate`, `refactor` and `test` modes, and for the structured `commit` mode,
-`bc250 code` fails closed when the final answer is wrapped in an outer Markdown code fence. It does
+`bc250 advanced code run` fails closed when the final answer is wrapped in an outer Markdown code fence. It does
 not silently strip the fence because that would hide a model output-contract failure. `review` and
 `document` continue to allow Markdown.
 
 `CODING_AGENT_MODEL` selects an installed agentic model; `OLLAMA_HOST`/`OLLAMA_URL`
 override its endpoint, and `CODING_AGENT_NUM_PREDICT` overrides the positive output
-token budget (default 3072). `bc250 code` uses `/api/chat` with `think:true` and writes
+token budget (default 3072). `bc250 advanced code run` uses `/api/chat` with `think:true` and writes
 only terminal non-empty `message.content`. It returns `3` and leaves an existing output
 file unchanged if completion is nonterminal, stops at `done_reason=length`, or final
 content contains literal reasoning markers. Coding helpers do not stage, push, approve
 or merge without the command's explicit local action.
 
-Prepare a candidate first with `sudo bc250 fetch-mtp ID`; the explicit helper exposes
+Prepare a candidate first with `sudo bc250 advanced mtp prepare ID`; the explicit helper exposes
 the packaged disabled experiments without making them part of normal convergence.
 
-`bc250 compare-mtp` is a controlled same-target qualification helper: it starts the
+`bc250 advanced mtp compare` is a controlled same-target qualification helper: it starts the
 same GGUF through the same external llama.cpp build and runtime settings first with
 MTP disabled, then with `draft-mtp` enabled. `NUM_PREDICT` and `PROMPT` may override
 the bounded completion probe. The result bundle records throughput, terminal
 completion integrity, draft accepted/proposed counts and acceptance percentage,
 minimum available memory, swap growth, model/source identity, llama.cpp identity and
 relevant kernel/GPU faults. Missing MTP draft-acceptance telemetry is insufficient
-qualification evidence rather than inference corruption. Use `bc250 benchmark` for
+qualification evidence rather than inference corruption. Use `bc250 advanced benchmark` for
 category quality/correctness comparisons. MTP requires a compatible external
 llama.cpp server binary through `LLAMACPP`; `PORT`, `CTX`, `DRAFT_N_MAX` and optional
 `UBATCH` override runtime values. When supported, the runner passes `--cache-ram 0`
@@ -694,7 +695,7 @@ and verified CU changes after dedicated confirmation while preserving
 `/srv/bc250-documents`. It does not reconstruct historical host ownership, roll
 back Fedora upgrades or shrink filesystems. Ordinary
 `dnf remove bc250-llm-server.x86_64` retains persistent data. Read
-[`UNINSTALL.md`](UNINSTALL.md) first.
+[`RESET.md`](RESET.md) first.
 
 ### Installed documentation and important paths
 
@@ -829,11 +830,11 @@ it does not dump the unrelated baseline set.
 ### Open WebUI package baseline
 
 Open WebUI package-owned provider/task/RAG/model-preset state is now managed by
-`bc250 openwebui-setup`, not the maintenance scheduler:
+`bc250 advanced openwebui`, not the maintenance scheduler:
 
 ```bash
-sudo bc250 openwebui-setup init
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup status
+sudo bc250 advanced openwebui init
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 advanced openwebui status
 ```
 
 The Qwen3.5 workspace preset is imported additively with request-level

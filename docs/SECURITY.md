@@ -86,7 +86,7 @@ sudo systemctl stop open-webui.service tika.service nginx.service
 sudo systemctl disable --now ollama.service ollama-task.service ollama-embedding.service ollama-agent.service
 ```
 
-For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250 agent-mode leave`; use `enter` only for exclusive coding tests. Rerun `sudo bc250 install` to restore Open WebUI boot enablement after deliberately removing its Quadlet drop-in.
+For the normal appliance, restore all three normal Ollama lanes together with `sudo bc250 advanced agent leave`; use `enter` only for exclusive coding tests. Rerun `sudo bc250 install` to restore Open WebUI boot enablement after deliberately removing its Quadlet drop-in.
 
 
 ## Package-owned Open WebUI Function
@@ -97,7 +97,7 @@ direction wrapper to the current text user message. Open WebUI Functions execute
 inside the application server, so treat any Function as executable server code. The
 package-owned filter is intentionally tiny: it performs no network, filesystem, process,
 credential or tool access and is attached only to the two production translation presets.
-`bc250 openwebui-setup apply` restores its reviewed source and active/non-global state;
+`bc250 advanced openwebui apply` restores its reviewed source and active/non-global state;
 `status` reports drift. Do not mark it global or replace it with unreviewed community
 code on a confidential appliance.
 
@@ -106,6 +106,6 @@ code on a confidential appliance.
 Open WebUI is configured with `OFFLINE_MODE=true` and `HF_HUB_OFFLINE=1`, with
 automatic embedding/reranking/Whisper model updates disabled. This reduces
 application-initiated outbound traffic but is not a network isolation boundary.
-Keep firewalld/nginx policy authoritative. `bc250 openwebui-setup` uses a
+Keep firewalld/nginx policy authoritative. `bc250 advanced openwebui` uses a
 temporary administrator credential only when explicitly run and does not store it.
 Agent/coding mode is exclusive and the agent service remains disabled at boot.

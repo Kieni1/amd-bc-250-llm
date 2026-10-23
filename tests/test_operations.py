@@ -110,7 +110,7 @@ class StatusTests(unittest.TestCase):
         self.assertNotIn('package runtime identity mismatch/unavailable', source)
         self.assertIn('Runtime mode: exclusive agent', source)
         self.assertIn('Overall: DEGRADED', source)
-        self.assertIn('Recovery: sudo bc250 agent-mode normal', source)
+        self.assertIn('Recovery: sudo bc250 advanced agent normal', source)
         self.assertIn('Overall: UNAVAILABLE', source)
         self.assertIn('Restart advisory: not evaluated (optional helper unavailable)', source)
 
@@ -357,7 +357,7 @@ ollama_version_line
         self.assertIn("configured_runtime", version)
         self.assertIn("runtime_identity", version)
         self.assertIn('section "Package runtime identity"', verify)
-        self.assertIn("release acceptance additionally requires bc250 package-gate", verify)
+        self.assertIn("release acceptance additionally requires bc250 advanced qualification", verify)
 
     def test_runtime_state_identifies_only_active_zram_swap_membership(self) -> None:
         helper = ROOT / "cmd/monitoring/runtime-state.sh"
@@ -644,12 +644,12 @@ class VerifyTests(unittest.TestCase):
 
 class DiagnoseTests(unittest.TestCase):
     def test_static_no_load_run_does_not_warn_about_expected_absence_of_resident_model(self) -> None:
-        source = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
+        source = (ROOT / "cmd/benchmark/parity-diagnose.sh").read_text(encoding="utf-8")
         self.assertIn("no model resident (--no-load requested; residency test skipped)", source)
         self.assertNotIn('wn "no model resident (start it, or run without --no-load)"', source)
 
     def test_mesa_reference_delta_is_informational_not_a_package_failure(self) -> None:
-        source = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
+        source = (ROOT / "cmd/benchmark/parity-diagnose.sh").read_text(encoding="utf-8")
         self.assertIn("package does not pin Mesa", source)
         self.assertNotIn('wn "${mv:-Mesa ?}  (ref Mesa 26.1.4)"', source)
 
@@ -693,7 +693,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "sudo bc250 fetch-mtp qwen3.8-27b-ymq-xs-ti-mtp", result.stdout
+            "sudo bc250 advanced mtp prepare qwen3.8-27b-ymq-xs-ti-mtp", result.stdout
         )
         self.assertNotIn("set LLAMACPP", result.stdout)
 
@@ -722,12 +722,12 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertIn('trap restore_on_exit EXIT', source)
 
     def test_mtp_compare_explicitly_keeps_ollama_cold_for_qualification(self) -> None:
-        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        source = (ROOT / "models/mtp/compare-mtp.sh").read_text(encoding="utf-8")
         self.assertIn("ollama_residency_policy=drain-only", source)
         self.assertIn("BC250_MTP_RESIDENCY_POLICY=drain-only", source)
 
     def test_mtp_compare_records_and_verifies_effective_draft_depth(self) -> None:
-        source = (ROOT / "models/experiments/compare-mtp.sh").read_text(encoding="utf-8")
+        source = (ROOT / "models/mtp/compare-mtp.sh").read_text(encoding="utf-8")
         for expected in (
             "catalog_draft_n_max",
             "requested_draft_n_max",
@@ -759,10 +759,10 @@ class RuntimeConvenienceTests(unittest.TestCase):
             encoding="utf-8"
         )
         for expected in (
-            "bc250 benchmark generation",
-            "bc250 benchmark rag-cycle",
-            "bc250 benchmark concurrency",
-            "bc250 benchmark owui-system-context",
+            "bc250 advanced benchmark generation",
+            "bc250 advanced benchmark rag-cycle",
+            "bc250 advanced benchmark concurrency",
+            "bc250 advanced benchmark owui-system-context",
         ):
             self.assertIn(expected, wrapper)
         for legacy in ("embeddings|embedding", "agent|coding", "compare-models.sh"):
@@ -807,8 +807,8 @@ class RuntimeConvenienceTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("bc250 benchmark generation", result.stdout)
-        self.assertIn("bc250 benchmark agent", result.stdout)
+        self.assertIn("bc250 advanced benchmark generation", result.stdout)
+        self.assertIn("bc250 advanced benchmark agent", result.stdout)
         missing = subprocess.run(
             [str(ROOT / "cmd/benchmark/benchmark.sh")],
             text=True,
@@ -837,7 +837,7 @@ class CuStatusTests(unittest.TestCase):
     def test_cu_status_keeps_full_routing_table_without_fixed_count_success(self) -> None:
         status = (ROOT / "cmd/system/cu-status.sh").read_text(encoding="utf-8")
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
-        diagnose = (ROOT / "cmd/monitoring/llm-run-diagnose.sh").read_text(encoding="utf-8")
+        diagnose = (ROOT / "cmd/benchmark/parity-diagnose.sh").read_text(encoding="utf-8")
         self.assertIn("Live routing dashboard", status)
         self.assertIn("Live SPI-routed CUs", status)
         self.assertNotIn("Kernel diagnostic active_cu_number", status)

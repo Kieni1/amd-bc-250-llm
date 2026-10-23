@@ -743,7 +743,7 @@ fi
   warn "package Open WebUI desired state does not define an extraction engine"
 if command -v bc250 >/dev/null 2>&1; then
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
-    owui_drift="$(bc250 openwebui-setup status 2>&1)"
+    owui_drift="$(bc250 advanced openwebui status 2>&1)"
     owui_rc=$?
     if ((owui_rc == 0)); then
       ok "authenticated Open WebUI package-owned desired-state check passed"
@@ -758,7 +758,7 @@ if command -v bc250 >/dev/null 2>&1; then
     skipped "authenticated Open WebUI desired-state check (no API token supplied)"
   fi
 else
-  warn "bc250 openwebui-setup is not installed; live Open WebUI drift was not checked"
+  warn "bc250 advanced openwebui is not installed; live Open WebUI drift was not checked"
 fi
 info "Open WebUI database settings can override bootstrap environment defaults after first launch"
 
@@ -822,7 +822,7 @@ if [[ "$observed_owui_digest" == "${BC250_OPEN_WEBUI_IMAGE_DIGEST:-}" && -n "$ob
 else
   bad "Open WebUI running image digest differs from package pin (expected ${BC250_OPEN_WEBUI_IMAGE_DIGEST:-unknown}; observed ${observed_owui_digest:-unavailable})"
 fi
-info "bc250 verify checks operational health and package-owned runtime identity; release acceptance additionally requires bc250 package-gate."
+info "bc250 verify checks operational health and package-owned runtime identity; release acceptance additionally requires bc250 advanced qualification."
 
 section "Container host gateway"
 if podman exec open-webui getent hosts host.containers.internal >/dev/null 2>&1; then

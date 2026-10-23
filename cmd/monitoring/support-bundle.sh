@@ -75,7 +75,7 @@ capture package.txt rpm -q bc250-llm-server
 capture package-verify.txt rpm -V bc250-llm-server
 capture status.txt bc250 status
 capture verify-summary.txt bc250 verify --summary
-capture topology.txt bc250 agent-mode status
+capture topology.txt bc250 advanced agent topology
 capture cu-routing.txt "$CU_STATUS" --summary
 capture maintenance.txt bc250 maintenance status
 capture failed-units.txt systemctl --failed --no-pager --full

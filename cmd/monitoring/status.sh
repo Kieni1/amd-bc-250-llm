@@ -47,11 +47,11 @@ service_status() {
 }
 
 runtime_mode() {
-  # Reuse bc250 agent-mode as the single topology classifier rather than
+  # Reuse bc250 advanced agent as the single topology classifier rather than
   # guessing from whether the agent unit alone happens to be active.
   local output mode
   if command -v bc250 >/dev/null 2>&1; then
-    output="$(bc250 agent-mode status 2>/dev/null || true)"
+    output="$(bc250 advanced agent topology 2>/dev/null || true)"
   elif [[ -x /usr/libexec/bc250-llm-server/agent-mode.sh ]]; then
     output="$(/usr/libexec/bc250-llm-server/agent-mode.sh status 2>/dev/null || true)"
   else
@@ -108,7 +108,7 @@ topology_summary() {
         echo "Overall: DEGRADED — unexpected runtime topology"
       fi
       echo "Runtime mode: degraded"
-      echo "Recovery: sudo bc250 agent-mode normal"
+      echo "Recovery: sudo bc250 advanced agent normal"
       ;;
     stopped)
       echo "Overall: UNAVAILABLE — normal runtime lanes are not operational"
