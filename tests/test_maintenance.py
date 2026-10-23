@@ -25,7 +25,7 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("setup --defaults", result.stdout)
 
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
-        defaults = (ROOT / "cmd/maintenance/owui-maintenance.env").read_text(
+        defaults = (ROOT / "config/maintenance/owui-maintenance.env").read_text(
             encoding="utf-8"
         )
         self.assertIn('"maintenance|$LIBEXEC/maintenance.sh"', dispatcher)
@@ -329,9 +329,9 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("prune) preflight_prune && run_task prune-uploads", source)
 
     def test_backups_are_persistent_and_serialized(self) -> None:
-        config_timer = (ROOT / "cmd/maintenance/owui-backup-config.timer").read_text()
-        users_timer = (ROOT / "cmd/maintenance/owui-backup-users.timer").read_text()
-        service = (ROOT / "cmd/maintenance/owui-maintenance@.service").read_text()
+        config_timer = (ROOT / "config/systemd/maintenance/owui-backup-config.timer").read_text()
+        users_timer = (ROOT / "config/systemd/maintenance/owui-backup-users.timer").read_text()
+        service = (ROOT / "config/systemd/maintenance/owui-maintenance@.service").read_text()
         self.assertIn("Persistent=true", config_timer)
         self.assertIn("Persistent=true", users_timer)
         self.assertIn("/usr/bin/flock --wait 1800", service)

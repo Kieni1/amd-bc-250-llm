@@ -12,6 +12,9 @@ ACCESS_HELPER="${BC250_MAINTENANCE_ACCESS_HELPER:-/usr/libexec/bc250-llm-server/
 SAFE_POWER_HELPER="${BC250_SAFE_POWER_HELPER:-/usr/libexec/bc250-llm-server/safe-power.sh}"
 POWER_CONTROL_USER="${BC250_POWER_CONTROL_USER:-bc250-power-control}"
 
+# Future restore ownership belongs here: `bc250 maintenance restore config|users`.
+# Do not expose it until rollback, confirmation and exact-device restore qualification are designed.
+
 BACKUP_TIMERS=(owui-backup-config.timer owui-backup-users.timer)
 OPTIONAL_TIMERS=(owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer)
 ALL_TIMERS=("${BACKUP_TIMERS[@]}" "${OPTIONAL_TIMERS[@]}")
