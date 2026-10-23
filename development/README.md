@@ -1,25 +1,27 @@
 # Development memory (Git-only)
 
-`development/` contains engineering guidance and evidence that is useful to maintainers but is not part of the installed appliance interface.
+`development/` contains maintainer guidance, historical evidence and engineering decisions. It is deliberately absent from the installed RPM payload and is **not** an independent source of runtime/release truth.
 
-## Current authority
+## Current authorities
 
 Use:
 
-- `TESTING-STRATEGY.md` — current source/package/device test split;
-- `VALIDATION-MATRIX.md` — current release evidence state;
-- `DEVELOPMENT-SCOPE.json` + `scope.py` — development ownership/freeze hints;
-- `DECISIONS.md` — durable engineering decisions;
-- `handovers/` — current `0.14.1-1.2` integration, release, testing and product-roadmap guidance.
+- `release-contract.json` + the RPM spec for release/build identity and authority;
+- `config/runtime.env` + `packaging/upstreams.toml` for pinned runtime/upstream identity;
+- `WORKBENCH-STATE.json` for the current release evidence state and next gate;
+- `TESTING-STRATEGY.md` and `VALIDATION-MATRIX.md` for current test/evidence expectations;
+- `DEVELOPMENT-SCOPE.json` + `scope.py` for development ownership/freeze hints;
+- `DECISIONS.md` for durable engineering decisions;
+- `OWNERSHIP.md` for the concise repository ownership map.
 
-The active handover entry point is `handovers/00_README_START_HERE.md`.
+## Handovers and history
 
-## Historical material
+`handovers/`, `model-runs/`, `patchnotes/`, `references/` and `SOURCE-REFRESH-*` preserve useful engineering history. They may explain why a decision was made, but they do not need to be rewritten for every RPM release and cannot override the current authorities above.
 
-`model-runs/`, `patchnotes/`, `references/`, `SOURCE-REFRESH-*` and `handovers/archive/` are historical evidence. They may explain why a decision was made, but they cannot override current release/runtime/operator guidance.
+The handover bundle remains intentionally readable in-tree because it records development reasoning that has repeatedly been useful. Sidechat prompt generation is not part of the repository contract; chat handoff prompts are handled outside the package source.
 
 Do not turn historical evidence into a release prerequisite without a current product reason.
 
-## Pre-v1.0 cleanup rule
+## Pre-v1 cleanup rule
 
-Prefer deleting obsolete implementation, wrappers and duplicated state before adding new abstraction. Preserve supported behavior, public CLI/package contracts, data/recovery safety and useful regression coverage. If a behavior is deliberately removed, remove its tests/docs/owners in the same change.
+Prefer deleting obsolete implementation, wrappers and duplicated state before adding abstraction. Greenfield software interfaces aggressively, while preserving valuable user state, release provenance and rollback/security boundaries. If a behavior is deliberately removed, remove its tests/docs/package references in the same change and add an absence regression where recurrence would be risky.

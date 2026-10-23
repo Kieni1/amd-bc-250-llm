@@ -12,7 +12,6 @@ import argparse
 import fnmatch
 import hashlib
 import json
-import re
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -94,19 +93,6 @@ def cmd_summary(manifest: dict) -> int:
 
 def cmd_check(manifest: dict, quiet: bool) -> int:
     failures: list[str] = []
-    release = manifest.get("release", {})
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-    match = re.search(r"^Release:\s*([^%\s]+)", spec, re.MULTILINE)
-    rpm_release = match.group(1) if match else None
-    nvr = f"bc250-llm-server-{version}-{rpm_release}" if rpm_release else None
-    if release.get("version") != version:
-        failures.append(f"manifest version {release.get('version')!r} != VERSION {version!r}")
-    if release.get("rpm_release") != rpm_release:
-        failures.append(f"manifest RPM release {release.get('rpm_release')!r} != spec Release {rpm_release!r}")
-    if release.get("nvr") != nvr:
-        failures.append(f"manifest NVR {release.get('nvr')!r} != source NVR {nvr!r}")
-
     for name, component in manifest.get("components", {}).items():
         status = component.get("status")
         if status not in VALID_STATUSES:
