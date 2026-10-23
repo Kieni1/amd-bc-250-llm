@@ -25,7 +25,7 @@ Filters = [
   'E: incorrect-fsf-address /usr/share/licenses/bc250-llm-server/LICENSE$',
 
   # Operator docs are shipped under /usr/share/doc rather than man pages.
-  'W: no-manual-page-for-binary (?:bc250|bc250-40cu|bc250-cu-live-manager|cyan-skillfish-governor-smu|cyan-skillfish-performance-mode|llm-run-diagnose)$',
+  'W: no-manual-page-for-binary (?:bc250|bc250-40cu|bc250-cu-live-manager|cyan-skillfish-governor-smu|cyan-skillfish-performance-mode)$',
 
   # Scriptlet commands are intentionally narrow package-maintenance operations.
   'W: dangerous-command-in-%preun rm$',

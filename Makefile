@@ -27,7 +27,7 @@ FROZEN_SOURCE_DIR := $(FROZEN_SOURCE_PARENT)/$(NAME)-$(VERSION)
 UPSTREAM_SOURCES := $(shell ./scripts/prepare-sources.py --print-files)
 TIME_STAGE := ./scripts/time-stage.sh
 
-.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm rpm artifact-manifests release-evidence release-selection check-rpm-payload rebuild-srpm check-rpmlint release-gate-preflight release-gate-package release-gate clean clean-sources distclean
+.PHONY: help sources sources-check lint quality-report source-tar freeze-rpm-inputs check-frozen-source preflight validate prepare-rpm-output rpm-tree rpm-tree-frozen srpm artifact-manifests release-evidence release-selection check-rpm-payload rebuild-srpm check-rpmlint release-gate-preflight release-gate-package release-gate clean clean-sources distclean
 
 help:
 	@printf '%s\n' \
@@ -41,7 +41,6 @@ help:
 	  'make freeze-rpm-inputs  Freeze Source0/spec plus source identity before package build' \
 	  'make check-frozen-source  Verify the exact frozen source/spec snapshot' \
 	  'make srpm       Build the source RPM' \
-	  'make rpm        Build binary and source RPMs' \
 	  'make artifact-manifests  Create closed binary/source checksum manifests' \
 	  'make release-evidence  Emit CI/build evidence and, when explicitly selected, release-selection.json' \
 	  'make BUILD_DIR=/path release-gate  Supported custom Make-level build root (BC250_BUILD_DIR is internal)' \
@@ -152,13 +151,6 @@ srpm: $(RPM_TREE_TARGET)
 	cp -f $(TOPDIR)/SRPMS/*.src.rpm $(DISTDIR)/
 	cd $(DISTDIR) && sha256sum *.src.rpm > SHA256SUMS.source && cp SHA256SUMS.source SHA256SUMS
 
-rpm: $(RPM_TREE_TARGET)
-	rpmbuild --define '_topdir $(TOPDIR)' -ba $(TOPDIR)/SPECS/$(NAME).spec
-	find $(TOPDIR)/RPMS -type f -name '*.rpm' -exec cp -f {} $(DISTDIR)/ \;
-	find $(TOPDIR)/SRPMS -type f -name '*.src.rpm' -exec cp -f {} $(DISTDIR)/ \;
-	$(MAKE) check-rpm-payload
-	$(MAKE) artifact-manifests
-
 artifact-manifests:
 	@set -Eeuo pipefail; \
 	cd '$(DISTDIR)'; \
@@ -205,9 +197,10 @@ check-rpm-payload:
 	rpm -qpl "$$main_rpm" > "$$payload"; \
 	for path in \
 	  /usr/bin/bc250 \
+	  /usr/libexec/bc250-llm-server/advanced \
 	  /usr/bin/bc250-40cu \
 	  /usr/bin/bc250-cu-live-manager \
-	  /usr/bin/llm-run-diagnose \
+	  /usr/libexec/bc250-llm-server/parity-diagnose.sh \
 	  /usr/libexec/bc250-llm-server/install-ollama.sh \
 	  /usr/libexec/bc250-llm-server/status-json.py \
 	  /usr/libexec/bc250-llm-server/health.py \

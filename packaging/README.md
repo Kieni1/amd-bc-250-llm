@@ -17,8 +17,8 @@ qualification belongs on the real BC-250.
 | `bc250-llm-server.tmpfiles` | Persistent directory declarations |
 | `90-bc250-llm-server.preset` | Default service enablement |
 
-Repository groups are `cmd/` for host commands and units, `config/` for shipped
-configuration, `models/` for Modelfiles/workflows, `quality-checks/` for source-only engineering real-device
+Repository groups are `cmd/` for host command implementations, `config/` for shipped
+configuration and unit assets, `models/` for Modelfiles/model workflows, `quality-checks/` for source-only engineering real-device
 candidate screens, `examples/` for operator-adapted integrations, and `development/`
 for Git-only engineering memory. `development/` is deliberately absent from the
 binary install manifest.
@@ -29,7 +29,7 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.7.fc44.x86_64`.
+Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.7.1.fc44.x86_64`.
 
 ## Validation and build boundary
 
@@ -52,7 +52,7 @@ installed and retain its release-evidence record.
 
 ### Runtime dependency footprint
 
-Keep dependency cleanup evidence-driven. The package requires `git-core` rather than Fedora's larger `git` meta-package because the appliance needs the Git CLI but not the documentation/meta dependency closure. The larger Mesa/Vulkan, `umr`, Poppler and Hugging Face closures remain intentional: they back active inference/verification, live CU routing, product RAG/document handling and model downloads. If fresh-install footprint needs a larger reduction, treat that as an architectural/package-splitting project rather than deleting runtime requirements without feature qualification.
+Keep dependency cleanup evidence-driven. The package requires `git-core` rather than Fedora's larger `git` meta-package because the appliance needs the Git CLI but not the documentation/meta dependency closure. The larger Mesa/Vulkan, `umr`, Poppler and Hugging Face closures remain intentional: they back active inference/verification, live CU routing, managed document preparation/retrieval and model downloads. If fresh-install footprint needs a larger reduction, treat that as an architectural/package-splitting project rather than deleting runtime requirements without feature qualification.
 
 ## External source cache
 
