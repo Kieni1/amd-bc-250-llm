@@ -4,17 +4,15 @@
   "release": {
     "name": "bc250-llm-server",
     "version": "0.14.1",
-    "rpm_release": "1.7",
-    "nvr": "bc250-llm-server-0.14.1-1.7",
+    "rpm_release": "1.7.1",
+    "nvr": "bc250-llm-server-0.14.1-1.7.1",
     "fedora": "44",
-    "runtime_ollama": "0.40.8",
-    "state": "source-ready-build-pending",
-    "runtime_open_webui": "0.12.3"
+    "state": "source-ready-build-pending"
   },
   "next_work": {
-    "build": "Run/select the authoritative Fedora 44 GitHub workflow_dispatch build for 0.14.1-1.7 and freeze exact RPM/SRPM/evidence identities from the single authoritative SRPM rebuild.",
-    "device": "Install the exact selected 0.14.1-1.7 RPM and re-establish core functionality with bounded requalification of the carried Ollama 0.40.8/governor 0.4.14 runtime changes plus the changed managed-RAG lifecycle: atomic replacement/rollback, DE-authority/FR-translation provenance, review/status UX, Open WebUI synchronization, reboot persistence and ordinary-user grounded/abstention behavior.",
-    "after_pass": "Freeze the stock-core plus managed-RAG baseline, then continue the product roadmap: document quality, German–French translation UX and polished local-assistant operation; simplify only where it removes real ownership/risk."
+    "build": "Run/select the authoritative Fedora 44 GitHub workflow_dispatch build for 0.14.1-1.7.1 and freeze exact RPM/SRPM/evidence identities from the single authoritative SRPM rebuild.",
+    "device": "Install the exact selected 0.14.1-1.7.1 RPM and run the low-cost core functionality cleanup regression against the 1.7 source/behavioral regression baseline: core status/health/verify, document lifecycle smoke, normal/agent/MTP advanced surfaces, representative generation, Open WebUI login, reboot persistence and absence of removed public command aliases.",
+    "after_pass": "After exact 1.7.1 acceptance, proceed to 1.8 Managed Documents v2 (PDF + DOCX foundation, corpus-health UX) rather than extending cleanup scope."
   },
   "build_authority": {
     "primary": "GitHub Actions / Fedora 44",
@@ -24,13 +22,13 @@
     "local": "scripts/ci-local.sh or matching Fedora 44 execution for reproduction/debug only"
   },
   "validation": {
-    "full_source_suite": "678/678 PASS across 24 modules",
-    "release_preflight": "26/26 PASS",
-    "rpm_package_check": "144/144 source-side package-critical PASS across 8 modules; authoritative unprivileged RPM %check pending Fedora 44 build",
-    "device_acceptance": "PENDING exact selected 0.14.1-1.7 RPM; prior device evidence cannot transfer to changed package/runtime/RAG bytes"
+    "full_source_suite": "687/687 PASS across 24 module-isolated source test modules",
+    "release_preflight": "27/27 PASS",
+    "rpm_package_check": "148/148 PASS across 8 declared source modules; authoritative unprivileged RPM %check pending Fedora 44 build",
+    "device_acceptance": "PENDING exact selected 0.14.1-1.7.1 RPM; 1.7 remains the source/behavioral regression baseline"
   },
   "long_term": {
-    "direction": "stock-first local office AI appliance; after the stock-core baseline, prioritize RAG/document quality, German–French translation and ordinary-user UX; perform bounded simplification opportunistically only where it removes concrete ownership/risk before optional expert-layer expansion",
+    "direction": "stock-first local office AI appliance; after exact 1.7.1 acceptance, prioritize Managed Documents v2, measurable RAG/document quality, German–French workflow quality and ordinary-user UX; keep expert layers bounded under the advanced namespace",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM",
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses"
   },

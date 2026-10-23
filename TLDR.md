@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.7` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Current release source: `bc250-llm-server-0.14.1-1.7.1` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
 
-Release 1.7 keeps the 1.6 runtime maintenance pins and adds managed-RAG integrity/UX fixes: atomic activation with rollback, stable DE→FR revision provenance, stricter source/fidelity validation and clearer review/status health. Model/retrieval tuning, four-lane Vulkan settings, Open WebUI/Tika pins and SRPM-first release authority remain unchanged; exact 1.7 build/device binding is required.
+Release 1.7.1 is a structural cleanup over the 1.7 source/behavioral regression baseline: `bc250 document` is the document lifecycle surface, specialist agent/MTP/benchmark/qualification/coding controls live under `bc250 advanced`, ordinary model discovery defaults to the combined catalog, and duplicated release/build policy has been reduced. Runtime/model/retrieval tuning and the SRPM-first authority path are unchanged; exact 1.7.1 build/device binding is required.
 
 ## Install
 
@@ -52,42 +52,39 @@ reflects reclaimed capacity even when `du` counts both names. Open
 `http://SERVER_IP/` from the trusted LAN. If Open WebUI initialization was skipped:
 
 ```bash
-sudo bc250 openwebui-setup init
+sudo bc250 advanced openwebui init
 ```
 
 When an RPM upgrade changes Open WebUI with existing persistent state, RPM `%pre` unconditionally requests Open WebUI stop, proves `ActiveState=inactive`, and holds boot enablement before the new Quadlet can restart. The guided installer then creates a verified stopped-state rollback archive before allowing the new image to start. See
 [`docs/OPERATIONS.md`](docs/OPERATIONS.md) for the supported restore procedure.
 
-Qualification evidence can be reviewed with `sudo bc250 qualification list`;
-`sudo bc250 qualification clean` only previews old terminal package-gate/resilience
+Qualification evidence can be reviewed with `sudo bc250 advanced qualification list`;
+`sudo bc250 advanced qualification clean` only previews old terminal package-gate/resilience
 evidence unless `--apply` is explicitly supplied.
 
-For RAG, keep operator documents under `/srv/bc250-documents`; batch preparation stops at a human review gate:
+For managed documents, keep operator sources under `/srv/bc250-documents`; batch preparation stops at a human review gate:
 
 ```bash
-sudo bc250 rag status
-sudo bc250 rag validate public COLLECTION
-sudo bc250 rag ingest --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250 document status
+sudo bc250 document validate public COLLECTION
+sudo bc250 document ingest --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
-RAG ingestion is loopback-only by default and token-file symlinks are rejected. `rag status` reports review/currentness/fidelity state plus lifecycle validation health. Remote Open WebUI requires explicit opt-in, with a separate override whenever confidential-scope knowledge state could participate in the sync. See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use [`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
+Document/knowledge synchronization is loopback-only by default and token-file symlinks are rejected. `document status` reports review/currentness/fidelity state plus lifecycle validation health. Remote Open WebUI requires explicit opt-in, with a separate override whenever confidential-scope knowledge state could participate in the sync. See [`docs/RAG.md`](docs/RAG.md) before bulk ingestion. HTTP is not encrypted; use [`docs/HTTPS.md`](docs/HTTPS.md) if HTTPS is required.
 
 ## Models
 
 ```bash
-bc250 model list production
-bc250 model list experiments
-bc250 model list task
-bc250 model list agentic
-bc250 model list embedding
-bc250 model list mtp --all
-sudo bc250 fetch-mtp qwen3.5-9b-mtp  # explicit opt-in MTP preparation
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 compare-mtp qwen3.5-9b-mtp
+bc250 model list                    # ordinary combined catalog view
+bc250 advanced agent list           # specialist agent view
+bc250 advanced mtp list             # specialist MTP view
+sudo bc250 advanced mtp prepare qwen3.5-9b-mtp  # explicit opt-in MTP preparation
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp compare qwen3.5-9b-mtp
 
-# Generic installer / `apply all` selection never includes MTP; use bc250 fetch-mtp explicitly.
+# Generic installer / `apply all` selection never includes MTP; use bc250 advanced mtp prepare explicitly.
 sudo bc250 model install
-sudo bc250 model status agentic MODEL
-sudo bc250 model status agentic MODEL --verbose
+sudo bc250 advanced agent status MODEL
+sudo bc250 advanced agent status MODEL --verbose
 sudo bc250 model apply production
 sudo bc250 model apply experiments
 sudo bc250 model apply task
@@ -116,7 +113,7 @@ downloaded GGUFs where practical; use package lifecycle commands rather than del
 ```bash
 sudo bc250 status
 sudo bc250 verify
-bc250 ollama-profile status
+bc250 advanced ollama-profile status
 sudo bc250-cu-live-manager
 sudo bc250-40cu status
 ```
@@ -128,20 +125,20 @@ Configure/save live routing with `sudo bc250-cu-live-manager`; verify it with `s
 ## Operations and maintenance
 
 ```bash
-bc250 benchmark generation --profile compare
-bc250 benchmark generation --profile edge --mode production
-bc250 benchmark embeddings
-bc250 benchmark ocr
-bc250 benchmark task
+bc250 advanced benchmark generation --profile compare
+bc250 advanced benchmark generation --profile edge --mode production
+bc250 advanced benchmark embeddings
+bc250 advanced benchmark ocr
+bc250 advanced benchmark task
 
-sudo bc250 agent-mode enter
-bc250 benchmark agent
-bc250 code review path/to/file review.md
-sudo bc250 agent-mode leave   # `normal` is the explicit convergence alias
+sudo bc250 advanced agent enter
+bc250 advanced benchmark agent
+bc250 advanced code run review path/to/file review.md
+sudo bc250 advanced agent leave   # `normal` is the explicit convergence alias
 
 sensors
-sudo llm-run-diagnose --no-load
-sudo bc250 revalidate status
+sudo bc250 advanced benchmark parity --no-load
+sudo bc250 advanced revalidate status
 
 sudo bc250 maintenance setup --defaults
 sudo bc250 maintenance companion status
@@ -188,12 +185,12 @@ sudo bc250 reset
 
 Reset preserves `/srv/bc250-documents` and does not undo Fedora upgrades/filesystem
 growth. Read
-[`docs/UNINSTALL.md`](docs/UNINSTALL.md) before reset.
+[`docs/RESET.md`](docs/RESET.md) before reset.
 
 ## Full qualification
 
 ```bash
-sudo bc250 revalidate start
+sudo bc250 advanced revalidate start
 ```
 
 It is opt-in/root-only, includes authenticated production translation-role and RAG

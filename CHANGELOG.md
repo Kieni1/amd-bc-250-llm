@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.14.1-1.7.1 - 2026-10-23
+
+- Greenfield the public command surface without migrating valuable state: replace `bc250 rag` with `bc250 document`, move specialist/qualification workflows under `bc250 advanced`, and keep existing `/srv/bc250-documents`, model-store and Open WebUI state paths unchanged.
+- Consolidate agent/MTP handling around shared `list`/`status`/`prepare` semantics, retain explicit agent topology controls, and remove the duplicate local binary-RPM build path in favor of the SRPM-first release authority.
+- Clarify repository ownership: move managed-document lifecycle/OCR into `cmd/documents`, static shipped configuration under `config`, MTP comparison beside its catalog, the CU compatibility patch under `packaging/patches`, document examples under `examples/document`, and reset under `cmd/system`.
+- Make the visible retired-model terminology consistent, keep the full model catalog, and retain development history as engineering memory rather than volatile release authority.
+- Fix internal document/model topology transitions to traverse the canonical `bc250 advanced agent` dispatcher and add exact cross-dispatch regressions so removed top-level commands cannot strand internal callers.
+- Fix the relocated OCR helper's source-tree model-manager fallback, add an exact relocation regression, remove the redundant Open WebUI version constant, and refresh current operator wording around managed documents, Agent topology and 1.7.1 qualification.
+- Correct OCR operator guidance so scanned-source OCR remains preprocessing into a reviewed `working/` draft with source provenance rather than bypassing the managed lifecycle into `active/`; clarify transactional activation wording without claiming crash-atomic filesystem semantics.
+- Keep runtime/model/retrieval tuning unchanged; exact Fedora 44 build and exact-RPM device acceptance remain required.
+
 ## 0.14.1-1.7 - 2026-10-22
 
 - Make managed RAG activation all-or-nothing for the requested batch: validate the projected active corpus before mutation, reject ambiguous same-family/language replacements, and roll back filesystem moves if activation fails.

@@ -1,10 +1,10 @@
-# BC-250 local LLM server
+# BC-250 local LLM appliance
 
-Fedora 44 integration for testing local LLMs on AMD BC-250 hardware. The
-package provides a Vulkan-oriented Ollama stack, Open WebUI, product RAG/document workflows, model management,
+BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD BC-250 hardware.
+It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1.7` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+Current release source: `bc250-llm-server-0.14.1-1.7.1` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -69,10 +69,10 @@ sudo bc250 verify
 sudo bc250 support-bundle   # redacted support evidence archive
 ```
 
-Release qualification adds `sudo bc250 package-gate capture` and the durable
-`sudo bc250 resilience ...` manager. See [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md)
+Release qualification adds `sudo bc250 advanced qualification capture` and the durable
+`sudo bc250 advanced resilience ...` manager. See [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md)
 for the closed gate format, Tika 4.1 bounded smoke, interruption semantics and
-post-reboot Lane 26 resume rules. `sudo bc250 qualification list` inventories package-gate and
+post-reboot Lane 26 resume rules. `sudo bc250 advanced qualification list` inventories package-gate and
 resilience evidence; `qualification clean` is dry-run-first and only prunes old terminal evidence.
 
 Storage visibility and explicit reclamation:
@@ -86,17 +86,17 @@ sudo bc250 storage prune-sources   # optional verified offline-source removal
 
 Open `http://SERVER_IP/` only from the trusted LAN. The guided installer can
 create/sign in the administrator and apply the package-owned Open WebUI baseline.
-Persisted providers, task, embedding, RAG and local/offline application policy come
+Persisted providers, task, embedding, document-retrieval and local/offline application policy come
 from the single packaged `openwebui/desired-state.json` through supported APIs.
 During the pre-v1 testing phase the normal main/task Open WebUI providers remain available for
-comparison, and `bc250 openwebui-setup` synchronizes their discovered Ollama inventories into
+comparison, and `bc250 advanced openwebui` synchronizes their discovered Ollama inventories into
 package-managed testing records. Curated Office roles remain the recommended product paths. Raw
 production/task models and ordinary-size experiments remain visible for comparison, while the
 Qwen3.6 35B is retired from active candidates; Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only, while IQ3_XXS remains the ordinary-user deployability comparison. Only the package-owned wildcard grant
 on package-managed discovery records may be removed when this visibility policy changes; unrelated
 administrator-created records and grants are preserved.
 Agent `11436` and embedding `11437` remain separate from the chat selector by topology. Arena is
-package-converged off; use `sudo bc250 openwebui-setup init` later
+package-converged off; use `sudo bc250 advanced openwebui init` later
 if that step was skipped. The default endpoint is unencrypted HTTP; see
 [`docs/SECURITY.md`](docs/SECURITY.md) before using a less trusted network.
 
@@ -124,7 +124,7 @@ The packaged comparison catalog retains active measured challengers, including
 `exp-granite42-3b-ibm-q6-k`, the distinct Qwen3.8 27B quality/deployability profiles,
 and the compact `agentic-qwen35-4b-khazarai-q6-k` /
 `agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
-kept only in the source graveyard and are not
+kept only in the retired source set and are not
 exposed through normal model discovery. The installed retirement catalog lets
 `sudo bc250 model status` identify stale package-retired registrations and
 `sudo bc250 model purge-retired` remove only those explicitly catalogued models.
@@ -137,8 +137,8 @@ catalog entries only. For routine interactive model installation, use
 `sudo bc250 model install`.
 
 Download-only MTP candidates do not participate in that workflow or `apply all`;
-discover them with `bc250 model list mtp --all` and prepare one explicitly with
-`bc250 fetch-mtp`.
+discover them with `bc250 advanced mtp list` and prepare one explicitly with
+`bc250 advanced mtp prepare`.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
@@ -157,14 +157,14 @@ review every model's current license before use.
 ```bash
 sudo bc250 status
 sudo bc250 verify
-sudo bc250 model status production
-sudo bc250 openwebui-setup status
+sudo bc250 model status all --compact
+sudo bc250 advanced openwebui status
 sudo bc250 maintenance status
-bc250 agent-mode status
+bc250 advanced agent topology
 
 # Enter/leave the exclusive coding lane only when needed:
-sudo bc250 agent-mode enter
-sudo bc250 agent-mode leave   # or: sudo bc250 agent-mode normal
+sudo bc250 advanced agent enter
+sudo bc250 advanced agent leave   # or: sudo bc250 advanced agent normal
 ```
 
 Keep experiments, MTP qualification, benchmark suites, destructive model lifecycle actions,
@@ -182,12 +182,12 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Open WebUI v0.12.3 and Tika v4.1.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
-| RAG lifecycle | Local DE/FR/bilingual batch preparation, human review, provenance validation and Open WebUI sync |
+| Document lifecycle | Local DE/FR/bilingual preparation, human review, provenance validation and Open WebUI knowledge sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Release 0.14.1-1.7 keeps the 1.6 runtime maintenance baseline (Ollama 0.40.8, governor 0.4.14, Open WebUI 0.12.3 and Tika 4.1.0-full) and hardens the managed RAG lifecycle: atomic activation/rollback, stable revision provenance, DE-authority/FR-translation policy, fidelity/source validation and clearer review/status health. Model/retrieval tuning and the four-lane Vulkan topology are unchanged.
-Prior exact-device evidence remains regression context only; the selected 1.7 RPM must requalify the carried Ollama/governor changes plus the changed managed-RAG lifecycle and ordinary-user Open WebUI boundary.
+Release 0.14.1-1.7.1 is a structural cleanup over the 1.7 source/behavioral regression baseline. Runtime/model/retrieval tuning is unchanged. The public command surface is product-oriented (`document` plus an explicit `advanced` namespace), agent/MTP specialist handling shares one catalog path, the duplicate local binary-RPM build path is removed, runtime pins have one authority, and development history is retained without acting as volatile release state.
+Prior exact-device evidence remains regression context only; the selected 1.7.1 RPM needs a bounded structural regression proving supported behavior, persistence and removed-command absence.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in
@@ -195,7 +195,7 @@ snapshot exists; recovery from that archive is documented in
 for Ollama upgrade, rollback and Granite-context notes.
 
 Normal mode uses main `11434`, task `11435` and dedicated embedding `11437`.
-Coding/agent mode uses `11436` exclusively and stops the normal lanes. `bc250 code`
+Coding/agent mode uses `11436` exclusively and stops the normal lanes. `bc250 advanced code run`
 uses the chat API so native thinking is separated from final content and refuses to
 write nonterminal, output-limit-truncated or reasoning-contaminated results. Keep all
 unauthenticated Ollama APIs blocked from untrusted networks.
@@ -204,9 +204,10 @@ unauthenticated Ollama APIs blocked from untrusted networks.
 
 `make validate` is the deterministic repository check. The normal RPM build is
 the Fedora 44 GitHub Actions workflow in `.github/workflows/build-rpm.yml`; it
-produces binary and source RPM artifacts. Maintainers can still use `make rpm`
-in a matching Fedora build environment. Third-party governor and CU sources are
-pinned in `packaging/upstreams.toml`.
+produces binary and source RPM artifacts through the SRPM-first authoritative path.
+Maintainers can reproduce the source-side release gate with `make release-gate`;
+binary RPM construction remains part of the Fedora 44 authoritative build path.
+Third-party governor and CU sources are pinned in `packaging/upstreams.toml`.
 
 For repeated local builds, `make clean` keeps the verified `sources/` cache; use
 `make clean-sources` only when an upstream refresh is actually wanted. `scripts/ci-local.sh`
@@ -239,7 +240,7 @@ Repository groups:
 - [`docs/SECURITY.md`](docs/SECURITY.md): hardening, network exposure and secret handling.
 - [`docs/HTTPS.md`](docs/HTTPS.md): TLS publication example and checklist.
 - [`docs/FILESTRUCTURE.md`](docs/FILESTRUCTURE.md): installed package, configuration and state paths.
-- [`docs/UNINSTALL.md`](docs/UNINSTALL.md): RPM removal versus greenfield appliance reset.
+- [`docs/RESET.md`](docs/RESET.md): RPM removal versus greenfield appliance reset.
 
 ## Acknowledgements
 

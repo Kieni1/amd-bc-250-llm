@@ -34,12 +34,8 @@
   "package": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "rpm_release": "1.7",
+    "rpm_release": "1.7.1",
     "version": "0.14.1"
-  },
-  "runtime": {
-    "ollama": "0.40.8",
-    "open_webui": "0.12.3"
   },
   "schema": "bc250.release-contract.v2",
   "validation": {
