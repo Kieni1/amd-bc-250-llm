@@ -103,7 +103,7 @@ run_round() {
     read -r start_mem start_swap < <(sample_resource)
     printf '\n===== direct translation / %s / round %s / think=%s =====\n' "$CANDIDATE" "$n" "$THINK_POLICY"
     set +e
-    bc250 benchmark translation "$CANDIDATE" --think "$THINK_POLICY" --ollama-url "$MAIN_URL" --output-dir "$dir" \
+    bc250 advanced benchmark translation "$CANDIDATE" --think "$THINK_POLICY" --ollama-url "$MAIN_URL" --output-dir "$dir" \
         2>&1 | tee "$OUT/runs/${n}.console.txt"
     rc="${PIPESTATUS[0]}"
     set -e

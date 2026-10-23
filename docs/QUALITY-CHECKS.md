@@ -15,8 +15,8 @@ sudo bc250 support-bundle
 ## Full qualification
 
 ```bash
-sudo bc250 revalidate start
-sudo bc250 revalidate status
+sudo bc250 advanced revalidate start
+sudo bc250 advanced revalidate status
 ```
 
 Revalidation exercises packaged defaults, including production model roles, RAG/embedding, translation, structured-output paths, resource safety and restoration. Run completion, infrastructure, quality, restoration and coverage are independent result dimensions: a fully executed run is `completed` even when optional Agent coverage is `partial` because the add-on model is not installed. `incomplete` is reserved for execution/evidence that did not finish.
@@ -26,11 +26,11 @@ Translation evidence also separates the underlying model from the delivered prod
 ## Focused benchmarks
 
 ```bash
-bc250 benchmark --help
-bc250 benchmark generation --profile compare
-bc250 benchmark embeddings
-bc250 benchmark rag-quality
-bc250 benchmark translation
+bc250 advanced benchmark --help
+bc250 advanced benchmark generation --profile compare
+bc250 advanced benchmark embeddings
+bc250 advanced benchmark rag-quality
+bc250 advanced benchmark translation
 ```
 
 Use focused benchmarks for explicit comparison work rather than changing production defaults. Candidate selection and hardware A/B work remain engineering activities.

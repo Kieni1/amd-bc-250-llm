@@ -129,7 +129,7 @@ run_one() {
     unload_host "$url" "$host"
     printf '\n===== round %s / %s / %s =====\n' "$round" "$label" "$model"
     set +e
-    bc250 benchmark task "$model" --ollama-url "$url" --output-dir "$dir" \
+    bc250 advanced benchmark task "$model" --ollama-url "$url" --output-dir "$dir" \
         2>&1 | tee "$OUT/runs/${round}-${label}.console.txt"
     rc="${PIPESTATUS[0]}"
     set -e

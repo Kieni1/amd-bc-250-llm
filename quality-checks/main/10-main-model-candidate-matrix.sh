@@ -186,7 +186,7 @@ run_generation() {
         REQUEST_TIMEOUT="$REQUEST_TIMEOUT" \
         KEEP_ALIVE='10m' \
         BOARD_NOTE='BC-250 main-model candidate matrix; task/embedding services active, resident companion models unloaded' \
-        bc250 benchmark generation \
+        bc250 advanced benchmark generation \
             --profile "$profile" \
             --mode neutral \
             --think omit \
