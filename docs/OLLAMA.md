@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.8**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.6 introduced the current runtime pin from the device-proven 0.40.6 baseline; release 1.7 carries it unchanged while modifying the managed-RAG lifecycle. Ollama 0.40.7 added explicit `renderer`, `parser` and `template_source` fields to `ollama show` and `/api/show`; 0.40.8 keeps the established four-lane settings and adds no package-required topology or context-policy change. Prior 0.40.6 device evidence remains regression baseline only and does not transfer DEVICE acceptance to the new runtime bytes.
+Package standard: **Ollama v0.40.8**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.6 introduced the current runtime pin from the device-proven 0.40.6 baseline; release 1.7 introduced the managed-document lifecycle changes, and release 1.7.1 carries it unchanged while restructuring package interfaces. Ollama 0.40.7 added explicit `renderer`, `parser` and `template_source` fields to `ollama show` and `/api/show`; 0.40.8 keeps the established four-lane settings and adds no package-required topology or context-policy change. Prior 0.40.6 device evidence remains regression baseline only and does not transfer DEVICE acceptance to the new runtime bytes.
 
 ## Install and verify
 
@@ -44,14 +44,14 @@ The package owns a fixed four-lane service topology. A completed normal applianc
 | embedding | 11437 | `10m` | yes | retrieval embeddings only |
 | agent | 11436 | `5m` | **no** | exclusive coding/agent work |
 
-`ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250 agent-mode enter` before coding work and
-`sudo bc250 agent-mode leave` afterwards. All lanes share the same BC-250 UMA
+`ollama-agent.service` has no boot enablement and conflicts with main/task/embedding. The normal lanes also conflict with the agent, so systemd enforces the mode boundary. Use `sudo bc250 advanced agent enter` before coding work and
+`sudo bc250 advanced agent leave` afterwards. All lanes share the same BC-250 UMA
 pool; the separation controls lifecycle and eviction, not physical memory.
 The compact task model remains ephemeral while the main chat model stays warm. This is
 intentional: real-device testing showed that the retired task candidate
 `exp-qwen38-4b-distill-empero-q6-k` can OOM the task service when it overlaps GPT-OSS,
 while making the main lane ephemeral adds a large cold-start penalty to normal chat.
-That exact Distill candidate is now source-graveyard only, not an opt-in packaged
+That exact Distill candidate is now retired-source only, not an opt-in packaged
 experiment. The similarly named active `exp-qwen38-4b-empero-q6-k` is a separate
 general comparison. GPT-OSS 20B with warm Jina remains the production memory-edge
 qualification; re-run it when a package/runtime change could affect residency or UMA
@@ -82,7 +82,7 @@ GGML_VK_VISIBLE_DEVICES=0
 
 These settings select the intended stock Vulkan/iGPU path and are part of the normal appliance configuration. The 0.40.8 review found no upstream change requiring different values for `OLLAMA_VULKAN=1`, `OLLAMA_IGPU_ENABLE=1`, `GGML_VK_VISIBLE_DEVICES=0`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, Flash Attention, keep-alive policy, or the package's q8/q4 KV-cache profiles. Keep those settings unless exact BC-250 evidence shows a regression.
 
-Ollama 0.40.7 updated llama.cpp and 0.40.8 keeps that runner line, so the selected 1.7 RPM must still exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance.
+Ollama 0.40.7 updated llama.cpp and 0.40.8 keeps that runner line, so the selected 1.7.1 RPM must still exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance.
 
 For more accurate Vulkan free-memory information the upstream docs suggest `cap_perfmon`; this package does **not** grant that capability automatically. An operator may test it deliberately after locating the real binary:
 
@@ -101,10 +101,10 @@ BC-250 comparison runs.
 ## Runtime profiles
 
 ```bash
-bc250 ollama-profile status
-sudo bc250 ollama-profile balanced
-sudo bc250 ollama-profile max-context
-sudo bc250 ollama-profile reset
+bc250 advanced ollama-profile status
+sudo bc250 advanced ollama-profile balanced
+sudo bc250 advanced ollama-profile max-context
+sudo bc250 advanced ollama-profile reset
 ```
 
 | Profile | Context | KV cache | Parallel/loaded models |
@@ -116,13 +116,13 @@ Both enable flash attention. `balanced` is the production default. `max-context`
 
 ## Benchmark API baseline
 
-`bc250 benchmark` targets the package-pinned Ollama **0.40.8** request schema. Neutral generation
+`bc250 advanced benchmark` targets the package-pinned Ollama **0.40.8** request schema. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
 lane; RAG-quality uses 11437 for vectors and 11434 for the answer model. Model
-allocation comes from `/api/ps`. The `bc250 benchmark agent` lane and `bc250 code`
-product helper use `/api/chat` on exclusive port 11436. `bc250 code` requests
+allocation comes from `/api/ps`. The `bc250 advanced benchmark agent` lane and `bc250 advanced code run`
+product helper use `/api/chat` on exclusive port 11436. `bc250 advanced code run` requests
 `think:true`, consumes only final `message.content`, and fails closed on nonterminal or
 output-limit-truncated completion instead of writing a partial file.
 
