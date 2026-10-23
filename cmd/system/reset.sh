@@ -17,7 +17,6 @@ failed() { warn "$*"; FAILURES=$((FAILURES + 1)); }
 usage() {
   cat <<'USAGE'
 Usage: sudo bc250 reset [--yes]
-       sudo ./uninstall.sh [--yes]
 
 Factory-style reset for the pre-1.0 appliance. Permanently removes appliance models, Open WebUI data,
 containers, BC-250 host profiles, the BC-250 RPM and the separately installed

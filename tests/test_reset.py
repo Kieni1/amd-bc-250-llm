@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RESET = ROOT / "uninstall.sh"
+RESET = ROOT / "cmd/system/reset.sh"
 
 
 class ResetTests(unittest.TestCase):
