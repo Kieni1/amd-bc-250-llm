@@ -10,7 +10,7 @@ The package uses two layers deliberately:
 2. `/usr/share/bc250-llm-server/openwebui/desired-state.json` is the single
    package authority for persisted providers/task/embedding/RAG settings and the
    small local/offline application-policy subset owned by the appliance;
-   `bc250 openwebui-setup` applies it through supported administrator APIs.
+   `bc250 advanced openwebui` applies it through supported administrator APIs.
 
 The package never edits `webui.db` directly and does not store the administrator
 password or the temporary API/session token used for setup. It does persist a
@@ -29,13 +29,13 @@ Unattended installation never waits for credentials.
 Manual equivalents:
 
 ```bash
-sudo bc250 openwebui-setup init
-sudo bc250 openwebui-setup init --token-file FILE
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup apply
-bc250 openwebui-setup status
-sudo bc250 openwebui-setup status --verbose
-OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 openwebui-setup status
-sudo bc250 openwebui-setup save-key --token-file FILE
+sudo bc250 advanced openwebui init
+sudo bc250 advanced openwebui init --token-file FILE
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 advanced openwebui apply
+bc250 advanced openwebui status
+sudo bc250 advanced openwebui status --verbose
+OWUI_API_KEY=TEMPORARY_ADMIN_KEY sudo -E bc250 advanced openwebui status
+sudo bc250 advanced openwebui save-key --token-file FILE
 ```
 
 `init` offers administrator sign-in/create or protected API-key-file authentication.
@@ -93,7 +93,7 @@ set. Existing unrelated grants are retained, including historical grants on inac
 The current pre-v1 testing policy keeps raw production/task implementations and ordinary-size
 experiments visible, while pressure-heavy large experimental profiles can be package-marked
 admin/testing-only. Provider allowlists alone are not treated as proof of the ordinary-user selector. On authenticated
-apply/status, `bc250 openwebui-setup` also discovers the actual `11434`/`11435` Ollama inventories and
+apply/status, `bc250 advanced openwebui` also discovers the actual `11434`/`11435` Ollama inventories and
 creates or updates lightweight package-managed testing records. Ordinary-user-visible records receive
 additive `user:*:read` access; package-managed records explicitly marked admin/testing-only do not. When a
 previously public package-managed discovery record becomes admin/testing-only, convergence may remove only
@@ -122,14 +122,14 @@ work.
 Agent/coding mode is exclusive. Use:
 
 ```bash
-sudo bc250 agent-mode enter
+sudo bc250 advanced agent enter
 # coding/agent work
-sudo bc250 agent-mode leave
+sudo bc250 advanced agent leave
 ```
 
 Entering agent mode stops main/task/embedding; leaving restores normal mode. Open WebUI itself
 remains reachable, and its persisted catalogue may continue to list normal office roles while those
-backends are intentionally unavailable. Return with `sudo bc250 agent-mode normal`; do not dynamically
+backends are intentionally unavailable. Return with `sudo bc250 advanced agent normal`; do not dynamically
 rewrite Open WebUI provider/model state merely to mirror the temporary exclusive topology.
 This is intentional on the BC-250 unified-memory pool.
 
@@ -176,7 +176,7 @@ Open WebUI 0.12 also adds several network/tool surfaces that are outside the app
 
 ## Package model presets
 
-`bc250 openwebui-setup` imports package-owned workspace presets:
+`bc250 advanced openwebui` imports package-owned workspace presets:
 
 | Preset | Base model | State |
 |---|---|---|
@@ -211,17 +211,17 @@ operator changes.
 To inspect the live verified contract, an explicit protected token file still overrides the package default:
 
 ```bash
-sudo bc250 openwebui-setup status --verbose
+sudo bc250 advanced openwebui status --verbose
 ```
 
 The package may store a verified administrator maintenance API key at
 `/var/lib/bc250-llm-server/secrets/openwebui-admin.key` inside a root-owned `0700` secrets directory;
-the key file is root-owned `0600`. `bc250 openwebui-setup`, `bc250 verify` and `bc250 revalidate` use this
+the key file is root-owned `0600`. `bc250 advanced openwebui`, `bc250 verify` and `bc250 advanced revalidate` use this
 default automatically when no explicit token file is supplied. Existing keys are never silently overwritten,
 and token contents must not be printed or collected in support/revalidation evidence.
 
 The former LFM comparison translator is retired from active discovery and no longer has an Open WebUI
-preset. Its source Modelfile remains only in the graveyard as historical comparison evidence.
+preset. Its source Modelfile remains only in the retired source set as historical comparison evidence.
 
 The Qwen3.5 general Advanced preset carries `think=true` and `max_tokens=6144`; the explicit
 `Office - Advanced Structured` preset uses the same base model, 6144-token ceiling and sampler set with
@@ -291,15 +291,15 @@ Open WebUI enforces **128 MiB per file**. nginx has a larger **256 MiB reverse-p
 application limit.
 
 See [`RAG.md`](RAG.md) for ingestion and retrieval acceptance testing. Explicit
-setting comparisons use `bc250 benchmark owui-embedding-batch`,
-`bc250 benchmark owui-chunk-min` and the root-only
-`bc250 benchmark owui-system-context`; routine revalidation tests only the packaged
+setting comparisons use `bc250 advanced benchmark owui-embedding-batch`,
+`bc250 advanced benchmark owui-chunk-min` and the root-only
+`bc250 advanced benchmark owui-system-context`; routine revalidation tests only the packaged
 values and does not choose among candidates.
 
 ## Local/offline application baseline
 
 The Quadlet keeps authentication enabled and supplies conservative bootstrap
-defaults. `bc250 openwebui-setup` also owns the persisted values for Arena,
+defaults. `bc250 advanced openwebui` also owns the persisted values for Arena,
 cloud OpenAI access, community sharing, direct browser connections, code
 execution/interpreter and memories so a later database-side admin change is
 visible as drift and is reconverged on apply. Arena is disabled rather than
@@ -336,7 +336,7 @@ xattrs; the supported restore sequence is documented in [`OPERATIONS.md`](OPERAT
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
 upload/extraction, embedding/retrieval, the seven active package presets and an
-authenticated `bc250 openwebui-setup status` before changing the pin.
+authenticated `bc250 advanced openwebui status` before changing the pin.
 
 ## Deferred candidates
 

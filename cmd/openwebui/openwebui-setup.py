@@ -25,8 +25,6 @@ DEFAULT_TOKEN_FILE = Path("/var/lib/bc250-llm-server/secrets/openwebui-admin.key
 LEGACY_TOKEN_FILE = Path("/root/owui-test.key")
 SOURCE_FUNCTIONS = Path(__file__).resolve().parents[2] / "config/openwebui/functions.json"
 
-# The model-view/access contract below is qualified against the packaged Open WebUI pin.
-OPENWEBUI_MODEL_API_VERSION = "0.12.3"
 AUTO_VISIBLE_TAG = "bc250-auto-visible"
 NORMAL_PROVIDER_LANES = {
     "main": "http://127.0.0.1:11434",

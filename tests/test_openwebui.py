@@ -576,13 +576,11 @@ class OpenWebUIStatusTests(unittest.TestCase):
             ):
                 OPENWEBUI.validate_model_request_policy_shape(malformed_visibility)
 
-    def test_compatibility_assumption_matches_packaged_openwebui_pin(self) -> None:
-        values: dict[str, str] = {}
-        for line in (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines():
-            if line and not line.startswith("#") and "=" in line:
-                key, value = line.split("=", 1)
-                values[key] = value
-        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], OPENWEBUI.OPENWEBUI_MODEL_API_VERSION)
+    def test_openwebui_setup_does_not_define_a_second_runtime_version_pin(self) -> None:
+        source = (ROOT / "cmd/openwebui/openwebui-setup.py").read_text(encoding="utf-8")
+        runtime = (ROOT / "config/runtime.env").read_text(encoding="utf-8")
+        self.assertNotIn("OPENWEBUI_MODEL_API_VERSION", source)
+        self.assertIn("BC250_OPEN_WEBUI_VERSION=", runtime)
 
     def test_status_reports_two_view_model_summary(self) -> None:
         output = io.StringIO()
