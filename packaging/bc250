@@ -2,33 +2,18 @@
 # Greenfield multicall entry point for the supported BC-250 product commands.
 set -Eeuo pipefail
 
-# Package Python helpers live under immutable /usr. Never create runtime bytecode there.
 export PYTHONDONTWRITEBYTECODE=1
-
 LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
 
 ROUTES=(
-  "agent-mode|$LIBEXEC/agent-mode.sh"
-  "benchmark|$LIBEXEC/benchmark.sh"
-  "revalidate|$LIBEXEC/revalidate.sh"
-  "resilience|$LIBEXEC/qualification/resilience_manager.py"
-  "code|$LIBEXEC/coding-agent/coding-agent.sh"
-  "code-commit|$LIBEXEC/coding-agent/commit-agent.sh"
-  "compare-mtp|$LIBEXEC/compare-mtp.sh"
+  "advanced|$LIBEXEC/advanced"
+  "document|$LIBEXEC/documents/lifecycle.py"
   "health|$LIBEXEC/health.py"
-  "fetch-mtp|$LIBEXEC/modelctl|apply|mtp|--include-disabled"
-  "gitea-review|$LIBEXEC/coding-agent/gitea-review.sh"
   "install|$LIBEXEC/install.sh"
   "maintenance|$LIBEXEC/maintenance.sh"
   "model|$LIBEXEC/modelctl"
-  "ocr|$LIBEXEC/ocr.sh"
-  "rag|$LIBEXEC/rag"
-  "reset|$LIBEXEC/uninstall.sh"
-  "ollama-profile|$LIBEXEC/ollama-profile.sh"
-  "openwebui-setup|$LIBEXEC/openwebui-setup.py"
-  "package-gate|$LIBEXEC/qualification/package_gate_capture.py"
-  "qualification|$LIBEXEC/qualification/qualification_inventory.py"
-  "run-mtp|$LIBEXEC/run-mtp-llamacpp.sh"
+  "ocr|$LIBEXEC/documents/ocr.sh"
+  "reset|$LIBEXEC/reset.sh"
   "status|$LIBEXEC/status.sh"
   "support-bundle|$LIBEXEC/support-bundle.sh"
   "storage|$LIBEXEC/storage.py"
@@ -40,17 +25,14 @@ usage() {
   cat <<'USAGE'
 Usage: bc250 COMMAND [ARGUMENTS...]
 
-Core appliance:
+Appliance:
   install, status, health, verify, version, support-bundle, storage, reset
 
-Models and product workflows:
-  model, rag, ocr, openwebui-setup, ollama-profile
+Managed workflows:
+  document, model, ocr, maintenance
 
-Validation and maintenance:
-  benchmark, revalidate, package-gate, qualification, resilience, maintenance, agent-mode
-
-Optional specialist workflows:
-  code, code-commit, gitea-review, compare-mtp, fetch-mtp, run-mtp
+Advanced and qualification workflows:
+  advanced
 
 Run `bc250 COMMAND --help` where supported.
 CU setup uses two standalone commands:

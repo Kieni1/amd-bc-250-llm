@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# Advanced/specialist BC-250 command dispatcher. Keeps implementation-oriented
+# workflows out of the ordinary appliance command surface.
+set -Eeuo pipefail
+
+export PYTHONDONTWRITEBYTECODE=1
+LIBEXEC="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}"
+
+usage() {
+  cat <<'USAGE'
+Usage: bc250 advanced COMMAND [ARGUMENTS...]
+
+Advanced appliance, validation and runtime controls:
+  benchmark ...
+  revalidate ...
+  qualification capture|list|clean ...
+  resilience ...
+  ollama-profile ...
+  openwebui ...
+
+Specialist model workflows:
+  agent list|status|prepare|topology|enter|leave|normal ...
+  mtp list|status|prepare|run|compare ...
+  code run|commit|review ...
+
+These commands are for advanced operation, testing and qualification; ordinary appliance use should prefer the top-level commands.
+USAGE
+}
+
+specialist_model() {
+  local category="$1" include_disabled="$2" command="$3"
+  shift 3
+  local extra=()
+  [[ "$include_disabled" == 1 ]] && extra+=(--include-disabled)
+  case "$command" in
+    list) exec "$LIBEXEC/modelctl" list "$category" "${extra[@]}" "$@" ;;
+    status) exec "$LIBEXEC/modelctl" status "$category" "${extra[@]}" "$@" ;;
+    prepare) exec "$LIBEXEC/modelctl" apply "$category" "${extra[@]}" "$@" ;;
+  esac
+}
+
+agent() {
+  local command="${1:-help}"
+  (($# == 0)) || shift
+  case "$command" in
+    list|status|prepare) specialist_model agentic 0 "$command" "$@" ;;
+    topology) exec "$LIBEXEC/agent-mode.sh" status "$@" ;;
+    enter|leave|normal) exec "$LIBEXEC/agent-mode.sh" "$command" "$@" ;;
+    help|-h|--help)
+      cat <<'USAGE'
+Usage: bc250 advanced agent COMMAND [ARGUMENTS...]
+  list                 list packaged agent candidates
+  status [MODEL]       inspect agent model/source state (not runtime topology)
+  prepare [MODEL]      fetch/reconcile an agent candidate
+  topology              inspect normal/exclusive runtime topology
+  enter                 enter exclusive agent lane mode
+  leave|normal          restore normal main/task/embedding topology
+USAGE
+      ;;
+    *) echo "ERROR: unknown advanced agent command: $command" >&2; return 2 ;;
+  esac
+}
+
+mtp() {
+  local command="${1:-help}"
+  (($# == 0)) || shift
+  case "$command" in
+    list|status|prepare) specialist_model mtp 1 "$command" "$@" ;;
+    run) exec "$LIBEXEC/run-mtp-llamacpp.sh" "$@" ;;
+    compare) exec "$LIBEXEC/compare-mtp.sh" "$@" ;;
+    help|-h|--help)
+      cat <<'USAGE'
+Usage: bc250 advanced mtp COMMAND [ARGUMENTS...]
+  list                 list MTP candidates, including disabled opt-in entries
+  status [MODEL]       inspect MTP source state
+  prepare MODEL        fetch/verify an MTP candidate
+  run MODEL            run one candidate with the reviewed llama.cpp path
+  compare MODEL        compare the same candidate with/without MTP
+USAGE
+      ;;
+    *) echo "ERROR: unknown advanced mtp command: $command" >&2; return 2 ;;
+  esac
+}
+
+qualification() {
+  local command="${1:-help}"
+  (($# == 0)) || shift
+  case "$command" in
+    capture) exec "$LIBEXEC/qualification/package_gate_capture.py" capture "$@" ;;
+    list|clean) exec "$LIBEXEC/qualification/qualification_inventory.py" "$command" "$@" ;;
+    help|-h|--help)
+      cat <<'USAGE'
+Usage: bc250 advanced qualification COMMAND [ARGUMENTS...]
+  capture              capture a closed package-owned qualification gate
+  list                 inventory package qualification evidence
+  clean                safely prune old terminal evidence (dry-run by default)
+USAGE
+      ;;
+    *) echo "ERROR: unknown advanced qualification command: $command" >&2; return 2 ;;
+  esac
+}
+
+code_workflow() {
+  local command="${1:-help}"
+  (($# == 0)) || shift
+  case "$command" in
+    run) exec "$LIBEXEC/coding-agent/coding-agent.sh" "$@" ;;
+    commit) exec "$LIBEXEC/coding-agent/commit-agent.sh" "$@" ;;
+    review) exec "$LIBEXEC/coding-agent/gitea-review.sh" "$@" ;;
+    help|-h|--help)
+      cat <<'USAGE'
+Usage: bc250 advanced code COMMAND [ARGUMENTS...]
+  run MODE INPUT [OUTPUT] [TASK...]
+  commit [--yes]
+  review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
+USAGE
+      ;;
+    *) echo "ERROR: unknown advanced code command: $command" >&2; return 2 ;;
+  esac
+}
+
+command="${1:-help}"
+(($# == 0)) || shift
+case "$command" in
+  help|-h|--help) usage ;;
+  benchmark) exec "$LIBEXEC/benchmark.sh" "$@" ;;
+  revalidate) exec "$LIBEXEC/revalidate.sh" "$@" ;;
+  qualification) qualification "$@" ;;
+  resilience) exec "$LIBEXEC/qualification/resilience_manager.py" "$@" ;;
+  ollama-profile) exec "$LIBEXEC/ollama-profile.sh" "$@" ;;
+  openwebui) exec "$LIBEXEC/openwebui-setup.py" "$@" ;;
+  agent) agent "$@" ;;
+  mtp) mtp "$@" ;;
+  code) code_workflow "$@" ;;
+  *) echo "ERROR: unknown advanced command: $command" >&2; usage >&2; exit 2 ;;
+esac

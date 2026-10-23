@@ -1,26 +1,17 @@
 # bash completion for the supported bc250 multicall interface.
 _bc250_complete() {
-  local cur prev command
+  local cur prev command advanced subsystem
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]:-}"
   command="${COMP_WORDS[1]:-}"
 
   if (( COMP_CWORD == 1 )); then
-    COMPREPLY=( $(compgen -W 'agent-mode benchmark code code-commit compare-mtp health fetch-mtp gitea-review install maintenance model ocr ollama-profile openwebui-setup package-gate qualification rag reset resilience run-mtp status storage support-bundle verify version help --help --version' -- "$cur") )
+    COMPREPLY=( $(compgen -W 'advanced document health install maintenance model ocr reset status storage support-bundle verify version help --help --version' -- "$cur") )
     return 0
   fi
 
   case "$command" in
-    qualification)
-      if (( COMP_CWORD == 2 )); then
-        COMPREPLY=( $(compgen -W 'list clean' -- "$cur") )
-      elif [[ "${COMP_WORDS[2]:-}" == list ]]; then
-        COMPREPLY=( $(compgen -W '--json' -- "$cur") )
-      elif [[ "${COMP_WORDS[2]:-}" == clean ]]; then
-        COMPREPLY=( $(compgen -W '--older-than-days --keep-latest --apply' -- "$cur") )
-      fi
-      ;;
     version)
       COMPREPLY=( $(compgen -W '--json --short' -- "$cur") )
       ;;
@@ -32,12 +23,7 @@ _bc250_complete() {
         COMPREPLY=( $(compgen -W 'list status path install apply refresh unregister remove purge-retired' -- "$cur") )
       fi
       ;;
-    benchmark)
-      if (( COMP_CWORD == 2 )); then
-        COMPREPLY=( $(compgen -W 'generation embeddings ocr task agent usecase translation rag-cycle rag-quality concurrency num-batch owui-translation owui-rag owui-embedding-batch owui-chunk-min owui-system-context' -- "$cur") )
-      fi
-      ;;
-    rag)
+    document)
       if (( COMP_CWORD == 2 )); then
         COMPREPLY=( $(compgen -W 'init prepare-batch review validate activate supersede status ingest' -- "$cur") )
       elif [[ "${COMP_WORDS[2]:-}" == ingest ]]; then
@@ -46,15 +32,32 @@ _bc250_complete() {
         COMPREPLY=( $(compgen -W '--model --agent-url --max-chars --dry-run' -- "$cur") )
       fi
       ;;
-    package-gate)
+    advanced)
+      advanced="${COMP_WORDS[2]:-}"
       if (( COMP_CWORD == 2 )); then
-        COMPREPLY=( $(compgen -W 'capture' -- "$cur") )
+        COMPREPLY=( $(compgen -W 'agent benchmark code mtp ollama-profile openwebui qualification resilience revalidate' -- "$cur") )
+        return 0
       fi
-      ;;
-    resilience)
-      if (( COMP_CWORD == 2 )); then
-        COMPREPLY=( $(compgen -W 'start resume status' -- "$cur") )
-      fi
+      case "$advanced" in
+        agent)
+          (( COMP_CWORD == 3 )) && COMPREPLY=( $(compgen -W 'list status prepare topology enter leave normal' -- "$cur") )
+          ;;
+        mtp)
+          (( COMP_CWORD == 3 )) && COMPREPLY=( $(compgen -W 'list status prepare run compare' -- "$cur") )
+          ;;
+        code)
+          (( COMP_CWORD == 3 )) && COMPREPLY=( $(compgen -W 'run commit review' -- "$cur") )
+          ;;
+        qualification)
+          (( COMP_CWORD == 3 )) && COMPREPLY=( $(compgen -W 'capture list clean' -- "$cur") )
+          ;;
+        resilience)
+          (( COMP_CWORD == 3 )) && COMPREPLY=( $(compgen -W 'start resume status' -- "$cur") )
+          ;;
+        benchmark)
+          (( COMP_CWORD == 3 )) && COMPREPLY=( $(compgen -W 'generation embeddings ocr task agent usecase translation rag-cycle rag-quality concurrency num-batch owui-translation owui-rag owui-embedding-batch owui-chunk-min owui-system-context parity' -- "$cur") )
+          ;;
+      esac
       ;;
   esac
 

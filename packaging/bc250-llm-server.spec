@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.7%{?dist}
+Release:        1.7.1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -98,7 +98,7 @@ tar -xJf %{SOURCE2} -C governor-src
 cp -p governor-src/LICENSE governor-src/LICENSE.cyan-skillfish-governor
 mkdir live-manager-src
 tar -xzf %{SOURCE3} -C live-manager-src --strip-components=1
-patch -d live-manager-src -p1 < patches/cu-live-manager-rpm-paths.patch
+patch -d live-manager-src -p1 < packaging/patches/cu-live-manager-rpm-paths.patch
 
 %build
 pushd governor-src
@@ -263,6 +263,14 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.7.1
+- Greenfield public CLI cleanup: move specialist/qualification workflows under bc250 advanced and rename bc250 rag to bc250 document without renaming persistent corpus state.
+- Consolidate agent/MTP/coding specialist entry points, remove the duplicate local make rpm binary-build route, and move the parity diagnostic under advanced benchmark.
+- Clarify source ownership by moving managed-document lifecycle/OCR under cmd/documents, static shipped configuration under config, MTP comparison beside its catalog, the CU compatibility patch under packaging/patches, document examples under examples/document and reset under cmd/system.
+- Use retired terminology consistently for visible archived model definitions, reduce development handover release coupling while preserving engineering history, and keep config/runtime.env as the runtime-pin authority.
+- Fix internal document/model topology changes to traverse bc250 advanced agent and add exact cross-dispatch regressions; keep runtime/model/retrieval tuning unchanged.
+- Fix the relocated OCR helper source-tree fallback, remove the redundant Open WebUI version constant, and align current operator documentation/help with the managed-document and Agent-topology interfaces.
+
 * Thu Oct 22 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.7
 - Make managed RAG activation transaction-safe and validate the complete proposed corpus before mutation, with duplicate-target rejection and rollback on filesystem failure.
 - Enforce German-authoritative/French-translation provenance with stable document/revision IDs, stronger metadata/date/source validation, symlink hardening and persisted extraction-fidelity review state.
