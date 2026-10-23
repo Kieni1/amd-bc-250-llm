@@ -27,30 +27,30 @@ def load(category: str) -> tuple[dict, list[dict]]:
 
 class ModelfileDiscoveryTests(unittest.TestCase):
 
-    def test_modelfile_graveyard_contains_only_modelfiles(self) -> None:
-        graveyard = ROOT / "models/modelfiles-graveyard"
-        self.assertTrue(graveyard.is_dir())
-        entries = list(graveyard.iterdir())
+    def test_modelfile_retired_contains_only_modelfiles(self) -> None:
+        retired = ROOT / "models/modelfiles-retired"
+        self.assertTrue(retired.is_dir())
+        entries = list(retired.iterdir())
         self.assertTrue(entries)
         self.assertTrue(all(path.is_file() and path.suffix == ".Modelfile" for path in entries))
 
-    def test_modelfile_graveyard_is_not_packaged_or_discovered(self) -> None:
-        graveyard = ROOT / "models/modelfiles-graveyard"
-        retired = {path.stem for path in graveyard.glob("*.Modelfile")}
+    def test_modelfile_retired_is_not_packaged_or_discovered(self) -> None:
+        retired = ROOT / "models/modelfiles-retired"
+        retired = {path.stem for path in retired.glob("*.Modelfile")}
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        self.assertNotIn("modelfiles-graveyard", manifest)
+        self.assertNotIn("modelfiles-retired", manifest)
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("MODELFILE_SOURCE_DIR", None)
             roots = modelctl.model_directories()
-        self.assertNotIn(graveyard, roots)
-        self.assertTrue(all("graveyard" not in str(path) for path in roots))
+        self.assertNotIn(retired, roots)
+        self.assertTrue(all("retired" not in str(path) for path in roots))
         active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
         self.assertTrue(retired.isdisjoint(active))
 
-    def test_retired_catalog_exactly_matches_source_graveyard(self) -> None:
-        graveyard = ROOT / "models/modelfiles-graveyard"
-        expected = {path.stem for path in graveyard.glob("*.Modelfile")}
+    def test_retired_catalog_exactly_matches_source_retired(self) -> None:
+        retired = ROOT / "models/modelfiles-retired"
+        expected = {path.stem for path in retired.glob("*.Modelfile")}
         catalog = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
         actual = {item["name"] for item in catalog["models"]}
         self.assertEqual(actual, expected)
@@ -356,19 +356,19 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("production German/French translation base", translator)
         self.assertIn("PARAMETER num_predict 2048", translator)
         self.assertNotRegex(translator, r"(?m)^SYSTEM\s")
-        graveyard = ROOT / "models/modelfiles-graveyard"
-        lfm = (graveyard / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
+        retired = ROOT / "models/modelfiles-retired"
+        lfm = (retired / "exp-lfm25-8b-a1b-liquidai-q6-k.Modelfile").read_text(encoding="utf-8")
         self.assertIn("retired from active comparison", lfm)
-        gemma26 = (graveyard / "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile").read_text(encoding="utf-8")
+        gemma26 = (retired / "exp-gemma4-26b-a4b-mradermacher-i1-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertIn("output degeneration", gemma26)
 
-    def test_eurollm_translation_challenger_is_retired_to_graveyard(self) -> None:
+    def test_eurollm_translation_challenger_is_retired_to_retired(self) -> None:
         name = "exp-eurollm9b-instruct-2512-mradermacher-q4-k-m"
         active_path = MODELFILES / f"{name}.Modelfile"
-        graveyard_path = ROOT / "models/modelfiles-graveyard" / f"{name}.Modelfile"
+        retired_path = ROOT / "models/modelfiles-retired" / f"{name}.Modelfile"
         self.assertFalse(active_path.exists())
-        self.assertTrue(graveyard_path.is_file())
-        text = graveyard_path.read_text(encoding="utf-8")
+        self.assertTrue(retired_path.is_file())
+        text = retired_path.read_text(encoding="utf-8")
         self.assertIn("EuroLLM-9B-Instruct-2512.Q4_K_M.gguf", text)
         discovered = {model["name"] for model in modelctl.discover_models([MODELFILES])}
         self.assertNotIn(name, discovered)
@@ -377,10 +377,10 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
         self.assertIn(name, {row["name"] for row in retired["models"]})
 
-    def test_qwen36_35b_remains_graveyard_only(self) -> None:
+    def test_qwen36_35b_remains_retired_only(self) -> None:
         active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
         self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", active)
-        self.assertTrue((ROOT / "models/modelfiles-graveyard/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile").is_file())
+        self.assertTrue((ROOT / "models/modelfiles-retired/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile").is_file())
         retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
         self.assertIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", {row["name"] for row in retired["models"]})
 
@@ -458,14 +458,14 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("primary / general-27b", text)
         self.assertIn("alternative / specialist", text)
 
-    def test_retired_mtp_candidates_are_source_graveyard_only(self) -> None:
+    def test_retired_mtp_candidates_are_source_retired_only(self) -> None:
         active = (ROOT / "models/mtp/models.toml").read_text(encoding="utf-8")
-        graveyard = (ROOT / "models/mtp/graveyard.toml").read_text(encoding="utf-8")
+        retired = (ROOT / "models/mtp/retired.toml").read_text(encoding="utf-8")
         for model_id in ("qwen3.6-27b-mtp", "qwen3.6-35b-a3b-mtp"):
             self.assertNotIn(f'id = "{model_id}"', active)
-            self.assertIn(f'id = "{model_id}"', graveyard)
-        self.assertIn("128 MiB MemAvailable hard floor", graveyard)
-        self.assertIn("Superseded in the recommended MTP lane", graveyard)
+            self.assertIn(f'id = "{model_id}"', retired)
+        self.assertIn("128 MiB MemAvailable hard floor", retired)
+        self.assertIn("Superseded in the recommended MTP lane", retired)
 
     def test_mtp_filtered_view_preserves_global_catalog_indexes(self) -> None:
         _defaults, mtp_only = modelctl.load_models(
@@ -513,11 +513,11 @@ class CategoryInterfaceTests(unittest.TestCase):
         with redirect_stdout(output):
             self.assertEqual(modelctl.main([]), 0)
         text = output.getvalue()
-        self.assertIn("bc250 model status agentic", text)
-        self.assertIn("bc250 model apply agentic MODEL", text)
+        self.assertIn("bc250 model status all --compact", text)
         self.assertIn("bc250 model apply all all", text)
-        self.assertIn("bc250 model unregister agentic MODEL", text)
-        self.assertIn("bc250 model remove agentic MODEL", text)
+        self.assertIn("bc250 advanced agent status MODEL", text)
+        self.assertIn("bc250 advanced agent prepare MODEL", text)
+        self.assertIn("bc250 advanced mtp prepare MODEL", text)
 
     def test_list_is_catalog_only_and_does_not_require_sudo(self) -> None:
         output = StringIO()
@@ -688,7 +688,7 @@ class CategoryInterfaceTests(unittest.TestCase):
     def test_active_package_callers_use_canonical_model_manager_lifecycle(self) -> None:
         callers = (
             "cmd/system/install.sh",
-            "models/ocr/bc250-ocr.sh",
+            "cmd/documents/ocr.sh",
             "models/mtp/run-mtp-llamacpp.sh",
             "quality-checks/main/10-main-model-candidate-matrix.sh",
             "quality-checks/task/10-candidate-screen.sh",
@@ -1010,7 +1010,7 @@ class StatusTests(unittest.TestCase):
         with redirect_stdout(output):
             rc = modelctl.main(["list", "mtp"])
         self.assertEqual(rc, 0)
-        self.assertIn("no enabled models; use --all", output.getvalue())
+        self.assertIn("no enabled models; use --include-disabled", output.getvalue())
 
     def test_suppressed_catalog_environment_is_honored_for_mutations(self) -> None:
         defaults, models = load("production")
@@ -1289,7 +1289,7 @@ class StatusTests(unittest.TestCase):
         )
         self.assertEqual(
             modelctl.recommended_status_action(missing),
-            "sudo bc250 fetch-mtp qwen3.6-27b-mtp",
+            "sudo bc250 advanced mtp prepare qwen3.6-27b-mtp",
         )
         update = modelctl.ModelInspection(
             model=model, source_path=None, state_path=None, source_status="current",
@@ -1423,7 +1423,7 @@ class StatusTests(unittest.TestCase):
 
     def test_pressure_heavy_qwen_profiles_are_retired_or_bounded_for_next_device_gate(self) -> None:
         q36_active = MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
-        q36_retired = ROOT / "models/modelfiles-graveyard/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
+        q36_retired = ROOT / "models/modelfiles-retired/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
         q38 = (MODELFILES / "exp-qwen38-27b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertFalse(q36_active.exists())
         self.assertTrue(q36_retired.exists())

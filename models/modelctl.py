@@ -133,7 +133,7 @@ def set_appliance_mode(mode: str) -> None:
         raise ModelError("bc250 dispatcher is required for package-managed model registration")
     action = "leave" if mode == "normal" else "enter"
     result = subprocess.run(
-        [command, "agent-mode", action],
+        [command, "advanced", "agent", action],
         check=False,
         stdout=(subprocess.DEVNULL if os.environ.get("BC250_MODELCTL_SUPPRESS_MODE_OUTPUT") == "1" else None),
     )
@@ -1853,12 +1853,13 @@ class FriendlyArgumentParser(argparse.ArgumentParser):
 CLI_EPILOG = """Common workflows:
   bc250 model list
   sudo bc250 model install
-  sudo bc250 model status agentic
-  sudo bc250 model apply agentic MODEL
+  sudo bc250 model status all --compact
   sudo bc250 model apply all all
-  sudo bc250 model refresh agentic MODEL
-  sudo bc250 model unregister agentic MODEL
-  sudo bc250 model remove agentic MODEL
+  bc250 advanced agent list
+  sudo bc250 advanced agent status MODEL
+  sudo bc250 advanced agent prepare MODEL
+  bc250 advanced mtp list
+  sudo bc250 advanced mtp prepare MODEL
   sudo bc250 model purge-retired
 
 Use 'bc250 model COMMAND --help' for command-specific options.
@@ -1965,7 +1966,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     catalog_arguments(listing, category_optional=True)
     listing.add_argument(
-        "--all", action="store_true", help="include disabled MTP entries"
+        "--include-disabled", action="store_true", help="include disabled MTP entries"
     )
 
     status = commands.add_parser(
@@ -2158,7 +2159,7 @@ def recommended_status_action(inspection: ModelInspection) -> str | None:
         return f"sudo bc250 model refresh {category} {name}"
     if inspection.overall_status in {"MISSING", "DRIFT"}:
         if category == "mtp" and not model.get("enabled", False):
-            return f"sudo bc250 fetch-mtp {name}"
+            return f"sudo bc250 advanced mtp prepare {name}"
         return f"sudo bc250 model apply {category} {name}"
     return None
 
@@ -2520,16 +2521,16 @@ def main(argv: list[str] | None = None) -> int:
         category = args.category or "all"
         if category == "all":
             catalogs = load_all_catalogs(directories=directories, source=source)
-            print_catalogs_basic(catalogs, include_disabled_mtp=args.all)
+            print_catalogs_basic(catalogs, include_disabled_mtp=args.include_disabled)
             return 0
         defaults, models = load_models(category, directories=directories, source=source)
         available = (
             models
-            if category != "mtp" or args.all
+            if category != "mtp" or args.include_disabled
             else [model for model in models if model["enabled"]]
         )
         if category == "mtp" and not available:
-            print("MTP models: no enabled models; use --all to include disabled opt-in models.")
+            print("MTP models: no enabled models; use --include-disabled to include disabled opt-in models.")
             return 0
         print(f"{'MTP' if category == 'mtp' else category.title()} models:")
         print_catalog_models(available)

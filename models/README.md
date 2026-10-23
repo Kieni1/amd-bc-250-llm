@@ -3,27 +3,23 @@
 The guided installer establishes the required production/task/embedding baseline, then offers one
 unified optional selection across ordinary Ollama-backed production, experiments, agentic, embedding
 and task entries. MTP is deliberately absent from that picker and from combined `apply all` /
-`refresh all`; use `bc250 fetch-mtp` for explicit speculative-decoding preparation. The model manager
+`refresh all`; use `bc250 advanced mtp prepare` for explicit speculative-decoding preparation. The model manager
 keeps lane routing and exclusive agent-mode transitions internal. Use the commands below later to add,
 refresh or remove models.
 
 ## Commands
 
 ```bash
-bc250 model list
-bc250 model list production
-bc250 model list experiments
-bc250 model list task
-bc250 model list agentic
-bc250 model list embedding
-bc250 model list mtp --all
-sudo bc250 fetch-mtp qwen3.5-9b-mtp  # explicit opt-in for disabled MTP experiments
-LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 compare-mtp qwen3.5-9b-mtp
+bc250 model list                    # ordinary combined catalog view
+bc250 advanced agent list           # specialist agent view
+bc250 advanced mtp list             # specialist MTP view
+sudo bc250 advanced mtp prepare qwen3.5-9b-mtp  # explicit opt-in for disabled MTP experiments
+LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp compare qwen3.5-9b-mtp
 
-sudo bc250 model status agentic MODEL
-sudo bc250 model status agentic MODEL --online
+sudo bc250 advanced agent status MODEL
+sudo bc250 advanced agent status MODEL --online
 sudo bc250 model status all --compact  # compact ordinary-model view used by the installer
-sudo bc250 model status mtp --include-disabled --compact  # explicit MTP state view
+sudo bc250 advanced mtp status --compact  # explicit MTP state view
 
 sudo bc250 model apply production MODEL-NAME
 sudo bc250 model refresh production MODEL-NAME
@@ -70,9 +66,9 @@ catalog also owns its small package-facing `role` and `recommendation` metadata 
 runtime context/draft defaults and operator documentation do not need separate selection tables.
 This metadata never enables a model or promotes it into normal convergence. Packaged MTP entries
 remain excluded from combined mutation convergence regardless of enabled state; use
-`sudo bc250 fetch-mtp ID` when deliberately preparing one for standalone llama.cpp use.
-`bc250 run-mtp` drains normal Ollama residency for memory isolation and restores the pre-run set on
-normal direct use, while `bc250 compare-mtp` intentionally leaves Ollama cold after qualification.
+`sudo bc250 advanced mtp prepare ID` when deliberately preparing one for standalone llama.cpp use.
+`bc250 advanced mtp run` drains normal Ollama residency for memory isolation and restores the pre-run set on
+normal direct use, while `bc250 advanced mtp compare` intentionally leaves Ollama cold after qualification.
 
 ## Add or override a model
 
@@ -84,7 +80,7 @@ sudo install -m0644 \
   /usr/share/bc250-llm-server/model-management/MODEL-TEMPLATE.Modelfile.example \
   /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
 sudoedit /etc/bc250-llm-server/models.d/exp-example-source-q4-k-m.Modelfile
-bc250 model list experiments
+bc250 model list
 sudo bc250 model status experiments exp-example-source-q4-k-m
 sudo bc250 model apply experiments exp-example-source-q4-k-m
 ```
@@ -169,7 +165,7 @@ For live source/blob pairs whose bytes are identical, `bc250 storage dedupe` use
 conservative 16 MiB XFS range while batching ranges per pair into one `xfs_io` process.
 Dedupe state is stored in the schema-3 sidecar and survives normal model reconciliation.
 
-Package-retired definitions remain source-only under `models/modelfiles-graveyard/`;
+Package-retired definitions remain source-only under `models/modelfiles-retired/`;
 installed `retired-models.json` contains the canonical identity/paths needed for safe
 cleanup. `sudo bc250 model purge-retired` previews and removes only those explicit
 package-retired models, refuses uncertain or misplaced registration state, and never
@@ -201,4 +197,4 @@ See [`../docs/OPERATIONS.md`](../docs/OPERATIONS.md) for every option and
 Normal mode uses main 11434, task 11435 and embedding 11437. Apply embedding
 models with `sudo bc250 model apply embedding` so registration targets the dedicated
 store/service. Agent 11436 is disabled at boot and runs only through exclusive
-`bc250 agent-mode enter|leave`; do not register production/embedding models there.
+`bc250 advanced agent enter|leave`; do not register production/embedding models there.

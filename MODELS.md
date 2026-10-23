@@ -22,7 +22,7 @@ Main, task and embedding stores are deliberately separate. The main lane keeps i
 selected chat model warm for 20 minutes, the compact task lane unloads after each
 request, and the embedding lane keeps the small retrieval model warm for 10 minutes.
 This preserves interactive chat latency while keeping background task residency small.
-Agent/coding is **exclusive**: `bc250 agent-mode enter` stops main/task/embedding and
+Agent/coding is **exclusive**: `bc250 advanced agent enter` stops main/task/embedding and
 starts only 11436; `leave` restores normal mode.
 
 During pre-v1 comparison testing Open WebUI discovers models installed on the normal main (`11434`)
@@ -35,7 +35,7 @@ remain outside the normal chat selector.
 
 MTP is different from the agent lane: it shares catalog/provenance handling with `bc250 model`, but
 its runtime is a standalone opt-in external llama.cpp server rather than an Ollama service lane.
-Direct `bc250 run-mtp` operation snapshots and drains any resident Ollama models first, then restores
+Direct `bc250 advanced mtp run` operation snapshots and drains any resident Ollama models first, then restores
 the exact pre-run residency set when the standalone server exits. Qualification/comparison runs
 intentionally leave Ollama cold so residency cannot contaminate performance/resource evidence.
 
@@ -46,25 +46,21 @@ The package owns all four Ollama service definitions statically. Normal mode req
 `bc250 model` separates catalog discovery, state inspection and lifecycle actions:
 
 ```bash
-bc250 model list
-bc250 model list production
-bc250 model list experiments
-bc250 model list task
-bc250 model list agentic
-bc250 model list embedding
-bc250 model list mtp --all
+bc250 model list                    # ordinary combined catalog view
+bc250 advanced agent list           # specialist agent view
+bc250 advanced mtp list             # specialist MTP view
 # MTP stays opt-in even though it shares the lifecycle manager:
-sudo bc250 fetch-mtp qwen3.5-9b-mtp
+sudo bc250 advanced mtp prepare qwen3.5-9b-mtp
 
 # Generic installer / apply-all convergence never selects MTP.
-sudo bc250 model status agentic MODEL
-sudo bc250 model status agentic MODEL --online
+sudo bc250 advanced agent status MODEL
+sudo bc250 advanced agent status MODEL --online
 
 sudo bc250 model apply production MODEL
 sudo bc250 model apply experiments MODEL
 sudo bc250 model apply embedding MODEL
 sudo bc250 model apply task MODEL
-sudo bc250 model apply agentic MODEL
+sudo bc250 advanced agent prepare MODEL
 
 sudo bc250 model refresh experiments MODEL
 sudo bc250 model unregister experiments MODEL
@@ -203,8 +199,8 @@ direct benchmark; with upstream/default OWUI prompts the live result was only
 with both models observed resident, no additional swap growth, and no serious
 OOM/GPU warnings. `task-lfm25-1.2b-instruct-liquidai-q6-k` is therefore the
 package default. At that historical point Gemma 3 1B remained an optional
-fallback/control; the current decision below retires it to the source graveyard. The exhausted compact task candidates and
-the unsafe Qwen3.8 4B task candidate are source-graveyard entries.
+fallback/control; the current decision below retires it to the retired source set. The exhausted compact task candidates and
+the unsafe Qwen3.8 4B task candidate are retired-source entries.
 
 Translation evidence on the actual authenticated Open WebUI path:
 
@@ -235,7 +231,7 @@ package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS. Installe
 clarifies the package-owned tag prompt so broad and specific tags share one array and only
 one raw JSON object is allowed. The model, strict evaluator and 128-token tag budget are
 unchanged pending focused device retest. The previous Gemma 3 1B fallback/control is
-retired to the source graveyard after its weak ~2/6 current-task behavior.
+retired to the retired source set after its weak ~2/6 current-task behavior.
 `exp-qwen3-4b-lmstudio-q6-k` remains an experiment but is explicitly rejected for
 concurrent background-task deployment because both task staging attempts caused global
 OOM and warm-main loss.
@@ -263,7 +259,7 @@ A focused exact-device regression also showed that German recommendation `sollte
 strengthened by the native Translate-Gemma generation into French obligation `doivent`.
 The package keeps the clause-local modality integrity guard fail-closed for this class of
 strengthening, but the underlying model behavior is accepted as a documented limitation
-rather than a release blocker. The EuroLLM 9B challenger fixed the `sollten -> devraient` anchor in Round 1 but reproducibly emitted English for German `muss nicht`; it is therefore retired to the source graveyard and no Round 2 is planned. The numeric evaluator correctly
+rather than a release blocker. The EuroLLM 9B challenger fixed the `sollten -> devraient` anchor in Round 1 but reproducibly emitted English for German `muss nicht`; it is therefore retired to the retired source set and no Round 2 is planned. The numeric evaluator correctly
 treats locale-equivalent values such as `8.1` and `8,1` as equal without claiming
 byte-for-byte formatting preservation.
 
@@ -271,7 +267,7 @@ The former `prod-lfm25-8b-a1b-liquidai-q6-k` identity and its later
 `exp-lfm25-8b-a1b-liquidai-q6-k` comparison identity are both retired. Corrected long-run evidence
 showed the LFM model reproduces the same recommendation→obligation strengthening as the production
 translator, so it is no longer described as a rollback candidate. Hunyuan-MT and Ministral
-translation-only challengers are likewise in the source graveyard. TIR Qwen3.5 9B remains active
+translation-only challengers are likewise in the retired source set. TIR Qwen3.5 9B remains active
 only as a broader office/RAG experiment;
 its translation deployment path is closed under current evidence. The old experimental
 Translate-Gemma identity is also retired after promotion to the production name.
@@ -297,18 +293,18 @@ residency OOM-killed the task service. Making every main request ephemeral avoid
 that overlap but imposed roughly large-model cold-load latency on subsequent chat,
 so the package keeps the proven warm main lane. The later LFM2.5 1.2B Q6_K task
 model passed true overlap without additional swap growth and replaced Gemma as the
-default; the unsafe Qwen3.8 4B task candidate moved to the source graveyard. Agentic/coding
+default; the unsafe Qwen3.8 4B task candidate moved to the retired source set. Agentic/coding
 results are separate because agent mode is exclusive by design.
 
 ### Retired / exhausted catalog
 
-The source-only graveyard is for models with no current routine promotion path. Graveyard
+The source-only retired set is for models with no current routine promotion path. Retired
 Modelfiles are not packaged or discovered. Their canonical manager-owned identities are
 mirrored in `models/retired-models.json` so stale installed registrations remain
 distinguishable from operator-created unmanaged models and can be removed safely with
 `bc250 model purge-retired`.
 
-The graveyard currently contains 21 definitions. Important recent role changes are:
+The retired set currently contains 21 definitions. Important recent role changes are:
 
 | Model | Why it is retired from routine discovery |
 |---|---|
@@ -321,7 +317,7 @@ The graveyard currently contains 21 definitions. Important recent role changes a
 | `exp-qwen38-4b-distill-empero-q6-k` | task quality was promising but simultaneous warm-main residency OOM-killed the task service |
 | `task-lfm25-2.6b-liquidai-q6-k` | superseded by the smaller promoted LFM2.5 1.2B task model |
 
-Other older graveyard entries remain documented by their Modelfiles, decision history and
+Other older retired entries remain documented by their Modelfiles, decision history and
 retired catalog. Do not resurrect them because of an isolated benchmark score; require a
 new role, changed hardware/runtime envelope or other explicit retest condition.
 
@@ -330,19 +326,19 @@ Active experiments must retain a current comparison purpose. The former producti
 Use the role-specific lanes before changing defaults:
 
 ```bash
-bc250 benchmark usecase
-bc250 benchmark translation
-bc250 benchmark rag-quality
-bc250 benchmark embeddings
-bc250 benchmark ocr
-bc250 benchmark task
-bc250 benchmark agent
+bc250 advanced benchmark usecase
+bc250 advanced benchmark translation
+bc250 advanced benchmark rag-quality
+bc250 advanced benchmark embeddings
+bc250 advanced benchmark ocr
+bc250 advanced benchmark task
+bc250 advanced benchmark agent
 ```
 
 ## Active experiment catalog
 
 This is the canonical operator-facing list of packaged `exp-*` registrations. It is
-validated against `models/modelfiles/`; retired/source-graveyard models are listed
+validated against `models/modelfiles/`; retired/retired-source models are listed
 separately below.
 
 <!-- ACTIVE_EXPERIMENTS:BEGIN -->
@@ -397,7 +393,7 @@ nonterminal/truncated/reasoning-contaminated output.
 The next comparison funnel keeps Ornith as baseline, Qwable 9B as a serious challenger,
 and adds Qwen3.5 4B Q6_K plus Gemma 4 E4B Q4_K_M as compact challengers. Gemma 4 12B
 remains available for one final comparison only if the E4B result leaves that useful.
-Qwen2.5-Coder 7B is not moved to the graveyard in this source because the raw campaign
+Qwen2.5-Coder 7B is not moved to the retired set in this source because the raw campaign
 archive was not supplied to this integration pass. No weights are deleted by catalog
 status changes.
 
@@ -417,7 +413,7 @@ cleanup decision from one comparable dataset. Notable additions are:
 
 | Model | Why it exists |
 |---|---|
-| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in graveyard/history |
+| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in retired/history |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-s` | admin/testing-only 8K quality/reasoning profile; `think=true`; mechanically strong but memory-tight |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |
 | `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental/admin-only pressure-heavy non-routine dense 27B control at 8K; retain only if quality value justifies the pressure |
@@ -444,7 +440,7 @@ from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cac
 runtime and the OS. Draft/MTP heads are not standalone Ollama role models and stay in the dedicated MTP
 workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from combined
 `apply all` / `refresh all` convergence regardless of their enabled flag; explicit
-`bc250 fetch-mtp` / `apply mtp` remains the preparation boundary.
+`bc250 advanced mtp prepare` / `apply mtp` remains the preparation boundary.
 
 The completed MTP campaign now has a small package-facing policy in the existing MTP catalog:
 
@@ -456,13 +452,13 @@ The completed MTP campaign now has a small package-facing policy in the existing
 
 `qwen3.6-27b-mtp` is retired from the active/recommended lane because the optimized Qwen3.8
 choices provide better absolute throughput, memory headroom and practical completion efficiency.
-Its historical passing result is preserved in the source-only MTP graveyard. The stock
+Its historical passing result is preserved in the source-only MTP retired set. The stock
 `qwen3.6-35b-a3b-mtp` 8K/full-GPU configuration remains retired for memory fit.
 
 The MTP `role` / `recommendation` fields are presentation/policy metadata only: all active entries
 remain disabled/download-only and excluded from installer or `apply all` convergence.
-`bc250 fetch-mtp [SELECTION]` remains the explicit preparation boundary. `bc250 compare-mtp ID`
-remains the same-target qualification path and `bc250 run-mtp ID` the manual runtime/debug path.
+`bc250 advanced mtp prepare [SELECTION]` remains the explicit preparation boundary. `bc250 advanced mtp compare ID`
+remains the same-target qualification path and `bc250 advanced mtp run ID` the manual runtime/debug path.
 Use exact IDs for 27B models; the ambiguous 27B convenience aliases were removed rather than
 silently retargeted after the package preference changed.
 

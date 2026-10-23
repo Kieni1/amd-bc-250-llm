@@ -21,13 +21,13 @@ Current packaged task model:
 
 - `task-lfm25-1.2b-instruct-liquidai-q6-k` — **production default and only active task-lane model**. Promotion evidence remains 15/18 direct, 15/18 through the actual Open WebUI title/tag/query endpoints with package-owned prompts, and 9/9 true-overlap trials while warm GPT-OSS remained resident.
 
-The previous `task-gemma3-1b-unsloth-ud-q4-k-xl` fallback/control is retired to the source graveyard after its ~2/6 current task result. Reinstall it only as an explicit historical experiment, not as a routine fallback.
+The previous `task-gemma3-1b-unsloth-ud-q4-k-xl` fallback/control is retired to the retired source set after its ~2/6 current task result. Reinstall it only as an explicit historical experiment, not as a routine fallback.
 
 The default LFM Modelfile deliberately omits a fixed `SYSTEM` prompt. A generic
 SYSTEM was tested and caused task-shape contamination (for example title responses
 that also emitted tags/search-query fields). Open WebUI therefore owns the exact
 title/tag/retrieval-query prompt templates in `openwebui/desired-state.json`. The
-direct `bc250 benchmark task` path reads those same templates so direct and live
+direct `bc250 advanced benchmark task` path reads those same templates so direct and live
 qualification cannot silently drift to different prompt contracts again.
 
 Keep port `11435` blocked from untrusted networks. The package adds
