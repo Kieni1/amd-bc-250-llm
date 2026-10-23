@@ -137,7 +137,7 @@ class OcrInstallTests(unittest.TestCase):
         self.assertNotIn("Unmanaged Ollama models", output.getvalue())
 
     def test_invalid_ocr_alias_fails_before_manager_or_ollama(self) -> None:
-        script = ROOT / "models/ocr/bc250-ocr.sh"
+        script = ROOT / "cmd/documents/ocr.sh"
         with tempfile.TemporaryDirectory() as temporary:
             temporary_path = Path(temporary)
             marker = temporary_path / "called"
