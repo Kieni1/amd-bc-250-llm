@@ -20,7 +20,6 @@ rpm -V bc250-llm-server.x86_64
 | `/usr/bin/bc250` | Multicall command dispatcher |
 | `/usr/bin/bc250-40cu` | Compact standalone live-CU status command |
 | `/usr/bin/bc250-cu-live-manager` | Pinned live WGP manager |
-| `/usr/bin/llm-run-diagnose` | Model-run diagnostic |
 | `/usr/libexec/bc250-llm-server/` | Command implementations |
 | `/usr/share/bc250-llm-server/model-management/` | Packaged Modelfiles and operator template |
 | `/usr/share/doc/bc250-llm-server/` | Curated operator documentation: top-level quick/model/release files, canonical `docs/`, model component notes, examples and third-party notices |
@@ -75,12 +74,12 @@ intentionally empty on a stock install; packaged model definitions live under
 | `/srv/bc250-documents/{public,confidential}/COLLECTION/inbox/{german,french,bilingual}/` | Batch-preparation input lanes; files remain here when OCR/manual review is required |
 | `/srv/bc250-documents/{public,confidential}/COLLECTION/sources/` | Immutable authoritative source files; never automatically indexed |
 | `/srv/bc250-documents/{public,confidential}/COLLECTION/working/` | Local agent/editor drafts; never indexed |
-| `/srv/bc250-documents/{public,confidential}/COLLECTION/active/` | Human-reviewed canonical Markdown eligible for RAG sync |
+| `/srv/bc250-documents/{public,confidential}/COLLECTION/active/` | Human-reviewed canonical Markdown eligible for knowledge synchronization |
 | `/srv/bc250-documents/{public,confidential}/COLLECTION/superseded/` | Previous source/Markdown revisions retained for audit |
 | `/var/lib/open-webui/` | Open WebUI application data; treat as confidential |
 | `/var/lib/open-webui/webui.db` | Accounts, chats, settings and knowledge metadata; confidential |
 | `/var/lib/open-webui/uploads/` | Uploaded source documents; confidential |
-| `/var/lib/open-webui/vector_db/` | Derived vector/RAG index data; confidential |
+| `/var/lib/open-webui/vector_db/` | Derived retrieval/vector index data; confidential |
 | `/var/backups/bc250-llm-server/` | Maintenance backups; config/users directories reserve the dormant `bc250-backup-export` group for optional read-only Pi export, while rollback data stays private |
 | `/var/log/bc250-llm-install.log` | Guided-installer transcript |
 
@@ -91,7 +90,7 @@ for administrative diagnostics. An unprivileged status command should report pro
 protected/unavailable rather than as an actual zero or missing value.
 
 Ordinary DNF removal retains persistent state. `sudo bc250 reset` is the
-separately confirmed greenfield appliance reset. Read [`UNINSTALL.md`](UNINSTALL.md) first.
+separately confirmed greenfield appliance reset. Read [`RESET.md`](RESET.md) first.
 
 ## Source-to-RPM mapping and packaging boundaries
 

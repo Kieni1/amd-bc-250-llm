@@ -6,7 +6,7 @@ set -Eeuo pipefail
   echo "Usage: sudo ./install [RPM-FILE-OR-DIRECTORY]"
   exit 0
 }
-RPM_PATH="${1:-$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")}" 
+RPM_PATH="${1:-$(dirname -- "$(readlink -f -- "${BASH_SOURCE[0]}")")}"
 [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
 
 find_rpm() {

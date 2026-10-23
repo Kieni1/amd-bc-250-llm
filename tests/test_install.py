@@ -255,16 +255,16 @@ class InstallerTests(unittest.TestCase):
         for example in (
             "sudo bc250 install",
             "sudo bc250 install",
-            "sudo bc250 ollama-profile balanced",
+            "sudo bc250 advanced ollama-profile balanced",
             "sudo bc250-40cu status",
             "sudo bc250-cu-live-manager",
-            "sudo bc250 agent-mode enter",
+            "sudo bc250 advanced agent enter",
             "sudo bc250 storage dedupe",
             "sudo bc250 maintenance status",
             "sudo bc250 reset [--yes]",
         ):
             self.assertIn(example, commands)
-        self.assertIn("bc250 agent-mode status", commands)
+        self.assertIn("bc250 advanced agent topology", commands)
         self.assertIn("bc250 storage status", commands)
 
     def test_one_unified_model_selection_is_used_after_required_active_roles(self) -> None:
@@ -283,7 +283,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('BC250_MODELCTL_CURRENT_SUMMARY=1', source)
         self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
         self.assertIn('bc250 model status mtp --include-disabled --compact', source)
-        self.assertIn('sudo bc250 fetch-mtp MODEL_ID', source)
+        self.assertIn('sudo bc250 advanced mtp prepare MODEL_ID', source)
         self.assertIn('Review or install optional models now? [y/N]:', source)
         self.assertNotIn('bc250 model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
@@ -405,7 +405,7 @@ input_is_interactive && exit 9 || exit 0
         self.assertIn("systemctl enable ollama.service ollama-task.service ollama-embedding.service", topology)
         self.assertIn('FragmentPath --value "$unit"', topology)
         self.assertIn('/usr/lib/systemd/system/$unit', topology)
-        self.assertIn("bc250 agent-mode leave", topology)
+        self.assertIn("bc250 advanced agent leave", topology)
 
     def test_agent_mode_switches_static_topology_and_restores_normal(self) -> None:
         script = ROOT / "cmd/system/agent-mode.sh"
@@ -499,7 +499,7 @@ input_is_interactive && exit 9 || exit 0
         self.assertIn("enter|leave|normal|status", source)
         self.assertIn("leave|normal) need_root; leave_agent", source)
         self.assertIn("Normal runtime topology restored.", source)
-        self.assertIn("Return to normal mode with: sudo bc250 agent-mode normal", source)
+        self.assertIn("Return to normal mode with: sudo bc250 advanced agent normal", source)
 
     def test_agent_mode_rejects_nonexclusive_service_state(self) -> None:
         script = ROOT / "cmd/system/agent-mode.sh"
@@ -578,7 +578,21 @@ systemctl() {
   esac
   return 0
 }
-bc250() { local cmd="$1"; shift; case "$cmd" in agent-mode) printf 'mode:%s\n' "$*" >> "$BC250_TEST_LOG" ;; model) printf 'model:%s\n' "$*" >> "$BC250_TEST_LOG" ;; *) return 64 ;; esac; }
+bc250() {
+  local cmd="$1"; shift
+  case "$cmd" in
+    advanced)
+      local sub="$1"; shift
+      case "$sub" in
+        agent) printf 'mode:%s\n' "$*" >> "$BC250_TEST_LOG" ;;
+        openwebui) printf 'openwebui:%s\n' "$*" >> "$BC250_TEST_LOG" ;;
+        *) return 64 ;;
+      esac
+      ;;
+    model) printf 'model:%s\n' "$*" >> "$BC250_TEST_LOG" ;;
+    *) return 64 ;;
+  esac
+}
 firewall-cmd() { printf 'firewall:%s\n' "$*" >> "$BC250_TEST_LOG"; }
 setsebool() { :; }
 podman() {
@@ -721,7 +735,7 @@ step_8_application_services
         block = source[source.index("step_10_verify() {"):source.index("run_models_only() {")]
         self.assertIn("bc250 verify --summary", block)
         self.assertIn("Detailed diagnostics remain available with: sudo bc250 verify", block)
-        self.assertNotIn("llm-run-diagnose --no-load", block)
+        self.assertNotIn("bc250 advanced benchmark parity --no-load", block)
 
     def test_full_installer_separates_local_maintenance_from_pi_setup(self) -> None:
         source = INSTALLER.read_text()
@@ -785,18 +799,18 @@ step_8_application_services
         ):
             self.assertIn(heading, main)
         for item in (
-            "sudo bc250 openwebui-setup status",
+            "sudo bc250 advanced openwebui status",
             "sudo bc250 model install",
             "sudo bc250 model status",
-            "bc250 rag --help",
+            "bc250 document --help",
             "sudo bc250 maintenance --help",
             "sudo bc250 storage --help",
             "sudo bc250-cu-live-manager",
             "sudo bc250 status",
             "sudo bc250 health",
             "sudo bc250 verify",
-            "sudo bc250 revalidate start",
-            "bc250 benchmark --help",
+            "sudo bc250 advanced revalidate start",
+            "bc250 advanced benchmark --help",
             "sudo bc250 install",
         ):
             self.assertIn(item, main)
@@ -936,7 +950,7 @@ step_11_maintenance
         helper = source[source.index("maybe_save_default_owui_token() {"):source.index("print_openwebui_completion_status() {")]
         self.assertIn('[[ "$OWUI_SETUP_STATE" == "applied" ]] || return 0', helper)
         self.assertIn("systemctl is-active --quiet open-webui.service", helper)
-        self.assertIn('bc250 openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE"', helper)
+        self.assertIn('bc250 advanced openwebui save-key --token-file "$OWUI_VERIFY_TOKEN_FILE"', helper)
         models_only = source[source.index("run_models_only() {"):source.index("print_40cu_completion_status() {")]
         self.assertLess(models_only.index("step_9_open_webui"), models_only.index("maybe_save_default_owui_token"))
 
@@ -952,8 +966,8 @@ step_11_maintenance
         self.assertNotIn("enable_open_webui_boot", step8)
         self.assertNotIn("systemctl enable --now nginx.service", step8)
         publish = source[source.index("publish_openwebui_after_convergence() {"):source.index("application_network_healthy() {")]
-        self.assertLess(publish.index("bc250 openwebui-setup apply"), publish.index("bc250 openwebui-setup status"))
-        self.assertLess(publish.index("bc250 openwebui-setup status"), publish.index("enable_open_webui_boot"))
+        self.assertLess(publish.index("bc250 advanced openwebui apply"), publish.index("bc250 advanced openwebui status"))
+        self.assertLess(publish.index("bc250 advanced openwebui status"), publish.index("enable_open_webui_boot"))
         self.assertLess(publish.index("enable_open_webui_boot"), publish.index("systemctl enable --now nginx.service"))
         self.assertIn("if ! enable_open_webui_boot; then", publish)
         self.assertNotIn("systemctl enable open-webui.service", publish)

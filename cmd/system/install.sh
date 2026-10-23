@@ -387,7 +387,7 @@ step_6_runtime_topology() {
   done
   systemctl enable ollama.service ollama-task.service ollama-embedding.service
   systemctl disable ollama-agent.service >/dev/null 2>&1 || true
-  bc250 agent-mode leave
+  bc250 advanced agent leave
 }
 
 step_7_models() {
@@ -421,7 +421,7 @@ step_7_models() {
   echo
   echo "Required package baseline models are current."
   echo "Additional Ollama models are optional and are not listed on a converged install."
-  echo "MTP remains a separate opt-in workflow: sudo bc250 fetch-mtp MODEL_ID"
+  echo "MTP remains a separate opt-in workflow: sudo bc250 advanced mtp prepare MODEL_ID"
   local selection="${BC250_MODEL_SELECTION:-}" review=""
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
     read -r -p "Review or install optional models now? [y/N]: " review
@@ -500,13 +500,13 @@ publish_openwebui_after_convergence() {
     return 1
   }
   echo "Verifying package-owned Open WebUI desired state before publishing the service."
-  if ! bc250 openwebui-setup apply --token-file "$token_file" >/dev/null; then
+  if ! bc250 advanced openwebui apply --token-file "$token_file" >/dev/null; then
     echo "ERROR: Open WebUI desired-state apply failed; public/boot publication remains held." >&2
     hold_open_webui_publication
     systemctl stop open-webui.service >/dev/null 2>&1 || true
     return 1
   fi
-  if ! bc250 openwebui-setup status --token-file "$token_file" >/dev/null; then
+  if ! bc250 advanced openwebui status --token-file "$token_file" >/dev/null; then
     echo "ERROR: Open WebUI desired-state verification failed; public/boot publication remains held." >&2
     hold_open_webui_publication
     systemctl stop open-webui.service >/dev/null 2>&1 || true
@@ -798,7 +798,7 @@ step_9_open_webui() {
   if [[ -n "$OWUI_TOKEN_FILE" ]]; then
     validate_owui_token_file "$OWUI_TOKEN_FILE"
     echo "Applying the package-owned Open WebUI baseline through the protected administrator API."
-    if ! bc250 openwebui-setup init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+    if ! bc250 advanced openwebui init --token-file "$OWUI_TOKEN_FILE" --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
       hold_open_webui_publication
       systemctl stop open-webui.service >/dev/null 2>&1 || true
@@ -815,7 +815,7 @@ step_9_open_webui() {
 
   if [[ -n "${OWUI_API_KEY:-}" ]]; then
     echo "Applying the package-owned Open WebUI baseline with OWUI_API_KEY from the environment."
-    if ! bc250 openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+    if ! bc250 advanced openwebui init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup failed; public/boot publication remains held." >&2
       hold_open_webui_publication
       systemctl stop open-webui.service >/dev/null 2>&1 || true
@@ -848,7 +848,7 @@ step_9_open_webui() {
         echo "NOTE: $candidate exists but is not a protected readable Open WebUI API key file; it will not be suggested." >&2
       fi
     fi
-    if ! bc250 openwebui-setup init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
+    if ! bc250 advanced openwebui init --token-output "$OWUI_VERIFY_TOKEN_FILE"; then
       echo "WARNING: Open WebUI API setup was not completed; public/boot publication remains held." >&2
       echo "Retry with: sudo bc250 install --models-only" >&2
       return 0
@@ -880,7 +880,7 @@ maybe_save_default_owui_token() {
   fi
   echo "No protected BC-250 Open WebUI administrator API key is configured."
   if yes_no_default_yes "Create/save one now for maintenance, verification and revalidation?"; then
-    if ! bc250 openwebui-setup save-key --token-file "$OWUI_VERIFY_TOKEN_FILE" >/dev/null; then
+    if ! bc250 advanced openwebui save-key --token-file "$OWUI_VERIFY_TOKEN_FILE" >/dev/null; then
       echo "ERROR: could not create/save and verify the protected Open WebUI maintenance API key." >&2
       return 1
     fi
@@ -1157,7 +1157,7 @@ print_setup_summary() {
   if command -v needs-restarting >/dev/null 2>&1; then
     if needs-restarting -r >/dev/null 2>&1; then restart_state="PASS"; else restart_state="RECOMMENDED"; fi
   fi
-  if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250 openwebui-setup status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
+  if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250 advanced openwebui status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
   echo
   echo "BC-250 SETUP SUMMARY"
   echo
@@ -1253,9 +1253,9 @@ main() {
   echo "OVERVIEW"
   echo
   echo "Administration"
-  echo "  Open WebUI:     sudo bc250 openwebui-setup status"
+  echo "  Open WebUI:     sudo bc250 advanced openwebui status"
   echo "  Models:         sudo bc250 model install"
-  echo "  RAG:            bc250 rag --help"
+  echo "  RAG:            bc250 document --help"
   echo "  Maintenance:    sudo bc250 maintenance --help"
   echo "  Documentation:  /usr/share/doc/bc250-llm-server/docs/OPERATIONS.md"
   echo
@@ -1269,8 +1269,8 @@ main() {
   echo "  Status:              sudo bc250 status"
   echo "  Health:              sudo bc250 health"
   echo "  Verify:              sudo bc250 verify"
-  echo "  Quality validation:  sudo bc250 revalidate start"
-  echo "  Benchmarking:        bc250 benchmark --help"
+  echo "  Quality validation:  sudo bc250 advanced revalidate start"
+  echo "  Benchmarking:        bc250 advanced benchmark --help"
   echo
   echo "Setup / repair"
   echo "  Rerun installation:  sudo bc250 install"
