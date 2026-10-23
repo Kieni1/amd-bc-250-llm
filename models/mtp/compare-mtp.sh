@@ -35,7 +35,7 @@ IDs are preferred for recorded evidence.
 
 Available MTP entries:
 USAGE
-  "$MANAGER" list mtp --all --source "$SOURCE_FILE"
+  "$MANAGER" list mtp --include-disabled --source "$SOURCE_FILE"
 }
 
 case "$choice" in
@@ -68,7 +68,7 @@ else
 fi
 [[ -s "$GGUF" ]] || {
   echo "ERROR: missing $GGUF." >&2
-  echo "Fetch it first: sudo bc250 fetch-mtp $choice" >&2
+  echo "Fetch it first: sudo bc250 advanced mtp prepare $choice" >&2
   exit 1
 }
 

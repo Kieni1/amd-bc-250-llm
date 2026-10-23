@@ -1,6 +1,6 @@
 schema = 1
 
-# Source-only MTP graveyard. Entries here are deliberately excluded from the
+# Source-only MTP retired set. Entries here are deliberately excluded from the
 # installed active MTP catalog and therefore from normal list/fetch/run/compare
 # discovery. Preserve exact historical definitions and failure rationale here
 # when a candidate has no current retest path.

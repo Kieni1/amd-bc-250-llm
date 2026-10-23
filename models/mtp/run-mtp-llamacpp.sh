@@ -48,7 +48,7 @@ Use exact IDs for 27B models so package-policy changes cannot silently retarget 
 
 Available MTP entries:
 USAGE
-  "$MANAGER" list mtp --all --source "$SOURCE_FILE"
+  "$MANAGER" list mtp --include-disabled --source "$SOURCE_FILE"
 }
 
 while (($#)); do
@@ -83,7 +83,7 @@ DRAFT_N_MAX="${DRAFT_N_MAX:-$DEFAULT_DRAFT}"
 [[ -s "$GGUF" ]] || {
   echo "ERROR: missing $GGUF." >&2
   echo "Fetch this exact experiment first with:" >&2
-  echo "  sudo bc250 fetch-mtp $choice" >&2
+  echo "  sudo bc250 advanced mtp prepare $choice" >&2
   exit 1
 }
 [[ -x "$LLAMACPP" ]] || { echo "ERROR: set LLAMACPP to an executable llama-server." >&2; exit 1; }

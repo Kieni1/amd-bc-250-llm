@@ -10,11 +10,11 @@ maintain a second status table here.
 ```bash
 bc250 model list experiments
 sudo bc250 model apply experiments
-bc250 benchmark
+bc250 advanced benchmark
 ```
 
 Normal discovery comes from `models/modelfiles/exp-*.Modelfile`. Candidates that no
-longer have a plausible promotion path move to `models/modelfiles-graveyard/`; that
+longer have a plausible promotion path move to `models/modelfiles-retired/`; that
 directory is source-only and is not installed or discovered. In particular, the
 retired task candidate `exp-qwen38-4b-distill-empero-q6-k` must not be confused with
 the separate active general comparison `exp-qwen38-4b-empero-q6-k`.
@@ -34,11 +34,11 @@ explicit coexistence evidence beside the warm main model before promotion.
 4. In the Git repository (not the installed RPM), record consequential run evidence
    and the resulting decision under `development/` so a future cleanup does not erase
    why a candidate was rejected.
-5. When retiring a manager-owned model, move its Modelfile to the source graveyard,
+5. When retiring a manager-owned model, move its Modelfile to the retired source set,
    add its canonical identity to `models/retired-models.json`, and update `MODELS.md`.
 
 Do not weaken quality evaluators to keep a candidate active. Do not move a model out
-of the graveyard merely because its raw benchmark score looks attractive; first read
+of the retired set merely because its raw benchmark score looks attractive; first read
 the recorded rejection and its explicit retest conditions.
 
 ## Source-management caveat
