@@ -70,12 +70,12 @@ class RagBaselineTests(unittest.TestCase):
         for command in (
             "bc250 model",
             "bc250 ocr",
-            "bc250 rag",
+            "bc250 document",
             "bc250 status",
             "bc250 verify",
         ):
             self.assertIn(command, guide)
-        self.assertIn("bc250 rag ingest", guide)
+        self.assertIn("bc250 document ingest", guide)
         for lifecycle in (
             "init", "prepare-batch", "review", "validate", "activate",
             "supersede", "status", "ingest",
@@ -113,7 +113,7 @@ class RagBaselineTests(unittest.TestCase):
         self.assertNotIn("/api/embed", verify)
 
     def test_rag_pilot_template_is_placeholder_only_and_packaged(self) -> None:
-        template = (ROOT / "examples/rag/pilot-evaluation.tsv").read_text(
+        template = (ROOT / "examples/document/pilot-evaluation.tsv").read_text(
             encoding="utf-8"
         )
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
@@ -121,11 +121,11 @@ class RagBaselineTests(unittest.TestCase):
         self.assertIn("[UNANSWERED_CONTROL]", template)
         self.assertNotIn("Customer project A", template)
         self.assertIn(
-            "examples/rag/pilot-evaluation.tsv\t{share}/examples/rag/pilot-evaluation.tsv",
+            "examples/document/pilot-evaluation.tsv\t{share}/examples/document/pilot-evaluation.tsv",
             manifest,
         )
         self.assertIn(
-            "examples/rag/document-template.md\t{share}/examples/rag/document-template.md",
+            "examples/document/document-template.md\t{share}/examples/document/document-template.md",
             manifest,
         )
 

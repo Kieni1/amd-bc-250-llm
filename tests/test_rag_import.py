@@ -13,28 +13,28 @@ from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / "models/rag/rag_import.py"
-LIFECYCLE = ROOT / "models/rag/rag.py"
+SCRIPT = ROOT / "cmd/documents/importer.py"
+LIFECYCLE = ROOT / "cmd/documents/lifecycle.py"
 
-spec = importlib.util.spec_from_file_location("bc250_rag_import", SCRIPT)
+spec = importlib.util.spec_from_file_location("bc250_document_importer", SCRIPT)
 assert spec and spec.loader
 rag = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = rag
 spec.loader.exec_module(rag)
 
-lifecycle_spec = importlib.util.spec_from_file_location("bc250_rag_lifecycle", LIFECYCLE)
+lifecycle_spec = importlib.util.spec_from_file_location("bc250_document_lifecycle", LIFECYCLE)
 assert lifecycle_spec and lifecycle_spec.loader
 lifecycle = importlib.util.module_from_spec(lifecycle_spec)
 sys.modules[lifecycle_spec.name] = lifecycle
-_previous_rag_import = sys.modules.get("rag_import")
-sys.modules["rag_import"] = rag
+_previous_importer = sys.modules.get("importer")
+sys.modules["importer"] = rag
 try:
     lifecycle_spec.loader.exec_module(lifecycle)
 finally:
-    if _previous_rag_import is None:
-        sys.modules.pop("rag_import", None)
+    if _previous_importer is None:
+        sys.modules.pop("importer", None)
     else:
-        sys.modules["rag_import"] = _previous_rag_import
+        sys.modules["importer"] = _previous_importer
 
 
 class RagImportTests(unittest.TestCase):
@@ -438,7 +438,7 @@ class RagImportTests(unittest.TestCase):
         self.assertIn("--prune", source)
         self.assertNotIn("sqlite", source.lower())
         self.assertNotIn("argparse.ArgumentParser", source)
-        self.assertNotIn('prog="bc250 rag ingest"', source)
+        self.assertNotIn('prog="bc250 document ingest"', source)
 
     def test_prune_knows_both_generated_lanes_even_when_one_is_empty(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -461,7 +461,7 @@ class RagImportTests(unittest.TestCase):
                 text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RAG collection ready", result.stdout)
+            self.assertIn("Document collection ready", result.stdout)
             self.assertIn("(created)", result.stdout)
             again = subprocess.run(
                 [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "public", "COLLECTION"],
@@ -495,7 +495,7 @@ class RagImportTests(unittest.TestCase):
                 text=True, capture_output=True, check=False,
             )
             self.assertEqual(missing.returncode, 2, missing.stdout + missing.stderr)
-            self.assertIn("RAG collection not found: public/MISSING", missing.stderr)
+            self.assertIn("Document collection not found: public/MISSING", missing.stderr)
             invalid = subprocess.run(
                 [sys.executable, str(LIFECYCLE), "--root", str(root), "init", "public", "bad/name"],
                 text=True, capture_output=True, check=False,
@@ -1011,15 +1011,47 @@ class RagImportTests(unittest.TestCase):
             self.assertIn("deferred/manual:  1", out.getvalue())
             self.assertIn("failed:           0", out.getvalue())
 
+    def test_document_topology_helpers_traverse_canonical_advanced_dispatcher(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bindir = root / "bin"
+            libexec = root / "libexec"
+            bindir.mkdir()
+            libexec.mkdir()
+            bc250 = bindir / "bc250"
+            bc250.write_text((ROOT / "packaging/bc250").read_text(encoding="utf-8"), encoding="utf-8")
+            bc250.chmod(0o755)
+            advanced = libexec / "advanced"
+            advanced.write_text((ROOT / "packaging/advanced").read_text(encoding="utf-8"), encoding="utf-8")
+            advanced.chmod(0o755)
+            log = root / "agent-mode.log"
+            mode = libexec / "agent-mode.sh"
+            mode.write_text(
+                '#!/usr/bin/env bash\nprintf "%s\n" "$*" >> "$BC250_AGENT_MODE_LOG"\n',
+                encoding="utf-8",
+            )
+            mode.chmod(0o755)
+            env = {
+                "PATH": f"{bindir}:{__import__('os').environ.get('PATH', '')}",
+                "BC250_LIBEXEC": str(libexec),
+                "BC250_AGENT_MODE_LOG": str(log),
+            }
+            with patch.dict(__import__('os').environ, env, clear=False), \
+                 patch.object(lifecycle.os, "geteuid", return_value=0), \
+                 patch.object(lifecycle, "agent_ready", side_effect=[False, True]):
+                self.assertTrue(lifecycle.enter_agent_if_needed("http://127.0.0.1:11436"))
+                self.assertIsNone(lifecycle.restore_normal_if_needed(True))
+            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["enter", "normal"])
+
     def test_importer_is_packaged_and_document_root_is_operator_owned(self) -> None:
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         dispatcher = (ROOT / "packaging/bc250").read_text(encoding="utf-8")
         tmpfiles = (ROOT / "packaging/bc250-llm-server.tmpfiles").read_text(
             encoding="utf-8"
         )
-        self.assertIn("models/rag/rag_import.py\t{libexec}/rag_import.py", manifest)
-        self.assertIn("models/rag/rag.py\t{libexec}/rag", manifest)
-        self.assertIn('"rag|$LIBEXEC/rag"', dispatcher)
+        self.assertIn("cmd/documents/importer.py\t{libexec}/documents/importer.py", manifest)
+        self.assertIn("cmd/documents/lifecycle.py\t{libexec}/documents/lifecycle.py", manifest)
+        self.assertIn('"document|$LIBEXEC/documents/lifecycle.py"', dispatcher)
         self.assertIn("d /srv/bc250-documents 0750 root root -", tmpfiles)
 
 
@@ -1180,7 +1212,7 @@ class RagImportTests(unittest.TestCase):
             source = base / "sources" / "reglement.pdf"
             source.write_bytes(b"source")
             digest = hashlib.sha256(source.read_bytes()).hexdigest()
-            _draft, _ = lifecycle.write_draft(
+            lifecycle.write_draft(
                 base,
                 source,
                 digest,
@@ -1297,7 +1329,7 @@ class RagImportTests(unittest.TestCase):
                     ["--root", str(root), "status", "public", "MISSING"]
                 )
             self.assertEqual(missing_rc, 2)
-            self.assertIn("RAG collection not found: public/MISSING", stderr.getvalue())
+            self.assertIn("Document collection not found: public/MISSING", stderr.getvalue())
 
     def test_batch3_review_surfaces_provenance_and_blocks_bad_source(self) -> None:
         class Tty:

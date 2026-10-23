@@ -1,10 +1,10 @@
-# Office documents and RAG
+# Managed office documents and RAG
 
-This is the product-relevant **local, privacy-oriented RAG workflow** for searchable office-document
-knowledge with German authoritative sources, French translations, and German/English query use. It uses
-the package's existing Open WebUI
-and Tika, the main answer lane on `11434`, and the dedicated embedding lane on
-`11437`. The current package uses Apache Tika 4.1.0-full for Open WebUI document extraction and tells
+This guide covers the appliance's **local, privacy-oriented managed document workflow** and the RAG
+(retrieval-augmented generation) path that makes reviewed office documents searchable in Open WebUI.
+For the current managed corpus, German sources are authoritative, French documents are reviewed
+translations, and users may query in German or English. The workflow uses the package's existing Open WebUI
+and Tika services, the main answer lane on `11434`, and the dedicated embedding lane on `11437`. The current package uses Apache Tika 4.1.0-full for Open WebUI document extraction and tells
 Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
 
@@ -17,13 +17,13 @@ adapter can feed the same review/activation contract without changing its proven
 **Never put confidential documents in this repository.** Keep authoritative
 source files under `/srv/bc250-documents/`, Open WebUI-managed copies under
 `/var/lib/open-webui/`, and recoverable copies on encrypted operator-controlled
-backups. The package contains only blank RAG templates under
-`/usr/share/bc250-llm-server/examples/rag/`.
+backups. The package contains only blank managed-document templates under
+`/usr/share/bc250-llm-server/examples/document/`.
 
-## 1. Back up Open WebUI before ingestion
+## 1. Back up Open WebUI before knowledge synchronization
 
 If the instance already contains useful data, take a stopped full snapshot. The
-normal configuration backup is not a complete RAG backup.
+normal configuration backup is not a complete Open WebUI knowledge/data backup.
 
 ```bash
 sudo systemctl stop open-webui.service
@@ -36,7 +36,7 @@ sudo systemctl start open-webui.service
 
 ## 2. Install answer and embedding models
 
-For this non-commercial test branch, Jina v5 remains the default because it is
+For the current pre-v1 package, Jina v5 remains the default because it is
 already the package's retrieval recommendation:
 
 ```bash
@@ -99,7 +99,7 @@ Both packaged embedding models use up to 1024 dimensions. This request loads the
 embedding model, so it is a deliberate operator test rather than part of
 `bc250 verify`.
 
-Use `bc250 benchmark embeddings` to compare the packaged models on the same
+Use `bc250 advanced benchmark embeddings` to compare the packaged models on the same
 DE/FR/EN retrieval fixture. It reports Recall@1/@3, MRR, cross-language retrieval
 and throughput and rejects inconsistent embedding dimensions; do not select an embedding model on tok/s alone.
 
@@ -136,7 +136,7 @@ chunks are desirable. These are starting points to measure, not fixed quality
 claims.
 
 Open WebUI persists many Admin settings in `webui.db`. The installer therefore
-offers `bc250 openwebui-setup init`, which applies the reviewed package-owned
+offers `bc250 advanced openwebui init`, which applies the reviewed package-owned
 provider/task/RAG state through supported APIs. The Quadlet remains the safe
 bootstrap baseline; later intentional operator overrides are not reset silently.
 
@@ -172,17 +172,17 @@ The package deliberately does not auto-tune these settings.
 Use the local quality lanes before and after a tuning experiment:
 
 ```bash
-bc250 benchmark embeddings
-bc250 benchmark rag-quality
-bc250 benchmark rag-quality --think true
-bc250 benchmark rag-quality --think false
-bc250 benchmark generation --profile compare \
+bc250 advanced benchmark embeddings
+bc250 advanced benchmark rag-quality
+bc250 advanced benchmark rag-quality --think true
+bc250 advanced benchmark rag-quality --think false
+bc250 advanced benchmark generation --profile compare \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
-bc250 benchmark owui-rag OWUI_RAG_MODEL \
+bc250 advanced benchmark owui-rag OWUI_RAG_MODEL \
   --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
-sudo bc250 benchmark owui-embedding-batch --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
-sudo bc250 benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
-sudo bc250 benchmark owui-system-context OWUI_RAG_MODEL \
+sudo bc250 advanced benchmark owui-embedding-batch --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250 advanced benchmark owui-chunk-min OWUI_RAG_MODEL --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+sudo bc250 advanced benchmark owui-system-context OWUI_RAG_MODEL \
   --token-file /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 ```
 
@@ -262,7 +262,7 @@ derived index, not the source of truth:
         └── superseded/
 ```
 
-`bc250 rag init` creates the collection. Public-source collections default to mode `0750`;
+`bc250 document init` creates the collection. Public-source collections default to mode `0750`;
 confidential collections default to root-private mode `0700`. `sources/` contains immutable
 authoritative inputs, `working/` contains drafts needing review, `active/` contains the only Markdown
 eligible for ingestion, and `superseded/` retains previous revisions for audit. Never index both a
@@ -288,13 +288,13 @@ the authoritative German source.
 The supported first-pass workflow is one local command, not a separate conversion framework:
 
 ```bash
-sudo bc250 rag init public municipal-regulations
+sudo bc250 document init public municipal-regulations
 # copy PDFs into the appropriate inbox lane
-sudo bc250 rag prepare-batch public municipal-regulations --dry-run
-sudo bc250 rag prepare-batch public municipal-regulations
-sudo bc250 rag review public municipal-regulations
-sudo bc250 rag validate public municipal-regulations --include-working
-sudo bc250 rag activate public municipal-regulations --all-ready
+sudo bc250 document prepare-batch public municipal-regulations --dry-run
+sudo bc250 document prepare-batch public municipal-regulations
+sudo bc250 document review public municipal-regulations
+sudo bc250 document validate public municipal-regulations --include-working
+sudo bc250 document activate public municipal-regulations --all-ready
 ```
 
 `prepare-batch` uses local `pdfinfo`/`pdftotext` and the exclusive local agent lane on `127.0.0.1:11436`.
@@ -310,13 +310,13 @@ Inbox semantics:
 - `bilingual/`: produce separate DE and FR drafts sharing the source; do not index mixed-language output.
 
 The local transformation prompt preserves complete substantive wording, original legal numbering, dates,
-amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. A batch with deferred or failed inputs exits nonzero, and failure to restore the normal Ollama topology also makes the command fail with a recovery instruction. This avoids growing `bc250 rag` into a fragile OCR/chunking engine while keeping automation exit status truthful.
+amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. A batch with deferred or failed inputs exits nonzero, and failure to restore the normal Ollama topology also makes the command fail with a recovery instruction. This avoids growing `bc250 document` into a fragile OCR/chunking engine while keeping automation exit status truthful.
 
 `prepare-batch` also persists its automated fidelity result in each new draft as
 `bc250_fidelity_status` plus `bc250_fidelity_note`. `pass` means the conservative
 critical-token coverage check found no missing token; `not-scored` means that check had
 no useful tokens to score; `review` means the operator must visually compare the source
-and explicitly acknowledge the warning during `bc250 rag review` before activation.
+and explicitly acknowledge the warning during `bc250 document review` before activation.
 Existing documents without these package metadata fields remain valid.
 
 The review step shows source SHA/provenance status, title, stable `document_family`, language/authority, exact revision identity, effective date/edition, currentness, DE/FR linkage and persisted fidelity state before asking for edits. A source SHA failure blocks readiness immediately. Review numbering covers only drafts that still need review, and the prompts make the effective-date-or-edition requirement explicit. For legal, financial or technical sources, visually compare representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an authoritative transformation until reviewed.
@@ -352,17 +352,17 @@ bc250_fidelity_note: "No automated critical-token result recorded for this manua
 
 `document_id` is the stable logical identity for one language representation; `revision_id` identifies the exact source revision and is source-SHA-derived for new managed drafts. For a French translation, use `authority_role: "translation"` and set `translation_of` to the exact reviewed German `revision_id`, not a filename. Legacy filename references remain readable for upgrade compatibility, but they are not allowed to silently retarget a replaced German revision and should be converted during review. Preserve source article/paragraph identifiers exactly; never invent replacement legal numbering merely to make retrieval IDs unique. Extra package metadata may use `bc250_*` keys so the schema can evolve without accepting arbitrary YAML.
 
-`bc250 rag validate` verifies source-file confinement, SHA-256 provenance, shared DE-authority/FR-translation rules, review state, unique revision identities, translation linkage, real calendar dates, persisted fidelity state, and one active revision per document-family/language. `bc250 rag status [SCOPE [COLLECTION]]` adds an operator summary of inbox/source/working/active/superseded counts, working drafts awaiting review versus ready, pending fidelity acknowledgement, active currentness warnings, DE/FR pairing and overall lifecycle validation `PASS`/`WARN`/`FAIL`. An explicitly requested collection that does not exist is an error rather than a successful empty status. `effective_from` and `approved_on`, when present, must be real canonical `YYYY-MM-DD` dates rather than merely matching the character shape. A French translation may additionally carry `relation.type: translation-pair` and `relation.source_language: de-*`; contradictory relation metadata is rejected. `currentness-not-verified` is deliberately a warning, not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
+`bc250 document validate` verifies source-file confinement, SHA-256 provenance, shared DE-authority/FR-translation rules, review state, unique revision identities, translation linkage, real calendar dates, persisted fidelity state, and one active revision per document-family/language. `bc250 document status [SCOPE [COLLECTION]]` adds an operator summary of inbox/source/working/active/superseded counts, working drafts awaiting review versus ready, pending fidelity acknowledgement, active currentness warnings, DE/FR pairing and overall lifecycle validation `PASS`/`WARN`/`FAIL`. An explicitly requested collection that does not exist is an error rather than a successful empty status. `effective_from` and `approved_on`, when present, must be real canonical `YYYY-MM-DD` dates rather than merely matching the character shape. A French translation may additionally carry `relation.type: translation-pair` and `relation.source_language: de-*`; contradictory relation metadata is rejected. `currentness-not-verified` is deliberately a warning, not an automatic failure; ambiguity should remain visible to the operator rather than be silently invented.
 
 The managed lifecycle rejects symlinked inbox entries, working/active Markdown and source
 files instead of following them as root. This keeps preparation and activation confined to
 the package-owned corpus tree.
 
-Before ingestion, use `bc250 rag validate`/`status` to review the local lifecycle state without contacting Open WebUI. Then sync only reviewed `active/*.md` files:
+Before ingestion, use `bc250 document validate`/`status` to review the local lifecycle state without contacting Open WebUI. Then sync only reviewed `active/*.md` files:
 
 ```bash
 sudo install -m 0600 -o root -g root /PATH/TO/KEY /etc/bc250-llm-server/rag-api-key
-sudo bc250 rag ingest --token-file /etc/bc250-llm-server/rag-api-key
+sudo bc250 document ingest --token-file /etc/bc250-llm-server/rag-api-key
 ```
 
 `ingest` validates the lifecycle schema before using the package-pinned Open WebUI incremental
@@ -376,14 +376,39 @@ an API-contract failure and stops ingestion rather than being silently interpret
 
 Ingestion is loopback-only by default (`127.0.0.1`, `localhost`, or `::1`). A non-loopback Open WebUI endpoint requires the explicit `--allow-remote` override because the API credential, document content and knowledge metadata leave the appliance. If the corpus contains a `confidential/` collection with an active lane, remote ingest requires `--allow-confidential-remote` as a second explicit override, including an empty active lane that may participate in prune convergence.
 
-The former compatibility interface is removed. All corpora use the `bc250 rag`
+The former compatibility interface is removed. All corpora use the `bc250 document`
 lifecycle commands above.
 
 ### OCR workflow for scanned office documents
 
-Use Tika for text-native PDFs and office files. Use OCR only for image-only or
-poorly extracted scans; OCR is a preprocessing step before RAG, not a replacement
-for the answer model.
+Keep the managed-document and ad-hoc extraction paths distinct:
+
+```text
+Managed text-native PDF
+→ bc250 document prepare-batch
+→ working/
+→ human review
+→ validate
+→ activate
+→ Open WebUI Knowledge
+
+Ad-hoc office document (DOCX/XLSX/PPTX/etc.)
+→ Open WebUI/Tika extraction
+
+Scanned or image-only source
+→ bc250 ocr
+→ operator-reviewed OCR text
+→ proper managed working draft with source provenance
+→ review
+→ validate
+→ activate
+```
+
+Use OCR only for image-only or poorly extracted scans. OCR is preprocessing: it
+produces text for an operator to review, not a valid managed document and not a
+replacement for the answer model. Text-native managed PDFs continue to use
+`bc250 document prepare-batch`; Tika serves the Open WebUI/ad-hoc office-document
+path rather than the managed PDF preparation path.
 
 Current OCR test set:
 
@@ -400,10 +425,15 @@ bc250 ocr list
 bc250 ocr test glm /PATH/TO/ONE-SCANNED-PAGE.png
 ```
 
-Use the engine names reported by `bc250 ocr list`. For the pilot, process page
-images individually, preserve page order, review the OCR output, and save the
-cleaned canonical Markdown under `active/` before indexing it. Do not index both
-the scan and its cleaned Markdown derivative.
+Use the engine names reported by `bc250 ocr list`. For the current experimental
+OCR workflow, process page images individually, preserve page order, and review
+the OCR output against the source. If that text should enter the managed corpus,
+retain the exact source file under the collection's `sources/`, create a proper
+Markdown draft under `working/` using the packaged `examples/document/document-template.md`
+metadata/provenance contract (including the source SHA-256 and an OCR normalization
+note), then run `bc250 document review`, `validate`, and `activate`. Never write raw
+`bc250 ocr test` output directly to `active/`. Do not index both the scan and its
+reviewed normalized Markdown derivative.
 
 OCR prompts should **transcribe and preserve the source language**. Do not ask the
 OCR model to translate, summarize or rewrite German/French/English content during
@@ -411,7 +441,7 @@ extraction. Translation or interpretation belongs in the downstream LLM step.
 Preserve headings, paragraphs, tables, numbers, dates and reading order where the
 model supports them.
 
-For a comparable regression check, run `bc250 benchmark ocr`. It uses packaged
+For a comparable regression check, run `bc250 advanced benchmark ocr`. It uses packaged
 DE/FR/mixed office-page fixtures with model-specific prompts and reports token precision/recall/F1, character similarity, exact-field/order scores and resource telemetry. Use `bc250 ocr test ENGINE REAL-PAGE.png` on a
 representative scan corpus before choosing the production OCR path.
 
@@ -420,26 +450,23 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: Open WebUI 0.12.3 candidate behavior
+## 7. Retrieval mode: packaged Open WebUI 0.12.3 behavior
 
-Use **Focused Retrieval** for the growing library. Use **Full Context** only for
-one short document that comfortably fits the model context.
+Use the package-owned **`Office - Documents / RAG`** preset for ordinary document questions.
+It is based on `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`, keeps File Context available, and
+enables the Knowledge builtin while leaving unrelated cloud/tool surfaces disabled. Do not create a
+second preset merely to reproduce the package baseline.
 
-For the most predictable baseline with the relatively small local Gemma model:
+For a managed collection, `bc250 document ingest` creates/synchronizes separate Open WebUI knowledge
+bases named `[SCOPE] COLLECTION — Originals` and `[SCOPE] COLLECTION — Français`. Attach the relevant
+knowledge base in the chat and use **Focused Retrieval** for a growing library. Use **Full Context** only
+for one short document that comfortably fits the model context.
 
-1. Create an Open WebUI model preset named `Office Documents – Pilot` using
-   `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`.
-2. Keep File Context enabled.
-3. Keep Memory, Web Search and Code Interpreter disabled.
-4. Keep Builtin Tools disabled for this first baseline.
-5. **Attach the knowledge base in the chat**, choose Focused Retrieval, and ask
-   the evaluation questions.
-
-The preceding v0.11.3 device baseline showed that knowledge permanently attached to a
-model in Native function-calling mode is accessed through knowledge tools, and that a knowledge-base rebuild includes its files. The v0.12.3 candidate must requalify this browser/product path rather than silently inheriting the old result. If model-bound knowledge still requires builtin knowledge tools, leaving Builtin Tools disabled will prevent that retrieval path. If you want a permanently model-bound knowledge base, keep Native
-mode and enable only the **Knowledge Base** builtin-tool category, then verify
-that the model reliably calls the knowledge tools. Do not switch the whole
-appliance to legacy tool calling merely to make RAG work.
+The exact 1.4 device baseline proved the Open WebUI 0.12.3 document path and package-owned local-first
+policy. Later releases use that result only as regression context: the selected exact RPM must still
+reconfirm ordinary-user knowledge retrieval, grounded answers and citation behavior after relevant
+package/runtime changes. Do not enable unrelated builtin tools or switch the appliance to legacy tool
+calling merely to make document retrieval work.
 
 The packaged Gemma Modelfile already tells the answer model to treat retrieved
 context as primary evidence, preserve names/numbers/dates, identify conflicts
@@ -451,7 +478,7 @@ Copy the installed blank template somewhere private and fill it with your test
 questions:
 
 ```bash
-cp /usr/share/bc250-llm-server/examples/rag/pilot-evaluation.tsv \
+cp /usr/share/bc250-llm-server/examples/document/pilot-evaluation.tsv \
   /PATH/ON/PRIVATE-STORAGE/rag-pilot.tsv
 ```
 
@@ -504,7 +531,7 @@ Inspect both pools when qualifying memory headroom:
 ```bash
 curl -fsS http://127.0.0.1:11434/api/ps | jq
 curl -fsS http://127.0.0.1:11437/api/ps | jq
-bc250 benchmark rag-cycle embed-jina-v5-small-retrieval-q4-k-m \
+bc250 advanced benchmark rag-cycle embed-jina-v5-small-retrieval-q4-k-m \
   prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 ```
 
