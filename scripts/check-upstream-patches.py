@@ -16,7 +16,7 @@ import tomllib
 ROOT = Path(__file__).resolve().parent.parent
 UPSTREAMS = ROOT / "packaging/upstreams.toml"
 NOTICES = ROOT / "licenses/THIRD_PARTY_NOTICES.md"
-PATCH = ROOT / "patches/cu-live-manager-rpm-paths.patch"
+PATCH = ROOT / "packaging/patches/cu-live-manager-rpm-paths.patch"
 SOURCES = ROOT / "sources"
 
 
@@ -137,7 +137,7 @@ def validate_live_manager(root: Path = ROOT, sources_dir: Path | None = None) ->
 
     archive_name = str(pin["archive"]).format(commit=commit)
     archive_path = (sources_dir or root / "sources") / archive_name
-    patch_path = root / "patches/cu-live-manager-rpm-paths.patch"
+    patch_path = root / "packaging/patches/cu-live-manager-rpm-paths.patch"
     if not archive_path.is_file():
         raise ValidationError(f"pinned live-manager source archive is missing: {archive_path}")
     if not patch_path.is_file():
