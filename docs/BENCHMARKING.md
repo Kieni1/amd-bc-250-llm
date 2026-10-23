@@ -3,8 +3,8 @@
 The package deliberately separates three operator questions:
 
 - `bc250 verify`: is the appliance healthy now?
-- `bc250 benchmark`: which model or setting behaves better?
-- `bc250 revalidate`: does the configuration shipped by this package qualify on this BC-250?
+- `bc250 advanced benchmark`: which model or setting behaves better?
+- `bc250 advanced revalidate`: does the configuration shipped by this package qualify on this BC-250?
 
 Revalidation does not choose settings. Tuning and A/B comparisons are explicit benchmark commands.
 
@@ -51,12 +51,12 @@ Quality `NOT-RUN` even when the measurements themselves completed successfully.
 ## Generation
 
 ```bash
-bc250 benchmark generation MODEL [MODEL ...]
-bc250 benchmark generation --profile compare MODEL...
-bc250 benchmark generation --profile edge --mode production MODEL...
-bc250 benchmark generation --profile thermal MODEL...
-bc250 benchmark generation --deep-context MODEL...
-bc250 benchmark generation --profile thermal --sustained-seconds 180 MODEL...
+bc250 advanced benchmark generation MODEL [MODEL ...]
+bc250 advanced benchmark generation --profile compare MODEL...
+bc250 advanced benchmark generation --profile edge --mode production MODEL...
+bc250 advanced benchmark generation --profile thermal MODEL...
+bc250 advanced benchmark generation --deep-context MODEL...
+bc250 advanced benchmark generation --profile thermal --sustained-seconds 180 MODEL...
 ```
 
 Profiles and optional qualification modes:
@@ -81,7 +81,7 @@ more aggressive comparison, but neither is globally promoted by this policy. Do 
 F16 when it makes the target context infeasible.
 
 After load/resource/completion-integrity smoke, use the existing compact
-`bc250 benchmark usecase MODEL` as the tiny semantic sanity gate before expensive
+`bc250 advanced benchmark usecase MODEL` as the tiny semantic sanity gate before expensive
 deep-context or sustained testing.
 
 The normal comparison summary emphasizes decode mean/CV, cold load, warm answer
@@ -111,7 +111,7 @@ threshold is weakened.
 ## Embeddings
 
 ```bash
-bc250 benchmark embeddings [MODEL ...]
+bc250 advanced benchmark embeddings [MODEL ...]
 ```
 
 Reports Recall@1, Recall@3, MRR, cross-language metrics, hard-case Recall@1 and
@@ -122,7 +122,7 @@ qualification policy; individual query rows are observations.
 ## OCR
 
 ```bash
-bc250 benchmark ocr [MODEL ...]
+bc250 advanced benchmark ocr [MODEL ...]
 ```
 
 Text fidelity is scored on canonicalized plain text so requested Markdown/HTML
@@ -134,7 +134,7 @@ separately. OCR remains a benchmark role until a production OCR model is promote
 ## Task
 
 ```bash
-bc250 benchmark task [MODEL ...]
+bc250 advanced benchmark task [MODEL ...]
 ```
 
 Exercises title, tag and retrieval-query shapes using the exact package-owned prompt
@@ -150,9 +150,9 @@ upstream/default Open WebUI prompts could turn a 15/18 direct result into 6/18 l
 Agent mode is exclusive. Enter it before benchmarking the packaged agent lane:
 
 ```bash
-sudo bc250 agent-mode enter
-bc250 benchmark agent MODEL --ollama-url http://127.0.0.1:11436
-sudo bc250 agent-mode leave
+sudo bc250 advanced agent enter
+bc250 advanced benchmark agent MODEL --ollama-url http://127.0.0.1:11436
+sudo bc250 advanced agent leave
 ```
 
 The agent benchmark is a safe static contract check. It records raw-format, syntax
@@ -172,7 +172,7 @@ machine ranking is produced.
 ## Production use-case acceptance
 
 ```bash
-bc250 benchmark usecase [MODEL ...]
+bc250 advanced benchmark usecase [MODEL ...]
 ```
 
 Runs a compact deterministic role-level acceptance set. This is quality evidence,
@@ -181,7 +181,7 @@ not a general model ranking score.
 ## Translation
 
 ```bash
-bc250 benchmark translation [--think auto|true|false] [MODEL ...]
+bc250 advanced benchmark translation [--think auto|true|false] [MODEL ...]
 ```
 
 Records target-language adherence, semantic anchors, preserved identifiers/numbers,
@@ -195,10 +195,10 @@ translation preset.
 ## Direct RAG
 
 ```bash
-bc250 benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
-bc250 benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
-bc250 benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
-bc250 benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
+bc250 advanced benchmark rag-cycle EMBED_MODEL ANSWER_MODEL
+bc250 advanced benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
+bc250 advanced benchmark rag-quality --think true [EMBED_MODEL ANSWER_MODEL]
+bc250 advanced benchmark rag-quality --think false [EMBED_MODEL ANSWER_MODEL]
 ```
 
 `rag-cycle` checks that the answer model remains available while the dedicated
@@ -235,14 +235,14 @@ These commands are explicit experiments. They are not part of routine package
 revalidation unless a promoted setting is later exercised there.
 
 ```bash
-bc250 benchmark concurrency MAIN_MODEL EMBED_MODEL
-bc250 benchmark num-batch MODEL [MODEL ...]
+bc250 advanced benchmark concurrency MAIN_MODEL EMBED_MODEL
+bc250 advanced benchmark num-batch MODEL [MODEL ...]
 
-bc250 benchmark owui-translation --token-file FILE
-bc250 benchmark owui-rag MODEL --token-file FILE
-bc250 benchmark owui-embedding-batch --token-file FILE
-bc250 benchmark owui-chunk-min MODEL --token-file FILE
-sudo bc250 benchmark owui-system-context MODEL --token-file FILE
+bc250 advanced benchmark owui-translation --token-file FILE
+bc250 advanced benchmark owui-rag MODEL --token-file FILE
+bc250 advanced benchmark owui-embedding-batch --token-file FILE
+bc250 advanced benchmark owui-chunk-min MODEL --token-file FILE
+sudo bc250 advanced benchmark owui-system-context MODEL --token-file FILE
 ```
 
 Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
@@ -278,11 +278,11 @@ starts; the readiness allowance is bounded to five minutes for slow application 
 ## Revalidation harness v4.8
 
 ```bash
-sudo bc250 revalidate start
+sudo bc250 advanced revalidate start
 # Explicit partial coverage only:
-sudo bc250 revalidate start --skip-owui
-sudo bc250 revalidate status
-sudo bc250 revalidate status --raw  # machine-readable key=value state
+sudo bc250 advanced revalidate start --skip-owui
+sudo bc250 advanced revalidate status
+sudo bc250 advanced revalidate status --raw  # machine-readable key=value state
 ```
 
 Agent is an optional add-on. If the recommended Ornith Agent source/registration is absent, its
@@ -321,7 +321,7 @@ of benchmark progress.
 Harness v4.7 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
 deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
-snapshots remain at preflight, agent-mode transitions, final restoration and failures.
+snapshots remain at preflight, agent-topology transitions, final restoration and failures.
 Non-severe context truncation is surfaced under `Diagnostics` without changing PASS
 criteria; severe early truncation remains an infrastructure qualification failure. The
 same section also reports tight resource headroom when MemAvailable falls below 512 MiB

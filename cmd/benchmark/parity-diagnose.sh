@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# llm-run-diagnose.sh - BC-250 performance-parity CHECKER.
+# BC-250 performance-parity checker, owned by `bc250 advanced benchmark parity`.
 #
 # Run on a NEW board; each check echoes the expected value FIRST, reads the live
 # value, and verdicts it [ OK ] / [WARN] / [FAIL] so the board self-scores
 # against the two reference boards we characterized (2026-07).
 #
-#   sudo ./llm-run-diagnose.sh                # full run incl. 60s load test
-#   sudo ./llm-run-diagnose.sh --no-load      # static checks only
-#   MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl sudo llm-run-diagnose
+#   sudo bc250 advanced benchmark parity                # full run incl. 60s load test
+#   sudo bc250 advanced benchmark parity --no-load      # static checks only
+#   MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl sudo bc250 advanced benchmark parity
 #
 # ===========================================================================
 # REFERENCE DATASETS (prod-gpt-oss20b-ggml-org-mxfp4, num_ctx 16384):

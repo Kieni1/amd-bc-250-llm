@@ -1346,7 +1346,7 @@ def add_owui(parser: argparse.ArgumentParser) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250 benchmark",
+        prog="bc250 advanced benchmark",
         description="Explicit Open WebUI RAG/tuning benchmarks with restoration.",
     )
     sub = parser.add_subparsers(dest="command", required=True)

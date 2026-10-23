@@ -2969,7 +2969,7 @@ phase_roles
             output = "\n".join(lines[1:])
             self.assertIn(
                 "translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 "
-                "TRANSLATION_THINK=auto bc250 benchmark translation "
+                "TRANSLATION_THINK=auto bc250 advanced benchmark translation "
                 "prod-translate-gemma4-sub-e4b-17s-q4-k-xl --ollama-url http://127.0.0.1:11434",
                 output,
             )
@@ -3149,7 +3149,7 @@ phase_roles
                     sys,
                     "argv",
                     [
-                        "bc250 benchmark generation",
+                        "bc250 advanced benchmark generation",
                         "test-model",
                         "--profile",
                         "edge",
@@ -3399,10 +3399,10 @@ status_run --raw
     def test_installer_revalidation_guidance_matches_authenticated_harness(self) -> None:
         source = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
         main = source[source.index("main() {"):]
-        self.assertIn('sudo bc250 revalidate start', main)
+        self.assertIn('sudo bc250 advanced revalidate start', main)
         self.assertNotIn("completion_owui_token", main)
-        self.assertNotIn("sudo bc250 revalidate start --owui-token-file FILE", main)
-        self.assertNotIn('echo "  Revalidation (partial): sudo bc250 revalidate start --skip-owui"', main)
+        self.assertNotIn("sudo bc250 advanced revalidate start --owui-token-file FILE", main)
+        self.assertNotIn('echo "  Revalidation (partial): sudo bc250 advanced revalidate start --skip-owui"', main)
 
     def test_edge_policy_documents_conservative_threshold_rationale(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
@@ -3581,9 +3581,9 @@ status_run --raw
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         self.assertNotIn("owui-test-helper.py", source)
         self.assertNotIn("write_helper()", source)
-        self.assertIn("bc250 benchmark concurrency", source)
-        self.assertIn("bc250 benchmark owui-translation", source)
-        self.assertIn("bc250 benchmark owui-rag", source)
+        self.assertIn("bc250 advanced benchmark concurrency", source)
+        self.assertIn("bc250 advanced benchmark owui-translation", source)
+        self.assertIn("bc250 advanced benchmark owui-rag", source)
 
     def test_round2b_workflows_use_common_results_and_explicit_restoration(self) -> None:
         runtime_source = (ROOT / "cmd/benchmark/runtime-benchmark.py").read_text(encoding="utf-8")

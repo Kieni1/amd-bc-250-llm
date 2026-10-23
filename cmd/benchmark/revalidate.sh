@@ -58,10 +58,10 @@ MEMORY_PROFILE="$LIBEXEC/memory-profile.sh"
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
 # Revalidation v4.8 qualifies packaged defaults only. Candidate/tuning A/B work belongs
-# under explicit bc250 benchmark commands and is never selected by this worker.
+# under explicit bc250 advanced benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
-# overrides; candidate selection belongs exclusively to bc250 benchmark.
+# overrides; candidate selection belongs exclusively to bc250 advanced benchmark.
 readonly E2B_MODEL=prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 readonly E4B_MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
 readonly TRANSLATION_ROLE_MODEL=prod-translate-gemma4-sub-e4b-17s-q4-k-xl
@@ -98,14 +98,14 @@ readonly EDGE_SEVERE_CONTEXT_TOKENS=4096
 usage() {
   cat <<'USAGE'
 Usage:
-  sudo bc250 revalidate start [--owui-token-file FILE] [--detach]
-  sudo bc250 revalidate start --skip-owui [--detach]
-  sudo bc250 revalidate status [--raw]
-  sudo bc250 revalidate abort
-  sudo bc250 revalidate cleanup
+  sudo bc250 advanced revalidate start [--owui-token-file FILE] [--detach]
+  sudo bc250 advanced revalidate start --skip-owui [--detach]
+  sudo bc250 advanced revalidate status [--raw]
+  sudo bc250 advanced revalidate abort
+  sudo bc250 advanced revalidate cleanup
 
 Recommended authenticated start:
-  sudo bc250 revalidate start
+  sudo bc250 advanced revalidate start
 
 `start` launches one systemd-owned qualification worker and follows a compact
 six-phase dashboard by default. Ctrl-C detaches from the display; it never kills
@@ -178,7 +178,7 @@ command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 # Revalidation sanitizes every benchmark invocation so systemd manager/default
 # environment cannot replace package-owned fixtures, lane endpoints, models, or
-# sampling/tuning policy. Standalone bc250 benchmark intentionally remains flexible.
+# sampling/tuning policy. Standalone bc250 advanced benchmark intentionally remains flexible.
 qualification_benchmark() {
   env \
     -u OLLAMA_URL -u OLLAMA_HOST -u EMBEDDING_OLLAMA_URL \
@@ -685,7 +685,7 @@ follow_run() {
   trap - INT
   if ((interrupted)); then
     echo "Detached. Worker continues in the background."
-    echo "Status: sudo bc250 revalidate status"
+    echo "Status: sudo bc250 advanced revalidate status"
     return 0
   fi
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
@@ -818,7 +818,7 @@ start_run() {
     echo "Coverage is partial: authenticated Open WebUI qualification was explicitly skipped."
   fi
   echo "The systemd worker qualifies packaged defaults only; this terminal only follows progress."
-  echo "Status: sudo bc250 revalidate status"
+  echo "Status: sudo bc250 advanced revalidate status"
   echo "Final bundles: $REPORT_DIR"
   ((detach)) || follow_run
 }
@@ -864,12 +864,12 @@ snapshot() {
   capture_cmd "$dir/status.txt" bc250 status
   if [[ -s $OWUI_TOKEN ]]; then
     bc250 verify --owui-token-file "$OWUI_TOKEN" > "$dir/verify.txt" 2>&1 || echo "command_rc=$?" >> "$dir/verify.txt"
-    bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/openwebui-status-auth.txt" 2>&1 || echo "command_rc=$?" >> "$dir/openwebui-status-auth.txt"
+    bc250 advanced openwebui status --owui-token-file "$OWUI_TOKEN" > "$dir/openwebui-status-auth.txt" 2>&1 || echo "command_rc=$?" >> "$dir/openwebui-status-auth.txt"
   else
     capture_cmd "$dir/verify.txt" bc250 verify
-    capture_cmd "$dir/openwebui-status.txt" bc250 openwebui-setup status
+    capture_cmd "$dir/openwebui-status.txt" bc250 advanced openwebui status
   fi
-  capture_cmd "$dir/agent-mode.txt" bc250 agent-mode status
+  capture_cmd "$dir/agent-mode.txt" bc250 advanced agent topology
   capture_cmd "$dir/systemctl.txt" systemctl --no-pager --full status ollama.service ollama-task.service ollama-embedding.service ollama-agent.service open-webui.service tika.service nginx.service
   if grep -Fxq 'mode=normal' "$dir/agent-mode.txt" 2>/dev/null \
       && [[ $(systemctl is-active ollama-agent.service 2>/dev/null || true) != active ]]; then
@@ -1085,7 +1085,7 @@ ensure_normal_mode() {
       return 1
     }
   done
-  bc250 agent-mode leave >/dev/null
+  bc250 advanced agent leave >/dev/null
   systemctl start tika.service open-webui.service nginx.service >/dev/null
   wait_api 11434 45 || return 1
   wait_api 11435 45 || return 1
@@ -1460,7 +1460,7 @@ phase_preflight() {
     fi
     record_event "openwebui-credential" infra pass "administrator credential valid"
     record_progress "checking authenticated Open WebUI desired state"
-    if bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$RAW/preflight/package-drift.txt" 2>&1; then rc=0; else rc=$?; fi
+    if bc250 advanced openwebui status --owui-token-file "$OWUI_TOKEN" > "$RAW/preflight/package-drift.txt" 2>&1; then rc=0; else rc=$?; fi
     if ((rc != 0)); then
       record_event "openwebui-drift" infra infra-fail "package-owned desired state not current (rc=$rc)"
       echo "ERROR: packaged Open WebUI state cannot be qualified without first resolving drift/API error (rc=$rc)." >&2
@@ -1481,14 +1481,14 @@ phase_roles() {
   set_phase roles "qualifying promoted production roles"
   install -d -m 0700 "$RAW/roles"
   warm_embedding > "$RAW/roles/embed-warm.txt" 2>&1
-  run_step roles embeddings quality qualification_benchmark bc250 benchmark embeddings "$EMBED_MODEL" --ollama-url http://127.0.0.1:11437 --output-dir "$RAW/roles/embeddings/results"
-  run_step roles task quality qualification_benchmark bc250 benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
+  run_step roles embeddings quality qualification_benchmark bc250 advanced benchmark embeddings "$EMBED_MODEL" --ollama-url http://127.0.0.1:11437 --output-dir "$RAW/roles/embeddings/results"
+  run_step roles task quality qualification_benchmark bc250 advanced benchmark task "$TASK_MODEL" --ollama-url http://127.0.0.1:11435 --output-dir "$RAW/roles/task/results"
   # Direct model/configuration sanity uses the promoted 2048-token production budget.
   # The authenticated OWUI phase separately proves the live role/filter product path.
-  run_step roles translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 TRANSLATION_THINK=auto bc250 benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
+  run_step roles translation quality qualification_benchmark env TRANSLATION_NUM_PREDICT=2048 TRANSLATION_THINK=auto bc250 advanced benchmark translation "$TRANSLATION_ROLE_MODEL" --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/translation/results"
   warm_embedding >/dev/null 2>&1 || true
-  run_step roles rag-quality quality qualification_benchmark bc250 benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
-  run_step roles usecase quality qualification_benchmark bc250 benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
+  run_step roles rag-quality quality qualification_benchmark bc250 advanced benchmark rag-quality "$EMBED_MODEL" "$E4B_MODEL" --ollama-url http://127.0.0.1:11434 --embedding-ollama-url http://127.0.0.1:11437 --think auto --output-dir "$RAW/roles/rag-quality/results"
+  run_step roles usecase quality qualification_benchmark bc250 advanced benchmark usecase --ollama-url http://127.0.0.1:11434 --output-dir "$RAW/roles/production-usecase/results" "${PACKAGE_PROD_MODELS[@]}"
   record_quality_diagnostics "$RAW/roles/production-usecase/results/results.jsonl" production-usecase
   checkpoint roles/final
   write_phase_report production-role-results roles
@@ -1502,20 +1502,20 @@ phase_edge() {
   jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key != $m))' "$policy" > "$generic_policy"
 
   warm_embedding >/dev/null 2>&1
-  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250 benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${EDGE_GENERIC_MODELS[@]}"
+  run_step edge production-generation infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 CTX_POINTS="88 220" NUM_PREDICT_CONTEXT=16 bc250 advanced benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/production-generation/results" "${EDGE_GENERIC_MODELS[@]}"
   run_step edge production-sanity infra check_edge_generation_sanity     "$RAW/edge/production-generation/results/results.jsonl" "$generic_policy" "$RAW/edge/production-generation/sanity.json"
   record_edge_diagnostics "$RAW/edge/production-generation/sanity.json" production-generation
 
   api_ready 11434 || ensure_normal_mode
   warm_embedding >/dev/null 2>&1
   jq --arg m "$GPT_OSS_MODEL" '.models |= with_entries(select(.key == $m))' "$policy" > "$gpt_policy"
-  run_step edge gpt-oss-jina infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 PREFILL_SENTENCES=352 CTX_POINTS="352 704" NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250 benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/gpt-oss-jina/results" "$GPT_OSS_MODEL"
+  run_step edge gpt-oss-jina infra qualification_benchmark env RUN_LATENCY=0 RUN_CONTEXT=1 RUN_THERMAL=0 PREFILL_SENTENCES=352 CTX_POINTS="352 704" NUM_PREDICT_PREFILL=16 NUM_PREDICT_CONTEXT=32 bc250 advanced benchmark generation --ollama-url http://127.0.0.1:11434 --mode production --profile edge --output-dir "$RAW/edge/gpt-oss-jina/results" "$GPT_OSS_MODEL"
   run_step edge gpt-oss-sanity infra check_edge_generation_sanity     "$RAW/edge/gpt-oss-jina/results/results.jsonl" "$gpt_policy" "$RAW/edge/gpt-oss-jina/sanity.json"
   record_edge_diagnostics "$RAW/edge/gpt-oss-jina/sanity.json" gpt-oss-jina
   run_step edge jina-still-resident infra model_loaded 11437 "$EMBED_MODEL"
 
   api_ready 11434 || ensure_normal_mode
-  run_step edge main-embedding-concurrency infra qualification_benchmark bc250 benchmark concurrency "$E2B_MODEL" "$EMBED_MODEL" --main-url http://127.0.0.1:11434 --embed-url http://127.0.0.1:11437 --output-dir "$RAW/edge/main-embedding-concurrency/results"
+  run_step edge main-embedding-concurrency infra qualification_benchmark bc250 advanced benchmark concurrency "$E2B_MODEL" "$EMBED_MODEL" --main-url http://127.0.0.1:11434 --embed-url http://127.0.0.1:11437 --output-dir "$RAW/edge/main-embedding-concurrency/results"
   run_step edge device-errors infra check_recent_device_errors "$RAW/edge/kernel-device-errors.txt"
   checkpoint edge/final
   write_phase_report resource-edge-results edge
@@ -1559,14 +1559,14 @@ phase_agent() {
   fi
 
   run_step agent agent-service-definition infra systemctl cat ollama-agent.service
-  run_step agent enter-agent-mode infra bc250 agent-mode enter
+  run_step agent enter-agent-mode infra bc250 advanced agent enter
   run_step agent agent-api infra wait_api 11436 45
   run_step agent exclusive-topology infra check_agent_exclusive_topology
   if ! check_agent_registration > "$dir/agent-model-prerequisite.txt" 2>&1; then
     set_stage "optional Agent registration unavailable — coverage skipped"
     mark_partial_coverage
     record_event "agent" coverage skipped "optional Agent add-on is not registered; coverage unavailable; see $dir/agent-model-prerequisite.txt"
-    run_step agent leave-agent-mode infra bc250 agent-mode leave
+    run_step agent leave-agent-mode infra bc250 advanced agent leave
     run_step agent normal-main-restored infra wait_api 11434 45
     run_step agent normal-task-restored infra wait_api 11435 45
     run_step agent normal-embedding-restored infra wait_api 11437 45
@@ -1577,8 +1577,8 @@ phase_agent() {
   fi
   record_event "agent-add-on" coverage pass "optional Agent registration available on exclusive lane"
   snapshot agent/active
-  run_step agent agent quality qualification_benchmark bc250 benchmark agent "$AGENT_MODEL" --ollama-url http://127.0.0.1:11436 --output-dir "$RAW/agent/benchmark/results"
-  run_step agent leave-agent-mode infra bc250 agent-mode leave
+  run_step agent agent quality qualification_benchmark bc250 advanced benchmark agent "$AGENT_MODEL" --ollama-url http://127.0.0.1:11436 --output-dir "$RAW/agent/benchmark/results"
+  run_step agent leave-agent-mode infra bc250 advanced agent leave
   run_step agent normal-main-restored infra wait_api 11434 45
   run_step agent normal-task-restored infra wait_api 11435 45
   run_step agent normal-embedding-restored infra wait_api 11437 45
@@ -1601,11 +1601,11 @@ phase_owui() {
     return 0
   fi
   validate_owui_token > "$dir/token-recheck.txt" 2>&1
-  if bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-before.txt" 2>&1; then rc=0; else rc=$?; fi
+  if bc250 advanced openwebui status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-before.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state drift/API failure rc=$rc" >&2; return "$rc"; }
-  run_step owui owui-translation quality qualification_benchmark bc250 benchmark owui-translation --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-translation/results"
-  run_step owui owui-rag quality qualification_benchmark bc250 benchmark owui-rag "$OWUI_RAG_MODEL" --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-rag/results"
-  if bc250 openwebui-setup status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
+  run_step owui owui-translation quality qualification_benchmark bc250 advanced benchmark owui-translation --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-translation/results"
+  run_step owui owui-rag quality qualification_benchmark bc250 advanced benchmark owui-rag "$OWUI_RAG_MODEL" --url http://127.0.0.1:3000 --token-file "$OWUI_TOKEN" --output-dir "$dir/packaged-rag/results"
+  if bc250 advanced openwebui status --owui-token-file "$OWUI_TOKEN" > "$dir/package-drift-after.txt" 2>&1; then rc=0; else rc=$?; fi
   ((rc == 0)) || { echo "ERROR: Open WebUI package-owned state changed during qualification rc=$rc" >&2; return "$rc"; }
   record_event "openwebui-state-unchanged" infra pass "package-owned settings unchanged"
   checkpoint owui/final
@@ -1884,7 +1884,7 @@ restore_all() {
   local rc=0
   # Restore appliance state only. The transient credential must remain available
   # through the final authenticated health gate/snapshot and failure evidence.
-  if command_exists bc250; then bc250 agent-mode leave >/dev/null 2>&1 || rc=1; fi
+  if command_exists bc250; then bc250 advanced agent leave >/dev/null 2>&1 || rc=1; fi
   return "$rc"
 }
 
@@ -2068,7 +2068,7 @@ status_run() {
   need_root
   local raw=0 phase stage service rid run_version worker position label stage_started last_event
   [[ "${1:-}" == status ]] && shift
-  while (($#)); do case "$1" in --raw) raw=1; shift ;; -h|--help) echo "Usage: sudo bc250 revalidate status [--raw]"; return 0 ;; *) echo "ERROR: unknown status option: $1" >&2; return 2 ;; esac; done
+  while (($#)); do case "$1" in --raw) raw=1; shift ;; -h|--help) echo "Usage: sudo bc250 advanced revalidate status [--raw]"; return 0 ;; *) echo "ERROR: unknown status option: $1" >&2; return 2 ;; esac; done
   ((raw == 0)) || { status_raw; return; }
   rid="$(run_id)"; phase="$(cat "$PHASE_FILE" 2>/dev/null || echo none)"; stage="$(cat "$STAGE_FILE" 2>/dev/null || echo none)"
   stage_started="$(cat "$STAGE_STARTED_FILE" 2>/dev/null || echo none)"; last_event="$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"

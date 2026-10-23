@@ -781,7 +781,7 @@ def fmt(value: Any, digits: int = 2) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        prog="bc250 benchmark generation",
+        prog="bc250 advanced benchmark generation",
         description="BC-250 generation benchmark for the package-pinned Ollama runtime.",
     )
     parser.add_argument(

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Public bc250 benchmark dispatcher. Canonical subcommands only.
+# Public bc250 advanced benchmark dispatcher. Canonical subcommands only.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -7,26 +7,28 @@ GENERATION="$SCRIPT_DIR/generation-benchmark.py"
 CATEGORY="$SCRIPT_DIR/category-benchmark.py"
 RUNTIME="$SCRIPT_DIR/runtime-benchmark.py"
 OPENWEBUI="$SCRIPT_DIR/openwebui-benchmark.py"
+PARITY="$SCRIPT_DIR/parity-diagnose.sh"
 
 usage() {
   cat <<'EOF'
 Usage:
-  bc250 benchmark generation [MODEL ...]
-  bc250 benchmark embeddings [MODEL ...]
-  bc250 benchmark ocr [MODEL ...]
-  bc250 benchmark task [MODEL ...]
-  bc250 benchmark agent [MODEL ...]
-  bc250 benchmark usecase [MODEL ...]
-  bc250 benchmark translation [MODEL ...]
-  bc250 benchmark rag-cycle [EMBED_MODEL ANSWER_MODEL]
-  bc250 benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
-  bc250 benchmark concurrency MAIN_MODEL EMBED_MODEL
-  bc250 benchmark num-batch MODEL [MODEL ...]
-  bc250 benchmark owui-translation --token-file FILE
-  bc250 benchmark owui-rag MODEL --token-file FILE
-  bc250 benchmark owui-embedding-batch --token-file FILE
-  bc250 benchmark owui-chunk-min MODEL --token-file FILE
-  sudo bc250 benchmark owui-system-context MODEL --token-file FILE
+  bc250 advanced benchmark generation [MODEL ...]
+  bc250 advanced benchmark embeddings [MODEL ...]
+  bc250 advanced benchmark ocr [MODEL ...]
+  bc250 advanced benchmark task [MODEL ...]
+  bc250 advanced benchmark agent [MODEL ...]
+  bc250 advanced benchmark usecase [MODEL ...]
+  bc250 advanced benchmark translation [MODEL ...]
+  bc250 advanced benchmark rag-cycle [EMBED_MODEL ANSWER_MODEL]
+  bc250 advanced benchmark rag-quality [EMBED_MODEL ANSWER_MODEL]
+  bc250 advanced benchmark concurrency MAIN_MODEL EMBED_MODEL
+  bc250 advanced benchmark num-batch MODEL [MODEL ...]
+  bc250 advanced benchmark owui-translation --token-file FILE
+  bc250 advanced benchmark owui-rag MODEL --token-file FILE
+  bc250 advanced benchmark owui-embedding-batch --token-file FILE
+  bc250 advanced benchmark owui-chunk-min MODEL --token-file FILE
+  sudo bc250 advanced benchmark owui-system-context MODEL --token-file FILE
+  sudo bc250 advanced benchmark parity [--no-load]
 
 Every invocation writes one isolated result directory containing meta.json,
 results.jsonl, summary.json, summary.txt, fixtures/, and an optional results.csv
@@ -48,6 +50,10 @@ case "$command" in
     ;;
   owui-translation|owui-rag|owui-embedding-batch|owui-chunk-min|owui-system-context)
     exec python3 "$OPENWEBUI" "$@"
+    ;;
+  parity)
+    shift
+    exec "$PARITY" "$@"
     ;;
   -h|--help)
     usage
