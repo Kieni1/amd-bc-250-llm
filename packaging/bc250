@@ -31,7 +31,7 @@ Appliance:
 Managed workflows:
   document, model, ocr, maintenance
 
-Advanced and qualification workflows:
+Advanced tools:
   advanced
 
 Run `bc250 COMMAND --help` where supported.
@@ -46,6 +46,9 @@ command="${1:-help}"
 case "$command" in
   help|-h|--help) usage; exit 0 ;;
   --version) exec "$LIBEXEC/version.py" --short ;;
+  openwebui-setup) echo "ERROR: 'openwebui-setup' moved to 'bc250 advanced openwebui'." >&2; exit 2 ;;
+  benchmark) echo "ERROR: 'benchmark' moved to 'bc250 advanced benchmark'." >&2; exit 2 ;;
+  agent-mode) echo "ERROR: 'agent-mode' moved to 'bc250 advanced agent'." >&2; exit 2 ;;
 esac
 
 for route in "${ROUTES[@]}"; do

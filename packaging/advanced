@@ -57,7 +57,7 @@ Usage: bc250 advanced agent COMMAND [ARGUMENTS...]
   leave|normal          restore normal main/task/embedding topology
 USAGE
       ;;
-    *) echo "ERROR: unknown advanced agent command: $command" >&2; return 2 ;;
+    *) echo "ERROR: unknown advanced agent command: $command" >&2; echo "Run: bc250 advanced agent --help" >&2; return 2 ;;
   esac
 }
 
@@ -78,7 +78,7 @@ Usage: bc250 advanced mtp COMMAND [ARGUMENTS...]
   compare MODEL        compare the same candidate with/without MTP
 USAGE
       ;;
-    *) echo "ERROR: unknown advanced mtp command: $command" >&2; return 2 ;;
+    *) echo "ERROR: unknown advanced mtp command: $command" >&2; echo "Run: bc250 advanced mtp --help" >&2; return 2 ;;
   esac
 }
 
@@ -111,8 +111,13 @@ code_workflow() {
       cat <<'USAGE'
 Usage: bc250 advanced code COMMAND [ARGUMENTS...]
   run MODE INPUT [OUTPUT] [TASK...]
+      Run the local coding model against explicit input/output files.
   commit [--yes]
+      Generate a message for the already staged Git diff and optionally create
+      one local commit. Nothing is staged or pushed automatically.
   review OWNER/REPOSITORY PR_NUMBER [--output FILE] [--post]
+      Generate a local Gitea PR review. --post asks for confirmation before
+      posting one external comment; it never approves or merges the PR.
 USAGE
       ;;
     *) echo "ERROR: unknown advanced code command: $command" >&2; return 2 ;;

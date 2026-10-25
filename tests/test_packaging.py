@@ -290,7 +290,10 @@ class PackagingTests(unittest.TestCase):
                     text=True, capture_output=True, check=False,
                 )
                 self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
-                self.assertIn(f"unknown command: {command}", result.stderr)
+                if command in {"benchmark", "agent-mode", "openwebui-setup"}:
+                    self.assertIn("moved to", result.stderr)
+                else:
+                    self.assertIn(f"unknown command: {command}", result.stderr)
 
     def test_171_advanced_surface_consolidates_specialist_commands(self) -> None:
         advanced = (ROOT / "packaging/advanced").read_text(encoding="utf-8")
