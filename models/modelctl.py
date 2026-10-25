@@ -496,7 +496,12 @@ def load_all_catalogs(
     return catalogs
 
 
-def select_models(models: list[dict], selection: str) -> list[dict]:
+def select_models(
+    models: list[dict],
+    selection: str,
+    *,
+    group_excluded_categories: frozenset[str] = frozenset(),
+) -> list[dict]:
     if not models:
         return []
     value = selection.strip()
@@ -510,12 +515,29 @@ def select_models(models: list[dict], selection: str) -> list[dict]:
         item = item.strip()
         special = item.lower()
         if special == "all":
-            choices = [model["id"] for model in models]
+            choices = [
+                model["id"]
+                for model in models
+                if model.get("category") not in group_excluded_categories
+            ]
         elif special == "production":
-            choices = [model["id"] for model in models if model.get("category") == "production"]
+            choices = [
+                model["id"]
+                for model in models
+                if model.get("category") == "production"
+                and model.get("category") not in group_excluded_categories
+            ]
         elif special == "recommended":
-            choices = [model["id"] for model in models if model["id"] in RECOMMENDED_MODELS]
+            choices = [
+                model["id"]
+                for model in models
+                if model["id"] in RECOMMENDED_MODELS
+                and model.get("category") not in group_excluded_categories
+            ]
         else:
+            # Exact IDs, indexes and numeric ranges are explicit selections. In
+            # the interactive installer they may therefore include standalone
+            # MTP entries even though broad groups intentionally cannot.
             choices = [item]
             if match := re.fullmatch(r"([0-9]+)-([0-9]+)", item):
                 first, last = map(int, match.groups())
@@ -1919,8 +1941,8 @@ def selection_arguments(parser: argparse.ArgumentParser, command: str) -> None:
     if command == "install":
         selection_help = (
             "model id/index/range or comma-separated selection; also recommended, "
-            "production or all. Selection 'all' means every eligible model in the "
-            "combined catalog"
+            "production or all. Broad groups cover eligible Ollama models only; "
+            "standalone MTP requires an explicit id/index/range selection"
         )
     else:
         selection_help = (
@@ -2476,7 +2498,12 @@ def resolve_one_model(
 
 
 def selected_models_for_catalog(
-    models: list[dict], selection: str | None, *, interactive: bool
+    models: list[dict],
+    selection: str | None,
+    *,
+    interactive: bool,
+    group_excluded_categories: frozenset[str] = frozenset(),
+    prompt: str | None = None,
 ) -> list[dict]:
     if not models:
         return []
@@ -2484,16 +2511,26 @@ def selected_models_for_catalog(
         return models
     if selection is None:
         selection = prompt_line(
-            "Select models by number, range, or group (recommended/production/all); press Enter to cancel: "
+            prompt
+            or "Select models by number, range, or group (recommended/production/all); press Enter to cancel: "
         )
     if not selection:
         return []
-    return select_models(models, selection)
+    return select_models(
+        models,
+        selection,
+        group_excluded_categories=group_excluded_categories,
+    )
+
+
+def install_available_models(catalogs: list[tuple[dict, list[dict]]]) -> list[dict]:
+    """Return the interactive installer catalog, including standalone MTP entries."""
+    return [model for _defaults, models in catalogs for model in models]
 
 
 def print_install_catalog_state(catalogs: list[tuple[dict, list[dict]]]) -> list[dict]:
-    """Show the combined normal-model catalog with current local state."""
-    available = all_available_models(catalogs, command="apply", include_disabled=False)
+    """Show the combined installer catalog with current local state."""
+    available = install_available_models(catalogs)
     registrations = registered_models_by_host(
         [defaults["ollama_host"] for defaults, _models in catalogs if defaults.get("ollama_host")]
     )
@@ -2525,9 +2562,31 @@ def run_install_workflow(
     args: argparse.Namespace, *, directories: list[Path] | None, source: Path | None
 ) -> int:
     catalogs = load_all_catalogs(directories=directories, source=source)
-    available = print_install_catalog_state(catalogs)
-    print("\nSelect models to install/reconcile.")
-    selected = selected_models_for_catalog(available, args.selection, interactive=True)
+    suppress_catalog = (
+        getattr(args, "quiet", False)
+        or os.environ.get("BC250_MODELCTL_SUPPRESS_CATALOG") == "1"
+    )
+    available = (
+        install_available_models(catalogs)
+        if suppress_catalog
+        else print_install_catalog_state(catalogs)
+    )
+    if not suppress_catalog:
+        print("\nSelect models to install/reconcile.")
+        print(
+            "Standalone MTP selections download and verify GGUF artifacts only; "
+            "they do not register with Ollama or start llama.cpp."
+        )
+    selected = selected_models_for_catalog(
+        available,
+        args.selection,
+        interactive=True,
+        group_excluded_categories=frozenset({"mtp"}),
+        prompt=(
+            "Select models by number, range, or group (recommended/production/all); "
+            "MTP requires an explicit ID/index/range; press Enter to cancel: "
+        ),
+    )
     if not selected:
         print("Cancelled — no changes made.")
         return 0

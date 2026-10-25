@@ -420,34 +420,32 @@ step_7_models() {
 
   echo
   echo "Required package baseline models are current."
-  echo "Additional Ollama models are optional and are not listed on a converged install."
-  echo "MTP remains a separate opt-in workflow: sudo bc250 advanced mtp prepare MODEL_ID"
+  echo "Additional models are optional and are not listed on a converged install."
+  echo "Standalone MTP artifacts remain explicit opt-ins; broad groups never acquire them."
   local selection="${BC250_MODEL_SELECTION:-}" review=""
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
     read -r -p "Review or install optional models now? [y/N]: " review
     case "${review,,}" in
       y|yes)
         echo
-        echo "Checking optional Ollama model registrations in parallel; standalone MTP artifacts are checked separately. This may take several minutes. Please wait..."
+        echo "Checking optional model state in parallel; standalone MTP artifacts are included in the same catalog overview. This may take several minutes. Please wait..."
         local optional_status current_count optional_count unavailable_count drift_count deferred_count
-        optional_status="$(bc250 model status all --compact 2>&1 || true)"
+        local mtp_ready_count mtp_missing_count mtp_drift_count
+        optional_status="$(bc250 model status all --include-disabled --compact 2>&1 || true)"
         current_count="$(grep -c '\[CURRENT\]' <<< "$optional_status" || true)"
         optional_count="$(grep -c '\[OPTIONAL' <<< "$optional_status" || true)"
         unavailable_count="$(grep -ci '\[OPTIONAL, registration unavailable\]' <<< "$optional_status" || true)"
         drift_count="$(grep -c '\[DRIFT' <<< "$optional_status" || true)"
         deferred_count="$(grep -ci 'deferred' <<< "$optional_status" || true)"
-        echo "Model status: current=${current_count:-0} optional=${optional_count:-0} selected drift=${drift_count:-0} deferred=${deferred_count:-0}"
+        mtp_ready_count="$(grep -c '\[FETCHED, VERIFIED\]' <<< "$optional_status" || true)"
+        mtp_missing_count="$(grep -c '\[NOT FETCHED\]' <<< "$optional_status" || true)"
+        mtp_drift_count="$(grep -c '\[SOURCE DRIFT\]' <<< "$optional_status" || true)"
+        echo "Ollama status: current=${current_count:-0} optional=${optional_count:-0} selected drift=${drift_count:-0} deferred=${deferred_count:-0}"
+        echo "MTP status: ready=${mtp_ready_count:-0} not-fetched=${mtp_missing_count:-0} source-drift=${mtp_drift_count:-0}"
         ((unavailable_count == 0)) || echo "  Optional catalog entries unavailable for registration: ${unavailable_count} (non-blocking)"
         echo "Model catalog/status:"
         printf '%s\n' "$optional_status"
-        echo
-        echo "Standalone MTP models (llama.cpp; read-only, not selectable here):"
-        if ! BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 \
-            bc250 model status mtp --include-disabled --compact \
-            | sed -E '/^MTP models:$/d; s/^([[:space:]]*)[0-9]+\) /\1- /'; then
-          echo "  MTP inventory unavailable; inspect later with: bc250 model status mtp --include-disabled --compact"
-        fi
-        read -r -p "Additional models (index/range/name/recommended/production/all; Enter to skip): " selection
+        read -r -p "Additional models (index/range/name/recommended/production/all; MTP requires explicit selection; Enter to skip): " selection
         ;;
       *)
         echo "Skipping additional-model review; required package baseline models are installed."
@@ -461,7 +459,7 @@ step_7_models() {
   fi
   [[ -n "$selection" ]] || { echo "Skipping additional models; required package baseline models are installed."; return 0; }
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
-    bc250 model apply all "$selection"
+    bc250 model install "$selection"
   echo "Managed document sources remain operator-owned under /srv/bc250-documents/."
 }
 

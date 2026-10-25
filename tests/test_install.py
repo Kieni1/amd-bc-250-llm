@@ -269,8 +269,8 @@ class InstallerTests(unittest.TestCase):
 
     def test_one_unified_model_selection_is_used_after_required_active_roles(self) -> None:
         source = INSTALLER.read_text()
-        self.assertIn("bc250 model status all --compact", source)
-        self.assertNotIn("bc250 model status all --include-disabled --compact", source)
+        self.assertIn("bc250 model status all --include-disabled --compact", source)
+        self.assertNotIn("bc250 model status all --compact", source)
         self.assertIn("BC250_MODEL_SELECTION", source)
         self.assertIn("select(.is_active == true)", source)
         self.assertIn(".task.TASK_MODEL", source)
@@ -278,12 +278,12 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn("PACKAGE_DEFAULT_AGENT_MODEL", source)
         self.assertIn("Optional Agent models remain add-ons and are not downloaded by the baseline installer.", source)
         self.assertIn('bc250 model apply all "$required_csv"', source)
-        self.assertIn('bc250 model apply all "$selection"', source)
-        self.assertNotIn('bc250 model apply all "$selection" --include-disabled', source)
+        self.assertIn('bc250 model install "$selection"', source)
+        self.assertNotIn('bc250 model apply all "$selection"', source)
         self.assertIn('BC250_MODELCTL_CURRENT_SUMMARY=1', source)
-        self.assertIn('Standalone MTP models (llama.cpp; read-only, not selectable here)', source)
-        self.assertIn('bc250 model status mtp --include-disabled --compact', source)
-        self.assertIn('sudo bc250 advanced mtp prepare MODEL_ID', source)
+        self.assertIn('standalone MTP artifacts are included in the same catalog overview', source)
+        self.assertIn('MTP requires explicit selection', source)
+        self.assertIn('Standalone MTP artifacts remain explicit opt-ins', source)
         self.assertIn('Review or install optional models now? [y/N]:', source)
         self.assertNotIn('bc250 model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
@@ -324,13 +324,14 @@ BC250_MODEL_SELECTION='recommended,19-20'
 step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("model:apply all recommended,19-20", result.stdout)
+        self.assertIn("model:install recommended,19-20", result.stdout)
         self.assertNotIn("model:status mtp --include-disabled --compact", result.stdout)
         self.assertNotIn("model:apply mtp", result.stdout)
         self.assertIn("prod-translate-gemma4-sub-e4b-17s-q4-k-xl", result.stdout)
         self.assertIn("task-lfm25-1.2b-instruct-liquidai-q6-k", result.stdout)
         self.assertIn("embed-jina-v5-small-retrieval-q4-k-m", result.stdout)
-        self.assertEqual(result.stdout.count("model:apply"), 2)
+        self.assertEqual(result.stdout.count("model:apply"), 1)
+        self.assertEqual(result.stdout.count("model:install"), 1)
 
     def test_installer_mtp_inventory_is_visible_only_after_optional_review(self) -> None:
         result = source_probe(r'''
@@ -350,8 +351,8 @@ read() {
 bc250() {
   local cmd="$1"; shift
   [[ "$cmd" == model ]] || return 64
-  if [[ "$1 $2" == "status mtp" ]]; then
-    printf 'MTP models:\n  33) qwen3.5-9b-mtp [FETCHED, VERIFIED]\n'
+  if [[ "$1 $2 $3" == "status all --include-disabled" ]]; then
+    printf 'Production models:\n  0) prod-a [CURRENT]\nMTP models:\n  33) qwen3.5-9b-mtp [FETCHED, VERIFIED]\n'
   else
     printf 'model:%s\n' "$*"
   fi
@@ -360,12 +361,10 @@ step_7_models
 ''')
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("Model catalog/status", result.stdout)
-        self.assertIn("Standalone MTP models", result.stdout)
-        self.assertIn("  - qwen3.5-9b-mtp", result.stdout)
+        self.assertIn("MTP models:", result.stdout)
+        self.assertIn("33) qwen3.5-9b-mtp", result.stdout)
         self.assertIn("[FETCHED, VERIFIED]", result.stdout)
-        self.assertNotIn("\nMTP models:\n", result.stdout)
-        self.assertNotIn("33) qwen3.5-9b-mtp", result.stdout)
-        self.assertIn("separate opt-in workflow", result.stdout)
+        self.assertIn("explicit opt-ins", result.stdout)
 
     def test_original_noninteractive_input_survives_transcript_pty(self) -> None:
         result = source_probe('''
@@ -909,7 +908,8 @@ step_8_application_services
         self.assertNotIn("Core installation and verification completed successfully.", source)
         self.assertNotIn("Installation and verification completed successfully.", source)
         self.assertIn('/root/owui-test.key', source)
-        self.assertIn("Checking optional Ollama model registrations in parallel", source)
+        self.assertIn("Checking optional model state in parallel", source)
+        self.assertIn("standalone MTP artifacts are included in the same catalog overview", source)
         for current_label in (
             "Live SPI-routed CUs",
             "Saved boot profile",

@@ -643,6 +643,11 @@ class CategoryInterfaceTests(unittest.TestCase):
             "Select models by number, range, or group (recommended/production/all); press Enter to cancel: "
         )
 
+    def test_model_install_catalog_includes_disabled_mtp_as_standalone_state(self) -> None:
+        catalogs = modelctl.load_all_catalogs(directories=[MODELFILES])
+        available = modelctl.install_available_models(catalogs)
+        self.assertTrue(any(model.get("category") == "mtp" for model in available))
+
     def test_model_install_labels_experiments_as_testing(self) -> None:
         defaults = {"category": "experiments", "ollama_host": "127.0.0.1:11434"}
         model = {"category": "experiments", "id": "e", "name": "exp-e", "index": 0, "provider": "ollama-hf", "origin": "catalog"}
@@ -706,8 +711,9 @@ class CategoryInterfaceTests(unittest.TestCase):
             text = (ROOT / relative).read_text(encoding="utf-8")
             self.assertNotRegex(text, r"\bbc250-(?:model|fetch-mtp)\b(?=[\s`'\"),;:]|$)", relative)
         installer = (ROOT / "cmd/system/install.sh").read_text(encoding="utf-8")
-        self.assertIn("bc250 model status all --compact", installer)
+        self.assertIn("bc250 model status all --include-disabled --compact", installer)
         self.assertIn("bc250 model apply all", installer)
+        self.assertIn('bc250 model install "$selection"', installer)
 
 
     def test_global_source_override_requires_exactly_one_selected_model(self) -> None:
@@ -874,6 +880,27 @@ class SelectionTests(unittest.TestCase):
         self.assertTrue(production)
         self.assertTrue(all(model.get("category") == "production" for model in production))
         self.assertEqual({m["id"] for m in recommended}, modelctl.RECOMMENDED_MODELS)
+
+    def test_installer_groups_exclude_mtp_but_explicit_index_selects_it(self) -> None:
+        catalogs = modelctl.load_all_catalogs(directories=[MODELFILES])
+        models = modelctl.install_available_models(catalogs)
+        mtp = next(model for model in models if model.get("category") == "mtp")
+
+        grouped = modelctl.select_models(
+            models,
+            "all",
+            group_excluded_categories=frozenset({"mtp"}),
+        )
+        self.assertTrue(grouped)
+        self.assertFalse(any(model.get("category") == "mtp" for model in grouped))
+        self.assertEqual(
+            modelctl.select_models(
+                models,
+                str(mtp["index"]),
+                group_excluded_categories=frozenset({"mtp"}),
+            ),
+            [mtp],
+        )
 
     def test_catalog_indexes_are_global_and_selectable(self) -> None:
         all_models = modelctl.discover_models([MODELFILES])
