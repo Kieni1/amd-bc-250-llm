@@ -272,7 +272,7 @@
         "config/systemd/maintenance/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "d85367e47a9f0115d6bc0caed1865b9d1c1af056708e1744632856a7d0ed8ab3",
+      "baseline_sha256": "db7d97ff2bb4e211910610ade545ad7fd08b6c56ab5d318215c93a694084c4df",
       "thaw_if": [
         "maintenance/companion behavior is intentionally changed",
         "protected Open WebUI credential path/format changes",
@@ -366,7 +366,7 @@
         "examples/benchmark/ocr/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "8d2537669a703e6784ea97c45630ccb85a9bd2f257530328b638c737f810568d",
+      "baseline_sha256": "8885b3003f0050452783ecca37ed9885109fd06bb1d9fc3fe161910ecb7aedf2",
       "thaw_if": [
         "OCR workflow becomes a current device/product requirement"
       ],
