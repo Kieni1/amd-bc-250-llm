@@ -462,7 +462,7 @@ step_7_models() {
   [[ -n "$selection" ]] || { echo "Skipping additional models; required package baseline models are installed."; return 0; }
   BC250_MODELCTL_SUPPRESS_CATALOG=1 BC250_MODELCTL_SUPPRESS_MODE_OUTPUT=1 BC250_MODELCTL_SELECTION_SUMMARY=1 \
     bc250 model apply all "$selection"
-  echo "RAG source documents remain operator-managed under /srv/bc250-documents/."
+  echo "Managed document sources remain operator-owned under /srv/bc250-documents/."
 }
 
 openwebui_boot_enabled() {
@@ -713,14 +713,14 @@ step_8_application_services() {
 
 show_plan() {
   heading "BC-250 SETUP PLAN"
-  local kernel="" memory="active" swap="pending" cu="operator-controlled live routing" ollama="install/update" reboot="pending Fedora update check"
+  local kernel="" memory="active" swap="pending" cu="operator-controlled live routing" ollama="install/update" reboot="UNKNOWN (pending Fedora update check)"
   kernel="$(pending_kernel || true)"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || memory="configure/pending reboot"
   "$SWAP_PROFILE" status --quiet >/dev/null 2>&1 && swap="configured"
   if [[ -x /usr/local/bin/ollama ]] && [[ "$(ollama_version /usr/local/bin/ollama)" == "$BC250_OLLAMA_VERSION" ]]; then
     ollama="current ($BC250_OLLAMA_VERSION)"
   fi
-  [[ -z "$kernel" && "$memory" == active ]] || reboot="yes: kernel/TTM activation"
+  [[ -z "$kernel" && "$memory" == active ]] || reboot="YES (kernel/TTM activation)"
   printf '  root grow             check/apply if needed\n'
   printf '  Fedora update         check/apply\n'
   printf '  package               %s\n' "$(rpm -q bc250-llm-server.x86_64 2>/dev/null || echo missing)"
@@ -749,7 +749,7 @@ show_plan() {
   printf '  core verification     run before optional power/remote-maintenance setup\n'
   printf '  local maintenance      optional guided setup after core verification\n'
   printf '  Pi / companion         separate optional, default-No guided setup\n'
-  printf '  BC-250 configuration reboot  %s\n' "$reboot"
+  printf '  Reboot required        %s\n' "$reboot"
 }
 
 wait_for_open_webui() {
@@ -837,7 +837,7 @@ step_9_open_webui() {
     return 0
   fi
 
-  if yes_no_default_yes "Configure package-owned Open WebUI providers, tasks, RAG and model presets now?"; then
+  if yes_no_default_yes "Configure package-owned Open WebUI providers, tasks, document knowledge and model presets now?"; then
     local candidate=""
     candidate="$(owui_token_candidate)"
     if [[ -n "$candidate" ]]; then
@@ -1146,7 +1146,7 @@ print_40cu_completion_status() {
 
 
 print_setup_summary() {
-  local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED" restart_state="not evaluated (optional helper unavailable)"
+  local owui_state="NOT READY" ollama_state="NOT READY" reboot_state="NO" auth_state="NOT CONFIGURED"
   curl -fsS --max-time 3 http://127.0.0.1:3000/api/version >/dev/null 2>&1 && owui_state="BACKEND READY"
   if [[ "$owui_state" == "BACKEND READY" ]] && curl -fsS --max-time 3 http://127.0.0.1:80/api/version >/dev/null 2>&1; then
     owui_state="WEB INTERFACE READY"
@@ -1155,7 +1155,9 @@ print_setup_summary() {
   [[ -n "$(pending_kernel || true)" ]] && reboot_state="YES"
   "$MEMORY_PROFILE" status --quiet >/dev/null 2>&1 || reboot_state="YES"
   if command -v needs-restarting >/dev/null 2>&1; then
-    if needs-restarting -r >/dev/null 2>&1; then restart_state="PASS"; else restart_state="RECOMMENDED"; fi
+    if ! needs-restarting -r >/dev/null 2>&1; then reboot_state="YES (package/kernel updates)"; fi
+  elif [[ "$reboot_state" == "NO" ]]; then
+    reboot_state="UNKNOWN (restart check unavailable)"
   fi
   if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250 advanced openwebui status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
   echo
@@ -1190,10 +1192,8 @@ print_setup_summary() {
   printf '  Ollama                  : %s
 ' "$ollama_state"
   print_40cu_completion_status "  "
-  printf '  BC-250 configuration reboot : %s
+  printf '  Reboot required          : %s
 ' "$reboot_state"
-  printf '  OS/package restart check     : %s
-' "$restart_state"
   printf '  Quality revalidation         : NOT RUN
 '
   echo
@@ -1255,7 +1255,7 @@ main() {
   echo "Administration"
   echo "  Open WebUI:     sudo bc250 advanced openwebui status"
   echo "  Models:         sudo bc250 model install"
-  echo "  RAG:            bc250 document --help"
+  echo "  Documents:      bc250 document --help"
   echo "  Maintenance:    sudo bc250 maintenance --help"
   echo "  Documentation:  /usr/share/doc/bc250-llm-server/docs/OPERATIONS.md"
   echo

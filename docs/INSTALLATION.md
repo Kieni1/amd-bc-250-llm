@@ -41,7 +41,7 @@ reachable on all configured host interfaces.
 
 ### Fresh-install dependency footprint
 
-The BC-250 RPM itself is small, but a minimal Fedora installation can pull a substantial dependency closure on first install. The active product intentionally requires the Mesa/Vulkan stack, `umr` for live CU routing, Poppler for managed PDF preparation and the Hugging Face client for reviewed model downloads. The package uses `git-core` rather than the larger `git` meta-package because only the Git CLI is required. Do not remove compute or document dependencies merely to reduce the transaction count; qualify any dependency change against the feature that uses it.
+The BC-250 RPM itself is small, but a minimal Fedora installation can pull a substantial dependency closure on first install. The active product intentionally requires the Mesa/Vulkan stack, `umr` for live CU routing, Poppler for managed PDF preparation (managed DOCX extraction uses Python OOXML support) and the Hugging Face client for reviewed model downloads. The package uses `git-core` rather than the larger `git` meta-package because only the Git CLI is required. Do not remove compute or document dependencies merely to reduce the transaction count; qualify any dependency change against the feature that uses it.
 
 After the guided installer completes, CU status is expressed in the live-only terms used by the product: **CU live routing**, **saved boot profile**, and **boot restore service**. A missing saved profile/service means the optional live-CU boot restore has not yet been configured; it does not mean the `bc250-cu-live-manager` command is missing.
 
