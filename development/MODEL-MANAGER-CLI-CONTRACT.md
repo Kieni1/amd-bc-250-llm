@@ -103,12 +103,14 @@ retaining the catalog definition. A missing selection never means implicit
 ### MTP explicit opt-in
 
 Packaged MTP entries may remain `enabled = false` so they are hidden from ordinary combined
-status views. More importantly, combined `apply all` / `refresh all` never select the MTP category,
-even with `--include-disabled`; this keeps installer/generic convergence incapable of acquiring
-experimental llama.cpp artifacts. `bc250 advanced mtp prepare [SELECTION]` is the explicit operator opt-in
-and dispatches to `bc250 model apply mtp --include-disabled`; no catalog edit is required just to download a
-candidate for a bounded llama.cpp experiment. MTP remains download-only,
-so it supports source `status/apply/refresh/remove/path` but not `unregister`.
+status views. Combined `apply all` / `refresh all` never select the MTP category, even with
+`--include-disabled`. The interactive `bc250 model install` view is the deliberate exception for
+presentation and explicit opt-in: it shows MTP with the same global indexes as Ollama models, but only
+an exact MTP ID/index or numeric range may select it. Broad `all`, `recommended` and `production`
+installer groups exclude MTP. Such an explicit installer selection performs the same download/verify
+preparation semantics as `bc250 advanced mtp prepare [SELECTION]`; it does not register Ollama or start
+llama.cpp. MTP remains download-only, so it supports source `status/apply/refresh/remove/path` but not
+`unregister`.
 
 ### `purge-retired`
 

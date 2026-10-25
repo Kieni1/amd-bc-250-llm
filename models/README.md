@@ -1,9 +1,11 @@
 # Model management
 
 The guided installer establishes the required production/task/embedding baseline, then offers one
-unified optional selection across ordinary Ollama-backed production, experiments, agentic, embedding
-and task entries. MTP is deliberately absent from that picker and from combined `apply all` /
-`refresh all`; use `bc250 advanced mtp prepare` for explicit speculative-decoding preparation. The model manager
+unified indexed optional view across Ollama-backed production, experiments, agentic, embedding and
+task entries plus standalone MTP candidates. An explicit MTP ID/index/range selection prepares and
+verifies its download-only GGUF; broad `all`, `recommended` and `production` groups exclude MTP, as do
+combined `apply all` / `refresh all`. `bc250 advanced mtp prepare` remains the specialist explicit
+preparation path. The model manager
 keeps lane routing and exclusive agent-mode transitions internal. Use the commands below later to add,
 refresh or remove models.
 
@@ -18,7 +20,7 @@ LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp compare qwen3.
 
 sudo bc250 advanced agent status MODEL
 sudo bc250 advanced agent status MODEL --online
-sudo bc250 model status all --compact  # compact ordinary-model view used by the installer
+sudo bc250 model status all --include-disabled --compact  # full indexed installer/status overview
 sudo bc250 advanced mtp status --compact  # explicit MTP state view
 
 sudo bc250 model apply production MODEL-NAME

@@ -49,10 +49,12 @@ The package owns all four Ollama service definitions statically. Normal mode req
 bc250 model list                    # ordinary combined catalog view
 bc250 advanced agent list           # specialist agent view
 bc250 advanced mtp list             # specialist MTP view
-# MTP stays opt-in even though it shares the lifecycle manager:
+# MTP stays opt-in even though it shares the lifecycle manager.
+# The interactive installer may prepare it only after an explicit ID/index/range selection:
+sudo bc250 model install
 sudo bc250 advanced mtp prepare qwen3.5-9b-mtp
 
-# Generic installer / apply-all convergence never selects MTP.
+# Broad installer groups and generic apply-all convergence never select MTP.
 sudo bc250 advanced agent status MODEL
 sudo bc250 advanced agent status MODEL --online
 
@@ -437,10 +439,11 @@ leak/unload failure, successful-but-excessively-tight operation, and comfortable
 
 GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,
-runtime and the OS. Draft/MTP heads are not standalone Ollama role models and stay in the dedicated MTP
-workflow. Packaged MTP entries have no Ollama Modelfiles and are excluded from combined
-`apply all` / `refresh all` convergence regardless of their enabled flag; explicit
-`bc250 advanced mtp prepare` / `apply mtp` remains the preparation boundary.
+runtime and the OS. Draft/MTP heads are not standalone Ollama role models. Packaged MTP entries have no Ollama
+Modelfiles and remain excluded from combined `apply all` / `refresh all` convergence regardless of
+their enabled flag. They are nevertheless shown in the same indexed `bc250 model install` overview;
+an explicit MTP ID/index/range selection there is a preparation request and downloads/verifies the
+GGUF only. `bc250 advanced mtp prepare` / explicit `apply mtp` remain equivalent specialist paths.
 
 The completed MTP campaign now has a small package-facing policy in the existing MTP catalog:
 
@@ -456,8 +459,9 @@ Its historical passing result is preserved in the source-only MTP retired set. T
 `qwen3.6-35b-a3b-mtp` 8K/full-GPU configuration remains retired for memory fit.
 
 The MTP `role` / `recommendation` fields are presentation/policy metadata only: all active entries
-remain disabled/download-only and excluded from installer or `apply all` convergence.
-`bc250 advanced mtp prepare [SELECTION]` remains the explicit preparation boundary. `bc250 advanced mtp compare ID`
+remain disabled/download-only and excluded from broad installer groups plus `apply all` convergence.
+The interactive installer can prepare one only through an explicit MTP ID/index/range selection;
+`bc250 advanced mtp prepare [SELECTION]` remains the direct specialist preparation boundary. `bc250 advanced mtp compare ID`
 remains the same-target qualification path and `bc250 advanced mtp run ID` the manual runtime/debug path.
 Use exact IDs for 27B models; the ambiguous 27B convenience aliases were removed rather than
 silently retargeted after the package preference changed.

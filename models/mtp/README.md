@@ -1,15 +1,16 @@
 # MTP models
 
-MTP entries are optional **download-only** standalone llama.cpp models. They are not Ollama
-role models and remain deliberately excluded from normal `apply all` / installer convergence.
-BC-250 qualification now defines their package-facing roles and defaults without turning MTP into a
-persistent production lane.
+MTP entries are optional **download-only** standalone llama.cpp models. They are not Ollama role
+models and remain deliberately excluded from generic combined `apply all` / `refresh all`
+convergence. The interactive `bc250 model install` overview does show them with global indexes and
+allows explicit ID/index/range preparation without turning MTP into a persistent production lane.
 
 The packaged entries are intentionally `enabled = false`. Ordinary `bc250 advanced mtp list` and
 `apply mtp` therefore do not select them accidentally. Combined `apply all` / `refresh all` excludes
-the MTP category entirely, even when `--include-disabled` is supplied. `bc250 advanced mtp prepare` is the
-explicit opt-in workflow and deliberately exposes those disabled experiment definitions. MTP entries
-intentionally have no Ollama Modelfile.
+the MTP category entirely, even when `--include-disabled` is supplied. In `bc250 model install`, broad
+`all`, `recommended` and `production` groups also exclude MTP; only an explicit MTP ID/index/range is
+an opt-in preparation request. `bc250 advanced mtp prepare` remains the specialist equivalent. MTP
+entries intentionally have no Ollama Modelfile.
 
 ## Current package policy
 
@@ -47,7 +48,7 @@ qualification remains valid and its exact definition is preserved in source-only
 whole-appliance hard floor before MTP inference, so that configuration should not be rerun unchanged.
 
 The packaged active entries remain `enabled = false`; MTP stays explicit opt-in and separate from
-normal model convergence. Do not reopen broad MTP qualification without a materially new product,
+generic model convergence even though it shares the interactive overview. Do not reopen broad MTP qualification without a materially new product,
 model, runtime or hardware question.
 
 ## Prepare one experiment
@@ -59,8 +60,9 @@ sudo bc250 model status mtp qwen3.5-9b-mtp --include-disabled --verbose
 ```
 
 With no selection, `sudo bc250 advanced mtp prepare` shows the disabled candidates and prompts for
-one. Long-lived scripts and recorded evidence should use the exact ID rather than a
-displayed index or convenience alias.
+one. `sudo bc250 model install` also shows those candidates in the common indexed overview; select an
+MTP entry explicitly by ID/index/range to prepare it. Long-lived scripts and recorded evidence should
+use the exact ID rather than a displayed index or convenience alias.
 
 `bc250 advanced mtp prepare` is equivalent to an explicit lifecycle apply of the MTP catalog with
 disabled entries exposed. Advanced/operator testing can use the underlying form directly:
