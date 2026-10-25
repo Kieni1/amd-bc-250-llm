@@ -10,6 +10,46 @@ diff --git a/bc250-cu-live-manager.sh b/bc250-cu-live-manager.sh
  SERVICE_CONF="/etc/bc250-cu-live-manager.conf"
  OLD_UDEV_RULE="/etc/udev/rules.d/99-bc250-cu-live-manager.rules"
  # CPU core unlock: SMN index/data window at PCI config 0xB8/0xBC on the GNB.
+@@ -75,12 +75,12 @@
+-  sudo ./$SCRIPT_NAME status
+-  sudo ./$SCRIPT_NAME enable all
+-  sudo ./$SCRIPT_NAME stock-dispatch
+-  sudo ./$SCRIPT_NAME table
+-  sudo ./$SCRIPT_NAME enable-wgp SE.SH.WGP [...]
+-  sudo ./$SCRIPT_NAME disable-wgp SE.SH.WGP [...]
+-  sudo ./$SCRIPT_NAME cpu-unlock
+-  sudo ./$SCRIPT_NAME install-service
+-  sudo ./$SCRIPT_NAME write-service-table
+-  sudo ./$SCRIPT_NAME apply-service
+-  sudo ./$SCRIPT_NAME uninstall-service
+-  sudo ./$SCRIPT_NAME menu
++  sudo $SCRIPT_NAME status
++  sudo $SCRIPT_NAME enable all
++  sudo $SCRIPT_NAME stock-dispatch
++  sudo $SCRIPT_NAME table
++  sudo $SCRIPT_NAME enable-wgp SE.SH.WGP [...]
++  sudo $SCRIPT_NAME disable-wgp SE.SH.WGP [...]
++  sudo $SCRIPT_NAME cpu-unlock
++  sudo $SCRIPT_NAME install-service
++  sudo $SCRIPT_NAME write-service-table
++  sudo $SCRIPT_NAME apply-service
++  sudo $SCRIPT_NAME uninstall-service
++  sudo $SCRIPT_NAME menu
+@@ -116,4 +116,4 @@
+-	- Live routing operations can enable or disable any WGP pair, including
+-	  pairs active in the driver topology.
+-	- Root-required commands auto re-run with sudo when available, with a
+-	  short reason printed before re-launch.
++  - Live routing operations can enable or disable any WGP pair, including
++    pairs active in the driver topology.
++  - Root-required commands auto re-run with sudo when available, with a
++    short reason printed before re-launch.
+@@ -142 +142 @@
+-	find_umr || die "umr not found. Run: sudo ./$SCRIPT_NAME install-umr"
++	find_umr || die "umr not found. Run: sudo $SCRIPT_NAME install-umr"
+@@ -222 +222 @@
+-	[ "$(id -u)" = "0" ] || die "umr register access requires root. Run: sudo ./$SCRIPT_NAME ${1:-status}"
++	[ "$(id -u)" = "0" ] || die "umr register access requires root. Run: sudo $SCRIPT_NAME ${1:-status}"
 @@ -714,7 +714,7 @@
  		case "$ans" in
  			y|Y|yes|YES)

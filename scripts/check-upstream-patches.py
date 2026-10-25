@@ -111,6 +111,8 @@ def validate_patched_semantics(script_path: Path) -> None:
         'SERVICE_BIN="/usr/bin/bc250-cu-live-manager"',
         "/usr/sbin/reboot",
         '[ -x "$SERVICE_BIN" ] || die "packaged service executable is missing: $SERVICE_BIN"',
+        'sudo $SCRIPT_NAME status',
+        'Run: sudo $SCRIPT_NAME install-umr',
     )
     for snippet in required:
         if snippet not in text:
@@ -122,6 +124,7 @@ def validate_patched_semantics(script_path: Path) -> None:
         "systemctl reboot",
         'source_path="$(readlink -f "$0")"',
         'rm -f "$SERVICE_PATH" "$SERVICE_BIN"',
+        'sudo ./$SCRIPT_NAME',
     )
     for snippet in forbidden:
         if snippet in text:
