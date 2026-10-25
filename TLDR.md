@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.7.1` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Current release source: `bc250-llm-server-0.14.1-1.8` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
 
-Release 1.7.1 is a structural cleanup over the 1.7 source/behavioral regression baseline: `bc250 document` is the document lifecycle surface, specialist agent/MTP/benchmark/qualification/coding controls live under `bc250 advanced`, ordinary model discovery defaults to the combined catalog, and duplicated release/build policy has been reduced. Runtime/model/retrieval tuning and the SRPM-first authority path are unchanged; exact 1.7.1 build/device binding is required.
+Release 1.8 adds Managed Documents v2 and qualification correctness: PDF + DOCX managed preparation, bounded large-source normalization, stronger review/corpus-health and read-only Knowledge-sync UX, corrected revalidation resource semantics, and the remaining device-found CLI/support fixes. Runtime/model/retrieval tuning, persistent state and the SRPM-first authority path are unchanged; exact 1.8 build/device binding is required.
 
 ## Install
 

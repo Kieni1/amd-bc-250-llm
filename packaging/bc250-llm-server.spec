@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.7.1%{?dist}
+Release:        1.8%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -263,6 +263,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Oct 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.8
+- Add Managed Documents v2 with first-class PDF/DOCX preparation, bounded large-source normalization, richer human review and read-only Knowledge-sync status.
+- Correct revalidation v4.9 resource-sanity classification so valid budget-limited measurements are not mislabeled as infrastructure failures.
+- Fix support-bundle execution and tighten operator CLI help, privilege, migration, safety and human-output behavior found during the completed 1.7.1 device campaign.
+- Include the post-1.7.1 terminal UX/Ruff corrections while keeping runtime, model, retrieval, topology and persistent-state policy unchanged.
+
 * Fri Oct 23 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.7.1
 - Greenfield public CLI cleanup: move specialist/qualification workflows under bc250 advanced and rename bc250 rag to bc250 document without renaming persistent corpus state.
 - Consolidate agent/MTP/coding specialist entry points, remove the duplicate local make rpm binary-build route, and move the parity diagnostic under advanced benchmark.

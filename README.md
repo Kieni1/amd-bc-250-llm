@@ -4,7 +4,7 @@ BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD B
 It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1.7.1` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+Current release source: `bc250-llm-server-0.14.1-1.8` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -186,8 +186,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Release 0.14.1-1.7.1 is a structural cleanup over the 1.7 source/behavioral regression baseline. Runtime/model/retrieval tuning is unchanged. The public command surface is product-oriented (`document` plus an explicit `advanced` namespace), agent/MTP specialist handling shares one catalog path, the duplicate local binary-RPM build path is removed, runtime pins have one authority, and development history is retained without acting as volatile release state.
-Prior exact-device evidence remains regression context only; the selected 1.7.1 RPM needs a bounded structural regression proving supported behavior, persistence and removed-command absence.
+Release 0.14.1-1.8 is the Managed Documents v2 and qualification-correctness release. Managed PDF and DOCX sources now share one reviewed lifecycle, larger text-native sources use bounded normalization rather than a fragile single-pass ceiling, document status can show concise corpus health and a read-only Knowledge-sync diff, and review exposes more of the draft needed for real semantic approval. Revalidation now keeps valid resource telemetry separate from output-budget incompleteness. CLI/support diagnostics are tightened from the completed 1.7.1 device campaign. Runtime/model/retrieval tuning and persistent state paths remain unchanged; exact-RPM build/device acceptance is still required.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in

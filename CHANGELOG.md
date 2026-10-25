@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.1-1.8 - 2026-10-25
+
+- Add Managed Documents v2: accept text-native PDF and DOCX sources through the same provenance/review/activation contract, normalize larger sources in bounded chunks with safe incomplete handling, expose richer review previews, and add concise lifecycle/corpus-health plus optional read-only Open WebUI Knowledge-sync status.
+- Correct package revalidation v4.9 resource sanity so valid performance/telemetry measurements with output/thinking-budget-only `INCOMPLETE` results remain usable evidence; visible-answer quality stays a separate assertion and real infrastructure failure kinds still fail.
+- Fix the device-confirmed `bc250 support-bundle` runtime-directory/archive naming defect and tighten privilege guidance, moved-command hints, command-specific model help, OCR/maintenance errors, destructive-operation help, Agent registration wording, public Open WebUI help, CU-manager examples and long human-readable status output.
+- Include the post-1.7.1 terminal UX/Ruff corrections; keep Ollama/Open WebUI/Tika/governor versions, model selection, retrieval tuning, runtime topology and persistent state paths unchanged.
+
 ## 0.14.1-1.7.1 - 2026-10-23
 
 - Greenfield the public command surface without migrating valuable state: replace `bc250 rag` with `bc250 document`, move specialist/qualification workflows under `bc250 advanced`, and keep existing `/srv/bc250-documents`, model-store and Open WebUI state paths unchanged.
