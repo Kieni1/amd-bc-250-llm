@@ -283,7 +283,11 @@ def enter_agent_if_needed(url: str) -> bool:
         die("bc250 dispatcher is required to enter exclusive agent mode")
     result = subprocess.run([command, "advanced", "agent", "enter"], text=True, check=False)
     if result.returncode != 0 or not agent_ready(url):
-        die("exclusive agent mode did not become ready on port 11436")
+        restore_error = restore_normal_if_needed(True)
+        message = "exclusive agent mode did not become ready on port 11436"
+        if restore_error:
+            message += f"; {restore_error}"
+        die(message)
     return True
 
 
@@ -305,6 +309,11 @@ def restore_normal_if_needed(switched: bool) -> str | None:
     return None
 
 
+def chunk_identity(text: str, chunk_index: int, chunk_total: int) -> str:
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+    return f"<!-- BC250-CHUNK {chunk_index}/{chunk_total} SHA256={digest} -->"
+
+
 def normalize_prompt(
     text: str, language: str, bilingual: bool, *, chunk_index: int = 1, chunk_total: int = 1
 ) -> str:
@@ -315,10 +324,14 @@ def normalize_prompt(
         if bilingual
         else f"The source is expected to be {language_name}. Do not translate it."
     )
+    identity = chunk_identity(text, chunk_index, chunk_total) if chunk_total > 1 else ""
     chunk_rule = (
         "Return ONLY normalized Markdown body text, beginning with one '# ' document title."
-        if chunk_total == 1 or chunk_index == 1
-        else "Return ONLY normalized Markdown continuation text for this chunk. Do not repeat the document title."
+        if chunk_total == 1
+        else (
+            f"Return {identity} as the exact first non-empty line, then normalized Markdown body text "
+            + ("beginning with one '# ' document title." if chunk_index == 1 else "for this chunk without repeating the document title.")
+        )
     )
     chunk_context = (
         ""
@@ -436,6 +449,7 @@ def normalize_source_text(
 ) -> str:
     chunks = split_source_chunks(text, max_chars)
     outputs: list[str] = []
+    output_fingerprints: set[str] = set()
     for index, chunk in enumerate(chunks, 1):
         prompt = normalize_prompt(
             chunk, language, bilingual, chunk_index=index, chunk_total=len(chunks)
@@ -454,9 +468,44 @@ def normalize_source_text(
                     "normalization incomplete",
                     f"chunk {index}/{len(chunks)} exhausted the local Agent generation budget twice; source remains in inbox",
                 ) from exc
+        if len(chunks) > 1:
+            identity = chunk_identity(chunk, index, len(chunks))
+            lines = normalized.splitlines()
+            first_content = next((offset for offset, line in enumerate(lines) if line.strip()), None)
+            if first_content is None or lines[first_content].strip() != identity:
+                raise DeferredPreparation(
+                    "normalization assembly invalid",
+                    f"chunk {index}/{len(chunks)} did not return its deterministic chunk identity; source remains in inbox",
+                )
+            del lines[first_content]
+            normalized = "\n".join(lines).strip() + "\n"
+
+            fingerprint = hashlib.sha256(normalized.strip().encode("utf-8")).hexdigest()
+            if fingerprint in output_fingerprints:
+                raise DeferredPreparation(
+                    "normalization assembly invalid",
+                    f"chunk {index}/{len(chunks)} duplicated an earlier normalized chunk; source remains in inbox",
+                )
+            output_fingerprints.add(fingerprint)
+
+            if not bilingual:
+                expected = critical_tokens(chunk)
+                missing = sorted(token for token in expected if token not in normalized)
+                if missing:
+                    preview = ", ".join(missing[:5])
+                    raise DeferredPreparation(
+                        "normalization fidelity incomplete",
+                        f"chunk {index}/{len(chunks)} omitted {len(missing)} critical source token(s) "
+                        f"({preview}); source remains in inbox",
+                    )
         if index > 1:
             normalized = re.sub(r"\A\s*#\s+[^\n]+\n+", "", normalized, count=1)
         outputs.append(normalized.strip())
+    if len(chunks) > 1 and len(outputs) != len(chunks):
+        raise DeferredPreparation(
+            "normalization assembly invalid",
+            f"assembled {len(outputs)} of {len(chunks)} source chunks; source remains in inbox",
+        )
     return "\n\n".join(part for part in outputs if part).rstrip() + "\n"
 
 
@@ -908,11 +957,11 @@ def cmd_review(args: argparse.Namespace) -> None:
         title = ask("Title", str(meta.get("title", "")))
         family = ask("Document family", str(meta.get("document_family", "")))
         effective = ask(
-            "Effective date (YYYY-MM-DD; or provide edition/version below)",
+            "Effective date (required unless edition/version is provided; YYYY-MM-DD)",
             str(meta.get("effective_from", "")),
         )
         edition = ask(
-            "Edition/version (required when effective date is blank)",
+            "Edition/version (required unless effective date is provided)",
             str(meta.get("edition", "")),
         )
         role = ask(
@@ -1007,6 +1056,8 @@ def cmd_review(args: argparse.Namespace) -> None:
             print(f"  Metadata validation: {exc}; keeping review_required=true.")
             metadata_valid = False
 
+        if not (effective or edition):
+            print("  REVIEW REQUIRED: provide either an effective date or edition/version before activation.")
         ready = input("Mark reviewed and ready for activation? [y/N]: ").strip().lower() in {"y", "yes"}
         if ready and not metadata_valid:
             ready = False
@@ -1035,6 +1086,8 @@ def cmd_review(args: argparse.Namespace) -> None:
             path.rename(target)
             path = target
         print(f"  saved: {path.name} ({'READY' if ready else 'REVIEW REQUIRED'})")
+        print(f"  RESULT={'READY' if ready else 'REVIEW_REQUIRED'}")
+        print(f"  READY_TO_ACTIVATE={'YES' if ready else 'NO'}")
 
 
 def docs_in(folder: Path) -> list[Path]:

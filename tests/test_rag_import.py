@@ -895,6 +895,44 @@ class RagImportTests(unittest.TestCase):
                  redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 self.assertEqual(lifecycle.main(argv), 2)
 
+    def test_agent_entry_readiness_failure_restores_normal_topology(self) -> None:
+        entered = subprocess.CompletedProcess(["bc250"], 0)
+        with patch.object(lifecycle, "agent_ready", return_value=False), \
+             patch.object(lifecycle.os, "geteuid", return_value=0), \
+             patch.object(lifecycle.shutil, "which", return_value="/usr/bin/bc250"), \
+             patch.object(lifecycle.subprocess, "run", return_value=entered), \
+             patch.object(lifecycle, "restore_normal_if_needed", return_value=None) as restore, \
+             self.assertRaisesRegex(ValueError, "did not become ready"):
+            lifecycle.enter_agent_if_needed(lifecycle.DEFAULT_AGENT_URL)
+        restore.assert_called_once_with(True)
+
+    def test_prepare_batch_keyboard_interrupt_restores_normal_topology(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            (base / "inbox" / "german" / "scan.pdf").write_bytes(b"scan")
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "agent_url": lifecycle.DEFAULT_AGENT_URL,
+                    "model": lifecycle.DEFAULT_AGENT_MODEL,
+                    "max_chars": lifecycle.DEFAULT_MAX_CHARS,
+                    "dry_run": False,
+                },
+            )()
+            with patch.object(lifecycle, "enter_agent_if_needed", return_value=True), \
+                 patch.object(lifecycle, "agent_models", return_value={lifecycle.DEFAULT_AGENT_MODEL}), \
+                 patch.object(lifecycle, "prepare_one", side_effect=KeyboardInterrupt), \
+                 patch.object(lifecycle, "restore_normal_if_needed", return_value=None) as restore, \
+                 redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()), \
+                 self.assertRaises(KeyboardInterrupt):
+                lifecycle.cmd_prepare(args)
+            restore.assert_called_once_with(True)
+
     def test_existing_working_draft_is_never_overwritten_by_reprepare(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1239,15 +1277,67 @@ class RagImportTests(unittest.TestCase):
                 },
             )()
             answers = iter(["", "", "2026-01-01", "", "", "y", "y"])
+            stdout = io.StringIO()
             with patch.object(lifecycle.sys, "stdin", Tty()), patch(
                 "builtins.input", side_effect=lambda _prompt="": next(answers)
-            ), redirect_stdout(io.StringIO()):
+            ), redirect_stdout(stdout):
                 lifecycle.cmd_review(args)
             reviewed = base / "working" / "reglement_de-CH_2026-01-01.md"
             self.assertTrue(reviewed.is_file())
             meta = rag.front_matter(reviewed)
             self.assertEqual(meta["review_required"], "false")
             self.assertEqual(meta["bc250_fidelity_acknowledged"], "true")
+            self.assertIn("RESULT=READY", stdout.getvalue())
+            self.assertIn("READY_TO_ACTIVATE=YES", stdout.getvalue())
+
+    def test_review_without_effective_or_edition_reports_not_ready_state(self) -> None:
+        class Tty:
+            @staticmethod
+            def isatty() -> bool:
+                return True
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            base = lifecycle.ensure_collection(root, "public", "COLLECTION")
+            source = base / "sources" / "reglement.pdf"
+            source.write_bytes(b"source")
+            digest = hashlib.sha256(source.read_bytes()).hexdigest()
+            lifecycle.write_draft(
+                base,
+                source,
+                digest,
+                "# Reglement\n\nBody\n",
+                "de-CH",
+                "authoritative",
+                bilingual=False,
+                fidelity_status="not-scored",
+                fidelity_note_text="no critical tokens",
+            )
+            args = type(
+                "Args",
+                (),
+                {
+                    "root": root,
+                    "scope": "public",
+                    "collection": "COLLECTION",
+                    "all": False,
+                },
+            )()
+            answers = iter(["", "", "", "", "", "y"])
+            stdout = io.StringIO()
+            with patch.object(lifecycle.sys, "stdin", Tty()), patch(
+                "builtins.input", side_effect=lambda _prompt="": next(answers)
+            ), redirect_stdout(stdout):
+                lifecycle.cmd_review(args)
+            output = stdout.getvalue()
+            self.assertIn(
+                "REVIEW REQUIRED: provide either an effective date or edition/version before activation.",
+                output,
+            )
+            self.assertIn("RESULT=REVIEW_REQUIRED", output)
+            self.assertIn("READY_TO_ACTIVATE=NO", output)
+            reviewed = base / "working" / "reglement_de-CH_review.md"
+            self.assertEqual(rag.front_matter(reviewed)["review_required"], "true")
 
     def test_batch2_prepare_one_records_automated_fidelity_result(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1387,6 +1477,8 @@ class RagImportTests(unittest.TestCase):
                 "Source provenance must be repaired before this draft can be marked ready.",
                 output,
             )
+            self.assertIn("RESULT=REVIEW_REQUIRED", output)
+            self.assertIn("READY_TO_ACTIVATE=NO", output)
             reviewed = base / "working" / "reglement_de-CH_2026-01-01.md"
             reviewed_meta = rag.front_matter(reviewed)
             self.assertEqual(reviewed_meta["review_required"], "true")
@@ -1418,7 +1510,9 @@ class RagImportTests(unittest.TestCase):
             calls.append((think, prompt))
             if think and len(calls) == 1:
                 raise lifecycle.AgentGenerationLimit("budget")
-            return "# Managed\n\nNormalized body\n"
+            marker = re.search(r"<!-- BC250-CHUNK \d+/\d+ SHA256=[0-9a-f]+ -->", prompt)
+            self.assertIsNotNone(marker)
+            return f"{marker.group(0)}\n# Managed\n\nNormalized body {len(calls)}\n"
         with patch.object(lifecycle, "call_agent", side_effect=fake_call):
             result = lifecycle.normalize_source_text(
                 "http://127.0.0.1:11436", "agent", source, "de-CH", False, 1000
@@ -1428,6 +1522,49 @@ class RagImportTests(unittest.TestCase):
         self.assertEqual(calls[1][0], False)
         self.assertTrue(result.startswith("# Managed"))
         self.assertEqual(result.count("# Managed"), 1)
+
+    def test_large_source_rejects_missing_chunk_critical_tokens(self) -> None:
+        sections = [
+            f"Article {100 + index} BC250-LARGE-{index:02d} CHF {1000 + index} " + ("word " * 130)
+            for index in range(1, 4)
+        ]
+        source = "\n\n".join(sections)
+        chunks = lifecycle.split_source_chunks(source, 1000)
+        by_identity = {
+            lifecycle.chunk_identity(chunk, index, len(chunks)): chunk
+            for index, chunk in enumerate(chunks, 1)
+        }
+
+        def fake_call(_url, _model, prompt, *, think=True):
+            marker = re.search(r"<!-- BC250-CHUNK \d+/\d+ SHA256=[0-9a-f]+ -->", prompt)
+            self.assertIsNotNone(marker)
+            body = by_identity[marker.group(0)]
+            if "BC250-LARGE-02" in body:
+                body = body.replace("BC250-LARGE-02", "")
+            return f"{marker.group(0)}\n# Managed\n\n{body}\n"
+
+        with patch.object(lifecycle, "call_agent", side_effect=fake_call), \
+             self.assertRaisesRegex(lifecycle.DeferredPreparation, "critical source token"):
+            lifecycle.normalize_source_text(
+                "http://127.0.0.1:11436", "agent", source, "de-CH", False, 1000
+            )
+
+    def test_large_source_rejects_duplicate_normalized_chunk(self) -> None:
+        source = "\n\n".join(
+            (f"Section {letter} " + (f"word{letter} " * 150)).strip()
+            for letter in ("A", "B", "C")
+        )
+
+        def fake_call(_url, _model, prompt, *, think=True):
+            marker = re.search(r"<!-- BC250-CHUNK \d+/\d+ SHA256=[0-9a-f]+ -->", prompt)
+            self.assertIsNotNone(marker)
+            return f"{marker.group(0)}\n# Managed\n\nRepeated normalized chunk\n"
+
+        with patch.object(lifecycle, "call_agent", side_effect=fake_call), \
+             self.assertRaisesRegex(lifecycle.DeferredPreparation, "duplicated an earlier"):
+            lifecycle.normalize_source_text(
+                "http://127.0.0.1:11436", "agent", source, "de-CH", False, 1000
+            )
 
     def test_document_status_help_exposes_read_only_knowledge_inspection(self) -> None:
         result = subprocess.run(
