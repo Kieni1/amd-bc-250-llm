@@ -459,9 +459,14 @@ show_status() {
   echo
   echo "Policy (API key redacted)"
   printf '  Backups kept:       config=%s users=%s\n' "$(get_setting KEEP_CONFIG 7)" "$(get_setting KEEP_USERS 14)"
-  printf '  Upload pruning:     age=%sd ceiling=%sGiB dry_run=%s API_key=%s\n' \
-    "$(get_setting MAX_AGE_DAYS 90)" "$(get_setting MAX_TOTAL_GB 20)" \
-    "$(get_setting DRY_RUN 1)" "$api_state"
+  printf '  Upload pruning:     age=%sd ceiling=%sGiB\n' \
+    "$(get_setting MAX_AGE_DAYS 90)" "$(get_setting MAX_TOTAL_GB 20)"
+  if [[ "$(get_setting DRY_RUN 1)" == 1 ]]; then
+    echo "  Dry run:            enabled"
+  else
+    echo "  Dry run:            disabled"
+  fi
+  printf '  API key:            %s\n' "$api_state"
   if [[ "$warmup_state" == enabled ]]; then
     printf '  Warm-up:            enabled model=%s keep_alive=%s\n' \
       "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)" \
@@ -513,7 +518,8 @@ preflight_prune() {
     '' \
     'Reason: Open WebUI API key is not configured.' \
     '' \
-    "Current policy: age=$(get_setting MAX_AGE_DAYS 90)d ceiling=$(get_setting MAX_TOTAL_GB 20)GiB dry_run=$(get_setting DRY_RUN 1)" \
+    "Current policy: age=$(get_setting MAX_AGE_DAYS 90)d; ceiling=$(get_setting MAX_TOTAL_GB 20)GiB" \
+    "Dry run: $([[ $(get_setting DRY_RUN 1) == 1 ]] && echo enabled || echo disabled)" \
     'Configure the protected Open WebUI credential and retry.' \
     'No uploads were changed.' >&2
   return 1
@@ -620,16 +626,16 @@ main() {
     status) (($# <= 1)) || { usage >&2; exit 2; }; show_status ;;
     contract) (($# == 1)) || { usage >&2; exit 2; }; show_contract ;;
     companion)
-      (($# == 2)) || { usage >&2; exit 2; }
-      case "$2" in status) run_access companion-status ;; enable) run_access companion-enable ;; *) usage >&2; exit 2 ;; esac
+      (($# == 2)) || { echo "ERROR: maintenance companion requires status|enable." >&2; echo "Run: sudo bc250 maintenance --help" >&2; exit 2; }
+      case "$2" in status) run_access companion-status ;; enable) run_access companion-enable ;; *) echo "ERROR: unknown maintenance companion command: $2" >&2; echo "Run: sudo bc250 maintenance --help" >&2; exit 2 ;; esac
       ;;
     backup-export)
-      (($# == 2)) || { usage >&2; exit 2; }
-      case "$2" in status) run_access backup-status ;; enable) run_access backup-enable ;; *) usage >&2; exit 2 ;; esac
+      (($# == 2)) || { echo "ERROR: maintenance backup-export requires status|enable." >&2; echo "Run: sudo bc250 maintenance --help" >&2; exit 2; }
+      case "$2" in status) run_access backup-status ;; enable) run_access backup-enable ;; *) echo "ERROR: unknown maintenance backup-export command: $2" >&2; echo "Run: sudo bc250 maintenance --help" >&2; exit 2 ;; esac
       ;;
     request-shutdown) (($# == 1)) || { usage >&2; exit 2; }; request_shutdown ;;
     request-shutdown-companion) (($# == 1)) || { usage >&2; exit 2; }; request_companion_shutdown ;;
-    run) (($# == 2)) || { usage >&2; exit 2; }; run_selected "$2" ;;
+    run) (($# == 2)) || { echo "ERROR: maintenance run requires backup|prune|all." >&2; echo "Run: sudo bc250 maintenance --help" >&2; exit 2; }; run_selected "$2" ;;
     clean-cache) (($# == 1)) || { usage >&2; exit 2; }; clean_cache ;;
     disable) (($# == 1)) || { usage >&2; exit 2; }; disable_all ;;
     -h|--help|help) usage ;;

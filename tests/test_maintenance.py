@@ -322,7 +322,7 @@ class MaintenanceTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("API key is not configured", result.stdout)
-            self.assertIn("dry_run=1", result.stdout)
+            self.assertIn("Dry run: enabled", result.stdout)
             self.assertNotIn("REPLACE_WITH_ADMIN_API_KEY", result.stdout)
 
         source = script.read_text(encoding="utf-8")
