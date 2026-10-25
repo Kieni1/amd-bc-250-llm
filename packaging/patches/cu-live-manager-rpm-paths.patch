@@ -37,9 +37,9 @@ diff --git a/bc250-cu-live-manager.sh b/bc250-cu-live-manager.sh
 +  sudo $SCRIPT_NAME menu
 @@ -116,4 +116,4 @@
 -	- Live routing operations can enable or disable any WGP pair, including
--	  pairs active in the driver topology.
+-		pairs active in the driver topology.
 -	- Root-required commands auto re-run with sudo when available, with a
--	  short reason printed before re-launch.
+-		short reason printed before re-launch.
 +  - Live routing operations can enable or disable any WGP pair, including
 +    pairs active in the driver topology.
 +  - Root-required commands auto re-run with sudo when available, with a
