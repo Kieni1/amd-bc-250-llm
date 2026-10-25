@@ -43,7 +43,7 @@ class WorkflowSmokeTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stdout)
-        self.assertIn("Experiments models:", result.stdout)
+        self.assertIn("Testing models:", result.stdout)
         self.assertIn("exp-glm-ocr-ggml-q8-0", result.stdout)
         self.assertIn("exp-ovisocr2-abiray-q8-0", result.stdout)
 

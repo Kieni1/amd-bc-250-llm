@@ -15,6 +15,8 @@ import re
 import shutil
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
+import zipfile
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -28,9 +30,11 @@ DEFAULT_AGENT_MODEL = os.environ.get(
     "BC250_RAG_AGENT_MODEL", "agentic-ornith15-9b-ornith-q5-k-m"
 )
 DEFAULT_MAX_CHARS = int(os.environ.get("BC250_RAG_MAX_CHARS", "50000"))
+DEFAULT_OWUI_TOKEN_FILE = Path("/var/lib/bc250-llm-server/secrets/openwebui-admin.key")
 INBOX_LANES = ("german", "french", "bilingual")
 COLLECTION_DIRS = ("sources", "working", "active", "superseded")
-PDF_EXTENSIONS = {".pdf"}
+SOURCE_EXTENSIONS = {".pdf", ".docx"}
+DOCX_NS = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 REASONING_MARKER_RE = re.compile(r"</?think(?:\s|>)|<\|/?think\|>", re.IGNORECASE)
 
 
@@ -40,6 +44,10 @@ class DeferredPreparation(RuntimeError):
     def __init__(self, kind: str, message: str) -> None:
         super().__init__(message)
         self.kind = kind
+
+
+class AgentGenerationLimit(RuntimeError):
+    """The local normalizer exhausted generation before returning usable content."""
 
 
 def die(message: str) -> None:
@@ -141,7 +149,7 @@ def render_markdown(meta: dict[str, object], body: str) -> str:
     return "\n".join(lines)
 
 
-def source_text(pdf: Path) -> tuple[int, str]:
+def pdf_source_text(pdf: Path) -> tuple[int, str]:
     for command in ("pdfinfo", "pdftotext"):
         if shutil.which(command) is None:
             die(f"{command} is unavailable; install the package dependency poppler-utils")
@@ -160,6 +168,81 @@ def source_text(pdf: Path) -> tuple[int, str]:
     if result.returncode != 0:
         die(f"pdftotext failed for {pdf.name}: {result.stderr.strip() or 'unknown error'}")
     return pages, result.stdout.replace("\x0c", "\n\n")
+
+
+def _docx_text_from_paragraph(paragraph: ET.Element) -> str:
+    parts: list[str] = []
+    for node in paragraph.iter():
+        if node.tag == f"{{{DOCX_NS['w']}}}t":
+            parts.append(node.text or "")
+        elif node.tag == f"{{{DOCX_NS['w']}}}tab":
+            parts.append("\t")
+        elif node.tag in {f"{{{DOCX_NS['w']}}}br", f"{{{DOCX_NS['w']}}}cr"}:
+            parts.append("\n")
+    text = "".join(parts).strip()
+    if not text:
+        return ""
+    style = paragraph.find("./w:pPr/w:pStyle", DOCX_NS)
+    style_name = style.get(f"{{{DOCX_NS['w']}}}val", "") if style is not None else ""
+    heading = re.fullmatch(r"Heading([1-6])", style_name, re.IGNORECASE)
+    if heading:
+        return "#" * int(heading.group(1)) + " " + text
+    if paragraph.find("./w:pPr/w:numPr", DOCX_NS) is not None:
+        return "- " + text
+    return text
+
+
+def docx_source_text(docx: Path) -> tuple[int, str]:
+    """Extract readable DOCX text with lightweight structural hints.
+
+    The local Agent remains responsible for normalization. This extractor deliberately
+    uses only the OOXML package itself so managed DOCX preparation does not depend on a
+    remote service or an additional Python library.
+    """
+    try:
+        with zipfile.ZipFile(docx) as archive:
+            raw = archive.read("word/document.xml")
+    except (OSError, KeyError, zipfile.BadZipFile) as exc:
+        die(f"cannot read DOCX source {docx.name}: {exc}")
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError as exc:
+        die(f"cannot parse DOCX source {docx.name}: {exc}")
+    body = root.find(".//w:body", DOCX_NS)
+    if body is None:
+        die(f"DOCX source has no document body: {docx.name}")
+    blocks: list[str] = []
+    for child in body:
+        local = child.tag.rsplit("}", 1)[-1]
+        if local == "p":
+            text = _docx_text_from_paragraph(child)
+            if text:
+                blocks.append(text)
+        elif local == "tbl":
+            for row in child.findall("./w:tr", DOCX_NS):
+                cells: list[str] = []
+                for cell in row.findall("./w:tc", DOCX_NS):
+                    value = " ".join(
+                        part
+                        for paragraph in cell.findall(".//w:p", DOCX_NS)
+                        if (part := _docx_text_from_paragraph(paragraph))
+                    )
+                    cells.append(value)
+                if any(cells):
+                    blocks.append(" | ".join(cells))
+    return 0, "\n\n".join(blocks) + ("\n" if blocks else "")
+
+
+def source_text(source: Path) -> tuple[int, str]:
+    suffix = source.suffix.lower()
+    if suffix == ".pdf":
+        return pdf_source_text(source)
+    if suffix == ".docx":
+        return docx_source_text(source)
+    die(
+        f"unsupported inbox file type for automated preparation: {source.name}; "
+        "supported managed sources are PDF and DOCX"
+    )
 
 
 def require_local_agent_url(url: str) -> None:
@@ -222,7 +305,9 @@ def restore_normal_if_needed(switched: bool) -> str | None:
     return None
 
 
-def normalize_prompt(text: str, language: str, bilingual: bool) -> str:
+def normalize_prompt(
+    text: str, language: str, bilingual: bool, *, chunk_index: int = 1, chunk_total: int = 1
+) -> str:
     language_name = "German" if language.startswith("de") else "French"
     bilingual_rule = (
         f"The source is bilingual. Extract and normalize ONLY the {language_name} source text; "
@@ -230,9 +315,20 @@ def normalize_prompt(text: str, language: str, bilingual: bool) -> str:
         if bilingual
         else f"The source is expected to be {language_name}. Do not translate it."
     )
+    chunk_rule = (
+        "Return ONLY normalized Markdown body text, beginning with one '# ' document title."
+        if chunk_total == 1 or chunk_index == 1
+        else "Return ONLY normalized Markdown continuation text for this chunk. Do not repeat the document title."
+    )
+    chunk_context = (
+        ""
+        if chunk_total == 1
+        else f"This is source chunk {chunk_index} of {chunk_total}. Preserve this chunk completely; do not summarize material from other chunks."
+    )
     return f"""You are a careful local document-ingestion editor for a private German/French managed-document corpus.
 
-Return ONLY normalized Markdown body text, beginning with one '# ' document title. Do not return YAML or a code fence.
+{chunk_rule} Do not return YAML or a code fence.
+{chunk_context}
 
 Rules:
 - Preserve the complete substantive source wording. Do not summarize, paraphrase, interpret or invent text.
@@ -260,7 +356,7 @@ def final_agent_content(data: object) -> str:
     if data.get("done") is not True:
         die("agent response did not report terminal completion")
     if str(data.get("done_reason", "")).lower() in {"length", "max_tokens"}:
-        die("agent output hit its generation limit; leave this document for manual/chapter-split processing")
+        raise AgentGenerationLimit("agent output hit its generation limit before usable normalized content")
     message = data.get("message")
     if not isinstance(message, dict):
         die("agent response did not contain a chat message")
@@ -279,13 +375,13 @@ def final_agent_content(data: object) -> str:
     return output + "\n"
 
 
-def call_agent(url: str, model: str, prompt: str) -> str:
+def call_agent(url: str, model: str, prompt: str, *, think: bool = True) -> str:
     payload = json.dumps(
         {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
-            "think": True,
+            "think": think,
             "keep_alive": "10m",
             "options": {"temperature": 0, "num_ctx": 32768, "num_predict": 16384},
         }
@@ -300,6 +396,68 @@ def call_agent(url: str, model: str, prompt: str) -> str:
     except (OSError, URLError, json.JSONDecodeError) as exc:
         die(f"agent generation failed: {exc}")
     return final_agent_content(data)
+
+
+
+def split_source_chunks(text: str, max_chars: int) -> list[str]:
+    """Split source text at paragraph/line boundaries without dropping content."""
+    if max_chars < 1000:
+        die("--max-chars must be at least 1000")
+    if len(text) <= max_chars:
+        return [text]
+    paragraphs = re.split(r"(\n\s*\n)", text)
+    chunks: list[str] = []
+    current = ""
+    for part in paragraphs:
+        if not part:
+            continue
+        if len(current) + len(part) <= max_chars:
+            current += part
+            continue
+        if current.strip():
+            chunks.append(current.strip() + "\n")
+            current = ""
+        while len(part) > max_chars:
+            cut = part.rfind("\n", 0, max_chars + 1)
+            if cut < max_chars // 2:
+                cut = part.rfind(" ", 0, max_chars + 1)
+            if cut < max_chars // 2:
+                cut = max_chars
+            chunks.append(part[:cut].strip() + "\n")
+            part = part[cut:].lstrip()
+        current = part
+    if current.strip():
+        chunks.append(current.strip() + "\n")
+    return chunks
+
+
+def normalize_source_text(
+    url: str, model: str, text: str, language: str, bilingual: bool, max_chars: int
+) -> str:
+    chunks = split_source_chunks(text, max_chars)
+    outputs: list[str] = []
+    for index, chunk in enumerate(chunks, 1):
+        prompt = normalize_prompt(
+            chunk, language, bilingual, chunk_index=index, chunk_total=len(chunks)
+        )
+        try:
+            normalized = call_agent(url, model, prompt, think=True)
+        except AgentGenerationLimit:
+            print(
+                f"  normalizer: chunk {index}/{len(chunks)} exhausted reasoning/output budget; retrying once without extended thinking",
+                file=sys.stderr,
+            )
+            try:
+                normalized = call_agent(url, model, prompt, think=False)
+            except AgentGenerationLimit as exc:
+                raise DeferredPreparation(
+                    "normalization incomplete",
+                    f"chunk {index}/{len(chunks)} exhausted the local Agent generation budget twice; source remains in inbox",
+                ) from exc
+        if index > 1:
+            normalized = re.sub(r"\A\s*#\s+[^\n]+\n+", "", normalized, count=1)
+        outputs.append(normalized.strip())
+    return "\n\n".join(part for part in outputs if part).rstrip() + "\n"
 
 
 def title_from_body(body: str, fallback: str) -> str:
@@ -436,33 +594,46 @@ def store_source(base: Path, source: Path, digest: str) -> Path:
 
 
 def prepare_one(base: Path, source: Path, lane: str, url: str, model: str, max_chars: int) -> list[Path]:
-    if source.suffix.lower() not in PDF_EXTENSIONS:
-        die(f"unsupported inbox file type for automated preparation: {source.name}; currently PDF only")
+    if source.suffix.lower() not in SOURCE_EXTENSIONS:
+        die(
+            f"unsupported inbox file type for automated preparation: {source.name}; "
+            "supported managed sources are PDF and DOCX"
+        )
     pages, text = source_text(source)
     compact = re.sub(r"\s+", "", text)
     print(f"\nSource: {source.name}")
     print(f"  lane:       {lane}")
-    print(f"  pages:      {pages or 'unknown'}")
+    print(f"  pages:      {pages or ('n/a' if source.suffix.lower() == '.docx' else 'unknown')}")
     print(f"  characters: {len(text):,}")
     if len(compact) < 300:
-        raise DeferredPreparation(
-            "OCR required",
-            "little/no selectable text detected; leave in inbox and use the local OCR workflow before activation",
+        kind = "OCR required" if source.suffix.lower() == ".pdf" else "insufficient text"
+        advice = (
+            "little/no selectable text detected; leave in inbox and use the local OCR workflow before managed preparation"
+            if source.suffix.lower() == ".pdf"
+            else "little/no readable text was extracted from the DOCX; inspect the source before retrying"
         )
-    if len(text) > max_chars:
-        raise DeferredPreparation(
-            "source split required",
-            f"extraction is {len(text):,} characters, above the safe single-pass limit {max_chars:,}; split at a genuine document/chapter boundary and retry",
-        )
+        raise DeferredPreparation(kind, advice)
     digest = sha256(source)
     outputs: list[tuple[str, str, str]] = []
     if lane == "german":
-        outputs.append(("de-CH", "authoritative", call_agent(url, model, normalize_prompt(text, "de-CH", False))))
+        outputs.append((
+            "de-CH", "authoritative",
+            normalize_source_text(url, model, text, "de-CH", False, max_chars),
+        ))
     elif lane == "french":
-        outputs.append(("fr-CH", "translation", call_agent(url, model, normalize_prompt(text, "fr-CH", False))))
+        outputs.append((
+            "fr-CH", "translation",
+            normalize_source_text(url, model, text, "fr-CH", False, max_chars),
+        ))
     else:
-        outputs.append(("de-CH", "authoritative", call_agent(url, model, normalize_prompt(text, "de-CH", True))))
-        outputs.append(("fr-CH", "translation", call_agent(url, model, normalize_prompt(text, "fr-CH", True))))
+        outputs.append((
+            "de-CH", "authoritative",
+            normalize_source_text(url, model, text, "de-CH", True, max_chars),
+        ))
+        outputs.append((
+            "fr-CH", "translation",
+            normalize_source_text(url, model, text, "fr-CH", True, max_chars),
+        ))
 
     for language, _role, _body in outputs:
         unique_working_path(base / "working", provisional_family(source), language, digest)
@@ -518,7 +689,7 @@ def cmd_init(args: argparse.Namespace) -> None:
     print("Inbox lanes:")
     for lane in INBOX_LANES:
         print(f"  {base / 'inbox' / lane}")
-    print("\nPlace source PDFs in german/, french/ or bilingual/, then run:")
+    print("\nPlace source PDF or DOCX files in german/, french/ or bilingual/, then run:")
     print(f"  sudo bc250 document prepare-batch {args.scope} {args.collection}")
 
 
@@ -721,6 +892,19 @@ def cmd_review(args: argparse.Namespace) -> None:
             print(f"  fidelity:   {fidelity_status}")
             if fidelity_note_text:
                 print(f"              {fidelity_note_text}")
+        source_name = str(meta.get("source_file", "")).strip()
+        if source_name:
+            print(f"  source path: {base / 'sources' / source_name}")
+        print(f"  draft path:  {path}")
+        if not getattr(args, "metadata_only", False):
+            lines = body.rstrip().splitlines()
+            visible = lines if getattr(args, "full_body", False) else lines[:40]
+            print("\n--- Normalized draft content ---")
+            print("\n".join(visible) if visible else "(empty draft body)")
+            if len(visible) < len(lines):
+                print(f"... {len(lines) - len(visible)} more line(s); rerun with --full-body or inspect the draft path above.")
+            print("--- End draft content ---\n")
+            print("Semantic approval requires comparing the complete normalized draft with the source document.")
         title = ask("Title", str(meta.get("title", "")))
         family = ask("Document family", str(meta.get("document_family", "")))
         effective = ask(
@@ -1269,6 +1453,49 @@ def cmd_supersede(args: argparse.Namespace) -> None:
         print(f"  validation warnings: {post_warnings}")
 
 
+
+def knowledge_sync_summary(root: Path, args: argparse.Namespace) -> dict[str, int | str]:
+    docs, warnings = importer.discover(root)
+    importer.validate_sync_endpoint(
+        args.url,
+        docs,
+        root=root,
+        allow_remote=bool(getattr(args, "allow_remote", False)),
+        allow_confidential_remote=bool(getattr(args, "allow_confidential_remote", False)),
+    )
+    token_file = getattr(args, "token_file", None)
+    if not token_file and DEFAULT_OWUI_TOKEN_FILE.is_file():
+        token_file = str(DEFAULT_OWUI_TOKEN_FILE)
+    if token_file:
+        token = importer.read_protected_token_file(Path(token_file))
+    else:
+        token = os.environ.get("OPEN_WEBUI_API_KEY", "").strip()
+        if not token:
+            die("Knowledge sync inspection requires --token-file or OPEN_WEBUI_API_KEY")
+    api = importer.OpenWebUI(args.url, token, args.timeout)
+    grouped = importer.groups(docs)
+    expected = importer.expected_knowledge(root)
+    totals = {"added": 0, "modified": 0, "deleted": 0, "unchanged": 0, "missing": 0}
+    for name in sorted(set(grouped) | set(expected)):
+        members = grouped.get(name, [])
+        kb = api.find_knowledge(name)
+        if kb is None:
+            if members:
+                totals["missing"] += 1
+            continue
+        kb_id = kb.get("id") if isinstance(kb, dict) else None
+        if not isinstance(kb_id, str) or not kb_id.strip():
+            raise RuntimeError(f"Open WebUI knowledge response for {name!r} is missing a valid id")
+        diff = importer.validate_diff_result(api.diff(kb_id, members))
+        totals["added"] += len(diff.get("added", []))
+        totals["modified"] += len(diff.get("modified", []))
+        totals["deleted"] += len(diff.get("deleted", []))
+        totals["unchanged"] += int(diff.get("unmodified_count", 0) or 0)
+    totals["warnings"] = len(warnings)
+    pending = totals["added"] + totals["modified"] + totals["deleted"] + totals["missing"]
+    totals["state"] = "CURRENT" if pending == 0 else "CHANGES PENDING"
+    return totals
+
 def cmd_status(args: argparse.Namespace) -> None:
     root = args.root.resolve()
     if args.scope and args.collection:
@@ -1305,14 +1532,7 @@ def cmd_status(args: argparse.Namespace) -> None:
                 else 0
                 for lane in INBOX_LANES
             }
-            print(f"  sources:    {counts['sources']:4d}")
-            print(f"  working:    {counts['working']:4d}")
-            print(f"  active:     {counts['active']:4d}")
-            print(f"  superseded: {counts['superseded']:4d}")
-            print(
-                "  inbox:      "
-                + ", ".join(f"{lane}={count}" for lane, count in inbox_counts.items())
-            )
+            inbox_total = sum(inbox_counts.values())
 
             awaiting_review = 0
             ready = 0
@@ -1354,17 +1574,41 @@ def cmd_status(args: argparse.Namespace) -> None:
                 base, include_working=True, emit=False
             )
             health = "FAIL" if errors else ("WARN" if warnings else "PASS")
-            print(f"  working awaiting review: {awaiting_review}")
-            print(f"  working ready:           {ready}")
-            print(f"  fidelity review pending: {fidelity_pending}")
-            print(f"  active currentness unverified: {active_currentness_unverified}")
-            print(f"  active DE/FR paired families:  {paired}")
+            print(f"  Active:               {counts['active']}")
+            print(f"  Needs review:         {awaiting_review}")
+            print(f"  Ready to activate:    {ready}")
+            print(f"  Inbox pending:        {inbox_total}")
+            print(f"  Superseded:           {counts['superseded']}")
+            print(f"  Currentness review:   {active_currentness_unverified}")
+            print(f"  DE/FR paired families: {paired}")
             print(
-                f"  lifecycle validation: {health} "
+                f"  Lifecycle validation: {health} "
                 f"({errors} failure(s), {warnings} warning(s))"
             )
+            if getattr(args, "verbose", False):
+                print(f"  Sources:              {counts['sources']}")
+                print(f"  Fidelity review:      {fidelity_pending}")
+                print(
+                    "  Inbox lanes:          "
+                    + ", ".join(f"{lane}={count}" for lane, count in inbox_counts.items())
+                )
     if not found:
         print(f"No document collections found below {root}.")
+    if getattr(args, "knowledge", False):
+        sync = knowledge_sync_summary(root, args)
+        print("\nKnowledge sync")
+        print(f"  State:     {sync['state']}")
+        print(
+            "  Pending:   "
+            f"{sync['added']} add / {sync['modified']} update / "
+            f"{sync['deleted']} stale / {sync['missing']} missing knowledge base(s)"
+        )
+        print(f"  Unchanged: {sync['unchanged']}")
+        if sync.get("warnings"):
+            print(f"  Local discovery warnings: {sync['warnings']}")
+    else:
+        print("\nKnowledge sync: NOT INSPECTED")
+        print("  Run with --knowledge and an administrator API key for a read-only diff.")
 
 
 def validate_lifecycle_root(root: Path) -> tuple[int, int, int]:
@@ -1406,13 +1650,13 @@ def parser() -> argparse.ArgumentParser:
     init.add_argument("scope", choices=importer.SCOPES)
     init.add_argument("collection")
 
-    prep = sub.add_parser("prepare-batch", help="extract and locally normalize PDFs into review drafts under working/")
+    prep = sub.add_parser("prepare-batch", help="extract and locally normalize PDF/DOCX sources into review drafts under working/")
     prep.add_argument("scope", choices=importer.SCOPES)
     prep.add_argument("collection")
-    prep.add_argument("--model", default=DEFAULT_AGENT_MODEL)
-    prep.add_argument("--agent-url", default=DEFAULT_AGENT_URL)
-    prep.add_argument("--max-chars", type=int, default=DEFAULT_MAX_CHARS, help=f"safe single-pass extraction limit (default: {DEFAULT_MAX_CHARS})")
-    prep.add_argument("--dry-run", action="store_true")
+    prep.add_argument("--model", default=DEFAULT_AGENT_MODEL, help="local Agent model used only for normalization")
+    prep.add_argument("--agent-url", default=DEFAULT_AGENT_URL, help=f"loopback Agent endpoint (default: {DEFAULT_AGENT_URL})")
+    prep.add_argument("--max-chars", type=int, default=DEFAULT_MAX_CHARS, help=f"maximum extracted characters per normalization chunk (default: {DEFAULT_MAX_CHARS})")
+    prep.add_argument("--dry-run", action="store_true", help="list pending sources without changing files or runtime topology")
 
     review = sub.add_parser(
         "review",
@@ -1421,6 +1665,9 @@ def parser() -> argparse.ArgumentParser:
     review.add_argument("scope", choices=importer.SCOPES)
     review.add_argument("collection")
     review.add_argument("--all", action="store_true", help="also revisit drafts already marked reviewed")
+    review_display = review.add_mutually_exclusive_group()
+    review_display.add_argument("--full-body", action="store_true", help="print the complete normalized draft body during review")
+    review_display.add_argument("--metadata-only", action="store_true", help="suppress normalized-content preview (not recommended for semantic approval)")
 
     validate = sub.add_parser("validate", help="validate active corpus provenance, uniqueness and review state")
     validate.add_argument("scope", choices=importer.SCOPES)
@@ -1430,9 +1677,9 @@ def parser() -> argparse.ArgumentParser:
     activate = sub.add_parser("activate", help="transactionally promote a validated batch of reviewed working Markdown and roll back ordinary runtime move failures")
     activate.add_argument("scope", choices=importer.SCOPES)
     activate.add_argument("collection")
-    activate.add_argument("files", nargs="*")
-    activate.add_argument("--all-ready", action="store_true")
-    activate.add_argument("--yes", action="store_true")
+    activate.add_argument("files", nargs="*", help="specific reviewed working Markdown files to activate")
+    activate.add_argument("--all-ready", action="store_true", help="activate every working draft already marked ready")
+    activate.add_argument("--yes", action="store_true", help="apply the validated activation plan without confirmation")
 
     sup = sub.add_parser("supersede", help="supersede one active Markdown revision while retaining audit evidence")
     sup.add_argument("scope", choices=importer.SCOPES)
@@ -1445,10 +1692,17 @@ def parser() -> argparse.ArgumentParser:
     )
     status.add_argument("scope", nargs="?", choices=importer.SCOPES)
     status.add_argument("collection", nargs="?")
+    status.add_argument("--verbose", action="store_true", help="show source, fidelity and per-inbox detail")
+    status.add_argument("--knowledge", action="store_true", help="perform a read-only Open WebUI Knowledge diff and report sync state")
+    status.add_argument("--url", default=importer.DEFAULT_URL, help=f"Open WebUI URL for --knowledge (default: {importer.DEFAULT_URL})")
+    status.add_argument("--token-file", help="protected Open WebUI administrator API-key file for --knowledge")
+    status.add_argument("--timeout", type=int, default=60, help="per-request timeout for --knowledge (default: 60 seconds)")
+    status.add_argument("--allow-remote", action="store_true", help="permit read-only Knowledge inspection against non-loopback Open WebUI")
+    status.add_argument("--allow-confidential-remote", action="store_true", help="also permit confidential-scope Knowledge inspection on a remote endpoint")
 
     ingest = sub.add_parser("ingest", help="validate and incrementally synchronize active Markdown with Open WebUI Knowledge")
-    ingest.add_argument("--url", default=importer.DEFAULT_URL)
-    ingest.add_argument("--token-file")
+    ingest.add_argument("--url", default=importer.DEFAULT_URL, help=f"Open WebUI URL (default: {importer.DEFAULT_URL})")
+    ingest.add_argument("--token-file", help="protected Open WebUI administrator API-key file")
     ingest.add_argument(
         "--allow-remote",
         action="store_true",
@@ -1459,8 +1713,8 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="also permit confidential-scope documents on an explicitly enabled remote endpoint",
     )
-    ingest.add_argument("--prune", action="store_true")
-    ingest.add_argument("--timeout", type=int, default=600)
+    ingest.add_argument("--prune", action="store_true", help="remove stale remote managed-document files after successful replacement/sync")
+    ingest.add_argument("--timeout", type=int, default=600, help="per-request Open WebUI timeout in seconds (default: 600)")
 
     return p
 

@@ -3,16 +3,17 @@
 This guide covers the appliance's **local, privacy-oriented managed document workflow** and the RAG
 (retrieval-augmented generation) path that makes reviewed office documents searchable in Open WebUI.
 For the current managed corpus, German sources are authoritative, French documents are reviewed
-translations, and users may query in German or English. The workflow uses the package's existing Open WebUI
+translations, and users may query in German, French or English by selecting the appropriate managed Knowledge lane. The workflow uses the package's existing Open WebUI
 and Tika services, the main answer lane on `11434`, and the dedicated embedding lane on `11437`. The current package uses Apache Tika 4.1.0-full for Open WebUI document extraction and tells
 Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
 
-There are two intentionally separate document paths. The **managed curated corpus** currently accepts
-PDF input only: PDF → local extraction/agent normalization → human review → active Markdown → Open
-WebUI Knowledge. This keeps the authoritative lifecycle narrow and auditable. Supported ad-hoc office
-documents such as DOCX continue to use Open WebUI/Tika directly. A future DOCX managed-corpus
-adapter can feed the same review/activation contract without changing its provenance model.
+There are two intentionally separate document paths. The **managed curated corpus** accepts text-native
+PDF and DOCX input: source → local extraction/agent normalization → human review → active Markdown →
+Open WebUI Knowledge. Both formats use the same provenance, review, validation, activation and revision
+contract. Other supported office formats such as XLSX/PPTX remain available through Open WebUI/Tika for
+ad-hoc use; importing a DOCX directly in Open WebUI is likewise an ad-hoc path and does not make it part of
+the managed corpus.
 
 **Never put confidential documents in this repository.** Keep authoritative
 source files under `/srv/bc250-documents/`, Open WebUI-managed copies under
@@ -289,7 +290,7 @@ The supported first-pass workflow is one local command, not a separate conversio
 
 ```bash
 sudo bc250 document init public municipal-regulations
-# copy PDFs into the appropriate inbox lane
+# copy PDF or DOCX sources into the appropriate inbox lane
 sudo bc250 document prepare-batch public municipal-regulations --dry-run
 sudo bc250 document prepare-batch public municipal-regulations
 sudo bc250 document review public municipal-regulations
@@ -297,8 +298,10 @@ sudo bc250 document validate public municipal-regulations --include-working
 sudo bc250 document activate public municipal-regulations --all-ready
 ```
 
-`prepare-batch` uses local `pdfinfo`/`pdftotext` and the exclusive local agent lane on `127.0.0.1:11436`.
-If the agent lane is inactive it enters agent mode for the batch and restores normal topology afterwards.
+`prepare-batch` extracts PDF text locally with `pdfinfo`/`pdftotext` and reads DOCX OOXML locally with the
+Python standard library, then uses the exclusive local agent lane on `127.0.0.1:11436` for conservative
+normalization. If the agent lane is inactive it enters agent mode for the batch and restores normal topology
+afterwards.
 The agent call uses Ollama `/api/chat` with native thinking kept separate from final `message.content`; truncated, empty, fenced or literal reasoning-contaminated final output is rejected before a draft is written. Fidelity checks run only against that validated final Markdown.
 No external OCR, conversion, translation or hosted document API is used. Automation writes **only** to
 `working/`; it never promotes generated text directly into `active/`.
@@ -310,7 +313,14 @@ Inbox semantics:
 - `bilingual/`: produce separate DE and FR drafts sharing the source; do not index mixed-language output.
 
 The local transformation prompt preserves complete substantive wording, original legal numbering, dates,
-amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. It is intentionally conservative: scanned PDFs with little selectable text are reported as `DEFERRED — OCR required`, and unusually large documents above the safe single-pass limit as `DEFERRED — source split required`; genuine processing failures are reported separately as `ERROR`. A batch with deferred or failed inputs exits nonzero, and failure to restore the normal Ollama topology also makes the command fail with a recovery instruction. This avoids growing `bc250 document` into a fragile OCR/chunking engine while keeping automation exit status truthful.
+amounts and identifiers while removing extraction/layout noise. Unique codes, markers and alphanumeric labels
+must not be discarded as layout noise unless repeated decorative/page-furniture behavior is clear. Scanned PDFs
+with little selectable text are reported as `DEFERRED — OCR required`. Larger text-native sources are split at
+bounded paragraph/line boundaries and normalized sequentially; if a thinking-capable Agent exhausts its output
+budget, that chunk is retried once without extended thinking. If the retry is still incomplete, the source stays
+in `inbox/` and no partial managed draft is published. Genuine processing failures remain `ERROR`. A batch with
+deferred or failed inputs exits nonzero, and failure to restore normal Ollama topology also makes the command
+fail with a recovery instruction.
 
 `prepare-batch` also persists its automated fidelity result in each new draft as
 `bc250_fidelity_status` plus `bc250_fidelity_note`. `pass` means the conservative
@@ -319,10 +329,23 @@ no useful tokens to score; `review` means the operator must visually compare the
 and explicitly acknowledge the warning during `bc250 document review` before activation.
 Existing documents without these package metadata fields remain valid.
 
-The review step shows source SHA/provenance status, title, stable `document_family`, language/authority, exact revision identity, effective date/edition, currentness, DE/FR linkage and persisted fidelity state before asking for edits. A source SHA failure blocks readiness immediately. Review numbering covers only drafts that still need review, and the prompts make the effective-date-or-edition requirement explicit. For legal, financial or technical sources, visually compare representative PDF pages before marking the draft ready. The agent output is an editorial proposal, not an authoritative transformation until reviewed.
+The review step shows source/draft paths, source SHA/provenance status, title, stable `document_family`,
+language/authority, exact revision identity, effective date/edition, currentness, DE/FR linkage, persisted
+fidelity state and a normalized-content preview before asking for edits. Use `--full-body` to display the complete
+draft during review; `--metadata-only` deliberately suppresses the preview. A source SHA failure blocks readiness
+immediately. Review numbering covers only drafts that still need review, and the prompts make the
+effective-date-or-edition requirement explicit. For legal, financial or technical sources, compare the complete
+normalized draft with the original source before marking it ready. The agent output is an editorial proposal,
+not an authoritative transformation until reviewed.
 
 Activation is explicit and all-or-nothing for the requested batch. The complete projected active corpus is
 validated before any filesystem mutation; ambiguous multiple replacements for the same `document_family` and language are rejected. A reviewed replacement supersedes the previous active revision while retaining old evidence, and a runtime move failure rolls back the activation transaction.
+
+`bc250 document status [SCOPE [COLLECTION]]` gives the concise operator view: active documents, drafts that
+need review, ready drafts, pending inbox sources, superseded revisions, currentness-review count, paired DE/FR
+families and lifecycle validation health. Add `--verbose` for source/fidelity/inbox detail. Add `--knowledge`
+(with an administrator API key) for a **read-only** Open WebUI Knowledge diff showing whether managed Knowledge
+is current or has pending add/update/stale/missing work; it never uploads, creates or prunes content.
 
 ## 6. Markdown metadata, validation and ingestion
 
@@ -384,7 +407,7 @@ lifecycle commands above.
 Keep the managed-document and ad-hoc extraction paths distinct:
 
 ```text
-Managed text-native PDF
+Managed text-native PDF or DOCX
 → bc250 document prepare-batch
 → working/
 → human review
@@ -406,9 +429,9 @@ Scanned or image-only source
 
 Use OCR only for image-only or poorly extracted scans. OCR is preprocessing: it
 produces text for an operator to review, not a valid managed document and not a
-replacement for the answer model. Text-native managed PDFs continue to use
-`bc250 document prepare-batch`; Tika serves the Open WebUI/ad-hoc office-document
-path rather than the managed PDF preparation path.
+replacement for the answer model. Text-native managed PDF and DOCX sources use
+`bc250 document prepare-batch`; Tika remains the Open WebUI/ad-hoc office-document
+path rather than the managed preparation path.
 
 Current OCR test set:
 

@@ -37,17 +37,17 @@ case "${1:-}" in
     "$MANAGER" list experiments | awk 'NR==1 || /exp-(glm-ocr|ovisocr2)-/'
     ;;
   install)
-    [[ $# -eq 2 ]] || { usage >&2; exit 2; }
+    [[ $# -eq 2 ]] || { echo "ERROR: bc250 ocr install requires glm|ovis." >&2; echo "Run: bc250 ocr --help" >&2; exit 2; }
     model="$(model_name "$2")"
     "$MANAGER" apply experiments "$model"
     ;;
   show)
-    [[ $# -eq 2 ]] || { usage >&2; exit 2; }
+    [[ $# -eq 2 ]] || { echo "ERROR: bc250 ocr show requires glm|ovis." >&2; echo "Run: bc250 ocr --help" >&2; exit 2; }
     model="$(model_name "$2")"
     run_ollama show "$model"
     ;;
   test)
-    [[ $# -eq 3 ]] || { usage >&2; exit 2; }
+    [[ $# -eq 3 ]] || { echo "ERROR: bc250 ocr test requires glm|ovis IMAGE." >&2; echo "Run: bc250 ocr --help" >&2; exit 2; }
     model="$(model_name "$2")"
     image="$(realpath -e -- "$3")"
     [[ -f "$image" ]] || { echo "ERROR: image is not a regular file: $image" >&2; exit 1; }
@@ -62,5 +62,6 @@ case "${1:-}" in
     run_ollama run "$model" "$image" "$prompt"
     ;;
   -h|--help) usage ;;
-  *) usage >&2; exit 2 ;;
+  '') echo "ERROR: OCR command is required." >&2; echo "Run: bc250 ocr --help" >&2; exit 2 ;;
+  *) echo "ERROR: unknown OCR command: $1" >&2; echo "Run: bc250 ocr --help" >&2; exit 2 ;;
 esac

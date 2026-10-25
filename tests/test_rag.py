@@ -106,7 +106,7 @@ class RagBaselineTests(unittest.TestCase):
 
     def test_verify_reports_rag_without_loading_embedding_model(self) -> None:
         verify = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
-        self.assertIn('section "Documents / RAG"', verify)
+        self.assertIn('section "Managed documents"', verify)
         self.assertIn("RAG_EMBEDDING_MODEL", verify)
         self.assertIn("CONTENT_EXTRACTION_ENGINE", verify)
         self.assertIn("/api/tags", verify)

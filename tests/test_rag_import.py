@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
@@ -544,7 +545,7 @@ class RagImportTests(unittest.TestCase):
                 text=True, capture_output=True, check=False,
             )
             self.assertEqual(status.returncode, 0, status.stderr)
-            self.assertIn("working awaiting review: 1", status.stdout)
+            self.assertIn("Needs review:         1", status.stdout)
 
     def test_activation_preflight_failure_preserves_active_and_working_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -934,7 +935,8 @@ class RagImportTests(unittest.TestCase):
     def test_lifecycle_agent_output_integrity_and_deferral_taxonomy(self) -> None:
         lifecycle_source = LIFECYCLE.read_text(encoding="utf-8")
         self.assertIn('url + "/api/chat"', lifecycle_source)
-        self.assertIn('"think": True', lifecycle_source)
+        self.assertIn('"think": think', lifecycle_source)
+        self.assertIn('retrying once without extended thinking', lifecycle_source)
         self.assertNotIn('url + "/api/generate"', lifecycle_source)
         prompt = lifecycle.normalize_prompt("FR-MARKER-8520", "fr-CH", False)
         self.assertIn("Do not remove unique codes, identifiers", prompt)
@@ -957,9 +959,12 @@ class RagImportTests(unittest.TestCase):
             }
         )
         self.assertIn("PASS", lifecycle.fidelity_note("FR-MARKER-8520", kept, False))
+        with self.assertRaises(lifecycle.AgentGenerationLimit):
+            lifecycle.final_agent_content(
+                {"done": True, "done_reason": "length", "message": {"content": "# T\nBody"}}
+            )
         for response in (
             {"done": True, "done_reason": "stop", "message": {"content": "# T\n</think>\nBody"}},
-            {"done": True, "done_reason": "length", "message": {"content": "# T\nBody"}},
             {"done": True, "done_reason": "stop", "message": {"content": ""}},
             {"done": True, "done_reason": "stop", "message": {"content": "```markdown\n# T\n```"}},
         ):
@@ -1317,11 +1322,11 @@ class RagImportTests(unittest.TestCase):
                 )
             self.assertEqual(rc, 0)
             output = stdout.getvalue()
-            self.assertIn("working awaiting review: 0", output)
-            self.assertIn("working ready:           1", output)
-            self.assertIn("fidelity review pending: 0", output)
-            self.assertIn("active currentness unverified: 1", output)
-            self.assertIn("lifecycle validation: WARN", output)
+            self.assertIn("Needs review:         0", output)
+            self.assertIn("Ready to activate:    1", output)
+            self.assertIn("Currentness review:   1", output)
+            self.assertIn("Lifecycle validation: WARN", output)
+            self.assertIn("Knowledge sync: NOT INSPECTED", output)
 
             stderr = io.StringIO()
             with redirect_stderr(stderr):
@@ -1386,6 +1391,53 @@ class RagImportTests(unittest.TestCase):
             reviewed_meta = rag.front_matter(reviewed)
             self.assertEqual(reviewed_meta["review_required"], "true")
 
+
+
+    def test_managed_docx_extraction_preserves_basic_structure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            docx = Path(tmp) / "example.docx"
+            xml = ('<?xml version="1.0" encoding="UTF-8"?>'
+                   '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'
+                   '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Policy</w:t></w:r></w:p>'
+                   '<w:p><w:pPr><w:numPr><w:numId w:val="1"/></w:numPr></w:pPr><w:r><w:t>Keep provenance</w:t></w:r></w:p>'
+                   '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>Amount</w:t></w:r></w:p></w:tc>'
+                   '<w:tc><w:p><w:r><w:t>CHF 123</w:t></w:r></w:p></w:tc></w:tr></w:tbl>'
+                   '</w:body></w:document>')
+            with zipfile.ZipFile(docx, "w") as archive:
+                archive.writestr("word/document.xml", xml)
+            pages, text = lifecycle.docx_source_text(docx)
+            self.assertEqual(pages, 0)
+            self.assertIn("# Policy", text)
+            self.assertIn("- Keep provenance", text)
+            self.assertIn("Amount | CHF 123", text)
+
+    def test_large_source_normalization_chunks_and_retries_budget_exhaustion_safely(self) -> None:
+        source = ("Paragraph one " * 120 + "\n\n" + "Paragraph two " * 120).strip()
+        calls = []
+        def fake_call(_url, _model, prompt, *, think=True):
+            calls.append((think, prompt))
+            if think and len(calls) == 1:
+                raise lifecycle.AgentGenerationLimit("budget")
+            return "# Managed\n\nNormalized body\n"
+        with patch.object(lifecycle, "call_agent", side_effect=fake_call):
+            result = lifecycle.normalize_source_text(
+                "http://127.0.0.1:11436", "agent", source, "de-CH", False, 1000
+            )
+        self.assertGreater(len(calls), 2)
+        self.assertEqual(calls[0][0], True)
+        self.assertEqual(calls[1][0], False)
+        self.assertTrue(result.startswith("# Managed"))
+        self.assertEqual(result.count("# Managed"), 1)
+
+    def test_document_status_help_exposes_read_only_knowledge_inspection(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(LIFECYCLE), "status", "--help"],
+            text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--knowledge", result.stdout)
+        self.assertIn("read-only Open WebUI Knowledge diff", result.stdout)
+        self.assertIn("--verbose", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()
