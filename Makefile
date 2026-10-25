@@ -59,6 +59,8 @@ sources-check:
 	./scripts/check-upstream-patches.py
 
 lint:
+	@command -v ruff >/dev/null 2>&1 || { echo 'ERROR: blocking lint tool missing: ruff' >&2; exit 127; }
+	@command -v shellcheck >/dev/null 2>&1 || { echo 'ERROR: blocking lint tool missing: shellcheck' >&2; exit 127; }
 	ruff check .
 	@set -Eeuo pipefail; \
 	while IFS= read -r file; do \
