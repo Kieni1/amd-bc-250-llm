@@ -222,11 +222,11 @@ def status() -> int:
     print(f"  GGUF logical bytes:    {human(gguf_bytes or 0)}")
     print(f"  Ollama logical bytes:  {human(ollama_bytes or 0)}")
     print(f"  verified live source/blob pairs:{len(live_pairs):7d}")
-    print(f"  dedupe state recorded:{len(live_pairs) - len(pending):9d}")
-    print(f"  dedupe state unrecorded:{len(pending):7d}")
-    print(f"  unrecorded logical data:{human(sum(src.stat().st_size for src, *_ in pending))}")
-    print(f"  unreferenced source-hash blobs:{len(transient_pairs):5d}")
-    print(f"  unreferenced logical data:{human(sum(src.stat().st_size for src, *_ in transient_pairs))}")
+    print(f"  dedupe state recorded:   {len(live_pairs) - len(pending):7d}")
+    print(f"  dedupe state unrecorded: {len(pending):7d}")
+    print(f"  unrecorded logical data: {human(sum(src.stat().st_size for src, *_ in pending))}")
+    print(f"  unreferenced source-hash blobs: {len(transient_pairs):5d}")
+    print(f"  unreferenced logical data: {human(sum(src.stat().st_size for src, *_ in transient_pairs))}")
     print("Note: logical byte totals include reflink-shared extents; df reports physical free capacity.")
     if transient_pairs:
         print("Unreferenced source-hash blobs are not dedupe targets; normal Ollama startup pruning can remove them.")
@@ -397,6 +397,10 @@ def main() -> int:
     dedupe_parser = sub.add_parser(
         "dedupe",
         help="share verified identical XFS extents while keeping both logical files",
+        description=(
+            "Share verified identical XFS extents while keeping both logical files. "
+            "A confirmation is required unless --yes is supplied."
+        ),
     )
     dedupe_parser.add_argument(
         "--yes", action="store_true", help="apply without the confirmation prompt"
@@ -404,6 +408,10 @@ def main() -> int:
     prune_parser = sub.add_parser(
         "prune-sources",
         help="remove verified offline GGUF source copies after Ollama registration",
+        description=(
+            "Delete only verified offline GGUF source copies after Ollama registration; "
+            "registered models remain. A confirmation is required unless --yes is supplied."
+        ),
     )
     prune_parser.add_argument(
         "--yes", action="store_true", help="apply without the confirmation prompt"

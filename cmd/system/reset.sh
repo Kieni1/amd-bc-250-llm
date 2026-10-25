@@ -18,7 +18,7 @@ usage() {
   cat <<'USAGE'
 Usage: sudo bc250 reset [--yes]
 
-Factory-style reset for the pre-1.0 appliance. Permanently removes appliance models, Open WebUI data,
+Factory-style reset for the BC-250 appliance. Permanently removes appliance models, Open WebUI data,
 containers, BC-250 host profiles, the BC-250 RPM and the separately installed
 Ollama binary. Operator documents under /srv/bc250-documents are preserved.
 

@@ -258,7 +258,7 @@ forces a full checksum before reuse. Source repository, revision and GGUF filena
 also match. This is what lets a Modelfile-only change re-register from retained bytes
 without silently accepting modified source data.
 
-### Documents / RAG lifecycle
+### Managed Documents lifecycle
 
 ```bash
 sudo bc250 document init public COLLECTION
@@ -268,14 +268,15 @@ sudo bc250 document review public COLLECTION
 sudo bc250 document validate public COLLECTION --include-working
 sudo bc250 document activate public COLLECTION --all-ready
 sudo bc250 document status
+sudo bc250 document status public COLLECTION --knowledge --token-file FILE
 sudo bc250 document ingest --token-file FILE [--prune] [--url URL --allow-remote [--allow-confidential-remote]]
 ```
 
 The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
 `inbox/bilingual`, `sources`, `working`, `active` and `superseded`. Agent-assisted batch preparation is
-local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Native agent thinking is separated from final Markdown through Ollama `/api/chat`; truncated, empty, fenced or reasoning-contaminated final content is rejected. Scanned PDFs and documents above the safe single-pass limit are intentionally reported as deferred OCR/manual chapter-split work rather than generic failures or guessed.
+local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Text-native PDF and DOCX sources share the same provenance/review contract. Native agent thinking is separated from final Markdown through Ollama `/api/chat`; truncated, empty, fenced or reasoning-contaminated final content is rejected. Larger text-native sources are normalized in bounded chunks, with one no-thinking retry for a chunk that exhausts the Agent generation budget; repeated incompleteness leaves the source in `inbox/` and publishes no partial draft. Scanned PDFs remain deferred to the OCR preprocessing workflow.
 
-`validate` checks provenance, review state, document identity, active revision conflicts and obvious native-reasoning marker contamination. `ingest` sends
+`status` presents concise corpus health; `--verbose` adds source/fidelity/inbox detail and `--knowledge` performs a read-only Open WebUI Knowledge diff without uploading or pruning content. `validate` checks provenance, review state, document identity, active revision conflicts and obvious native-reasoning marker contamination. `ingest` sends
 only `active/*.md` through the existing incremental Open WebUI knowledge API. The API key is never packaged;
 `--token-file` must be a non-empty private regular file and must not be a symlink. Ingestion is loopback-only by default. `--allow-remote` is required for a non-loopback Open WebUI endpoint; when the corpus contains a confidential collection with an active lane, remote ingest additionally requires `--allow-confidential-remote`, including for an empty lane that may be pruned. These overrides mean API credentials, document content and knowledge metadata leave the appliance. Use `--prune` only when stale remote documents should be removed. The former compatibility interface is removed; new and existing corpora use the product lifecycle above.
 
@@ -430,7 +431,7 @@ the archived checksum set again. It intentionally excludes OWUI credentials, pro
 uploaded document contents, database rows, identity SQL and backup contents. Use `--output-dir DIR`
 when the archive should be written elsewhere.
 
-`bc250 advanced revalidate` harness v4.8 is the root-only systemd-backed package
+`bc250 advanced revalidate` harness v4.9 is the root-only systemd-backed package
 qualification workflow. A full
 `sudo bc250 advanced revalidate start --owui-token-file FILE` follows a compact six-phase
 dashboard. Use `--skip-owui` only for an explicitly partial Open WebUI coverage
@@ -441,7 +442,7 @@ state and the age of the last real progress event rather than treating a periodi
 heartbeat as progress. Run completion is independent from coverage: if all required
 phases finish normally, the run is `completed` even when the optional Agent is not
 installed and coverage is PARTIAL.
-Harness v4.8 also surfaces non-failing observations under a separate `Diagnostics`
+Harness v4.9 also surfaces non-failing observations under a separate `Diagnostics`
 section. This includes non-severe context truncation, a MemAvailable minimum below the
 512 MiB tight-headroom diagnostic threshold while still above the unchanged 128 MiB hard
 floor, and accepted use cases that reach their generation output budget. These diagnostics
@@ -1171,4 +1172,4 @@ Release 1.9 keeps that privileged verification unchanged but fixes the non-root 
 
 `sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
 
-When the optional `needs-restarting` helper is absent, status reports `Restart advisory: not evaluated (optional helper unavailable)` rather than treating that absence as a health failure.
+When the optional `needs-restarting` helper is absent, status reports `Reboot required: UNKNOWN (restart check unavailable)` rather than treating that absence as a health failure.
