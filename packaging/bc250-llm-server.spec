@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.8%{?dist}
+Release:        1.9%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -263,6 +263,12 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Oct 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.9
+- Unify MTP with the indexed interactive model overview and allow explicit installer selection to prepare/verify standalone MTP GGUF artifacts.
+- Keep broad installer groups and generic combined apply/refresh convergence MTP-free; MTP remains download-only and standalone llama.cpp runtime policy is unchanged.
+- Fail closed on invalid multi-chunk managed-document assembly with deterministic chunk identity, duplicate-output rejection and per-chunk critical-token preservation for single-language sources.
+- Restore normal Ollama topology even when document preparation fails immediately after Agent entry, and make review readiness state explicit in interactive output.
+
 * Sun Oct 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.8
 - Add Managed Documents v2 with first-class PDF/DOCX preparation, bounded large-source normalization, richer human review and read-only Knowledge-sync status.
 - Correct revalidation v4.9 resource-sanity classification so valid budget-limited measurements are not mislabeled as infrastructure failures.

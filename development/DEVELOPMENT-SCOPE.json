@@ -329,7 +329,7 @@
         "models/mtp/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "4be92cab1bb9020734ab6895bc73018c03bd7b46af155c9f40948e4c2d44af6a",
+      "baseline_sha256": "27e25e5ddf3cc8528fe0363684403389b233d89f54447648bd0ba55f59926e89",
       "thaw_if": [
         "MTP is explicitly returned to active comparison",
         "generic model lifecycle begins managing MTP"
