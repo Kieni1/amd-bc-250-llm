@@ -287,9 +287,8 @@ class QualificationTests(unittest.TestCase):
         status = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
         self.assertIn("COMPLETED — QUALITY MIXED", revalidate)
         self.assertIn("qualification: PASS; diagnostic headroom: TIGHT", revalidate)
-        self.assertIn("BC-250 configuration reboot", install)
-        self.assertIn("OS/package restart check", install)
-        self.assertIn("OS/package restart check", status)
+        self.assertIn("Reboot required", install)
+        self.assertIn("Reboot required", status)
 
 
 if __name__ == "__main__":

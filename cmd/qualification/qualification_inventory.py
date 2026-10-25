@@ -258,11 +258,11 @@ def parser() -> argparse.ArgumentParser:
     )
     sub = result.add_subparsers(dest="command", required=True)
     listing = sub.add_parser("list", help="list package-gate, resilience and GFX benchmark evidence")
-    listing.add_argument("--json", action="store_true")
-    clean = sub.add_parser("clean", help="prune old terminal evidence; dry-run by default")
-    clean.add_argument("--older-than-days", type=int, default=30)
-    clean.add_argument("--keep-latest", type=int, default=2)
-    clean.add_argument("--apply", action="store_true", help="actually remove the selected evidence")
+    listing.add_argument("--json", action="store_true", help="emit the evidence inventory as JSON")
+    clean = sub.add_parser("clean", help="prune old terminal evidence; dry-run by default", description="Dry-run by default. Nothing is removed unless --apply is supplied.")
+    clean.add_argument("--older-than-days", type=int, default=30, help="select terminal evidence older than this many days (default: 30)")
+    clean.add_argument("--keep-latest", type=int, default=2, help="always retain this many newest runs per evidence kind (default: 2)")
+    clean.add_argument("--apply", action="store_true", help="remove the selected evidence; without --apply this command is a dry run")
     return result
 
 
