@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configure the package-owned Open WebUI 0.12.3 baseline through supported APIs."""
+"""Configure the package-owned Open WebUI baseline through supported APIs."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ import os
 import re
 import stat
 import sys
+import textwrap
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -759,36 +760,48 @@ def print_verbose_summary(models: list[dict[str, Any]], functions: list[dict[str
             extras.append(f"keep_alive={params['keep_alive']}")
         custom_params = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
         if custom_params:
-            effective = ",".join(f"{key}={custom_params[key]}" for key in sorted(custom_params))
-            extras.append(f"effective={effective}")
+            effective = ", ".join(f"{key}={custom_params[key]}" for key in sorted(custom_params))
+            extras.append(f"effective: {effective}")
         elif "think" in params:
             extras.append(f"think={params['think']}")
         elif "translation" in model_id:
             extras.append("think=omitted")
         if filters:
             extras.append("filters=" + ",".join(str(value) for value in filters))
-        suffix = f"  ({'; '.join(extras)})" if extras else ""
-        print(f"  {model_id:<36} -> {base}{suffix}")
+        print(f"  {model_id}")
+        print(f"    Base model: {base}")
+        if extras:
+            print(textwrap.fill(
+                '; '.join(extras),
+                width=108,
+                initial_indent='    Settings:   ',
+                subsequent_indent='                ',
+            ))
 
     if implementation_models:
         print()
         print("Implementation/task models")
         for model_id, hidden, params, lane in implementation_models:
             visibility = "admin/testing only" if hidden else "ordinary-user testing"
+            print(f"  {model_id}")
+            print(f"    Visibility: {visibility}; lane={lane}")
             custom_params = params.get("custom_params") if isinstance(params.get("custom_params"), dict) else {}
-            effective = ""
             if custom_params:
-                values = ",".join(f"{key}={custom_params[key]}" for key in sorted(custom_params))
-                effective = f"; effective={values}"
-            print(f"  {model_id:<52} {visibility}; lane={lane}{effective}")
+                values = ", ".join(f"{key}={custom_params[key]}" for key in sorted(custom_params))
+                print(textwrap.fill(
+                    values,
+                    width=108,
+                    initial_indent='    Effective:  ',
+                    subsequent_indent='                ',
+                ))
 
     print()
-    print("Task and RAG")
-    print(f"  task model:       {TASK_MODEL}")
-    print(f"  embedding model:  {EMBED_MODEL}")
-    print(f"  extraction:       {DESIRED['rag'].get('CONTENT_EXTRACTION_ENGINE', 'unknown')}")
+    print("Task and document retrieval")
+    print(f"  Task model:       {TASK_MODEL}")
+    print(f"  Embedding model:  {EMBED_MODEL}")
+    print(f"  Extraction:       {DESIRED['rag'].get('CONTENT_EXTRACTION_ENGINE', 'unknown')}")
     print(
-        "  chunks:           "
+        "  Chunks:           "
         f"{DESIRED['rag'].get('CHUNK_SIZE', 'unknown')} / "
         f"overlap {DESIRED['rag'].get('CHUNK_OVERLAP', 'unknown')}"
     )
@@ -1140,7 +1153,7 @@ def suggested_token_file() -> str:
     return ""
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description=__doc__)
+    p = argparse.ArgumentParser(prog="bc250 advanced openwebui", description=__doc__)
     p.add_argument("command", choices=("init", "apply", "status", "save-key"))
     p.add_argument("--url", default=os.environ.get("OWUI_URL", DEFAULT_URL))
     p.add_argument(
@@ -1159,7 +1172,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--verbose",
         action="store_true",
-        help="show the verified active role, task, RAG and package-function summary",
+        help="show the verified role, task, document/knowledge and package-function summary",
     )
     return p
 

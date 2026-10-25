@@ -334,7 +334,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertIn("max_tokens=2048", text)
         self.assertIn("think=omitted", text)
         self.assertIn("filters=bc250_translation_direction", text)
-        self.assertIn("Task and RAG", text)
+        self.assertIn("Task and document retrieval", text)
         self.assertIn("Package-owned functions", text)
         self.assertIn("Implementation/task models", text)
         self.assertIn("ordinary-user testing", text)
