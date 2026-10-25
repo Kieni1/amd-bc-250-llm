@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.8` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Current release source: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
 
-Release 1.8 adds Managed Documents v2 and qualification correctness: PDF + DOCX managed preparation, bounded large-source normalization, stronger review/corpus-health and read-only Knowledge-sync UX, corrected revalidation resource semantics, and the remaining device-found CLI/support fixes. Runtime/model/retrieval tuning, persistent state and the SRPM-first authority path are unchanged; exact 1.8 build/device binding is required.
+Release 1.9 unifies MTP presentation with the normal indexed model overview while preserving standalone semantics, and carries focused Managed Documents fixes from 1.8 device acceptance: multi-chunk normalization now fails closed on invalid/duplicate/incomplete chunk assembly, Agent-mode preparation restores normal topology across the readiness-failure window, and review output reports explicit readiness state. Runtime/model/retrieval tuning, persistent state and the SRPM-first authority path are unchanged; exact 1.9 build/device binding is required.
 
 ## Install
 
@@ -81,7 +81,8 @@ bc250 advanced mtp list             # specialist MTP view
 sudo bc250 advanced mtp prepare qwen3.5-9b-mtp  # explicit opt-in MTP preparation
 LLAMACPP=/opt/llama.cpp/build/bin/llama-server bc250 advanced mtp compare qwen3.5-9b-mtp
 
-# Generic installer / `apply all` selection never includes MTP; use bc250 advanced mtp prepare explicitly.
+# The interactive installer shows indexed MTP state. Explicit MTP ID/index/range selection prepares it;
+# broad all/recommended/production groups and generic `apply all` still exclude MTP.
 sudo bc250 model install
 sudo bc250 advanced agent status MODEL
 sudo bc250 advanced agent status MODEL --verbose

@@ -4,7 +4,7 @@ BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD B
 It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1.8` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+Current release source: `bc250-llm-server-0.14.1-1.9` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -132,13 +132,13 @@ The 1.5 catalog also adds optional, non-recommended comparison profiles for LFM2
 
 Experimental models are never silent replacements for the defaults above. During `bc250 install`,
 required role models are converged first; entries that are already fully current are summarized rather
-than printed model-by-model. The optional picker shows compact runtime state for ordinary Ollama
-catalog entries only. For routine interactive model installation, use
-`sudo bc250 model install`.
-
-Download-only MTP candidates do not participate in that workflow or `apply all`;
-discover them with `bc250 advanced mtp list` and prepare one explicitly with
-`bc250 advanced mtp prepare`.
+than printed model-by-model. The optional picker shows one indexed overview across ordinary Ollama models and standalone
+MTP candidates. For routine interactive model installation, use `sudo bc250 model install`.
+Explicit MTP ID/index/range selections prepare and verify the download-only GGUF only; they do not
+register Ollama or start llama.cpp. Broad `all`, `recommended` and `production` groups never acquire
+MTP, and generic combined `apply all` / `refresh all` remain MTP-free. The specialist
+`bc250 advanced mtp list` / `bc250 advanced mtp prepare` entry points remain available for direct
+MTP discovery and preparation.
 
 These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
@@ -186,7 +186,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Release 0.14.1-1.8 is the Managed Documents v2 and qualification-correctness release. Managed PDF and DOCX sources now share one reviewed lifecycle, larger text-native sources use bounded normalization rather than a fragile single-pass ceiling, document status can show concise corpus health and a read-only Knowledge-sync diff, and review exposes more of the draft needed for real semantic approval. Revalidation now keeps valid resource telemetry separate from output-budget incompleteness. CLI/support diagnostics are tightened from the completed 1.7.1 device campaign. Runtime/model/retrieval tuning and persistent state paths remain unchanged; exact-RPM build/device acceptance is still required.
+Release 0.14.1-1.9 combines the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates now appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence still excludes MTP. Multi-chunk document normalization now fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state. Runtime/model/retrieval tuning and persistent state paths remain unchanged; exact-RPM build/device acceptance is still required.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in

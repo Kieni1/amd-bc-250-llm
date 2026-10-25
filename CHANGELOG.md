@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.1-1.9 - 2026-10-25
+
+- Unify standalone MTP candidates with the normal interactive model catalog: `bc250 model install` and installer Stage 7 now show indexed MTP state alongside Ollama models, while explicit MTP ID/index/range selection prepares and verifies the download-only GGUF without registering Ollama or starting llama.cpp.
+- Preserve the MTP safety boundary: broad `all`, `recommended` and `production` installer groups never acquire MTP, generic combined `apply all` / `refresh all` remain MTP-free, and the standalone runtime/residency-isolation policy is unchanged.
+- Harden Managed Documents multi-chunk normalization after 1.8 device acceptance found a semantically incomplete 9-chunk assembly: require deterministic per-chunk identity, reject duplicate normalized chunks, and fail closed when a single-language chunk drops critical legal/numeric/source identifiers so incomplete assembly never publishes a working draft.
+- Make Agent-topology restoration transactional across document preparation, including the failure window immediately after entering exclusive Agent mode but before readiness is established; existing normalization/retry/interrupt paths continue to restore normal topology through the outer cleanup guard.
+- Clarify interactive review outcomes without changing approval semantics: prompts state the effective-date/edition dependency before approval, and each reviewed draft ends with explicit `RESULT=READY|REVIEW_REQUIRED` plus `READY_TO_ACTIVATE=YES|NO`; command success still means the review interaction completed, not that readiness was granted.
+
 ## 0.14.1-1.8 - 2026-10-25
 
 - Add Managed Documents v2: accept text-native PDF and DOCX sources through the same provenance/review/activation contract, normalize larger sources in bounded chunks with safe incomplete handling, expose richer review previews, and add concise lifecycle/corpus-health plus optional read-only Open WebUI Knowledge-sync status.

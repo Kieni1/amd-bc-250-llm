@@ -342,8 +342,10 @@ path. Do not keep polishing the framework without hardware evidence.
 **Decision:** `bc250 install` may use the shared model-state inspector to render its optional
 ordinary-model picker, but install-time state discovery must not turn into an unbounded runtime
 probe or an accidental MTP acquisition path. Generic combined `apply all` / `refresh all`
-therefore never select the MTP category; disabled MTP preparation remains explicit through
-`bc250 advanced mtp prepare` / `bc250 model apply mtp ... --include-disabled`. The known-inactive agent
+therefore never select the MTP category. The 1.9 interactive overview may show disabled MTP rows,
+but only an explicit MTP ID/index/range may prepare one; broad `all` / `recommended` / `production`
+installer groups exclude MTP. `bc250 advanced mtp prepare` / `bc250 model apply mtp ... --include-disabled`
+remain direct specialist paths. The known-inactive agent
 Ollama lane is skipped during registration discovery, and remaining local registration probes
 have a short timeout rather than being allowed to stall setup indefinitely. GGUF integrity is
 unchanged: matching schema-3 file identity may use the recorded verified SHA fast path, while
@@ -354,9 +356,10 @@ Modelfile drift or registration repair must remain visible.
 **Why:** Installed pre-refinement `0.11.3-0.4.fc44` showed correct model state and a clean
 54/0/0 verifier, but the optional picker took noticeably long to appear and the initial required
 convergence printed a redundant catalog/current-model stream. The same run also demonstrated that
-showing disabled MTP indexes inside the generic installer picker creates an unnecessary path for
-operator ambiguity even though MTP is a separate experimental llama.cpp lane. These are UX/runtime
-probe issues, not reasons to weaken source verification.
+showing disabled MTP indexes without a clear lifecycle distinction created operator ambiguity even
+though MTP is a separate experimental llama.cpp lane. The 1.9 refinement resolves that ambiguity by
+using standalone status labels and explicit-only MTP selection while retaining broad-group exclusion.
+These are UX/runtime probe issues, not reasons to weaken source verification.
 
 **Retest only if:** a bounded active-lane registration timeout causes false UNKNOWN states on a
 healthy BC-250, a future topology changes which Ollama lanes are intentionally inactive during
@@ -602,8 +605,9 @@ ACL-based alternative. Do not weaken the default private-file rule for convenien
 
 **Decision:** Keep MTP as a standalone opt-in external llama.cpp runtime, not another persistent
 Ollama/service lane. The model manager owns only catalog/provenance/source lifecycle for MTP. The
-installer may show read-only MTP operational state, but MTP remains non-selectable by normal model
-convergence and is never fetched implicitly.
+installer shows MTP in the normal indexed interactive model overview. MTP is still never fetched
+implicitly: only an explicit MTP ID/index/range in `bc250 model install` (or the specialist prepare
+path) may prepare it, while broad installer groups and generic combined convergence exclude MTP.
 
 Before any MTP llama.cpp launch, snapshot every reachable package Ollama lane and drain all resident
 models so unified-memory headroom and performance are not contaminated. A direct operator
@@ -615,7 +619,8 @@ changes normal/agent service topology. Restoration failure on the direct path is
 **Why:** MTP competes for the same ~16 GiB UMA as Ollama. Warm Ollama residency can invalidate both
 fit and throughput evidence. At the same time, turning MTP into another persistent service/mode would
 add lifecycle complexity without a product requirement. The split preserves clean experimental
-isolation while keeping normal operator use state-preserving.
+isolation while keeping normal operator use state-preserving. The 1.9 UX refinement treats MTP as a
+first-class catalog entry for discovery/explicit preparation without weakening that runtime boundary.
 
 **Retest only if:** the external llama.cpp runtime or Ollama unload/load APIs change, MTP becomes a
 first-class product role, or real-device evidence shows restoration/isolation is unreliable.
@@ -667,8 +672,9 @@ required before unattended poweroff is enabled, not as automatic gates for unrel
 
 **Status:** ACTIVE — final package-facing MTP policy from the completed BC-250 campaign.
 
-**Decision:** Keep MTP standalone, disabled/download-only and outside normal installer/Open WebUI/
-Ollama convergence. Use the existing MTP TOML catalog as the single runtime source for context,
+**Decision:** Keep MTP standalone, disabled/download-only and outside broad installer/Open WebUI/
+Ollama convergence. The common interactive model overview may expose MTP with global indexes, but
+only explicit ID/index/range selection prepares it. Use the existing MTP TOML catalog as the single runtime source for context,
 draft and a deliberately small package-policy pair: `role` plus `recommendation`. The active set is:
 
 ```text
@@ -834,3 +840,17 @@ part of the new exact-device 0.12.2 campaign.
 **Evaluator/tooling consequences:** preserve clean empty-visible reasoning exhaustion as `INCOMPLETE`, repetition at the same ceiling as quality failure; normalize unambiguous date/time surface forms; compare required numeric values by semantic membership rather than a last-number heuristic; do not fail persisted task title/tag results solely because the ephemeral task model escaped residency sampling; record starting swap/PSI/residency state in performance evidence.
 
 **Retest only if:** Ollama/Qwen request construction, model identity, KV implementation, Advanced reasoning policy, Documents retrieval contract or RAG retrieval policy changes materially. Do not rerun the closed q4_0 discovery campaign merely because a new RPM is built.
+
+## DEC-032 — Fail closed on managed-document chunk assembly and make Agent cleanup transactional
+
+**Status:** ACTIVE — 0.14.1-1.9.
+
+**Decision:** Multi-chunk managed-document normalization must prove chunk identity before assembly and must not publish a working draft when chunk output is missing, duplicated or loses critical legal/numeric/source identifiers for a single-language source. Chunk identity metadata is temporary processing metadata and is stripped before the working Markdown is written. Bilingual normalization retains mandatory human fidelity review rather than applying language-ambiguous token ownership checks.
+
+Entering exclusive Agent topology for document preparation is a transaction: once an Agent-entry command has been attempted, readiness failure must attempt normal-topology restoration before returning an error; after successful entry, the existing outer cleanup guard owns restoration across model lookup, normalization failures, retry exhaustion and interrupts.
+
+Interactive review keeps rc=0 as “review interaction completed” for compatibility. Readiness is a lifecycle state, not an exit-code synonym, so the CLI emits explicit `RESULT=READY|REVIEW_REQUIRED` and `READY_TO_ACTIVATE=YES|NO` lines and automation must assert those states or the resulting metadata.
+
+**Why:** Exact 1.8 device acceptance found a nine-chunk DOCX that completed normalization but assembled with duplicated/missing sections, and an intentional unreachable-Agent path that could leave the appliance in exclusive Agent mode. Both are product-safety defects because successful command progression could otherwise leave either semantically incomplete document state or the wrong runtime topology.
+
+**Retest only if:** document chunking/normalization, Agent topology entry/cleanup, or review readiness semantics change. Use a synthetic multi-chunk source with unique per-chunk markers plus an unreachable/readiness-failure control; do not rerun unrelated runtime/model campaigns solely because this contract is touched.
