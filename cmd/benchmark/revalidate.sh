@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# BC-250 package revalidation harness v4.8
+# BC-250 package revalidation harness v4.9
 #
 # The target package version is read from the package-owned VERSION file; the RPM
 # release suffix is intentionally not hard-coded.
@@ -57,7 +57,7 @@ MEMORY_PROFILE="$LIBEXEC/memory-profile.sh"
 
 PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfeaturemask)='
 
-# Revalidation v4.8 qualifies packaged defaults only. Candidate/tuning A/B work belongs
+# Revalidation v4.9 qualifies packaged defaults only. Candidate/tuning A/B work belongs
 # under explicit bc250 advanced benchmark commands and is never selected by this worker.
 
 # Immutable package-owned role definitions. Revalidation never accepts model-role
@@ -1213,18 +1213,46 @@ for model, limits in policy["models"].items():
     # already gates generation-benchmark infrastructure, but it intentionally does not
     # duplicate per-request allocation/residency/memory/temperature telemetry. Keep it
     # out of the resource-measurement sanity set.
-    passed = [
-        r for r in rows
-        if r.get("outcome") == "pass" and r.get("case_id") != "lane-completeness"
-    ]
-    model_checks = {}
-    if not passed:
-        failures.append(f"{model}: no successful generation measurements")
-        checks[model] = {"measurements_present": False}
+    # Resource sanity evaluates whether the request executed and produced complete
+    # telemetry; it does not require visible prose. Thinking-capable models may
+    # legitimately consume a deliberately tiny probe budget before visible output
+    # begins. Accept that narrow INCOMPLETE class when no infrastructure/quality
+    # failure was reported and the resource measurements are present. Functional
+    # visible-answer quality is exercised separately by the promoted-role/use-case
+    # stages with production-sized generation budgets.
+    accepted_incomplete_diagnostics = {
+        "output-budget", "thinking-budget", "visible-answer-empty"
+    }
+
+    def resource_measurement(row):
+        if row.get("case_id") == "lane-completeness":
+            return False
+        outcome = row.get("outcome")
+        if outcome == "pass":
+            return True
+        if outcome != "incomplete":
+            return False
+        failure_kinds = {str(value) for value in (row.get("failure_kinds") or [])}
+        if failure_kinds:
+            return False
+        diagnostics = {str(value) for value in (row.get("diagnostics") or [])}
+        return bool(diagnostics) and diagnostics <= accepted_incomplete_diagnostics
+
+    measurements = [r for r in rows if resource_measurement(r)]
+    model_checks = {
+        "accepted_incomplete_measurements": sum(
+            1 for row in measurements if row.get("outcome") == "incomplete"
+        )
+    }
+    if not measurements:
+        failures.append(f"{model}: no valid resource/performance generation measurements")
+        model_checks["measurements_present"] = False
+        checks[model] = model_checks
         continue
 
+    model_checks["measurements_present"] = True
     missing_evidence = []
-    for r in passed:
+    for r in measurements:
         case_id = str(r.get("case_id", "unknown"))
         metrics = r.get("metrics", {})
         required = (
@@ -1257,7 +1285,7 @@ for model, limits in policy["models"].items():
 
     short = [
         float(r.get("metrics", {}).get("tokens_per_second"))
-        for r in passed
+        for r in measurements
         if str(r.get("case_id", "")).startswith("short-")
         and r.get("metrics", {}).get("tokens_per_second") is not None
     ]
@@ -1269,7 +1297,7 @@ for model, limits in policy["models"].items():
 
     contexts = [
         int(r.get("metrics", {}).get("allocated_context"))
-        for r in passed
+        for r in measurements
         if r.get("metrics", {}).get("allocated_context") is not None
     ]
     allocated = min(contexts, default=0)
@@ -1279,7 +1307,7 @@ for model, limits in policy["models"].items():
         failures.append(f"{model}: minimum allocated context {allocated} < package requirement {limits['min_context']}")
 
     ratios = []
-    for r in passed:
+    for r in measurements:
         m = r.get("metrics", {})
         size_raw = m.get("resident_size_bytes")
         vram_raw = m.get("resident_vram_bytes")
@@ -1295,7 +1323,7 @@ for model, limits in policy["models"].items():
 
     mem_values = [
         float(r.get("metrics", {}).get("mem_available_min_mib"))
-        for r in passed
+        for r in measurements
         if r.get("metrics", {}).get("mem_available_min_mib") is not None
     ]
     mem_min = min(mem_values) if mem_values else 0.0
@@ -1314,11 +1342,11 @@ for model, limits in policy["models"].items():
 
     temps = [
         float(r.get("metrics", {}).get("temp_max_c"))
-        for r in passed
+        for r in measurements
         if r.get("metrics", {}).get("temp_max_c") is not None
     ]
     model_checks["temperature_telemetry_present"] = bool(temps)
-    model_checks["temperature_telemetry_complete"] = len(temps) == len(passed)
+    model_checks["temperature_telemetry_complete"] = len(temps) == len(measurements)
     if temps:
         temp_max = max(temps)
         model_checks["temp_max_c"] = temp_max
@@ -1327,7 +1355,7 @@ for model, limits in policy["models"].items():
     else:
         model_checks["temp_max_c"] = None
 
-    truncated = [r for r in passed if "context-truncation" in r.get("diagnostics", [])]
+    truncated = [r for r in measurements if "context-truncation" in r.get("diagnostics", [])]
     severe = [
         r for r in truncated
         if int(r.get("metrics", {}).get("prompt_eval_count") or 0) < int(policy["severe_context_tokens"])

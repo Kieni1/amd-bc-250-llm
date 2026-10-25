@@ -275,7 +275,7 @@ valid matching preset IDs. Only the sanitized active `preset_id -> base_model` m
 in benchmark metadata. Open WebUI must answer HTTP readiness before the product-path benchmark
 starts; the readiness allowance is bounded to five minutes for slow application restarts.
 
-## Revalidation harness v4.8
+## Revalidation harness v4.9
 
 ```bash
 sudo bc250 advanced revalidate start

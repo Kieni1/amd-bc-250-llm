@@ -4353,5 +4353,55 @@ raise SystemExit(module.entrypoint())
         self.assertEqual(failures, ["modality"])
         self.assertNotIn("source-leakage", failures)
 
+
+class RevalidationResourceSanityRegressionTests(unittest.TestCase):
+    def _run_sanity(self, row: dict) -> tuple[subprocess.CompletedProcess[str], dict]:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            results = t / "results.jsonl"
+            policy = t / "policy.json"
+            output = t / "sanity.json"
+            results.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            policy.write_text(json.dumps({
+                "min_residency_ratio": 0.9,
+                "min_mem_available_mib": 512,
+                "tight_mem_available_mib": 1024,
+                "max_temp_c": 90,
+                "severe_context_tokens": 512,
+                "models": {"prod-test": {"min_decode_tps": 50, "min_context": 32768}},
+            }), encoding="utf-8")
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = 'source "' + str(source) + '" help >/dev/null\ncheck_edge_generation_sanity "$1" "$2" "$3"'
+            completed = subprocess.run(
+                ["bash", "-c", script, "test", str(results), str(policy), str(output)],
+                text=True, capture_output=True, check=False,
+            )
+            parsed = json.loads(output.read_text(encoding="utf-8"))
+            return completed, parsed
+
+    def test_resource_sanity_accepts_budget_only_incomplete_measurement(self) -> None:
+        completed, result = self._run_sanity({
+            "category": "generation", "model": "prod-test", "case_id": "short-1",
+            "outcome": "incomplete", "failure_kinds": [],
+            "diagnostics": ["output-budget", "thinking-budget", "visible-answer-empty"],
+            "metrics": {"allocated_context": 32768, "resident_size_bytes": 100,
+                        "resident_vram_bytes": 100, "mem_available_min_mib": 8192,
+                        "temp_max_c": 75, "tokens_per_second": 80,
+                        "prompt_eval_count": 1024},
+        })
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["checks"]["prod-test"]["accepted_incomplete_measurements"], 1)
+
+    def test_resource_sanity_rejects_incomplete_measurement_with_failure_kind(self) -> None:
+        completed, result = self._run_sanity({
+            "category": "generation", "model": "prod-test", "case_id": "short-1",
+            "outcome": "incomplete", "failure_kinds": ["timeout"],
+            "diagnostics": ["output-budget"], "metrics": {},
+        })
+        self.assertEqual(completed.returncode, 1)
+        self.assertFalse(result["passed"])
+        self.assertIn("no valid resource/performance generation measurements", completed.stderr)
+
 if __name__ == "__main__":
     unittest.main()
