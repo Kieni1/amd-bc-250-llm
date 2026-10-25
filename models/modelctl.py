@@ -847,7 +847,12 @@ def print_catalogs(catalogs: list[tuple[dict, list[dict]]], *, include_disabled_
             if category != "mtp" or include_disabled_mtp
             else [model for model in models if model["enabled"]]
         )
-        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        label = (
+            "Testing"
+            if category == "experiments"
+            else ("MTP" if category == "mtp" else category.title())
+        )
+        print(f"{label} models:")
         host = defaults.get("ollama_host")
         print_models(defaults, available, registrations.get(host) if host else None)
 
@@ -1270,6 +1275,28 @@ def run_as_ollama(
             shlex.join(argv),
             "/dev/null",
         ]
+    if (
+        os.environ.get("BC250_INSTALL_TRANSCRIPT") == "1"
+        and len(command) > 1
+        and Path(command[0]).name == "ollama"
+        and command[1] == "create"
+    ):
+        # The installer itself owns a PTY for interactive prompts and transcript
+        # capture. Pipe `ollama create` through Python so Ollama emits plain
+        # non-interactive progress instead of terminal spinner escape sequences.
+        child_environment.setdefault("NO_COLOR", "1")
+        process = subprocess.Popen(
+            argv,
+            env=child_environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="", flush=True)
+        return subprocess.CompletedProcess(argv, process.wait())
     return subprocess.run(argv, env=child_environment, check=False)
 
 
@@ -1845,9 +1872,13 @@ def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) 
 
 
 
+class UsageModelError(ModelError):
+    """Command-line usage error; callers should return rc=2."""
+
+
 class FriendlyArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> None:
-        raise ModelError(message)
+        raise UsageModelError(message)
 
 
 CLI_EPILOG = """Common workflows:
@@ -1884,16 +1915,20 @@ def catalog_arguments(
     )
 
 
-def selection_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "selection",
-        nargs="?",
-        help=(
+def selection_arguments(parser: argparse.ArgumentParser, command: str) -> None:
+    if command == "install":
+        selection_help = (
             "model id/index/range or comma-separated selection; also recommended, "
-            "production or all. Category 'all' plus selection 'all' means every "
-            "eligible model: 'bc250 model apply all all'"
-        ),
-    )
+            "production or all. Selection 'all' means every eligible model in the "
+            "combined catalog"
+        )
+    else:
+        selection_help = (
+            "model id/index/range or comma-separated selection; also recommended, "
+            f"production or all. Category 'all' plus selection 'all' selects every "
+            f"eligible model for this command: 'bc250 model {command} all all'"
+        )
+    parser.add_argument("selection", nargs="?", help=selection_help)
 
 
 def mutation_common_arguments(parser: argparse.ArgumentParser) -> None:
@@ -1912,9 +1947,9 @@ def mutation_common_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def apply_arguments(parser: argparse.ArgumentParser) -> None:
+def apply_arguments(parser: argparse.ArgumentParser, command: str) -> None:
     catalog_arguments(parser, category_optional=True)
-    selection_arguments(parser)
+    selection_arguments(parser, command)
     mutation_common_arguments(parser)
     parser.add_argument(
         "--revision",
@@ -1941,9 +1976,9 @@ def apply_arguments(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def removal_arguments(parser: argparse.ArgumentParser) -> None:
+def removal_arguments(parser: argparse.ArgumentParser, command: str) -> None:
     catalog_arguments(parser, category_optional=True)
-    selection_arguments(parser)
+    selection_arguments(parser, command)
     mutation_common_arguments(parser)
     parser.add_argument("--yes", action="store_true", help="skip confirmation")
 
@@ -1974,7 +2009,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="inspect source, provenance, Modelfile and registration state",
     )
     catalog_arguments(status, category_optional=True)
-    selection_arguments(status)
+    selection_arguments(status, "status")
     status.add_argument(
         "--online",
         action="store_true",
@@ -2007,7 +2042,7 @@ def build_parser() -> argparse.ArgumentParser:
         "install",
         help="interactively install/manage models from the combined catalog",
     )
-    selection_arguments(installing)
+    selection_arguments(installing, "install")
     mutation_common_arguments(installing)
     installing.add_argument("--source", type=Path, help="alternate MTP TOML catalog")
     installing.add_argument(
@@ -2026,25 +2061,25 @@ def build_parser() -> argparse.ArgumentParser:
         "apply",
         help="make selected models match the current catalog; reuse verified GGUFs",
     )
-    apply_arguments(applying)
+    apply_arguments(applying, "apply")
 
     refreshing = commands.add_parser(
         "refresh",
         help="re-fetch selected model sources and then apply the current catalog",
     )
-    apply_arguments(refreshing)
+    apply_arguments(refreshing, "refresh")
 
     unregistering = commands.add_parser(
         "unregister",
         help="remove Ollama registration/runtime Modelfile but retain GGUF and state",
     )
-    removal_arguments(unregistering)
+    removal_arguments(unregistering, "unregister")
 
     removing = commands.add_parser(
         "remove",
         help="remove registration plus manager-owned GGUF/state; retain catalog definition",
     )
-    removal_arguments(removing)
+    removal_arguments(removing, "remove")
 
     retired = commands.add_parser(
         "purge-retired",
@@ -2064,15 +2099,16 @@ def category_required(command: str) -> ModelError:
         "remove": "sudo bc250 model remove agentic MODEL",
         "path": "bc250 model path agentic MODEL",
     }.get(command, f"bc250 model {command} agentic")
-    return ModelError(
+    return UsageModelError(
         f"{command}: model category is required; choose one of: {categories}. Example: {example}"
     )
 
 
-def require_privilege(command: str) -> None:
+def require_privilege(command: str, values: list[str]) -> None:
     if command == "status" and os.geteuid() != 0:
+        rerun = shlex.join(["sudo", "bc250", "model", *values])
         raise ModelError(
-            "status inspects protected GGUF/state directories; run: sudo bc250 model status ..."
+            f"status inspects protected GGUF/state directories; run: {rerun}"
         )
     if command in {"install", "apply", "refresh", "unregister", "remove", "purge-retired"} and os.geteuid() != 0:
         raise ModelError(f"{command} changes package-managed model state; run with sudo")
@@ -2109,7 +2145,12 @@ def print_catalogs_basic(
         )
         if not available:
             continue
-        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        label = (
+            "Testing"
+            if category == "experiments"
+            else ("MTP" if category == "mtp" else category.title())
+        )
+        print(f"{label} models:")
         print_catalog_models(available)
 
 
@@ -2240,11 +2281,14 @@ def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> Non
         print(f"    detail:       {inspection.source_detail}")
     if model["provider"] != "download-only":
         print(f"  Modelfile:      {inspection.modelfile_status}")
-        registration = {
-            "current": "present",
-            "missing": "missing",
-            "unavailable": "unavailable",
-        }.get(inspection.registration_status, inspection.registration_status)
+        if model.get("category") == "agentic" and inspection.registration_status == "unavailable":
+            registration = "not inspected (agent lane inactive in normal mode)"
+        else:
+            registration = {
+                "current": "present",
+                "missing": "missing",
+                "unavailable": "unavailable",
+            }.get(inspection.registration_status, inspection.registration_status)
         print(f"  Registration:   {registration}")
     upstream = inspection.remote_status
     if upstream == "not checked":
@@ -2252,7 +2296,15 @@ def print_model_inspection(inspection: ModelInspection, *, verbose: bool) -> Non
     print(f"  Upstream:       {upstream}")
     if inspection.remote_detail:
         print(f"    detail:       {inspection.remote_detail}")
-    print(f"  Status:         {displayed_status_text(inspection)}")
+    if (
+        model.get("category") == "agentic"
+        and inspection.registration_status == "unavailable"
+        and inspection.source_status in {"current", "ollama-managed"}
+        and inspection.modelfile_status == "current"
+    ):
+        print("  Status:         SOURCE CURRENT — runtime registration not inspected")
+    else:
+        print(f"  Status:         {displayed_status_text(inspection)}")
     action = recommended_status_action(inspection)
     if action:
         print(f"  Recommended:    {action}")
@@ -2452,7 +2504,11 @@ def print_install_catalog_state(catalogs: list[tuple[dict, list[dict]]]) -> list
         if not chosen:
             continue
         category = defaults["category"]
-        label = "Experimental" if category == "experiments" else ("MTP" if category == "mtp" else category.title())
+        label = (
+            "Testing"
+            if category == "experiments"
+            else ("MTP" if category == "mtp" else category.title())
+        )
         print(f"{label} models:")
         host = defaults.get("ollama_host")
         for model in chosen:
@@ -2500,7 +2556,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command is None:
         parser.print_help()
         return 0
-    require_privilege(args.command)
+    require_privilege(args.command, values)
     if getattr(args, "quiet", False):
         os.environ["BC250_MODELCTL_SUPPRESS_MODE_OUTPUT"] = "1"
         os.environ["BC250_MODELCTL_SUPPRESS_CATALOG"] = "1"
@@ -2532,7 +2588,12 @@ def main(argv: list[str] | None = None) -> int:
         if category == "mtp" and not available:
             print("MTP models: no enabled models; use --include-disabled to include disabled opt-in models.")
             return 0
-        print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+        label = (
+            "Testing"
+            if category == "experiments"
+            else ("MTP" if category == "mtp" else category.title())
+        )
+        print(f"{label} models:")
         print_catalog_models(available)
         return 0
 
@@ -2583,7 +2644,12 @@ def main(argv: list[str] | None = None) -> int:
                 ]
                 if args.compact and category_models:
                     category = defaults["category"]
-                    print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+                    label = (
+                        "Testing"
+                        if category == "experiments"
+                        else ("MTP" if category == "mtp" else category.title())
+                    )
+                    print(f"{label} models:")
                 for model in category_models:
                     inspection = inspect_model_state(
                         defaults,
@@ -2610,7 +2676,12 @@ def main(argv: list[str] | None = None) -> int:
         host = defaults.get("ollama_host")
         registrations = registered_models(host) if host else None
         if args.compact and selected:
-            print(f"{'MTP' if category == 'mtp' else category.title()} models:")
+            label = (
+                "Testing"
+                if category == "experiments"
+                else ("MTP" if category == "mtp" else category.title())
+            )
+            print(f"{label} models:")
         for model in selected:
             inspection = inspect_model_state(
                 defaults,
@@ -2694,6 +2765,9 @@ def main(argv: list[str] | None = None) -> int:
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except UsageModelError as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        raise SystemExit(2)
     except ModelError as error:
         print(f"ERROR: {error}", file=sys.stderr)
         raise SystemExit(1)

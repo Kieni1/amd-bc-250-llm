@@ -538,9 +538,14 @@ class CategoryInterfaceTests(unittest.TestCase):
     def test_status_requires_sudo_for_protected_runtime_state(self) -> None:
         with (
             patch.object(modelctl.os, "geteuid", return_value=1000),
-            self.assertRaisesRegex(modelctl.ModelError, "sudo bc250 model status"),
+            self.assertRaises(modelctl.ModelError) as raised,
         ):
-            modelctl.main(["status", "agentic"])
+            modelctl.main(["status", "agentic", "--compact"])
+        self.assertEqual(
+            str(raised.exception),
+            "status inspects protected GGUF/state directories; "
+            "run: sudo bc250 model status agentic --compact",
+        )
 
     def test_model_command_set_is_greenfield_only(self) -> None:
         parser = modelctl.build_parser()
@@ -638,7 +643,7 @@ class CategoryInterfaceTests(unittest.TestCase):
             "Select models by number, range, or group (recommended/production/all); press Enter to cancel: "
         )
 
-    def test_model_install_labels_experiments_as_experimental(self) -> None:
+    def test_model_install_labels_experiments_as_testing(self) -> None:
         defaults = {"category": "experiments", "ollama_host": "127.0.0.1:11434"}
         model = {"category": "experiments", "id": "e", "name": "exp-e", "index": 0, "provider": "ollama-hf", "origin": "catalog"}
         inspection = modelctl.ModelInspection(
@@ -664,7 +669,7 @@ class CategoryInterfaceTests(unittest.TestCase):
         ):
             modelctl.print_install_catalog_state([(defaults, [model])])
         text = output.getvalue()
-        self.assertIn("Experimental models:", text)
+        self.assertIn("Testing models:", text)
         self.assertNotIn("Experiments models:", text)
 
     def test_destructive_combined_catalog_prompt_does_not_casually_print_all_command(self) -> None:
