@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.8**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.6 introduced the current runtime pin from the device-proven 0.40.6 baseline; release 1.7 introduced the managed-document lifecycle changes, and release 1.7.1 carries it unchanged while restructuring package interfaces. Ollama 0.40.7 added explicit `renderer`, `parser` and `template_source` fields to `ollama show` and `/api/show`; 0.40.8 keeps the established four-lane settings and adds no package-required topology or context-policy change. Prior 0.40.6 device evidence remains regression baseline only and does not transfer DEVICE acceptance to the new runtime bytes.
+Package standard: **Ollama v0.40.8**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.6 introduced the current runtime pin from the device-proven 0.40.6 baseline; release 1.7 introduced the managed-document lifecycle changes, and release 1.7.1 carried it unchanged while restructuring package interfaces; release 1.8 carries it unchanged while adding Managed Documents v2 and qualification fixes. Ollama 0.40.7 added explicit `renderer`, `parser` and `template_source` fields to `ollama show` and `/api/show`; 0.40.8 keeps the established four-lane settings and adds no package-required topology or context-policy change. Prior 0.40.6 device evidence remains regression baseline only and does not transfer DEVICE acceptance to the new runtime bytes.
 
 ## Install and verify
 
@@ -82,7 +82,7 @@ GGML_VK_VISIBLE_DEVICES=0
 
 These settings select the intended stock Vulkan/iGPU path and are part of the normal appliance configuration. The 0.40.8 review found no upstream change requiring different values for `OLLAMA_VULKAN=1`, `OLLAMA_IGPU_ENABLE=1`, `GGML_VK_VISIBLE_DEVICES=0`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, Flash Attention, keep-alive policy, or the package's q8/q4 KV-cache profiles. Keep those settings unless exact BC-250 evidence shows a regression.
 
-Ollama 0.40.7 updated llama.cpp and 0.40.8 keeps that runner line, so the selected 1.7.1 RPM must still exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance.
+Ollama 0.40.7 updated llama.cpp and 0.40.8 keeps that runner line, so the selected 1.8 RPM must still exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance.
 
 For more accurate Vulkan free-memory information the upstream docs suggest `cap_perfmon`; this package does **not** grant that capability automatically. An operator may test it deliberately after locating the real binary:
 
