@@ -284,15 +284,17 @@ class DocumentationTests(unittest.TestCase):
         self.assertNotIn("The quick MTP comparison accepts `BASELINE_MODEL`", reference)
         self.assertNotIn("speed-oriented Ollama-vs-llama.cpp helper", reference)
 
-    def test_current_docs_keep_mtp_out_of_generic_installer_convergence(self) -> None:
+    def test_current_docs_keep_mtp_explicit_while_unifying_installer_overview(self) -> None:
         commands = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         models = (ROOT / "models/README.md").read_text(encoding="utf-8")
         for text in (commands, models):
             self.assertIn("apply all", text)
             self.assertIn("MTP", text)
-        self.assertIn("never include MTP", commands)
-        self.assertIn("MTP is deliberately absent from that picker", models)
-        self.assertNotIn("optional model selection across production, experiments,\nagentic, embedding, task and MTP entries", models)
+            self.assertIn("explicit", text)
+        self.assertIn("same global indexed", commands)
+        self.assertIn("broad `all`, `recommended` and `production` groups exclude MTP", models)
+        self.assertIn("combined `apply all` / `refresh all`", models)
+        self.assertNotIn("MTP is deliberately absent from that picker", models)
 
     def test_current_docs_preserve_optional_setup_and_diagnostic_contracts(self) -> None:
         maintenance = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")

@@ -85,13 +85,14 @@ roles, plus the task and embedding defaults, without printing the full catalog. 
 optional add-ons and are not downloaded by baseline reconciliation. Fully unchanged required models are summarized
 by category; downloads or repairs remain verbose. Model management temporarily enters exclusive
 Agent mode when explicitly managing an Agent add-on and restores normal mode afterward. It then presents
-compact state for other production/experiment/task/agent/embedding extras. Fully current rows collapse to `[CURRENT]`, and the intentionally inactive agent
-lane is shown as deferred without waiting on that stopped Ollama instance. Stage 7 also shows a
-**read-only, non-indexed MTP inventory** so fetched/current standalone llama.cpp artifacts are visible,
-but MTP is not part of the generic picker and is never fetched by installer convergence. Use
-`bc250 advanced mtp prepare ID` explicitly when preparing one.
-Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter skips
-optional extras only.
+one indexed compact overview across production/experiment/task/agent/embedding entries and standalone
+MTP candidates. Fully current Ollama rows collapse to `[CURRENT]`, the intentionally inactive agent
+lane is shown as deferred without waiting on that stopped Ollama instance, and MTP rows use standalone
+source state such as `[FETCHED, VERIFIED]` / `[NOT FETCHED]`. An explicit MTP ID/index/range selection
+prepares and verifies the download-only GGUF; it does not register Ollama or start llama.cpp. Broad
+`recommended`, `production` and `all` selections exclude MTP, as do generic combined `apply all` /
+`refresh all`. Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter
+skips optional extras only. `bc250 advanced mtp prepare ID` remains the direct specialist path.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
 across transcript PTY creation, so unattended runs never become interactive by
 accident. `BC250_HF_ANONYMOUS=1` forces anonymous Hugging Face downloads. The model manager
@@ -224,11 +225,12 @@ authentication is requested only when a manager download actually needs it.
 
 #### MTP lifecycle
 
-MTP entries are download-only inputs for a standalone opt-in llama.cpp runtime and are intentionally
-outside generic combined convergence. The installer displays their read-only operational state but
-never exposes them as normal selectable indexes; `apply all` / `refresh all` never select MTP even
-when `--include-disabled` is supplied. Use the explicit `mtp` category or the
-opt-in helper to select one:
+MTP entries are download-only inputs for a standalone opt-in llama.cpp runtime and remain outside
+generic combined convergence. The interactive installer displays them in the same global indexed
+catalog as Ollama models. An explicit MTP ID/index/range selection there prepares/verifies the GGUF;
+broad `recommended`, `production` and `all` groups do not select MTP. Combined `apply all` / `refresh
+all` also never select MTP even when `--include-disabled` is supplied. Use the installer explicitly,
+the `mtp` category, or the specialist helper to prepare one:
 
 ```bash
 bc250 advanced mtp list
@@ -249,8 +251,10 @@ Ollama registration, so `unregister mtp` is invalid; `remove mtp ID` removes onl
 manager-owned source/state after confirmation.
 
 Keep `enabled = false` for candidates that should remain hidden from ordinary combined status
-views. The combined mutation path still excludes the MTP category regardless of that flag; setting
-an entry true is an operator visibility policy choice, not a qualification or promotion signal.
+views. `bc250 model install` deliberately includes those opt-in entries so an operator can see and
+explicitly choose them; ordinary combined status still requires `--include-disabled` to expose them.
+The combined mutation path excludes the MTP category regardless of that flag; setting an entry true
+is an operator visibility policy choice, not a qualification or promotion signal.
 
 The manager records schema-3 source/model/category identity plus SHA-256 and file stat
 metadata. Unchanged stat metadata can use the validated fast path; changed or legacy state
@@ -274,7 +278,9 @@ sudo bc250 document ingest --token-file FILE [--prune] [--url URL --allow-remote
 
 The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
 `inbox/bilingual`, `sources`, `working`, `active` and `superseded`. Agent-assisted batch preparation is
-local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Text-native PDF and DOCX sources share the same provenance/review contract. Native agent thinking is separated from final Markdown through Ollama `/api/chat`; truncated, empty, fenced or reasoning-contaminated final content is rejected. Larger text-native sources are normalized in bounded chunks, with one no-thinking retry for a chunk that exhausts the Agent generation budget; repeated incompleteness leaves the source in `inbox/` and publishes no partial draft. Scanned PDFs remain deferred to the OCR preprocessing workflow.
+local-only and stops at `working/`; reviewed Markdown must be explicitly activated before ingestion. Text-native PDF and DOCX sources share the same provenance/review contract. Native agent thinking is separated from final Markdown through Ollama `/api/chat`; truncated, empty, fenced or reasoning-contaminated final content is rejected. Larger text-native sources are normalized in bounded chunks, with one no-thinking retry for a chunk that exhausts the Agent generation budget. Multi-chunk output carries a deterministic per-chunk identity during normalization; missing identity, duplicate normalized chunks, or dropped critical legal/numeric/source identifiers in a single-language chunk make the whole preparation non-publishable. The source remains in `inbox/`, no partial working draft is created, and normal Ollama topology is restored even when failure occurs immediately after Agent entry or during normalization. Bilingual normalization still requires the documented human fidelity review because language-specific token ownership cannot be inferred safely. Scanned PDFs remain deferred to the OCR preprocessing workflow.
+
+Interactive `document review` requires either an effective date or an edition/version before a draft can become ready. The final per-draft lines are `RESULT=READY|REVIEW_REQUIRED` and `READY_TO_ACTIVATE=YES|NO`; exit status 0 means the interactive review completed successfully, not that the draft was approved. Automation must assert the resulting lifecycle state rather than command rc alone.
 
 `status` presents concise corpus health; `--verbose` adds source/fidelity/inbox detail and `--knowledge` performs a read-only Open WebUI Knowledge diff without uploading or pruning content. `validate` checks provenance, review state, document identity, active revision conflicts and obvious native-reasoning marker contamination. `ingest` sends
 only `active/*.md` through the existing incremental Open WebUI knowledge API. The API key is never packaged;
