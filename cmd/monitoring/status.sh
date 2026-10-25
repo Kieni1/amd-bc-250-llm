@@ -69,6 +69,10 @@ topology_summary() {
   local mode="$1" runtime_identity_state="${2:-unavailable}" setup_state="${3:-unknown}" unit label missing=()
   case "$mode" in
     normal|agent)
+      if ((EUID != 0)); then
+        echo "Overall: HEALTHY (limited unprivileged view)"
+        echo "Coverage: LIMITED — run sudo bc250 status for full inspection"
+      else
       case "$runtime_identity_state" in
         mismatch)
           echo "Overall: HEALTHY WITH WARNINGS — package runtime identity mismatch"
@@ -84,6 +88,7 @@ topology_summary() {
           echo "Overall: HEALTHY"
           ;;
       esac
+      fi
       if [[ "$mode" == agent ]]; then
         echo "Runtime mode: exclusive agent"
       else
@@ -284,12 +289,12 @@ printf '  Kernel:       %s\n' "$(uname -r)"
 printf '  Command line: %s\n' "$(cat /proc/cmdline 2>/dev/null || printf 'unavailable')"
 if command -v needs-restarting >/dev/null 2>&1; then
   if needs-restarting -r >/dev/null 2>&1; then
-    echo "  OS/package restart check: PASS (no restart requested)"
+    echo "  Reboot required: NO"
   else
-    echo "  OS/package restart check: RECOMMENDED after package/kernel updates"
+    echo "  Reboot required: YES (package/kernel updates)"
   fi
 else
-  echo "  Restart advisory: not evaluated (optional helper unavailable)"
+  echo "  Reboot required: UNKNOWN (restart check unavailable)"
 fi
 
 section "CPU power states"
@@ -377,8 +382,12 @@ for unit in open-webui.service tika.service nginx.service; do
 done
 printf '  %-38s %s\n' 'Open WebUI application readiness' "$(openwebui_readiness)"
 if [[ -n "$status_payload" ]]; then
-  echo "  Package runtime identity:"
-  runtime_identity_summary "$status_payload"
+  if [[ "$runtime_inspection" == not_inspected ]]; then
+    echo "  Package runtime identity: requires sudo for inspection"
+  else
+    echo "  Package runtime identity:"
+    runtime_identity_summary "$status_payload"
+  fi
 else
   echo "  Package runtime identity: unavailable"
 fi

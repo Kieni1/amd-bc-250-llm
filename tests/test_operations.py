@@ -112,7 +112,7 @@ class StatusTests(unittest.TestCase):
         self.assertIn('Overall: DEGRADED', source)
         self.assertIn('Recovery: sudo bc250 advanced agent normal', source)
         self.assertIn('Overall: UNAVAILABLE', source)
-        self.assertIn('Restart advisory: not evaluated (optional helper unavailable)', source)
+        self.assertIn('Reboot required: UNKNOWN (restart check unavailable)', source)
 
     def test_status_overall_state_distinguishes_pending_mismatch_and_unavailable(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -219,7 +219,7 @@ ollama_version_line
         for required in ("OLLAMA_VULKAN=1", "OLLAMA_IGPU_ENABLE=1", "GGML_VK_VISIBLE_DEVICES=0"):
             self.assertIn(required, verify)
         self.assertIn("resident:", source)
-        self.assertIn("Restart advisory: not evaluated (optional helper unavailable)", source)
+        self.assertIn("Reboot required: UNKNOWN (restart check unavailable)", source)
 
 
     def test_machine_readable_status_and_health_are_packaged_interfaces(self) -> None:
@@ -340,7 +340,7 @@ ollama_version_line
         health = (ROOT / "cmd/monitoring/health.py").read_text(encoding="utf-8")
         self.assertIn('runtime_inspection" == not_inspected', status)
         self.assertIn('runtime_identity_state=not_inspected', status)
-        self.assertIn("observed not inspected (requires sudo) — NOT INSPECTED", status)
+        self.assertIn("Package runtime identity: requires sudo for inspection", status)
         self.assertIn('row.get("inspection") == "not_inspected"', version)
         self.assertIn('"INFO"', health)
         self.assertNotIn("secure-boot", health.lower())
@@ -471,6 +471,10 @@ bc250_failed_systemd_units
             "cat /var/lib/bc250-llm-server/secrets/openwebui-admin.key",
         ):
             self.assertNotIn(forbidden, source)
+        self.assertIn("mktemp -d /run/bc250/support-bundle.XXXXXX", source)
+        self.assertIn("-bc250-support-bundle.tar.gz", source)
+        self.assertNotIn("/run/bc250 support-bundle", source)
+        self.assertNotIn("-bc250 support-bundle.tar.gz", source)
 
     def test_status_uses_agent_mode_as_single_runtime_topology_classifier(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -627,7 +631,7 @@ class VerifyTests(unittest.TestCase):
     def test_verify_reports_dependent_lane_checks_as_skipped(self) -> None:
         source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
         self.assertIn('skipped "task model registration unavailable because ollama-task.service is inactive"', source)
-        self.assertIn('skipped "RAG embedding registration unavailable because ollama-embedding.service is inactive"', source)
+        self.assertIn('skipped "document embedding registration unavailable because ollama-embedding.service is inactive"', source)
         self.assertIn('skipped "authenticated Open WebUI desired-state check (no API token supplied)"', source)
         self.assertIn("Verification: %d ok / %d warn / %d fail / %d skipped", source)
         self.assertIn("optional/authenticated check was skipped", source)

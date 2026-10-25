@@ -39,11 +39,12 @@ command -v timeout >/dev/null 2>&1 || { echo "ERROR: timeout is required." >&2; 
 
 run_id="$(date +%Y%m%dT%H%M%S%z)-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 started="$(date --iso-8601=seconds)"
-work="$(mktemp -d /run/bc250 support-bundle.XXXXXX)"
+install -d -m 0700 /run/bc250 "$OUTPUT_DIR"
+work="$(mktemp -d /run/bc250/support-bundle.XXXXXX)"
 evidence="$work/evidence"
-archive="$OUTPUT_DIR/${run_id}-bc250 support-bundle.tar.gz"
+archive="$OUTPUT_DIR/${run_id}-bc250-support-bundle.tar.gz"
 trap 'rm -rf "$work"' EXIT
-install -d -m 0700 "$evidence" "$OUTPUT_DIR"
+install -d -m 0700 "$evidence"
 
 capture() {
   local file="$1"; shift

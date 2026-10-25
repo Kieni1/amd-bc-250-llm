@@ -53,6 +53,14 @@ while (($#)); do
   esac
 done
 
+if ((EUID != 0)); then
+  echo "ERROR: full verification requires root privileges." >&2
+  rerun="sudo bc250 verify"
+  ((SUMMARY)) && rerun+=" --summary"
+  echo "Run: $rerun" >&2
+  exit 1
+fi
+
 if [[ -z "$OWUI_TOKEN_FILE" && -s "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
   OWUI_TOKEN_FILE="$DEFAULT_OWUI_TOKEN_FILE"
 fi
@@ -713,7 +721,7 @@ else
   warn "journalctl is unavailable; Vulkan failure patterns were not checked"
 fi
 
-section "Documents / RAG"
+section "Managed documents"
 desired_state="${BC250_OWUI_DESIRED_STATE:-/usr/share/bc250-llm-server/openwebui/desired-state.json}"
 if [[ ! -r "$desired_state" ]]; then
   desired_state="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
@@ -723,21 +731,21 @@ rag_embedding_url="$(jq -r '.embedding.ollama_config.url // empty' "$desired_sta
 rag_extraction_engine="$(jq -r '.rag.CONTENT_EXTRACTION_ENGINE // empty' "$desired_state" 2>/dev/null || true)"
 embedding_tags="$(curl -fsS http://127.0.0.1:11437/api/tags 2>/dev/null || true)"
 if [[ -n "$rag_embedding_model" ]]; then
-  info "Package RAG embedding default: $rag_embedding_model"
-  [[ -n "$rag_embedding_url" ]] && info "Package RAG embedding endpoint: $rag_embedding_url"
+  info "Document embedding model: $rag_embedding_model"
+  [[ -n "$rag_embedding_url" ]] && info "Document embedding endpoint: $rag_embedding_url"
   if ((agent_active)); then
     info "embedding registration check deferred while exclusive agent mode stops :11437"
   elif ((!embedding_lane_active)); then
-    skipped "RAG embedding registration unavailable because ollama-embedding.service is inactive"
+    skipped "document embedding registration unavailable because ollama-embedding.service is inactive"
   elif [[ -n "$embedding_tags" ]] && jq -e --arg model "$rag_embedding_model" \
       'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
       <<< "$embedding_tags" >/dev/null 2>&1; then
-    ok "default RAG embedding model is registered with dedicated embedding Ollama"
+    ok "default document embedding model is registered with dedicated embedding Ollama"
   else
-    bad "default RAG embedding model is not registered on dedicated embedding Ollama :11437"
+    bad "default document embedding model is not registered on dedicated embedding Ollama :11437"
   fi
 else
-  bad "package Open WebUI desired state does not define a RAG embedding model"
+  bad "package Open WebUI desired state does not define a document embedding model"
 fi
 [[ -n "$rag_extraction_engine" ]] && info "Package extraction engine: $rag_extraction_engine" || \
   warn "package Open WebUI desired state does not define an extraction engine"
