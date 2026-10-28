@@ -16,6 +16,18 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+_COMMAND_ROOT = Path(__file__).resolve().parents[1]
+if (_COMMAND_ROOT / "model_contract.py").is_file() and str(_COMMAND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_COMMAND_ROOT))
+
+from model_contract import (
+    ModelContractError,
+    normalize_model_id,
+)
+from model_contract import (
+    model_contract as _package_model_contract,
+)
+
 DEFAULT_URL = "http://127.0.0.1:3000"
 DEFAULT_MODELS = Path("/usr/share/bc250-llm-server/openwebui/models.json")
 SOURCE_MODELS = Path(__file__).resolve().parents[2] / "config/openwebui/models.json"
@@ -235,6 +247,101 @@ def testing_model_policies(document: dict[str, Any]) -> dict[str, dict[str, Any]
     return policies
 
 
+def package_testing_model_policy(model_id: str) -> tuple[str | None, dict[str, Any]]:
+    """Return package-derived testing metadata without inventing request policy.
+
+    The profile decides whether a packaged implementation may be exposed as a raw
+    testing model. Intrinsic capabilities enrich the Open WebUI record, while
+    sampler/reasoning request policy remains owned by explicit product/testing policy.
+    """
+    try:
+        contract = _package_model_contract(model_id)
+    except ModelContractError as exc:
+        raise ApiError(str(exc)) from exc
+    if contract is None:
+        return None, {}
+
+    catalog = contract["catalog"]
+    profile = contract.get("profile") or {}
+    exposure = str(profile.get("owui_testing_exposure") or "forbidden")
+    capabilities = catalog.get("capabilities") if isinstance(catalog.get("capabilities"), dict) else {}
+    modalities = capabilities.get("modalities") if isinstance(capabilities.get("modalities"), list) else []
+    features = capabilities.get("features") if isinstance(capabilities.get("features"), list) else []
+
+    tags: list[str] = []
+    for value in [*features, profile.get("comparison_role"), profile.get("profile_class")]:
+        if isinstance(value, str) and value and value not in tags:
+            tags.append(value)
+
+    intended = str(profile.get("intended_role") or "package model").replace("-", " ")
+    policy: dict[str, Any] = {
+        "description": (
+            f"Package-owned {intended} exposed for pre-v1 comparison testing. "
+            "Use curated Office roles for normal product use."
+        ),
+        "tags": tags,
+        "qualification": dict(profile),
+        "ordinary_user_visible": exposure == "testing",
+        "capabilities": {
+            # Technical tool capability is deliberately not enough to enable OWUI
+            # built-in tools. Product/testing request policy owns that decision.
+            "builtin_tools": False,
+            "file_context": bool({"text", "image"}.intersection(modalities)),
+            "vision": "image" in modalities,
+            "ocr": capabilities.get("ocr") is True,
+        },
+    }
+    return exposure, policy
+
+
+def merged_testing_model_policy(
+    model_id: str, explicit_policies: dict[str, dict[str, Any]]
+) -> tuple[str | None, dict[str, Any]]:
+    exposure, metadata = package_testing_model_policy(model_id)
+    canonical = normalize_model_id(model_id)
+    explicit = (
+        explicit_policies.get(model_id)
+        or explicit_policies.get(canonical)
+        or explicit_policies.get(f"{canonical}:latest")
+    )
+    if explicit is None:
+        return exposure, metadata
+
+    merged = dict(metadata)
+    for key in ("description", "ordinary_user_visible"):
+        if key in explicit:
+            merged[key] = explicit[key]
+
+    tags: list[str] = []
+    for source in (metadata.get("tags", []), explicit.get("tags", [])):
+        if isinstance(source, list):
+            for tag in source:
+                if isinstance(tag, str) and tag and tag not in tags:
+                    tags.append(tag)
+    if tags:
+        merged["tags"] = tags
+
+    custom_params = {}
+    if isinstance(metadata.get("custom_params"), dict):
+        custom_params.update(metadata["custom_params"])
+    if isinstance(explicit.get("custom_params"), dict):
+        custom_params.update(explicit["custom_params"])
+    if custom_params:
+        merged["custom_params"] = custom_params
+
+    qualification = {}
+    if isinstance(metadata.get("qualification"), dict):
+        qualification.update(metadata["qualification"])
+    if isinstance(explicit.get("qualification"), dict):
+        qualification.update(explicit["qualification"])
+    if qualification:
+        merged["qualification"] = qualification
+
+    # An explicit package testing policy is allowed to opt into a raw testing
+    # record even when generic profile exposure would otherwise be non-testing.
+    return "explicit", merged
+
+
 def discover_normal_provider_models() -> dict[str, list[str]]:
     global _DISCOVERED_MODEL_CACHE
     if _DISCOVERED_MODEL_CACHE is not None:
@@ -285,11 +392,19 @@ def auto_visible_model_record(
         "Use a curated Office role for normal product use."
     ))
     qualification = policy.get("qualification")
+    capabilities = policy.get("capabilities")
+    if not isinstance(capabilities, dict):
+        capabilities = {
+            "builtin_tools": False,
+            "file_context": True,
+            "vision": False,
+            "ocr": False,
+        }
     meta: dict[str, Any] = {
         "hidden": not ordinary_user_visible,
         "description": description,
         "tags": tags,
-        "capabilities": {"builtin_tools": False, "file_context": True},
+        "capabilities": capabilities,
         "bc250_managed": "testing-discovery",
         "bc250_lane": lane,
         "bc250_ordinary_user_visible": ordinary_user_visible,
@@ -322,7 +437,11 @@ def effective_model_document(
         for model_id in lanes.get(lane, []):
             if model_id in known:
                 continue
-            policy = policies.get(model_id)
+            exposure, policy = merged_testing_model_policy(model_id, policies)
+            if exposure in {"forbidden", "curated"} and not policy.get("ordinary_user_visible"):
+                # Package policy explicitly says this implementation is not a raw
+                # normal-lane testing model. Static curated records are handled above.
+                continue
             models.append(auto_visible_model_record(model_id, lane, policy))
             known.add(model_id)
     return {"models": models}
@@ -655,7 +774,7 @@ def model_view_map(
 def load_live_model_views(
     client: Client,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    # Open WebUI v0.12.3 represents curated presets and raw-model overrides in
+    # Open WebUI v0.12.4 represents curated presets and raw-model overrides in
     # separate API views. Keep this explicit so a future pin change fails as an
     # inspection-compatibility issue instead of looking like mass desired-state drift.
     presets = model_view_map(

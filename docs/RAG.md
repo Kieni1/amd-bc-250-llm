@@ -152,7 +152,7 @@ and hybrid-without-reranker results have been measured.
 
 ### Measured tuning candidates, not fresh-install defaults
 
-Open WebUI 0.12.3 exposes settings that are relevant to this appliance but
+Open WebUI 0.12.4 exposes settings that are relevant to this appliance but
 remain conservative in the packaged Quadlet:
 
 - `RAG_SYSTEM_CONTEXT=false`: enabling it moves retrieved context to a stable
@@ -473,7 +473,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: packaged Open WebUI 0.12.3 behavior
+## 7. Retrieval mode: packaged Open WebUI 0.12.4 behavior
 
 Use the package-owned **`Office - Documents / RAG`** preset for ordinary document questions.
 It is based on `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`, keeps File Context available, and

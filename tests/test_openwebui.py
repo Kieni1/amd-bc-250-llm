@@ -455,6 +455,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
                     "prod-qwen35-9b-unsloth-q6-k:latest",
                     "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest",
                     "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest",
+                    "exp-minicpm-v47-1b-openbmb-q4-k-m:latest",
+                    "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest",
                 ],
                 "task": ["task-extra:latest"],
             },
@@ -469,6 +471,18 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertTrue(xxs["meta"]["bc250_ordinary_user_visible"])
         self.assertEqual(OPENWEBUI.desired_access_grants(xxs), [REQUIRED_READ])
         self.assertEqual(xxs["meta"]["bc250_qualification"]["profile_role"], "experimental-deployability")
+        minicpm = models["exp-minicpm-v47-1b-openbmb-q4-k-m:latest"]
+        self.assertTrue(minicpm["meta"]["capabilities"]["vision"])
+        self.assertTrue(minicpm["meta"]["capabilities"]["ocr"])
+        self.assertTrue(minicpm["meta"]["capabilities"]["file_context"])
+        self.assertFalse(minicpm["meta"]["capabilities"]["builtin_tools"])
+        self.assertEqual(
+            minicpm["meta"]["bc250_qualification"]["intended_role"],
+            "document-vision-ocr-challenger",
+        )
+        lfm8 = models["exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest"]
+        self.assertFalse(lfm8["meta"]["capabilities"]["vision"])
+        self.assertNotIn("think", lfm8["params"].get("custom_params", {}))
         task = models["task-extra:latest"]
         self.assertEqual(task["meta"]["bc250_lane"], "task")
         self.assertFalse(task["meta"]["capabilities"]["builtin_tools"])

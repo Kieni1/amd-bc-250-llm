@@ -1,6 +1,6 @@
 # Open WebUI
 
-Current package baseline: **Open WebUI v0.12.3** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
+Current next-release workbench baseline: **Open WebUI v0.12.4** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -94,7 +94,11 @@ The current pre-v1 testing policy keeps raw production/task implementations and 
 experiments visible, while pressure-heavy large experimental profiles can be package-marked
 admin/testing-only. Provider allowlists alone are not treated as proof of the ordinary-user selector. On authenticated
 apply/status, `bc250 advanced openwebui` also discovers the actual `11434`/`11435` Ollama inventories and
-creates or updates lightweight package-managed testing records. Ordinary-user-visible records receive
+creates or updates lightweight package-managed testing records. Discovery policy is declarative: an explicit
+`testing_model_policies` entry has highest precedence, package catalog/profile capability metadata is next,
+and generic testing defaults are only the fallback. Intrinsic capabilities may enable presentation features
+such as MiniCPM-V vision/OCR/file-context, but they do not silently enable product request policy: a model
+being reasoning- or tool-capable does not by itself force `think` or built-in tools. Ordinary-user-visible records receive
 additive `user:*:read` access; package-managed records explicitly marked admin/testing-only do not. When a
 previously public package-managed discovery record becomes admin/testing-only, convergence may remove only
 the package wildcard `user:*:read` grant while preserving unrelated administrator grants.
@@ -172,7 +176,7 @@ of reasoning or truncation from the adapter metadata fields alone.
 `/openai/responses` workspace aliases likewise remain outside the qualified product path unless they are
 explicitly adopted and tested.
 
-Open WebUI 0.12 also adds several network/tool surfaces that are outside the appliance contract. The package explicitly keeps direct integrations, external tool servers, Tool Search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations disabled at bootstrap and persisted where supported. Skills are not enabled/adopted by this release; in 0.12.3 model-attached skills can add their full instructions to each message, so they require a separate context/privacy qualification before adoption.
+Open WebUI 0.12 also adds several network/tool surfaces that are outside the appliance contract. The package explicitly keeps direct integrations, external tool servers, Tool Search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations disabled at bootstrap and persisted where supported. Skills are not enabled/adopted by this release; in 0.12.4 Skills remain outside the appliance contract; the upstream optional lazy-loading feature does not change that package policy.
 
 ## Package model presets
 
@@ -227,7 +231,7 @@ The Qwen3.5 general Advanced preset carries `think=true` and `max_tokens=6144`; 
 `Office - Advanced Structured` preset uses the same base model, 6144-token ceiling and sampler set with
 only `think=false`. This is intentionally visible product policy rather than prompt-based automatic switching.
 Strict machine-consumed Advanced extraction should use the Structured preset; normal reasoning stays on
-General / Higher Quality. Open WebUI 0.12.3 retains the package-owned stored/request parameter path,
+General / Higher Quality. Open WebUI 0.12.4 retains the package-owned stored/request parameter path,
 including `think` at the Ollama root and `max_tokens` as `options.num_predict`; no package patch to generic
 `payload.py` is required.
 
@@ -263,8 +267,8 @@ task-lfm25-1.2b-instruct-liquidai-q6-k:latest
 
 and keeps title/tag generation on while follow-up, autocomplete, search-query and
 retrieval-query generation remain off. `TASK_MODEL_PARAMS` stays `{}` so Open
-WebUI v0.12.3 retains upstream ownership of unreviewed task behavior. The helper first reads the
-complete v0.12.3 task configuration and then updates only reviewed fields, preserving new/unowned fields. Those
+WebUI v0.12.4 retains upstream ownership of unreviewed task behavior. The helper first reads the
+complete v0.12.4 task configuration and then updates only reviewed fields, preserving new/unowned fields. Those
 reviewed fields now include package-owned title, tag and retrieval-query prompt
 templates so live Open WebUI and direct task qualification share one prompt policy. The
 0.11.3-0.3 tag prompt keeps broad themes and specific subtopics in one `tags` array and
@@ -328,7 +332,7 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250 maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database—including the 0.12.3 upgrade, whose 0.12.1 lineage includes database schema changes—RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database—including the current 0.12.4 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and
