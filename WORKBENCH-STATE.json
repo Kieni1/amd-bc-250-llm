@@ -12,30 +12,29 @@
   "kind": "release-workbench",
   "long_term": {
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses",
-    "direction": "stock-first local office AI appliance; after exact 1.9 acceptance, prioritize measurable document/retrieval quality, German–French workflow quality and ordinary-user UX; keep expert layers bounded under the advanced namespace",
+    "direction": "stock-first local office AI appliance; 1.9 is the accepted baseline; next-release model architecture is now metadata-first across catalog, OWUI, benchmark and lifecycle consumers",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "after_pass": "After exact 1.9 acceptance, retain the unified model-overview UX and corrected Managed Documents v2 chunk/topology/review contracts as accepted baselines; prioritize measured document/retrieval and German–French workflow quality rather than reopening proven runtime/model topology.",
-    "build": "Run/select the authoritative Fedora 44 GitHub workflow_dispatch build for 0.14.1-1.9 after release-gate validation is frozen.",
-    "device": "Install the exact selected 0.14.1-1.9 RPM and run normal new-build core functionality health/verify plus focused MTP overview/selection safety and Managed Documents multi-chunk fidelity, failed-Agent cleanup and review-state acceptance; retain 1.8/1.7.1 evidence for unchanged runtime boundaries."
+    "current_batch": "Batch 3 integration/refinement complete; post-Batch3 coherence audit also complete: tracking/pinned source semantics corrected, all active pre-1.0 model sources normalized to tracking, profile/provider/Agent metadata validation tightened, secondary docs/scope refreshed, and the coherent Open WebUI 0.12.4 pin retained.",
+    "integration": "Batches 1-3 plus the final coherence audit are complete; the metadata-first catalog/profile/Modelfile/product-role authority split is consistent across model manager, OWUI, benchmark, lifecycle, docs and packaging.",
+    "next_batch": "Freeze/assign the next release identity, run mandatory Ruff/ShellCheck plus the authoritative Fedora 44 release gate, then resume targeted challenger qualification on that exact RPM."
   },
   "release": {
     "fedora": "44",
     "name": "bc250-llm-server",
     "nvr": "bc250-llm-server-0.14.1-1.9",
     "rpm_release": "1.9",
-    "state": "source-ready-build-pending",
+    "state": "accepted-1.9-baseline-next-release-development",
     "version": "0.14.1"
   },
   "schema": 2,
   "validation": {
-    "device_acceptance": "PENDING exact selected 0.14.1-1.9 RPM; focused model-installer/MTP UX plus Managed Documents chunk/topology/review regressions required",
-    "device_baseline": "1.8 carries Managed Documents v2 and exposed the chunk-assembly/topology defects fixed in 1.9; 1.7.1 carries the broad unchanged runtime baseline",
-    "full_source_suite": "NOT USED as the edit-loop oracle for the expanded 1.9 fixes; authoritative release gate remains required before build selection",
-    "release_preflight": "PENDING final 1.9 release gate; only focused changed-file tests are run during this edit",
-    "rpm_package_check": "PENDING authoritative Fedora 44 build for 1.9",
-    "package_critical": "PENDING final 1.9 release gate / RPM %check; focused changed-path tests pass during source preparation",
-    "source_checks": "Focused Python/shell syntax plus model catalog/installer and managed-document chunk/topology/review regressions run for the 1.9 changes; final release-gate validation remains required"
+    "device_acceptance": "0.14.1-1.9 accepted; release closure PASS with no core defects/check errors/not-tested.",
+    "device_baseline": "1.9 is the current accepted runtime/product baseline; do not rerun closed model/document/application campaigns unless affected code changes.",
+    "package_critical": "Final workbench package-critical validation PASS (156/156 tests).",
+    "release_preflight": "Final workbench release-pipeline preflight PASS (27/27 tests).",
+    "rpm_package_check": "Not applicable yet: next release has not been frozen/built.",
+    "source_checks": "Final next-release workbench audit: focused model/consumer/documentation regression PASS (472/472 across catalog, models, benchmark, OpenWebUI, documentation, operations, install and maintenance); scripts/validate.py and development scope check PASS. Ruff/ShellCheck are unavailable in this workspace and remain mandatory at release freeze."
   }
 }

@@ -854,3 +854,82 @@ Interactive review keeps rc=0 as “review interaction completed” for compatib
 **Why:** Exact 1.8 device acceptance found a nine-chunk DOCX that completed normalization but assembled with duplicated/missing sections, and an intentional unreachable-Agent path that could leave the appliance in exclusive Agent mode. Both are product-safety defects because successful command progression could otherwise leave either semantically incomplete document state or the wrong runtime topology.
 
 **Retest only if:** document chunking/normalization, Agent topology entry/cleanup, or review readiness semantics change. Use a synthetic multi-chunk source with unique per-chunk markers plus an unreachable/readiness-failure control; do not rerun unrelated runtime/model campaigns solely because this contract is touched.
+
+## DEC-033 — Separate intrinsic model facts, BC-250 qualification policy and runtime parameters
+
+**Status:** ACTIVE — pre-1.0 model-management architecture.
+
+**Decision:** Package-owned Ollama models use `models/model-catalog.json` as the authority for
+intrinsic/acquisition facts: provider, source identity, source policy/reproducibility, ownership,
+runtime lane and stable capabilities. Packaged Modelfiles are runtime-only templates and remain the
+sole authority for runtime parameters/samplers. `models/model-profiles.json` schema 2 is the authority
+for BC-250 qualification limits, intended/comparison roles, recommended status and product/testing
+policy. MTP retains its separate TOML acquisition catalog but uses the same capability/ownership
+vocabulary and has matching qualification profiles.
+
+Every active package model is migrated immediately rather than maintaining mixed old/new metadata.
+Reasoning capability is expressed independently as `verified`, `candidate` or `unsupported`; product
+roles decide separately whether a request should enable reasoning. Context metadata distinguishes an
+informational native maximum from the BC-250 qualified target and product default; unknown upstream
+maximums remain null rather than being guessed.
+
+During the pre-1.0 greenfield phase, every active package model source uses `tracking` so explicit
+`refresh` can pick up newer upstream artifacts for continued capability evaluation. Tracking package entries
+intentionally do not carry an enforced catalog digest; the manager records the requested source identity plus
+the actual downloaded SHA-256 in local state, and `apply` reuses that validated local artifact without silently
+refreshing it. `status --online` uses source policy rather than the literal ref name, so moving refs such as
+`main` and `latest` are both comparable. The `pinned` policy remains implemented for the 1.0 stabilization
+step, where an immutable revision plus package-owned digest can be required without changing the schema.
+
+`bc250 model inspect MODEL --json` is the consolidated machine-readable metadata view.
+`--effective` additionally reads protected current state and renders effective runtime parameters from
+the Modelfile; the human format is convenience output rather than a parser contract.
+
+**Why:** The catalog now includes heterogeneous text, embedding, Agent, OCR/vision, provider-managed
+and standalone MTP models. Name heuristics and duplicated source/profile/runtime facts would make
+OWUI, benchmark and lifecycle tooling progressively harder to reason about. One authority per kind of
+fact allows later consumers to become declarative without changing the runtime lane architecture.
+
+
+## DEC-034 — Consumers use package model metadata before heuristics
+
+**Status:** ACTIVE — pre-1.0 model-management architecture.
+
+**Decision:** Open WebUI testing discovery and package benchmarks consume the model contract introduced
+by DEC-033. For testing-model discovery, precedence is explicit `testing_model_policies`, then catalog/profile
+metadata, then generic defaults. Intrinsic capabilities may expose appropriate testing surfaces such as
+vision/OCR/file-context, but do not automatically turn on role/request policy such as `think` or built-in tools.
+The OCR benchmark selects packaged model kind from `benchmark_kinds` + `ocr_profile`; name heuristics are a
+fallback only for unknown external models. MiniCPM-V is the first multimodal model using this declarative path.
+
+Destructive model lifecycle is ownership-aware. `remove --explain` is read-only and reports registration,
+source and state ownership. Actual removal uses Ollama's supported registration removal and verifies post-state;
+BC-250 deletes manager-owned GGUF/state/runtime files as applicable but never unlinks Ollama shared blob files
+by pathname. Provider-specific source semantics remain intentionally different while the operator receives one
+consistent lifecycle command surface.
+
+**Why:** The model fleet now mixes manager-owned GGUFs, provider-owned multimodal assets, Agent/embedding/MTP
+lanes and different capabilities. Metadata-first consumers eliminate repeated name heuristics and incorrect
+filesystem assumptions while preserving the critical separation between what a model can do and what a product
+role chooses to request.
+
+
+## DEC-035 — Finish metadata-first model consumer integration and move Open WebUI to 0.12.4
+
+**Status:** ACTIVE — next-release workbench.
+
+**Decision:** Package benchmark discovery uses the DEC-033 model contract before model-name prefixes.
+Embedding input-prefix behavior and the packaged TranslateGemma benchmark prompt profile are explicit
+catalog capabilities. Generic generation discovery admits packaged normal-lane generation models by
+metadata and excludes OCR/task/embedding/Agent implementations without deriving those roles from names.
+Name-based logic remains only as compatibility fallback for operator-supplied/external models that are not
+in the package catalog. Packaged models without an explicit request policy do not infer a `think` request
+from their family/name; capability and request policy remain separate authorities.
+
+The next-release workbench updates the digest-pinned Open WebUI runtime from 0.12.3 to 0.12.4. No new
+Open WebUI feature surface is enabled by that version bump; package feature policy remains unchanged.
+
+**Why:** Batch 1 established one authority per model fact and Batch 2 taught the largest consumers to read
+it. Leaving package-model benchmark selection/profile behavior name-derived would preserve duplicate
+implicit policy and make future model additions require evaluator edits. The 0.12.4 runtime update is small
+and is intentionally kept independent of the model-contract architecture.
