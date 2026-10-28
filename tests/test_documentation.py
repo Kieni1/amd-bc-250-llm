@@ -170,11 +170,14 @@ class DocumentationTests(unittest.TestCase):
                         continue
                     for pattern in privileged:
                         if re.search(pattern, command):
+                            # Provider-aware removal explanation is deliberately read-only and rootless.
+                            if re.search(r"\bbc250\s+model\s+remove\b", command) and "--explain" in command:
+                                continue
                             self.assertRegex(command, r"(?:^|\s)sudo(?:\s|$)", f"{relative}: {command}")
 
     def test_current_docs_use_supported_model_rag_and_storage_subcommands(self) -> None:
         allowed = {
-            "model": {"list", "status", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
+            "model": {"list", "status", "inspect", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
             "document": {"init", "prepare-batch", "review", "validate", "activate", "supersede", "status", "ingest"},
             "storage": {"status", "dedupe", "prune-sources"},
         }
@@ -356,18 +359,19 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(workbench["kind"], "release-workbench")
         _version, _release, nvr = current_identity()
         self.assertEqual(workbench["release"]["nvr"], nvr)
-        self.assertEqual(workbench["release"]["state"], "source-ready-build-pending")
+        self.assertEqual(workbench["release"]["state"], "accepted-1.9-baseline-next-release-development")
         self.assertNotIn("checkpoint", workbench)
-        self.assertIn("core functionality", workbench["next_work"]["device"])
-        self.assertIn("Managed Documents v2", workbench["next_work"]["after_pass"])
-        self.assertIn("German–French workflow quality", workbench["long_term"]["direction"])
+        self.assertIn("Batch 3 integration/refinement complete", workbench["next_work"]["current_batch"])
+        self.assertIn("Freeze/assign the next release identity", workbench["next_work"]["next_batch"])
+        self.assertIn("metadata-first", workbench["long_term"]["direction"])
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
         _version, release, _nvr = current_identity()
         self.assertIn("Package standard: **Ollama v0.40.8**", ollama)
-        self.assertIn(f"release {release} carries it unchanged", ollama)
+        self.assertIn(f"release {release}", ollama)
+        self.assertIn("runtime pin unchanged", ollama)
         self.assertIn("0.40.8 keeps the established four-lane settings", ollama)
         self.assertIn("does not transfer DEVICE acceptance", ollama)
         self.assertNotIn("0.34.4 remains the last exact-device-qualified runtime", ollama)

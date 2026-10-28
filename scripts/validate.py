@@ -83,6 +83,7 @@ def check_required_inputs() -> None:
         "packaging/bc250-llm-server.sysusers",
         "packaging/upstreams.toml",
         "models/modelctl.py",
+        "models/model-catalog.json",
         "models/model-profiles.json",
         "cmd/monitoring/status.sh",
         "cmd/monitoring/support-bundle.sh",
@@ -397,7 +398,8 @@ def check_dispatcher_and_runtime_contracts() -> None:
             "terminal=True",
             'command_path("script")',
             "OPERATOR_MODEL_DIR",
-            "RECOMMENDED_MODELS",
+            "recommended_model_ids",
+            "model-catalog.json",
             "already current; skipping",
         ),
         "packaging/bc250-llm-server.spec": (

@@ -310,7 +310,7 @@ ollama_version_line
             share = Path(temporary)
             (share / "runtime.env").write_text(
                 (
-                    "BC250_OPEN_WEBUI_VERSION=0.12.3\n"
+                    "BC250_OPEN_WEBUI_VERSION=0.12.4\n"
                     f"BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:{'1' * 64}\n"
                     "BC250_TIKA_VERSION=4.1.0-full\n"
                     f"BC250_TIKA_IMAGE_DIGEST=sha256:{'2' * 64}\n"
@@ -520,7 +520,7 @@ bc250_failed_systemd_units
             (share / "VERSION").write_text(CURRENT_VERSION + "\n", encoding="utf-8")
             (share / "runtime.env").write_text(
                 "BC250_OLLAMA_VERSION=0.40.8\n"
-                "BC250_OPEN_WEBUI_VERSION=0.12.3\n"
+                "BC250_OPEN_WEBUI_VERSION=0.12.4\n"
                 "BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:" + "1" * 64 + "\n"
                 "BC250_TIKA_VERSION=4.1.0-full\n"
                 "BC250_TIKA_IMAGE_DIGEST=sha256:" + "2" * 64 + "\n"
@@ -539,7 +539,7 @@ bc250_failed_systemd_units
                 "#!/usr/bin/env python3\n"
                 "import json\n"
                 "json.dump({'runtime_identity': {"
-                "'open_webui': {'expected': {'version': '0.12.3', 'digest': 'sha256:' + '1'*64}, 'observed': {'version': '0.12.3', 'digest': 'sha256:' + '1'*64}, 'match': True}, "
+                "'open_webui': {'expected': {'version': '0.12.4', 'digest': 'sha256:' + '1'*64}, 'observed': {'version': '0.12.4', 'digest': 'sha256:' + '1'*64}, 'match': True}, "
                 "'tika': {'expected': {'version': '4.1.0-full', 'digest': 'sha256:' + '2'*64}, 'observed': {'version': '4.1.0-full', 'digest': 'sha256:' + '2'*64}, 'match': True}"
                 "}}, __import__('sys').stdout)\n",
                 encoding="utf-8",

@@ -76,6 +76,7 @@ class PackagingTests(unittest.TestCase):
         revalidate = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
         self.assertNotIn("quality-checks/", manifest)
         self.assertNotIn("quality-checks", revalidate)
+        self.assertIn("models/model-catalog.json\t{share}/model-management/model-catalog.json", manifest)
         self.assertIn("models/retired-models.json\t{share}/model-management/retired-models.json", manifest)
         self.assertTrue((ROOT / "quality-checks/README.md").is_file())
 
@@ -578,10 +579,10 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn("# v0.12.3, pinned OCI index digest.", quadlet)
+        self.assertIn("# v0.12.4, pinned OCI index digest.", quadlet)
         self.assertIn(
             "Image=ghcr.io/open-webui/open-webui@sha256:"
-            "a537bbe1e6b428820f52ed4a029d7fff97062e24d5cf32c365fba36fd0542def",
+            "a5b9e403d19154796850679c8c5d1295301cee954be8b84ddd62af92426558f7",
             quadlet,
         )
         self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.12\.3)$")
@@ -684,10 +685,10 @@ class PackagingTests(unittest.TestCase):
             f'--arg model "{task}"',
             (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8"),
         )
-        self.assertIn(
-            f'"{task}"',
-            (ROOT / "models/modelctl.py").read_text(encoding="utf-8"),
-        )
+        catalog = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
+        profiles = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        self.assertIn(task, catalog["models"])
+        self.assertTrue(profiles["profiles"][task]["recommended"])
 
     def test_compare_mtp_does_not_force_global_think_false(self) -> None:
         source = (ROOT / "models/mtp/compare-mtp.sh").read_text(
@@ -940,7 +941,7 @@ class PackagingTests(unittest.TestCase):
             values["BC250_OLLAMA_PAYLOAD_SHA256"],
             "0bb17cc19e9c1339ddbe0cba55148bf068f8f19dec8ec5fd531461aaa207282a",
         )
-        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.12.3")
+        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.12.4")
         self.assertEqual(values["BC250_TIKA_VERSION"], "4.1.0-full")
         self.assertEqual(values["BC250_GOVERNOR_VERSION"], "0.4.14")
         self.assertEqual(values["BC250_GOVERNOR_COMMIT"], "7b08fdcf542d1edd82f3a9077c902038019c9842")

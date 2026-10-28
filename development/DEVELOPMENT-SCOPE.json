@@ -95,6 +95,8 @@
       "status": "active",
       "description": "Current production/experiment/task/embedding/agent model registry, model profiles and model lifecycle controller. Retired content is separate archive-only scope.",
       "paths": [
+        "cmd/model_contract.py",
+        "models/model-catalog.json",
         "models/model-profiles.json",
         "models/modelctl.py",
         "models/README.md",
@@ -329,7 +331,7 @@
         "models/mtp/**"
       ],
       "focused_tests": [],
-      "baseline_sha256": "27e25e5ddf3cc8528fe0363684403389b233d89f54447648bd0ba55f59926e89",
+      "baseline_sha256": "b222463fb8eb90880b9944c001e463d479bccf615fe21d9a0031fe2f3e5ad624",
       "thaw_if": [
         "MTP is explicitly returned to active comparison",
         "generic model lifecycle begins managing MTP"
@@ -337,6 +339,9 @@
       "watch_paths": [
         "models/modelctl.py",
         "packaging/install-manifest.tsv"
+      ],
+      "notes": [
+        "Frozen implementation retained; baseline refreshed only for the cross-cutting schema-1 capability/ownership metadata added to the MTP catalog."
       ]
     },
     "coding-agent": {

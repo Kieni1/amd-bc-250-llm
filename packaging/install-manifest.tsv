@@ -54,6 +54,7 @@ file	0644	config/maintenance/owui-maintenance.env	{share}/examples/maintenance.e
 ghost	0600	-	{config}/maintenance.env
 
 file	0755	models/modelctl.py	{libexec}/modelctl
+file	0644	cmd/model_contract.py	{libexec}/model_contract.py
 file	0755	cmd/documents/ocr.sh	{libexec}/documents/ocr.sh
 file	0644	cmd/documents/importer.py	{libexec}/documents/importer.py
 file	0755	cmd/documents/lifecycle.py	{libexec}/documents/lifecycle.py
@@ -137,6 +138,7 @@ file	0644	models/mtp/models.toml	{share}/model-management/mtp-models.toml
 file	0644	models/modelfiles/*.Modelfile	{share}/model-management/modelfiles/
 file	0644	models/modelfiles/MODEL-TEMPLATE.Modelfile.example	{share}/model-management/MODEL-TEMPLATE.Modelfile.example
 file	0644	models/retired-models.json	{share}/model-management/retired-models.json
+file	0644	models/model-catalog.json	{share}/model-management/model-catalog.json
 file	0644	models/model-profiles.json	{share}/model-management/model-profiles.json
 
 file	0644	models/coding-agent/README.md	{share}/examples/coding-agent/README.md
