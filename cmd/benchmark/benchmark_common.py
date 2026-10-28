@@ -16,6 +16,7 @@ import re
 import shutil
 import statistics
 import subprocess
+import sys
 import threading
 import time
 import unicodedata
@@ -25,6 +26,20 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib import error, request
+
+_COMMAND_ROOT = Path(__file__).resolve().parents[1]
+if (_COMMAND_ROOT / "model_contract.py").is_file() and str(_COMMAND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_COMMAND_ROOT))
+
+from model_contract import (
+    ModelContractError,
+)
+from model_contract import (
+    benchmark_kinds as _package_benchmark_kinds,
+)
+from model_contract import (
+    model_contract as _package_model_contract,
+)
 
 DEFAULT_TIMEOUT = 900.0
 DEFAULT_TELEMETRY_INTERVAL = 0.5
@@ -192,6 +207,21 @@ def translation_literal_integrity_mismatch(source: str, target: str) -> str | No
         raise BenchmarkError("translation contract does not define literal_integrity_mismatch")
     result = checker(source, target)
     return str(result) if result is not None else None
+
+
+def package_model_contract(model: str) -> dict[str, Any] | None:
+    """Return the package model contract, failing clearly if package metadata is malformed."""
+    try:
+        return _package_model_contract(model)
+    except ModelContractError as exc:
+        raise BenchmarkError(str(exc)) from exc
+
+
+def package_benchmark_kinds(model: str) -> tuple[str, ...]:
+    try:
+        return _package_benchmark_kinds(model)
+    except ModelContractError as exc:
+        raise BenchmarkError(str(exc)) from exc
 
 
 def model_policy_path() -> Path:

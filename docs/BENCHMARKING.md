@@ -125,6 +125,11 @@ qualification policy; individual query rows are observations.
 bc250 advanced benchmark ocr [MODEL ...]
 ```
 
+Package-owned model kind is selected from `models/model-catalog.json` capability metadata first;
+name heuristics are retained only for unknown external models. The canonical evaluator currently
+supports the package OCR profiles for GLM-OCR, OvisOCR2 and MiniCPM-V, with MiniCPM using a
+direct extraction prompt suited to its document-vision/OCR role.
+
 Text fidelity is scored on canonicalized plain text so requested Markdown/HTML
 markup does not distort transcription quality. Semantic literal matching likewise normalizes paired
 Markdown emphasis plus Unicode space/hyphen presentation before deciding that required content is
@@ -248,7 +253,7 @@ sudo bc250 advanced benchmark owui-system-context MODEL --token-file FILE
 Open WebUI benchmark `--token-file` inputs must be non-empty regular files with no
 group/world access (normally mode `0600`), matching the package credential-file boundary.
 
-The pinned Open WebUI v0.12.3 OpenAI-style adapter is not an external BC-250 compatibility
+The pinned Open WebUI v0.12.4 OpenAI-style adapter is not an external BC-250 compatibility
 contract. A client-supplied root `max_tokens` field on that external-style endpoint is not advertised
 as a reliable hard cap for Ollama-backed requests. The package-owned Advanced model record is a
 different package-owned internal path: exact-device evidence from the 1.4 campaign records `params.max_tokens=6144` reaching Ollama as `options.num_predict=6144`, with no root-level Ollama `max_tokens`. Later releases use that path as a bounded no-regression check when the Open WebUI/Ollama request boundary changes. The raw outbound capture is not retained in this source tree. Direct benchmark callers

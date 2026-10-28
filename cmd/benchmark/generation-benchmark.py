@@ -39,6 +39,7 @@ from benchmark_common import (
     finalize_active_infrastructure_failure,
     finalize_benchmark_metadata,
     fixture_metadata,
+    package_model_contract,
     prepare_result_dir,
     request_policy_for_model,
     result_record,
@@ -312,6 +313,12 @@ def resolve_think_policy(model: str, requested: str) -> str:
             return "false"
         if isinstance(value, str) and value in {"low", "medium", "high", "max"}:
             return value
+    # Packaged models without an explicit request policy deliberately do not
+    # infer request-time reasoning behavior from their name or capability.
+    # Capability and request policy are separate package authorities.
+    if package_model_contract(model) is not None:
+        return "omit"
+
     lower = model.casefold()
     if "gpt-oss" in lower:
         return "medium"
@@ -700,13 +707,36 @@ def generation_measurement_semantics(
 def select_models(client: OllamaClient, explicit: list[str], *, interactive: bool = True) -> list[str]:
     if explicit:
         return explicit
-    names = [str(row.get("name") or row.get("model") or "") for row in client.tags()]
-    names = [
-        name
-        for name in names
-        if name
-        and not any(token in name.casefold() for token in ("embed-", "ocr", "task-"))
-    ]
+    discovered = [str(row.get("name") or row.get("model") or "") for row in client.tags()]
+    names: list[str] = []
+    production_names: list[str] = []
+    for name in discovered:
+        if not name:
+            continue
+        canonical = name.rsplit("/", 1)[-1].removesuffix(":latest")
+        contract = package_model_contract(canonical)
+        if contract is not None:
+            catalog = contract["catalog"]
+            capabilities = catalog.get("capabilities", {})
+            kinds = capabilities.get("benchmark_kinds", [])
+            if (
+                "generation" not in kinds
+                or capabilities.get("ocr") is True
+                or catalog.get("category") in {"task", "embedding", "agentic"}
+            ):
+                continue
+            names.append(name)
+            if catalog.get("category") == "production":
+                production_names.append(name)
+            continue
+
+        # Compatibility fallback for unknown external models.
+        if any(token in name.casefold() for token in ("embed-", "ocr", "task-")):
+            continue
+        names.append(name)
+        if canonical.startswith("prod-"):
+            production_names.append(name)
+
     if not names:
         raise BenchmarkError("no generation models found")
     if not interactive or not sys.stdin.isatty():
@@ -717,13 +747,8 @@ def select_models(client: OllamaClient, explicit: list[str], *, interactive: boo
         include_experiments = os.environ.get("BENCH_INCLUDE_EXPERIMENTS", "0").casefold() in {
             "1", "true", "yes", "y", "on"
         }
-        if not include_experiments:
-            production = [
-                name for name in names
-                if name.rsplit("/", 1)[-1].removesuffix(":latest").startswith("prod-")
-            ]
-            if production:
-                return production
+        if not include_experiments and production_names:
+            return production_names
         return names
     print("Available generation models:")
     for index, name in enumerate(names):

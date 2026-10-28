@@ -461,6 +461,23 @@ class GenerationPolicyTests(unittest.TestCase):
 
 
 class CategoryPolicyTests(unittest.TestCase):
+    def test_category_discovery_prefers_package_benchmark_metadata(self) -> None:
+        class FakeClient:
+            def tags(self):
+                return [
+                    {"name": "exp-minicpm-v47-1b-openbmb-q4-k-m:latest"},
+                    {"name": "exp-qwen35-4b-unsloth-q6-k:latest"},
+                    {"name": "exp-external-ocr:latest"},
+                ]
+
+        self.assertEqual(
+            category.choose_models(FakeClient(), [], "exp-", "ocr"),
+            [
+                "exp-minicpm-v47-1b-openbmb-q4-k-m:latest",
+                "exp-external-ocr:latest",
+            ],
+        )
+
     def test_embedding_prefixes_match_packaged_rag_policy(self) -> None:
         q, d, scheme = category.embedding_scheme("embed-jina-v5-small-retrieval-q4-k-m")
         self.assertEqual((q, d, scheme), ("Query: ", "Document: ", "jina-v5"))
@@ -468,6 +485,8 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertIn("German, French, and English office documents", q)
         self.assertEqual(d, "")
         self.assertEqual(scheme, "qwen3-embedding")
+        q, d, scheme = category.embedding_scheme("external-jina:test")
+        self.assertEqual((q, d, scheme), ("Query: ", "Document: ", "jina-v5"))
 
     def test_ocr_prompts_preserve_source_language_and_structure(self) -> None:
         self.assertEqual(category.OCR_PROMPTS["glm"], "Text Recognition:")
@@ -476,7 +495,17 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertIn("translat", prompt)
         self.assertIn("table row", prompt)
         self.assertNotIn("tables as html", prompt)
-        self.assertEqual(set(category.OCR_PROMPTS), {"glm", "ovis"})
+        minicpm_prompt = category.OCR_PROMPTS["minicpm"].lower()
+        self.assertIn("table row", minicpm_prompt)
+        self.assertIn("do not translate", minicpm_prompt)
+        self.assertEqual(set(category.OCR_PROMPTS), {"glm", "ovis", "minicpm"})
+        self.assertEqual(category.ocr_kind("exp-glm-ocr-ggml-q8-0:latest"), "glm")
+        self.assertEqual(category.ocr_kind("exp-ovisocr2-abiray-q8-0:latest"), "ovis")
+        self.assertEqual(
+            category.ocr_kind("exp-minicpm-v47-1b-openbmb-q4-k-m:latest"),
+            "minicpm",
+        )
+        self.assertEqual(category.ocr_kind("external-minicpm:test"), "minicpm")
 
     def test_fixtures_cover_multilingual_office_categories(self) -> None:
         embed = json.loads(
@@ -1675,7 +1704,7 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertNotIn('"role": "system"', json.dumps(hunyuan))
 
         gemma = category.translation_messages(
-            case, "exp-translate-gemma4-sub-e4b-17s-q4-k-xl"
+            case, "prod-translate-gemma4-sub-e4b-17s-q4-k-xl"
         )
         self.assertEqual([message["role"] for message in gemma], ["system", "user"])
         self.assertEqual(
@@ -3657,6 +3686,30 @@ status_run --raw
             self.assertIn("swap_used_mib", meta["starting_state"])
             self.assertIn("memory_psi", meta["starting_state"])
             self.assertIn("ollama_residency", meta["starting_state"])
+
+    def test_generation_default_discovery_uses_package_metadata(self) -> None:
+        class FakeClient:
+            def tags(self):
+                return [
+                    {"name": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest"},
+                    {"name": "exp-minicpm-v47-1b-openbmb-q4-k-m:latest"},
+                    {"name": "embed-jina-v5-small-retrieval-q4-k-m:latest"},
+                    {"name": "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest"},
+                ]
+
+        with patch.dict(os.environ, {"BENCH_INCLUDE_EXPERIMENTS": "0"}, clear=False):
+            selected = generation.select_models(FakeClient(), [], interactive=False)
+        self.assertEqual(selected, ["prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest"])
+
+        with patch.dict(os.environ, {"BENCH_INCLUDE_EXPERIMENTS": "1"}, clear=False):
+            selected = generation.select_models(FakeClient(), [], interactive=False)
+        self.assertEqual(
+            selected,
+            [
+                "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
+                "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest",
+            ],
+        )
 
     def test_generation_cli_supports_noninteractive_explicit_controls(self) -> None:
         source = (BENCH / "generation-benchmark.py").read_text(encoding="utf-8")

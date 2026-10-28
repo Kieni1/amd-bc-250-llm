@@ -38,6 +38,8 @@ from benchmark_common import (
     fixture_metadata,
     mean,
     normalize_words,
+    package_benchmark_kinds,
+    package_model_contract,
     prepare_result_dir,
     request_policy_for_model,
     resolve_package_resource,
@@ -83,11 +85,24 @@ def process_seconds(response: dict[str, Any]) -> float:
     )
 
 
-def choose_models(client: OllamaClient, explicit: list[str], prefix: str) -> list[str]:
+def choose_models(
+    client: OllamaClient, explicit: list[str], prefix: str, benchmark_kind: str
+) -> list[str]:
     if explicit:
         return explicit
     names = [str(row.get("name") or row.get("model") or "") for row in client.tags()]
-    return [name for name in names if name.removesuffix(":latest").startswith(prefix)]
+    selected: list[str] = []
+    for name in names:
+        canonical = name.removesuffix(":latest")
+        contract = package_model_contract(canonical)
+        if contract is not None:
+            if benchmark_kind in package_benchmark_kinds(canonical):
+                selected.append(name)
+            continue
+        # Unknown external models retain the historical prefix fallback.
+        if canonical.startswith(prefix):
+            selected.append(name)
+    return selected
 
 
 def model_meta(client: OllamaClient, model: str) -> dict[str, Any]:
@@ -154,14 +169,27 @@ def print_result_paths(paths: Any, summary_txt: Path) -> None:
     )
 
 def embedding_scheme(model: str) -> tuple[str, str, str]:
-    lower = model.lower()
     forced_query = os.environ.get("EMBED_QUERY_PREFIX")
     forced_doc = os.environ.get("EMBED_CONTENT_PREFIX")
     if forced_query is not None or forced_doc is not None:
         return forced_query or "", forced_doc or "", "environment"
-    if "jina" in lower:
+
+    contract = package_model_contract(model)
+    profile = None
+    if contract is not None:
+        capabilities = contract["catalog"].get("capabilities", {})
+        profile = capabilities.get("embedding_profile")
+    else:
+        # Compatibility fallback for unknown external models.
+        lower = model.lower()
+        if "jina" in lower:
+            profile = "jina-v5"
+        elif "qwen3" in lower and "embed" in lower:
+            profile = "qwen3-embedding"
+
+    if profile == "jina-v5":
         return "Query: ", "Document: ", "jina-v5"
-    if "qwen3" in lower and "embed" in lower:
+    if profile == "qwen3-embedding":
         return (
             "Instruct: Retrieve relevant passages from German, French, and English office documents that answer the query.\nQuery: ",
             "",
@@ -196,7 +224,7 @@ def benchmark_embeddings(args: argparse.Namespace) -> int:
     corpus = json.loads(fixture.read_text(encoding="utf-8"))
     documents = corpus["documents"]
     queries = corpus["queries"]
-    models = choose_models(client, args.models, "embed-")
+    models = choose_models(client, args.models, "embed-", "embedding")
     if not models:
         raise BenchmarkError("no embedding models found")
 
@@ -575,7 +603,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "task-cases.json")
     cases = json.loads(fixture.read_text(encoding="utf-8"))
-    models = choose_models(client, args.models, "task-")
+    models = choose_models(client, args.models, "task-", "task")
     if not models:
         raise BenchmarkError("no task models found")
     paths = prepare_result_dir("task", args.output_dir)
@@ -1228,7 +1256,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
     client = OllamaClient(args.ollama_url, args.timeout)
     fixture = Path(args.fixture or FIXTURE_ROOT / "agent-cases.json")
     cases = json.loads(fixture.read_text(encoding="utf-8"))
-    models = choose_models(client, args.models, "agentic-")
+    models = choose_models(client, args.models, "agentic-", "agent")
     if not models:
         raise BenchmarkError("no agentic models found")
     paths = prepare_result_dir("agent", args.output_dir)
@@ -1354,23 +1382,44 @@ def benchmark_agent(args: argparse.Namespace) -> int:
 
 
 OCR_PROMPTS = {
-    # GLM-OCR uses its trained recognition trigger. Ovis accepts a natural-language
-    # extraction instruction. Both are scored against the same text/structure goals.
+    # Prompt choice is package metadata for packaged models. Name heuristics remain
+    # only as a fallback for unknown external models supplied by the operator.
     "glm": "Text Recognition:",
     "ovis": (
         "Extract all readable text in natural human reading order. Preserve the "
         "source exactly without translation or paraphrasing. Preserve table row "
         "and column associations when possible."
     ),
+    "minicpm": (
+        "Extract all readable text from the image in natural human reading order. "
+        "Preserve wording, identifiers, numbers, line grouping, and table row/column "
+        "associations. Do not translate, summarize, or add commentary."
+    ),
 }
+OCR_DIRECT_EXTRACTION = frozenset({"ovis", "minicpm"})
 
 
 def ocr_kind(model: str) -> str:
+    contract = package_model_contract(model)
+    if contract is not None:
+        capabilities = contract["catalog"].get("capabilities", {})
+        kinds = capabilities.get("benchmark_kinds", [])
+        if "ocr" not in kinds or capabilities.get("ocr") is not True:
+            return "generic"
+        profile = capabilities.get("ocr_profile")
+        if not isinstance(profile, str) or profile not in OCR_PROMPTS:
+            raise BenchmarkError(
+                f"packaged OCR model {contract['id']} has no supported ocr_profile"
+            )
+        return profile
+
     lower = model.lower()
     if "glm-ocr" in lower:
         return "glm"
     if "ovisocr" in lower:
         return "ovis"
+    if "minicpm" in lower:
+        return "minicpm"
     return "generic"
 
 
@@ -1511,7 +1560,7 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
     manifest = Path(args.fixture or FIXTURE_ROOT / "ocr" / "manifest.json")
     fixture_dir = manifest.parent
     cases = json.loads(manifest.read_text(encoding="utf-8"))
-    models = choose_models(client, args.models, "exp-")
+    models = choose_models(client, args.models, "exp-", "ocr")
     models = [model for model in models if ocr_kind(model) != "generic"]
     if not models:
         raise BenchmarkError("no packaged OCR models found")
@@ -1574,9 +1623,9 @@ def benchmark_ocr(args: argparse.Namespace) -> int:
                         "stream": False,
                         "keep_alive": KEEP_ALIVE,
                     }
-                    # OvisOCR2 is trained for direct extraction rather than a
-                    # visible reasoning trace.
-                    if kind == "ovis":
+                    # Direct OCR extractors should not spend their bounded output
+                    # budget on a visible reasoning trace.
+                    if kind in OCR_DIRECT_EXTRACTION:
                         payload["think"] = False
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
                     start = time.monotonic()
@@ -2015,6 +2064,13 @@ TRANSLATE_GEMMA_DIRECTION_WRAPPERS = translation_direction_wrappers()
 
 
 def translation_prompt_profile(model: str) -> str:
+    contract = package_model_contract(model)
+    if contract is not None:
+        capabilities = contract["catalog"].get("capabilities", {})
+        profile = capabilities.get("translation_profile")
+        return str(profile) if isinstance(profile, str) and profile else "generic-explicit"
+
+    # Compatibility fallback for unknown external models.
     lower = model.casefold()
     if "hunyuan-mt" in lower:
         return "hunyuan-mt-upstream"
