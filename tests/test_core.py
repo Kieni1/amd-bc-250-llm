@@ -113,7 +113,7 @@ class CoreContractTests(unittest.TestCase):
     def test_primary_json_and_toml_configs_parse(self) -> None:
         for relative in (
             "config/openwebui/desired-state.json", "config/openwebui/functions.json",
-            "config/openwebui/models.json", "models/model-profiles.json", "models/retired-models.json",
+            "config/openwebui/models.json", "models/model-catalog.json", "models/model-profiles.json", "models/retired-models.json",
         ):
             json.loads((ROOT / relative).read_text(encoding="utf-8"))
         with (ROOT / "models/mtp/models.toml").open("rb") as stream:

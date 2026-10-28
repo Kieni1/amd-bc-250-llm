@@ -50,10 +50,14 @@ class ModelCatalogTests(unittest.TestCase):
         self.assertIn("Production models", result.stdout)
         self.assertIn("exp-", result.stdout)
 
-    def test_profile_and_retired_metadata_are_well_formed(self) -> None:
+    def test_catalog_profile_and_retired_metadata_are_well_formed(self) -> None:
+        catalog = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
         profiles = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
         retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
-        self.assertIsInstance(profiles, dict)
+        self.assertEqual(catalog["schema"], 1)
+        self.assertEqual(profiles["schema"], 2)
+        self.assertEqual(set(catalog["models"]), set(self.modelctl.load_model_catalog()))
+        self.assertTrue(set(catalog["models"]) <= set(profiles["profiles"]))
         self.assertIsInstance(retired, (dict, list))
 
     def test_mtp_catalog_is_parseable(self) -> None:

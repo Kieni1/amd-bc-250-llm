@@ -33,6 +33,8 @@ INSTALLED_CONFIG = Path(f"/etc/{PROJECT}")
 PACKAGED_MODEL_DIR = INSTALLED_SHARE / "modelfiles"
 OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 RETIRED_CATALOG = INSTALLED_SHARE / "retired-models.json"
+MODEL_CATALOG = INSTALLED_SHARE / "model-catalog.json"
+MODEL_PROFILES = INSTALLED_SHARE / "model-profiles.json"
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
@@ -42,16 +44,6 @@ OPTIONAL_MODEL_NAMES = frozenset({
 })
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 MTP_RECOMMENDATIONS = {"primary", "alternative"}
-RECOMMENDED_MODELS = {
-    "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
-    "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
-    "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
-    "prod-qwen35-9b-unsloth-q6-k",
-    "prod-gpt-oss20b-ggml-org-mxfp4",
-    "task-lfm25-1.2b-instruct-liquidai-q6-k",
-    "agentic-ornith15-9b-ornith-q5-k-m",
-    "embed-jina-v5-small-retrieval-q4-k-m",
-}
 LOW_FREE_BYTES = 20 * 1024**3
 REGISTRATION_PROBE_TIMEOUT = 5
 SYSTEMD_PROBE_TIMEOUT = 2
@@ -182,6 +174,372 @@ def local_source_root() -> Path | None:
     ).is_file():
         return script_dir
     return None
+
+
+
+def model_catalog_path() -> Path:
+    source_root = local_source_root()
+    local = source_root / "model-catalog.json" if source_root else None
+    return local if local and local.is_file() else MODEL_CATALOG
+
+
+def model_profiles_path() -> Path:
+    source_root = local_source_root()
+    local = source_root / "model-profiles.json" if source_root else None
+    return local if local and local.is_file() else MODEL_PROFILES
+
+
+def _load_json_object(path: Path, label: str) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ModelError(f"could not read {label} {path}: {error}") from error
+    if not isinstance(value, dict):
+        raise ModelError(f"invalid {label}: {path}")
+    return value
+
+
+def load_model_profiles(path: Path | None = None) -> dict[str, dict]:
+    source = path or model_profiles_path()
+    document = _load_json_object(source, "model profiles")
+    if document.get("schema") != 2 or not isinstance(document.get("profiles"), dict):
+        raise ModelError(f"{source}: unsupported model-profile schema")
+    result: dict[str, dict] = {}
+    for model_id, profile in document["profiles"].items():
+        if not isinstance(model_id, str) or not model_id or not isinstance(profile, dict):
+            raise ModelError(f"{source}: invalid model profile entry")
+        required_strings = (
+            "profile_class",
+            "intended_role",
+            "comparison_role",
+            "residency_policy",
+            "reasoning_request_policy",
+        )
+        for field in required_strings:
+            value = profile.get(field)
+            if not isinstance(value, str) or not value:
+                raise ModelError(f"{source}: {model_id}: {field} must be a non-empty string")
+        if profile.get("owui_testing_exposure") not in {"curated", "testing", "forbidden"}:
+            raise ModelError(
+                f"{source}: {model_id}: owui_testing_exposure must be curated, testing, or forbidden"
+            )
+        if not isinstance(profile.get("recommended"), bool):
+            raise ModelError(f"{source}: {model_id}: recommended must be boolean")
+        if not isinstance(profile.get("specialized"), bool):
+            raise ModelError(f"{source}: {model_id}: specialized must be boolean")
+        output_expectation = profile.get("output_token_expectation")
+        if output_expectation is not None and (
+            type(output_expectation) is not int or output_expectation <= 0
+        ):
+            raise ModelError(
+                f"{source}: {model_id}: output_token_expectation must be null or a positive integer"
+            )
+        qualified = profile.get("qualified_context_target")
+        product_default = profile.get("product_context_default")
+        if type(qualified) is not int or qualified <= 0:
+            raise ModelError(
+                f"{source}: {model_id}: qualified_context_target must be a positive integer"
+            )
+        if product_default is not None and (
+            type(product_default) is not int or product_default <= 0
+        ):
+            raise ModelError(
+                f"{source}: {model_id}: product_context_default must be null or a positive integer"
+            )
+        if product_default is not None and product_default > qualified:
+            raise ModelError(
+                f"{source}: {model_id}: product_context_default cannot exceed qualified_context_target"
+            )
+        result[model_id] = profile
+    return result
+
+
+def recommended_model_ids() -> frozenset[str]:
+    return frozenset(
+        model_id
+        for model_id, profile in load_model_profiles().items()
+        if profile.get("recommended") is True
+    )
+
+
+def _validate_string_list(value, *, path: Path, model_id: str, field: str) -> list[str]:
+    if not isinstance(value, list) or not value or any(
+        not isinstance(item, str) or not item for item in value
+    ):
+        raise ModelError(f"{path}: {model_id}: {field} must be a non-empty string list")
+    return list(value)
+
+
+def load_model_catalog(path: Path | None = None) -> dict[str, dict]:
+    source = path or model_catalog_path()
+    document = _load_json_object(source, "model catalog")
+    if document.get("schema") != 1 or not isinstance(document.get("models"), dict):
+        raise ModelError(f"{source}: unsupported model-catalog schema")
+    result: dict[str, dict] = {}
+    allowed_providers = {"ollama", "ollama-hf"}
+    allowed_reasoning = {"verified", "candidate", "unsupported"}
+    allowed_source_policy = {"tracking", "pinned"}
+    allowed_ownership = {"bc250", "ollama", "provider", "none"}
+    expected_lane = {
+        "production": "main",
+        "experiments": "main",
+        "task": "task",
+        "agentic": "agent",
+        "embedding": "embedding",
+    }
+    for model_id, entry in document["models"].items():
+        context = f"{source}: {model_id}"
+        if not isinstance(model_id, str) or re.fullmatch(r"[a-z0-9][a-z0-9._-]*", model_id) is None:
+            raise ModelError(f"{context}: invalid model id")
+        if not isinstance(entry, dict):
+            raise ModelError(f"{context}: entry must be an object")
+        category = entry.get("category")
+        if category not in OLLAMA_CATEGORIES:
+            raise ModelError(f"{context}: invalid category")
+        if not model_id.startswith(CATEGORY_PREFIXES[category]):
+            raise ModelError(f"{context}: id does not match category prefix")
+        provider = entry.get("provider")
+        if provider not in allowed_providers:
+            raise ModelError(f"{context}: invalid provider")
+        if not isinstance(entry.get("enabled"), bool):
+            raise ModelError(f"{context}: enabled must be boolean")
+
+        source_info = entry.get("source")
+        if not isinstance(source_info, dict):
+            raise ModelError(f"{context}: source must be an object")
+        repository = require_string(source_info, "repository", f"{context}: source")
+        if re.fullmatch(r"[^/\s]+/[^/\s]+", repository) is None:
+            raise ModelError(f"{context}: source repository must be owner/repository")
+        require_string(source_info, "revision", f"{context}: source")
+        require_string(source_info, "filename", f"{context}: source", filename=True)
+        digest = source_info.get("expected_sha256", "")
+        if not isinstance(digest, str) or (digest and re.fullmatch(r"[0-9a-f]{64}", digest) is None):
+            raise ModelError(f"{context}: invalid expected_sha256")
+        source_policy = source_info.get("policy")
+        if source_policy not in allowed_source_policy:
+            raise ModelError(f"{context}: source policy must be tracking or pinned")
+        reproducibility = require_string(source_info, "reproducibility", f"{context}: source")
+        if source_policy == "tracking" and digest:
+            raise ModelError(
+                f"{context}: tracking sources must record downloaded digests in state, "
+                "not pin expected_sha256 in the catalog"
+            )
+        if source_policy == "pinned" and provider == "ollama" and not digest:
+            raise ModelError(f"{context}: pinned manager-owned sources require expected_sha256")
+        if source_policy == "tracking" and provider == "ollama" and reproducibility != "tracking-ref":
+            raise ModelError(f"{context}: tracking manager-owned source must use reproducibility=tracking-ref")
+        if source_policy == "pinned" and provider == "ollama" and reproducibility != "pinned+digest":
+            raise ModelError(f"{context}: pinned manager-owned source must use reproducibility=pinned+digest")
+        if provider == "ollama":
+            local_path = Path(require_string(source_info, "local_path", f"{context}: source"))
+            if not local_path.is_absolute() or local_path.name != source_info["filename"]:
+                raise ModelError(f"{context}: local_path must be absolute and end in filename")
+        else:
+            provider_ref = require_string(source_info, "provider_ref", f"{context}: source")
+            remote = re.fullmatch(r"hf\.co/(?P<repository>[^/\s]+/[^/:\s]+):[^\s]+", provider_ref)
+            if remote is None:
+                raise ModelError(f"{context}: ollama-hf provider_ref must be an hf.co owner/repository reference")
+            if remote.group("repository") != repository:
+                raise ModelError(f"{context}: provider_ref repository must match source repository")
+
+        ownership = entry.get("ownership")
+        if not isinstance(ownership, dict):
+            raise ModelError(f"{context}: ownership must be an object")
+        for field in ("source", "registration", "state"):
+            if ownership.get(field) not in allowed_ownership:
+                raise ModelError(f"{context}: invalid ownership.{field}")
+        expected_ownership = (
+            {"source": "bc250", "registration": "bc250", "state": "bc250"}
+            if provider == "ollama"
+            else {"source": "ollama", "registration": "bc250", "state": "provider"}
+        )
+        if any(ownership.get(field) != value for field, value in expected_ownership.items()):
+            raise ModelError(
+                f"{context}: ownership does not match {provider} provider contract"
+            )
+
+        runtime = entry.get("runtime")
+        if not isinstance(runtime, dict):
+            raise ModelError(f"{context}: runtime must be an object")
+        if runtime.get("lane") != expected_lane[category]:
+            raise ModelError(f"{context}: runtime lane does not match category")
+        if runtime.get("modelfile") != f"{model_id}.Modelfile":
+            raise ModelError(f"{context}: runtime Modelfile must match model id")
+        if not isinstance(runtime.get("agent_prepare_required"), bool):
+            raise ModelError(f"{context}: agent_prepare_required must be boolean")
+        if runtime["agent_prepare_required"] != (category == "agentic"):
+            raise ModelError(
+                f"{context}: agent_prepare_required must be true only for agentic models"
+            )
+
+        capabilities = entry.get("capabilities")
+        if not isinstance(capabilities, dict):
+            raise ModelError(f"{context}: capabilities must be an object")
+        _validate_string_list(
+            capabilities.get("modalities"), path=source, model_id=model_id, field="capabilities.modalities"
+        )
+        _validate_string_list(
+            capabilities.get("features"), path=source, model_id=model_id, field="capabilities.features"
+        )
+        _validate_string_list(
+            capabilities.get("benchmark_kinds"), path=source, model_id=model_id, field="capabilities.benchmark_kinds"
+        )
+        if capabilities.get("reasoning") not in allowed_reasoning:
+            raise ModelError(f"{context}: invalid reasoning capability")
+        for field in ("ocr", "tools"):
+            if not isinstance(capabilities.get(field), bool):
+                raise ModelError(f"{context}: capabilities.{field} must be boolean")
+        for optional_profile in ("ocr_profile", "embedding_profile", "translation_profile"):
+            value = capabilities.get(optional_profile)
+            if value is not None and (
+                not isinstance(value, str)
+                or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", value)
+            ):
+                raise ModelError(f"{context}: invalid capabilities.{optional_profile}")
+
+        ocr_profile = capabilities.get("ocr_profile")
+        if capabilities["ocr"]:
+            if not isinstance(ocr_profile, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", ocr_profile):
+                raise ModelError(f"{context}: OCR models require capabilities.ocr_profile")
+            if "ocr" not in capabilities["benchmark_kinds"]:
+                raise ModelError(f"{context}: OCR models must declare the ocr benchmark kind")
+        elif ocr_profile is not None:
+            raise ModelError(f"{context}: non-OCR models cannot define capabilities.ocr_profile")
+        if "embedding" in capabilities["benchmark_kinds"] and not capabilities.get("embedding_profile"):
+            raise ModelError(f"{context}: embedding benchmark models require capabilities.embedding_profile")
+        if capabilities.get("embedding_profile") and category != "embedding":
+            raise ModelError(f"{context}: embedding_profile is only valid for embedding models")
+        if capabilities.get("translation_profile") and "generation" not in capabilities["benchmark_kinds"]:
+            raise ModelError(f"{context}: translation_profile requires generation benchmark support")
+        native = entry.get("native_context_max")
+        if native is not None and (type(native) is not int or native <= 0):
+            raise ModelError(f"{context}: native_context_max must be null or a positive integer")
+        result[model_id] = entry
+    return result
+
+
+def _catalog_for_model_directory(directory: Path) -> Path | None:
+    local = directory.parent / "model-catalog.json"
+    if local.is_file():
+        return local
+    if directory == PACKAGED_MODEL_DIR and MODEL_CATALOG.is_file():
+        return MODEL_CATALOG
+    return None
+
+
+def _runtime_template_metadata(path: Path) -> tuple[str, str]:
+    category = ""
+    name = ""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as error:
+        raise ModelError(f"cannot read Modelfile {path}: {error}") from error
+    for line in lines:
+        if line.startswith("# BC250 category: "):
+            category = line.removeprefix("# BC250 category: ").strip()
+        elif line.startswith("# Ollama model: "):
+            name = line.removeprefix("# Ollama model: ").strip()
+    return category, name
+
+
+def load_packaged_model(path: Path, model_id: str, entry: dict) -> dict:
+    if path.name != f"{model_id}.Modelfile" or not path.is_file():
+        raise ModelError(f"missing runtime Modelfile template for {model_id}: {path}")
+    text = path.read_text(encoding="utf-8")
+    category_marker, name_marker = _runtime_template_metadata(path)
+    category = entry["category"]
+    if modelfile_category(category_marker) != category or name_marker != model_id:
+        raise ModelError(f"{path}: runtime template identity does not match model catalog")
+    if any(line.startswith(("# Source: ", "# GGUF: ", "# SHA256: ")) for line in text.splitlines()):
+        raise ModelError(f"{path}: acquisition metadata belongs in model-catalog.json")
+    if text.splitlines().count("FROM __BC250_SOURCE__") != 1:
+        raise ModelError(f"{path}: expected exactly one 'FROM __BC250_SOURCE__' line")
+    required_parameters = ["PARAMETER num_gpu 99"]
+    if category != "embedding":
+        required_parameters.append("PARAMETER num_keep 256")
+    for parameter in required_parameters:
+        if len(re.findall(rf"^{re.escape(parameter)}$", text, re.MULTILINE)) != 1:
+            raise ModelError(f"{path}: expected exactly one {parameter!r}")
+
+    source = entry["source"]
+    provider = entry["provider"]
+    runtime_from = source.get("local_path") if provider == "ollama" else source.get("provider_ref")
+    return {
+        "enabled": entry["enabled"],
+        "provider": provider,
+        "category": category,
+        "id": model_id,
+        "name": model_id,
+        "repository": source["repository"],
+        "revision": source["revision"],
+        "gguf": source["filename"],
+        "sha256": source.get("expected_sha256", ""),
+        "from": runtime_from,
+        "modelfile": entry["runtime"]["modelfile"],
+        "template": path,
+        "origin": "packaged",
+        "catalog": entry,
+        "ownership": entry["ownership"],
+        "capabilities": entry["capabilities"],
+        "runtime_metadata": entry["runtime"],
+        "native_context_max": entry.get("native_context_max"),
+        "source_metadata": source,
+    }
+
+
+def load_packaged_models(directory: Path, catalog_path: Path) -> list[dict]:
+    catalog = load_model_catalog(catalog_path)
+    models = []
+    for model_id, entry in catalog.items():
+        models.append(
+            load_packaged_model(directory / entry["runtime"]["modelfile"], model_id, entry)
+        )
+    templates = {
+        path.stem
+        for path in directory.glob("*.Modelfile")
+        if path.name != "MODEL-TEMPLATE.Modelfile.example"
+    }
+    missing_catalog = templates - set(catalog)
+    if missing_catalog:
+        raise ModelError(
+            f"{catalog_path}: runtime template(s) missing catalog entries: {', '.join(sorted(missing_catalog))}"
+        )
+    return models
+
+
+def _operator_metadata_defaults(model: dict, previous: dict | None) -> dict:
+    if previous:
+        for field in ("capabilities", "native_context_max"):
+            if field in previous:
+                model[field] = previous[field]
+    if "capabilities" not in model:
+        model["capabilities"] = {
+            "modalities": ["text"],
+            "features": ["text-generation"],
+            "reasoning": "candidate",
+            "ocr": False,
+            "tools": model["category"] == "agentic",
+            "benchmark_kinds": ["generation"] + (["agent"] if model["category"] == "agentic" else []),
+        }
+    model["ownership"] = {
+        "source": "bc250" if model["provider"] == "ollama" else "ollama",
+        "registration": "bc250",
+        "state": "bc250" if model["provider"] == "ollama" else "provider",
+    }
+    model["runtime_metadata"] = {
+        "lane": {"production": "main", "experiments": "main", "task": "task", "agentic": "agent", "embedding": "embedding"}[model["category"]],
+        "modelfile": model["modelfile"],
+        "agent_prepare_required": model["category"] == "agentic",
+    }
+    model["source_metadata"] = {
+        "repository": model["repository"],
+        "revision": model["revision"],
+        "filename": model["gguf"],
+        "expected_sha256": model.get("sha256", ""),
+        "policy": "pinned" if re.fullmatch(r"[0-9a-f]{40}", model["revision"]) else "tracking",
+        "reproducibility": "operator-defined",
+    }
+    return model
 
 
 def model_directories(explicit: list[Path] | None = None) -> list[Path]:
@@ -356,9 +714,31 @@ def validate_operator_model_directory(directory: Path) -> None:
         )
 
 
+def load_operator_model(path: Path, previous: dict | None) -> dict:
+    text = path.read_text(encoding="utf-8")
+    if previous is not None and "FROM __BC250_SOURCE__" in text and "# Source: " not in text:
+        category_marker, name_marker = _runtime_template_metadata(path)
+        if modelfile_category(category_marker) != previous["category"] or name_marker != previous["id"]:
+            raise ModelError(f"{path}: runtime override identity does not match packaged model")
+        required_parameters = ["PARAMETER num_gpu 99"]
+        if previous["category"] != "embedding":
+            required_parameters.append("PARAMETER num_keep 256")
+        for parameter in required_parameters:
+            if len(re.findall(rf"^{re.escape(parameter)}$", text, re.MULTILINE)) != 1:
+                raise ModelError(f"{path}: expected exactly one {parameter!r}")
+        model = dict(previous)
+        model["template"] = path
+        model["origin"] = "operator"
+        model["runtime_metadata"] = dict(previous.get("runtime_metadata") or {})
+        model["runtime_metadata"]["modelfile"] = path.name
+        return model
+    return _operator_metadata_defaults(load_modelfile(path), previous)
+
+
 def discover_models(directories: list[Path]) -> list[dict]:
-    # Later directories override a same-named packaged template. This gives
-    # /etc/bc250-llm-server/models.d the usual operator-over-package precedence.
+    # Package models are defined by model-catalog.json plus runtime-only
+    # Modelfile templates. Later operator directories retain the historical
+    # self-contained Modelfile format and override a same-named package entry.
     discovered: dict[str, dict] = {}
     found_directory = False
     for directory in directories:
@@ -366,8 +746,14 @@ def discover_models(directories: list[Path]) -> list[dict]:
             continue
         found_directory = True
         validate_operator_model_directory(directory)
-        for path in sorted(directory.glob("*.Modelfile")):
-            model = load_modelfile(path)
+        catalog_path = _catalog_for_model_directory(directory)
+        if catalog_path is not None:
+            incoming = load_packaged_models(directory, catalog_path)
+        else:
+            incoming = [(path, discovered.get(path.stem)) for path in sorted(directory.glob("*.Modelfile"))]
+        if catalog_path is None:
+            incoming = [load_operator_model(path, previous) for path, previous in incoming]
+        for model in incoming:
             previous = discovered.get(model["name"])
             if previous is not None:
                 model["overrides_origin"] = previous.get("origin", "catalog")
@@ -432,11 +818,56 @@ def load_mtp_catalog(path: Path) -> tuple[dict, list[dict]]:
         if recommendation not in MTP_RECOMMENDATIONS:
             allowed = ", ".join(sorted(MTP_RECOMMENDATIONS))
             raise ModelError(f"{context}: recommendation must be one of: {allowed}")
+        if model.get("source_policy") not in {"tracking", "pinned"}:
+            raise ModelError(f"{context}: source_policy must be tracking or pinned")
+        require_string(model, "reproducibility", context)
+        for field, allowed_values in {
+            "source_owner": {"bc250"},
+            "registration_owner": {"none"},
+            "state_owner": {"bc250"},
+            "runtime_lane": {"llamacpp-mtp"},
+            "reasoning_capability": {"verified", "candidate", "unsupported"},
+        }.items():
+            if model.get(field) not in allowed_values:
+                raise ModelError(f"{context}: invalid {field}")
+        _validate_string_list(model.get("modalities"), path=path, model_id=model_id, field="modalities")
+        _validate_string_list(model.get("features"), path=path, model_id=model_id, field="features")
+        _validate_string_list(model.get("benchmark_kinds"), path=path, model_id=model_id, field="benchmark_kinds")
+        for field in ("ocr", "tools"):
+            if not isinstance(model.get(field), bool):
+                raise ModelError(f"{context}: {field} must be boolean")
         checksum = model.get("sha256", "")
         if not isinstance(checksum, str) or (
             checksum and re.fullmatch(r"[0-9a-f]{64}", checksum) is None
         ):
             raise ModelError(f"{context}: invalid SHA256")
+        model["source_metadata"] = {
+            "repository": model["repository"],
+            "revision": model["revision"],
+            "filename": model["gguf"],
+            "expected_sha256": checksum,
+            "policy": model["source_policy"],
+            "reproducibility": model["reproducibility"],
+        }
+        model["ownership"] = {
+            "source": model["source_owner"],
+            "registration": model["registration_owner"],
+            "state": model["state_owner"],
+        }
+        model["runtime_metadata"] = {
+            "lane": model["runtime_lane"],
+            "modelfile": None,
+            "agent_prepare_required": False,
+        }
+        model["capabilities"] = {
+            "modalities": list(model["modalities"]),
+            "features": list(model["features"]),
+            "reasoning": model["reasoning_capability"],
+            "ocr": model["ocr"],
+            "tools": model["tools"],
+            "benchmark_kinds": list(model["benchmark_kinds"]),
+        }
+        model["native_context_max"] = None
     return defaults, models
 
 
@@ -531,7 +962,7 @@ def select_models(
             choices = [
                 model["id"]
                 for model in models
-                if model["id"] in RECOMMENDED_MODELS
+                if model["id"] in recommended_model_ids()
                 and model.get("category") not in group_excluded_categories
             ]
         else:
@@ -947,8 +1378,11 @@ def rendered_modelfile_content(source: Path, model: dict, output: Path | None) -
             line = f"# Source: {model['repository']} @ {model['revision']}"
         elif line.startswith("# GGUF: "):
             line = f"# GGUF: {model['gguf']}"
-        elif line.startswith("FROM ") and output is not None:
-            line = f"FROM {output}"
+        elif line.startswith("FROM "):
+            if output is not None:
+                line = f"FROM {output}"
+            elif line == "FROM __BC250_SOURCE__":
+                line = f"FROM {model['from']}"
         rendered.append(line)
     return "\n".join(rendered) + "\n"
 
@@ -1117,7 +1551,11 @@ def inspect_model_state(
     remote_status = "not checked"
     remote_detail = ""
     if online:
-        if model["revision"] != "latest":
+        source_policy = str(
+            (model.get("source_metadata") or {}).get("policy")
+            or ("pinned" if re.fullmatch(r"[0-9a-f]{40}", str(model.get("revision", ""))) else "tracking")
+        )
+        if source_policy == "pinned":
             remote_status = "pinned"
             remote_detail = f"catalog pins revision {model['revision']}"
         elif model["provider"] == "ollama-hf":
@@ -1764,6 +2202,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
 def show_removal_plan(
     groups: list[tuple[dict, list[dict]]], args: argparse.Namespace
 ) -> None:
+    """Explain provider/ownership-aware cleanup without relying on filesystem guesses."""
     keep_source = args.command == "unregister"
     title = "Unregister plan:" if keep_source else "Removal plan:"
     print(title)
@@ -1771,28 +2210,32 @@ def show_removal_plan(
         host = ollama_host(defaults, getattr(args, "host", None))
         for model in models:
             label = model.get("name", model["id"])
+            ownership = model.get("ownership") if isinstance(model.get("ownership"), dict) else {}
+            source_owner = str(ownership.get("source") or "unknown")
+            registration_owner = str(ownership.get("registration") or "unknown")
+            state_owner = str(ownership.get("state") or "unknown")
             print(f"\n{label}")
-            if model["provider"].startswith("ollama"):
-                print(f"  Registration: remove from {host}")
-            else:
-                print("  Registration: none (download-only)")
-            runtime = runtime_modelfile_path(
-                defaults,
-                model,
-                None if model["provider"] == "ollama-hf" else model_path(
-                    defaults, model, getattr(args, "destination", None)
-                ),
+            print(
+                "  Ownership: "
+                f"source={source_owner}, registration={registration_owner}, state={state_owner}"
             )
+            if registration_owner == "none" or model["provider"] == "download-only":
+                print("  Registration: none")
+            else:
+                print(f"  Registration: remove through Ollama at {host}")
+
+            output = None
+            if source_owner == "bc250":
+                output = model_path(defaults, model, getattr(args, "destination", None))
+            runtime = runtime_modelfile_path(defaults, model, output)
             if runtime and model["provider"] != "download-only":
                 print(f"  Runtime Modelfile: remove {runtime}")
-            if model["provider"] == "ollama-hf":
-                print("  Manager-owned source: none (Ollama-managed model/projector blobs)")
-            else:
-                output = model_path(defaults, model, getattr(args, "destination", None))
+
+            if source_owner == "bc250":
                 try:
                     size = (
                         f" ({output.stat().st_size / 1024**3:.1f} GiB)"
-                        if output.is_file()
+                        if output is not None and output.is_file()
                         else ""
                     )
                 except OSError:
@@ -1800,11 +2243,27 @@ def show_removal_plan(
                 action = "retain" if keep_source else "remove"
                 print(f"  Manager-owned source: {action} {output}{size}")
                 print(f"  State sidecar: {action} {state_path(output)}")
+            elif source_owner in {"ollama", "provider"}:
+                print(
+                    "  Provider assets: released via Ollama registration semantics; "
+                    "BC-250 never deletes shared blob files directly"
+                )
+                if keep_source:
+                    print("  Source retention: provider-owned; no BC-250 GGUF/state to retain")
+            else:
+                print("  Source ownership: no package-managed source action")
             print("  Catalog definition: retain")
 
 
+def _existing_size(path: Path) -> int:
+    try:
+        return path.stat().st_size if path.is_file() else 0
+    except OSError:
+        return 0
+
+
 def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
-    """Unregister or fully remove selected manager-owned model state."""
+    """Unregister or fully remove selected state while respecting provider ownership."""
     if os.geteuid() != 0:
         raise ModelError("run with sudo")
     keep_source = args.command == "unregister"
@@ -1823,14 +2282,20 @@ def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) 
     ollama_bin = shutil.which("ollama")
     failures: list[str] = []
     removed = 0
+    reclaimed_manager_bytes = 0
+
     for model in models:
         label = model.get("name", model["id"])
         verb = "unregistering" if keep_source else "removing"
         print(f"\n>>> {verb} {label}")
-        if model["provider"].startswith("ollama"):
+        ownership = model.get("ownership") if isinstance(model.get("ownership"), dict) else {}
+        source_owner = str(ownership.get("source") or ("ollama" if model["provider"] == "ollama-hf" else "bc250"))
+        registration_owner = str(ownership.get("registration") or ("none" if model["provider"] == "download-only" else "bc250"))
+
+        if registration_owner != "none" and model["provider"].startswith("ollama"):
             if not ollama_bin:
                 print(
-                    "    ERROR: ollama executable is unavailable; local source retained",
+                    "    ERROR: ollama executable is unavailable; source/state retained",
                     file=sys.stderr,
                 )
                 failures.append(label)
@@ -1839,34 +2304,93 @@ def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) 
                 [ollama_bin, "rm", model["name"]],
                 {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
             )
+            registrations = registered_models(host)
+            if registrations is not None and model["name"] in registrations:
+                print(
+                    "    ERROR: Ollama registration remains after removal; source/state retained",
+                    file=sys.stderr,
+                )
+                failures.append(label)
+                continue
+            if result.returncode != 0 and registrations is None:
+                print(
+                    "    ERROR: Ollama removal failed and post-state could not be verified; "
+                    "source/state retained",
+                    file=sys.stderr,
+                )
+                failures.append(label)
+                continue
             if result.returncode != 0:
-                registrations = registered_models(host)
-                if registrations is None or model["name"] in registrations:
-                    print(
-                        "    ERROR: Ollama registration could not be removed; local source retained",
-                        file=sys.stderr,
+                print("    registration was already absent; continuing with owned state cleanup")
+            else:
+                print("    removed Ollama registration")
+
+            # Older/provider-managed installs could leave the temporary hf.co source
+            # manifest behind. Remove that registration too, but never manipulate the
+            # shared blob graph directly.
+            if model["provider"] == "ollama-hf":
+                source_registration = str(model.get("from") or "")
+                remaining = registered_models(host)
+                if source_registration and remaining is not None and source_registration in remaining:
+                    source_result = run_as_ollama(
+                        [ollama_bin, "rm", source_registration],
+                        {"HOME": "/var/lib/ollama", "OLLAMA_HOST": host},
                     )
-                    failures.append(label)
-                    continue
+                    after_source = registered_models(host)
+                    if after_source is not None and source_registration in after_source:
+                        print(
+                            f"    ERROR: temporary provider registration remains: {source_registration}",
+                            file=sys.stderr,
+                        )
+                        failures.append(label)
+                        continue
+                    if source_result.returncode != 0 and after_source is None:
+                        print(
+                            f"    ERROR: could not verify removal of provider registration: {source_registration}",
+                            file=sys.stderr,
+                        )
+                        failures.append(label)
+                        continue
+                    if source_result.returncode != 0:
+                        print(f"    provider registration was already absent: {source_registration}")
+                    else:
+                        print(f"    removed stale provider registration {source_registration}")
+                print(
+                    "    provider-owned shared blobs remain under Ollama ownership; "
+                    "no direct blob deletion attempted"
+                )
 
         output = None
-        if model["provider"] != "ollama-hf":
+        if source_owner == "bc250":
             output = model_path(defaults, model, getattr(args, "destination", None))
-        elif keep_source:
-            print(
-                "    no manager-owned GGUF/state to retain; "
-                "multimodal source/projector blobs are Ollama-managed"
-            )
         runtime = runtime_modelfile_path(defaults, model, output)
         paths: list[Path] = []
         if runtime and model["provider"] != "download-only":
             paths.append(runtime)
         if output is not None and not keep_source:
             paths.extend((output, state_path(output)))
+
+        failed_local = False
         for path in paths:
-            if path.exists():
+            if not path.exists():
+                continue
+            size = _existing_size(path)
+            try:
                 path.unlink()
-                print(f"    removed {path}")
+            except OSError as exc:
+                print(f"    ERROR: cannot remove {path}: {exc}", file=sys.stderr)
+                failed_local = True
+                continue
+            if path.exists():
+                print(f"    ERROR: path remains after removal: {path}", file=sys.stderr)
+                failed_local = True
+                continue
+            reclaimed_manager_bytes += size
+            print(f"    removed {path}")
+
+        if failed_local:
+            failures.append(label)
+            continue
         if output is not None and keep_source:
             for path in (output, state_path(output)):
                 if path.exists():
@@ -1880,18 +2404,23 @@ def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) 
 
     if keep_source:
         print(
-            f"\nUnregistered {removed} model(s). Verified GGUF/state retained where present."
+            f"\nUnregistered {removed} model(s). Verified manager-owned GGUF/state "
+            "retained where present."
         )
     else:
         print(
             f"\nRemoved {removed} model(s). Catalog definitions were retained; "
             "manager-owned GGUF/state removed where present."
         )
+        if reclaimed_manager_bytes:
+            print(
+                "Manager-owned files removed: "
+                f"{reclaimed_manager_bytes / 1024**3:.2f} GiB logical bytes."
+            )
     if failures:
         print(f"Failed: {' '.join(failures)}", file=sys.stderr)
         return 2
     return 0
-
 
 
 class UsageModelError(ModelError):
@@ -2002,7 +2531,130 @@ def removal_arguments(parser: argparse.ArgumentParser, command: str) -> None:
     catalog_arguments(parser, category_optional=True)
     selection_arguments(parser, command)
     mutation_common_arguments(parser)
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="show provider-aware removal effects without changing model state",
+    )
     parser.add_argument("--yes", action="store_true", help="skip confirmation")
+
+
+
+def effective_runtime_view(defaults: dict, model: dict) -> dict:
+    """Return runtime parameters from the actual package template/rendering path."""
+    if model["provider"] == "download-only":
+        return {
+            "engine": "llama.cpp",
+            "context": model.get("context"),
+            "draft": model.get("draft"),
+        }
+    output = None if model["provider"] == "ollama-hf" else model_path(defaults, model)
+    content = rendered_modelfile_content(model["template"], model, output)
+    parameters: dict[str, str] = {}
+    capabilities: list[str] = []
+    renderer = None
+    parser = None
+    runtime_from = None
+    for line in content.splitlines():
+        if line.startswith("FROM "):
+            runtime_from = line.split(maxsplit=1)[1]
+        elif line.startswith("PARAMETER "):
+            parts = line.split(maxsplit=2)
+            if len(parts) == 3:
+                parameters[parts[1]] = parts[2]
+        elif line.startswith("RENDERER "):
+            renderer = line.split(maxsplit=1)[1]
+        elif line.startswith("PARSER "):
+            parser = line.split(maxsplit=1)[1]
+        elif line.startswith("CAPABILITY "):
+            capabilities.append(line.split(maxsplit=1)[1])
+    return {
+        "engine": "ollama",
+        "from": runtime_from,
+        "parameters": parameters,
+        "renderer": renderer,
+        "parser": parser,
+        "declared_runtime_capabilities": capabilities,
+    }
+
+
+def model_inspect_payload(
+    defaults: dict, model: dict, *, effective: bool
+) -> dict:
+    profiles = load_model_profiles()
+    payload = {
+        "schema": 1,
+        "id": model["id"],
+        "category": model["category"],
+        "provider": model["provider"],
+        "enabled": bool(model.get("enabled", True)),
+        "source": dict(model.get("source_metadata") or {}),
+        "ownership": dict(model.get("ownership") or {}),
+        "runtime": dict(model.get("runtime_metadata") or {}),
+        "capabilities": dict(model.get("capabilities") or {}),
+        "native_context_max": model.get("native_context_max"),
+        "qualification": profiles.get(model["id"]),
+        "definition_origin": definition_origin(model),
+    }
+    if model["provider"] in {"download-only", "ollama"}:
+        payload["source"]["resolved_path"] = str(model_path(defaults, model))
+    else:
+        payload["source"]["resolved_path"] = None
+
+    if effective:
+        host = defaults.get("ollama_host")
+        registrations = registered_models(host) if host else None
+        inspection = inspect_model_state(
+            defaults,
+            model,
+            registrations=registrations,
+        )
+        payload["runtime"]["effective"] = effective_runtime_view(defaults, model)
+        payload["state"] = {
+            "source": inspection.source_status,
+            "source_detail": inspection.source_detail,
+            "source_sha256": inspection.source_checksum or None,
+            "runtime_modelfile": inspection.modelfile_status,
+            "registration": inspection.registration_status,
+            "overall": inspection.overall_status,
+            "source_path": str(inspection.source_path) if inspection.source_path else None,
+            "state_path": str(inspection.state_path) if inspection.state_path else None,
+            "runtime_modelfile_path": (
+                str(inspection.runtime_modelfile) if inspection.runtime_modelfile else None
+            ),
+        }
+    return payload
+
+
+def print_model_inspect_payload(payload: dict) -> None:
+    print(f"Model:              {payload['id']}")
+    print(f"Category/provider:  {payload['category']} / {payload['provider']}")
+    runtime = payload.get("runtime") or {}
+    print(f"Runtime lane:       {runtime.get('lane', 'unknown')}")
+    capabilities = payload.get("capabilities") or {}
+    print(f"Modalities:         {', '.join(capabilities.get('modalities', [])) or 'unknown'}")
+    print(f"Reasoning:          {capabilities.get('reasoning', 'unknown')}")
+    print(f"Benchmark kinds:    {', '.join(capabilities.get('benchmark_kinds', [])) or 'unknown'}")
+    source = payload.get("source") or {}
+    print(f"Source:             {source.get('repository', 'unknown')} @ {source.get('revision', 'unknown')}")
+    print(f"Source policy:      {source.get('policy', 'unknown')} / {source.get('reproducibility', 'unknown')}")
+    ownership = payload.get("ownership") or {}
+    print(
+        "Ownership:          "
+        f"source={ownership.get('source', 'unknown')} "
+        f"registration={ownership.get('registration', 'unknown')} "
+        f"state={ownership.get('state', 'unknown')}"
+    )
+    profile = payload.get("qualification") or {}
+    if profile:
+        print(f"Intended role:      {profile.get('intended_role', 'unknown')}")
+        print(f"Comparison role:    {profile.get('comparison_role', 'unknown')}")
+        print(f"Qualified context:  {profile.get('qualified_context_target', 'unknown')}")
+        print(f"Recommended:        {'yes' if profile.get('recommended') else 'no'}")
+    if state := payload.get("state"):
+        print(f"Source state:       {state['source']}")
+        print(f"Registration:       {state['registration']}")
+        print(f"Overall state:      {state['overall']}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2051,6 +2703,35 @@ def build_parser() -> argparse.ArgumentParser:
         "--include-disabled",
         action="store_true",
         help="include disabled MTP entries",
+    )
+
+    inspecting = commands.add_parser(
+        "inspect",
+        help="show consolidated package metadata for one model",
+    )
+    inspecting.add_argument("id", help="exact catalog model id")
+    inspecting.add_argument(
+        "--category",
+        choices=CATEGORIES,
+        default="all",
+        help="optional category constraint; defaults to the combined catalog",
+    )
+    inspecting.add_argument(
+        "--effective",
+        action="store_true",
+        help="also inspect protected source/registration state and rendered runtime parameters",
+    )
+    inspecting.add_argument(
+        "--json",
+        action="store_true",
+        help="emit the machine-readable inspect contract",
+    )
+    inspecting.add_argument("--source", type=Path, help="alternate MTP TOML catalog")
+    inspecting.add_argument(
+        "--modelfile-dir",
+        type=Path,
+        action="append",
+        help="alternate Modelfile directory; may be repeated",
     )
 
     path = commands.add_parser(
@@ -2127,11 +2808,18 @@ def category_required(command: str) -> ModelError:
 
 
 def require_privilege(command: str, values: list[str]) -> None:
+    if command == "inspect" and "--effective" in values and os.geteuid() != 0:
+        rerun = shlex.join(["sudo", "bc250", "model", *values])
+        raise ModelError(
+            f"inspect --effective reads protected model state; run: {rerun}"
+        )
     if command == "status" and os.geteuid() != 0:
         rerun = shlex.join(["sudo", "bc250", "model", *values])
         raise ModelError(
             f"status inspects protected GGUF/state directories; run: {rerun}"
         )
+    if command in {"unregister", "remove"} and "--explain" in values:
+        return
     if command in {"install", "apply", "refresh", "unregister", "remove", "purge-retired"} and os.geteuid() != 0:
         raise ModelError(f"{command} changes package-managed model state; run with sudo")
 
@@ -2415,6 +3103,9 @@ def run_all_catalog_operation(
             groups[defaults["category"]] = (defaults, chosen)
 
     if args.command in {"unregister", "remove"}:
+        if getattr(args, "explain", False):
+            show_removal_plan(list(groups.values()), args)
+            return 0
         if not confirm_removal(list(groups.values()), selected, args):
             return 0
         args = argparse.Namespace(**vars(args))
@@ -2455,6 +3146,9 @@ def run_category_operation(
     defaults: dict, selected: list[dict], args: argparse.Namespace
 ) -> int:
     if args.command in {"unregister", "remove"}:
+        if getattr(args, "explain", False):
+            show_removal_plan([(defaults, selected)], args)
+            return 0
         if not confirm_removal([(defaults, selected)], selected, args):
             return 0
         args = argparse.Namespace(**vars(args))
@@ -2654,6 +3348,20 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"{label} models:")
         print_catalog_models(available)
+        return 0
+
+    if args.command == "inspect":
+        defaults, model = resolve_one_model(
+            canonical_category(args.category),
+            args.id,
+            directories=directories,
+            source=source,
+        )
+        payload = model_inspect_payload(defaults, model, effective=args.effective)
+        if args.json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            print_model_inspect_payload(payload)
         return 0
 
     if args.command == "path":

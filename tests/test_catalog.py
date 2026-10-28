@@ -60,6 +60,93 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         packaged = {path.stem for path in MODELFILES.glob("*.Modelfile")}
         self.assertEqual({model["name"] for model in models}, packaged)
 
+    def test_package_catalog_and_profiles_cover_every_active_model(self) -> None:
+        catalog = modelctl.load_model_catalog(ROOT / "models/model-catalog.json")
+        profiles = modelctl.load_model_profiles(ROOT / "models/model-profiles.json")
+        discovered = {model["id"]: model for model in modelctl.discover_models([MODELFILES])}
+        self.assertEqual(set(catalog), set(discovered))
+        self.assertTrue(set(catalog) <= set(profiles))
+        for model_id, model in discovered.items():
+            with self.subTest(model=model_id):
+                self.assertIn(model["capabilities"]["reasoning"], {"verified", "candidate", "unsupported"})
+                self.assertTrue(model["capabilities"]["benchmark_kinds"])
+                self.assertIn(model["ownership"]["source"], {"bc250", "ollama"})
+                self.assertIn(model["source_metadata"]["policy"], {"tracking", "pinned"})
+                if model["provider"] == "ollama":
+                    if model["source_metadata"]["policy"] == "tracking":
+                        self.assertEqual(model["sha256"], "")
+                        self.assertEqual(model["source_metadata"]["reproducibility"], "tracking-ref")
+                    else:
+                        self.assertRegex(model["sha256"], r"^[0-9a-f]{64}$")
+                        self.assertEqual(model["source_metadata"]["reproducibility"], "pinned+digest")
+
+    def test_profile_schema_rejects_missing_policy_fields(self) -> None:
+        document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        model_id = "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "model-profiles.json"
+            broken = json.loads(json.dumps(document))
+            del broken["profiles"][model_id]["comparison_role"]
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(modelctl.ModelError, "comparison_role must be a non-empty string"):
+                modelctl.load_model_profiles(path)
+
+    def test_catalog_provider_ownership_contract_is_enforced(self) -> None:
+        document = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
+        model_id = "exp-minicpm-v47-1b-openbmb-q4-k-m"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "model-catalog.json"
+            broken = json.loads(json.dumps(document))
+            broken["models"][model_id]["ownership"]["source"] = "bc250"
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(modelctl.ModelError, "ownership does not match ollama-hf provider contract"):
+                modelctl.load_model_catalog(path)
+
+    def test_agent_prepare_requirement_is_derived_from_runtime_lane_category(self) -> None:
+        document = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
+        model_id = "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "model-catalog.json"
+            broken = json.loads(json.dumps(document))
+            broken["models"][model_id]["runtime"]["agent_prepare_required"] = True
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(modelctl.ModelError, "true only for agentic models"):
+                modelctl.load_model_catalog(path)
+
+    def test_packaged_modelfiles_are_runtime_only_templates(self) -> None:
+        for path in MODELFILES.glob("*.Modelfile"):
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path.name):
+                self.assertEqual(text.splitlines().count("FROM __BC250_SOURCE__"), 1)
+                self.assertNotRegex(text, r"(?m)^# Source: ")
+                self.assertNotRegex(text, r"(?m)^# GGUF: ")
+                self.assertNotRegex(text, r"(?m)^# SHA256: ")
+
+    def test_minicpm_capability_metadata_is_explicit(self) -> None:
+        catalog = modelctl.load_model_catalog(ROOT / "models/model-catalog.json")
+        model = catalog["exp-minicpm-v47-1b-openbmb-q4-k-m"]
+        self.assertEqual(model["capabilities"]["modalities"], ["text", "image"])
+        self.assertTrue(model["capabilities"]["ocr"])
+        self.assertIn("ocr", model["capabilities"]["benchmark_kinds"])
+        self.assertEqual(model["capabilities"]["ocr_profile"], "minicpm")
+        self.assertIn("ocr", model["capabilities"]["benchmark_kinds"])
+        self.assertEqual(model["ownership"]["source"], "ollama")
+
+    def test_inspect_json_separates_capability_qualification_and_runtime_authority(self) -> None:
+        defaults, model = modelctl.resolve_one_model(
+            "all",
+            "exp-lfm25-8b-a1b-unsloth-q6-k-xl",
+            directories=[MODELFILES],
+            source=ROOT / "models/mtp/models.toml",
+        )
+        payload = modelctl.model_inspect_payload(defaults, model, effective=False)
+        self.assertEqual(payload["capabilities"]["reasoning"], "candidate")
+        self.assertEqual(payload["qualification"]["qualified_context_target"], 8192)
+        self.assertNotIn("effective", payload["runtime"])
+        effective = modelctl.effective_runtime_view(defaults, model)
+        self.assertEqual(effective["parameters"]["num_ctx"], "8192")
+        self.assertEqual(effective["renderer"], "lfm2")
+
     def test_operator_overlay_rejects_visible_files_without_modelfile_suffix(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             operator = Path(temporary) / "models.d"
@@ -149,26 +236,26 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         )
         glm = (MODELFILES / "exp-glm-ocr-ggml-q8-0.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 16384", glm)
+        self.assertIn("FROM __BC250_SOURCE__", glm)
+        catalog = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
+        entry = catalog["models"]["exp-glm-ocr-ggml-q8-0"]
+        self.assertEqual(entry["provider"], "ollama-hf")
+        self.assertEqual(entry["source"]["provider_ref"], "hf.co/ggml-org/GLM-OCR-GGUF:Q8_0")
         with tempfile.TemporaryDirectory() as temporary:
-            path = Path(temporary) / "exp-remote-mismatch.Modelfile"
-            path.write_text(
-                glm.replace("exp-glm-ocr-ggml-q8-0", "exp-remote-mismatch").replace(
-                    "hf.co/ggml-org/GLM-OCR-GGUF", "hf.co/other/repository"
-                ),
-                encoding="utf-8",
-            )
-            with self.assertRaisesRegex(
-                modelctl.ModelError, "must match Source metadata"
-            ):
-                modelctl.load_modelfile(path)
+            path = Path(temporary) / "model-catalog.json"
+            broken = json.loads(json.dumps(catalog))
+            broken["models"]["exp-glm-ocr-ggml-q8-0"]["source"]["provider_ref"] = "hf.co/other/repository:Q8_0"
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(modelctl.ModelError, "must match source repository"):
+                modelctl.load_model_catalog(path)
 
-    def test_ornith_checksum_is_pinned_to_replacement_commit(self) -> None:
-        text = (MODELFILES / "agentic-ornith15-9b-ornith-q5-k-m.Modelfile").read_text()
-        self.assertIn("@ 87fcf5d7dbecb02941c0917a0e93619af2075b61", text)
-        self.assertIn(
-            "# SHA256: e4d9634a3b6546a5c00a8680568fe1125f6c98c704ee51ae52ba07650fb4247d",
-            text,
-        )
+    def test_ornith_uses_pre_v1_tracking_policy(self) -> None:
+        catalog = modelctl.load_model_catalog(ROOT / "models/model-catalog.json")
+        source = catalog["agentic-ornith15-9b-ornith-q5-k-m"]["source"]
+        self.assertEqual(source["revision"], "latest")
+        self.assertEqual(source["expected_sha256"], "")
+        self.assertEqual(source["policy"], "tracking")
+        self.assertEqual(source["reproducibility"], "tracking-ref")
 
     def test_optional_2026_10_model_challengers_are_bounded_and_not_recommended(self) -> None:
         names = {
@@ -179,17 +266,20 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         }
         discovered = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
         self.assertTrue(names <= discovered.keys())
-        self.assertTrue(names.isdisjoint(modelctl.RECOMMENDED_MODELS))
+        self.assertTrue(names.isdisjoint(modelctl.recommended_model_ids()))
 
         lfm8 = (MODELFILES / "exp-lfm25-8b-a1b-unsloth-q6-k-xl.Modelfile").read_text()
-        self.assertIn("# SHA256: de2718c45e69587a0589ebe5f531ed4a99bccf341b2c122b6479ffe28929a9be", lfm8)
+        self.assertEqual(discovered["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]["sha256"], "")
+        self.assertEqual(discovered["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]["source_metadata"]["policy"], "tracking")
+        self.assertEqual(discovered["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]["revision"], "latest")
         self.assertIn("RENDERER lfm2", lfm8)
         self.assertIn("PARSER lfm2", lfm8)
         self.assertIn("PARAMETER num_ctx 8192", lfm8)
         self.assertNotIn("CAPABILITY thinking", lfm8)
 
         lfm24 = (MODELFILES / "agentic-lfm25-24b-a2b-unsloth-q3-k-xl.Modelfile").read_text()
-        self.assertIn("# SHA256: d54834c785c7e265f1cb7375e47aa6f55a0b7cfab75816254c4d2e0c82fd5efc", lfm24)
+        self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["sha256"], "")
+        self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["source_metadata"]["policy"], "tracking")
         self.assertIn("RENDERER lfm2-thinking", lfm24)
         self.assertIn("PARSER lfm2-thinking", lfm24)
         self.assertIn("CAPABILITY thinking", lfm24)
@@ -198,18 +288,20 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["category"], "agentic")
 
         gemma = (MODELFILES / "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m.Modelfile").read_text()
-        self.assertIn("# SHA256: 59656d7494d6376ca97e9e20b64ea2e16cd97f12ec6d47bfccba91cb785b5134", gemma)
+        self.assertEqual(discovered["exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"]["sha256"], "")
+        self.assertEqual(discovered["exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"]["source_metadata"]["policy"], "tracking")
+        self.assertEqual(discovered["exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"]["revision"], "latest")
         self.assertIn("RENDERER gemma4-large", gemma)
         self.assertIn("PARSER gemma4", gemma)
         self.assertIn("CAPABILITY thinking", gemma)
 
         minicpm = discovered["exp-minicpm-v47-1b-openbmb-q4-k-m"]
         self.assertEqual(minicpm["provider"], "ollama-hf")
-        self.assertIn("hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M", (MODELFILES / minicpm["modelfile"]).read_text())
+        self.assertEqual(minicpm["from"], "hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M")
 
         profiles = json.loads((ROOT / "models" / "model-profiles.json").read_text())["profiles"]
-        self.assertEqual(profiles["agentic-lfm25-24b-a2b-unsloth-q3-k-xl:latest"]["residency_policy"], "agent-mode-only")
-        self.assertEqual(profiles["exp-minicpm-v47-1b-openbmb-q4-k-m:latest"]["profile_class"], "specialized-vision")
+        self.assertEqual(profiles["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["residency_policy"], "agent-mode-only")
+        self.assertEqual(profiles["exp-minicpm-v47-1b-openbmb-q4-k-m"]["profile_class"], "specialized-vision")
 
     def test_embedding_modelfiles_are_bounded_to_dedicated_4k_lane(self) -> None:
         for name in (
@@ -220,15 +312,16 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             self.assertIn("PARAMETER num_ctx 4096", text)
             self.assertNotIn("PARAMETER num_ctx 32768", text)
 
-    def test_jina_embedding_uses_pooling_metadata_revision(self) -> None:
+    def test_jina_embedding_keeps_pooling_runtime_metadata_and_tracks_pre_v1_source(self) -> None:
         text = (
             MODELFILES / "embed-jina-v5-small-retrieval-q4-k-m.Modelfile"
         ).read_text()
-        self.assertIn("@ e9137ac0a9d41c851de69bea36babc029b7f5fc9", text)
-        self.assertIn(
-            "# SHA256: 9440cf89f3e8a7a31a42e11b87e106dd5b344af4e0e3b6b21a96136cc8686e21",
-            text,
-        )
+        catalog = modelctl.load_model_catalog(ROOT / "models/model-catalog.json")
+        source = catalog["embed-jina-v5-small-retrieval-q4-k-m"]["source"]
+        self.assertEqual(source["revision"], "latest")
+        self.assertEqual(source["expected_sha256"], "")
+        self.assertEqual(source["policy"], "tracking")
+        self.assertEqual(source["reproducibility"], "tracking-ref")
         self.assertIn("pooling metadata", text)
 
     def test_promoted_task_model_has_reviewed_sampling_and_no_fixed_system(self) -> None:
@@ -325,16 +418,15 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             ):
                 modelctl.load_modelfile(path)
 
-    def test_duplicate_source_metadata_is_rejected(self) -> None:
+    def test_packaged_runtime_template_rejects_duplicated_acquisition_metadata(self) -> None:
         source = MODELFILES / "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile"
+        catalog = modelctl.load_model_catalog(ROOT / "models/model-catalog.json")
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / source.name
             text = source.read_text(encoding="utf-8")
-            path.write_text(
-                text.replace("# GGUF:", "# Source: owner/other @ main\n# GGUF:")
-            )
-            with self.assertRaisesRegex(modelctl.ModelError, "exactly one.*Source"):
-                modelctl.load_modelfile(path)
+            path.write_text(text.replace("FROM __BC250_SOURCE__", "# Source: owner/other @ main\nFROM __BC250_SOURCE__"))
+            with self.assertRaisesRegex(modelctl.ModelError, "acquisition metadata belongs"):
+                modelctl.load_packaged_model(path, source.stem, catalog[source.stem])
 
     def test_production_qwen35_prompt_and_fablevibes_sampling_match_policy(
         self,
@@ -547,6 +639,26 @@ class CategoryInterfaceTests(unittest.TestCase):
             "run: sudo bc250 model status agentic --compact",
         )
 
+    def test_inspect_metadata_is_ordinary_user_safe_but_effective_requires_root(self) -> None:
+        output = StringIO()
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=1000),
+            patch.object(modelctl, "registered_models") as registered,
+            redirect_stdout(output),
+        ):
+            rc = modelctl.main(["inspect", "exp-minicpm-v47-1b-openbmb-q4-k-m", "--json"])
+        self.assertEqual(rc, 0)
+        registered.assert_not_called()
+        payload = json.loads(output.getvalue())
+        self.assertTrue(payload["capabilities"]["ocr"])
+        self.assertNotIn("state", payload)
+
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=1000),
+            self.assertRaisesRegex(modelctl.ModelError, r"inspect --effective.*sudo bc250 model inspect"),
+        ):
+            modelctl.main(["inspect", "exp-minicpm-v47-1b-openbmb-q4-k-m", "--effective", "--json"])
+
     def test_model_command_set_is_greenfield_only(self) -> None:
         parser = modelctl.build_parser()
         subparsers = next(
@@ -554,7 +666,7 @@ class CategoryInterfaceTests(unittest.TestCase):
         )
         self.assertEqual(
             set(subparsers.choices),
-            {"list", "status", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
+            {"list", "status", "inspect", "path", "install", "apply", "refresh", "unregister", "remove", "purge-retired"},
         )
 
 
@@ -694,6 +806,61 @@ class CategoryInterfaceTests(unittest.TestCase):
         self.assertIn("Category 'all' means the combined catalog", text)
         self.assertIn("destructive actions", text)
         self.assertNotIn("sudo bc250 model remove all all", text)
+
+    def test_remove_explain_is_read_only_and_does_not_require_root(self) -> None:
+        args = modelctl.argparse.Namespace(
+            command="remove", explain=True, yes=False, host=None, destination=None
+        )
+        defaults = {"category": "experiments", "ollama_host": "127.0.0.1:11434"}
+        model = {
+            "id": "exp-provider",
+            "name": "exp-provider",
+            "provider": "ollama-hf",
+            "category": "experiments",
+            "ownership": {"source": "ollama", "registration": "bc250", "state": "provider"},
+            "modelfile": None,
+        }
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=1000),
+            patch.object(modelctl, "show_removal_plan") as plan,
+            patch.object(modelctl, "operate_models") as operate,
+        ):
+            modelctl.require_privilege("remove", ["remove", "experiments", "exp-provider", "--explain"])
+            self.assertEqual(modelctl.run_category_operation(defaults, [model], args), 0)
+        plan.assert_called_once()
+        operate.assert_not_called()
+
+    def test_provider_remove_cleans_friendly_and_stale_hf_registration_via_ollama(self) -> None:
+        defaults = {"category": "experiments", "ollama_host": "127.0.0.1:11434"}
+        source = "hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M"
+        model = {
+            "id": "exp-minicpm-v47-1b-openbmb-q4-k-m",
+            "name": "exp-minicpm-v47-1b-openbmb-q4-k-m",
+            "provider": "ollama-hf",
+            "from": source,
+            "category": "experiments",
+            "ownership": {"source": "ollama", "registration": "bc250", "state": "provider"},
+            "modelfile": None,
+        }
+        args = modelctl.argparse.Namespace(
+            command="remove", yes=True, host=None, destination=None
+        )
+        completed = modelctl.subprocess.CompletedProcess(["ollama", "rm"], 0)
+        with (
+            patch.object(modelctl.os, "geteuid", return_value=0),
+            patch.object(modelctl, "ollama_identity", return_value=(1000, 1000)),
+            patch.object(modelctl.shutil, "which", return_value="/usr/bin/ollama"),
+            patch.object(modelctl, "run_as_ollama", return_value=completed) as run,
+            patch.object(
+                modelctl,
+                "registered_models",
+                side_effect=[{source}, {source}, set()],
+            ),
+        ):
+            self.assertEqual(modelctl.remove_models(defaults, [model], args), 0)
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0], ["/usr/bin/ollama", "rm", model["name"]])
+        self.assertEqual(commands[1], ["/usr/bin/ollama", "rm", source])
 
     def test_active_package_callers_use_canonical_model_manager_lifecycle(self) -> None:
         callers = (
@@ -879,7 +1046,7 @@ class SelectionTests(unittest.TestCase):
         recommended = modelctl.select_models(models, "recommended")
         self.assertTrue(production)
         self.assertTrue(all(model.get("category") == "production" for model in production))
-        self.assertEqual({m["id"] for m in recommended}, modelctl.RECOMMENDED_MODELS)
+        self.assertEqual({m["id"] for m in recommended}, modelctl.recommended_model_ids())
 
     def test_installer_groups_exclude_mtp_but_explicit_index_selects_it(self) -> None:
         catalogs = modelctl.load_all_catalogs(directories=[MODELFILES])
@@ -1194,6 +1361,56 @@ class StatusTests(unittest.TestCase):
         self.assertIn("Source revision: latest", text)
         self.assertIn(f"Source SHA-256: {'b' * 64}", text)
 
+    def test_tracking_main_revision_uses_online_digest_comparison(self) -> None:
+        model = {
+            "id": "prod-track",
+            "name": "prod-track",
+            "category": "production",
+            "provider": "ollama",
+            "origin": "packaged",
+            "repository": "example/repo",
+            "revision": "main",
+            "gguf": "model.gguf",
+            "source_metadata": {"policy": "tracking"},
+        }
+        defaults = {"destination": "/unused", "modelfile_destination": "/unused"}
+        with (
+            patch.object(modelctl, "inspect_local_source", return_value=("current", "verified", "a" * 64)),
+            patch.object(modelctl, "runtime_modelfile_path", return_value=Path("/tmp/prod-track.Modelfile")),
+            patch.object(modelctl, "inspect_runtime_modelfile", return_value=("current", "current")),
+            patch.object(modelctl, "remote_file_sha256", return_value="b" * 64) as remote,
+        ):
+            state = modelctl.inspect_model_state(
+                defaults, model, registrations={"prod-track"}, destination="/tmp", online=True
+            )
+        remote.assert_called_once()
+        self.assertEqual(state.remote_status, "update available")
+
+    def test_pinned_source_never_treats_non_latest_revision_as_tracking(self) -> None:
+        model = {
+            "id": "prod-pinned",
+            "name": "prod-pinned",
+            "category": "production",
+            "provider": "ollama",
+            "origin": "packaged",
+            "repository": "example/repo",
+            "revision": "0123456789abcdef0123456789abcdef01234567",
+            "gguf": "model.gguf",
+            "source_metadata": {"policy": "pinned"},
+        }
+        defaults = {"destination": "/unused", "modelfile_destination": "/unused"}
+        with (
+            patch.object(modelctl, "inspect_local_source", return_value=("current", "verified", "a" * 64)),
+            patch.object(modelctl, "runtime_modelfile_path", return_value=Path("/tmp/prod-pinned.Modelfile")),
+            patch.object(modelctl, "inspect_runtime_modelfile", return_value=("current", "current")),
+            patch.object(modelctl, "remote_file_sha256") as remote,
+        ):
+            state = modelctl.inspect_model_state(
+                defaults, model, registrations={"prod-pinned"}, destination="/tmp", online=True
+            )
+        remote.assert_not_called()
+        self.assertEqual(state.remote_status, "pinned")
+
     def test_optional_model_status_distinguishes_unselected_from_real_drift(self) -> None:
         model = {
             "id": "exp-test",
@@ -1443,15 +1660,15 @@ class StatusTests(unittest.TestCase):
 
     def test_package_model_profiles_encode_specialized_roles_and_pressure_candidates(self) -> None:
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        self.assertEqual(document["schema"], 1)
+        self.assertEqual(document["schema"], 2)
         profiles = document["profiles"]
-        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k:latest"]["reasoning_policy"], "request-think-true-bounded-6144")
-        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest", profiles)
-        self.assertEqual(profiles["exp-qwen38-27b-unsloth-ud-iq3-s:latest"]["context_target"], 8192)
-        self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-s:latest"]["profile_class"], "experimental-quality")
-        self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]["profile_class"], "experimental-deployability")
-        self.assertTrue(profiles["prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest"]["specialized"])
-        self.assertTrue(profiles["exp-glm-ocr-ggml-q8-0:latest"]["specialized"])
+        self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k"]["reasoning_request_policy"], "request-think-true-bounded-6144")
+        self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", profiles)
+        self.assertEqual(profiles["exp-qwen38-27b-unsloth-ud-iq3-s"]["qualified_context_target"], 8192)
+        self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-s"]["profile_class"], "experimental-quality")
+        self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-xxs"]["profile_class"], "experimental-deployability")
+        self.assertTrue(profiles["prod-translate-gemma4-sub-e4b-17s-q4-k-xl"]["specialized"])
+        self.assertTrue(profiles["exp-glm-ocr-ggml-q8-0"]["specialized"])
 
     def test_pressure_heavy_qwen_profiles_are_retired_or_bounded_for_next_device_gate(self) -> None:
         q36_active = MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
