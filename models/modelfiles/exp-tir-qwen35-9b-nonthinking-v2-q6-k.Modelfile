@@ -1,14 +1,13 @@
 # BC250 category: experimental
 # Ollama model: exp-tir-qwen35-9b-nonthinking-v2-q6-k
-# Source: mradermacher/TIR-Qwen3.5-9B-NonThinking-v2-GGUF @ latest
+# Acquisition/capability metadata: models/model-catalog.json
 # Base fine-tune: HEART77/TIR-Qwen3.5-9B-NonThinking-v2
-# GGUF: TIR-Qwen3.5-9B-NonThinking-v2.Q6_K.gguf
 # Role: direct/non-thinking 9B office and RAG comparison against stock Qwen3.5-9B.
 #
 # This model is intentionally evaluated as a non-thinking alternative; do not
 # add a forced reasoning policy to the Modelfile.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-tir-qwen35-9b-nonthinking-v2-q6-k/TIR-Qwen3.5-9B-NonThinking-v2.Q6_K.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload.
 PARAMETER num_gpu 99

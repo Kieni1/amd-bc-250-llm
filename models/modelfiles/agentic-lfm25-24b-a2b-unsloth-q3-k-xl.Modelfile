@@ -1,12 +1,10 @@
 # BC250 category: agentic
 # Ollama model: agentic-lfm25-24b-a2b-unsloth-q3-k-xl
-# Source: unsloth/LFM2.5-24B-A2B-GGUF @ latest
-# GGUF: LFM2.5-24B-A2B-UD-Q3_K_XL.gguf
-# SHA256: d54834c785c7e265f1cb7375e47aa6f55a0b7cfab75816254c4d2e0c82fd5efc
+# Acquisition/capability metadata: models/model-catalog.json
 #
 # Experimental exclusive-agent-lane challenger. LFM2.5-24B-A2B is an always-
 # reasoning/tool-oriented model; keep it off the normal lanes until device proof.
-FROM /var/lib/bc250-llm-server/gguf/agent/LFM2.5-24B-A2B-UD-Q3_K_XL.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

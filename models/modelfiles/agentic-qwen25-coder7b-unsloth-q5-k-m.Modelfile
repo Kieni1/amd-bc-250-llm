@@ -1,7 +1,6 @@
 # BC250 category: agentic
 # Ollama model: agentic-qwen25-coder7b-unsloth-q5-k-m
-# Source: unsloth/Qwen2.5-Coder-7B-Instruct-GGUF @ latest
-# GGUF: Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 #
 # Intended role:
@@ -9,7 +8,7 @@
 # - Repository edits, shell/Python generation, code review
 # - Compare practical correctness/TTFA against Ornith 1.5 9B
 
-FROM /var/lib/bc250-llm-server/gguf/agent/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

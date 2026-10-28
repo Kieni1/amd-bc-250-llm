@@ -1,7 +1,6 @@
 # BC250 category: agentic
 # Ollama model: agentic-gemma4-12b-fable5-tau2-q4-k-m
-# Source: yuxinlu1/gemma-4-12B-agentic-fable5-composer2.5-v2-3.5x-tau2-GGUF @ latest
-# GGUF: gemma4-v2-Q4_K_M.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 #
 # Intended role:
@@ -15,7 +14,7 @@
 # - repetition penalty 1.1 avoids pathological repeating/garbled output
 # - model is specialized for coding/terminal/agentic work and is English-centric
 
-FROM /var/lib/bc250-llm-server/gguf/agent/gemma4-v2-Q4_K_M.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload in the exclusive agent lane.
 PARAMETER num_gpu 99

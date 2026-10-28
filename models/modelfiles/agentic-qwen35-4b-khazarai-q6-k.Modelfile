@@ -1,7 +1,6 @@
 # BC250 category: agentic
 # Ollama model: agentic-qwen35-4b-khazarai-q6-k
-# Source: mradermacher/Qwen3.5-4B-Agentic-Coding-GGUF @ latest
-# GGUF: Qwen3.5-4B-Agentic-Coding.Q6_K.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 #
 # Underlying fine-tune:
@@ -15,7 +14,7 @@
 #
 # Sampling follows Qwen3.5 precise-coding guidance where Ollama supports it.
 
-FROM /var/lib/bc250-llm-server/gguf/agent/Qwen3.5-4B-Agentic-Coding.Q6_K.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

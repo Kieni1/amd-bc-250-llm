@@ -1,7 +1,6 @@
 # BC250 category: experimental
 # Ollama model: exp-qwen38-4b-empero-q6-k
-# Source: empero-ai/Qwen3.8-4B-Distill-GGUF @ latest
-# GGUF: Qwen3.8-4B-Q6_K.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 #
 # Intended role:
@@ -11,7 +10,7 @@
 #
 # The upstream model is a reasoning model and emits a <think> block by default.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-4b-empero-q6-k/Qwen3.8-4B-Q6_K.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload.
 PARAMETER num_gpu 99

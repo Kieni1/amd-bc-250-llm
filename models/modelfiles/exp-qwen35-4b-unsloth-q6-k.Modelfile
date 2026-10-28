@@ -1,7 +1,6 @@
 # BC250 category: experimental
 # Ollama model: exp-qwen35-4b-unsloth-q6-k
-# Source: unsloth/Qwen3.5-4B-GGUF @ latest
-# GGUF: Qwen3.5-4B-Q6_K.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 #
 # Intended role:
 # - Fast office/general assistant
@@ -11,7 +10,7 @@
 # - This profile uses Qwen3.5 NON-THINKING sampling.
 # - Open WebUI/Ollama: think = OFF.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-4b-unsloth-q6-k/Qwen3.5-4B-Q6_K.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload.
 PARAMETER num_gpu 99

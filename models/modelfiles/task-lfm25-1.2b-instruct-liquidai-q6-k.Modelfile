@@ -1,13 +1,11 @@
 # BC250 category: task
 # Ollama model: task-lfm25-1.2b-instruct-liquidai-q6-k
-# Source: LiquidAI/LFM2.5-1.2B-Instruct-GGUF @ main
-# GGUF: LFM2.5-1.2B-Instruct-Q6_K.gguf
-# SHA256: c5e895c191a066f6b26a8f09f10e94cdb799e579216f87df61a7e27beacd9a2b
+# Acquisition/capability metadata: models/model-catalog.json
 # License: LFM1.0
 # Role: production compact Open WebUI title/tag/retrieval-query task model.
 # Deliberately no fixed SYSTEM prompt: Open WebUI supplies package-owned task prompts.
 
-FROM /var/lib/bc250-llm-server/gguf/task/LFM2.5-1.2B-Instruct-Q6_K.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

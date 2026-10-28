@@ -1,7 +1,6 @@
 # BC250 category: experimental
 # Ollama model: exp-gemma4-12b-google-qat-q4-0
-# Source: google/gemma-4-12B-it-qat-q4_0-gguf @ latest
-# GGUF: gemma-4-12b-it-qat-q4_0.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 #
 # Intended role:
 # - Higher-quality document/general assistant
@@ -11,7 +10,7 @@
 # Gemma4 thinking can be tested separately by starting the
 # system prompt with <|think|>.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-12b-google-qat-q4-0/gemma-4-12b-it-qat-q4_0.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload.
 PARAMETER num_gpu 99

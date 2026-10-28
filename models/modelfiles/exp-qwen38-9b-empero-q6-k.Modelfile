@@ -1,13 +1,12 @@
 # BC250 category: experimental
 # Ollama model: exp-qwen38-9b-empero-q6-k
-# Source: empero-ai/Qwen3.8-9B-Distill-GGUF @ latest
-# GGUF: Qwen3.8-9B-Q6_K.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 # Role: 9B distilled reasoning comparison against stock Qwen3.5-9B and GPT-OSS.
 #
 # Native reasoning model. Keep thinking enabled/default during evaluation.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-9b-empero-q6-k/Qwen3.8-9B-Q6_K.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload.
 PARAMETER num_gpu 99

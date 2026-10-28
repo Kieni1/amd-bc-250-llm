@@ -1,12 +1,10 @@
 # BC250 category: experimental
 # Ollama model: exp-lfm25-8b-a1b-unsloth-q6-k-xl
-# Source: unsloth/LFM2.5-8B-A1B-GGUF @ 2fec5095fc6c228eb66eaa7e4afd54f6ade4e46c
-# GGUF: LFM2.5-8B-A1B-UD-Q6_K_XL.gguf
-# SHA256: de2718c45e69587a0589ebe5f531ed4a99bccf341b2c122b6479ffe28929a9be
+# Acquisition/capability metadata: models/model-catalog.json
 #
 # Experimental fast assistant / RAG / translation challenger. Keep optional until
 # exact-device BC-250 qualification proves quality, memory, latency and tool behavior.
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-lfm25-8b-a1b-unsloth-q6-k-xl/LFM2.5-8B-A1B-UD-Q6_K_XL.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

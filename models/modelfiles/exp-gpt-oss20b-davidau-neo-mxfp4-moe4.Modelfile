@@ -1,8 +1,7 @@
 # BC250 category: experimental
 # Ollama model: exp-gpt-oss20b-davidau-neo-mxfp4-moe4
-# Source: DavidAU/Openai_gpt-oss-20b-NEO-GGUF @ latest
-# GGUF: OpenAI-20B-NEO-MXFP4_MOE4.gguf
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gpt-oss20b-davidau-neo-mxfp4-moe4/OpenAI-20B-NEO-MXFP4_MOE4.gguf
+# Acquisition/capability metadata: models/model-catalog.json
+FROM __BC250_SOURCE__
 
 # BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
 PARAMETER num_gpu 99

@@ -1,7 +1,6 @@
 # BC250 category: experimental
 # Ollama model: exp-gpt-oss20b-unsloth-ud-q4-k-xl
-# Source: unsloth/gpt-oss-20b-GGUF @ latest
-# GGUF: gpt-oss-20b-UD-Q4_K_XL.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 #
 # Intended role:
@@ -14,7 +13,7 @@
 # - Text-only comparison
 # - Conservative BC-250 context to preserve UMA headroom
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-gpt-oss20b-unsloth-ud-q4-k-xl/gpt-oss-20b-UD-Q4_K_XL.gguf
+FROM __BC250_SOURCE__
 
 # BC-250: force full GPU offload.
 PARAMETER num_gpu 99

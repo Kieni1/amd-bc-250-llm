@@ -1,8 +1,7 @@
 # BC250 category: experimental
 # Ollama model: exp-qwen3-4b-lmstudio-q6-k
-# Source: lmstudio-community/Qwen3-4B-Instruct-2507-GGUF @ latest
-# GGUF: Qwen3-4B-Instruct-2507-Q6_K.gguf
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen3-4b-lmstudio-q6-k/Qwen3-4B-Instruct-2507-Q6_K.gguf
+# Acquisition/capability metadata: models/model-catalog.json
+FROM __BC250_SOURCE__
 
 # BC-250: Ollama once chose 13/25 GPU layers (22 vs 84 tok/s). Do not remove.
 PARAMETER num_gpu 99

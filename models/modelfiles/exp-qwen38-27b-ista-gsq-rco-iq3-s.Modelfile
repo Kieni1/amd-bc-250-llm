@@ -1,8 +1,6 @@
 # BC250 category: experimental
 # Ollama model: exp-qwen38-27b-ista-gsq-rco-iq3-s
-# Source: ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF @ latest
-# GGUF: Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf
-# SHA256: 64b53b64c7aa39f20a7e54bd80582fe595b1d745624ee8a72e92508c0326d810
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 # Role: quality-first dense 27B main-model experiment for BC-250.
 # Approx source GGUF size: 11.8 GB; ISTA describes IQ3_S as the recommended/task-lossless quant.
@@ -10,7 +8,7 @@
 # Text-only first pass: no vision projector and no MTP payload.
 # 8K context is deliberate on the 16 GiB UMA profile; expand only after measured headroom.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-27b-ista-gsq-rco-iq3-s/Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

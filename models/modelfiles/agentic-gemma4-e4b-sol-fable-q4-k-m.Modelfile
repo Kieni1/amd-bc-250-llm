@@ -1,7 +1,6 @@
 # BC250 category: agentic
 # Ollama model: agentic-gemma4-e4b-sol-fable-q4-k-m
-# Source: deadbydawn101/gemma-4-E4B-Agentic-Sol-Fable-Reasoning-GeminiCLI-GGUF @ latest
-# GGUF: gemma-4-E4B-v2-Sol-Fable-Q4_K_M.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Gemma
 #
 # Intended role:
@@ -14,7 +13,7 @@
 # - conservative 16K context for first qualification
 # - deterministic generation to favor exact raw-file contracts
 
-FROM /var/lib/bc250-llm-server/gguf/agent/gemma-4-E4B-v2-Sol-Fable-Q4_K_M.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256

@@ -1,7 +1,6 @@
 # BC250 category: experimental
 # Ollama model: exp-granite42-3b-ibm-q6-k
-# Source: ibm-granite/granite-4.2-3b-GGUF @ latest
-# GGUF: granite-4.2-3b-Q6_K.gguf
+# Acquisition/capability metadata: models/model-catalog.json
 # License: Apache-2.0
 # Role: compact multilingual enterprise/RAG/structured-output comparison.
 #
@@ -16,7 +15,7 @@
 # upstream 0.33.x reports show auto/full-context OOMs on <=16 GB shared-memory
 # systems. Verify load/template/think behavior on BC-250 before role promotion.
 
-FROM /var/lib/bc250-llm-server/gguf/experiments/exp-granite42-3b-ibm-q6-k/granite-4.2-3b-Q6_K.gguf
+FROM __BC250_SOURCE__
 
 PARAMETER num_gpu 99
 PARAMETER num_keep 256
