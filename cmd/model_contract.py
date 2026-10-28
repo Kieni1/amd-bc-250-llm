@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Read package-owned BC-250 model catalog/profile metadata for runtime consumers."""
 
 from __future__ import annotations

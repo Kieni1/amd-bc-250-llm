@@ -558,8 +558,24 @@ def check_manifest_sources() -> None:
             continue
         if source.startswith(EXTERNAL_BUILD_TREES):
             continue
-        if not glob.glob(str(ROOT / source)):
+        matches = [Path(item) for item in glob.glob(str(ROOT / source))]
+        if not matches:
             fail(f"install manifest line {number}: source does not exist: {source}")
+            continue
+        if int(mode, 8) & 0o111:
+            continue
+        for path in matches:
+            try:
+                with path.open("rb") as stream:
+                    first_line = stream.readline(256)
+            except OSError as error:
+                fail(f"install manifest line {number}: cannot inspect {path}: {error}")
+                continue
+            if first_line.startswith(b"#!"):
+                fail(
+                    f"install manifest line {number}: non-executable source has a shebang: "
+                    f"{path.relative_to(ROOT)}"
+                )
 
 
 def check_upstream_manifest() -> None:
