@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current release source: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14; GitHub/Fedora 44 selected workflow-dispatch artifacts are release authority.
+Accepted release baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14. The next-release workbench pins Open WebUI 0.12.4; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
 Release 1.9 unifies MTP presentation with the normal indexed model overview while preserving standalone semantics, and carries focused Managed Documents fixes from 1.8 device acceptance: multi-chunk normalization now fails closed on invalid/duplicate/incomplete chunk assembly, Agent-mode preparation restores normal topology across the readiness-failure window, and review output reports explicit readiness state. Runtime/model/retrieval tuning, persistent state and the SRPM-first authority path are unchanged; exact 1.9 build/device binding is required.
 
@@ -76,6 +76,8 @@ Document/knowledge synchronization is loopback-only by default and token-file sy
 
 ```bash
 bc250 model list                    # ordinary combined catalog view
+bc250 model inspect MODEL --json    # authoritative package metadata view
+sudo bc250 model inspect MODEL --effective --json  # include protected/effective state
 bc250 advanced agent list           # specialist agent view
 bc250 advanced mtp list             # specialist MTP view
 sudo bc250 advanced mtp prepare qwen3.5-9b-mtp  # explicit opt-in MTP preparation
@@ -98,15 +100,21 @@ sudo bc250 model refresh experiments MODEL
 # Remove registration only; retain verified GGUF/state
 sudo bc250 model unregister experiments MODEL
 
-# Remove registration plus manager-owned GGUF/state
+# Explain provider-aware destructive scope without changing state
+bc250 model remove experiments MODEL --explain
+
+# Remove registration plus manager-owned GGUF/state where BC-250 owns it
 sudo bc250 model remove experiments MODEL
 ```
 
 Selections accept a full name, displayed index, ranges such as `0,2-4`, or `all`.
 `list` is catalog-only; use `sudo bc250 model status` when you need downloaded,
 registration or Modelfile-drift state. `--verbose` also shows source repository/revision,
-verified SHA-256 when available and resolved paths; `--online` checks moving upstream state. Enter cancels an interactive selection. Preserve
-downloaded GGUFs where practical; use package lifecycle commands rather than deleting
+verified SHA-256 when available and resolved paths; `--online` checks moving upstream state.
+Before 1.0, catalog entries marked `tracking` reuse the recorded local artifact during ordinary
+`apply`; only explicit `refresh` reacquires the moving source and records the newly downloaded
+SHA-256. `pinned` entries retain revision+digest enforcement. Enter cancels an interactive selection.
+Preserve downloaded GGUFs where practical; use package lifecycle commands rather than deleting
 `/var/lib` content manually.
 
 ## Profiles and hardware

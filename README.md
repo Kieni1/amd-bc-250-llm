@@ -4,7 +4,8 @@ BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD B
 It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current release source: `bc250-llm-server-0.14.1-1.9` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+Accepted release baseline: `bc250-llm-server-0.14.1-1.9` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+The next-release workbench keeps Ollama/Tika/governor unchanged and pins Open WebUI 0.12.4.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -53,6 +54,13 @@ are reconciled before this prompt. For unattended extra-model setup use
 `BC250_MODEL_SELECTION`. Runtime routing remains main 11434, task 11435,
 embedding 11437 and exclusive agent 11436.
 
+Model metadata is split by authority: the package catalog owns source/provider/capability/ownership
+facts, profiles own BC-250 qualification and comparison intent, Modelfiles own runtime parameters,
+and product roles own request policy. Use `bc250 model inspect MODEL --json` for the consolidated
+package view and `sudo bc250 model inspect MODEL --effective --json` when protected/effective state
+is required. Pre-1.0 `tracking` sources update only through explicit `refresh`; ordinary convergence
+reuses the recorded artifact, while `pinned` sources continue to enforce revision+digest.
+
 The reviewed fresh-machine memory profile uses only
 `ttm.pages_limit=4194304 ttm.page_pool_size=4194304`; the older explicit
 `amdgpu.gttsize` and full `amdgpu.ppfeaturemask` settings are not defaults.
@@ -79,6 +87,7 @@ Storage visibility and explicit reclamation:
 
 ```bash
 sudo bc250 storage status          # protected accounting requires sudo
+bc250 model remove experiments MODEL --explain  # read-only provider-aware removal plan
 sudo bc250 model purge-retired     # preview/purge package-retired model data
 sudo bc250 storage dedupe          # confirmed XFS extent sharing
 sudo bc250 storage prune-sources   # optional verified offline-source removal
@@ -128,7 +137,7 @@ kept only in the retired source set and are not
 exposed through normal model discovery. The installed retirement catalog lets
 `sudo bc250 model status` identify stale package-retired registrations and
 `sudo bc250 model purge-retired` remove only those explicitly catalogued models.
-The 1.5 catalog also adds optional, non-recommended comparison profiles for LFM2.5 8B A1B Q6_K_XL, an exclusive-agent LFM2.5 24B A2B Q3_K_XL, and MiniCPM-V 4.7 1B document vision; the existing HauhauCS Gemma 4 12B challenger now has pinned source checksum and explicit Gemma renderer/parser metadata. These additions are qualification candidates only and do not change any production role or baseline install selection.
+The next model-management workbench makes model capabilities declarative across the fleet: catalog metadata owns intrinsic modalities/capabilities/provider ownership and runtime lane, profiles own BC-250 qualification/role policy, and Modelfiles remain runtime-parameter authority. MiniCPM-V therefore exposes its vision/OCR testing capabilities without name heuristics, while reasoning/tool capability remains separate from product request policy. The optional LFM2.5/Gemma/MiniCPM challengers remain qualification candidates only and do not change any production role or baseline install selection.
 
 Experimental models are never silent replacements for the defaults above. During `bc250 install`,
 required role models are converged first; entries that are already fully current are summarized rather
@@ -179,7 +188,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 |---|---|
 | Cyan Skillfish governor v0.4.14 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
 | Ollama v0.40.8 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.12.3 and Tika v4.1.0-full | Digest-pinned local UI, API-driven baseline setup and document extraction |
+| Open WebUI v0.12.4 and Tika v4.1.0-full | Digest-pinned next-release UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | Document lifecycle | Local DE/FR/bilingual preparation, human review, provenance validation and Open WebUI knowledge sync |

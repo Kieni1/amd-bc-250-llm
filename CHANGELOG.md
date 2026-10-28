@@ -1,5 +1,14 @@
 # Changelog
 
+## Next release workbench
+
+- Replace scattered package-model acquisition/capability facts with a declarative model catalog and schema-2 qualification profiles; packaged Modelfiles remain runtime-parameter authority.
+- Make Open WebUI testing discovery and package benchmarks metadata-first, including explicit MiniCPM-V vision/OCR support, metadata-owned embedding/translation benchmark profiles, and package-owned category discovery with name heuristics retained only for unknown external models.
+- Add consolidated `bc250 model inspect MODEL --json` / `--effective --json` state, ownership-aware `model remove --explain`, and verified provider-aware cleanup without direct deletion of Ollama shared blobs.
+- Update the next-release Open WebUI pin from 0.12.3 to 0.12.4 while keeping Ollama 0.40.8, Tika 4.1.0-full, governor 0.4.14 and the existing appliance feature policy unchanged.
+- Make pre-1.0 tracking-source semantics internally consistent: active model sources carry no stale package digest pin, `status --online` follows catalog policy for moving refs such as `main`/`latest`, explicit `refresh` records newly downloaded SHA-256 state, and normal `apply` reuses that recorded artifact. Ornith and Jina are migrated from legacy exact-revision pins to the same greenfield tracking policy; immutable revision+digest pinning remains the intended 1.0 stabilization mode.
+- Tighten the metadata contract after the Batch 1-3 coherence audit: model profiles now require the complete role/qualification/exposure surface, catalog ownership must match provider semantics, and Agent preparation metadata is valid only for Agent-category models.
+
 ## 0.14.1-1.9 - 2026-10-25
 
 - Unify standalone MTP candidates with the normal interactive model catalog: `bc250 model install` and installer Stage 7 now show indexed MTP state alongside Ollama models, while explicit MTP ID/index/range selection prepares and verifies the download-only GGUF without registering Ollama or starting llama.cpp.
