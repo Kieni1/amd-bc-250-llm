@@ -113,6 +113,8 @@ mutating lifecycle operations:
 bc250 model list [--include-disabled] [--source PATH] [--modelfile-dir PATH]
 sudo bc250 model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
 bc250 model path CATEGORY ID
+bc250 model inspect ID [--category CATEGORY] [--json]
+sudo bc250 model inspect ID [--category CATEGORY] --effective [--json]
 
 sudo bc250 model apply CATEGORY [SELECTION] [OPTIONS]
 sudo bc250 model refresh CATEGORY [SELECTION] [OPTIONS]
@@ -135,6 +137,12 @@ registration state. Specialist agent/MTP filtered views live under `bc250 advanc
 manager still accepts category filters internally so those workflows do not duplicate catalog code.
 Add `--include-disabled` only when deliberately inspecting disabled opt-in MTP definitions.
 
+`inspect MODEL --json` is the authoritative consolidated package metadata view: source policy,
+provider/ownership, lane, intrinsic capabilities and BC-250 qualification stay distinct from
+Modelfile runtime parameters and product-role request policy. Add `--effective` with `sudo` to
+include protected source/registration state plus parameters parsed from the rendered runtime
+Modelfile. Pretty text is operator-facing; JSON is the machine-readable contract.
+
 `status` is the read-only runtime inspector and normally runs with `sudo` because
 manager-owned GGUF/state trees are protected. It evaluates the same state contract that
 `apply` consumes: source presence and checksum/provenance validity, whether the selected
@@ -146,9 +154,8 @@ same inspection contract but keeps healthy interactive views short: ordinary ful
 entries render as `[CURRENT]`, inactive agent entries render as deferred, and non-current
 entries keep the detailed source/Modelfile/registration reason. Local registration probes are
 bounded; the known-inactive agent lane is skipped during normal status-all inspection.
-`--online` checks moving upstream revisions such as `latest` without downloading or modifying
-the local model.
-Pinned revisions are reported as pinned rather than mislabelled as needing an update.
+`--online` checks catalog-policy `tracking` sources such as `latest` or `main` without downloading or
+modifying the local model. `pinned` policy is reported as pinned rather than mislabelled as needing an update.
 When normal mode is active, the agent API is intentionally stopped; full
 `status agentic MODEL` therefore may show registration as unavailable/UNKNOWN. Read-only status
 does not switch runtime modes merely to inspect it.
@@ -178,7 +185,9 @@ and restore normal mode afterward.
 `refresh` is the explicit source-update/reinstall operation. It deliberately refetches
 source bytes and then performs the same reconciliation as `apply`. Use it when
 `status --online` reports a changed moving source or when you intentionally want to
-replace otherwise valid cached bytes. It is not an automatic side effect of `apply`.
+replace otherwise valid cached bytes. For package `tracking` sources, refresh accepts the current upstream
+bytes and records their calculated SHA-256 in local state; `pinned` sources enforce the catalog digest.
+It is not an automatic side effect of `apply`.
 
 `unregister` removes the Ollama registration and rendered runtime Modelfile while
 retaining manager-owned GGUF plus `.bc250.json` provenance/state where those exist. It is
@@ -186,11 +195,15 @@ the correct operation when you want to free the Ollama registration/store refere
 retain verified source for a later fast `apply`. Remote OCR sources are Ollama-managed and
 therefore have no separate package-local GGUF/state pair to retain.
 
-`remove` removes the registration/runtime Modelfile and then manager-owned GGUF/state. A
-failed registration removal leaves local source intact and returns failure. Destructive
-commands preview their effects and require confirmation unless `--yes` is supplied; an
-omitted selection never silently turns into destructive `all`. If a model was applied
-with `--host` or `--destination`, pass the same override to `unregister`/`remove`.
+`remove` removes the registration/runtime Modelfile and then manager-owned GGUF/state. Use
+`bc250 model remove CATEGORY MODEL --explain` for a read-only provider-aware plan showing registration,
+source and state ownership before mutation; it does not require root. Actual removal uses Ollama's supported
+`rm` path for registrations and verifies post-state. For Ollama-managed HF/provider assets, BC-250 may remove
+its friendly/stale provider registration but never unlinks files inside Ollama's shared blob store by pathname;
+shared-layer reclamation remains Ollama-owned. A failed or unverifiable registration removal leaves
+manager-owned local source intact and returns failure. Destructive commands preview their effects and require
+confirmation unless `--yes` is supplied; an omitted selection never silently turns into destructive `all`.
+If a model was applied with `--host` or `--destination`, pass the same override to `unregister`/`remove`.
 
 `purge-retired` is separate from ordinary removal. It targets only models named in the
 package retirement catalog, previews canonical identity/registration/source state, and
@@ -296,7 +309,9 @@ bc250 ocr test glm|ovis IMAGE
 ```
 
 OCR models stay in the normal `experiments` category and main Ollama instance;
-there is no OCR daemon or separate model store. GLM/Ovis use remote `hf.co/...`
+there is no OCR daemon or separate model store. The package benchmark recognizes GLM-OCR, OvisOCR2 and
+MiniCPM-V from catalog capability metadata; MiniCPM's text+image/OCR declaration also drives testing OWUI
+vision exposure without enabling unrelated built-in tools. GLM/Ovis use remote `hf.co/...`
 imports so Ollama can manage the required vision projector; unlike text-only
 models, their source files therefore live in the Ollama blob store rather than
 `/var/lib/bc250-llm-server/gguf/`. The helper tests one image and

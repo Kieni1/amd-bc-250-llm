@@ -13,6 +13,8 @@ refresh or remove models.
 
 ```bash
 bc250 model list                    # ordinary combined catalog view
+bc250 model inspect MODEL --json    # consolidated package metadata
+sudo bc250 model inspect MODEL --effective --json  # include protected runtime/source state
 bc250 advanced agent list           # specialist agent view
 bc250 advanced mtp list             # specialist MTP view
 sudo bc250 advanced mtp prepare qwen3.5-9b-mtp  # explicit opt-in for disabled MTP experiments
@@ -30,8 +32,12 @@ sudo bc250 model remove production MODEL-NAME
 sudo bc250 model purge-retired
 ```
 
-`list` reports catalog definitions only and therefore does not need root. `status` is the
-read-only runtime/state view and normally needs `sudo` for the protected GGUF/state tree.
+`list` reports catalog definitions only and therefore does not need root. `inspect MODEL --json`
+returns the package-owned technical facts, ownership, capabilities and BC-250 qualification profile
+for one model. `inspect MODEL --effective --json` additionally renders the actual runtime Modelfile
+parameters and inspects protected source/registration state, so that form requires `sudo`. The JSON
+form is the machine-readable contract; the human display is convenience output. `status` is the
+read-only fleet/runtime-state view and normally needs `sudo` for the protected GGUF/state tree.
 It reports source/provenance validity, Modelfile drift and registration state. Intentionally
 unselected optional models are `OPTIONAL`, with a distinction between not installed and source
 cached/not registered; they do not receive repair advice until explicitly selected. `DRIFT` is
@@ -61,9 +67,21 @@ misplaced.
 | `embedding` | `embed-` | `127.0.0.1:11437` | `gguf/embedding` |
 
 The public categories are `production`, `experiments`, `task`, `agentic`,
-`embedding`, `mtp` and `all`; legacy aliases are intentionally not accepted. MTP
-is the only exception to Modelfile discovery: its download-only entries remain in
-a TOML runtime catalog because they have no Ollama model or Modelfile. The active MTP
+`embedding`, `mtp` and `all`; legacy aliases are intentionally not accepted. Packaged Ollama
+models are defined by `model-catalog.json`, which is authoritative for acquisition, provider,
+source ownership, runtime lane and intrinsic capabilities. Their packaged `.Modelfile` files are
+runtime templates only and intentionally contain `FROM __BC250_SOURCE__`; the manager renders the
+source from the catalog before registration. `model-profiles.json` is a separate authority for
+BC-250 qualification, intended/comparison roles, recommended status and product/test policy. Runtime
+samplers remain authoritative only in the Modelfile. During the pre-1.0 greenfield phase, every active
+package model source uses `tracking`; immutable pinning is reserved for the 1.0 stabilization step.
+Package `tracking` sources intentionally have no `expected_sha256` pin: normal `apply` reuses the locally recorded digest, while explicit `refresh` may fetch
+a newer moving ref and records the newly calculated SHA-256 in state. `pinned` manager-owned sources require
+an immutable revision plus package-owned digest.
+
+MTP is the only exception to the JSON acquisition catalog: its download-only entries remain in
+a TOML runtime catalog because they have no Ollama model or Modelfile. MTP entries use the same
+capability/ownership vocabulary and also have qualification profiles. The active MTP
 catalog also owns its small package-facing `role` and `recommendation` metadata so list output,
 runtime context/draft defaults and operator documentation do not need separate selection tables.
 This metadata never enables a model or promotes it into normal convergence. Packaged MTP entries
@@ -74,8 +92,13 @@ normal direct use, while `bc250 advanced mtp compare` intentionally leaves Ollam
 
 ## Add or override a model
 
-Copy the installed template, name it after the intended Ollama display name and
-edit it:
+Stock package models are changed in `models/model-catalog.json` plus their runtime-only Modelfile;
+qualification/role changes belong in `models/model-profiles.json`. The installed example below is
+for **operator-owned additions** and therefore remains self-contained with source metadata. A
+same-name operator override may also copy a packaged runtime-only template; in that case it inherits
+the package catalog source/capability definition and overrides only runtime Modelfile behavior.
+
+Copy the installed template, name it after the intended Ollama display name and edit it:
 
 ```bash
 sudo install -m0644 \
@@ -184,12 +207,16 @@ sudo bc250 model apply CATEGORY MODEL
 For deliberate source deletion use:
 
 ```bash
+bc250 model remove CATEGORY MODEL --explain
 sudo bc250 model remove CATEGORY MODEL --yes
 ```
 
-Never manually purge Ollama's shared blob directory for one model. Remote OCR definitions
-have Ollama-managed model/projector blobs rather than a separate manager-owned source
-GGUF/state pair; lifecycle output states that distinction explicitly.
+`--explain` is read-only and describes registration/source/state ownership before mutation.
+Manager-owned models remove their BC-250 GGUF/state after Ollama registration removal. Provider-owned
+HF/Ollama assets are released only through Ollama registration semantics; BC-250 never unlinks files
+inside Ollama's shared blob store by pathname. Post-removal registration/path checks fail closed when
+the intended state cannot be established. Remote OCR definitions therefore keep provider-specific
+semantics rather than pretending they have a separate manager-owned GGUF/state pair.
 
 See [`../docs/OPERATIONS.md`](../docs/OPERATIONS.md) for every option and
 [`../docs/OPENWEBUI.md`](../docs/OPENWEBUI.md) for current model roles.

@@ -10,7 +10,9 @@ package callers and operator documentation are expected to follow.
 
 `bc250 model` treats one model as three related package states:
 
-1. **Catalog definition** — packaged or operator Modelfile / MTP catalog entry.
+1. **Catalog definition** — packaged `model-catalog.json` intrinsic/acquisition metadata plus
+   a runtime-only Modelfile template, an operator-owned self-contained Modelfile override, or an MTP
+   catalog entry. `model-profiles.json` separately owns BC-250 qualification/role policy.
 2. **Manager-owned source state** — local GGUF plus `.bc250.json` provenance
    sidecar when the provider is not Ollama-managed.
 3. **Runtime state** — rendered runtime Modelfile and Ollama registration when
@@ -24,6 +26,8 @@ own path/provenance guesses.
 
 ```text
 bc250 model list [CATEGORY]
+bc250 model inspect ID [--category CATEGORY] [--json]
+sudo bc250 model inspect ID [--category CATEGORY] --effective [--json]
 sudo bc250 model status [CATEGORY] [SELECTION] [--online] [--verbose|--compact]
 bc250 model path CATEGORY ID
 
@@ -46,6 +50,16 @@ Catalog-only discovery. It does not inspect protected GGUF/state directories or
 Ollama registration and therefore does not require root. Operator definitions
 that shadow packaged definitions are labelled as overrides.
 
+### `inspect`
+
+Consolidated single-model metadata view. Without `--effective` it is ordinary-user-safe and combines
+the package catalog's source/provider/ownership/capability facts with the BC-250 qualification profile.
+`--json` is the machine-readable contract; human formatting is not a frozen parser interface.
+
+`--effective` additionally renders runtime parameters from the actual Modelfile template and inspects
+protected source/state/registration state, so it requires root. Runtime sampler values are never copied
+into the profile: the rendered Modelfile remains their authority.
+
 ### `status`
 
 Read-only installed-state inspection. It reports definition origin, verified
@@ -53,11 +67,14 @@ source/provenance state, runtime Modelfile drift, registration state and an
 overall `CURRENT`, `MISSING`, `DRIFT` or `UNKNOWN` result. It requires root
 because manager-owned GGUF/state directories are protected.
 
-`--online` is opt-in. For `@ latest` manager-owned Hugging Face sources it
-compares remote file SHA metadata with the locally verified SHA without
-modifying or downloading the model. Pinned revisions are reported as pinned,
-not as update candidates. Normal output explicitly points to `--online` when
-upstream state has not been checked.
+During the pre-1.0 greenfield phase, all active package model sources use `tracking`; the `pinned`
+policy remains part of the contract for the later 1.0 stabilization step.
+
+`--online` is opt-in. For manager-owned sources whose catalog policy is `tracking`
+(`latest`, `main`, or another intentionally moving ref), it compares remote file SHA metadata with the
+locally verified SHA without modifying or downloading the model. `pinned` policy is reported as pinned,
+not as an update candidate. Normal output explicitly points to `--online` when upstream state has not
+been checked.
 
 `--verbose` adds catalog source repository/revision, verified local SHA-256 when
 available, and resolved source/state/runtime paths. `--compact` uses the same
@@ -87,7 +104,9 @@ one model, including selections from category `all`.
 ### `refresh`
 
 Explicit source refresh. It re-fetches the selected source even when the local
-GGUF/state is valid, then performs the same reconciliation as `apply`.
+GGUF/state is valid, then performs the same reconciliation as `apply`. For package `tracking` sources, the
+newly downloaded bytes are intentionally not constrained by a stale catalog digest; their calculated SHA-256
+is recorded in state. `pinned` sources continue to enforce the package-owned expected digest.
 
 ### `unregister`
 

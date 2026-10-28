@@ -370,9 +370,9 @@ exp-tir-qwen35-9b-nonthinking-v2-q6-k
 
 Release 1.5 adds comparison profiles only; no production/default role changes.
 
-- `exp-lfm25-8b-a1b-unsloth-q6-k-xl`: checksum-pinned local GGUF, 8K first-pass context, explicit `lfm2` renderer/parser. Treat thinking/tool capability as unproven for this imported quant until device qualification.
-- `agentic-lfm25-24b-a2b-unsloth-q3-k-xl`: checksum-pinned 10.9 GB-class local GGUF on the exclusive agent lane, `lfm2-thinking`, bounded 8K context / 3072 output. It is an always-reasoning/tool-oriented challenger, not a normal chat-lane model.
-- `exp-gemma4-12b-hauhaucs-uncensored-q4-k-m`: existing challenger retained, now with exact source commit/SHA-256 plus explicit `gemma4-large` renderer, `gemma4` parser and thinking capability metadata. Q4_K_M is intentional for this QAT-oriented release.
+- `exp-lfm25-8b-a1b-unsloth-q6-k-xl`: pre-1.0 tracking local GGUF, 8K first-pass context, explicit `lfm2` renderer/parser. Treat thinking/tool capability as unproven for this imported quant until device qualification.
+- `agentic-lfm25-24b-a2b-unsloth-q3-k-xl`: pre-1.0 tracking 10.9 GB-class local GGUF on the exclusive agent lane, `lfm2-thinking`, bounded 8K context / 3072 output. It is an always-reasoning/tool-oriented challenger, not a normal chat-lane model.
+- `exp-gemma4-12b-hauhaucs-uncensored-q4-k-m`: existing pre-1.0 tracking challenger retained with explicit `gemma4-large` renderer, `gemma4` parser and thinking capability metadata. Q4_K_M is intentional for this QAT-oriented release; each acquisition records the actual downloaded SHA-256 in state.
 - `exp-minicpm-v47-1b-openbmb-q4-k-m`: Ollama-managed HF document-vision/OCR experiment so multimodal/projector assets stay paired. It is not a Tika replacement.
 
 Promotion requires BC-250 evidence for registration/capabilities, visible output, memory/load/throughput, office DE↔FR integrity, grounded RAG behavior and the role-specific vision/tool tests. Generic leaderboard scores are insufficient.
@@ -431,13 +431,27 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use comparison; retain until the E4B challenger establishes whether a final 12B comparison is useful |
 | `agentic-qwen25-coder7b-unsloth-q5-k-m` | legacy coding comparison; lifecycle decision remains pending canonical campaign-evidence reconciliation |
 
-Package-owned role/profile metadata for production and significant experimental models lives in
-`models/model-profiles.json`. Qualification should select probes from that intended role rather than
-inferring product purpose from generic Ollama capabilities. Repeated successful unload/recovery is
+Package-owned model metadata is deliberately split by authority. `models/model-catalog.json` owns
+intrinsic Ollama-model facts: acquisition identity, provider/source ownership, runtime lane and
+capabilities. Packaged Modelfiles own runtime parameters only. `models/model-profiles.json` schema 2
+now covers every active model (plus MTP) and owns BC-250 qualification limits, intended/comparison
+roles, recommended status and request/test policy. Use `bc250 model inspect MODEL --json` for the
+consolidated view and `sudo bc250 model inspect MODEL --effective --json` when current protected
+source/registration state and the rendered runtime parameters are required. During the pre-1.0
+greenfield phase, all active package model sources use tracking policy. Tracking sources deliberately
+carry no catalog checksum pin: `apply` reuses the locally recorded digest, while explicit `refresh` may accept
+new upstream bytes and records their new SHA-256 in state. Pinned sources retain an immutable revision plus
+package-owned digest. Qualification should select probes from the intended/comparison role rather than
+inferring product purpose from names or generic Ollama capabilities. Repeated successful unload/recovery is
 not a memory leak, but repeated sub-512 MiB recovery is still a profile-quality signal: distinguish
 leak/unload failure, successful-but-excessively-tight operation, and comfortable operation.
 
-GLM-OCR and OvisOCR2 remain the packaged OCR comparison pair. Do not infer fit
+GLM-OCR, OvisOCR2 and MiniCPM-V use the package-owned OCR benchmark path. Model-kind
+and default category selection are metadata-first for package models; name heuristics are only a fallback
+for unknown external models. Embedding query/document prefix profiles and the packaged TranslateGemma
+prompt profile are likewise catalog-owned rather than inferred from package model names. MiniCPM-V declares
+text+image modalities plus OCR capability explicitly, so OWUI testing
+discovery and the benchmark no longer need to guess its role from its name. Do not infer fit
 from GGUF size alone on the BC-250: the 16 GB CPU/GPU pool must also hold KV/cache,
 runtime and the OS. Draft/MTP heads are not standalone Ollama role models. Packaged MTP entries have no Ollama
 Modelfiles and remain excluded from combined `apply all` / `refresh all` convergence regardless of

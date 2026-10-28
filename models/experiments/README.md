@@ -27,8 +27,11 @@ explicit coexistence evidence beside the warm main model before promotion.
 
 ## Adding or retiring an experiment
 
-1. Add a checksum-pinned `exp-*.Modelfile` under `models/modelfiles/`.
-2. Add the exact model ID and purpose to the canonical active catalog in `MODELS.md`.
+1. Add the model's acquisition/provider/capability facts to `models/model-catalog.json`, its runtime-only
+   `exp-*.Modelfile` under `models/modelfiles/`, and its qualification/role policy to
+   `models/model-profiles.json`. Use `tracking` for intentionally moving pre-1.0 sources and `pinned` only
+   when the package must hold an immutable revision+digest.
+2. Add the model's purpose/status to the canonical active catalog in `MODELS.md`.
 3. Add or reuse a bounded quality screen only where the existing benchmark surface
    cannot answer the question.
 4. In the Git repository (not the installed RPM), record consequential run evidence
