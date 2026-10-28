@@ -2199,6 +2199,24 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
     return 0
 
 
+def effective_ownership(model: dict) -> dict[str, str]:
+    """Return explicit ownership metadata with safe provider-compatible fallbacks."""
+    provider = str(model.get("provider") or "")
+    if provider == "download-only":
+        fallback = {"source": "bc250", "registration": "none", "state": "bc250"}
+    elif provider == "ollama-hf":
+        fallback = {"source": "ollama", "registration": "bc250", "state": "provider"}
+    else:
+        fallback = {"source": "bc250", "registration": "bc250", "state": "bc250"}
+    ownership = model.get("ownership")
+    if not isinstance(ownership, dict):
+        return fallback
+    return {
+        key: str(ownership.get(key) or value)
+        for key, value in fallback.items()
+    }
+
+
 def show_removal_plan(
     groups: list[tuple[dict, list[dict]]], args: argparse.Namespace
 ) -> None:
@@ -2210,10 +2228,10 @@ def show_removal_plan(
         host = ollama_host(defaults, getattr(args, "host", None))
         for model in models:
             label = model.get("name", model["id"])
-            ownership = model.get("ownership") if isinstance(model.get("ownership"), dict) else {}
-            source_owner = str(ownership.get("source") or "unknown")
-            registration_owner = str(ownership.get("registration") or "unknown")
-            state_owner = str(ownership.get("state") or "unknown")
+            ownership = effective_ownership(model)
+            source_owner = ownership["source"]
+            registration_owner = ownership["registration"]
+            state_owner = ownership["state"]
             print(f"\n{label}")
             print(
                 "  Ownership: "
@@ -2288,9 +2306,9 @@ def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) 
         label = model.get("name", model["id"])
         verb = "unregistering" if keep_source else "removing"
         print(f"\n>>> {verb} {label}")
-        ownership = model.get("ownership") if isinstance(model.get("ownership"), dict) else {}
-        source_owner = str(ownership.get("source") or ("ollama" if model["provider"] == "ollama-hf" else "bc250"))
-        registration_owner = str(ownership.get("registration") or ("none" if model["provider"] == "download-only" else "bc250"))
+        ownership = effective_ownership(model)
+        source_owner = ownership["source"]
+        registration_owner = ownership["registration"]
 
         if registration_owner != "none" and model["provider"].startswith("ollama"):
             if not ollama_bin:
@@ -2359,6 +2377,11 @@ def remove_models(defaults: dict, models: list[dict], args: argparse.Namespace) 
                     "    provider-owned shared blobs remain under Ollama ownership; "
                     "no direct blob deletion attempted"
                 )
+                if keep_source:
+                    print(
+                        "    no manager-owned GGUF/state to retain; "
+                        "multimodal source/projector blobs are Ollama-managed"
+                    )
 
         output = None
         if source_owner == "bc250":

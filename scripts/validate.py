@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import glob
 import json
 import os
 import re
@@ -558,7 +557,7 @@ def check_manifest_sources() -> None:
             continue
         if source.startswith(EXTERNAL_BUILD_TREES):
             continue
-        matches = [Path(item) for item in glob.glob(str(ROOT / source))]
+        matches = list(ROOT.glob(source))
         if not matches:
             fail(f"install manifest line {number}: source does not exist: {source}")
             continue
