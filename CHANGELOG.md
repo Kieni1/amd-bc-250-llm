@@ -8,6 +8,8 @@
 - Update the next-release Open WebUI pin from 0.12.3 to 0.12.4 while keeping Ollama 0.40.8, Tika 4.1.0-full, governor 0.4.14 and the existing appliance feature policy unchanged.
 - Make pre-1.0 tracking-source semantics internally consistent: active model sources carry no stale package digest pin, `status --online` follows catalog policy for moving refs such as `main`/`latest`, explicit `refresh` records newly downloaded SHA-256 state, and normal `apply` reuses that recorded artifact. Ornith and Jina are migrated from legacy exact-revision pins to the same greenfield tracking policy; immutable revision+digest pinning remains the intended 1.0 stabilization mode.
 - Tighten the metadata contract after the Batch 1-3 coherence audit: model profiles now require the complete role/qualification/exposure surface, catalog ownership must match provider semantics, and Agent preparation metadata is valid only for Agent-category models.
+- Remove the historical LFM name-based generation latency exception: latency budgets now follow the resolved `think` request plus package reasoning policy/capability metadata, so the LFM2.5 8B `nonthinking-first-pass` challenger receives the normal non-thinking latency budget.
+- Make Agent qualification scope machine-readable with `agent_validation=static-output-contract`; `tools=true` remains an intrinsic capability and does not claim that native Ollama `tool_calls` protocol execution has been device-qualified.
 
 ## 0.14.1-1.9 - 2026-10-25
 

@@ -141,7 +141,7 @@ bc250 advanced benchmark ocr
 bc250 advanced benchmark task
 
 sudo bc250 advanced agent enter
-bc250 advanced benchmark agent
+bc250 advanced benchmark agent   # static output/tool-format contract; not native Ollama tool_calls qualification
 bc250 advanced code run review path/to/file review.md
 sudo bc250 advanced agent leave   # `normal` is the explicit convergence alias
 
