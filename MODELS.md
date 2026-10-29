@@ -337,6 +337,10 @@ bc250 advanced benchmark task
 bc250 advanced benchmark agent
 ```
 
+Agent profiles declare `agent_validation=static-output-contract`. This means the package
+has qualified static Bash/Python/JSON/tool-format output contracts, not native Ollama
+`tool_calls` execution. `tools=true` describes intrinsic model capability only.
+
 ## Active experiment catalog
 
 This is the canonical operator-facing list of packaged `exp-*` registrations. It is
@@ -370,7 +374,7 @@ exp-tir-qwen35-9b-nonthinking-v2-q6-k
 
 Release 1.5 adds comparison profiles only; no production/default role changes.
 
-- `exp-lfm25-8b-a1b-unsloth-q6-k-xl`: pre-1.0 tracking local GGUF, 8K first-pass context, explicit `lfm2` renderer/parser. Treat thinking/tool capability as unproven for this imported quant until device qualification.
+- `exp-lfm25-8b-a1b-unsloth-q6-k-xl`: pre-1.0 tracking local GGUF, 8K first-pass context, explicit `lfm2` renderer/parser. Treat thinking/tool capability as unproven for this imported quant until device qualification. Its `nonthinking-first-pass` qualification policy also controls benchmark latency budgeting; family-name heuristics do not override `think=false` or the package profile.
 - `agentic-lfm25-24b-a2b-unsloth-q3-k-xl`: pre-1.0 tracking 10.9 GB-class local GGUF on the exclusive agent lane, `lfm2-thinking`, bounded 8K context / 3072 output. It is an always-reasoning/tool-oriented challenger, not a normal chat-lane model.
 - `exp-gemma4-12b-hauhaucs-uncensored-q4-k-m`: existing pre-1.0 tracking challenger retained with explicit `gemma4-large` renderer, `gemma4` parser and thinking capability metadata. Q4_K_M is intentional for this QAT-oriented release; each acquisition records the actual downloaded SHA-256 in state.
 - `exp-minicpm-v47-1b-openbmb-q4-k-m`: Ollama-managed HF document-vision/OCR experiment so multimodal/projector assets stay paired. It is not a Tika replacement.
@@ -435,7 +439,9 @@ Package-owned model metadata is deliberately split by authority. `models/model-c
 intrinsic Ollama-model facts: acquisition identity, provider/source ownership, runtime lane and
 capabilities. Packaged Modelfiles own runtime parameters only. `models/model-profiles.json` schema 2
 now covers every active model (plus MTP) and owns BC-250 qualification limits, intended/comparison
-roles, recommended status and request/test policy. Use `bc250 model inspect MODEL --json` for the
+roles, recommended status and request/test policy. Agent profiles explicitly report
+`agent_validation=static-output-contract`; this is narrower than intrinsic `tools=true` and does not
+claim native Ollama `tool_calls` execution has been qualified. Use `bc250 model inspect MODEL --json` for the
 consolidated view and `sudo bc250 model inspect MODEL --effective --json` when current protected
 source/registration state and the rendered runtime parameters are required. During the pre-1.0
 greenfield phase, all active package model sources use tracking policy. Tracking sources deliberately

@@ -54,6 +54,8 @@ that shadow packaged definitions are labelled as overrides.
 
 Consolidated single-model metadata view. Without `--effective` it is ordinary-user-safe and combines
 the package catalog's source/provider/ownership/capability facts with the BC-250 qualification profile.
+For Agent models the qualification profile includes `agent_validation=static-output-contract`; this is
+deliberately narrower than intrinsic `tools=true` and does not assert native Ollama `tool_calls` qualification.
 `--json` is the machine-readable contract; human formatting is not a frozen parser interface.
 
 `--effective` additionally renders runtime parameters from the actual Modelfile template and inspects

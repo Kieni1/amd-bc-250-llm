@@ -516,6 +516,13 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("advertised external BC-250 API", settings)
 
 
+    def test_agent_validation_scope_is_explicit_in_current_guidance(self) -> None:
+        benchmarking = (ROOT / "docs/BENCHMARKING.md").read_text(encoding="utf-8")
+        models = (ROOT / "MODELS.md").read_text(encoding="utf-8")
+        self.assertIn("agent_validation=static-output-contract", benchmarking)
+        self.assertIn("does not exercise/qualify native Ollama `tool_calls`", benchmarking)
+        self.assertIn("agent_validation=static-output-contract", models)
+
     def test_development_scope_ignores_python_bytecode_in_frozen_trees(self) -> None:
         cache_dir = ROOT / "cmd/documents/__pycache__"
         cache_dir.mkdir(exist_ok=True)

@@ -538,6 +538,9 @@ sudo bc250 advanced agent leave
 # explicit idempotent normal-topology convergence/recovery alias:
 sudo bc250 advanced agent normal
 
+# Agent benchmark qualification is static output/syntax/tool-format only.
+# It does not qualify native Ollama tool_calls execution; inspect agent_validation for the machine-readable boundary.
+
 bc250 advanced benchmark concurrency MAIN_MODEL EMBED_MODEL
 bc250 advanced benchmark num-batch MODEL [MODEL ...]
 bc250 advanced benchmark owui-translation --token-file FILE
