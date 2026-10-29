@@ -933,3 +933,25 @@ Open WebUI feature surface is enabled by that version bump; package feature poli
 it. Leaving package-model benchmark selection/profile behavior name-derived would preserve duplicate
 implicit policy and make future model additions require evaluator edits. The 0.12.4 runtime update is small
 and is intentionally kept independent of the model-contract architecture.
+
+
+## DEC-036 — Benchmark latency follows request/qualification policy and Agent validation is explicit
+
+**Status:** ACTIVE — next-release workbench.
+
+**Decision:** Remove the historical generation-benchmark exception that selected the larger reasoning
+latency budget merely because a model name contained `lfm`. Explicit `think=false` always uses the normal
+latency budget. When `think` is omitted, packaged models use qualification policy and reasoning capability
+metadata: deliberately non-thinking policies such as `nonthinking-first-pass` use the normal budget, while
+reasoning-capable/unknown cases retain the conservative larger budget. Unknown external models remain
+conservative rather than receiving package-specific assumptions.
+
+Agent model profiles explicitly declare `agent_validation=static-output-contract`; all non-Agent profiles
+declare `not-applicable`. Catalog `tools=true` remains an intrinsic capability statement. The current
+package-owned Agent benchmark proves static output format/syntax/required-structure behavior and does not
+claim native Ollama `tool_calls` protocol execution has been qualified.
+
+**Why:** Model-family name heuristics conflict with the declarative model contract introduced by DEC-033/034
+and specifically over-budget the LFM2.5 8B `nonthinking-first-pass` challenger. Separately, tool capability
+and proven validation scope must stay distinct so challenger acceptance cannot silently overstate what the
+Agent benchmark actually exercises.

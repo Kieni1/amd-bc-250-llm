@@ -50,3 +50,11 @@ Do not stop artifact production solely for:
 - historical campaign expectations.
 
 Current operator/release guidance is not "documentation-only" when it defines release or safety behavior; contradictions there are blocking coherence defects.
+
+
+### Next-release model metadata/benchmark contract
+
+- Generation latency selection must follow resolved `think` behavior plus package qualification/capability metadata; packaged LFM models receive no family-name exception.
+- `exp-lfm25-8b-a1b-unsloth-q6-k-xl` with `nonthinking-first-pass` uses the normal latency budget when `think` is omitted or explicitly false.
+- Every Agent profile declares `agent_validation=static-output-contract`; non-Agent profiles declare `not-applicable`.
+- `tools=true` is capability metadata only. The existing Agent benchmark does not qualify native Ollama `tool_calls` execution.

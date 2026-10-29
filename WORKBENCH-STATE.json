@@ -16,8 +16,8 @@
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "Batch 3 integration/refinement complete; post-Batch3 coherence audit also complete: tracking/pinned source semantics corrected, all active pre-1.0 model sources normalized to tracking, profile/provider/Agent metadata validation tightened, secondary docs/scope refreshed, and the coherent Open WebUI 0.12.4 pin retained.",
-    "integration": "Batches 1-3 plus the final coherence audit are complete; the metadata-first catalog/profile/Modelfile/product-role authority split is consistent across model manager, OWUI, benchmark, lifecycle, docs and packaging.",
+    "current_batch": "Batch 3 integration/refinement complete; post-Batch3 coherence audit and benchmark/Agent-validation refinement also complete: generation latency budgeting follows resolved think behavior plus package qualification/capability metadata with no LFM family-name exception, and Agent profiles explicitly declare static-output-contract validation scope.",
+    "integration": "Batches 1-3, the coherence audit, and the benchmark/Agent-validation refinement are complete; model capability, qualification scope, runtime parameters and product request policy remain separate authorities.",
     "next_batch": "Freeze/assign the next release identity, run mandatory Ruff/ShellCheck plus the authoritative Fedora 44 release gate, then resume targeted challenger qualification on that exact RPM."
   },
   "release": {
@@ -35,6 +35,6 @@
     "package_critical": "Final workbench package-critical validation PASS (156/156 tests).",
     "release_preflight": "Final workbench release-pipeline preflight PASS (27/27 tests).",
     "rpm_package_check": "Not applicable yet: next release has not been frozen/built.",
-    "source_checks": "Final next-release workbench audit: focused model/consumer/documentation regression PASS (472/472 across catalog, models, benchmark, OpenWebUI, documentation, operations, install and maintenance); scripts/validate.py and development scope check PASS. Ruff/ShellCheck are unavailable in this workspace and remain mandatory at release freeze."
+    "source_checks": "Final next-release workbench refinement: focused benchmark/catalog/model/documentation regression PASS (306/306); release-facing release-pipeline/packaging/operations/OpenWebUI regression PASS (185/185); package-critical validation PASS (156/156); release-pipeline preflight tests PASS (27/27); scripts/validate.py and development scope check PASS. Ruff/ShellCheck are unavailable in this workspace and remain mandatory at release freeze."
   }
 }
