@@ -56,8 +56,9 @@ Generated output is never applied automatically; review it and run the real test
 suite. `bc250 advanced benchmark agent` checks Bash/Python syntax and small static semantic
 requirements without executing model-generated code, including raw-output
 format/reasoning contamination, space-safe Bash patterns, explicit Python range
-rejection and JSON key shapes. It records native thinking separately when the runtime
-exposes it.
+rejection and JSON key shapes. Agent qualification profiles therefore use
+`agent_validation=static-output-contract`; this does not claim native Ollama `tool_calls`
+protocol compatibility. It records native thinking separately when the runtime exposes it.
 
 ## Local commits and Gitea review
 

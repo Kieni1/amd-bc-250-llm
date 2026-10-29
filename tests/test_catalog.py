@@ -72,6 +72,14 @@ class ModelfileDiscoveryTests(unittest.TestCase):
                 self.assertTrue(model["capabilities"]["benchmark_kinds"])
                 self.assertIn(model["ownership"]["source"], {"bc250", "ollama"})
                 self.assertIn(model["source_metadata"]["policy"], {"tracking", "pinned"})
+                expected_agent_validation = (
+                    "static-output-contract"
+                    if model["category"] == "agentic"
+                    else "not-applicable"
+                )
+                self.assertEqual(
+                    profiles[model_id]["agent_validation"], expected_agent_validation
+                )
                 if model["provider"] == "ollama":
                     if model["source_metadata"]["policy"] == "tracking":
                         self.assertEqual(model["sha256"], "")
@@ -89,6 +97,20 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             del broken["profiles"][model_id]["comparison_role"]
             path.write_text(json.dumps(broken), encoding="utf-8")
             with self.assertRaisesRegex(modelctl.ModelError, "comparison_role must be a non-empty string"):
+                modelctl.load_model_profiles(path)
+
+    def test_profile_schema_rejects_invalid_agent_validation_contract(self) -> None:
+        document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        model_id = "agentic-lfm25-24b-a2b-unsloth-q3-k-xl"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "model-profiles.json"
+            broken = json.loads(json.dumps(document))
+            broken["profiles"][model_id]["agent_validation"] = "native-tool-calls"
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(
+                modelctl.ModelError,
+                "agent_validation must be not-applicable or static-output-contract",
+            ):
                 modelctl.load_model_profiles(path)
 
     def test_catalog_provider_ownership_contract_is_enforced(self) -> None:

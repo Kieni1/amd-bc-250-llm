@@ -214,6 +214,7 @@ def load_model_profiles(path: Path | None = None) -> dict[str, dict]:
             "comparison_role",
             "residency_policy",
             "reasoning_request_policy",
+            "agent_validation",
         )
         for field in required_strings:
             value = profile.get(field)
@@ -222,6 +223,10 @@ def load_model_profiles(path: Path | None = None) -> dict[str, dict]:
         if profile.get("owui_testing_exposure") not in {"curated", "testing", "forbidden"}:
             raise ModelError(
                 f"{source}: {model_id}: owui_testing_exposure must be curated, testing, or forbidden"
+            )
+        if profile["agent_validation"] not in {"not-applicable", "static-output-contract"}:
+            raise ModelError(
+                f"{source}: {model_id}: agent_validation must be not-applicable or static-output-contract"
             )
         if not isinstance(profile.get("recommended"), bool):
             raise ModelError(f"{source}: {model_id}: recommended must be boolean")

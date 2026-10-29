@@ -72,7 +72,8 @@ models are defined by `model-catalog.json`, which is authoritative for acquisiti
 source ownership, runtime lane and intrinsic capabilities. Their packaged `.Modelfile` files are
 runtime templates only and intentionally contain `FROM __BC250_SOURCE__`; the manager renders the
 source from the catalog before registration. `model-profiles.json` is a separate authority for
-BC-250 qualification, intended/comparison roles, recommended status and product/test policy. Runtime
+BC-250 qualification, intended/comparison roles, recommended status and product/test policy, including
+the explicit Agent validation boundary (`static-output-contract` versus `not-applicable`). Runtime
 samplers remain authoritative only in the Modelfile. During the pre-1.0 greenfield phase, every active
 package model source uses `tracking`; immutable pinning is reserved for the 1.0 stabilization step.
 Package `tracking` sources intentionally have no `expected_sha256` pin: normal `apply` reuses the locally recorded digest, while explicit `refresh` may fetch

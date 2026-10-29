@@ -2,6 +2,7 @@
   "authority": "package-owned BC-250 qualification, role, comparison and product-policy metadata; model-catalog.json owns intrinsic facts and Modelfiles remain runtime parameter authority",
   "profiles": {
     "agentic-gemma4-12b-fable5-tau2-q4-k-m": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
       "owui_testing_exposure": "forbidden",
@@ -14,6 +15,7 @@
       "specialized": true
     },
     "agentic-gemma4-e4b-sol-fable-q4-k-m": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
       "output_token_expectation": 3072,
@@ -27,6 +29,7 @@
       "specialized": true
     },
     "agentic-lfm25-24b-a2b-unsloth-q3-k-xl": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-tool-use-challenger",
       "output_token_expectation": 3072,
@@ -40,6 +43,7 @@
       "specialized": true
     },
     "agentic-ornith15-9b-ornith-q5-k-m": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "coding-agent",
       "output_token_expectation": 3072,
@@ -53,6 +57,7 @@
       "specialized": true
     },
     "agentic-qwable9b-empero-q6-k": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
       "owui_testing_exposure": "forbidden",
@@ -65,6 +70,7 @@
       "specialized": true
     },
     "agentic-qwen25-coder7b-unsloth-q5-k-m": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
       "owui_testing_exposure": "forbidden",
@@ -77,6 +83,7 @@
       "specialized": true
     },
     "agentic-qwen35-4b-khazarai-q6-k": {
+      "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
       "output_token_expectation": 3072,
@@ -90,6 +97,7 @@
       "specialized": true
     },
     "embed-jina-v5-small-retrieval-q4-k-m": {
+      "agent_validation": "not-applicable",
       "comparison_role": "retrieval-embedding",
       "intended_role": "embedding",
       "owui_testing_exposure": "forbidden",
@@ -102,6 +110,7 @@
       "specialized": true
     },
     "embed-qwen3-0.6b-q8-0": {
+      "agent_validation": "not-applicable",
       "comparison_role": "retrieval-embedding",
       "intended_role": "embedding-challenger",
       "owui_testing_exposure": "forbidden",
@@ -114,6 +123,7 @@
       "specialized": true
     },
     "exp-gemma4-12b-google-qat-q4-0": {
+      "agent_validation": "not-applicable",
       "comparison_role": "documents-quality",
       "intended_role": "office-document-quality-challenger",
       "owui_testing_exposure": "testing",
@@ -126,6 +136,7 @@
       "specialized": false
     },
     "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m": {
+      "agent_validation": "not-applicable",
       "comparison_role": "documents-quality",
       "intended_role": "office-document-quality-challenger",
       "owui_testing_exposure": "testing",
@@ -138,6 +149,7 @@
       "specialized": true
     },
     "exp-glm-ocr-ggml-q8-0": {
+      "agent_validation": "not-applicable",
       "comparison_role": "ocr-vision",
       "intended_role": "ocr",
       "owui_testing_exposure": "testing",
@@ -150,6 +162,7 @@
       "specialized": true
     },
     "exp-gpt-oss20b-davidau-neo-mxfp4-moe4": {
+      "agent_validation": "not-applicable",
       "comparison_role": "deep-reasoning",
       "intended_role": "deep-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -162,6 +175,7 @@
       "specialized": false
     },
     "exp-gpt-oss20b-unsloth-ud-q4-k-xl": {
+      "agent_validation": "not-applicable",
       "comparison_role": "deep-reasoning",
       "intended_role": "deep-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -174,6 +188,7 @@
       "specialized": false
     },
     "exp-granite42-3b-ibm-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "office-standard",
       "intended_role": "general-office-challenger",
       "owui_testing_exposure": "testing",
@@ -186,6 +201,7 @@
       "specialized": false
     },
     "exp-lfm25-8b-a1b-unsloth-q6-k-xl": {
+      "agent_validation": "not-applicable",
       "comparison_role": "office-fast",
       "intended_role": "fast-office-rag-translation-challenger",
       "owui_testing_exposure": "testing",
@@ -198,6 +214,7 @@
       "specialized": true
     },
     "exp-minicpm-v47-1b-openbmb-q4-k-m": {
+      "agent_validation": "not-applicable",
       "comparison_role": "ocr-vision",
       "intended_role": "document-vision-ocr-challenger",
       "owui_testing_exposure": "testing",
@@ -210,6 +227,7 @@
       "specialized": true
     },
     "exp-ovisocr2-abiray-q8-0": {
+      "agent_validation": "not-applicable",
       "comparison_role": "ocr-vision",
       "intended_role": "ocr",
       "owui_testing_exposure": "testing",
@@ -222,6 +240,7 @@
       "specialized": true
     },
     "exp-qwen3-4b-lmstudio-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -234,6 +253,7 @@
       "specialized": false
     },
     "exp-qwen35-4b-unsloth-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -246,6 +266,7 @@
       "specialized": false
     },
     "exp-qwen35-9b-hauhaucs-uncensored-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -258,6 +279,7 @@
       "specialized": false
     },
     "exp-qwen38-27b-ista-gsq-rco-iq3-s": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning",
       "output_token_expectation": 3072,
@@ -271,6 +293,7 @@
       "specialized": false
     },
     "exp-qwen38-27b-ista-gsq-rco-iq3-xxs": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning",
       "output_token_expectation": 1024,
@@ -284,6 +307,7 @@
       "specialized": false
     },
     "exp-qwen38-27b-unsloth-ud-iq3-s": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning",
       "owui_testing_exposure": "testing",
@@ -296,6 +320,7 @@
       "specialized": false
     },
     "exp-qwen38-4b-empero-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -308,6 +333,7 @@
       "specialized": false
     },
     "exp-qwen38-9b-empero-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -320,6 +346,7 @@
       "specialized": false
     },
     "exp-tir-qwen35-9b-nonthinking-v2-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
       "intended_role": "general-reasoning-challenger",
       "owui_testing_exposure": "testing",
@@ -332,6 +359,7 @@
       "specialized": false
     },
     "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl": {
+      "agent_validation": "not-applicable",
       "comparison_role": "office-standard",
       "intended_role": "office-standard-implementation",
       "owui_testing_exposure": "curated",
@@ -344,6 +372,7 @@
       "specialized": false
     },
     "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl": {
+      "agent_validation": "not-applicable",
       "comparison_role": "documents-rag",
       "intended_role": "documents-rag-implementation",
       "owui_testing_exposure": "curated",
@@ -356,6 +385,7 @@
       "specialized": false
     },
     "prod-gpt-oss20b-ggml-org-mxfp4": {
+      "agent_validation": "not-applicable",
       "comparison_role": "deep-reasoning",
       "intended_role": "deep-reasoning-implementation",
       "owui_testing_exposure": "curated",
@@ -368,6 +398,7 @@
       "specialized": false
     },
     "prod-qwen35-9b-unsloth-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "advanced-reasoning",
       "intended_role": "office-advanced-implementation",
       "output_token_expectation": 6144,
@@ -381,6 +412,7 @@
       "specialized": false
     },
     "prod-translate-gemma4-sub-e4b-17s-q4-k-xl": {
+      "agent_validation": "not-applicable",
       "comparison_role": "translation-de-fr",
       "intended_role": "translation-implementation",
       "output_token_expectation": 2048,
@@ -394,6 +426,7 @@
       "specialized": true
     },
     "qwen3.5-9b-mtp": {
+      "agent_validation": "not-applicable",
       "comparison_role": "mtp-fast",
       "intended_role": "mtp-fast",
       "owui_testing_exposure": "forbidden",
@@ -406,6 +439,7 @@
       "specialized": true
     },
     "qwen3.8-27b-hauhaucs-mtp": {
+      "agent_validation": "not-applicable",
       "comparison_role": "mtp-27b",
       "intended_role": "mtp-specialist",
       "owui_testing_exposure": "forbidden",
@@ -418,6 +452,7 @@
       "specialized": true
     },
     "qwen3.8-27b-ymq-xs-ti-mtp": {
+      "agent_validation": "not-applicable",
       "comparison_role": "mtp-27b",
       "intended_role": "mtp-general-27b",
       "owui_testing_exposure": "forbidden",
@@ -430,6 +465,7 @@
       "specialized": true
     },
     "task-lfm25-1.2b-instruct-liquidai-q6-k": {
+      "agent_validation": "not-applicable",
       "comparison_role": "openwebui-task",
       "intended_role": "openwebui-task-model",
       "output_token_expectation": 128,
