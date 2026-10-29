@@ -283,12 +283,33 @@ def capture_gpu_journal(since: str) -> tuple[str, list[str], str | None]:
 
 
 def latency_budget(base: int, thinking: int, think_policy: str, model: str = "") -> int:
-    """Use a larger shared cap when reasoning can still consume answer space.
+    """Choose latency tokens from resolved request policy and package metadata.
 
-    LFM2.5 was measured emitting native reasoning even when Ollama received
-    think:false, so keep its latency fixture on the reasoning-capable budget.
+    Explicit request-time reasoning always receives the larger budget. When the
+    request omits ``think``, packaged qualification policy may still declare a
+    deliberate non-thinking first pass; unknown external models stay conservative.
     """
-    if think_policy == "false" and "lfm" not in model.casefold():
+    if think_policy == "false":
+        return base
+    if think_policy != "omit":
+        return thinking
+
+    contract = package_model_contract(model) if model else None
+    if contract is None:
+        return thinking
+    profile = contract.get("profile") if isinstance(contract.get("profile"), dict) else {}
+    reasoning_policy = str(profile.get("reasoning_request_policy", ""))
+    if reasoning_policy in {
+        "nonthinking-first-pass",
+        "not-applicable",
+        "request-think-false",
+        "system-selected-nonthinking",
+        "task-generation",
+        "translation-task",
+    }:
+        return base
+    capabilities = contract.get("catalog", {}).get("capabilities", {})
+    if isinstance(capabilities, dict) and capabilities.get("reasoning") == "unsupported":
         return base
     return thinking
 

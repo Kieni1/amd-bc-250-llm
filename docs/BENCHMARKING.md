@@ -160,12 +160,14 @@ bc250 advanced benchmark agent MODEL --ollama-url http://127.0.0.1:11436
 sudo bc250 advanced agent leave
 ```
 
-The agent benchmark is a safe static contract check. It records raw-format, syntax
+The agent benchmark is a safe static contract check. Package profiles expose this
+qualification boundary as `agent_validation=static-output-contract`. It records raw-format, syntax
 and required-structure evidence; literal thinking markers in final output are a format
 failure. NUL-safe `xargs -0 -r ... basename` is accepted for the basename contract,
 while omitting `-r` remains an empty-input robustness miss. The benchmark does not
-execute generated Bash/Python as root and does not claim arbitrary behavioral
-correctness.
+execute generated Bash/Python as root, does not exercise/qualify native Ollama `tool_calls`,
+and does not claim arbitrary behavioral correctness. Intrinsic `tools=true` capability
+therefore remains distinct from the validation contract actually proven on BC-250.
 
 Generation canonical summaries expose more than headline decode throughput: cold request wall time and
 actual `cold_load_s` are separate, optional 4K/16K deep-context lanes report target versus actual prompt

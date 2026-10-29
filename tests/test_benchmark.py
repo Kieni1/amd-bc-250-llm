@@ -372,9 +372,26 @@ class GenerationPolicyTests(unittest.TestCase):
 
     def test_reasoning_latency_budget_and_prompt_variants_are_explicit(self) -> None:
         self.assertEqual(generation.latency_budget(96, 512, "false", "prod-qwen35-9b"), 96)
-        self.assertEqual(generation.latency_budget(96, 512, "false", "prod-lfm25-8b"), 512)
+        self.assertEqual(
+            generation.latency_budget(
+                96, 512, "false", "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+            ),
+            96,
+        )
+        self.assertEqual(
+            generation.latency_budget(
+                96, 512, "omit", "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+            ),
+            96,
+        )
         self.assertEqual(generation.latency_budget(96, 512, "medium", "prod-gpt-oss20b"), 512)
-        self.assertEqual(generation.latency_budget(96, 512, "omit", "prod-gemma4-e2b"), 512)
+        self.assertEqual(
+            generation.latency_budget(
+                96, 512, "omit", "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"
+            ),
+            512,
+        )
+        self.assertEqual(generation.latency_budget(96, 512, "omit", "external-model"), 512)
         first = generation.prompt_variant("Prompt", 0)
         second = generation.prompt_variant("Prompt", 1)
         self.assertNotEqual(first, second)
