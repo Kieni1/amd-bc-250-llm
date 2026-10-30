@@ -1,25 +1,25 @@
 # BC-250 validation matrix — current package baseline and next-release workbench
 
-Current release identity: `bc250-llm-server-0.14.1-1.11`.
+Current release identity: `bc250-llm-server-0.14.1-1.12`.
 
-Release identity 1.11 is assigned to the current SOURCE candidate. Exact 1.10 remains the packaged DEVICE evidence baseline; no 1.11 RPM exists until the authoritative Fedora 44 build completes. This matrix tracks only the evidence needed to move the workbench forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
+Release identity 1.12 is assigned to the current SOURCE dependency-refresh candidate. Prior exact-RPM evidence remains historical baseline evidence; no 1.12 RPM exists until the authoritative Fedora 44 build completes. This matrix tracks only the evidence needed to move the workbench forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
 
 | Area | Current state | Next evidence |
 |---|---|---|
-| Release identity | `0.14.1-1.11` assigned to current SOURCE candidate; exact `0.14.1-1.10` remains packaged DEVICE evidence baseline | run blocking lint, freeze exact 1.11 Source0/spec, then authoritative Fedora 44 build |
+| Release identity | `0.14.1-1.12` assigned to current SOURCE candidate; prior exact-RPM evidence remains historical only | run blocking lint, freeze exact 1.12 Source0/spec, then authoritative Fedora 44 build |
 | Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during product work and bounded cleanup |
-| 1.11 SOURCE checks | governance/export/evidence/LFM benchmark refinements integrated; all 24 modules / 715 tests PASS locally in module-isolated/split runs before release bump | rerun release-owned checks on exact 1.11 identity; blocking Ruff/ShellCheck remain required before freeze/build |
-| 1.10 model architecture | exact 1.10 RPM model-management/lifecycle DEVICE campaign PASS; metadata-first contract, schema-4 tracking, provider-aware lifecycle and Open WebUI 0.12.4 remain accepted architecture | do not reopen accepted architecture without affected evidence; retest only changed next-release surfaces |
+| 1.12 SOURCE checks | dependency/settings integration complete; all 24 repository modules pass in split runs (717/717 after the persisted-prefix apply regression), package-critical 156/156, release preflight 27/27, shell/Python/JSON syntax clean, Source0 smoke clean | Ruff/ShellCheck remain required in the release environment before exact Source0/spec freeze/build |
+| 1.10 model architecture | exact 1.10 RPM model-management/lifecycle DEVICE campaign PASS; metadata-first contract, schema-4 tracking, provider-aware lifecycle and Open WebUI model architecture remains accepted | do not reopen accepted architecture without affected evidence; retest only changed next-release surfaces |
 | RPM `%check` | current workbench package-critical set PASS locally: 156/156 | must pass unprivileged in the next authoritative Fedora 44 SRPM rebuild |
 | Release preflight | current workbench release-pipeline preflight PASS: 27/27 plus current-guidance/clean-core/scope checks | rerun after next release identity/freeze |
 | Static lint | required Ruff/ShellCheck gate is not executable in the current workbench environment because those tools are unavailable | blocking next-release gate must pass where Ruff/ShellCheck are installed |
-| Source0/spec freeze | not started; 1.11 identity is now assigned | freeze only after blocking lint and final release-owned checks pass |
-| RPM payload / rpmlint | no 1.11 RPM exists yet | validate exact 1.11 built payload and configured blocking rpmlint in authoritative Fedora 44 build |
-| GitHub authority | explicit selected `workflow_dispatch` remains artifact authority | capture next-release `release-evidence.json` + `release-selection.json` from selected build |
-| Runtime/UI baseline | exact 1.10 RPM runs Ollama `0.40.8` + Open WebUI `0.12.4`; focused model-management/lifecycle DEVICE blocks PASS | support-bundle/evidence UX changes in this newer workbench require changed-surface device verification after build |
+| Source0/spec freeze | not started; 1.12 identity is now assigned | freeze only after blocking lint and final release-owned checks pass |
+| RPM payload / rpmlint | no 1.12 RPM exists yet | validate exact 1.12 built payload and configured blocking rpmlint in authoritative Fedora 44 build |
+| GitHub authority | explicit selected `workflow_dispatch` remains artifact authority; main pushes and PRs provide CI evidence, superseded push/PR runs cancel while dispatch authority runs do not | capture next-release `release-evidence.json` + `release-selection.json` from selected build |
+| Runtime/UI baseline | prior exact RPMs provide historical model/runtime evidence; 1.12 changes Ollama/Open WebUI/Tika bytes | verify four lanes/Vulkan, role switching, persisted Jina prefixes, Tika extraction and one managed-document/RAG flow after build |
 | Managed Documents correctness | accepted prior boundary remains unchanged by current workbench edits | do not rerun large document campaign unless affected code/evidence changes |
-| Exact-RPM core functionality / changed-surface acceptance | exact 1.10 model lifecycle/atomicity campaign PASS; 1.11 source is not yet built | after 1.11 build, verify operator export ownership/directory non-mutation/JSON evidence plus bounded source-changed smoke |
-| Product-roadmap baseline | stock-first local office-AI direction unchanged; 1.11 is evidence/UX and benchmark-contract refinement | return to measurable document/retrieval and German–French workflow quality after 1.11 acceptance |
+| Exact-RPM core functionality / changed-surface acceptance | prior lifecycle/atomicity evidence remains historical; 1.12 source is not yet built | after 1.12 build, run bounded runtime/UI/document delta acceptance plus normal topology/verify restoration |
+| Product-roadmap baseline | stock-first local office-AI direction unchanged; 1.12 is a bounded dependency/settings refresh | return to measurable document/retrieval and German–French workflow quality after 1.12 acceptance |
 
 ## Current stop conditions
 

@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.11%{?dist}
+Release:        1.12%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -263,12 +263,17 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.12
+- Update Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full using exact payload/container digests while retaining the established BC-250 topology and model set.
+- Harden Open WebUI privacy/network defaults, persist the Jina embedding prefixes through the 0.12.5 retrieval API, pin the 1000-chunk embedding save buffer, and refresh Tika qualification to 4.2.0.
+
 * Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.11
 - Make revalidation and support-bundle exports operator-ready without mutating operator-selected directories; retain protected internal evidence and export invoking-user-owned mode-0600 archives.
 - Harden evidence publication so JSON artifacts are parseable, failed endpoint captures use explicit diagnostic files, final qualification dimensions are machine-readable, and human summaries match the evidence contract.
 - Restore archive provenance and persistent Modelfile read compatibility while keeping current package output canonical; explicitly refreeze MTP on exact catalog IDs only.
 - Make nonthinking-first-pass issue an explicit think=false benchmark request while preserving and diagnosing provider reasoning contamination in raw evidence.
 - Add behavior-level support-bundle export/evidence regressions and align operator wording for model quality, translation integrity, topology restoration and unavailable reboot diagnostics.
+- Tighten GitHub/Fedora build execution with main-only push CI, superseded-run cancellation, non-persisted checkout credentials, no weak DNF dependencies, a bounded job timeout, non-duplicated advisory tests with streamed failures, and clean rpmlint changelog output.
 
 * Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.10
 - Introduce metadata-first model acquisition/capability/qualification contracts and consolidated model inspect output across lifecycle, benchmark and Open WebUI consumers.
@@ -333,7 +338,7 @@ fi
 - Promote the validated clean-core source to the first unused 0.14.1 release identity without changing the Ollama 0.34.4 runtime pin or device-acceptance status.
 - Distinguish ordinary GitHub CI evidence from an explicitly selected workflow-dispatch release-authority run; emit a separate release-selection record for that selected run.
 - Record Fedora/container and key build-tool versions in release evidence, and make BUILD_DIR the supported Make-level build-root override while BC250_BUILD_DIR remains an internal helper variable.
-- Clean reconstruction-era active guidance, retain the full regression suite (including the restored 175-test benchmark module), and keep a bounded package-critical RPM %check separate from advisory full-suite quality.
+- Clean reconstruction-era active guidance, retain the full regression suite (including the restored 175-test benchmark module), and keep a bounded package-critical RPM check phase separate from advisory full-suite quality.
 - Make installer scratch runtime state testable via an override while preserving the production /run/bc250-llm-server default, and isolate source-tarball fixtures from inherited build-helper state.
 - Run Ruff/ShellCheck and current-guidance/scope checks before source preparation/freeze, make configured rpmlint a hard post-build gate, and keep the broad behavioral suite advisory.
 - Make release-gate command dependencies explicit in both GitHub and local Fedora bootstrap paths instead of relying on base-image composition.

@@ -12,31 +12,31 @@
   "kind": "release-workbench",
   "long_term": {
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses",
-    "direction": "stock-first local office AI appliance; exact 0.14.1-1.10 device evidence is retained as baseline evidence, while 0.14.1-1.11 is the current SOURCE release candidate",
+    "direction": "stock-first local office AI appliance; exact prior DEVICE evidence is retained as historical baseline evidence, while 0.14.1-1.12 is the current SOURCE release candidate (bounded dependency refresh)",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "Batch 8 complete \u2014 0.14.1-1.11 release promotion and exact-identity SOURCE validation. Active release metadata, guidance, changelog/spec history and workbench state are coherent; all 24 repository test modules / 715 tests pass in split runs on the 1.11 identity; package-critical validation passes 156/156 and release-pipeline preflight passes 27/27. Exact 1.10 DEVICE evidence remains historical baseline evidence and is not transferred to 1.11.",
-    "integration": "0.14.1-1.11 SOURCE release candidate. Runtime/model pins remain unchanged from 1.10; 1.11 contains bounded governance, operator-export/evidence and benchmark-contract fixes. No 1.11 BUILD or DEVICE acceptance exists yet.",
-    "next_batch": "Push the 0.14.1-1.11 source candidate through the authoritative Fedora 44 GitHub workflow. Blocking lint/rpmlint/build evidence must come from that release path; after selecting the exact workflow-dispatch artifact, run bounded 1.11 DEVICE changed-surface acceptance for operator exports/evidence plus normal health smoke."
+    "current_batch": "Batch 13 complete \u2014 1.12 dependency/settings refresh SOURCE validation complete. Ollama 0.40.13, Open WebUI 0.12.5 and Tika 4.2.0-full pins and settings are integrated; the exact Open WebUI 0.12.5 settings audit keeps the local/offline policy fail-closed, persists Jina prefixes, and documents deliberate non-changes for broader admin/prompt policy; the exact Ollama 0.40.13 env surface supports the existing four-lane controls without new scheduler overrides; Tika 4.2 keeps stock safer server defaults behind the private container boundary. All 24 repository modules pass in split runs (717/717), package-critical validation PASS 156/156, release preflight PASS 27/27, shell/Python/JSON syntax clean, and Source0 smoke PASS with 370 files.",
+    "integration": "0.14.1-1.12 SOURCE dependency-refresh candidate. Runtime architecture/model set/retrieval tuning remain unchanged; changed surfaces are Ollama 0.40.13, Open WebUI 0.12.5 policy/retrieval integration and Tika 4.2.0.",
+    "next_batch": "Run blocking Ruff and ShellCheck in the GitHub/Fedora 44 release environment, then freeze the exact 1.12 Source0/spec, perform the authoritative SRPM-first build, validate payload/rpmlint/release evidence, and run focused exact-RPM DEVICE acceptance for the changed Ollama/Open WebUI/Tika surfaces."
   },
   "release": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "nvr": "bc250-llm-server-0.14.1-1.11",
-    "rpm_release": "1.11",
-    "state": "1.11-source-release-candidate-unbuilt",
+    "nvr": "bc250-llm-server-0.14.1-1.12",
+    "rpm_release": "1.12",
+    "state": "1.12-source-release-candidate-unbuilt",
     "version": "0.14.1"
   },
   "schema": 2,
   "validation": {
-    "device_acceptance": "Exact 0.14.1-1.10 RPM model-management/lifecycle/atomicity blocks reported DEVICE PASS with no confirmed lifecycle product defect. Exact 1.10 support-bundle DEVICE testing confirmed export/evidence defects that are corrected in 1.11 SOURCE. No 1.11 DEVICE acceptance exists until the exact selected 1.11 RPM is built and exercised.",
-    "device_baseline": "1.9 remains the broad accepted runtime/product regression baseline; exact 1.10 has focused model-management/lifecycle DEVICE PASS and defect evidence for support-bundle behavior. Do not transfer either PASS to 1.11 bytes.",
-    "package_critical": "Exact 0.14.1-1.11 SOURCE package-critical validation PASS (156/156 tests) via scripts/validate.sh --package.",
-    "release_preflight": "Exact 0.14.1-1.11 release-pipeline module PASS (27/27 tests); release-owned identity/current-guidance checks PASS.",
-    "rpm_package_check": "No 0.14.1-1.11 RPM has been built yet. Exact 0.14.1-1.10 RPM remains the most recent DEVICE-tested package artifact; authoritative 1.11 BUILD evidence is pending GitHub/Fedora 44.",
-    "source_checks": "Exact 0.14.1-1.11 SOURCE identity: all 24 repository test modules / 715 tests PASS in split/module-isolated runs; current-guidance, development-scope, clean-core absence, package-owned shell bash syntax, Python compilation and JSON syntax checks PASS.",
-    "static_lint": "NOT_TESTED in this environment: Ruff and ShellCheck executables are unavailable. Both remain blocking next-release gates and must pass before Source0 freeze/build.",
-    "source0_smoke": "Exact 0.14.1-1.11 source-tarball generation smoke PASS using scripts/make-source-tarball.sh outside the source tree: 370 source files archived under bc250-llm-server-0.14.1 with safe member paths. This is not the authoritative GitHub freeze/build evidence."
+    "device_acceptance": "Exact 0.14.1-1.10 RPM model-management/lifecycle evidence remains a focused historical DEVICE baseline; prior 1.9 broad evidence remains historical as well. No 0.14.1-1.12 DEVICE acceptance exists; changed Ollama/Open WebUI/Tika bytes and 0.12.5 policy/prefix behavior require focused exact-RPM acceptance after authoritative build.",
+    "device_baseline": "1.9 remains the broad accepted runtime/product regression baseline; exact 1.10 retains focused model-management/lifecycle DEVICE PASS. Neither transfers PASS to the changed 1.12 runtime bytes.",
+    "package_critical": "Exact 0.14.1-1.12 SOURCE package-critical validation PASS (156/156 tests) via scripts/validate.sh --package.",
+    "release_preflight": "Exact 0.14.1-1.12 release preflight PASS: release-pipeline 27/27 plus current-guidance/clean-core checks.",
+    "rpm_package_check": "No 0.14.1-1.12 RPM has been built yet. 1.12 BUILD evidence is pending authoritative Fedora 44 GitHub build.",
+    "source0_smoke": "Exact 0.14.1-1.12 Source0 smoke PASS: build/bc250-llm-server-0.14.1.tar.gz contains 370 source files, safe paths and no generated build/cache artifacts.",
+    "source_checks": "Exact 0.14.1-1.12 SOURCE broad split validation PASS: all 24 repository test modules / 717 tests pass after the dependency/settings integration and persisted-prefix apply regression. Shell syntax, Python AST and JSON parsing are clean.",
+    "static_lint": "Ruff/ShellCheck remain required blocking 1.12 release gates; neither executable is available in the current local environment, so no local PASS is claimed. Run both in GitHub/Fedora before freeze/build selection."
   }
 }

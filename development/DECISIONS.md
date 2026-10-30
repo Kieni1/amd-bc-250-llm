@@ -977,7 +977,7 @@ Tracking-source state uses schema 4. It records the catalog `configured_ref`, `s
 
 ## DEC-038 — Refreeze MTP with exact catalog IDs only
 
-**Status:** ACTIVE — 0.14.1-1.11 candidate.
+**Status:** ACTIVE — carried into 0.14.1-1.12.
 
 **Decision:** Explicitly thaw the frozen MTP command/input surface only to remove the remaining
 `qwen35-9b` convenience alias. `bc250 advanced mtp run`, prepare/status guidance and the underlying
@@ -992,7 +992,7 @@ rather than as generic greenfield normalization.
 
 ## DEC-039 — Make `nonthinking-first-pass` an explicit benchmark request and preserve provider contamination
 
-**Status:** ACTIVE — 0.14.1-1.11 candidate.
+**Status:** ACTIVE — carried into 0.14.1-1.12.
 
 **Decision:** In the package generation benchmark, a model profile declaring
 `reasoning_request_policy=nonthinking-first-pass` resolves `--think auto` to an explicit
@@ -1016,10 +1016,21 @@ reasoning serialization, or product presentation of testing models changes.
 
 ## DEC-040 — Separate protected internal state from operator-export evidence
 
-**Status:** ACTIVE — 0.14.1-1.11 candidate.
+**Status:** ACTIVE — carried into 0.14.1-1.12.
 
 **Decision:** Revalidation and support-bundle workflows keep package-private working/history state under package-controlled `/var/lib`/`/run` paths, but final artifacts intended for transfer are exported to the invoking operator. The default export target is the invoking working directory, with explicit `--output-dir` support; existing operator-selected directories are never chmod/chowned as a side effect. Exported archives are owned by the invoking user and mode `0600`. Endpoint evidence is published as `.json` only after successful JSON parsing; failed/non-JSON captures use diagnostic files instead. Revalidation machine state exposes independent completion, infrastructure, model-quality, product-integrity, topology-restoration and coverage dimensions.
 
 **Why:** Root-only internal state is appropriate for service/recovery operation, but an operator-facing export must be directly transferable and must not mutate unrelated filesystem policy. Evidence filenames and completion wording must also truthfully describe what has actually been validated so automated consumers can trust the artifact contract.
 
 **Retest only if:** export destination/ownership semantics, support/revalidation evidence serialization, manifest/result dimensions, or final artifact validation changes.
+
+
+## DEC-041 — Refresh application runtimes without changing appliance topology
+
+**Status:** ACTIVE — 0.14.1-1.12 candidate.
+
+**Decision:** Release 1.12 updates the package-qualified runtime pins to Ollama 0.40.13, Open WebUI 0.12.5 and Apache Tika 4.2.0-full while retaining the existing four-lane Ollama topology, Vulkan/iGPU settings, context/KV-cache profiles, model set, RAG chunking/top-K policy and persistent-state paths. Open WebUI 0.12.5 is integrated as a policy-bearing upgrade rather than a tag-only change: BC-250 disables administrator cross-user chat access/export, OpenAI passthrough, upstream version checks and remote-code trust for local embedding/reranking models; pins the new document-embedding save buffer to 1000 chunks; and converges the Jina `Query: ` / `Document: ` prefixes through the new persisted retrieval API. Tika keeps its private, capability-dropped container boundary and moves to the 4.2.0 full image by immutable OCI index digest; its deterministic qualification marker is version-neutral.
+
+**Why:** The three upstream releases provide security/stability/runtime improvements without requiring a topology redesign. Open WebUI 0.12.5 also turns previously environment-only embedding prefixes into persisted administrator state, so relying on bootstrap environment alone would allow upgraded databases to drift from the package Jina retrieval contract. Explicit fail-closed settings make upstream defaults irrelevant to the appliance policy. Tika 4.2.0 strengthens server-side limits and request-config trust by default; the package uses `/tika`, not the changed `/unpack` default, so no compatibility shim is justified. Ollama 0.40.13 changes runtime bytes/llama.cpp and adds LFM3 capability, but runtime support does not imply model promotion.
+
+**Retest:** authoritative 1.12 build plus focused DEVICE checks for all normal Ollama lanes/Vulkan logs, representative generation/embedding/reasoning behavior, Open WebUI migration and production-role switching, persisted embedding-prefix drift/convergence, Tika `/version` + `/tika` extraction, one real managed-document/RAG path, and repeated convergence.

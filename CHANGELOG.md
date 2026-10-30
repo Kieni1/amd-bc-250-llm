@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.1-1.12 - 2026-10-30
+
+- Update the package-qualified application stack to Ollama 0.40.13, Open WebUI 0.12.5 and Apache Tika 4.2.0-full with exact Ollama payload checksum and immutable container-image digests; keep governor 0.4.14 unchanged.
+- Preserve the established four-lane Ollama topology, Vulkan/iGPU selection, context/KV-cache profiles, model set and retrieval tuning; treat new LFM3 support as runtime capability only, not model promotion.
+- Audit the exact 0.40.13/0.12.5/4.2.0 settings surfaces: retain the proven Ollama lane controls without speculative automatic-fit/queue/load overrides, keep Tika on its safer stock 4.2 server defaults behind the private container boundary, and reserve broader Open WebUI administrator/prompt-policy changes for separate evidence.
+- Integrate Open WebUI 0.12.5 policy changes explicitly: disable administrator cross-user chat access/export, OpenAI passthrough, upstream version checks and embedding/reranking remote-code trust; keep the existing local/offline feature surface fail-closed.
+- Make the Jina query/content prefixes authenticated persisted desired state now that Open WebUI 0.12.5 exposes them through the retrieval API, while retaining the same fresh-database bootstrap values. Pin the new large-document embedding save buffer to 1000 chunks and keep request batch size 1, synchronous embedding and one concurrent request for predictable BC-250 memory use.
+- Refresh Tika package-gate qualification to 4.2.0 and make the deterministic `/tika` extraction marker version-neutral; retain the private non-host-published container boundary and avoid an unnecessary `/unpack` compatibility shim.
+
 ## 0.14.1-1.11 - 2026-10-30
 
 - Keep current package-owned Modelfiles canonical as `experiments` while retaining cheap read-only normalization of the former `experimental` spelling only for persistent operator-owned Modelfiles; restore retired/archive Modelfiles unchanged for provenance.
@@ -9,6 +18,7 @@
 - Define `nonthinking-first-pass` as an explicit generation-benchmark `think=false` request; preserve and diagnose literal provider `<think>` contamination rather than silently rewriting raw benchmark evidence.
 - Align current operator wording around model quality, translation integrity, topology restoration and unavailable reboot diagnostics; keep the post-1.10 workbench state distinct from exact 1.10 device evidence.
 - Add runtime support-bundle export/evidence regression coverage: preserve existing operator-directory ownership/mode, keep exports operator-readable at mode 0600, require every published/archived JSON payload to parse, record inactive endpoints as `.error.txt`, and replace ambiguous `self-verified` completion wording with explicit archive/checksum and JSON-evidence validation results.
+- Tighten the Fedora GitHub build workflow: avoid duplicate feature-branch push/PR runs, cancel superseded CI but never explicit workflow-dispatch authority runs, disable checkout credential persistence and DNF weak dependencies, cap job runtime, remove repeated lint/hard-gate tests from the post-build advisory phase, stream advisory failures, and clear the persistent rpmlint changelog warning.
 
 ## 0.14.1-1.10 - 2026-10-30
 

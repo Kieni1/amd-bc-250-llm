@@ -29,14 +29,14 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.11.fc44.x86_64`.
+Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.12.fc44.x86_64`.
 
 ## Validation and build boundary
 
 The primary release build runs through the Fedora 44 GitHub Actions workflow and its
 `make release-gate`. Local Fedora execution through `scripts/ci-local.sh` reproduces the
 same gate but is backup/debug evidence only; it does not silently become release authority.
-`make validate` runs current guidance/scope checks plus the complete repository regression suite and can be run wherever its required tools are present. A successful source edit must not be reported as an RPM build unless the Fedora gate actually ran. GitHub runs Ruff and ShellCheck as blocking pre-build checks and configured `rpmlint` as a blocking post-build package check, so predictable source/package defects do not consume another authoritative RPM iteration. The broad repository suite remains additional advisory quality evidence. `rpmlint` uses `packaging/rpmlint.toml`, which filters only documented appliance policy choices and known false positives.
+`make validate` runs current guidance/scope checks plus the complete repository regression suite and can be run wherever its required tools are present. A successful source edit must not be reported as an RPM build unless the Fedora gate actually ran. GitHub runs Ruff and ShellCheck as blocking pre-build checks and configured `rpmlint` as a blocking post-build package check, so predictable source/package defects do not consume another authoritative RPM iteration. Repository modules not already covered by the blocking preflight/package gates run afterward as additional advisory quality evidence; `make validate` remains the complete standalone repository suite. `rpmlint` uses `packaging/rpmlint.toml`, which filters only documented appliance policy choices and known false positives.
 
 `release-contract.json` is the machine-readable core release contract. The release gate
 first verifies source identity and cheap pipeline contracts, then freezes Source0 plus the
@@ -46,9 +46,9 @@ GitHub writes the installable `*.x86_64.rpm`, rebuild-input `*.src.rpm`, separat
 `SHA256SUMS.binary` / `SHA256SUMS.source`, frozen-input `SHA256SUMS.inputs`, and
 `release-evidence.json` under `dist/`. The evidence record captures the Git commit, GitHub
 Actions run ID, workflow name/reference, Source0 SHA-256, spec SHA-256, release-contract
-SHA-256, and binary/SRPM NEVRA+SHA-256. Push and pull-request builds are CI evidence;
-for BC-250 acceptance, explicitly select the specific GitHub run whose artifacts are being
-installed and retain its release-evidence record.
+SHA-256, and binary/SRPM NEVRA+SHA-256. Main-branch push and pull-request builds are CI evidence;
+feature branches rely on pull-request CI to avoid duplicate push+PR runs. For BC-250 acceptance, explicitly
+select a workflow-dispatch run whose artifacts are being installed and retain its release-evidence record.
 
 ### Runtime dependency footprint
 
@@ -125,7 +125,7 @@ rebuild artifact.
 - Keep the top spec changelog entry aligned with the resulting Version-Release.
 - Review pinned revisions, licenses, source-RPM contents and the binary payload.
 - Run only checks available in the editing environment and report them exactly.
-- Build through GitHub/Fedora and require frozen-input verification, frozen-SRPM creation, the single isolated SRPM rebuild with package-critical `%check`, RPM payload-contract checks and closed checksum manifests to pass. Require Ruff, ShellCheck and configured `rpmlint` to pass; review the broad full-suite advisory report separately. The rebuilt binaries from that one SRPM rebuild are the distributed artifacts.
+- Build through GitHub/Fedora and require frozen-input verification, frozen-SRPM creation, the single isolated SRPM rebuild with package-critical `%check`, RPM payload-contract checks and closed checksum manifests to pass. Require Ruff, ShellCheck and configured `rpmlint` to pass; review the post-build advisory report for repository modules not already exercised by the blocking preflight/package gates. The rebuilt binaries from that one SRPM rebuild are the distributed artifacts.
 - Record the selected GitHub Actions run and retain its `release-evidence.json`; a PR build is CI evidence until deliberately selected for device acceptance.
 - On the BC-250 test clean install or upgrade as appropriate, guided reboot/resume,
   models, affected runtime features and both removal paths.

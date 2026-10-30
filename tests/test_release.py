@@ -45,6 +45,10 @@ class ReleaseContractTests(unittest.TestCase):
         self.assertIn("make release-gate", workflow)
         self.assertIn("continue-on-error: true", workflow)
         self.assertIn("quality-report", workflow)
+        quality = make_recipe("quality-report")
+        self.assertIn("validate.sh --advisory", quality)
+        self.assertIn('exit "$$validate_rc"', quality)
+        self.assertNotIn("$(MAKE) lint", quality)
 
     def test_release_gate_builds_from_frozen_inputs(self) -> None:
         preflight = make_recipe("release-gate-preflight")

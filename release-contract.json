@@ -34,7 +34,7 @@
   "package": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "rpm_release": "1.11",
+    "rpm_release": "1.12",
     "version": "0.14.1"
   },
   "schema": "bc250.release-contract.v2",
@@ -42,7 +42,7 @@
     "advisory_quality": {
       "blocking": false,
       "command": "make quality-report",
-      "policy": "Run the full repository test suite for additional visibility after the hard release-candidate gates. Ruff, ShellCheck, current-guidance/scope checks, package-critical tests and configured rpmlint are blocking elsewhere in make release-gate."
+      "policy": "Run repository test modules not already covered by the blocking preflight or package-critical gates for additional post-build visibility. Ruff, ShellCheck, current-guidance/scope checks, package-critical tests and configured rpmlint are blocking elsewhere in make release-gate."
     },
     "blocking_static": {
       "blocking": true,

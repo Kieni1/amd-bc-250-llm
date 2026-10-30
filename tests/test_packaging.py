@@ -480,7 +480,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('source "$runtime_env"', installer)
         self.assertNotIn('BC250_OLLAMA_VERSION="0.34.0"', installer)
         self.assertIn('requested="$BC250_OLLAMA_VERSION"', installer)
-        self.assertIn("BC250_OLLAMA_VERSION=0.40.8", (ROOT / "config/runtime.env").read_text())
+        self.assertIn("BC250_OLLAMA_VERSION=0.40.13", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
@@ -579,10 +579,10 @@ class PackagingTests(unittest.TestCase):
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn("# v0.12.4, pinned OCI index digest.", quadlet)
+        self.assertIn("# v0.12.5, pinned OCI index digest.", quadlet)
         self.assertIn(
             "Image=ghcr.io/open-webui/open-webui@sha256:"
-            "a5b9e403d19154796850679c8c5d1295301cee954be8b84ddd62af92426558f7",
+            "03443b8de6b617da9d900edd09b4bf1cb0ddbfdcba6afb42c548336a0b821ded",
             quadlet,
         )
         self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.12\.3)$")
@@ -805,12 +805,15 @@ class PackagingTests(unittest.TestCase):
             self.assertIn(expected, source)
         self.assertIn('qualification evidence is incomplete', source)
 
-    def test_ci_runs_on_push_and_pull_request_with_static_linters(self) -> None:
+    def test_ci_runs_on_main_push_and_pull_request_with_static_linters(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(
             encoding="utf-8"
         )
-        self.assertRegex(workflow, r"(?m)^  push:$")
+        self.assertRegex(workflow, r"(?m)^  push:\n    branches:\n      - main$")
         self.assertRegex(workflow, r"(?m)^  pull_request:$")
+        self.assertIn("--setopt=install_weak_deps=False", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("timeout-minutes: 30", workflow)
         makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
         self.assertIn("make release-gate", workflow)
         self.assertIn("ruff check .", makefile)
@@ -932,22 +935,22 @@ class PackagingTests(unittest.TestCase):
                 values[key] = value
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.40.8")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.40.13")
         self.assertEqual(
             values["BC250_OLLAMA_PAYLOAD_URL"],
-            "https://github.com/ollama/ollama/releases/download/v0.40.8/ollama-linux-amd64.tar.zst",
+            "https://github.com/ollama/ollama/releases/download/v0.40.13/ollama-linux-amd64.tar.zst",
         )
         self.assertEqual(
             values["BC250_OLLAMA_PAYLOAD_SHA256"],
-            "0bb17cc19e9c1339ddbe0cba55148bf068f8f19dec8ec5fd531461aaa207282a",
+            "c9490e0f520be21271d969e6703f012268b1d39f8b70dd58854e5bfef7a75bb6",
         )
-        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.12.4")
-        self.assertEqual(values["BC250_TIKA_VERSION"], "4.1.0-full")
+        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.12.5")
+        self.assertEqual(values["BC250_TIKA_VERSION"], "4.2.0-full")
         self.assertEqual(values["BC250_GOVERNOR_VERSION"], "0.4.14")
         self.assertEqual(values["BC250_GOVERNOR_COMMIT"], "7b08fdcf542d1edd82f3a9077c902038019c9842")
         self.assertEqual(
             values["BC250_TIKA_IMAGE_DIGEST"],
-            "sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7",
+            "sha256:4774eaac44f86cdf648ae7b5a367016eaf6f9052adec31e5cff07cff1a0c6e24",
         )
         self.assertIn(f'# v{values["BC250_OPEN_WEBUI_VERSION"]}, pinned OCI index digest.', quadlet)
         self.assertIn(values["BC250_OPEN_WEBUI_IMAGE_DIGEST"], quadlet)
