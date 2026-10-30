@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Accepted release baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14. Current candidate `bc250-llm-server-0.14.1-1.10` keeps Ollama 0.40.8 and updates Open WebUI to 0.12.4 with the metadata-first model-management contract; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
+Accepted broad regression baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline. Exact `0.14.1-1.10` is the focused packaged model-management/lifecycle DEVICE evidence baseline. Current SOURCE candidate `bc250-llm-server-0.14.1-1.11` keeps Ollama 0.40.8, Open WebUI 0.12.4, Tika 4.1.0-full and governor 0.4.14 while adding the evidence/export/UX and benchmark-contract corrections; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
-Release 1.10 is the current candidate: model acquisition/capability/qualification metadata is centralized and semantically validated for model management, Open WebUI and benchmarks; tracking sources keep validated acquired bytes during ordinary `apply` and advance only through explicit `refresh`; MiniCPM vision/OCR and Agent validation scope are package-declared; Open WebUI moves to 0.12.4. Ollama/runtime parameters/topology remain unchanged. Exact 1.10 build/device binding is required.
+Release 1.11 is the current SOURCE candidate. It carries forward the exact 1.10 metadata-first model architecture and focused lifecycle evidence while fixing operator export ownership/directory semantics, evidence JSON/result contracts, archive/persistent-state governance, MTP exact-ID refreeze and explicit `nonthinking-first-pass` benchmark requests. Runtime pins remain unchanged. Exact 1.11 RPM build and changed-surface DEVICE acceptance are still required.
 
 Release 1.9 remains the accepted device baseline with unified MTP presentation and the focused Managed Documents fixes from 1.8 acceptance.
 
@@ -44,7 +44,7 @@ sudo bc250 status --json
 sudo bc250 health
 bc250 version
 sudo bc250 verify
-sudo bc250 support-bundle   # redacted support evidence archive
+sudo bc250 support-bundle   # mode-0600 redacted archive exported to this directory
 sudo bc250 storage status
 sudo bc250 storage dedupe
 ```
@@ -202,10 +202,12 @@ growth. Read
 
 ```bash
 sudo bc250 advanced revalidate start
+# Optional: --output-dir /path/to/existing/export-dir
 ```
 
 It is opt-in/root-only, includes authenticated production translation-role and RAG
-checks when an Open WebUI key is supplied, and stores final bundles under
-`/var/lib/bc250-llm-server/revalidation/results/`. See `docs/BENCHMARKING.md`
+checks when an Open WebUI key is supplied, keeps protected canonical evidence under
+`/var/lib/bc250-llm-server/revalidation/results/`, and exports a mode-0600 copy owned by
+the invoking operator to the current directory by default. See `docs/BENCHMARKING.md`
 (installed at the same relative path under `/usr/share/doc/bc250-llm-server/`) for
 result directories, tuning commands, RAG qualification and thermal profiles.

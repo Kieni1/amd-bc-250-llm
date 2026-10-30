@@ -199,6 +199,14 @@ contract explicit and record it in result provenance. Explicit-vs-implicit direc
 belongs here as a comparison; routine revalidation tests only the packaged production
 translation preset.
 
+
+For packaged generation models, `reasoning_request_policy=nonthinking-first-pass` is an explicit
+qualification request policy: `--think auto` resolves that first pass to `think=false`. Device evidence
+shows that a provider/model template can still serialize a literal `<think>...</think>` block into the raw
+response despite that request. The generation benchmark therefore preserves the raw provider response and
+records `reasoning-present-despite-think-false` rather than silently stripping it. Product presentation is a
+separate role/UI contract and must not be inferred from benchmark cleanup.
+
 ## Direct RAG
 
 ```bash
@@ -286,6 +294,7 @@ starts; the readiness allowance is bounded to five minutes for slow application 
 
 ```bash
 sudo bc250 advanced revalidate start
+sudo bc250 advanced revalidate start --output-dir /path/to/existing/export-dir
 # Explicit partial coverage only:
 sudo bc250 advanced revalidate start --skip-owui
 sudo bc250 advanced revalidate status
@@ -320,12 +329,12 @@ report 40/40 routed, but revalidation does not hard-code that number as the gene
 success rule.
 
 Case-quality `rc=3` is recorded and does not abort the worker. Other benchmark/helper
-errors are infrastructure failures. Final status reports run state, infrastructure,
-quality and restoration separately. Worker liveness and the age of the last real
+errors are infrastructure failures. Final status reports run completion, infrastructure,
+model quality, product integrity and topology restoration separately. Worker liveness and the age of the last real
 progress event are also separate; a free-running pulse is never presented as proof
 of benchmark progress.
 
-Harness v4.7 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
+Harness v4.9 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritative
 deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
 snapshots remain at preflight, agent-topology transitions, final restoration and failures.

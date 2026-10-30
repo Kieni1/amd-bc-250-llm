@@ -359,11 +359,17 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(workbench["kind"], "release-workbench")
         _version, _release, nvr = current_identity()
         self.assertEqual(workbench["release"]["nvr"], nvr)
-        self.assertEqual(workbench["release"]["state"], "candidate-1.10-source-ready-device-pending")
+        self.assertEqual(workbench["release"]["state"], "1.11-source-release-candidate-unbuilt")
         self.assertNotIn("checkpoint", workbench)
-        self.assertIn("Batch 3 integration/refinement complete", workbench["next_work"]["current_batch"])
-        self.assertIn("authoritative Fedora 44 release gate", workbench["next_work"]["next_batch"])
-        self.assertIn("metadata-first", workbench["long_term"]["direction"])
+        self.assertIn("Batch ", workbench["next_work"]["current_batch"])
+        self.assertIn("complete", workbench["next_work"]["current_batch"].casefold())
+        self.assertTrue(workbench["next_work"]["next_batch"].strip())
+        self.assertIn("current SOURCE release candidate", workbench["long_term"]["direction"])
+        self.assertIn("Exact 0.14.1-1.10 RPM", workbench["validation"]["device_acceptance"])
+        rpm_check = workbench["validation"]["rpm_package_check"]
+        self.assertIn("0.14.1-1.11", rpm_check)
+        self.assertIn("No", rpm_check)
+        self.assertIn("built yet", rpm_check)
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:

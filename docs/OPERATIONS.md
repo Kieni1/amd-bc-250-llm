@@ -411,6 +411,7 @@ MODEL=MODEL_NAME LOAD_SECONDS=120 NUM_PREDICT=2000 sudo bc250 advanced benchmark
 sensors
 bc250 advanced benchmark generation
 sudo bc250 advanced revalidate start
+sudo bc250 advanced revalidate start --output-dir /path/to/existing/export-dir
 sudo bc250 advanced revalidate start --skip-owui
 sudo bc250 advanced revalidate status
 sudo bc250 advanced revalidate status --raw  # machine-readable key=value state
@@ -420,7 +421,7 @@ sudo bc250 advanced qualification capture --candidate-rpm /path/to/candidate.rpm
 sudo bc250 advanced resilience status --campaign-dir /var/lib/bc250-llm-server/resilience/campaign-...
 ```
 
-`sudo bc250 status --json` emits schema `bc250.status.v3` with installed package, kernel,
+`sudo bc250 status --json` emits schema `bc250.status.v4` with installed package, kernel,
 service topology, runtime identity, memory/swap/PSI, failed-unit and restart-diagnostic
 state. `bc250 health` layers read-only PASS/WARN/FAIL diagnostics over that state,
 including `rpm -V`, runtime topology, runtime identity, memory headroom and
@@ -438,13 +439,18 @@ Open WebUI systemd unit from HTTP application readiness, queries the active Olla
 `/api/version` endpoint rather than inferring the server version from CLI output, and reports current
 `/api/ps` residency per Ollama lane so memory-sensitive investigations can see what is actually loaded.
 
-`sudo bc250 support-bundle` creates a mode-0600 timestamped archive under
-`/var/lib/bc250-llm-server/support/` by default. It reuses existing status, verifier,
+`sudo bc250 support-bundle` creates a mode-0600 timestamped archive in the invoking
+operator's current working directory by default. `--output-dir DIR` selects another existing
+directory without changing that directory's owner or mode. The archive is owned by the invoking
+operator so it can be copied off the appliance without another sudo step. It reuses existing status, verifier,
 maintenance, topology and CU commands, adds bounded resource/failure evidence, and writes
 `manifest.json` plus `SHA256SUMS.txt`. Individual command captures are bounded by
-`BC250_SUPPORT_CAPTURE_TIMEOUT` (20 seconds by default) and record `TIMEOUT` distinctly. Before
-reporting success the command validates the checksum set, creates the archive, reopens it and validates
-the archived checksum set again. It intentionally excludes OWUI credentials, prompts, chat content,
+`BC250_SUPPORT_CAPTURE_TIMEOUT` (20 seconds by default) and record `TIMEOUT` distinctly. Endpoint
+captures are published as `.json` only after JSON parsing succeeds; unavailable or invalid endpoints are
+recorded as sibling `.error.txt` diagnostics instead. Before reporting success the command validates every
+published JSON payload, validates the checksum set, creates the archive, reopens it, validates the archived
+checksum set again and reparses the archived JSON payloads. Completion output states those checks
+explicitly rather than using the broader `self-verified` wording. It intentionally excludes OWUI credentials, prompts, chat content,
 uploaded document contents, database rows, identity SQL and backup contents. Use `--output-dir DIR`
 when the archive should be written elsewhere.
 
@@ -482,8 +488,11 @@ path. Authenticated packaged Open WebUI qualification accepts
 and the packaged RAG path. The direct translation stage pins the promoted 2048-token
 budget; the Open WebUI stage sends source text through the real production role IDs rather
 than rebuilding the Filter contract in the harness. Final bundles remain under
-`/var/lib/bc250-llm-server/revalidation/results/`; each bundle now includes a small
-`manifest.json` and `SHA256SUMS.txt` covering its evidence files. Expected nonzero raw
+`/var/lib/bc250-llm-server/revalidation/results/` as protected canonical history. A second
+mode-0600 operator export is written to the invoking working directory by default, or to the existing
+directory selected with `--output-dir`; the export is owned by the invoking operator. Each bundle includes
+a small `manifest.json` and `SHA256SUMS.txt` covering its evidence files. Endpoint captures publish a
+`*.json` file only after JSON validation; failed/non-JSON captures use a sibling `.error.txt`. Expected nonzero raw
 `systemctl status` results are annotated when the agent lane is intentionally inactive in
 normal mode. Completed work remains inspectable until `cleanup` or a later `start`.
 
@@ -729,7 +738,7 @@ The RPM installs operator documentation under:
 Start with `README.md`, `TLDR.md`, `docs/OPERATIONS.md`, `MODELS.md` and
 `docs/FILESTRUCTURE.md`. Important live paths are `/etc/bc250-llm-server/` for package
 configuration, `/var/lib/bc250-llm-server/` for manager/runtime state,
-`/var/lib/bc250-llm-server/revalidation/results/` for final revalidation bundles, and
+`/var/lib/bc250-llm-server/revalidation/results/` for protected canonical revalidation history (operator export copies go to the invocation/output directory), and
 `/var/log/bc250-llm-install.log` for the guided-installer transcript.
 
 ## Office maintenance
@@ -1192,4 +1201,4 @@ Release 1.8 keeps that privileged verification unchanged but fixes the non-root 
 
 `sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
 
-When the optional `needs-restarting` helper is absent, status reports `Reboot required: UNKNOWN (restart check unavailable)` rather than treating that absence as a health failure.
+When the optional `needs-restarting` helper is absent, status reports `Reboot required: NOT CHECKED (needs-restarting unavailable)` rather than treating that absence as a health failure.

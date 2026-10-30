@@ -10,7 +10,7 @@ sudo bc250 verify
 sudo bc250 support-bundle
 ```
 
-`bc250 verify` distinguishes failures from warnings and checks the packaged runtime, services, CU live-routing state, memory/swap policy, model infrastructure and Open WebUI state. Model-quality findings remain test evidence and must not automatically be relabeled as infrastructure failures. `support-bundle` collects bounded, redacted evidence without including prompts, chats, uploaded document contents or credentials.
+`bc250 verify` distinguishes failures from warnings and checks the packaged runtime, services, CU live-routing state, memory/swap policy, model infrastructure and Open WebUI state. Model-quality findings remain test evidence and must not automatically be relabeled as infrastructure failures. `support-bundle` collects bounded, redacted evidence without including prompts, chats, uploaded document contents or credentials; its mode-0600 archive is exported to the invoking operator's current directory by default, or to an existing `--output-dir`, without changing that directory's permissions. Published JSON evidence is parsed before archiving and after archive extraction; unavailable endpoints are recorded as `.error.txt` rather than malformed or empty `.json` files.
 
 ## Full qualification
 
@@ -21,7 +21,7 @@ sudo bc250 advanced revalidate status
 
 Revalidation exercises packaged defaults, including production model roles, RAG/embedding, translation, structured-output paths, resource safety and restoration. Run completion, infrastructure, quality, restoration and coverage are independent result dimensions: a fully executed run is `completed` even when optional Agent coverage is `partial` because the add-on model is not installed. `incomplete` is reserved for execution/evidence that did not finish.
 
-Translation evidence also separates the underlying model from the delivered product path. A direct Translate-Gemma case may remain `quality-fail` for the documented DE→FR recommendation-strengthening limitation. If the Open WebUI integrity outlet detects that raw defect and withholds the unsafe translation, the product integrity control is reported as **PASS — detected and withheld** while the raw-model failure remains visible in the evidence. A guard false positive remains a product quality failure.
+Translation evidence also separates the underlying model from the delivered product path. A direct Translate-Gemma case may remain `quality-fail` for the documented DE→FR recommendation-strengthening limitation. If the Open WebUI integrity outlet detects that raw defect and withholds the translation-integrity failure, the product integrity control is reported as **PASS — detected and withheld** while the raw-model failure remains visible in the evidence. A guard false positive remains a product quality failure.
 
 ## Focused benchmarks
 

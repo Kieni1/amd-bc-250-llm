@@ -66,7 +66,7 @@ intentionally empty on a stock install; packaged model definitions live under
 | `/var/lib/bc250-llm-server/ollama/agent/` | Exclusive agent store, port 11436 |
 | `/var/lib/ollama/` | Persistent upstream/Ollama-owned state outside ordinary RPM file ownership |
 | `/var/lib/bc250-llm-server/revalidation/` | Root-only revalidation work state; completed state remains inspectable until explicit cleanup or the next run |
-| `/var/lib/bc250-llm-server/revalidation/results/` | Root-only final whole-appliance revalidation bundles |
+| `/var/lib/bc250-llm-server/revalidation/results/` | Root-only canonical revalidation evidence history; operator export copies are written to the invocation/output directory |
 | `/var/lib/bc250-llm-server/secrets/open-webui.env` | Persistent root-only Open WebUI signing secret |
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |

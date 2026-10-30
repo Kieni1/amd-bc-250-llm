@@ -2,11 +2,14 @@
 
 This is intentionally a lean pre-1.0 suite.
 
-- `test_core.py` is the only RPM `%check` module. It protects release identity, runtime pins, core CLI help, package ownership and active model loading without requiring root or host runtime state.
-- `test_release.py` checks release/build policy and frozen-source wiring.
-- `test_models.py` checks active catalog integrity without pinning every implementation detail.
-- `test_workflows.py` smoke-tests supported operator/specialist entrypoints through `--help` only.
-- `test_benchmark.py` protects only the visible-output/thinking semantics that affect evidence correctness.
+RPM `%check` runs the package-critical module set declared in `release-contract.json` via
+`scripts/validate.sh --package`. The release-preflight module is declared separately in the same
+contract, while `scripts/validate.sh` without a mode runs the full advisory repository suite.
+
+The package-critical set protects release identity, packaging/source integrity, runtime behavior,
+managed documents/RAG, upstream patch validation and qualification logic without requiring root or
+host runtime state. Broader modules cover release wiring, model/catalog behavior, workflows,
+benchmarks, installation, maintenance, Open WebUI, storage and other source-level contracts.
 
 Rules for new tests:
 
