@@ -368,8 +368,9 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("Exact 0.14.1-1.10 RPM", workbench["validation"]["device_acceptance"])
         rpm_check = workbench["validation"]["rpm_package_check"]
         self.assertIn("0.14.1-1.12", rpm_check)
-        self.assertIn("No", rpm_check)
-        self.assertIn("built yet", rpm_check)
+        self.assertIn("First", rpm_check)
+        self.assertIn("Current fixed SOURCE differs", rpm_check)
+        self.assertIn("new authoritative BUILD", rpm_check)
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:

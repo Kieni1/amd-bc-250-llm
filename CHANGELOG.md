@@ -8,6 +8,7 @@
 - Integrate Open WebUI 0.12.5 policy changes explicitly: disable administrator cross-user chat access/export, OpenAI passthrough, upstream version checks and embedding/reranking remote-code trust; keep the existing local/offline feature surface fail-closed.
 - Make the Jina query/content prefixes authenticated persisted desired state now that Open WebUI 0.12.5 exposes them through the retrieval API, while retaining the same fresh-database bootstrap values. Pin the new large-document embedding save buffer to 1000 chunks and keep request batch size 1, synchronous embedding and one concurrent request for predictable BC-250 memory use.
 - Refresh Tika package-gate qualification to 4.2.0 and make the deterministic `/tika` extraction marker version-neutral; retain the private non-host-published container boundary and avoid an unnecessary `/unpack` compatibility shim.
+- Make the post-build advisory suite genuinely unprivileged-hermetic after the first 1.12 GitHub run exposed host-path leakage: sandbox installer runtime/Hugging Face cache paths in tests and unit-test privileged status/token-validation branches without depending on the runner UID.
 
 ## 0.14.1-1.11 - 2026-10-30
 
