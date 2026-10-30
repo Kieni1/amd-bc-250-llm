@@ -3,9 +3,11 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Accepted release baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14. The next-release workbench pins Open WebUI 0.12.4; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
+Accepted release baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline, Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14. Current candidate `bc250-llm-server-0.14.1-1.10` keeps Ollama 0.40.8 and updates Open WebUI to 0.12.4 with the metadata-first model-management contract; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
-Release 1.9 unifies MTP presentation with the normal indexed model overview while preserving standalone semantics, and carries focused Managed Documents fixes from 1.8 device acceptance: multi-chunk normalization now fails closed on invalid/duplicate/incomplete chunk assembly, Agent-mode preparation restores normal topology across the readiness-failure window, and review output reports explicit readiness state. Runtime/model/retrieval tuning, persistent state and the SRPM-first authority path are unchanged; exact 1.9 build/device binding is required.
+Release 1.10 is the current candidate: model acquisition/capability/qualification metadata is centralized and semantically validated for model management, Open WebUI and benchmarks; tracking sources keep validated acquired bytes during ordinary `apply` and advance only through explicit `refresh`; MiniCPM vision/OCR and Agent validation scope are package-declared; Open WebUI moves to 0.12.4. Ollama/runtime parameters/topology remain unchanged. Exact 1.10 build/device binding is required.
+
+Release 1.9 remains the accepted device baseline with unified MTP presentation and the focused Managed Documents fixes from 1.8 acceptance.
 
 ## Install
 

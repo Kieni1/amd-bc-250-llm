@@ -5,7 +5,9 @@ It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflo
 hardware profiles, diagnostics and optional specialist tools.
 
 Accepted release baseline: `bc250-llm-server-0.14.1-1.9` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
-The next-release workbench keeps Ollama/Tika/governor unchanged and pins Open WebUI 0.12.4.
+
+Current candidate: `bc250-llm-server-0.14.1-1.10` (Ollama 0.40.8, Open WebUI 0.12.4) with metadata-first model management and explicit tracking-source refresh semantics; exact Fedora 44 RPM/device acceptance is pending.
+Release 1.10 keeps Ollama/Tika/governor unchanged and pins Open WebUI 0.12.4.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -188,14 +190,16 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 |---|---|
 | Cyan Skillfish governor v0.4.14 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
 | Ollama v0.40.8 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.12.4 and Tika v4.1.0-full | Digest-pinned next-release UI, API-driven baseline setup and document extraction |
+| Open WebUI v0.12.4 and Tika v4.1.0-full | Digest-pinned 1.10 candidate UI, API-driven baseline setup and document extraction |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | Document lifecycle | Local DE/FR/bilingual preparation, human review, provenance validation and Open WebUI knowledge sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Release 0.14.1-1.9 combines the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates now appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence still excludes MTP. Multi-chunk document normalization now fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state. Runtime/model/retrieval tuning and persistent state paths remain unchanged; exact-RPM build/device acceptance is still required.
+Release 0.14.1-1.10 is the current candidate built on the accepted 1.9 baseline. It introduces the metadata-first model contract, centralized semantic validation, provider-aware lifecycle inspection/removal, metadata-driven MiniCPM vision/OCR handling, explicit Agent validation scope, tracking-source state migration semantics, and Open WebUI 0.12.4. Ordinary `apply` does not silently advance a valid tracking artifact; only explicit `refresh` resolves the moving source again. Ollama 0.40.8, model runtime parameters, retrieval tuning, lane topology and persistent-state paths remain unchanged. Exact Fedora 44 RPM/device acceptance is pending.
+
+Release 0.14.1-1.9 remains the accepted device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in

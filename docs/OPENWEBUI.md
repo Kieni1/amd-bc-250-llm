@@ -1,6 +1,6 @@
 # Open WebUI
 
-Current next-release workbench baseline: **Open WebUI v0.12.4** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
+Current 0.14.1-1.10 candidate baseline: **Open WebUI v0.12.4** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:

@@ -139,14 +139,13 @@ accepted only for older files.
 
 ## Download state and authentication
 
-After a successful manager-downloaded GGUF, an adjacent schema-3
-`*.bc250.json` file records source/model/category identity, calculated SHA-256
-and file stat metadata. Schema 1/2 sidecars remain readable. Unchanged
+After a successful manager-downloaded GGUF, an adjacent schema-4
+`*.bc250.json` file records source/model/category identity, source policy, configured moving ref,
+resolved revision when known, acquired SHA-256 and file stat metadata. Schema 1/2/3 sidecars remain readable and are upgraded in place during normal reconciliation. Unchanged
 size/mtime/ctime use a fast reuse path. Legacy state or changed stat metadata
 forces a full SHA-256 check before the existing GGUF can be reused, so modified
 or corrupted bytes are not accepted merely because the sidecar still exists.
-Repository, revision and GGUF filename must also match. Modelfile-only changes
-therefore regenerate the Ollama registration without downloading again. Reconciliation prints the reason (source, Modelfile or missing registration); `--quiet`
+Repository and GGUF filename must always match. For `pinned` sources the configured revision/digest must also match. For `tracking` sources, an older valid acquired revision remains current across a catalog commit→`latest`/`main` migration; normal `apply` records the new configured ref without replacing bytes, and only explicit `refresh` advances the source. Modelfile-only changes therefore regenerate the Ollama registration without downloading again. Reconciliation prints the reason (source, Modelfile or missing registration); `--quiet`
 suppresses repeated catalog/mode chatter for scripted actions. Use the explicit `refresh`
 command to deliberately fetch new source bytes, including a moving revision such as
 `latest`.
@@ -189,7 +188,7 @@ redownload.
 
 For live source/blob pairs whose bytes are identical, `bc250 storage dedupe` uses the
 conservative 16 MiB XFS range while batching ranges per pair into one `xfs_io` process.
-Dedupe state is stored in the schema-3 sidecar and survives normal model reconciliation.
+Dedupe state is stored in the schema-4 sidecar and survives normal model reconciliation.
 
 Package-retired definitions remain source-only under `models/modelfiles-retired/`;
 installed `retired-models.json` contains the canonical identity/paths needed for safe

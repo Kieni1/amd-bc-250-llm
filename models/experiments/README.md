@@ -13,7 +13,7 @@ sudo bc250 model apply experiments
 bc250 advanced benchmark
 ```
 
-Normal discovery comes from `models/modelfiles/exp-*.Modelfile`. Candidates that no
+Normal packaged discovery comes from `models/model-catalog.json`; each catalog entry points to a runtime-only `models/modelfiles/exp-*.Modelfile` template. Candidates that no
 longer have a plausible promotion path move to `models/modelfiles-retired/`; that
 directory is source-only and is not installed or discovered. In particular, the
 retired task candidate `exp-qwen38-4b-distill-empero-q6-k` must not be confused with

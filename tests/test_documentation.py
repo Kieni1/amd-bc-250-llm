@@ -359,10 +359,10 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(workbench["kind"], "release-workbench")
         _version, _release, nvr = current_identity()
         self.assertEqual(workbench["release"]["nvr"], nvr)
-        self.assertEqual(workbench["release"]["state"], "accepted-1.9-baseline-next-release-development")
+        self.assertEqual(workbench["release"]["state"], "candidate-1.10-source-ready-device-pending")
         self.assertNotIn("checkpoint", workbench)
         self.assertIn("Batch 3 integration/refinement complete", workbench["next_work"]["current_batch"])
-        self.assertIn("Freeze/assign the next release identity", workbench["next_work"]["next_batch"])
+        self.assertIn("authoritative Fedora 44 release gate", workbench["next_work"]["next_batch"])
         self.assertIn("metadata-first", workbench["long_term"]["direction"])
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
