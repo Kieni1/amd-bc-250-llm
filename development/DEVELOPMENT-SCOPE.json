@@ -184,11 +184,13 @@
       "status": "active"
     },
     "mtp": {
-      "baseline_sha256": "b222463fb8eb90880b9944c001e463d479bccf615fe21d9a0031fe2f3e5ad624",
+      "baseline_sha256": "abc60ae5ccbec63c917788561456d57c9acc893140ff73befeec040e4d3b0916",
       "description": "Standalone llama.cpp MTP models and comparison helpers; retained under the advanced namespace with modelctl-backed list/status/prepare handling.",
       "focused_tests": [],
       "notes": [
-        "Frozen implementation retained; baseline refreshed only for the cross-cutting schema-1 capability/ownership metadata added to the MTP catalog."
+        "Frozen implementation retained after an explicit pre-1.0 thaw/refreeze: the remaining qwen35-9b convenience alias was removed so the MTP CLI accepts exact catalog IDs only.",
+        "Runtime model behavior and lifecycle semantics were unchanged by this bounded CLI/input cleanup.",
+        "The baseline also includes the earlier cross-cutting schema-1 capability/ownership metadata in the MTP catalog."
       ],
       "paths": [
         "models/mtp/**"

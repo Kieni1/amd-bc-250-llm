@@ -62,7 +62,7 @@ sudo bc250 model status mtp qwen3.5-9b-mtp --include-disabled --verbose
 With no selection, `sudo bc250 advanced mtp prepare` shows the disabled candidates and prompts for
 one. `sudo bc250 model install` also shows those candidates in the common indexed overview; select an
 MTP entry explicitly by ID/index/range to prepare it. Long-lived scripts and recorded evidence should
-use the exact ID rather than a displayed index or convenience alias.
+use the exact package ID rather than a displayed index.
 
 `bc250 advanced mtp prepare` is equivalent to an explicit lifecycle apply of the MTP catalog with
 disabled entries exposed. Advanced/operator testing can use the underlying form directly:
@@ -119,9 +119,7 @@ LLAMACPP=/opt/llama.cpp/build/bin/llama-server \
 bc250 advanced mtp run --no-mtp qwen3.5-9b-mtp
 ```
 
-Exact IDs are preferred. Only the unambiguous `qwen35-9b` convenience alias remains for interactive
-use. Use exact IDs for 27B models so a future package-policy change cannot silently retarget an
-alias. Retired MTP entries have no alias and are not accepted by the active runner.
+Use exact package IDs for every MTP entry. Retired MTP entries are not accepted by the active runner.
 
 `PORT`, `CTX`, `DRAFT_N_MAX` and optional `UBATCH` override catalog values; an unset `UBATCH` preserves the runtime default. `MIN_MEM_AVAILABLE_MIB` may be changed only
 as an explicitly recorded experiment, not merely to bypass a failed safety preflight.

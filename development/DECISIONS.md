@@ -974,3 +974,52 @@ Tracking-source state uses schema 4. It records the catalog `configured_ref`, `s
 **Why:** Reusing release 1.9 for materially changed model-management/Open WebUI behavior would make build/device evidence ambiguous. Treating a pinned→tracking metadata migration as source drift would also let installer convergence silently download different upstream bytes, contradicting the explicit-refresh contract. Central semantic validation prevents the catalog from having different meanings in lifecycle, benchmark and Open WebUI consumers.
 
 **Retest only if:** package identity, source-policy/state migration, shared model-contract validation, model lifecycle, benchmark metadata consumption or Open WebUI model discovery changes. Bind device acceptance to the exact selected Fedora 44 1.10 RPM.
+
+## DEC-038 — Refreeze MTP with exact catalog IDs only
+
+**Status:** ACTIVE — 0.14.1-1.11 candidate.
+
+**Decision:** Explicitly thaw the frozen MTP command/input surface only to remove the remaining
+`qwen35-9b` convenience alias. `bc250 advanced mtp run`, prepare/status guidance and the underlying
+model lifecycle now require exact catalog IDs such as `qwen3.5-9b-mtp`. No model source, context,
+draft-depth, runtime, lifecycle or comparison behavior changes as part of this thaw. After exact-ID
+regressions and development-scope validation pass, refreeze `models/mtp/**` at the new baseline.
+
+**Why:** The project is pre-1.0 and the alias duplicated model identity without protecting persistent
+operator state. Because MTP is a frozen surface, the cleanup is governed as a bounded thaw/refreeze
+rather than as generic greenfield normalization.
+
+
+## DEC-039 — Make `nonthinking-first-pass` an explicit benchmark request and preserve provider contamination
+
+**Status:** ACTIVE — 0.14.1-1.11 candidate.
+
+**Decision:** In the package generation benchmark, a model profile declaring
+`reasoning_request_policy=nonthinking-first-pass` resolves `--think auto` to an explicit
+Ollama `think=false` request. The normal non-thinking latency budget remains unchanged.
+If the provider/model template nevertheless serializes a leading literal `<think>...</think>`
+block into the raw response while the structured thinking field is empty, the benchmark
+preserves that raw response and records `reasoning-present-despite-think-false` plus
+`reasoning_contamination=literal-think-block`. It does not silently strip or rewrite provider
+output.
+
+**Why:** Exact 1.10 DEVICE recovery evidence showed that LFM2.5 8B can return literal reasoning
+inside the response even when called with `think=false`. The profile field is request policy, so
+`nonthinking-first-pass` should produce the request it names. At the same time, generation
+benchmarking is provider/runtime evidence rather than a product-presentation filter; hiding raw
+reasoning there would make evidence less truthful. Product/UI handling remains a separate role/UI
+contract and is not inferred from capability metadata or benchmark cleanup.
+
+**Retest only if:** generation think-policy resolution, the LFM2.5 qualification profile, Ollama
+reasoning serialization, or product presentation of testing models changes.
+
+
+## DEC-040 — Separate protected internal state from operator-export evidence
+
+**Status:** ACTIVE — 0.14.1-1.11 candidate.
+
+**Decision:** Revalidation and support-bundle workflows keep package-private working/history state under package-controlled `/var/lib`/`/run` paths, but final artifacts intended for transfer are exported to the invoking operator. The default export target is the invoking working directory, with explicit `--output-dir` support; existing operator-selected directories are never chmod/chowned as a side effect. Exported archives are owned by the invoking user and mode `0600`. Endpoint evidence is published as `.json` only after successful JSON parsing; failed/non-JSON captures use diagnostic files instead. Revalidation machine state exposes independent completion, infrastructure, model-quality, product-integrity, topology-restoration and coverage dimensions.
+
+**Why:** Root-only internal state is appropriate for service/recovery operation, but an operator-facing export must be directly transferable and must not mutate unrelated filesystem policy. Evidence filenames and completion wording must also truthfully describe what has actually been validated so automated consumers can trust the artifact contract.
+
+**Retest only if:** export destination/ownership semantics, support/revalidation evidence serialization, manifest/result dimensions, or final artifact validation changes.
