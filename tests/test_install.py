@@ -622,6 +622,7 @@ step_8_application_services
                 "PATH": f"{fake_bin}:/usr/bin:/bin",
                 "BC250_TEST_LOG": str(log),
                 "BC250_TEST_RUN_DIR": str(test_run),
+                "BC250_RUNTIME_DIR": str(test_run),
                 "BC250_OWUI_ENABLE_SOURCE": str(enable_source),
                 "BC250_OWUI_ENABLE_DROPIN": str(enable_target),
             }

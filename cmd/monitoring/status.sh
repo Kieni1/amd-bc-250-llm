@@ -65,11 +65,16 @@ runtime_mode() {
 }
 
 
+status_view_is_privileged() {
+  ((EUID == 0))
+}
+
+
 topology_summary() {
   local mode="$1" runtime_identity_state="${2:-unavailable}" setup_state="${3:-unknown}" unit label missing=()
   case "$mode" in
     normal|agent)
-      if ((EUID != 0)); then
+      if ! status_view_is_privileged; then
         echo "Overall: HEALTHY (limited unprivileged view)"
         echo "Coverage: LIMITED — run sudo bc250 status for full inspection"
       else

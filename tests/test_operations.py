@@ -26,9 +26,21 @@ class StatusTests(unittest.TestCase):
             target.chmod(0o600)
             link = Path(tmp) / "token-link"
             link.symlink_to(target)
+            source = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+            start = source.index("validate_owui_token_file() {")
+            end = source.index("\n}\n\nif ((EUID != 0)); then", start) + 2
+            function = source[start:end]
             result = subprocess.run(
-                [str(ROOT / "cmd/monitoring/verify-server.sh"), "--owui-token-file", str(link)],
-                text=True, capture_output=True, check=False,
+                [
+                    "bash",
+                    "-c",
+                    function + '\nvalidate_owui_token_file "$1" /var/lib/bc250-llm-server/secrets/openwebui-admin.key',
+                    "test",
+                    str(link),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
             )
             self.assertEqual(result.returncode, 2)
             self.assertIn("must not be a symlink", result.stderr)
@@ -118,7 +130,7 @@ class StatusTests(unittest.TestCase):
 
     def test_status_overall_state_distinguishes_pending_mismatch_and_unavailable(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
-        start = source.index("topology_summary() {")
+        start = source.index("status_view_is_privileged() {")
         end = source.index("\n}\n\nollama_status() {", start) + 2
         function = source[start:end]
         cases = (
@@ -128,7 +140,12 @@ class StatusTests(unittest.TestCase):
             (("normal", "match", "published"), "Overall: HEALTHY\nRuntime mode: normal"),
         )
         for arguments, expected in cases:
-            command = function + "\ntopology_summary " + " ".join(arguments)
+            command = (
+                function
+                + "\nstatus_view_is_privileged() { return 0; }"
+                + "\ntopology_summary "
+                + " ".join(arguments)
+            )
             result = subprocess.run(
                 ["bash", "-c", command],
                 text=True,

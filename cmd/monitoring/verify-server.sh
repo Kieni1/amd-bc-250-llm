@@ -53,6 +53,42 @@ while (($#)); do
   esac
 done
 
+validate_owui_token_file() {
+  local token_file="$1" default_token_file="$2" token_mode dir_mode
+  [[ ! -L "$token_file" ]] || {
+    echo "ERROR: Open WebUI API key file must not be a symlink: $token_file" >&2
+    return 2
+  }
+  [[ -f "$token_file" && -r "$token_file" && -s "$token_file" ]] || {
+    echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $token_file" >&2
+    return 2
+  }
+  token_mode="$(stat -c '%a' "$token_file" 2>/dev/null || true)"
+  [[ "$token_mode" =~ ^[0-7]{3,4}$ ]] || {
+    echo "ERROR: cannot determine permissions for Open WebUI API key file: $token_file" >&2
+    return 2
+  }
+  if (( (8#$token_mode) & 077 )); then
+    echo "ERROR: Open WebUI API key file must not be group/world accessible: $token_file (mode $token_mode)" >&2
+    return 2
+  fi
+  if [[ "$token_file" == "$default_token_file" ]]; then
+    [[ "$(stat -c '%u' "$token_file" 2>/dev/null || echo -1)" == 0 ]] || {
+      echo "ERROR: package default Open WebUI API key must be root-owned" >&2
+      return 2
+    }
+    [[ "$(stat -c '%u' "$(dirname "$token_file")" 2>/dev/null || echo -1)" == 0 ]] || {
+      echo "ERROR: package secrets directory must be root-owned" >&2
+      return 2
+    }
+    dir_mode="$(stat -c '%a' "$(dirname "$token_file")" 2>/dev/null || true)"
+    [[ "$dir_mode" == 700 || "$dir_mode" == 0700 ]] || {
+      echo "ERROR: package secrets directory must be mode 0700" >&2
+      return 2
+    }
+  fi
+}
+
 if ((EUID != 0)); then
   echo "ERROR: full verification requires root privileges." >&2
   rerun="sudo bc250 verify"
@@ -66,29 +102,7 @@ if [[ -z "$OWUI_TOKEN_FILE" && -s "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
 fi
 
 if [[ -n "$OWUI_TOKEN_FILE" ]]; then
-  [[ ! -L "$OWUI_TOKEN_FILE" ]] || {
-    echo "ERROR: Open WebUI API key file must not be a symlink: $OWUI_TOKEN_FILE" >&2
-    exit 2
-  }
-  [[ -f "$OWUI_TOKEN_FILE" && -r "$OWUI_TOKEN_FILE" && -s "$OWUI_TOKEN_FILE" ]] || {
-    echo "ERROR: Open WebUI API key file must be a readable, non-empty regular file: $OWUI_TOKEN_FILE" >&2
-    exit 2
-  }
-  token_mode="$(stat -c '%a' "$OWUI_TOKEN_FILE" 2>/dev/null || true)"
-  [[ "$token_mode" =~ ^[0-7]{3,4}$ ]] || {
-    echo "ERROR: cannot determine permissions for Open WebUI API key file: $OWUI_TOKEN_FILE" >&2
-    exit 2
-  }
-  if (( (8#$token_mode) & 077 )); then
-    echo "ERROR: Open WebUI API key file must not be group/world accessible: $OWUI_TOKEN_FILE (mode $token_mode)" >&2
-    exit 2
-  fi
-  if [[ "$OWUI_TOKEN_FILE" == "$DEFAULT_OWUI_TOKEN_FILE" ]]; then
-    [[ "$(stat -c '%u' "$OWUI_TOKEN_FILE" 2>/dev/null || echo -1)" == 0 ]] || { echo "ERROR: package default Open WebUI API key must be root-owned" >&2; exit 2; }
-    [[ "$(stat -c '%u' "$(dirname "$OWUI_TOKEN_FILE")" 2>/dev/null || echo -1)" == 0 ]] || { echo "ERROR: package secrets directory must be root-owned" >&2; exit 2; }
-    dir_mode="$(stat -c '%a' "$(dirname "$OWUI_TOKEN_FILE")" 2>/dev/null || true)"
-    [[ "$dir_mode" == 700 || "$dir_mode" == 0700 ]] || { echo "ERROR: package secrets directory must be mode 0700" >&2; exit 2; }
-  fi
+  validate_owui_token_file "$OWUI_TOKEN_FILE" "$DEFAULT_OWUI_TOKEN_FILE" || exit $?
   OWUI_API_KEY="$(<"$OWUI_TOKEN_FILE")"
   export OWUI_API_KEY
 fi
