@@ -505,6 +505,21 @@ class CategoryPolicyTests(unittest.TestCase):
         q, d, scheme = category.embedding_scheme("external-jina:test")
         self.assertEqual((q, d, scheme), ("Query: ", "Document: ", "jina-v5"))
 
+    def test_package_contract_rejects_missing_shared_profile(self) -> None:
+        document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        del document["profiles"]["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]
+        with tempfile.TemporaryDirectory() as temporary:
+            profile_path = Path(temporary) / "model-profiles.json"
+            profile_path.write_text(json.dumps(document), encoding="utf-8")
+            with patch.dict(
+                os.environ, {"BC250_MODEL_PROFILES": str(profile_path)}, clear=False
+            ), self.assertRaisesRegex(
+                common.BenchmarkError, "missing qualification profiles"
+            ):
+                common.package_model_contract(
+                    "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+                )
+
     def test_ocr_prompts_preserve_source_language_and_structure(self) -> None:
         self.assertEqual(category.OCR_PROMPTS["glm"], "Text Recognition:")
         prompt = category.OCR_PROMPTS["ovis"].lower()

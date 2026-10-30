@@ -99,6 +99,19 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(modelctl.ModelError, "comparison_role must be a non-empty string"):
                 modelctl.load_model_profiles(path)
 
+    def test_shared_profile_contract_rejects_missing_catalog_model(self) -> None:
+        document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        model_id = "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "model-profiles.json"
+            broken = json.loads(json.dumps(document))
+            del broken["profiles"][model_id]
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            with self.assertRaisesRegex(
+                modelctl.ModelError, r"catalog model\(s\) missing qualification profiles"
+            ):
+                modelctl.load_model_profiles(path)
+
     def test_profile_schema_rejects_invalid_agent_validation_contract(self) -> None:
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
         model_id = "agentic-lfm25-24b-a2b-unsloth-q3-k-xl"

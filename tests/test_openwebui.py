@@ -446,6 +446,23 @@ class OpenWebUIStatusTests(unittest.TestCase):
         ):
             self.assertNotIn("system", models[model_id]["params"])
 
+    def test_package_testing_policy_rejects_missing_shared_profile(self) -> None:
+        import json
+
+        document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
+        del document["profiles"]["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]
+        with tempfile.TemporaryDirectory() as temporary:
+            profile_path = Path(temporary) / "model-profiles.json"
+            profile_path.write_text(json.dumps(document), encoding="utf-8")
+            with mock.patch.dict(
+                os.environ, {"BC250_MODEL_PROFILES": str(profile_path)}, clear=False
+            ), self.assertRaisesRegex(
+                OPENWEBUI.ApiError, "missing qualification profiles"
+            ):
+                OPENWEBUI.package_testing_model_policy(
+                    "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+                )
+
     def test_testing_inventory_expands_normal_lanes_with_model_specific_policy(self) -> None:
         document = OPENWEBUI.load_models()
         effective = OPENWEBUI.effective_model_document(

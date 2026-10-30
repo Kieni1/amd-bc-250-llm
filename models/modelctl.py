@@ -8,6 +8,7 @@ import errno
 import getpass
 import grp
 import hashlib
+import importlib.util
 import json
 import os
 import pwd
@@ -18,6 +19,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -25,7 +27,27 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-import tomllib
+
+
+def _load_shared_model_contract_module():
+    """Load the shared package contract validator in source and installed layouts."""
+    candidates = (
+        Path(__file__).resolve().with_name("model_contract.py"),
+        Path(__file__).resolve().parents[1] / "cmd" / "model_contract.py",
+    )
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        spec = importlib.util.spec_from_file_location("bc250_model_contract_shared", candidate)
+        if spec is None or spec.loader is None:
+            continue
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    raise RuntimeError("shared model_contract.py is missing")
+
+
+_SHARED_MODEL_CONTRACT = _load_shared_model_contract_module()
 
 PROJECT = "bc250-llm-server"
 INSTALLED_SHARE = Path(f"/usr/share/{PROJECT}/model-management")
@@ -202,61 +224,13 @@ def _load_json_object(path: Path, label: str) -> dict:
 def load_model_profiles(path: Path | None = None) -> dict[str, dict]:
     source = path or model_profiles_path()
     document = _load_json_object(source, "model profiles")
-    if document.get("schema") != 2 or not isinstance(document.get("profiles"), dict):
-        raise ModelError(f"{source}: unsupported model-profile schema")
-    result: dict[str, dict] = {}
-    for model_id, profile in document["profiles"].items():
-        if not isinstance(model_id, str) or not model_id or not isinstance(profile, dict):
-            raise ModelError(f"{source}: invalid model profile entry")
-        required_strings = (
-            "profile_class",
-            "intended_role",
-            "comparison_role",
-            "residency_policy",
-            "reasoning_request_policy",
-            "agent_validation",
+    try:
+        catalog = load_model_catalog()
+        return _SHARED_MODEL_CONTRACT.validate_model_profiles_document(
+            document, source=source, catalog=catalog
         )
-        for field in required_strings:
-            value = profile.get(field)
-            if not isinstance(value, str) or not value:
-                raise ModelError(f"{source}: {model_id}: {field} must be a non-empty string")
-        if profile.get("owui_testing_exposure") not in {"curated", "testing", "forbidden"}:
-            raise ModelError(
-                f"{source}: {model_id}: owui_testing_exposure must be curated, testing, or forbidden"
-            )
-        if profile["agent_validation"] not in {"not-applicable", "static-output-contract"}:
-            raise ModelError(
-                f"{source}: {model_id}: agent_validation must be not-applicable or static-output-contract"
-            )
-        if not isinstance(profile.get("recommended"), bool):
-            raise ModelError(f"{source}: {model_id}: recommended must be boolean")
-        if not isinstance(profile.get("specialized"), bool):
-            raise ModelError(f"{source}: {model_id}: specialized must be boolean")
-        output_expectation = profile.get("output_token_expectation")
-        if output_expectation is not None and (
-            type(output_expectation) is not int or output_expectation <= 0
-        ):
-            raise ModelError(
-                f"{source}: {model_id}: output_token_expectation must be null or a positive integer"
-            )
-        qualified = profile.get("qualified_context_target")
-        product_default = profile.get("product_context_default")
-        if type(qualified) is not int or qualified <= 0:
-            raise ModelError(
-                f"{source}: {model_id}: qualified_context_target must be a positive integer"
-            )
-        if product_default is not None and (
-            type(product_default) is not int or product_default <= 0
-        ):
-            raise ModelError(
-                f"{source}: {model_id}: product_context_default must be null or a positive integer"
-            )
-        if product_default is not None and product_default > qualified:
-            raise ModelError(
-                f"{source}: {model_id}: product_context_default cannot exceed qualified_context_target"
-            )
-        result[model_id] = profile
-    return result
+    except _SHARED_MODEL_CONTRACT.ModelContractError as error:
+        raise ModelError(str(error)) from error
 
 
 def recommended_model_ids() -> frozenset[str]:
@@ -278,149 +252,12 @@ def _validate_string_list(value, *, path: Path, model_id: str, field: str) -> li
 def load_model_catalog(path: Path | None = None) -> dict[str, dict]:
     source = path or model_catalog_path()
     document = _load_json_object(source, "model catalog")
-    if document.get("schema") != 1 or not isinstance(document.get("models"), dict):
-        raise ModelError(f"{source}: unsupported model-catalog schema")
-    result: dict[str, dict] = {}
-    allowed_providers = {"ollama", "ollama-hf"}
-    allowed_reasoning = {"verified", "candidate", "unsupported"}
-    allowed_source_policy = {"tracking", "pinned"}
-    allowed_ownership = {"bc250", "ollama", "provider", "none"}
-    expected_lane = {
-        "production": "main",
-        "experiments": "main",
-        "task": "task",
-        "agentic": "agent",
-        "embedding": "embedding",
-    }
-    for model_id, entry in document["models"].items():
-        context = f"{source}: {model_id}"
-        if not isinstance(model_id, str) or re.fullmatch(r"[a-z0-9][a-z0-9._-]*", model_id) is None:
-            raise ModelError(f"{context}: invalid model id")
-        if not isinstance(entry, dict):
-            raise ModelError(f"{context}: entry must be an object")
-        category = entry.get("category")
-        if category not in OLLAMA_CATEGORIES:
-            raise ModelError(f"{context}: invalid category")
-        if not model_id.startswith(CATEGORY_PREFIXES[category]):
-            raise ModelError(f"{context}: id does not match category prefix")
-        provider = entry.get("provider")
-        if provider not in allowed_providers:
-            raise ModelError(f"{context}: invalid provider")
-        if not isinstance(entry.get("enabled"), bool):
-            raise ModelError(f"{context}: enabled must be boolean")
-
-        source_info = entry.get("source")
-        if not isinstance(source_info, dict):
-            raise ModelError(f"{context}: source must be an object")
-        repository = require_string(source_info, "repository", f"{context}: source")
-        if re.fullmatch(r"[^/\s]+/[^/\s]+", repository) is None:
-            raise ModelError(f"{context}: source repository must be owner/repository")
-        require_string(source_info, "revision", f"{context}: source")
-        require_string(source_info, "filename", f"{context}: source", filename=True)
-        digest = source_info.get("expected_sha256", "")
-        if not isinstance(digest, str) or (digest and re.fullmatch(r"[0-9a-f]{64}", digest) is None):
-            raise ModelError(f"{context}: invalid expected_sha256")
-        source_policy = source_info.get("policy")
-        if source_policy not in allowed_source_policy:
-            raise ModelError(f"{context}: source policy must be tracking or pinned")
-        reproducibility = require_string(source_info, "reproducibility", f"{context}: source")
-        if source_policy == "tracking" and digest:
-            raise ModelError(
-                f"{context}: tracking sources must record downloaded digests in state, "
-                "not pin expected_sha256 in the catalog"
-            )
-        if source_policy == "pinned" and provider == "ollama" and not digest:
-            raise ModelError(f"{context}: pinned manager-owned sources require expected_sha256")
-        if source_policy == "tracking" and provider == "ollama" and reproducibility != "tracking-ref":
-            raise ModelError(f"{context}: tracking manager-owned source must use reproducibility=tracking-ref")
-        if source_policy == "pinned" and provider == "ollama" and reproducibility != "pinned+digest":
-            raise ModelError(f"{context}: pinned manager-owned source must use reproducibility=pinned+digest")
-        if provider == "ollama":
-            local_path = Path(require_string(source_info, "local_path", f"{context}: source"))
-            if not local_path.is_absolute() or local_path.name != source_info["filename"]:
-                raise ModelError(f"{context}: local_path must be absolute and end in filename")
-        else:
-            provider_ref = require_string(source_info, "provider_ref", f"{context}: source")
-            remote = re.fullmatch(r"hf\.co/(?P<repository>[^/\s]+/[^/:\s]+):[^\s]+", provider_ref)
-            if remote is None:
-                raise ModelError(f"{context}: ollama-hf provider_ref must be an hf.co owner/repository reference")
-            if remote.group("repository") != repository:
-                raise ModelError(f"{context}: provider_ref repository must match source repository")
-
-        ownership = entry.get("ownership")
-        if not isinstance(ownership, dict):
-            raise ModelError(f"{context}: ownership must be an object")
-        for field in ("source", "registration", "state"):
-            if ownership.get(field) not in allowed_ownership:
-                raise ModelError(f"{context}: invalid ownership.{field}")
-        expected_ownership = (
-            {"source": "bc250", "registration": "bc250", "state": "bc250"}
-            if provider == "ollama"
-            else {"source": "ollama", "registration": "bc250", "state": "provider"}
+    try:
+        return _SHARED_MODEL_CONTRACT.validate_model_catalog_document(
+            document, source=source
         )
-        if any(ownership.get(field) != value for field, value in expected_ownership.items()):
-            raise ModelError(
-                f"{context}: ownership does not match {provider} provider contract"
-            )
-
-        runtime = entry.get("runtime")
-        if not isinstance(runtime, dict):
-            raise ModelError(f"{context}: runtime must be an object")
-        if runtime.get("lane") != expected_lane[category]:
-            raise ModelError(f"{context}: runtime lane does not match category")
-        if runtime.get("modelfile") != f"{model_id}.Modelfile":
-            raise ModelError(f"{context}: runtime Modelfile must match model id")
-        if not isinstance(runtime.get("agent_prepare_required"), bool):
-            raise ModelError(f"{context}: agent_prepare_required must be boolean")
-        if runtime["agent_prepare_required"] != (category == "agentic"):
-            raise ModelError(
-                f"{context}: agent_prepare_required must be true only for agentic models"
-            )
-
-        capabilities = entry.get("capabilities")
-        if not isinstance(capabilities, dict):
-            raise ModelError(f"{context}: capabilities must be an object")
-        _validate_string_list(
-            capabilities.get("modalities"), path=source, model_id=model_id, field="capabilities.modalities"
-        )
-        _validate_string_list(
-            capabilities.get("features"), path=source, model_id=model_id, field="capabilities.features"
-        )
-        _validate_string_list(
-            capabilities.get("benchmark_kinds"), path=source, model_id=model_id, field="capabilities.benchmark_kinds"
-        )
-        if capabilities.get("reasoning") not in allowed_reasoning:
-            raise ModelError(f"{context}: invalid reasoning capability")
-        for field in ("ocr", "tools"):
-            if not isinstance(capabilities.get(field), bool):
-                raise ModelError(f"{context}: capabilities.{field} must be boolean")
-        for optional_profile in ("ocr_profile", "embedding_profile", "translation_profile"):
-            value = capabilities.get(optional_profile)
-            if value is not None and (
-                not isinstance(value, str)
-                or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", value)
-            ):
-                raise ModelError(f"{context}: invalid capabilities.{optional_profile}")
-
-        ocr_profile = capabilities.get("ocr_profile")
-        if capabilities["ocr"]:
-            if not isinstance(ocr_profile, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", ocr_profile):
-                raise ModelError(f"{context}: OCR models require capabilities.ocr_profile")
-            if "ocr" not in capabilities["benchmark_kinds"]:
-                raise ModelError(f"{context}: OCR models must declare the ocr benchmark kind")
-        elif ocr_profile is not None:
-            raise ModelError(f"{context}: non-OCR models cannot define capabilities.ocr_profile")
-        if "embedding" in capabilities["benchmark_kinds"] and not capabilities.get("embedding_profile"):
-            raise ModelError(f"{context}: embedding benchmark models require capabilities.embedding_profile")
-        if capabilities.get("embedding_profile") and category != "embedding":
-            raise ModelError(f"{context}: embedding_profile is only valid for embedding models")
-        if capabilities.get("translation_profile") and "generation" not in capabilities["benchmark_kinds"]:
-            raise ModelError(f"{context}: translation_profile requires generation benchmark support")
-        native = entry.get("native_context_max")
-        if native is not None and (type(native) is not int or native <= 0):
-            raise ModelError(f"{context}: native_context_max must be null or a positive integer")
-        result[model_id] = entry
-    return result
+    except _SHARED_MODEL_CONTRACT.ModelContractError as error:
+        raise ModelError(str(error)) from error
 
 
 def _catalog_for_model_directory(directory: Path) -> Path | None:
@@ -1324,7 +1161,7 @@ def load_state(path: Path) -> dict:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
-    if not isinstance(value, dict) or value.get("schema") not in {1, 2, 3}:
+    if not isinstance(value, dict) or value.get("schema") not in {1, 2, 3, 4}:
         return {}
     return value
 
@@ -1334,8 +1171,24 @@ def state_matches(state: dict, model: dict, output: Path) -> bool:
     return inspect_local_source(state, model, output)[0] == "current"
 
 
+def source_policy(model: dict) -> str:
+    """Return the catalog/operator source policy for one model."""
+    configured = (model.get("source_metadata") or {}).get("policy")
+    if configured in {"tracking", "pinned"}:
+        return str(configured)
+    if model.get("sha256"):
+        return "pinned"
+    return "pinned" if re.fullmatch(r"[0-9a-f]{40}", str(model.get("revision", ""))) else "tracking"
+
+
 def inspect_local_source(state: dict, model: dict, output: Path) -> tuple[str, str, str]:
-    """Return (status, detail, checksum) for one manager-owned GGUF."""
+    """Return (status, detail, checksum) for one manager-owned GGUF.
+
+    Tracking sources deliberately treat an existing validated artifact as current
+    until explicit refresh. A catalog ref change such as commit -> latest/main is
+    therefore metadata migration, not source drift. Pinned sources still require
+    exact catalog provenance and digest agreement.
+    """
     if not output.is_file():
         return "missing", "GGUF is not present", ""
     try:
@@ -1347,24 +1200,52 @@ def inspect_local_source(state: dict, model: dict, output: Path) -> tuple[str, s
     if not state:
         return "drift", "state sidecar is missing or invalid", ""
 
-    recorded = str(state.get("sha256", ""))
+    recorded = str(state.get("acquired_sha256") or state.get("sha256", ""))
     expected = str(model.get("sha256", ""))
-    provenance = ("repository", "revision", "gguf")
-    changed = [key for key in provenance if state.get(key) != model.get(key)]
+    policy = source_policy(model)
+
+    changed = [
+        key
+        for key in ("repository", "gguf")
+        if state.get(key) != model.get(key)
+    ]
+    if policy == "pinned":
+        state_ref = state.get("configured_ref", state.get("revision"))
+        if state_ref != model.get("revision"):
+            changed.append("revision")
     if changed:
         return "drift", f"state provenance differs: {', '.join(changed)}", recorded
     if re.fullmatch(r"[0-9a-f]{64}", recorded) is None:
         return "drift", "state sidecar has no valid SHA-256", ""
-    if expected and recorded != expected:
+    if policy == "pinned" and expected and recorded != expected:
         return "drift", "recorded SHA-256 differs from current catalog pin", recorded
 
+    configured_ref = str(model.get("revision", ""))
+    acquired_ref = str(
+        state.get("resolved_revision")
+        or state.get("revision")
+        or state.get("configured_ref")
+        or ""
+    )
+    tracking_migration = (
+        policy == "tracking"
+        and acquired_ref
+        and acquired_ref != configured_ref
+    )
+    detail = "verified by recorded file identity"
+    if tracking_migration:
+        detail = (
+            f"verified tracking artifact acquired from {acquired_ref}; "
+            f"configured ref is {configured_ref}; refresh required to advance"
+        )
+
     if (
-        state.get("schema") in {2, 3}
+        state.get("schema") in {2, 3, 4}
         and state.get("size") == stat_result.st_size
         and state.get("mtime_ns") == stat_result.st_mtime_ns
         and state.get("ctime_ns") == stat_result.st_ctime_ns
     ):
-        return "current", "verified by recorded file identity", recorded
+        return "current", detail, recorded
 
     try:
         actual = sha256(output)
@@ -1372,6 +1253,8 @@ def inspect_local_source(state: dict, model: dict, output: Path) -> tuple[str, s
         return "unavailable", f"cannot hash GGUF: {error}", recorded
     if actual != recorded:
         return "drift", "GGUF content differs from recorded SHA-256", recorded
+    if tracking_migration:
+        return "current", detail, recorded
     return "current", "verified by SHA-256", recorded
 
 
@@ -1556,11 +1439,8 @@ def inspect_model_state(
     remote_status = "not checked"
     remote_detail = ""
     if online:
-        source_policy = str(
-            (model.get("source_metadata") or {}).get("policy")
-            or ("pinned" if re.fullmatch(r"[0-9a-f]{40}", str(model.get("revision", ""))) else "tracking")
-        )
-        if source_policy == "pinned":
+        current_source_policy = source_policy(model)
+        if current_source_policy == "pinned":
             remote_status = "pinned"
             remote_detail = f"catalog pins revision {model['revision']}"
         elif model["provider"] == "ollama-hf":
@@ -1621,25 +1501,48 @@ def ensure_file_permissions(path: Path, uid: int, gid: int, mode: int) -> bool:
     return changed
 
 
-def write_state(path: Path, model: dict, checksum: str, gid: int) -> None:
-    stat = path.with_name(path.name.removesuffix(".bc250.json")).stat()
+def write_state(
+    path: Path,
+    model: dict,
+    checksum: str,
+    gid: int,
+    *,
+    preserve_acquisition: bool = False,
+) -> None:
+    """Write verified local-source state without advancing tracking refs implicitly."""
+    stat_result = path.with_name(path.name.removesuffix(".bc250.json")).stat()
     existing = load_state(path)
+    policy = source_policy(model)
+    configured_ref = str(model.get("revision", ""))
+
+    resolved_revision = None
+    legacy_revision = str(existing.get("resolved_revision") or existing.get("revision") or "")
+    if preserve_acquisition and policy == "tracking" and legacy_revision:
+        if existing.get("repository") == model.get("repository") and existing.get("gguf") == model.get("gguf"):
+            resolved_revision = legacy_revision
+    elif policy == "pinned" and re.fullmatch(r"[0-9a-f]{40}", configured_ref):
+        resolved_revision = configured_ref
+
+    # Keep the legacy revision field meaningful for older tooling while schema 4
+    # separates the configured moving ref from the exact acquired byte identity.
+    legacy_state_revision = resolved_revision or configured_ref
     value = {
-        "schema": 3,
+        "schema": 4,
         "model_name": model.get("name", model["id"]),
         "model_id": model["id"],
         "category": model.get("category", ""),
         "repository": model["repository"],
-        "revision": model["revision"],
+        "revision": legacy_state_revision,
+        "configured_ref": configured_ref,
+        "resolved_revision": resolved_revision,
+        "source_policy": policy,
         "gguf": model["gguf"],
         "sha256": checksum,
-        "size": stat.st_size,
-        "mtime_ns": stat.st_mtime_ns,
-        "ctime_ns": stat.st_ctime_ns,
+        "acquired_sha256": checksum,
+        "size": stat_result.st_size,
+        "mtime_ns": stat_result.st_mtime_ns,
+        "ctime_ns": stat_result.st_ctime_ns,
     }
-    # Preserve dedupe bookkeeping across harmless state refreshes. The record
-    # contains source/blob stat signatures, so storage.py will still reject it
-    # automatically if a source inode/content transition made it stale.
     if isinstance(existing.get("dedupe"), dict):
         value["dedupe"] = existing["dedupe"]
     temporary = path.with_name(f".{path.name}.tmp")
@@ -2064,14 +1967,19 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 current = output.stat()
                 state = load_state(metadata)
                 source_metadata_changed = (
-                    state.get("schema") != 3
+                    state.get("schema") != 4
+                    or state.get("configured_ref") != model.get("revision")
+                    or state.get("source_policy") != source_policy(model)
+                    or state.get("acquired_sha256") != checksum
                     or state.get("size") != current.st_size
                     or state.get("mtime_ns") != current.st_mtime_ns
                     or state.get("ctime_ns") != current.st_ctime_ns
                     or permissions_changed
                 )
                 if source_metadata_changed:
-                    write_state(metadata, model, checksum, gid)
+                    write_state(
+                        metadata, model, checksum, gid, preserve_acquisition=True
+                    )
                 if not summarize_current:
                     print(f"    reusing validated GGUF; recorded SHA-256 {checksum}")
             else:
@@ -2638,10 +2546,30 @@ def model_inspect_payload(
             registrations=registrations,
         )
         payload["runtime"]["effective"] = effective_runtime_view(defaults, model)
+        source_record = (
+            load_state(inspection.state_path)
+            if inspection.state_path and inspection.state_path.is_file()
+            else {}
+        )
+        effective_source_policy = source_record.get("source_policy", source_policy(model))
+        effective_configured_ref = source_record.get("configured_ref", model.get("revision"))
+        effective_resolved_revision = source_record.get("resolved_revision")
+        legacy_revision = source_record.get("revision")
+        if (
+            effective_resolved_revision is None
+            and effective_source_policy == "tracking"
+            and isinstance(legacy_revision, str)
+            and legacy_revision != effective_configured_ref
+        ):
+            effective_resolved_revision = legacy_revision
         payload["state"] = {
             "source": inspection.source_status,
             "source_detail": inspection.source_detail,
             "source_sha256": inspection.source_checksum or None,
+            "source_policy": effective_source_policy,
+            "configured_ref": effective_configured_ref,
+            "resolved_revision": effective_resolved_revision,
+            "acquired_sha256": source_record.get("acquired_sha256") or inspection.source_checksum or None,
             "runtime_modelfile": inspection.modelfile_status,
             "registration": inspection.registration_status,
             "overall": inspection.overall_status,
