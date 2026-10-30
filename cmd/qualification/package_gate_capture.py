@@ -33,7 +33,7 @@ except ImportError as exc:  # pragma: no cover - exercised by packaged bootstrap
 DEFAULT_ROOT = Path("/var/lib/bc250-llm-server/package-gates")
 DEFAULT_LIBEXEC = Path("/usr/libexec/bc250-llm-server")
 DEFAULT_OWUI_TOKEN = Path("/var/lib/bc250-llm-server/secrets/openwebui-admin.key")
-TIKA_EXPECTED = "4.1.0"
+TIKA_EXPECTED = "4.2.0"
 
 
 def parser() -> argparse.ArgumentParser:
@@ -112,7 +112,7 @@ def _tika_smoke(evidence: Path) -> tuple[str, dict[str, object]]:
         return "DEFECT", checks
     checks["version"] = _check_payload("PASS", f"Tika {TIKA_EXPECTED} reachable from Open WebUI")
 
-    marker = "BC250TIKA410PACKAGEGATE7D6D6F"
+    marker = "BC250TIKAPACKAGEGATE7D6D6F"
     extraction_script = f"""
 import urllib.request
 marker = {marker!r}

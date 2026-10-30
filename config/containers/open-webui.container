@@ -7,8 +7,8 @@ Wants=network-online.target tika.service
 
 [Container]
 ContainerName=open-webui
-# v0.12.4, pinned OCI index digest.
-Image=ghcr.io/open-webui/open-webui@sha256:a5b9e403d19154796850679c8c5d1295301cee954be8b84ddd62af92426558f7
+# v0.12.5, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:03443b8de6b617da9d900edd09b4bf1cb0ddbfdcba6afb42c548336a0b821ded
 Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
@@ -25,10 +25,16 @@ Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 EnvironmentFile=/var/lib/bc250-llm-server/secrets/open-webui.env
 Environment=ENABLE_OPENAI_API=false
+Environment=ENABLE_OPENAI_API_PASSTHROUGH=false
+Environment=ENABLE_ADMIN_CHAT_ACCESS=false
+Environment=ENABLE_ADMIN_EXPORT=false
+Environment=ENABLE_VERSION_UPDATE_CHECK=false
 Environment=OFFLINE_MODE=true
 Environment=HF_HUB_OFFLINE=1
 Environment=RAG_EMBEDDING_MODEL_AUTO_UPDATE=false
 Environment=RAG_RERANKING_MODEL_AUTO_UPDATE=false
+Environment=RAG_EMBEDDING_MODEL_TRUST_REMOTE_CODE=false
+Environment=RAG_RERANKING_MODEL_TRUST_REMOTE_CODE=false
 Environment=WHISPER_MODEL_AUTO_UPDATE=false
 Environment=ENABLE_COMMUNITY_SHARING=false
 Environment=ENABLE_CODE_EXECUTION=false
@@ -58,6 +64,7 @@ Environment=RAG_FILE_MAX_COUNT=20
 Environment="RAG_ALLOWED_FILE_EXTENSIONS=pdf,txt,md,csv,tsv,doc,docx,xls,xlsx,ppt,pptx,odt,ods,odp,rtf,html,htm,xml,json,epub"
 Environment=TIKA_SERVER_VERSION=4
 Environment=RAG_SYSTEM_CONTEXT=false
+Environment=RAG_EMBEDDING_BUFFER_SIZE=1000
 Environment="RAG_EMBEDDING_QUERY_PREFIX=Query: "
 Environment="RAG_EMBEDDING_CONTENT_PREFIX=Document: "
 Environment=ENABLE_KNOWLEDGE_FILE_RETENTION=false

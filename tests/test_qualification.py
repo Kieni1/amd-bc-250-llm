@@ -25,7 +25,7 @@ def command_result(argv: list[str], rc: int = 0, stdout: str = "", stderr: str =
 class QualificationTests(unittest.TestCase):
     def test_tika_gate_marker_is_extraction_safe_and_reports_observed_text(self) -> None:
         source = (QUALIFICATION / "package_gate_capture.py").read_text(encoding="utf-8")
-        self.assertIn('marker = "BC250TIKA410PACKAGEGATE7D6D6F"', source)
+        self.assertIn('marker = "BC250TIKAPACKAGEGATE7D6D6F"', source)
         self.assertNotIn("BC250_TIKA_410_PACKAGE_GATE_7D6D6F", source)
         self.assertIn("observed=extraction.stdout.strip()", source)
 
@@ -270,13 +270,13 @@ class QualificationTests(unittest.TestCase):
             self.assertEqual(observed, link)
             self.assertTrue(observed.is_symlink())
 
-    def test_release_wires_tika_410_and_qualification_commands(self) -> None:
+    def test_release_wires_tika_420_and_qualification_commands(self) -> None:
         runtime = (ROOT / "config/runtime.env").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
         dispatcher = (ROOT / "packaging/advanced").read_text(encoding="utf-8")
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
-        self.assertIn("BC250_TIKA_VERSION=4.1.0-full", runtime)
-        self.assertIn("sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7", tika)
+        self.assertIn("BC250_TIKA_VERSION=4.2.0-full", runtime)
+        self.assertIn("sha256:4774eaac44f86cdf648ae7b5a367016eaf6f9052adec31e5cff07cff1a0c6e24", tika)
         self.assertIn('capture) exec "$LIBEXEC/qualification/package_gate_capture.py" capture', dispatcher)
         self.assertIn('resilience) exec "$LIBEXEC/qualification/resilience_manager.py"', dispatcher)
         self.assertIn("cmd/qualification/resilience_common.py", manifest)

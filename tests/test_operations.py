@@ -312,9 +312,9 @@ ollama_version_line
             share = Path(temporary)
             (share / "runtime.env").write_text(
                 (
-                    "BC250_OPEN_WEBUI_VERSION=0.12.4\n"
+                    "BC250_OPEN_WEBUI_VERSION=0.12.5\n"
                     f"BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:{'1' * 64}\n"
-                    "BC250_TIKA_VERSION=4.1.0-full\n"
+                    "BC250_TIKA_VERSION=4.2.0-full\n"
                     f"BC250_TIKA_IMAGE_DIGEST=sha256:{'2' * 64}\n"
                 ),
                 encoding="utf-8",
@@ -639,10 +639,10 @@ bc250_failed_systemd_units
             libexec.mkdir()
             (share / "VERSION").write_text(CURRENT_VERSION + "\n", encoding="utf-8")
             (share / "runtime.env").write_text(
-                "BC250_OLLAMA_VERSION=0.40.8\n"
-                "BC250_OPEN_WEBUI_VERSION=0.12.4\n"
+                "BC250_OLLAMA_VERSION=0.40.13\n"
+                "BC250_OPEN_WEBUI_VERSION=0.12.5\n"
                 "BC250_OPEN_WEBUI_IMAGE_DIGEST=sha256:" + "1" * 64 + "\n"
-                "BC250_TIKA_VERSION=4.1.0-full\n"
+                "BC250_TIKA_VERSION=4.2.0-full\n"
                 "BC250_TIKA_IMAGE_DIGEST=sha256:" + "2" * 64 + "\n"
                 "BC250_GOVERNOR_VERSION=0.4.14\n",
                 encoding="utf-8",
@@ -659,8 +659,8 @@ bc250_failed_systemd_units
                 "#!/usr/bin/env python3\n"
                 "import json\n"
                 "json.dump({'runtime_identity': {"
-                "'open_webui': {'expected': {'version': '0.12.4', 'digest': 'sha256:' + '1'*64}, 'observed': {'version': '0.12.4', 'digest': 'sha256:' + '1'*64}, 'match': True}, "
-                "'tika': {'expected': {'version': '4.1.0-full', 'digest': 'sha256:' + '2'*64}, 'observed': {'version': '4.1.0-full', 'digest': 'sha256:' + '2'*64}, 'match': True}"
+                "'open_webui': {'expected': {'version': '0.12.5', 'digest': 'sha256:' + '1'*64}, 'observed': {'version': '0.12.5', 'digest': 'sha256:' + '1'*64}, 'match': True}, "
+                "'tika': {'expected': {'version': '4.2.0-full', 'digest': 'sha256:' + '2'*64}, 'observed': {'version': '4.2.0-full', 'digest': 'sha256:' + '2'*64}, 'match': True}"
                 "}}, __import__('sys').stdout)\n",
                 encoding="utf-8",
             )
@@ -698,7 +698,7 @@ bc250_failed_systemd_units
             share.mkdir()
             libexec.mkdir()
             (share / "VERSION").write_text(CURRENT_VERSION + "\n", encoding="utf-8")
-            (share / "runtime.env").write_text("BC250_OLLAMA_VERSION=0.40.8\n", encoding="utf-8")
+            (share / "runtime.env").write_text("BC250_OLLAMA_VERSION=0.40.13\n", encoding="utf-8")
             rpm = bindir / "rpm"
             rpm.write_text("#!/usr/bin/env bash\nexit 1\n", encoding="utf-8")
             rpm.chmod(0o755)

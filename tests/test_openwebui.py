@@ -224,6 +224,17 @@ class OpenWebUIStatusTests(unittest.TestCase):
         for key, value in OPENWEBUI.desired_task().items():
             self.assertEqual(task_payload[key], value)
 
+    def test_apply_converges_persisted_embedding_prefixes(self) -> None:
+        client = FakeApplyClient()
+        OPENWEBUI.apply(client)
+        payload = next(
+            payload
+            for method, path, payload in client.calls
+            if method == "POST" and path == "/api/v1/retrieval/embedding/update"
+        )
+        self.assertEqual(payload["RAG_EMBEDDING_QUERY_PREFIX"], "Query: ")
+        self.assertEqual(payload["RAG_EMBEDDING_CONTENT_PREFIX"], "Document: ")
+
     def test_persisted_application_policy_matches_local_offline_contract(self) -> None:
         self.assertEqual(
             OPENWEBUI.desired_application(),
@@ -254,6 +265,19 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(rag["FILE_MAX_COUNT"], 20)
         self.assertIn("pdf", rag["ALLOWED_FILE_EXTENSIONS"])
         self.assertIn("docx", rag["ALLOWED_FILE_EXTENSIONS"])
+
+    def test_status_detects_embedding_prefix_drift(self) -> None:
+        current = OPENWEBUI.desired_embedding()
+        current["RAG_EMBEDDING_QUERY_PREFIX"] = ""
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(
+                OPENWEBUI.status(FakeClient({"/api/v1/retrieval/embedding": current}), True),
+                2,
+            )
+        self.assertIn(
+            "Embedding config differs: RAG_EMBEDDING_QUERY_PREFIX", output.getvalue()
+        )
 
     def test_status_detects_arena_drift(self) -> None:
         current = OPENWEBUI.desired_application()

@@ -597,13 +597,13 @@ setsebool() { :; }
 podman() {
   case "$*" in
     "inspect --format {{.ImageName}} tika")
-      printf 'apache/tika:4.1.0-full@sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7\n'
+      printf 'apache/tika:4.2.0-full@sha256:4774eaac44f86cdf648ae7b5a367016eaf6f9052adec31e5cff07cff1a0c6e24\n'
       ;;
     "image inspect --format {{.Digest}} "*)
       printf 'sha256:d7607239d4e9c2dc1fd396f41a370576a334aef28f767e5bc5511247a1e1adf7\n'
       ;;
     "exec open-webui getent hosts "*) return 0 ;;
-    "exec open-webui python -c "*) printf 'Apache Tika 4.1.0\n' ;;
+    "exec open-webui python -c "*) printf 'Apache Tika 4.2.0\n' ;;
     *) return 0 ;;
   esac
 }
@@ -667,8 +667,8 @@ setsebool() { :; }
 prepare_openwebui_migration_backup() { :; }
 hold_open_webui_publication() { :; }
 application_network_healthy() { return 0; }
-tika_expected_version() { printf '4.1.0\n'; }
-tika_running_version() { [[ ${TIKA_REFRESHED:-0} == 1 ]] && printf 'Apache Tika 4.1.0\n' || printf 'Apache Tika 4.0.0\n'; }
+tika_expected_version() { printf '4.2.0\n'; }
+tika_running_version() { [[ ${TIKA_REFRESHED:-0} == 1 ]] && printf 'Apache Tika 4.2.0\n' || printf 'Apache Tika 4.0.0\n'; }
 tika_container_digest() { [[ ${TIKA_REFRESHED:-0} == 1 ]] && printf '%s\n' "$BC250_TIKA_IMAGE_DIGEST" || printf 'sha256:%064d\n' 0; }
 tika_runtime_identity_match() { [[ ${TIKA_REFRESHED:-0} == 1 ]]; }
 wait_for_tika_runtime_identity() { tika_runtime_identity_match; }
@@ -865,7 +865,7 @@ step_8_application_services
             fake.write_text(
                 "#!/usr/bin/env bash\n"
                 "printf '%s\n' 'Warning: could not connect to a running Ollama instance'\n"
-                "printf '%s\n' 'Warning: client version is 0.40.8'\n",
+                "printf '%s\n' 'Warning: client version is 0.40.13'\n",
                 encoding="utf-8",
             )
             fake.chmod(0o755)
@@ -876,7 +876,7 @@ step_8_application_services
                 check=False,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "0.40.8")
+        self.assertEqual(result.stdout.strip(), "0.40.13")
         self.assertNotIn("instance", result.stdout)
 
     def test_installer_distinguishes_backend_from_usable_front_door(self) -> None:

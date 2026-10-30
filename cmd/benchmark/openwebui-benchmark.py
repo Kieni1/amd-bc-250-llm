@@ -267,6 +267,8 @@ def embedding_config(data: dict[str, Any]) -> dict[str, Any]:
         "RAG_EMBEDDING_BATCH_SIZE",
         "ENABLE_ASYNC_EMBEDDING",
         "RAG_EMBEDDING_CONCURRENT_REQUESTS",
+        "RAG_EMBEDDING_QUERY_PREFIX",
+        "RAG_EMBEDDING_CONTENT_PREFIX",
         "ollama_config",
     )
     return {key: data.get(key) for key in keys}

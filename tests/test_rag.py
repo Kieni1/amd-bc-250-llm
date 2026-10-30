@@ -27,6 +27,9 @@ class RagBaselineTests(unittest.TestCase):
         self.assertEqual(embedding["ollama_config"]["url"], "http://host.containers.internal:11437")
         self.assertEqual(embedding["RAG_EMBEDDING_BATCH_SIZE"], 1)
         self.assertFalse(embedding["ENABLE_ASYNC_EMBEDDING"])
+        self.assertEqual(embedding["RAG_EMBEDDING_CONCURRENT_REQUESTS"], 1)
+        self.assertEqual(embedding["RAG_EMBEDDING_QUERY_PREFIX"], "Query: ")
+        self.assertEqual(embedding["RAG_EMBEDDING_CONTENT_PREFIX"], "Document: ")
         self.assertEqual(rag["TEXT_SPLITTER"], "token")
         self.assertEqual(rag["CHUNK_SIZE"], 1500)
         self.assertEqual(rag["CHUNK_OVERLAP"], 200)
@@ -46,6 +49,7 @@ class RagBaselineTests(unittest.TestCase):
             "Environment=RAG_FILE_MAX_SIZE=128",
             "Environment=RAG_FILE_MAX_COUNT=20",
             "Environment=RAG_SYSTEM_CONTEXT=false",
+            "Environment=RAG_EMBEDDING_BUFFER_SIZE=1000",
         ):
             self.assertIn(line, quadlet)
         for persisted in ("RAG_EMBEDDING_MODEL=", "CHUNK_SIZE=", "RAG_TOP_K="):

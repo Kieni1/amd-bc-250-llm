@@ -49,7 +49,9 @@
     "ollama_config": {
       "url": "http://host.containers.internal:11437",
       "key": ""
-    }
+    },
+    "RAG_EMBEDDING_QUERY_PREFIX": "Query: ",
+    "RAG_EMBEDDING_CONTENT_PREFIX": "Document: "
   },
   "rag": {
     "RAG_TEMPLATE": "Answer the user from the supplied context. If the requested fact is not supported by the context, state that the available documents do not provide sufficient evidence. Do not fill missing document facts from general knowledge unless the user explicitly asks for external or general knowledge. Respond in the user-requested language. Preserve names, numbers, dates, terminology, and important qualifications. Use inline [id] citations only for source tags that provide an id. <context>{{CONTEXT}}</context>",
