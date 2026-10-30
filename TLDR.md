@@ -3,9 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Accepted broad regression baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline. Exact `0.14.1-1.10` is the focused packaged model-management/lifecycle DEVICE evidence baseline. Current SOURCE candidate `bc250-llm-server-0.14.1-1.11` keeps Ollama 0.40.8, Open WebUI 0.12.4, Tika 4.1.0-full and governor 0.4.14 while adding the evidence/export/UX and benchmark-contract corrections; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
+Accepted broad regression baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline. Exact `0.14.1-1.10` is the focused packaged model-management/lifecycle DEVICE evidence baseline. Current SOURCE candidate `bc250-llm-server-0.14.1-1.12` updates Ollama to 0.40.13, Open WebUI to 0.12.5 and Tika to 4.2.0-full while carrying forward the 1.11 evidence/export/CI corrections; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
-Release 1.11 is the current SOURCE candidate. It carries forward the exact 1.10 metadata-first model architecture and focused lifecycle evidence while fixing operator export ownership/directory semantics, evidence JSON/result contracts, archive/persistent-state governance, MTP exact-ID refreeze and explicit `nonthinking-first-pass` benchmark requests. Runtime pins remain unchanged. Exact 1.11 RPM build and changed-surface DEVICE acceptance are still required.
+Release 1.12 is the current SOURCE candidate. The model/lane architecture stays unchanged; the dependency refresh adds Open WebUI privacy/fail-closed defaults, persists the Jina query/content prefixes through the 0.12.5 retrieval API, pins the 1000-chunk embedding buffer, and refreshes Tika qualification to 4.2.0. Exact 1.12 BUILD and focused changed-surface DEVICE acceptance are still required.
 
 Release 1.9 remains the accepted device baseline with unified MTP presentation and the focused Managed Documents fixes from 1.8 acceptance.
 

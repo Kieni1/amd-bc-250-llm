@@ -4,9 +4,18 @@ This guide covers the appliance's **local, privacy-oriented managed document wor
 (retrieval-augmented generation) path that makes reviewed office documents searchable in Open WebUI.
 For the current managed corpus, German sources are authoritative, French documents are reviewed
 translations, and users may query in German, French or English by selecting the appropriate managed Knowledge lane. The workflow uses the package's existing Open WebUI
-and Tika services, the main answer lane on `11434`, and the dedicated embedding lane on `11437`. The current package uses Apache Tika 4.1.0-full for Open WebUI document extraction and tells
+and Tika services, the main answer lane on `11434`, and the dedicated embedding lane on `11437`. The current package uses Apache Tika 4.2.0-full for Open WebUI document extraction and tells
 Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
+
+Apache Tika 4.2.0 now treats request-supplied configuration as untrusted by default and keeps
+per-request configuration disabled unless the operator opts in. BC-250 does not opt in: Tika remains
+unpublished on the host, attached only to the private container network, capability-dropped and
+reachable by the Open WebUI container. The package uses `/tika` and `/version`, not the changed
+`/unpack` default. It also keeps the stock Tika server configuration instead of duplicating upstream
+server limits in a package-owned JSON file; Open WebUI's 128 MiB upload policy is already materially
+stricter than Tika's server request-size default. Add a custom Tika server configuration only if
+DEVICE evidence identifies a concrete resource or endpoint problem.
 
 There are two intentionally separate document paths. The **managed curated corpus** accepts text-native
 PDF and DOCX input: source → local extraction/agent normalization → human review → active Markdown →
@@ -66,12 +75,14 @@ likewise need re-uploading when their extracted text must change.
 
 ### Embedding prefixes
 
-The fresh-install container defaults match Jina:
+The package-owned Open WebUI desired state matches Jina:
 
 ```text
 Query prefix:   "Query: "
 Content prefix: "Document: "
 ```
+
+Open WebUI 0.12.5 persists these fields through the retrieval API. BC-250 converges them explicitly so an upgraded database cannot silently retain a prefix scheme that no longer matches the package embedding model. The same values remain in the Quadlet as conservative fresh-database bootstrap defaults.
 
 For Qwen3 Embedding, use an English query instruction and leave the content
 prefix empty:
@@ -123,7 +134,9 @@ The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 | Relevance threshold | `0` | `0` |
 | Hybrid search | Off initially | Off initially |
 | Embedding batch size | `1` | `1` |
+| Embedding save buffer | `1000` chunks | `1000` chunks |
 | Async embedding | Off | Off |
+| Concurrent embedding requests | `1` | `1` |
 | RAG system-context injection | Off | Off |
 | Retrieval-query generation | Off for baseline | Off for baseline |
 | Reranker | None | None |
@@ -152,7 +165,7 @@ and hybrid-without-reranker results have been measured.
 
 ### Measured tuning candidates, not fresh-install defaults
 
-Open WebUI 0.12.4 exposes settings that are relevant to this appliance but
+Open WebUI 0.12.5 exposes settings that are relevant to this appliance but
 remain conservative in the packaged Quadlet:
 
 - `RAG_SYSTEM_CONTEXT=false`: enabling it moves retrieved context to a stable
@@ -164,6 +177,7 @@ remain conservative in the packaged Quadlet:
 - `RAG_EMBEDDING_BATCH_SIZE=1`: Ollama accepts batched embedding inputs, but larger
   batches can increase memory pressure. Compare `1`, `4`, `8` and `16` on the real
   BC-250 before changing the default.
+- `RAG_EMBEDDING_BUFFER_SIZE=1000`: Open WebUI 0.12.5 saves very large document embeddings in bounded 1000-chunk buffers. This is separate from the request batch size; keep the upstream 1000-chunk default explicit unless real BC-250 ingestion evidence justifies a different memory/throughput tradeoff.
 
 Changing chunking or the embedding model requires reindexing affected Knowledge
 documents. `RAG_SYSTEM_CONTEXT` changes prompt placement rather than stored
@@ -473,7 +487,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: packaged Open WebUI 0.12.4 behavior
+## 7. Retrieval mode: packaged Open WebUI 0.12.5 behavior
 
 Use the package-owned **`Office - Documents / RAG`** preset for ordinary document questions.
 It is based on `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`, keeps File Context available, and

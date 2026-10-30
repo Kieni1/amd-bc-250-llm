@@ -1,6 +1,6 @@
 # Open WebUI
 
-Current 0.14.1-1.11 source candidate (runtime unchanged from the exact 1.10 package baseline): **Open WebUI v0.12.4** with **Ollama v0.40.8** and **Apache Tika v4.1.0-full**. Runtime pins
+Current 0.14.1-1.12 source candidate: **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -107,6 +107,29 @@ limited to provider lanes successfully inspected during that run. A temporarily 
 therefore never interpreted as an empty lane. Administrator-created records and unrelated grants are
 preserved. This is a testing surface, not a promise that every raw model remains user-facing for v1.
 
+
+## Open WebUI 0.12.5 settings audit
+
+The 0.12.5 refresh keeps BC-250 deliberately local and fail-closed. In addition to the
+persisted application policy above, the Quadlet explicitly disables administrator cross-user
+chat browsing and the in-product administrator export surface, OpenAI catch-all passthrough,
+upstream version checks, runtime pip installation from Function/Tool frontmatter, remote-code
+trust for embedding/reranking models, tool servers, Apps/channels/sub-agents, cloud-drive
+integrations, realtime audio and web search. Authentication remains enabled. These are
+bootstrap/runtime policy controls rather than a claim that an operating-system administrator is
+cryptographically isolated from local data.
+
+Open WebUI 0.12.5 makes the embedding query/content prefixes editable persisted settings. BC-250
+therefore owns `Query: ` and `Document: ` through the supported retrieval API as well as fresh-DB
+bootstrap environment values. The new embedding save buffer is pinned explicitly at the upstream
+`1000`-chunk default. Batch size remains `1`, asynchronous embedding remains off and concurrency
+remains `1` because the dedicated local Ollama embedding lane is intentionally serialized.
+
+The audit deliberately does **not** change administrator workspace-visibility semantics, disable
+the broader Analytics product, or enable `RAG_SYSTEM_CONTEXT`. Those choices affect operator/UI
+or prompt behavior beyond the dependency refresh and require separate product evidence rather
+than being inferred from a new upstream default.
+
 ## Ollama lanes
 
 | Purpose | Endpoint | Open WebUI use |
@@ -176,7 +199,7 @@ of reasoning or truncation from the adapter metadata fields alone.
 `/openai/responses` workspace aliases likewise remain outside the qualified product path unless they are
 explicitly adopted and tested.
 
-Open WebUI 0.12 also adds several network/tool surfaces that are outside the appliance contract. The package explicitly keeps direct integrations, external tool servers, Tool Search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations disabled at bootstrap and persisted where supported. Skills are not enabled/adopted by this release; in 0.12.4 Skills remain outside the appliance contract; the upstream optional lazy-loading feature does not change that package policy.
+Open WebUI 0.12 also adds several network/tool surfaces that are outside the appliance contract. The package explicitly keeps direct integrations, external tool servers, Tool Search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations disabled at bootstrap and persisted where supported. Skills are not enabled/adopted by this release; in 0.12.5 Skills remain outside the appliance contract; the upstream optional lazy-loading feature does not change that package policy.
 
 ## Package model presets
 
@@ -231,7 +254,7 @@ The Qwen3.5 general Advanced preset carries `think=true` and `max_tokens=6144`; 
 `Office - Advanced Structured` preset uses the same base model, 6144-token ceiling and sampler set with
 only `think=false`. This is intentionally visible product policy rather than prompt-based automatic switching.
 Strict machine-consumed Advanced extraction should use the Structured preset; normal reasoning stays on
-General / Higher Quality. Open WebUI 0.12.4 retains the package-owned stored/request parameter path,
+General / Higher Quality. Open WebUI 0.12.5 retains the package-owned stored/request parameter path,
 including `think` at the Ollama root and `max_tokens` as `options.num_predict`; no package patch to generic
 `payload.py` is required.
 
@@ -267,8 +290,8 @@ task-lfm25-1.2b-instruct-liquidai-q6-k:latest
 
 and keeps title/tag generation on while follow-up, autocomplete, search-query and
 retrieval-query generation remain off. `TASK_MODEL_PARAMS` stays `{}` so Open
-WebUI v0.12.4 retains upstream ownership of unreviewed task behavior. The helper first reads the
-complete v0.12.4 task configuration and then updates only reviewed fields, preserving new/unowned fields. Those
+WebUI v0.12.5 retains upstream ownership of unreviewed task behavior. The helper first reads the
+complete v0.12.5 task configuration and then updates only reviewed fields, preserving new/unowned fields. Those
 reviewed fields now include package-owned title, tag and retrieval-query prompt
 templates so live Open WebUI and direct task qualification share one prompt policy. The
 0.11.3-0.3 tag prompt keeps broad themes and specific subtopics in one `tags` array and
@@ -332,7 +355,7 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250 maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database—including the current 0.12.4 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database—including the current 0.12.5 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and

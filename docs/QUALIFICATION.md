@@ -29,7 +29,7 @@ sudo bc250 advanced qualification capture \
 also bind the gate to an SRPM or source archive. There is intentionally no
 operator-supplied result flag: PASS is derived from the candidate/installed RPM
 identity, `bc250 verify`, `rpm -V`, actual failed-unit rows, normal topology,
-Tika 4.1 service/version/extraction checks, one bounded authenticated Open WebUI
+Tika 4.2 service/version/extraction checks, one bounded authenticated Open WebUI
 RAG ingest/retrieve smoke with cleanup, and a high-confidence secret scan.
 
 The gate directory contains `gate.json`, raw evidence, and a closed
@@ -39,14 +39,14 @@ qualification-relevant configuration-tree hashes. Any unlisted/missing file,
 checksum mismatch, unknown schema, non-PASS authoritative result, or later
 package/kernel/configuration identity drift is rejected by the resilience manager.
 
-## Tika 4.1 qualification boundary
+## Tika 4.2 qualification boundary
 
-The package pins `apache/tika:4.1.0-full` by immutable OCI digest. The package
+The package pins `apache/tika:4.2.0-full` by immutable OCI digest. The package
 gate keeps the refresh qualification intentionally small:
 
 1. `tika.service` must be active.
 2. Open WebUI must resolve the private `tika` alias.
-3. `http://tika:9998/version` must report Tika 4.1.0.
+3. `http://tika:9998/version` must report Tika 4.2.0.
 4. A deterministic text marker must round-trip through the `/tika` extraction endpoint.
 5. `bc250 advanced benchmark owui-rag bc250-office-documents` performs one synthetic
    ingest/retrieve path and its built-in cleanup.
