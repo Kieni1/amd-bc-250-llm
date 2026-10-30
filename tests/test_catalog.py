@@ -619,6 +619,29 @@ class CategoryInterfaceTests(unittest.TestCase):
         self.assertIn("Categories: production, experiments, task, agentic, embedding", template)
         self.assertNotIn("Categories: production, experimental, task, agentic, embedding", template)
 
+    def test_operator_legacy_experimental_category_is_read_and_normalized_only_at_persistent_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            operator = Path(temporary) / "models.d"
+            operator.mkdir()
+            path = operator / "exp-legacy.Modelfile"
+            path.write_text(
+                "# BC250 category: experimental\n"
+                "# Ollama model: exp-legacy\n"
+                "# Source: owner/repo @ main\n"
+                "# GGUF: legacy.gguf\n"
+                "FROM /var/lib/bc250-llm-server/gguf/experiments/legacy.gguf\n"
+                "PARAMETER num_gpu 99\n"
+                "PARAMETER num_keep 256\n",
+                encoding="utf-8",
+            )
+            with patch.object(modelctl, "OPERATOR_MODEL_DIR", operator):
+                loaded = modelctl.load_modelfile(path)
+            self.assertEqual(loaded["category"], "experiments")
+            self.assertEqual(loaded["origin"], "operator")
+
+        with self.assertRaisesRegex(modelctl.ModelError, "unsupported Modelfile category"):
+            modelctl.modelfile_category("experimental")
+
     def test_public_categories_are_canonical_and_include_all(self) -> None:
         self.assertEqual(
             modelctl.CATEGORIES,
@@ -634,6 +657,8 @@ class CategoryInterfaceTests(unittest.TestCase):
         )
         for legacy in ("experimental", "tasker", "coding", "embedded", "embed"):
             self.assertNotIn(legacy, modelctl.CATEGORIES)
+        with self.assertRaisesRegex(modelctl.ModelError, "unsupported Modelfile category"):
+            modelctl.modelfile_category("experimental")
 
     def test_no_argument_help_explains_common_workflows(self) -> None:
         output = StringIO()

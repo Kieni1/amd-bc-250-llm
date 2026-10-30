@@ -169,13 +169,12 @@ def canonical_category(value: str) -> str:
     return value
 
 
-def modelfile_category(value: str) -> str:
-    # Keep reading existing operator/package metadata while exposing only the
-    # canonical CLI vocabulary. Historical Modelfiles used singular experimental.
-    normalized = "experiments" if value == "experimental" else value
-    if normalized not in OLLAMA_CATEGORIES:
+def modelfile_category(value: str, *, allow_persistent_legacy: bool = False) -> str:
+    if allow_persistent_legacy and value == "experimental":
+        return "experiments"
+    if value not in OLLAMA_CATEGORIES:
         raise ModelError(f"unsupported Modelfile category: {value}")
-    return normalized
+    return value
 
 
 def require_string(
@@ -470,7 +469,10 @@ def load_modelfile(path: Path) -> dict:
             raise ModelError(f"{path}: expected exactly one {marker.strip()!r} line")
     if sum(line.startswith("# SHA256:") for line in text.splitlines()) > 1:
         raise ModelError(f"{path}: expected at most one '# SHA256:' line")
-    category = modelfile_category(metadata["category"])
+    category = modelfile_category(
+        metadata["category"],
+        allow_persistent_legacy=OPERATOR_MODEL_DIR in path.parents,
+    )
     if category not in OLLAMA_CATEGORIES:
         raise ModelError(f"{path}: MTP entries cannot use Modelfiles")
     if metadata["name"] != name:

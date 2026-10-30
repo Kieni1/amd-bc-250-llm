@@ -116,8 +116,8 @@ expected to be empty on a stock install; packaged definitions live under
 metadata, GGUF/FROM and BC-250 parameters consistent with the template; invalid definitions are
 rejected before download. Operator definitions must retain the `.Modelfile` suffix; visible
 regular files in `models.d` with another suffix are rejected instead of being silently ignored.
-Use the canonical category metadata `experiments` for new experimental overrides; historical
-singular `experimental` metadata remains readable for compatibility. `status` makes an override
+Use the canonical category metadata `experiments` for experimental overrides; singular
+`experimental` metadata is rejected. `status` makes an override
 or Modelfile drift visible before an action is taken.
 
 ## Source retention and reindexing

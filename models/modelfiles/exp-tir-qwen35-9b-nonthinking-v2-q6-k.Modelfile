@@ -1,4 +1,4 @@
-# BC250 category: experimental
+# BC250 category: experiments
 # Ollama model: exp-tir-qwen35-9b-nonthinking-v2-q6-k
 # Acquisition/capability metadata: models/model-catalog.json
 # Base fine-tune: HEART77/TIR-Qwen3.5-9B-NonThinking-v2

@@ -1,4 +1,4 @@
-# BC250 category: experimental
+# BC250 category: experiments
 # Ollama model: exp-gpt-oss20b-davidau-neo-mxfp4-moe4
 # Acquisition/capability metadata: models/model-catalog.json
 FROM __BC250_SOURCE__

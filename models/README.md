@@ -134,8 +134,7 @@ expected to be empty on a stock install because packaged definitions live under
 `/usr/share/bc250-llm-server/model-management/modelfiles/`. A same-name operator file overrides
 the packaged template and survives upgrades. Every visible regular definition there must end in
 `.Modelfile`; otherwise model discovery fails with the offending filename instead of silently
-ignoring it. Use canonical category `experiments` for new overrides; singular `experimental` is
-accepted only for older files.
+ignoring it. Use canonical category `experiments`; singular `experimental` metadata is rejected.
 
 ## Download state and authentication
 

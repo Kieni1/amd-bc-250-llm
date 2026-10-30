@@ -1,4 +1,4 @@
-# BC250 category: experimental
+# BC250 category: experiments
 # Ollama model: exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
 # Acquisition/capability metadata: models/model-catalog.json
 FROM __BC250_SOURCE__
