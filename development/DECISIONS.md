@@ -348,7 +348,7 @@ installer groups exclude MTP. `bc250 advanced mtp prepare` / `bc250 model apply 
 remain direct specialist paths. The known-inactive agent
 Ollama lane is skipped during registration discovery, and remaining local registration probes
 have a short timeout rather than being allowed to stall setup indefinitely. GGUF integrity is
-unchanged: matching schema-3 file identity may use the recorded verified SHA fast path, while
+unchanged: matching schema-4 (or compatible legacy) file identity may use the recorded verified SHA fast path, while
 changed/legacy identity still forces a full checksum. Required models that are fully unchanged
 may be summarized by category, but any actual download, source metadata/permission repair,
 Modelfile drift or registration repair must remain visible.
@@ -875,11 +875,14 @@ maximums remain null rather than being guessed.
 
 During the pre-1.0 greenfield phase, every active package model source uses `tracking` so explicit
 `refresh` can pick up newer upstream artifacts for continued capability evaluation. Tracking package entries
-intentionally do not carry an enforced catalog digest; the manager records the requested source identity plus
-the actual downloaded SHA-256 in local state, and `apply` reuses that validated local artifact without silently
-refreshing it. `status --online` uses source policy rather than the literal ref name, so moving refs such as
-`main` and `latest` are both comparable. The `pinned` policy remains implemented for the 1.0 stabilization
-step, where an immutable revision plus package-owned digest can be required without changing the schema.
+intentionally do not carry an enforced catalog digest. Schema-4 local state separates the current catalog
+`configured_ref` from the acquired artifact identity (`resolved_revision` when known plus `acquired_sha256`).
+Ordinary `apply` validates repository, filename and recorded bytes, then reuses that artifact even when an older
+pinned sidecar recorded an immutable commit and the new catalog now says `latest`/`main`; it upgrades metadata
+without silently changing model bytes. Only explicit `refresh` advances a tracking source. `status --online` uses
+source policy rather than the literal ref name, so moving refs such as `main` and `latest` are both comparable.
+The `pinned` policy remains implemented for the 1.0 stabilization step, where an immutable revision plus
+package-owned digest can be required without changing the schema.
 
 `bc250 model inspect MODEL --json` is the consolidated machine-readable metadata view.
 `--effective` additionally reads protected current state and renders effective runtime parameters from
@@ -901,6 +904,9 @@ metadata, then generic defaults. Intrinsic capabilities may expose appropriate t
 vision/OCR/file-context, but do not automatically turn on role/request policy such as `think` or built-in tools.
 The OCR benchmark selects packaged model kind from `benchmark_kinds` + `ocr_profile`; name heuristics are a
 fallback only for unknown external models. MiniCPM-V is the first multimodal model using this declarative path.
+`cmd/model_contract.py` is the shared semantic validator for package catalog/profile metadata. `modelctl`,
+Open WebUI setup and benchmark consumers all use that validator; malformed ownership, lane, capability,
+qualification or missing-profile state is a package error rather than a consumer-specific fallback.
 
 Destructive model lifecycle is ownership-aware. `remove --explain` is read-only and reports registration,
 source and state ownership. Actual removal uses Ollama's supported registration removal and verifies post-state;
@@ -916,7 +922,7 @@ role chooses to request.
 
 ## DEC-035 — Finish metadata-first model consumer integration and move Open WebUI to 0.12.4
 
-**Status:** ACTIVE — next-release workbench.
+**Status:** ACTIVE — 0.14.1-1.10 candidate.
 
 **Decision:** Package benchmark discovery uses the DEC-033 model contract before model-name prefixes.
 Embedding input-prefix behavior and the packaged TranslateGemma benchmark prompt profile are explicit
@@ -926,7 +932,7 @@ Name-based logic remains only as compatibility fallback for operator-supplied/ex
 in the package catalog. Packaged models without an explicit request policy do not infer a `think` request
 from their family/name; capability and request policy remain separate authorities.
 
-The next-release workbench updates the digest-pinned Open WebUI runtime from 0.12.3 to 0.12.4. No new
+Release 0.14.1-1.10 updates the digest-pinned Open WebUI runtime from 0.12.3 to 0.12.4. No new
 Open WebUI feature surface is enabled by that version bump; package feature policy remains unchanged.
 
 **Why:** Batch 1 established one authority per model fact and Batch 2 taught the largest consumers to read
@@ -937,7 +943,7 @@ and is intentionally kept independent of the model-contract architecture.
 
 ## DEC-036 — Benchmark latency follows request/qualification policy and Agent validation is explicit
 
-**Status:** ACTIVE — next-release workbench.
+**Status:** ACTIVE — 0.14.1-1.10 candidate.
 
 **Decision:** Remove the historical generation-benchmark exception that selected the larger reasoning
 latency budget merely because a model name contained `lfm`. Explicit `think=false` always uses the normal
@@ -955,3 +961,16 @@ claim native Ollama `tool_calls` protocol execution has been qualified.
 and specifically over-budget the LFM2.5 8B `nonthinking-first-pass` challenger. Separately, tool capability
 and proven validation scope must stay distinct so challenger acceptance cannot silently overstate what the
 Agent benchmark actually exercises.
+
+
+## DEC-037 — Bind metadata-first model management to release 1.10 and keep tracking advancement explicit
+
+**Status:** ACTIVE — 0.14.1-1.10 candidate.
+
+**Decision:** The metadata-first model-management work is a new package release, `0.14.1-1.10`; accepted 1.9 device evidence remains a regression baseline and must not be reused as identity evidence for changed 1.10 bytes. `cmd/model_contract.py` is the shared semantic validator for catalog/profile metadata consumed by model management, Open WebUI and benchmarks. Missing profiles, invalid ownership/lane/capability combinations and malformed qualification metadata are package errors, not consumer-specific fallbacks.
+
+Tracking-source state uses schema 4. It records the catalog `configured_ref`, `source_policy`, acquired SHA-256 and a resolved revision when known. A valid manager-owned tracking artifact remains current when package policy moves from an old immutable commit sidecar to `latest`/`main`; ordinary `apply` migrates metadata and repairs registration/runtime state without downloading replacement bytes. Explicit `refresh` is the only normal lifecycle command that advances a valid tracking artifact to the current moving ref. Pinned sources continue to require exact revision/digest agreement.
+
+**Why:** Reusing release 1.9 for materially changed model-management/Open WebUI behavior would make build/device evidence ambiguous. Treating a pinned→tracking metadata migration as source drift would also let installer convergence silently download different upstream bytes, contradicting the explicit-refresh contract. Central semantic validation prevents the catalog from having different meanings in lifecycle, benchmark and Open WebUI consumers.
+
+**Retest only if:** package identity, source-policy/state migration, shared model-contract validation, model lifecycle, benchmark metadata consumption or Open WebUI model discovery changes. Bind device acceptance to the exact selected Fedora 44 1.10 RPM.
