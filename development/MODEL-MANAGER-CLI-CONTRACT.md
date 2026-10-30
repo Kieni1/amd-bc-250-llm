@@ -62,6 +62,8 @@ deliberately narrower than intrinsic `tools=true` and does not assert native Oll
 protected source/state/registration state, so it requires root. Runtime sampler values are never copied
 into the profile: the rendered Modelfile remains their authority.
 
+`cmd/model_contract.py` is the shared semantic validator for package catalog/profile metadata. Model management, Open WebUI setup and benchmark consumers must reject malformed package metadata consistently; missing profiles or invalid ownership/lane/capability combinations are not silently downgraded to generic defaults.
+
 ### `status`
 
 Read-only installed-state inspection. It reports definition origin, verified
@@ -70,7 +72,7 @@ overall `CURRENT`, `MISSING`, `DRIFT` or `UNKNOWN` result. It requires root
 because manager-owned GGUF/state directories are protected.
 
 During the pre-1.0 greenfield phase, all active package model sources use `tracking`; the `pinned`
-policy remains part of the contract for the later 1.0 stabilization step.
+policy remains part of the contract for the later 1.0 stabilization step. Schema-4 state separates `configured_ref` from acquired identity. A valid tracking artifact remains current across a pinned→tracking/ref migration during ordinary `apply`; metadata is upgraded in place and only `refresh` advances the moving source.
 
 `--online` is opt-in. For manager-owned sources whose catalog policy is `tracking`
 (`latest`, `main`, or another intentionally moving ref), it compares remote file SHA metadata with the
@@ -97,7 +99,7 @@ is viewed by itself.
 ### `apply`
 
 Converges the selected model to the current catalog definition. It reuses a
-verified current GGUF, repairs/replaces a drifted runtime Modelfile and creates
+verified current GGUF, including a tracking artifact acquired from an older immutable revision when repository/filename/recorded bytes remain valid, repairs/replaces a drifted runtime Modelfile and creates
 or repairs the Ollama registration as required. It downloads only when source
 state is missing, invalid or no longer matches the catalog definition. Source
 revision/checksum overrides are valid only when the complete selection contains exactly

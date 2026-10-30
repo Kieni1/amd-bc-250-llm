@@ -269,11 +269,7 @@ explicitly choose them; ordinary combined status still requires `--include-disab
 The combined mutation path excludes the MTP category regardless of that flag; setting an entry true
 is an operator visibility policy choice, not a qualification or promotion signal.
 
-The manager records schema-3 source/model/category identity plus SHA-256 and file stat
-metadata. Unchanged stat metadata can use the validated fast path; changed or legacy state
-forces a full checksum before reuse. Source repository, revision and GGUF filename must
-also match. This is what lets a Modelfile-only change re-register from retained bytes
-without silently accepting modified source data.
+The manager records schema-4 source/model/category identity plus `source_policy`, `configured_ref`, `resolved_revision` when known, acquired SHA-256 and file stat metadata. Schema 1/2/3 state remains readable and is upgraded during reconciliation. Unchanged stat metadata can use the validated fast path; changed or legacy identity still forces a full checksum before reuse. Repository and GGUF filename always have to match. `pinned` sources additionally require the configured revision/digest; `tracking` sources deliberately keep a valid recorded artifact across configured-ref migration until explicit `refresh`, preventing ordinary installer/apply convergence from silently advancing upstream bytes.
 
 ### Managed Documents lifecycle
 
@@ -347,7 +343,7 @@ are physically undeduplicated. Unreferenced source-hash Ollama blobs are reporte
 separately and excluded from dedupe targets; normal Ollama startup pruning is expected
 to remove those transient imports. `dedupe` requires XFS with `reflink=1`; it verifies
 manager state/source hashes and uses kernel-verified 16 MiB `FIDEDUPERANGE` sharing
-while retaining both paths. Successful pairs are recorded in schema-3 sidecars and
+while retaining both paths. Successful pairs are recorded in schema-4 sidecars and
 unchanged recorded pairs are skipped on later runs. Normal interactive use requires
 typing `DEDUPLICATE`; `--yes` is for deliberate automation. Compare `df` before
 and after because `du` may still account a shared extent to both logical files.
