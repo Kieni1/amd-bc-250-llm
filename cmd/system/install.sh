@@ -1155,7 +1155,7 @@ print_setup_summary() {
   if command -v needs-restarting >/dev/null 2>&1; then
     if ! needs-restarting -r >/dev/null 2>&1; then reboot_state="YES (package/kernel updates)"; fi
   elif [[ "$reboot_state" == "NO" ]]; then
-    reboot_state="UNKNOWN (restart check unavailable)"
+    reboot_state="NOT CHECKED (needs-restarting unavailable)"
   fi
   if [[ -s "$DEFAULT_OWUI_TOKEN_FILE" ]] && bc250 advanced openwebui status --token-file "$DEFAULT_OWUI_TOKEN_FILE" >/dev/null 2>&1; then auth_state="CONFIGURED"; fi
   echo

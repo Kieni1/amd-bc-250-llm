@@ -334,10 +334,17 @@ def resolve_think_policy(model: str, requested: str) -> str:
             return "false"
         if isinstance(value, str) and value in {"low", "medium", "high", "max"}:
             return value
-    # Packaged models without an explicit request policy deliberately do not
-    # infer request-time reasoning behavior from their name or capability.
-    # Capability and request policy are separate package authorities.
-    if package_model_contract(model) is not None:
+    # Package qualification policy may deliberately require an explicit
+    # non-thinking first pass. This is request intent, not a claim that every
+    # provider/model template will honor the request perfectly; raw provider
+    # output remains evidence and contamination is diagnosed below.
+    contract = package_model_contract(model)
+    if contract is not None:
+        profile = contract.get("profile") if isinstance(contract.get("profile"), dict) else {}
+        if profile.get("reasoning_request_policy") == "nonthinking-first-pass":
+            return "false"
+        # Other packaged models without an explicit Open WebUI request policy
+        # deliberately do not infer request-time reasoning from capability/name.
         return "omit"
 
     lower = model.casefold()
@@ -698,6 +705,25 @@ def visible_response_identity(response: str, thinking: str) -> dict[str, Any]:
         "determinism_eligible": False,
         "sha256": None,
     }
+
+
+_LEADING_LITERAL_THINK_RE = re.compile(
+    r"^\s*<think(?:\s[^>]*)?>.*?</think>\s*",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def literal_reasoning_contamination(response: str, thinking: str, think_policy: str) -> bool:
+    """Detect provider reasoning serialized into visible text despite think=false.
+
+    Keep the raw response unchanged: generation benchmarking measures the provider
+    surface and must not silently synthesize a cleaner product answer.
+    """
+    return (
+        think_policy == "false"
+        and not thinking.strip()
+        and bool(_LEADING_LITERAL_THINK_RE.match(response))
+    )
 
 
 def generation_measurement_semantics(
@@ -1138,9 +1164,14 @@ def main() -> int:
             )
             if value
         ]
-        warning = "; ".join(warnings) or None
         response_text = str(detail.get("response") or "")
         thinking_text = str(detail.get("thinking") or "")
+        reasoning_contamination = literal_reasoning_contamination(
+            response_text, thinking_text, think_policy
+        )
+        if reasoning_contamination:
+            warnings.append("provider returned literal <think> content despite think=false")
+        warning = "; ".join(warnings) or None
         semantics = generation_measurement_semantics(
             metrics,
             requested=requested,
@@ -1151,6 +1182,8 @@ def main() -> int:
         if early_stop_warning(metrics, requested, early_fraction):
             diagnostics.append("early-stop")
         diagnostics.extend(semantics["diagnostics"])
+        if reasoning_contamination:
+            diagnostics.append("reasoning-present-despite-think-false")
         if extra_warning:
             diagnostics.append("context-truncation")
         if float(metrics.get("seconds_ge_80c") or 0) > 0:
@@ -1190,6 +1223,9 @@ def main() -> int:
                 request=request_meta,
                 response=response_text,
                 thinking=thinking_text,
+                reasoning_contamination=(
+                    "literal-think-block" if reasoning_contamination else None
+                ),
                 visible_response_identity=semantics["visible_response"],
                 context_target_tokens=detail.get("context_target_tokens"),
                 notes=warnings,

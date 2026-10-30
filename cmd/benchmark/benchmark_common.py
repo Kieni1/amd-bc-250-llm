@@ -1111,16 +1111,17 @@ def write_result_summary(
     if structure is not None:
         lines.append(f"Structure      {structure.upper()}")
     lines += [
-        f"Infrastructure {infrastructure.upper()}",
-        f"Quality        {quality.upper()}",
-        f"Pass           {counts['pass']}",
-        f"Measurements   {type_counts['measurement']}",
-        f"Qualifications {type_counts['qualification']}",
-        f"Qual pass      {qualification_counts['pass']}",
-        f"Quality-fail   {qualification_counts['quality-fail']}",
-        f"Qual skipped   {qualification_counts['skipped']}",
-        f"Incomplete     {qualification_counts['incomplete']}",
-        f"Infra-fail     {counts['infra-fail']}",
+        f"Infrastructure    {infrastructure.upper()}",
+        f"Quality           {quality.upper()}",
+        f"Overall pass      {counts['pass']}",
+        f"Overall incomplete {counts['incomplete']}",
+        f"Measurements      {type_counts['measurement']}",
+        f"Qualifications    {type_counts['qualification']}",
+        f"Qual pass         {qualification_counts['pass']}",
+        f"Qual quality-fail {qualification_counts['quality-fail']}",
+        f"Qual skipped      {qualification_counts['skipped']}",
+        f"Qual incomplete   {qualification_counts['incomplete']}",
+        f"Infra-fail        {counts['infra-fail']}",
     ]
     if structure == "fail" and completeness is not None:
         lines += ["", "Structural completeness"]

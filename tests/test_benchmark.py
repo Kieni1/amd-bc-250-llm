@@ -326,6 +326,12 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             generation.resolve_think_policy(
+                "exp-lfm25-8b-a1b-unsloth-q6-k-xl", "auto"
+            ),
+            "false",
+        )
+        self.assertEqual(
+            generation.resolve_think_policy(
                 "exp-qwen38-4b-distill-empero-q6-k", "auto"
             ),
             "omit",
@@ -352,6 +358,21 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertEqual(qwen_payload["options"]["min_p"], 0.0)
         self.assertEqual(qwen_payload["options"]["presence_penalty"], 0.0)
         self.assertEqual(qwen_payload["options"]["repeat_penalty"], 1.0)
+
+    def test_explicit_nonthinking_records_literal_reasoning_contamination_without_hiding_raw_output(self) -> None:
+        raw = "<think>private-looking provider reasoning</think>\nM3B_RECOVERED"
+        self.assertTrue(
+            generation.literal_reasoning_contamination(raw, "", "false")
+        )
+        self.assertFalse(
+            generation.literal_reasoning_contamination(raw, "", "omit")
+        )
+        self.assertFalse(
+            generation.literal_reasoning_contamination("M3B_RECOVERED", "", "false")
+        )
+        self.assertFalse(
+            generation.literal_reasoning_contamination(raw, "structured reasoning", "false")
+        )
 
     def test_early_stop_only_flags_short_done_reason_stop(self) -> None:
         self.assertIsNone(
@@ -2111,7 +2132,7 @@ class TelemetryTests(unittest.TestCase):
                 }],
             )
             text = summary_txt.read_text(encoding="utf-8")
-            self.assertIn("Quality        MIXED", text)
+            self.assertIn("Quality           MIXED", text)
             self.assertIn("m / b: language", text)
 
     def test_result_directory_is_canonical_and_refuses_reuse(self) -> None:
@@ -2214,7 +2235,7 @@ class TelemetryTests(unittest.TestCase):
 
     def test_revalidation_v4_is_six_phase_packaged_qualification(self) -> None:
         source = (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8")
-        self.assertIn("HARNESS_VERSION=4.8", source)
+        self.assertIn("HARNESS_VERSION=4.9", source)
         self.assertIn(
             "PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}",
             source,
@@ -2421,8 +2442,8 @@ dashboard_text
                 ["bash", "-c", script], text=True, capture_output=True, check=True
             )
             self.assertIn("[RUNNING ", completed.stdout)
-            self.assertIn("Infrastructure  PASS so far", completed.stdout)
-            self.assertIn("Quality suites", completed.stdout)
+            self.assertIn("Infrastructure       PASS so far", completed.stdout)
+            self.assertIn("Model quality", completed.stdout)
             self.assertIn(
                 "Ctrl-C detaches; the worker continues under systemd.",
                 completed.stdout,
@@ -2457,10 +2478,10 @@ dashboard_text
             )
             self.assertIn("[COMPLETED ", completed.stdout)
             self.assertIn("Worker        inactive", completed.stdout)
-            self.assertIn("Infrastructure  PASS", completed.stdout)
-            self.assertNotIn("Infrastructure  PASS so far", completed.stdout)
+            self.assertIn("Infrastructure       PASS", completed.stdout)
+            self.assertNotIn("Infrastructure       PASS so far", completed.stdout)
             self.assertNotIn("worker continues under systemd", completed.stdout)
-            self.assertIn("Quality suites", completed.stdout)
+            self.assertIn("Model quality", completed.stdout)
 
     def test_revalidation_failed_dashboard_preserves_original_phase_and_stage(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -3439,15 +3460,15 @@ status_run --raw
                 ["bash", "-c", script], text=True, capture_output=True, check=True
             )
             output = completed.stdout.lower()
-            self.assertIn("run completion: completed", output)
+            self.assertIn("state          : completed", output)
             self.assertIn(
-                "coverage:       partial (optional agent not installed)", output
+                "coverage:             partial (optional agent not installed)", output
             )
             self.assertIn(
                 "coverage       : partial (optional agent not installed)", output
             )
             self.assertIn("coverage=partial", output)
-            self.assertNotIn("run completion: incomplete", output)
+            self.assertNotIn("state          : incomplete", output)
             source_text = source.read_text(encoding="utf-8")
             self.assertIn('status) status_run "${@:2}" ;;', source_text)
             restore = source_text[
@@ -3625,17 +3646,32 @@ status_run --raw
         summary = source[source.index("create_summary() {"):source.index("create_final_bundle() {")]
         self.assertIn("Run completion", summary)
         self.assertIn("Infrastructure", summary)
-        self.assertIn("Quality", summary)
-        self.assertIn("Restoration", summary)
+        self.assertIn("Model quality", summary)
+        self.assertIn("Product integrity", summary)
+        self.assertIn("Topology restoration", summary)
         self.assertNotIn("PASSED", summary)
         self.assertIn("Diagnostics", summary)
         self.assertIn("informational", summary)
         self.assertNotIn("diagnostic(s)", summary)
         bundle = source[source.index("create_bundle_manifest() {"):source.index("restore_all() {")]
+        self.assertIn('"schema_version": 2', bundle)
         self.assertIn('"checksum_file": "SHA256SUMS.txt"', bundle)
-        self.assertIn('"final_result": result', bundle)
+        for field in ("run_completion", "infrastructure", "model_quality", "product_integrity", "topology_restoration", "coverage"):
+            self.assertIn(f'"{field}":', bundle)
+        self.assertNotIn('"final_result": result', bundle)
         self.assertIn('items+=(manifest.json)', bundle)
         self.assertIn('items+=(SHA256SUMS.txt)', bundle)
+        self.assertNotIn('items=(events.tsv phase stage ', bundle)
+        self.assertNotIn(' stage-started ', bundle)
+        self.assertNotIn(' last-event ', bundle)
+        self.assertIn('capture_json()', source)
+        self.assertIn('.error.txt', source)
+        self.assertIn('json.loads', source)
+        self.assertIn('Evidence archive destination:', source)
+        self.assertIn('Internal evidence history:', source)
+        self.assertIn('export_final_bundle()', source)
+        self.assertIn('chown "$EXPORT_UID:$EXPORT_GID" "$tmp"', source)
+        self.assertIn('chmod 0600 "$tmp"', source)
         self.assertIn('interpretation=EXPECTED: ollama-agent.service intentionally inactive in normal mode', source)
 
     def test_round2b_removes_private_revalidation_tuning_helper(self) -> None:
@@ -4129,7 +4165,7 @@ cleanup_failed_launch
         for stale in ("PARAM_NAMES=", "run_bench()", "unload_model()", "disable_worker_for_future_boots", "Compatibility name"):
             self.assertNotIn(stale, revalidate)
         self.assertIn("Recent results", revalidate)
-        self.assertIn("Revalidation run completed.", revalidate)
+        self.assertIn("Revalidation completed.", revalidate)
         self.assertTrue((BENCH / "runtime-benchmark.py").exists())
         self.assertTrue((BENCH / "openwebui-benchmark.py").exists())
         self.assertFalse((BENCH / "workflow-benchmark.py").exists())

@@ -10,7 +10,7 @@
 set -Eeuo pipefail
 umask 0077
 
-HARNESS_VERSION=4.8
+HARNESS_VERSION=4.9
 PACKAGE_VERSION_FILE=${BC250_PACKAGE_VERSION_FILE:-/usr/share/bc250-llm-server/VERSION}
 TARGET_VERSION=
 TARGET_RELEASE_PREFIX=${TARGET_RELEASE_PREFIX:-}
@@ -50,6 +50,9 @@ FAILURE_STAGE_STARTED_FILE=$WORK/failure-stage-started
 FAILURE_CONSOLE_FILE=$WORK/failure-console
 ERROR_CONTEXT=$WORK/error-context.txt
 SERVICE_JOURNAL=$WORK/revalidation-service-journal.txt
+OPERATOR_EXPORT_PATH_FILE=$WORK/operator-export-path
+OPERATOR_EXPORT_STATE_FILE=$WORK/operator-export-state
+OPERATOR_EXPORT_ERROR_FILE=$WORK/operator-export-error.txt
 
 LIBEXEC=${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}
 CU_STATUS="$LIBEXEC/cu-status.sh"
@@ -98,8 +101,8 @@ readonly EDGE_SEVERE_CONTEXT_TOKENS=4096
 usage() {
   cat <<'USAGE'
 Usage:
-  sudo bc250 advanced revalidate start [--owui-token-file FILE] [--detach]
-  sudo bc250 advanced revalidate start --skip-owui [--detach]
+  sudo bc250 advanced revalidate start [--owui-token-file FILE] [--output-dir DIR] [--detach]
+  sudo bc250 advanced revalidate start --skip-owui [--output-dir DIR] [--detach]
   sudo bc250 advanced revalidate status [--raw]
   sudo bc250 advanced revalidate abort
   sudo bc250 advanced revalidate cleanup
@@ -109,7 +112,10 @@ Recommended authenticated start:
 
 `start` launches one systemd-owned qualification worker and follows a compact
 six-phase dashboard by default. Ctrl-C detaches from the display; it never kills
-the worker. Use --detach for immediate return.
+the worker. Use --detach for immediate return. The finished sanitized evidence
+archive is exported to the invoking working directory by default; --output-dir
+selects another existing directory without changing that directory's ownership
+or mode. A protected canonical copy remains under package state for history.
 
 Revalidation answers one question only: does the configuration currently shipped
 by this package qualify on this BC-250? It does not choose or tune configuration.
@@ -232,12 +238,20 @@ remember_failure_location() {
 }
 
 save_settings() {
-  printf 'SKIP_OWUI=%q\n' "${SKIP_OWUI:-0}" > "$SETTINGS_FILE"
+  {
+    printf 'SKIP_OWUI=%q\n' "${SKIP_OWUI:-0}"
+    printf 'EXPORT_DIR=%q\n' "${EXPORT_DIR:-}"
+    printf 'EXPORT_UID=%q\n' "${EXPORT_UID:-0}"
+    printf 'EXPORT_GID=%q\n' "${EXPORT_GID:-0}"
+  } > "$SETTINGS_FILE"
   chmod 0600 "$SETTINGS_FILE"
 }
 
 load_settings() {
   SKIP_OWUI=0
+  EXPORT_DIR=
+  EXPORT_UID=0
+  EXPORT_GID=0
   [[ -f $SETTINGS_FILE ]] && source "$SETTINGS_FILE"
 }
 
@@ -598,11 +612,6 @@ dashboard_text() {
   [[ $phase != failed ]] || banner=FAILED
   if [[ $phase == done ]]; then
     banner=COMPLETED
-    if ((q > 0)); then
-      banner="COMPLETED — QUALITY MIXED"
-    elif ((incomplete > 0)); then
-      banner="COMPLETED — QUALITY REVIEW"
-    fi
   fi
   printf 'BC-250 revalidation  [%s %s]\n\n' "$banner" "$elapsed"
   printf 'Phase         %-4s  %s\n' "${position:-?}" "$label"
@@ -613,12 +622,14 @@ dashboard_text() {
   local infra_state
   infra_state="$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo pass)"
   if [[ $phase == done ]]; then
-    printf '\nInfrastructure  %s\n' "${infra_state^^}"
+    printf '\nInfrastructure       %s\n' "${infra_state^^}"
+    printf 'Product integrity    %s\n' "$(product_integrity_state | tr '[:lower:]' '[:upper:]')"
+    printf 'Topology restoration %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
   else
-    printf '\nInfrastructure  %s so far\n' "${infra_state^^}"
+    printf '\nInfrastructure       %s so far\n' "${infra_state^^}"
   fi
-  printf 'Quality suites  %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
-  printf 'Coverage        %s\n' "$(coverage_display)"
+  printf 'Model quality        %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
+  printf 'Coverage             %s\n' "$(coverage_display)"
   printf '\nRecent results\n'
   recent_step_results
   if ((q > 0 || incomplete > 0)) && [[ $phase == done || $phase == failed ]]; then
@@ -654,6 +665,25 @@ render_dashboard_frame() {
   RENDERED_DASHBOARD_LINES="$new_lines"
 }
 
+final_evidence_ready() {
+  local bundle export_state worker_state
+  bundle="$(latest_bundle_path)"
+  worker_state="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+  # A terminal phase can be written before the worker finishes failure evidence.
+  # Wait while that worker is active, but never hang after it has exited/crashed.
+  if [[ -z $bundle ]]; then
+    [[ $worker_state != active && $worker_state != activating ]]
+    return
+  fi
+  export_state="$(cat "$OPERATOR_EXPORT_STATE_FILE" 2>/dev/null || true)"
+  [[ $export_state == pass || $export_state == fail ]] && return 0
+  # The operator export is convenience output, not qualification state. While the
+  # worker is active, wait for its export attempt so foreground UX reports the
+  # actual operator path. If the worker is already gone, the protected canonical
+  # bundle is sufficient and missing export bookkeeping cannot deadlock the CLI.
+  [[ $worker_state != active && $worker_state != activating ]]
+}
+
 follow_run() {
   local interrupted=0 phase stage last="" rc=1 dashboard="" drawn_lines=0
   trap 'interrupted=1' INT
@@ -677,8 +707,8 @@ follow_run() {
       last="$phase|$stage"
     fi
     case "$phase" in
-      done) [[ -n $(latest_bundle_path) ]] && break ;;
-      failed) break ;;
+      done) final_evidence_ready && break ;;
+      failed) final_evidence_ready && break ;;
     esac
     sleep 2 || true
   done
@@ -690,16 +720,22 @@ follow_run() {
   fi
   phase="$(cat "$PHASE_FILE" 2>/dev/null || echo unknown)"
   if [[ "$phase" == done ]]; then
-    echo "Revalidation run completed."
-    printf 'Run completion: %s\n' "$(effective_run_state)"
-    printf 'Infrastructure: %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
-    printf 'Quality evidence: %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
-    if [[ -n "$(product_integrity_report)" ]]; then
-      printf 'Product integrity: pass\n'
+    local export_path export_state
+    export_path="$(cat "$OPERATOR_EXPORT_PATH_FILE" 2>/dev/null || true)"
+    export_state="$(cat "$OPERATOR_EXPORT_STATE_FILE" 2>/dev/null || echo unknown)"
+    echo "Revalidation completed."
+    printf 'Infrastructure:       %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
+    printf 'Product integrity:    %s\n' "$(product_integrity_state)"
+    printf 'Model quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+    printf 'Topology restoration: %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
+    printf 'Coverage:             %s\n' "$(coverage_display)"
+    if [[ $export_state == pass && -n $export_path ]]; then
+      printf 'Evidence archive:     %s\n' "$export_path"
+    else
+      printf 'Evidence archive:     export failed; internal evidence remains available\n'
+      [[ ! -r $OPERATOR_EXPORT_ERROR_FILE ]] || printf 'Export error:          %s\n' "$OPERATOR_EXPORT_ERROR_FILE"
     fi
-    printf 'Restoration:    %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
-    printf 'Coverage:       %s\n' "$(coverage_display)"
-    echo "Final bundle: $(find "$REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-bc250-revalidation-results.tar.gz" -print -quit 2>/dev/null)"
+    printf 'Internal evidence:    %s\n' "$(latest_bundle_path)"
     return 0
   fi
   [[ -r "$FAILURE_RC_FILE" ]] && rc="$(cat "$FAILURE_RC_FILE")"; [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
@@ -709,6 +745,15 @@ follow_run() {
   failed_console="$(cat "$FAILURE_CONSOLE_FILE" 2>/dev/null || true)"
   failed_position="$(phase_position "$failed_phase")"; failed_label="$(phase_label "$failed_phase")"
   echo "Revalidation failed in ${failed_position:-?} $failed_label, stage=$failed_stage (rc=$rc)." >&2
+  local failed_export_path failed_export_state
+  failed_export_path="$(cat "$OPERATOR_EXPORT_PATH_FILE" 2>/dev/null || true)"
+  failed_export_state="$(cat "$OPERATOR_EXPORT_STATE_FILE" 2>/dev/null || echo unknown)"
+  if [[ $failed_export_state == pass && -n $failed_export_path ]]; then
+    echo "Evidence archive: $failed_export_path" >&2
+  else
+    echo "Evidence archive export failed; internal evidence remains available." >&2
+  fi
+  echo "Internal evidence: $(latest_bundle_path)" >&2
   [[ ! -e $ERROR_CONTEXT ]] || echo "Error context: sudo cat $ERROR_CONTEXT" >&2
   if [[ -n $failed_console && -r $failed_console && -s $failed_console ]]; then
     echo "Failing step log: $failed_console" >&2
@@ -744,7 +789,8 @@ launch_worker() {
 
 start_run() {
   need_root
-  local token_file="" detach=0 skip_owui=0
+  local token_file="" detach=0 skip_owui=0 output_dir="$PWD"
+  local caller_uid="${SUDO_UID:-$(id -u)}" caller_gid="${SUDO_GID:-$(id -g)}"
   shift || true
   while (($#)); do
     case "$1" in
@@ -752,6 +798,9 @@ start_run() {
         [[ $# -ge 2 ]] || { echo "ERROR: --owui-token-file requires a path" >&2; exit 2; }
         token_file="$2"; shift 2 ;;
       --skip-owui) skip_owui=1; shift ;;
+      --output-dir)
+        [[ $# -ge 2 ]] || { echo "ERROR: --output-dir requires a directory" >&2; exit 2; }
+        output_dir="$2"; shift 2 ;;
       --detach) detach=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) echo "ERROR: unknown start option: $1" >&2; usage >&2; exit 2 ;;
@@ -771,6 +820,8 @@ start_run() {
     echo "       Use --skip-owui only for an explicitly incomplete run." >&2
     exit 2
   fi
+  [[ -d "$output_dir" ]] || { echo "ERROR: output directory does not exist: $output_dir" >&2; exit 2; }
+  output_dir="$(cd -- "$output_dir" && pwd -P)"
 
   preflight
   if [[ -n $token_file ]]; then
@@ -795,6 +846,9 @@ start_run() {
   install -d -m 0700 "$WORK" "$RAW" "$PHASE_REPORT_DIR" "$RUN_DIR" "$STATE_ROOT" "$REPORT_DIR"
   install -m 0700 "$0" "$HARNESS_COPY"
   SKIP_OWUI="$skip_owui"
+  EXPORT_DIR="$output_dir"
+  EXPORT_UID="$caller_uid"
+  EXPORT_GID="$caller_gid"
   save_settings
   : > "$EVENTS"
   printf 'initializing\n' > "$PHASE_FILE"; printf 'start requested\n' > "$STAGE_FILE"
@@ -819,13 +873,44 @@ start_run() {
   fi
   echo "The systemd worker qualifies packaged defaults only; this terminal only follows progress."
   echo "Status: sudo bc250 advanced revalidate status"
-  echo "Final bundles: $REPORT_DIR"
+  echo "Evidence archive destination: $output_dir"
+  echo "Internal evidence history: $REPORT_DIR"
   ((detach)) || follow_run
 }
 
 capture_cmd() {
   local file="$1"; shift
   { echo '$' "$@"; "$@"; } > "$file" 2>&1 || echo "command_rc=$?" >> "$file"
+}
+
+capture_json() {
+  local file="$1" rc=0 tmp err_tmp err_file
+  shift
+  tmp="${file}.tmp.$$"
+  err_tmp="${file}.stderr.$$"
+  err_file="${file%.json}.error.txt"
+  rm -f -- "$file" "$err_file" "$tmp" "$err_tmp"
+  if "$@" >"$tmp" 2>"$err_tmp"; then
+    if python3 - "$tmp" <<'PY_JSON'
+import json
+import sys
+from pathlib import Path
+json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+PY_JSON
+    then
+      mv -f -- "$tmp" "$file"
+      rm -f -- "$err_tmp"
+      return 0
+    fi
+    rc=65
+    printf 'capture_error=invalid JSON response\n' >"$err_file"
+  else
+    rc=$?
+    printf 'command_rc=%s\n' "$rc" >"$err_file"
+  fi
+  [[ ! -s "$err_tmp" ]] || cat "$err_tmp" >>"$err_file"
+  rm -f -- "$tmp" "$err_tmp"
+  return 0
 }
 
 snapshot() {
@@ -876,9 +961,9 @@ snapshot() {
     echo 'interpretation=EXPECTED: ollama-agent.service intentionally inactive in normal mode' >> "$dir/systemctl.txt"
   fi
   for port in 11434 11435 11436 11437; do
-    curl -fsS "http://127.0.0.1:$port/api/version" > "$dir/ollama-$port-version.json" 2>&1 || true
-    curl -fsS "http://127.0.0.1:$port/api/tags" > "$dir/ollama-$port-tags.json" 2>&1 || true
-    curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
+    capture_json "$dir/ollama-$port-version.json" curl -fsS --connect-timeout 2 --max-time 8 "http://127.0.0.1:$port/api/version"
+    capture_json "$dir/ollama-$port-tags.json" curl -fsS --connect-timeout 2 --max-time 8 "http://127.0.0.1:$port/api/tags"
+    capture_json "$dir/ollama-$port-ps.json" curl -fsS --connect-timeout 2 --max-time 8 "http://127.0.0.1:$port/api/ps"
   done
   # Ollama 0.40.7+ exposes renderer, parser and template_source through /api/show,
   # in addition to model capability/thinking metadata. Capture the complete response
@@ -886,10 +971,10 @@ snapshot() {
   local show_model show_port show_name
   while IFS='|' read -r show_port show_model; do
     show_name="${show_model//[^A-Za-z0-9._-]/_}"
-    curl -fsS -H 'Content-Type: application/json' \
+    capture_json "$dir/ollama-${show_port}-show-${show_name}.json" \
+      curl -fsS --connect-timeout 2 --max-time 12 -H 'Content-Type: application/json' \
       -d "$(jq -cn --arg model "$show_model" '{model:$model}')" \
-      "http://127.0.0.1:${show_port}/api/show" \
-      > "$dir/ollama-${show_port}-show-${show_name}.json" 2>&1 || true
+      "http://127.0.0.1:${show_port}/api/show"
   done <<EOF_SHOW
 11434|$E2B_MODEL
 11434|$E4B_MODEL
@@ -899,7 +984,7 @@ snapshot() {
 11435|$TASK_MODEL
 11437|$EMBED_MODEL
 EOF_SHOW
-  podman inspect open-webui --format '{{json .State}}' > "$dir/openwebui-container-state.json" 2>&1 || true
+  capture_json "$dir/openwebui-container-state.json" podman inspect open-webui --format '{{json .State}}'
   podman inspect open-webui --format '{{.ImageName}}' > "$dir/openwebui-container-image.txt" 2>&1 || true
   capture_cmd "$dir/free.txt" free -h
   capture_cmd "$dir/swapon.txt" swapon --show
@@ -924,7 +1009,7 @@ checkpoint() {
   } > "$dir/checkpoint.txt" 2>&1
   capture_cmd "$dir/status.txt" bc250 status
   for port in 11434 11435 11436 11437; do
-    curl -fsS "http://127.0.0.1:$port/api/ps" > "$dir/ollama-$port-ps.json" 2>&1 || true
+    capture_json "$dir/ollama-$port-ps.json" curl -fsS --connect-timeout 2 --max-time 8 "http://127.0.0.1:$port/api/ps"
   done
   capture_cmd "$dir/free.txt" free -h
   capture_cmd "$dir/swapon.txt" swapon --show
@@ -1729,6 +1814,37 @@ else:
 PY_CAUSES
 }
 
+product_integrity_state() {
+  python3 - "$RAW" <<'PY_INTEGRITY_STATE'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+seen = False
+failed = False
+for path in sorted(root.rglob("results.jsonl")):
+    try:
+        rows = [
+            json.loads(line)
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except (OSError, json.JSONDecodeError):
+        continue
+    for row in rows:
+        if row.get("category") != "owui-translation":
+            continue
+        seen = True
+        checks = row.get("checks") if isinstance(row.get("checks"), dict) else {}
+        if checks.get("product_integrity_guard") is False:
+            failed = True
+        if row.get("product_guard") == "quality-fail-overblocked":
+            failed = True
+print("fail" if failed else ("pass" if seen else "not-run"))
+PY_INTEGRITY_STATE
+}
+
 product_integrity_report() {
   python3 - "$RAW" <<'PY_INTEGRITY'
 import json
@@ -1760,8 +1876,8 @@ for path in sorted(root.rglob("results.jsonl")):
 
 if guarded:
     print(
-        f"  owui-translation: PASS — {len(guarded)} unsafe translation"
-        f"{'s' if len(guarded) != 1 else ''} detected and withheld"
+        f"  owui-translation: PASS — {len(guarded)} translation-integrity failure"
+        f"{'s' if len(guarded) != 1 else ''} detected; delivery withheld"
     )
     for case_id, failures in guarded:
         causes = ", ".join(failures) or "quality-fail"
@@ -1777,11 +1893,12 @@ diagnostic_count() {
 }
 
 create_summary() {
-  local out="$WORK/revalidation-summary.txt" p q skipped incomplete quality coverage diagnostics run_state
+  local out="$WORK/revalidation-summary.txt" p q skipped incomplete quality coverage diagnostics run_state integrity
   read -r p q skipped incomplete <<<"$(quality_counts)"; quality="$(quality_state)"
   coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
   diagnostics="$(diagnostic_count)"
   run_state="$(tr '[:lower:]' '[:upper:]' < "$RUN_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
+  integrity="$(product_integrity_state)"
   printf '%s\n' "$quality" > "$QUALITY_STATE_FILE"
   {
     echo "BC-250 revalidation evidence bundle complete"
@@ -1793,8 +1910,9 @@ create_summary() {
     echo
     printf 'Run completion  %s\n' "$run_state"
     printf 'Infrastructure  %s\n' "$(tr '[:lower:]' '[:upper:]' < "$INFRA_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
-    printf 'Quality         %s       %s pass / %s quality-fail / %s incomplete / %s skipped\n' "${quality^^}" "$p" "$q" "$incomplete" "$skipped"
-    printf 'Restoration     %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
+    printf 'Model quality   %s       %s pass / %s quality-fail / %s incomplete / %s skipped\n' "${quality^^}" "$p" "$q" "$incomplete" "$skipped"
+    printf 'Product integrity %s\n' "${integrity^^}"
+    printf 'Topology restoration %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
     printf 'Coverage        %s\n' "$(coverage_display | tr '[:lower:]' '[:upper:]')"
     ((diagnostics == 0)) || printf 'Diagnostics     %d informational\n' "$diagnostics"
     echo
@@ -1826,29 +1944,41 @@ create_summary() {
 }
 
 create_bundle_manifest() {
-  local path="$WORK/manifest.json" started ended diagnostics package result coverage
+  local path="$WORK/manifest.json" started ended diagnostics package coverage run_completion infrastructure model_quality product_integrity topology_restoration
   started="$(awk 'NR==1{print $1; exit}' "$EVENTS" 2>/dev/null || true)"
   ended="$(awk 'END{print $1}' "$EVENTS" 2>/dev/null || true)"
   diagnostics="$(diagnostic_count)"
   package="$(rpm -q bc250-llm-server 2>/dev/null || echo unknown)"
-  result="$(effective_run_state)"
   coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
-  python3 - "$path" "$(run_id)" "$HARNESS_VERSION" "$package" "$(uname -r)" "$started" "$ended" "$coverage" "$result" "$diagnostics" <<'PY_MANIFEST'
+  run_completion="$(effective_run_state)"
+  infrastructure="$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
+  model_quality="$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  product_integrity="$(product_integrity_state)"
+  topology_restoration="$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
+  python3 - "$path" "$(run_id)" "$HARNESS_VERSION" "$package" "$(uname -r)" "$started" "$ended" "$coverage" "$run_completion" "$infrastructure" "$model_quality" "$product_integrity" "$topology_restoration" "$diagnostics" <<'PY_MANIFEST'
 import json
 import sys
 from pathlib import Path
 
-(path, run_id, harness, package, kernel, started, ended, coverage, result, diagnostics) = sys.argv[1:]
+(
+    path, run_id, harness, package, kernel, started, ended, coverage,
+    run_completion, infrastructure, model_quality, product_integrity,
+    topology_restoration, diagnostics,
+) = sys.argv[1:]
 data = {
-    "schema_version": 1,
+    "schema_version": 2,
     "run_id": run_id,
     "harness_version": harness,
     "package": package,
     "kernel": kernel,
     "started_at": started or None,
     "ended_at": ended or None,
+    "run_completion": run_completion,
+    "infrastructure": infrastructure,
+    "model_quality": model_quality,
+    "product_integrity": product_integrity,
+    "topology_restoration": topology_restoration,
     "coverage": coverage,
-    "final_result": result,
     "diagnostics": int(diagnostics),
     "checksum_file": "SHA256SUMS.txt",
 }
@@ -1873,6 +2003,44 @@ create_bundle_checksums() {
   done > "$WORK/SHA256SUMS.txt"
 }
 
+export_final_bundle() {
+  local bundle="$1" destination tmp
+  rm -f -- "$OPERATOR_EXPORT_PATH_FILE" "$OPERATOR_EXPORT_STATE_FILE" "$OPERATOR_EXPORT_ERROR_FILE"
+  if [[ -z ${EXPORT_DIR:-} || ! -d ${EXPORT_DIR:-} ]]; then
+    printf 'Configured operator export directory is unavailable: %s\n' "${EXPORT_DIR:-unset}" > "$OPERATOR_EXPORT_ERROR_FILE"
+    printf 'fail\n' > "$OPERATOR_EXPORT_STATE_FILE"
+    record_event "operator-export" diagnostic info "evidence export unavailable: ${EXPORT_DIR:-unset}"
+    return 1
+  fi
+  destination="$EXPORT_DIR/$(basename "$bundle")"
+  if [[ "$destination" == "$bundle" ]]; then
+    printf 'Operator export destination must be separate from protected internal evidence: %s\n' "$destination" > "$OPERATOR_EXPORT_ERROR_FILE"
+    printf 'fail\n' > "$OPERATOR_EXPORT_STATE_FILE"
+    record_event "operator-export" diagnostic info "operator export destination overlaps internal evidence"
+    return 1
+  fi
+  tmp="${destination}.tmp.$$"
+  rm -f -- "$tmp"
+  if ! cp -- "$bundle" "$tmp" 2>"$OPERATOR_EXPORT_ERROR_FILE"; then
+    rm -f -- "$tmp"
+    printf 'fail\n' > "$OPERATOR_EXPORT_STATE_FILE"
+    record_event "operator-export" diagnostic info "failed to copy evidence archive to $EXPORT_DIR"
+    return 1
+  fi
+  if ! chown "$EXPORT_UID:$EXPORT_GID" "$tmp" 2>>"$OPERATOR_EXPORT_ERROR_FILE" \
+      || ! chmod 0600 "$tmp" 2>>"$OPERATOR_EXPORT_ERROR_FILE" \
+      || ! mv -f -- "$tmp" "$destination" 2>>"$OPERATOR_EXPORT_ERROR_FILE"; then
+    rm -f -- "$tmp"
+    printf 'fail\n' > "$OPERATOR_EXPORT_STATE_FILE"
+    record_event "operator-export" diagnostic info "failed to publish evidence archive to $EXPORT_DIR"
+    return 1
+  fi
+  rm -f -- "$OPERATOR_EXPORT_ERROR_FILE"
+  printf '%s\n' "$destination" > "$OPERATOR_EXPORT_PATH_FILE"
+  printf 'pass\n' > "$OPERATOR_EXPORT_STATE_FILE"
+  record_event "operator-export" infra pass "evidence archive exported to $destination"
+}
+
 create_final_bundle() {
   local bundle tmp journal_since
   bundle="$REPORT_DIR/$(run_id)-bc250-revalidation-results.tar.gz"
@@ -1888,7 +2056,7 @@ create_final_bundle() {
   else
     journalctl -b -u "$UNIT" --no-pager > "$SERVICE_JOURNAL" 2>&1 || true
   fi
-  local -a items=(events.tsv phase stage stage-started last-event run-id run-state infrastructure-state quality-state restoration-state coverage-state settings.env revalidation-summary.txt results phase-reports)
+  local -a items=(events.tsv phase run-id run-state infrastructure-state quality-state restoration-state coverage-state settings.env revalidation-summary.txt results phase-reports)
   [[ ! -e $FAILURE_RC_FILE ]] || items+=(failure-rc)
   [[ ! -e $FAILURE_PHASE_FILE ]] || items+=(failure-phase)
   [[ ! -e $FAILURE_STAGE_FILE ]] || items+=(failure-stage)
@@ -1902,10 +2070,11 @@ create_final_bundle() {
   items+=(SHA256SUMS.txt)
   rm -f "$tmp"
   tar -C "$WORK" -czf "$tmp" "${items[@]}"
-  chmod 0644 "$tmp"
+  chmod 0600 "$tmp"
   mv -f "$tmp" "$bundle"
   FINAL_BUNDLE="$bundle"
-  record_progress "final bundle written: $bundle"
+  export_final_bundle "$bundle" || true
+  record_progress "final evidence archived"
 }
 
 restore_all() {
@@ -1917,12 +2086,18 @@ restore_all() {
 }
 
 finish_worker_session() {
-  local bundle="${FINAL_BUNDLE:-}"
+  local bundle="${FINAL_BUNDLE:-}" export_path="" export_state=""
   # Never remove/reload the unit or delete $WORK from inside the executing oneshot.
   # Doing so can make systemd terminate an otherwise successful worker. Leave the
   # finished state for `status`; `cleanup` or the next `start` removes it safely.
   cleanup_transient_token
-  [[ -z $bundle ]] || echo "Final bundle: $bundle"
+  export_state="$(cat "$OPERATOR_EXPORT_STATE_FILE" 2>/dev/null || echo unknown)"
+  export_path="$(cat "$OPERATOR_EXPORT_PATH_FILE" 2>/dev/null || true)"
+  [[ -z $export_path ]] || echo "Evidence archive: $export_path"
+  [[ -z $bundle ]] || echo "Internal evidence: $bundle"
+  if [[ $export_state == fail ]]; then
+    echo "WARN: operator evidence export failed; revalidation result is unchanged. See: $OPERATOR_EXPORT_ERROR_FILE" >&2
+  fi
 }
 
 finish_failed_run() {
@@ -2078,14 +2253,17 @@ status_raw() {
   echo "last_event=$(cat "$LAST_EVENT_FILE" 2>/dev/null || echo none)"
   echo "run_state=$(effective_run_state)"
   echo "infrastructure=$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo none)"
-  echo "quality=$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
-  echo "restoration=$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo none)"
+  echo "model_quality=$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  echo "product_integrity=$(product_integrity_state)"
+  echo "topology_restoration=$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo none)"
   echo "coverage=$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo none)"
   echo "kernel=$(uname -r)"
   echo "service=$(systemctl is-active "$UNIT" 2>/dev/null || true)"
   echo "phase_reports=$(find "$PHASE_REPORT_DIR" -maxdepth 1 -type f -name "$(run_id)-*.txt" 2>/dev/null | wc -l)"
   echo "latest_phase_report=$(latest_phase_report_path)"
-  echo "latest_bundle=$(latest_bundle_path)"
+  echo "evidence_archive=$(cat "$OPERATOR_EXPORT_PATH_FILE" 2>/dev/null || true)"
+  echo "operator_export=$(cat "$OPERATOR_EXPORT_STATE_FILE" 2>/dev/null || echo none)"
+  echo "internal_evidence=$(latest_bundle_path)"
   [[ ! -e $FAILURE_PHASE_FILE ]] || echo "failure_phase=$(cat "$FAILURE_PHASE_FILE")"
   [[ ! -e $FAILURE_STAGE_FILE ]] || echo "failure_stage=$(cat "$FAILURE_STAGE_FILE")"
   [[ ! -e $FAILURE_CONSOLE_FILE ]] || echo "failure_console=$(cat "$FAILURE_CONSOLE_FILE")"
@@ -2115,11 +2293,9 @@ status_run() {
   diagnostics="$(diagnostic_count)"
   printf '  State          : %s\n' "$(effective_run_state)"
   printf '  Infrastructure : %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
-  printf '  Quality evidence: %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
-  if [[ -n "$(product_integrity_report)" ]]; then
-    printf '  Product integrity: pass\n'
-  fi
-  printf '  Restoration    : %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
+  printf '  Model quality   : %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+  printf '  Product integrity: %s\n' "$(product_integrity_state)"
+  printf '  Topology restoration: %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
   printf '  Coverage       : %s\n' "$(coverage_display)"
   ((diagnostics == 0)) || printf '  Diagnostics    : %d informational\n' "$diagnostics"
   if [[ "$phase" != done && "$phase" != failed ]]; then
@@ -2135,7 +2311,8 @@ status_run() {
   else
     printf '  Last phase     : %s\n' "$label"
   fi
-  printf '  Bundle         : %s\n' "$(latest_bundle_path)"
+  printf '  Evidence archive: %s\n' "$(cat "$OPERATOR_EXPORT_PATH_FILE" 2>/dev/null || echo unavailable)"
+  printf '  Internal evidence: %s\n' "$(latest_bundle_path)"
   [[ ! -e $FAILURE_CONSOLE_FILE ]] || printf '  Failing log    : %s\n' "$(cat "$FAILURE_CONSOLE_FILE")"
   [[ ! -e $ERROR_CONTEXT ]] || printf '  Error context  : sudo cat %s\n' "$ERROR_CONTEXT"
   echo; echo "System"; printf '  Kernel         : %s\n' "$(uname -r)"; printf '  Memory profile : %s\n' "$(current_relevant_args)"

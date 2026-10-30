@@ -294,7 +294,7 @@ if command -v needs-restarting >/dev/null 2>&1; then
     echo "  Reboot required: YES (package/kernel updates)"
   fi
 else
-  echo "  Reboot required: UNKNOWN (restart check unavailable)"
+  echo "  Reboot required: NOT CHECKED (needs-restarting unavailable)"
 fi
 
 section "CPU power states"

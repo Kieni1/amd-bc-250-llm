@@ -5,8 +5,9 @@ CU_STATUS="${BC250_LIBEXEC:-/usr/libexec/bc250-llm-server}/cu-status.sh"
 umask 077
 
 BUNDLE_VERSION=2
-DEFAULT_OUTPUT=/var/lib/bc250-llm-server/support
-OUTPUT_DIR="$DEFAULT_OUTPUT"
+OUTPUT_DIR="${PWD}"
+CALLER_UID="${SUDO_UID:-$(id -u)}"
+CALLER_GID="${SUDO_GID:-$(id -g)}"
 CAPTURE_TIMEOUT=${BC250_SUPPORT_CAPTURE_TIMEOUT:-20}
 
 usage() {
@@ -14,9 +15,11 @@ usage() {
 Usage: sudo bc250 support-bundle [--output-dir DIR]
 
 Create a timestamped, read-only support archive containing appliance state,
-health summaries and redacted diagnostics. The bundle intentionally excludes
-Open WebUI tokens, prompts, chats, uploaded document contents, database rows,
-identity SQL and backup contents.
+health summaries and redacted diagnostics. By default, export it to the current
+working directory as the invoking operator; --output-dir selects another existing
+directory without changing that directory's ownership or mode. The bundle
+intentionally excludes Open WebUI tokens, prompts, chats, uploaded document
+contents, database rows, identity SQL and backup contents.
 USAGE
 }
 
@@ -37,9 +40,12 @@ command -v sha256sum >/dev/null 2>&1 || { echo "ERROR: sha256sum is required." >
 command -v timeout >/dev/null 2>&1 || { echo "ERROR: timeout is required." >&2; exit 1; }
 [[ "$CAPTURE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: BC250_SUPPORT_CAPTURE_TIMEOUT must be a positive integer." >&2; exit 2; }
 
+[[ -d "$OUTPUT_DIR" ]] || { echo "ERROR: output directory does not exist: $OUTPUT_DIR" >&2; exit 2; }
+OUTPUT_DIR="$(cd -- "$OUTPUT_DIR" && pwd -P)"
+
 run_id="$(date +%Y%m%dT%H%M%S%z)-$(head -c 4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
 started="$(date --iso-8601=seconds)"
-install -d -m 0700 /run/bc250 "$OUTPUT_DIR"
+install -d -m 0700 /run/bc250
 work="$(mktemp -d /run/bc250/support-bundle.XXXXXX)"
 evidence="$work/evidence"
 archive="$OUTPUT_DIR/${run_id}-bc250-support-bundle.tar.gz"
@@ -72,6 +78,59 @@ capture_shell() {
   } > "$evidence/$file" 2>&1
 }
 
+capture_json() {
+  local file="$1" rc=0 tmp err_tmp err_file
+  shift
+  tmp="$evidence/${file}.tmp.$$"
+  err_tmp="$evidence/${file}.stderr.$$"
+  err_file="$evidence/${file%.json}.error.txt"
+  rm -f -- "$evidence/$file" "$err_file" "$tmp" "$err_tmp"
+  if timeout --signal=TERM --kill-after=5s "${CAPTURE_TIMEOUT}s" "$@" >"$tmp" 2>"$err_tmp"; then
+    if python3 - "$tmp" <<'PY_JSON'
+import json
+import sys
+from pathlib import Path
+json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+PY_JSON
+    then
+      mv -f -- "$tmp" "$evidence/$file"
+      rm -f -- "$err_tmp"
+      return 0
+    fi
+    rc=65
+    printf 'capture_error=invalid JSON response\n' >"$err_file"
+  else
+    rc=$?
+    printf 'command_rc=%s\n' "$rc" >"$err_file"
+    [[ $rc -ne 124 ]] || printf 'interpretation=TIMEOUT after %ss\n' "$CAPTURE_TIMEOUT" >>"$err_file"
+  fi
+  [[ ! -s "$err_tmp" ]] || cat "$err_tmp" >>"$err_file"
+  rm -f -- "$tmp" "$err_tmp"
+  return 0
+}
+
+validate_json_tree() {
+  local root="$1"
+  python3 - "$root" <<'PY_VALIDATE_JSON'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+invalid = []
+for path in sorted(root.rglob("*.json")):
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - diagnostics are reported as validation failure
+        invalid.append(f"{path.relative_to(root)}: {exc}")
+if invalid:
+    print("ERROR: invalid JSON evidence payload(s):", file=sys.stderr)
+    for item in invalid:
+        print(f"  {item}", file=sys.stderr)
+    raise SystemExit(1)
+PY_VALIDATE_JSON
+}
+
 capture package.txt rpm -q bc250-llm-server
 capture package-verify.txt rpm -V bc250-llm-server
 capture status.txt bc250 status
@@ -92,8 +151,8 @@ command -v sensors >/dev/null 2>&1 && capture sensors.txt sensors
 } > "$evidence/boots.txt"
 
 for port in 11434 11435 11436 11437; do
-  curl -fsS --connect-timeout 1 --max-time 3 "http://127.0.0.1:${port}/api/ps" \
-    > "$evidence/ollama-${port}-residency.json" 2>/dev/null || true
+  capture_json "ollama-${port}-residency.json" \
+    curl -fsS --connect-timeout 1 --max-time 3 "http://127.0.0.1:${port}/api/ps"
 done
 
 {
@@ -157,6 +216,7 @@ manifest = {
 Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 PY
 
+validate_json_tree "$work"
 (
   cd "$work"
   find manifest.json evidence -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
@@ -167,8 +227,13 @@ verify_dir="$work/verify"
 install -d -m 0700 "$verify_dir"
 tar -xzf "$archive.tmp" -C "$verify_dir"
 (cd "$verify_dir" && sha256sum -c SHA256SUMS.txt >/dev/null)
+validate_json_tree "$verify_dir"
 chmod 0600 "$archive.tmp"
 mv -f "$archive.tmp" "$archive"
+chown "$CALLER_UID:$CALLER_GID" "$archive"
+chmod 0600 "$archive"
 
-echo "Support bundle created and self-verified: $archive"
-echo "The archive is mode 0600 and excludes user content and credentials by design."
+echo "Support bundle created: $archive"
+echo "Archive integrity and checksums verified."
+echo "JSON evidence validation: PASS"
+echo "The archive is owned by the invoking operator, mode 0600, and excludes user content and credentials by design."

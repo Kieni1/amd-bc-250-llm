@@ -3,7 +3,9 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import stat
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -112,7 +114,7 @@ class StatusTests(unittest.TestCase):
         self.assertIn('Overall: DEGRADED', source)
         self.assertIn('Recovery: sudo bc250 advanced agent normal', source)
         self.assertIn('Overall: UNAVAILABLE', source)
-        self.assertIn('Reboot required: UNKNOWN (restart check unavailable)', source)
+        self.assertIn('Reboot required: NOT CHECKED (needs-restarting unavailable)', source)
 
     def test_status_overall_state_distinguishes_pending_mismatch_and_unavailable(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -219,7 +221,7 @@ ollama_version_line
         for required in ("OLLAMA_VULKAN=1", "OLLAMA_IGPU_ENABLE=1", "GGML_VK_VISIBLE_DEVICES=0"):
             self.assertIn(required, verify)
         self.assertIn("resident:", source)
-        self.assertIn("Reboot required: UNKNOWN (restart check unavailable)", source)
+        self.assertIn("Reboot required: NOT CHECKED (needs-restarting unavailable)", source)
 
 
     def test_machine_readable_status_and_health_are_packaged_interfaces(self) -> None:
@@ -462,7 +464,8 @@ bc250_failed_systemd_units
             "BC250_SUPPORT_CAPTURE_TIMEOUT",
             "interpretation=TIMEOUT",
             "sha256sum -c SHA256SUMS.txt",
-            "Support bundle created and self-verified",
+            "Archive integrity and checksums verified.",
+            "JSON evidence validation: PASS",
         ):
             self.assertIn(expected, source)
         for forbidden in (
@@ -472,9 +475,126 @@ bc250_failed_systemd_units
         ):
             self.assertNotIn(forbidden, source)
         self.assertIn("mktemp -d /run/bc250/support-bundle.XXXXXX", source)
+        self.assertIn('OUTPUT_DIR="${PWD}"', source)
+        self.assertIn('CALLER_UID="${SUDO_UID:-$(id -u)}"', source)
+        self.assertIn('CALLER_GID="${SUDO_GID:-$(id -g)}"', source)
+        self.assertIn('[[ -d "$OUTPUT_DIR" ]]', source)
+        self.assertIn('install -d -m 0700 /run/bc250', source)
+        self.assertNotIn('install -d -m 0700 /run/bc250 "$OUTPUT_DIR"', source)
+        self.assertIn('capture_json()', source)
+        self.assertIn('.error.txt', source)
+        self.assertIn('json.loads', source)
+        self.assertIn('chown "$CALLER_UID:$CALLER_GID" "$archive"', source)
+        self.assertIn('chmod 0600 "$archive"', source)
+        self.assertIn('Support bundle created: $archive', source)
+        self.assertNotIn('self-verified', source)
         self.assertIn("-bc250-support-bundle.tar.gz", source)
         self.assertNotIn("/run/bc250 support-bundle", source)
         self.assertNotIn("-bc250 support-bundle.tar.gz", source)
+
+    def test_support_bundle_runtime_preserves_export_dir_and_publishes_valid_evidence(self) -> None:
+        path = ROOT / "cmd/monitoring/support-bundle.sh"
+        source = path.read_text(encoding="utf-8")
+        root_guard = '((EUID == 0)) || { echo "ERROR: run with sudo for complete support evidence." >&2; exit 1; }'
+        self.assertIn(root_guard, source)
+
+        with tempfile.TemporaryDirectory() as tmp_raw:
+            tmp = Path(tmp_raw)
+            tmp.chmod(0o755)
+            output_dir = tmp / "operator-export"
+            output_dir.mkdir(mode=0o755)
+            before = output_dir.stat()
+
+            run_root = tmp / "run" / "bc250"
+            test_script = tmp / "support-bundle-test.sh"
+            test_source = source.replace(root_guard, ': # root requirement bypassed by isolated unit harness')
+            test_source = test_source.replace('/run/bc250', str(run_root))
+            test_script.write_text(test_source, encoding="utf-8")
+            test_script.chmod(0o755)
+
+            mock_bin = tmp / "bin"
+            mock_bin.mkdir()
+            libexec = tmp / "libexec"
+            libexec.mkdir()
+
+            def write_exe(name: str, body: str) -> None:
+                target = mock_bin / name
+                target.write_text("#!/usr/bin/env bash\nset -eu\n" + body, encoding="utf-8")
+                target.chmod(0o755)
+
+            write_exe(
+                "rpm",
+                """if [[ ${1:-} == -q ]]; then echo 'bc250-llm-server-0.14.1-1.test'; fi\nexit 0\n""",
+            )
+            write_exe(
+                "bc250",
+                """case "${1:-} ${2:-} ${3:-}" in\n  'status  ') echo 'status ok' ;;\n  'verify --summary ') echo 'verify ok' ;;\n  'maintenance status ') echo 'maintenance ok' ;;\n  'advanced agent topology') echo 'mode=normal' ;;\n  *) echo 'mock bc250 ok' ;;\nesac\n""",
+            )
+            write_exe(
+                "systemctl",
+                """case "${1:-}" in\n  --failed) exit 0 ;;\n  is-active) echo inactive ;;\n  is-enabled) echo disabled ;;\n  show) echo '' ;;\nesac\n""",
+            )
+            write_exe("free", "echo 'mock free'\n")
+            write_exe("swapon", "echo 'mock swapon'\n")
+            write_exe("df", "echo 'mock df'\n")
+            write_exe("sensors", "echo 'mock sensors'\n")
+            write_exe(
+                "journalctl",
+                """if [[ ${1:-} == --list-boots ]]; then echo '0 boot mock'; fi\nexit 0\n""",
+            )
+            write_exe(
+                "curl",
+                """url="${@: -1}"\nif [[ "$url" == *':11436/'* ]]; then\n  echo 'curl: (7) expected inactive agent lane' >&2\n  exit 7\nfi\nprintf '{"models": []}\\n'\n""",
+            )
+            # Keep ownership unchanged in this unprivileged harness. The source-level
+            # contract separately requires chown to SUDO_UID/SUDO_GID.
+            write_exe("chown", "exit 0\n")
+
+            cu_status = libexec / "cu-status.sh"
+            cu_status.write_text("#!/usr/bin/env bash\necho 'cu ok'\n", encoding="utf-8")
+            cu_status.chmod(0o755)
+
+            env = os.environ | {
+                "PATH": f"{mock_bin}:{os.environ.get('PATH', '')}",
+                "BC250_LIBEXEC": str(libexec),
+                "BC250_SUPPORT_CAPTURE_TIMEOUT": "2",
+                "SUDO_UID": str(os.getuid()),
+                "SUDO_GID": str(os.getgid()),
+            }
+            result = subprocess.run(
+                [str(test_script), "--output-dir", str(output_dir)],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("Archive integrity and checksums verified.", result.stdout)
+            self.assertIn("JSON evidence validation: PASS", result.stdout)
+            self.assertNotIn("self-verified", result.stdout)
+
+            after = output_dir.stat()
+            self.assertEqual(stat.S_IMODE(after.st_mode), 0o755)
+            self.assertEqual(after.st_uid, before.st_uid)
+            self.assertEqual(after.st_gid, before.st_gid)
+
+            archives = list(output_dir.glob("*-bc250-support-bundle.tar.gz"))
+            self.assertEqual(len(archives), 1)
+            archive = archives[0]
+            self.assertEqual(stat.S_IMODE(archive.stat().st_mode), 0o600)
+            self.assertEqual(archive.stat().st_uid, os.getuid())
+            self.assertEqual(archive.stat().st_gid, os.getgid())
+
+            with tarfile.open(archive, "r:gz") as tf:
+                names = tf.getnames()
+                self.assertIn("evidence/ollama-11436-residency.error.txt", names)
+                self.assertNotIn("evidence/ollama-11436-residency.json", names)
+                json_names = [name for name in names if name.endswith(".json")]
+                self.assertGreaterEqual(len(json_names), 4)
+                for name in json_names:
+                    member = tf.extractfile(name)
+                    self.assertIsNotNone(member, name)
+                    json.loads(member.read().decode("utf-8"))
 
     def test_status_uses_agent_mode_as_single_runtime_topology_classifier(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")
@@ -684,6 +804,7 @@ class RuntimeConvenienceTests(unittest.TestCase):
         self.assertNotIn("qwen3.6-35b-a3b-mtp", result.stdout)
         self.assertNotIn("qwen36-27b", result.stdout)
         self.assertNotIn("qwen38-27b", result.stdout)
+        self.assertNotIn("qwen35-9b", result.stdout)
         self.assertNotIn("set LLAMACPP", result.stdout)
 
     def test_mtp_runner_missing_source_points_to_exact_fetch_before_runtime(self) -> None:
