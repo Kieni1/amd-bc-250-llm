@@ -48,8 +48,8 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertRegex(spec, rf"(?m)^Version:\s+{re.escape(version)}$")
         self.assertRegex(spec, rf"(?m)^Release:\s+{re.escape(contract['package']['rpm_release'])}%")
         self.assertNotIn("runtime", contract)
-        self.assertIn("BC250_OLLAMA_VERSION=0.40.8", runtime)
-        self.assertIn("BC250_OPEN_WEBUI_VERSION=0.12.4", runtime)
+        self.assertIn("BC250_OLLAMA_VERSION=0.40.13", runtime)
+        self.assertIn("BC250_OPEN_WEBUI_VERSION=0.12.5", runtime)
 
     def test_workflow_runs_primary_gate_as_unprivileged_builder(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
@@ -62,6 +62,11 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("Upload selected release authority record", workflow)
         self.assertIn("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1", workflow)
         self.assertIn("--disable-repo=fedora-cisco-openh264", workflow)
+        self.assertIn("--setopt=install_weak_deps=False", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("timeout-minutes: 30", workflow)
+        self.assertIn("cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}", workflow)
+        self.assertRegex(workflow, r"(?m)^  push:\n    branches:\n      - main$")
         for package in ("coreutils", "diffutils", "gawk", "grep", "sed"):
             self.assertIn(package, workflow)
         self.assertNotIn("build-local.sh", workflow)
@@ -75,6 +80,7 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("BC250_RELEASE_AUTHORITY=false", local)
         self.assertIn("BC250_BUILD_IMAGE_REF", local)
         self.assertIn("--disable-repo=fedora-cisco-openh264", local)
+        self.assertIn("--setopt=install_weak_deps=False", local)
         for package in ("coreutils", "diffutils", "gawk", "grep", "sed"):
             self.assertIn(package, local)
         self.assertNotIn("gfx" + "1013", local.lower())
@@ -136,7 +142,7 @@ class ReleasePipelineTests(unittest.TestCase):
 
     def test_github_uploads_release_artifacts_before_advisory_quality(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")
-        quality = workflow.index("Run advisory full quality report")
+        quality = workflow.index("Run advisory remaining quality report")
         self.assertLess(workflow.index("Upload binary RPM evidence"), quality)
         self.assertLess(workflow.index("Upload source RPM evidence"), quality)
         self.assertLess(workflow.index("Upload selected release authority record"), quality)
@@ -158,7 +164,7 @@ class ReleasePipelineTests(unittest.TestCase):
         contract = json.loads((ROOT / "release-contract.json").read_text(encoding="utf-8"))
         validator = (ROOT / "scripts/validate.sh").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
-        self.assertIn("all|--preflight|--package", validator)
+        self.assertIn("all|--preflight|--package|--advisory", validator)
         self.assertEqual(
             contract["validation"]["package_critical_tests"],
             [
@@ -184,10 +190,19 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertIn("$(MAKE) lint", preflight)
         self.assertLess(preflight.index("$(MAKE) lint"), preflight.index("$(MAKE) freeze-rpm-inputs"))
         self.assertIn("quality-report:", makefile)
-        self.assertIn("Advisory quality report: WARN", makefile)
+        quality_report = make_recipe("quality-report")
+        self.assertIn("./scripts/validate.sh --advisory", quality_report)
+        self.assertNotIn("$(MAKE) lint", quality_report)
+        self.assertIn('exit "$$validate_rc"', quality_report)
+        self.assertIn("Advisory quality report: FAIL", quality_report)
+        self.assertIn("all|--preflight|--package|--advisory", validator)
+        self.assertIn('hard_gate_tests["$test_file"]=1', validator)
+        self.assertIn('"${preflight_tests[@]}" "${package_tests[@]}"', validator)
+        self.assertIn("find tests -maxdepth 1 -type f -name 'test_*.py'", validator)
+        self.assertNotIn("find \"$ROOT/tests\" -maxdepth 1 -type f -name 'test_*.py'", validator)
         self.assertIn("development/scope.py check --quiet", validator)
         self.assertIn("check-current-guidance.sh", validator)
-        self.assertIn("Run advisory full quality report", workflow)
+        self.assertIn("Run advisory remaining quality report", workflow)
         self.assertIn("continue-on-error: true", workflow)
         self.assertIn("Upload advisory quality report", workflow)
         rpmlint = make_recipe("check-rpmlint")

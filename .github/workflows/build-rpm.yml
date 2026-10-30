@@ -9,7 +9,13 @@ on:
         default: false
         type: boolean
   push:
+    branches:
+      - main
   pull_request:
+
+concurrency:
+  group: build-rpm-${{ github.event_name == 'workflow_dispatch' && github.run_id || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
@@ -24,19 +30,22 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     container:
       image: fedora:44
 
     steps:
       - name: Install build tools
         run: |
-          dnf --disable-repo=fedora-cisco-openh264 install -y \
+          dnf --disable-repo=fedora-cisco-openh264 --setopt=install_weak_deps=False install -y \
             bash cargo coreutils cpio curl diffutils findutils gawk gcc git-core grep gzip make sed \
             libdrm-devel patch python3 rpm-build rpmlint ruff rust ShellCheck shadow-utils \
             systemd systemd-rpm-macros tar util-linux xz
 
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Run Fedora RPM gate as unprivileged builder
         run: |
@@ -92,7 +101,7 @@ jobs:
             dist/SHA256SUMS.source
             dist/SHA256SUMS.inputs
 
-      - name: Run advisory full quality report
+      - name: Run advisory remaining quality report
         if: always()
         continue-on-error: true
         run: |

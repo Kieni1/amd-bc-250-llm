@@ -34,7 +34,7 @@ help:
 	  'make sources    Download pinned governor and live-manager sources' \
 	  'make sources-check  Verify the local source cache and SHA-256 sidecars' \
 	  'make lint       Run blocking Ruff and ShellCheck release preflight' \
-	  'make quality-report  Run lint + full validation and report all issues without blocking artifacts' \
+	  'make quality-report  Run remaining advisory tests, stream the report, and return their real status' \
 	  'make preflight  Run release-critical source/release-pipeline checks' \
 	  'make validate   Run current guidance/scope plus the full advisory repository test suite' \
 	  'make source-tar Create the project source archive' \
@@ -80,15 +80,14 @@ quality-report:
 	report='$(BUILD_DIR)/quality-report.txt'; \
 	: > "$$report"; \
 	echo '== Advisory quality report ==' | tee -a "$$report"; \
-	$(MAKE) lint >>"$$report" 2>&1; lint_rc=$$?; \
-	./scripts/validate.sh >>"$$report" 2>&1; validate_rc=$$?; \
-	printf 'lint_rc=%s\nvalidate_rc=%s\n' "$$lint_rc" "$$validate_rc" | tee -a "$$report"; \
-	if ((lint_rc == 0 && validate_rc == 0)); then \
+	./scripts/validate.sh --advisory 2>&1 | tee -a "$$report"; validate_rc=$${PIPESTATUS[0]}; \
+	printf 'validate_rc=%s\n' "$$validate_rc" | tee -a "$$report"; \
+	if ((validate_rc == 0)); then \
 	  echo 'Advisory quality report: PASS' | tee -a "$$report"; \
 	else \
-	  echo 'Advisory quality report: WARN (non-blocking; inspect report)' | tee -a "$$report"; \
+	  echo "Advisory quality report: FAIL (validation rc=$$validate_rc; GitHub treats this step as non-blocking)" | tee -a "$$report"; \
 	fi; \
-	exit 0
+	exit "$$validate_rc"
 
 source-tar:
 	./scripts/make-source-tarball.sh

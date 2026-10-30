@@ -6,34 +6,37 @@ cd "$ROOT"
 
 mode="${1:-all}"
 case "$mode" in
-  all|--preflight|--package) ;;
+  all|--preflight|--package|--advisory) ;;
   -h|--help)
     cat <<'HELP'
-Usage: scripts/validate.sh [--preflight|--package]
+Usage: scripts/validate.sh [--preflight|--package|--advisory]
   default       run current-guidance/scope checks plus every repository test module
   --preflight   run release-critical source contracts and release-pipeline tests
   --package     run the package-critical test set declared in release-contract.json
+  --advisory    run only repository test modules not already covered by the hard preflight/package gates
 HELP
     exit 0
     ;;
   *) echo "ERROR: unknown validation mode: $mode" >&2; exit 2 ;;
 esac
 
-# Syntax-check source-owned shell entrypoints only. Build/vendor/history trees are not product source.
-while IFS= read -r -d '' file; do
-  bash -n "$file"
-done < <(
-  find "$ROOT" \
-    \( -path "$ROOT/.git" -o -path "$ROOT/.build" -o -path "$ROOT/build" -o -path "$ROOT/dist" \
-       -o -path "$ROOT/rpmbuild" -o -path "$ROOT/sources" -o -path "$ROOT/vendor" \
-       -o -path "$ROOT/development/handovers/archive" -o -path "$ROOT/development/model-runs" \
-       -o -path "$ROOT/development/patchnotes" -o -path "$ROOT/governor-src" -o -path "$ROOT/live-manager-src" \
-       -o -path "$ROOT/quality-checks/history" \) -prune -o \
-    -type f \( -name '*.sh' -o -path "$ROOT/packaging/bc250" -o -path "$ROOT/install" \) -print0
-)
+if [[ "$mode" != "--advisory" ]]; then
+  # Syntax-check source-owned shell entrypoints only. Build/vendor/history trees are not product source.
+  while IFS= read -r -d '' file; do
+    bash -n "$file"
+  done < <(
+    find "$ROOT" \
+      \( -path "$ROOT/.git" -o -path "$ROOT/.build" -o -path "$ROOT/build" -o -path "$ROOT/dist" \
+         -o -path "$ROOT/rpmbuild" -o -path "$ROOT/sources" -o -path "$ROOT/vendor" \
+         -o -path "$ROOT/development/handovers/archive" -o -path "$ROOT/development/model-runs" \
+         -o -path "$ROOT/development/patchnotes" -o -path "$ROOT/governor-src" -o -path "$ROOT/live-manager-src" \
+         -o -path "$ROOT/quality-checks/history" \) -prune -o \
+      -type f \( -name '*.sh' -o -path "$ROOT/packaging/bc250" -o -path "$ROOT/install" \) -print0
+  )
 
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate.py
-bash scripts/check-clean-core-absence.sh "$ROOT"
+  PYTHONDONTWRITEBYTECODE=1 python3 scripts/validate.py
+  bash scripts/check-clean-core-absence.sh "$ROOT"
+fi
 
 test_module_timeout="${BC250_TEST_MODULE_TIMEOUT:-120}"
 [[ "$test_module_timeout" =~ ^[1-9][0-9]*$ ]] || {
@@ -72,7 +75,7 @@ run_test_set() {
   fi
 }
 
-mapfile -t all_tests < <(find "$ROOT/tests" -maxdepth 1 -type f -name 'test_*.py' -print | sort)
+mapfile -t all_tests < <(find tests -maxdepth 1 -type f -name 'test_*.py' -print | sort)
 mapfile -t preflight_tests < <(python3 - <<'PY'
 import json
 from pathlib import Path
@@ -88,6 +91,20 @@ for item in json.loads(Path('release-contract.json').read_text())['validation'][
     print(item)
 PY
 )
+
+if [[ "$mode" == "--advisory" ]]; then
+  declare -A hard_gate_tests=()
+  for test_file in "${preflight_tests[@]}" "${package_tests[@]}"; do
+    hard_gate_tests["$test_file"]=1
+  done
+  advisory_tests=()
+  for test_file in "${all_tests[@]}"; do
+    [[ -n "${hard_gate_tests[$test_file]:-}" ]] || advisory_tests+=("$test_file")
+  done
+  run_test_set "${advisory_tests[@]}"
+  echo "Advisory repository validation passed (${#advisory_tests[@]} non-hard-gate modules)."
+  exit 0
+fi
 
 if [[ "$mode" == "--preflight" ]]; then
   preflight_failures=0

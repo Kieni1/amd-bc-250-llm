@@ -25,7 +25,7 @@ podman run --rm --pull="$pull_policy" \
       systemd systemd-rpm-macros tar util-linux xz
     )
     if ! rpm -q "${build_packages[@]}" >/dev/null 2>&1; then
-      dnf --disable-repo=fedora-cisco-openh264 install -y "${build_packages[@]}"
+      dnf --disable-repo=fedora-cisco-openh264 --setopt=install_weak_deps=False install -y "${build_packages[@]}"
     fi
 
     groupadd --force --gid "$BC250_HOST_GID" bc250-builder
