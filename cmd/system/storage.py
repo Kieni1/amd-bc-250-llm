@@ -156,7 +156,7 @@ def stat_signature(path: Path) -> dict[str, int]:
 def source_checksum_valid(source: Path, checksum: str, state: dict) -> bool:
     current = stat_signature(source)
     if (
-        state.get("schema") in {2, 3}
+        state.get("schema") in {2, 3, 4}
         and state.get("size") == current["size"]
         and state.get("mtime_ns") == current["mtime_ns"]
         and state.get("ctime_ns") == current["ctime_ns"]

@@ -76,6 +76,15 @@ class StorageTests(unittest.TestCase):
             with patch.object(storage.os, "access", return_value=False):
                 self.assertIsNone(storage.tree_bytes(root))
 
+    def test_schema4_sidecar_uses_stat_checksum_fast_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "model.gguf"
+            source.write_bytes(b"weights")
+            signature = storage.stat_signature(source)
+            state = {"schema": 4, **signature}
+            with patch.object(storage, "digest", side_effect=AssertionError("unexpected hash")):
+                self.assertTrue(storage.source_checksum_valid(source, "a" * 64, state))
+
     def test_schema1_sidecar_does_not_use_stat_only_checksum_fast_path(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "model.gguf"
