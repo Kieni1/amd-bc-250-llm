@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.9%{?dist}
+Release:        1.10%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -263,6 +263,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.10
+- Introduce metadata-first model acquisition/capability/qualification contracts and consolidated model inspect output across lifecycle, benchmark and Open WebUI consumers.
+- Update Open WebUI to 0.12.4 while retaining Ollama 0.40.8 and the established appliance runtime topology/policy.
+- Make pre-1.0 tracking-source refresh explicit: ordinary apply reuses a valid recorded artifact across moving-ref policy migration; refresh alone advances tracking sources and records acquired byte identity.
+- Centralize semantic model-catalog/profile validation so modelctl, benchmarks and Open WebUI reject malformed package metadata consistently.
+- Add provider-aware remove explanation/cleanup, metadata-driven MiniCPM vision/OCR support, and explicit static Agent qualification scope without claiming native tool-call execution.
+
 * Sun Oct 25 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.9
 - Unify MTP with the indexed interactive model overview and allow explicit installer selection to prepare/verify standalone MTP GGUF artifacts.
 - Keep broad installer groups and generic combined apply/refresh convergence MTP-free; MTP remains download-only and standalone llama.cpp runtime policy is unchanged.

@@ -34,7 +34,7 @@
   "package": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "rpm_release": "1.9",
+    "rpm_release": "1.10",
     "version": "0.14.1"
   },
   "schema": "bc250.release-contract.v2",
