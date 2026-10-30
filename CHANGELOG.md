@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.14.1-1.11 - 2026-10-30
+
+- Keep current package-owned Modelfiles canonical as `experiments` while retaining cheap read-only normalization of the former `experimental` spelling only for persistent operator-owned Modelfiles; restore retired/archive Modelfiles unchanged for provenance.
+- Explicitly thaw/refreeze the frozen MTP input surface to remove the remaining `qwen35-9b` convenience alias and require exact catalog IDs without changing MTP runtime/lifecycle behavior.
+- Make revalidation and support-bundle outputs operator-ready: export mode-0600 archives to the invoking working directory by default (or an existing `--output-dir`) without mutating the destination directory, while retaining protected internal revalidation history.
+- Harden diagnostic evidence: publish endpoint `.json` only after validation, use `.error.txt` for failed/non-JSON captures, separate final revalidation completion/infrastructure/model-quality/product-integrity/topology-restoration/coverage dimensions, exclude transient progress files from final evidence, and align human summaries with machine state.
+- Define `nonthinking-first-pass` as an explicit generation-benchmark `think=false` request; preserve and diagnose literal provider `<think>` contamination rather than silently rewriting raw benchmark evidence.
+- Align current operator wording around model quality, translation integrity, topology restoration and unavailable reboot diagnostics; keep the post-1.10 workbench state distinct from exact 1.10 device evidence.
+- Add runtime support-bundle export/evidence regression coverage: preserve existing operator-directory ownership/mode, keep exports operator-readable at mode 0600, require every published/archived JSON payload to parse, record inactive endpoints as `.error.txt`, and replace ambiguous `self-verified` completion wording with explicit archive/checksum and JSON-evidence validation results.
+
 ## 0.14.1-1.10 - 2026-10-30
 
 - Replace scattered package-model acquisition/capability facts with a declarative model catalog and schema-2 qualification profiles; packaged Modelfiles remain runtime-parameter authority.

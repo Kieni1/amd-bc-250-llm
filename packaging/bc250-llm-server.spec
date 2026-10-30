@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.10%{?dist}
+Release:        1.11%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -263,6 +263,13 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.11
+- Make revalidation and support-bundle exports operator-ready without mutating operator-selected directories; retain protected internal evidence and export invoking-user-owned mode-0600 archives.
+- Harden evidence publication so JSON artifacts are parseable, failed endpoint captures use explicit diagnostic files, final qualification dimensions are machine-readable, and human summaries match the evidence contract.
+- Restore archive provenance and persistent Modelfile read compatibility while keeping current package output canonical; explicitly refreeze MTP on exact catalog IDs only.
+- Make nonthinking-first-pass issue an explicit think=false benchmark request while preserving and diagnosing provider reasoning contamination in raw evidence.
+- Add behavior-level support-bundle export/evidence regressions and align operator wording for model quality, translation integrity, topology restoration and unavailable reboot diagnostics.
+
 * Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.10
 - Introduce metadata-first model acquisition/capability/qualification contracts and consolidated model inspect output across lifecycle, benchmark and Open WebUI consumers.
 - Update Open WebUI to 0.12.4 while retaining Ollama 0.40.8 and the established appliance runtime topology/policy.
