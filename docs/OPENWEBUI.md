@@ -1,6 +1,6 @@
 # Open WebUI
 
-Current 0.14.1-1.12 source candidate: **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
+Current 0.14.1-1.13 source candidate (carrying the accepted 1.12 runtime baseline): **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -55,6 +55,15 @@ A reported difference may be an intentional operator override; `status` does not
 reset it. Verbose status also renders effective nested `params.custom_params` for model/request
 policy and, when the pinned API exports it, reports the administrator-owned multi-model-chat
 permission without converging that permission.
+
+Open WebUI 0.12.5 also has one package-owned, version-scoped compatibility guard mounted read-only
+into the container. For the Tika 4 Markdown endpoint only, BC-250 rejects HTTP-success responses whose
+`tk:content` is missing, blank, or the literal upstream placeholder `<No text content found>`. The resulting
+processing failure explicitly says that no usable text was found and notes that the file may be empty,
+corrupted, image-only or unsupported; a textless/image-only file is not mislabeled as corruption. The same
+pinned-version shim makes duplicate-content rejection explicit: the content is already present in the
+Knowledge collection. Recoverable Tika extraction remains successful. The guard is deliberately tied to
+the pinned Open WebUI 0.12.5 behavior and must be revalidated or removed when the Open WebUI pin changes.
 
 Open WebUI is a Podman Quadlet. Its generated `open-webui.service` is transient and is not directly
 `systemctl enable`d. The package controls boot publication by installing/removing the Quadlet `[Install]`
@@ -355,7 +364,7 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250 maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database—including the current 0.12.5 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database—including the current 0.12.5 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` first captures the trustworthy previous Open WebUI version from the old live API when available, falling back to the still-installed old package runtime metadata. It then unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer consumes that capture when naming the stopped-state rollback snapshot; `unknown` is retained only when neither source provides reliable provenance. The capture is removed only after the rollback archive and checksum have been verified. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and

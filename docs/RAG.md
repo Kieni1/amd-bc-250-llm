@@ -8,6 +8,21 @@ and Tika services, the main answer lane on `11434`, and the dedicated embedding 
 Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
 
+For the pinned Open WebUI 0.12.5/Tika 4 combination, BC-250 includes a narrow runtime guard for
+semantically empty extraction: a Tika HTTP-success response with missing/blank `tk:content` or the literal
+`<No text content found>` placeholder is converted into an ingestion failure instead of being stored and
+indexed as document text. The user-facing reason states that no usable text was found and notes that the
+file may be empty, corrupted, image-only or unsupported. Recoverable malformed documents remain valid when
+Tika returns real extracted content. An image-only file is not called corrupt; it is reported as having no
+usable extracted text unless OCR is deliberately used through the separate OCR workflow. Revalidate this
+compatibility guard whenever the Open WebUI or Tika extraction contract changes.
+
+Open WebUI's duplicate-content protection is an expected Knowledge policy, not an extraction failure. For
+the pinned 0.12.5 backend BC-250 presents it as: `Duplicate document content — this content is already present
+in the knowledge collection.` The original indexed document remains the authoritative copy; regression
+harnesses treat this condition as an expected duplicate rejection and should retain the failed upload ID
+where possible so cleanup/orphan behavior can be checked separately.
+
 Apache Tika 4.2.0 now treats request-supplied configuration as untrusted by default and keeps
 per-request configuration disabled unless the operator opts in. BC-250 does not opt in: Tika remains
 unpublished on the host, attached only to the private container network, capability-dropped and

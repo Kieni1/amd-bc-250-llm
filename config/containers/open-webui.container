@@ -13,6 +13,10 @@ Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
 Volume=/var/lib/open-webui:/app/backend/data:Z,U
+# BC-250 compatibility guard for the pinned Open WebUI 0.12.5/Tika 4 loader.
+# Keep the upstream image immutable; the guard only rejects semantically empty
+# Tika extraction responses that upstream would otherwise store as placeholder text.
+Volume=/var/lib/bc250-llm-server/openwebui-runtime:/opt/bc250-openwebui-shim:ro,Z
 AddHost=host.containers.internal:host-gateway
 Memory=2g
 PidsLimit=512
@@ -21,6 +25,7 @@ DropCapability=all
 
 # Process bootstrap only. Persisted providers, task settings, embedding backend
 # and RAG chunking are owned by bc250 advanced openwebui through supported APIs.
+Environment=PYTHONPATH=/opt/bc250-openwebui-shim:/app/backend
 Environment=OLLAMA_BASE_URL=http://host.containers.internal:11434
 Environment=WEBUI_AUTH=true
 EnvironmentFile=/var/lib/bc250-llm-server/secrets/open-webui.env

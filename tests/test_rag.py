@@ -1,11 +1,59 @@
 from __future__ import annotations
 
+import importlib.util
+import io
 import json
 import re
+import sys
+import types
 import unittest
+import zipfile
 from pathlib import Path
 
+from tests import dependency_depth_harness as DEPTH
+
 ROOT = Path(__file__).resolve().parent.parent
+
+
+class _GuardResponse:
+    def __init__(self, payload: object, *, status_code: int = 200, json_error: bool = False) -> None:
+        self.payload = payload
+        self.status_code = status_code
+        self.reason = "OK"
+        self.json_error = json_error
+
+    @property
+    def ok(self) -> bool:
+        return self.status_code < 400
+
+    def json(self) -> object:
+        if self.json_error:
+            raise ValueError("invalid json")
+        return self.payload
+
+
+def _load_tika_guard(response: _GuardResponse):
+    fake_requests = types.ModuleType("requests")
+
+    def fake_put(url: object, *args: object, **kwargs: object) -> _GuardResponse:
+        del url, args, kwargs
+        return response
+
+    fake_requests.put = fake_put  # type: ignore[attr-defined]
+    old_requests = sys.modules.get("requests")
+    sys.modules["requests"] = fake_requests
+    try:
+        path = ROOT / "config/openwebui/runtime/sitecustomize.py"
+        spec = importlib.util.spec_from_file_location("bc250_openwebui_sitecustomize_test", path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    finally:
+        if old_requests is None:
+            sys.modules.pop("requests", None)
+        else:
+            sys.modules["requests"] = old_requests
+    return module, fake_requests
 
 
 class RagBaselineTests(unittest.TestCase):
@@ -54,6 +102,164 @@ class RagBaselineTests(unittest.TestCase):
             self.assertIn(line, quadlet)
         for persisted in ("RAG_EMBEDDING_MODEL=", "CHUNK_SIZE=", "RAG_TOP_K="):
             self.assertNotIn(persisted, quadlet)
+
+    def test_openwebui_tika_guard_is_packaged_and_mounted_read_only(self) -> None:
+        quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
+        manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
+        self.assertIn(
+            "Volume=/var/lib/bc250-llm-server/openwebui-runtime:/opt/bc250-openwebui-shim:ro,Z",
+            quadlet,
+        )
+        self.assertIn("Environment=PYTHONPATH=/opt/bc250-openwebui-shim:/app/backend", quadlet)
+        self.assertIn(
+            "config/openwebui/runtime/sitecustomize.py\t/var/lib/bc250-llm-server/openwebui-runtime/sitecustomize.py",
+            manifest,
+        )
+
+    def test_openwebui_tika_guard_rejects_missing_blank_and_placeholder_content(self) -> None:
+        for payload in (
+            {},
+            {"resourceName": "corrupt.docx"},
+            {"tk:content": ""},
+            {"tk:content": "   \n\t"},
+            {"tk:content": "<No text content found>"},
+            {"tk:content": "  <No text content found>  "},
+        ):
+            with self.subTest(payload=payload):
+                response = _GuardResponse(payload)
+                module, requests = _load_tika_guard(response)
+                guarded = requests.put("http://tika:9998/tika/json/md")  # type: ignore[attr-defined]
+                self.assertEqual(guarded.status_code, 422)
+                self.assertEqual(guarded.reason, module.NO_USABLE_TEXT_REASON)
+
+    def test_openwebui_tika_guard_preserves_real_extraction_and_unrelated_requests(self) -> None:
+        real = _GuardResponse({"tk:content": "Recovered office text"})
+        _, requests = _load_tika_guard(real)
+        self.assertEqual(
+            requests.put("http://tika:9998/tika/json/md").status_code,  # type: ignore[attr-defined]
+            200,
+        )
+
+        unrelated = _GuardResponse({})
+        _, requests = _load_tika_guard(unrelated)
+        self.assertEqual(
+            requests.put("http://example.invalid/api").status_code,  # type: ignore[attr-defined]
+            200,
+        )
+
+
+    def test_openwebui_duplicate_content_wording_is_explicit(self) -> None:
+        response = _GuardResponse({"tk:content": "usable"})
+        fake_package = types.ModuleType("open_webui")
+        fake_constants = types.ModuleType("open_webui.constants")
+
+        class UpstreamErrors:
+            DUPLICATE_CONTENT = "Duplicate content detected. Please provide unique content to proceed."
+            EMPTY_CONTENT = "empty"
+
+        fake_constants.ERROR_MESSAGES = UpstreamErrors
+        fake_package.constants = fake_constants
+        old_package = sys.modules.get("open_webui")
+        old_constants = sys.modules.get("open_webui.constants")
+        sys.modules["open_webui"] = fake_package
+        sys.modules["open_webui.constants"] = fake_constants
+        try:
+            module, _requests = _load_tika_guard(response)
+            self.assertEqual(
+                fake_constants.ERROR_MESSAGES.DUPLICATE_CONTENT,
+                module.DUPLICATE_CONTENT_REASON,
+            )
+            self.assertEqual(fake_constants.ERROR_MESSAGES.EMPTY_CONTENT, "empty")
+            module.install_openwebui_error_wording()
+            self.assertEqual(
+                fake_constants.ERROR_MESSAGES.DUPLICATE_CONTENT,
+                module.DUPLICATE_CONTENT_REASON,
+            )
+        finally:
+            if old_package is None:
+                sys.modules.pop("open_webui", None)
+            else:
+                sys.modules["open_webui"] = old_package
+            if old_constants is None:
+                sys.modules.pop("open_webui.constants", None)
+            else:
+                sys.modules["open_webui.constants"] = old_constants
+
+    def test_dependency_depth_duplicate_rejection_is_expected_policy(self) -> None:
+        self.assertTrue(
+            DEPTH.expected_duplicate_rejection(
+                "failed",
+                "400: Duplicate content detected. Please provide unique content to proceed.",
+            )
+        )
+        self.assertFalse(DEPTH.expected_duplicate_rejection("failed", "embedding failed"))
+        self.assertTrue(
+            DEPTH.expected_duplicate_rejection(
+                "failed", DEPTH.OPENWEBUI_DUPLICATE_CONTENT_MESSAGES[1]
+            )
+        )
+        self.assertFalse(
+            DEPTH.expected_duplicate_rejection(
+                "completed", DEPTH.OPENWEBUI_DUPLICATE_CONTENT_MESSAGES[0]
+            )
+        )
+
+    def test_openwebui_tika_guard_preserves_existing_http_and_json_failures(self) -> None:
+        upstream_failure = _GuardResponse({}, status_code=500)
+        _, requests = _load_tika_guard(upstream_failure)
+        self.assertEqual(
+            requests.put("http://tika:9998/tika/json/md").status_code,  # type: ignore[attr-defined]
+            500,
+        )
+
+        invalid_json = _GuardResponse({}, json_error=True)
+        _, requests = _load_tika_guard(invalid_json)
+        self.assertEqual(
+            requests.put("http://tika:9998/tika/json/md").status_code,  # type: ignore[attr-defined]
+            200,
+        )
+
+    def test_openwebui_tika_guard_installation_is_idempotent(self) -> None:
+        response = _GuardResponse({"tk:content": "real"})
+        module, requests = _load_tika_guard(response)
+        first_put = requests.put  # type: ignore[attr-defined]
+        module.install_tika_empty_content_guard(requests)
+        self.assertIs(requests.put, first_put)  # type: ignore[attr-defined]
+
+    def test_dependency_depth_tika_marker_oracle_normalizes_markdown_escapes(self) -> None:
+        raw = DEPTH.DOCX_MARKER.replace("_", r"\_")
+        self.assertTrue(DEPTH.tika_marker_present(raw, DEPTH.DOCX_MARKER))
+        self.assertEqual(DEPTH.normalize_tika_markdown(raw), DEPTH.DOCX_MARKER)
+        narrow = DEPTH.normalize_tika_markdown(r"path\\name and \q stay; BC250\_DEPTH")
+        self.assertIn(r"path\\name", narrow)
+        self.assertIn(r"\q", narrow)
+        self.assertIn("BC250_DEPTH", narrow)
+
+    def test_dependency_depth_xlsx_oracle_is_unambiguous(self) -> None:
+        payload = DEPTH.minimal_xlsx_bytes()
+        with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+            sheet = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        self.assertEqual(sheet.count(DEPTH.XLSX_MARKER), 1)
+        self.assertIn(f"Validation code: {DEPTH.XLSX_MARKER}", sheet)
+        self.assertNotIn("Exact marker", sheet)
+
+    def test_dependency_depth_malformed_fixture_classes_are_distinct(self) -> None:
+        wrong_extension = b"Readable text saved with a .docx name\n"
+        valid = DEPTH.minimal_docx_bytes()
+        truncated = DEPTH.truncate_zip_central_directory(valid)
+        corrupt = b"\x00\xffBC250_CORRUPT_BINARY\x10\x11"
+        empty = b""
+
+        self.assertIn(b"Readable text", wrong_extension)
+        self.assertTrue(zipfile.is_zipfile(io.BytesIO(valid)))
+        self.assertIn(b"word/document.xml", valid)
+        self.assertIn(DEPTH.DOCX_MARKER.encode(), valid)
+        self.assertFalse(zipfile.is_zipfile(io.BytesIO(truncated)))
+        self.assertIn(b"word/document.xml", truncated)
+        self.assertIn(DEPTH.DOCX_MARKER.encode(), truncated)
+        self.assertFalse(zipfile.is_zipfile(io.BytesIO(corrupt)))
+        self.assertTrue(corrupt)
+        self.assertEqual(empty, b"")
 
     def test_rag_guide_uses_real_packaged_models_and_commands(self) -> None:
         guide = (ROOT / "docs/RAG.md").read_text(encoding="utf-8")
