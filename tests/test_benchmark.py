@@ -35,6 +35,634 @@ generation = load_module("generation_benchmark_test", BENCH / "generation-benchm
 category = load_module("category_benchmark_test", BENCH / "category-benchmark.py")
 runtime_workflow = load_module("runtime_benchmark_test", BENCH / "runtime-benchmark.py")
 openwebui_workflow = load_module("openwebui_benchmark_test", BENCH / "openwebui-benchmark.py")
+quality_campaign = load_module("quality_campaign_test", BENCH / "quality-campaign.py")
+
+
+class QualityCampaignFoundationTests(unittest.TestCase):
+    def test_campaign_audit_matches_current_package_controls(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            args = SimpleNamespace(manifest=None, output_dir=str(Path(tmp) / "audit"))
+            self.assertEqual(quality_campaign.run_audit(args), 0)
+            summary = json.loads((Path(tmp) / "audit" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(summary["qualification_counts"]["pass"], 11)
+            self.assertEqual(summary["qualification_counts"]["quality-fail"], 0)
+
+    def test_campaign_manifest_tracks_managed_challengers_and_source_integrated_sampler(self) -> None:
+        manifest = json.loads((ROOT / "examples/benchmark/quality-campaign.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["language_weights"], {"de": 0.45, "fr": 0.45, "en": 0.10})
+        by_id = {row["id"]: row for row in manifest["challengers"]}
+        self.assertEqual(by_id["lfm3-1.7b"]["package_state"], "package-managed")
+        self.assertEqual(by_id["nemotron-3.5-bolt-e4b"]["package_state"], "package-managed")
+        self.assertEqual(by_id["qwen3-embedding-0.6b"]["package_state"], "already-packaged")
+        self.assertEqual(manifest["setting_hypotheses"][0]["status"], "source-integrated-device-regression-pending")
+
+    def test_corpus_inventory_records_external_pdf_provenance_and_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            nested = corpus / "nested"
+            nested.mkdir(parents=True)
+            first = corpus / "Richtlinie 01.pdf"
+            duplicate = nested / "copie.pdf"
+            invalid = corpus / "not-really.pdf"
+            ignored = corpus / "notes.txt"
+            first.write_bytes(b"%PDF-1.7\nsynthetic\n")
+            duplicate.write_bytes(first.read_bytes())
+            invalid.write_bytes(b"not a pdf")
+            ignored.write_text("ignore me", encoding="utf-8")
+            output = root / "inventory"
+            args = SimpleNamespace(
+                corpus_dir=str(corpus),
+                corpus_id="public-office-pdfs",
+                description="Synthetic inventory test",
+                output_dir=str(output),
+            )
+            self.assertEqual(quality_campaign.run_corpus_inventory(args), 0)
+            inventory = json.loads(
+                (output / "corpus-inventory.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(inventory["corpus_id"], "public-office-pdfs")
+            self.assertEqual(len(inventory["documents"]), 3)
+            by_file = {row["file"]: row for row in inventory["documents"]}
+            self.assertTrue(by_file["Richtlinie 01.pdf"]["pdf_header_valid"])
+            self.assertFalse(by_file["not-really.pdf"]["pdf_header_valid"])
+            duplicate_rows = [
+                row for row in inventory["documents"] if "duplicate_of" in row
+            ]
+            self.assertEqual(len(duplicate_rows), 1)
+            duplicate_row = duplicate_rows[0]
+            original_ids = {
+                by_file["nested/copie.pdf"]["id"],
+                by_file["Richtlinie 01.pdf"]["id"],
+            }
+            self.assertIn(duplicate_row["id"], original_ids)
+            self.assertIn(duplicate_row["duplicate_of"], original_ids)
+            self.assertNotEqual(duplicate_row["id"], duplicate_row["duplicate_of"])
+            self.assertIsNone(by_file["Richtlinie 01.pdf"]["annotation"]["language"])
+            self.assertTrue(
+                all(
+                    quality_campaign.SAFE_LOGICAL_ID.fullmatch(row["id"])
+                    for row in inventory["documents"]
+                )
+            )
+            summary = json.loads(
+                (output / "inventory-summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(summary["byte_identical_duplicates"], 1)
+            self.assertEqual(summary["invalid_pdf_headers"], 1)
+
+    def test_corpus_inventory_rejects_symlinked_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            target = root / "outside.pdf"
+            target.write_bytes(b"%PDF-1.7\n")
+            (corpus / "linked.pdf").symlink_to(target)
+            with self.assertRaisesRegex(quality_campaign.BenchmarkError, "symlink"):
+                quality_campaign.inventory_external_pdfs(corpus)
+
+    def test_corpus_manifest_allows_empty_questions_before_gold_phase(self) -> None:
+        manifest = {
+            "schema": 1,
+            "corpus_id": "step4",
+            "documents": [
+                {
+                    "id": "doc",
+                    "file": "doc.pdf",
+                    "sha256": "0" * 64,
+                    "size_bytes": 0,
+                    "language": "de",
+                    "document_type": "pdf",
+                }
+            ],
+            "questions": [],
+        }
+        documents, questions = quality_campaign.validate_manifest_shape(manifest)
+        self.assertEqual(list(documents), ["doc"])
+        self.assertEqual(questions, [])
+
+    def test_external_corpus_manifest_rejects_path_escape(self) -> None:
+        manifest = {
+            "schema": 1,
+            "corpus_id": "x",
+            "documents": [
+                {
+                    "id": "doc", "file": "../escape.pdf", "sha256": "0" * 64,
+                    "size_bytes": 0, "language": "de", "document_type": "pdf",
+                }
+            ],
+            "questions": [
+                {
+                    "id": "q", "question": "?", "query_language": "de",
+                    "supported": True,
+                    "required_evidence": [{"document_id": "doc", "contains": "x"}],
+                }
+            ],
+        }
+        with self.assertRaisesRegex(quality_campaign.BenchmarkError, "safe relative path"):
+            quality_campaign.validate_manifest_shape(manifest)
+
+    def test_external_corpus_manifest_rejects_unsafe_logical_ids(self) -> None:
+        manifest = {
+            "schema": 1,
+            "corpus_id": "x",
+            "documents": [
+                {
+                    "id": "../doc",
+                    "file": "doc.pdf",
+                    "sha256": "0" * 64,
+                    "size_bytes": 0,
+                    "language": "de",
+                    "document_type": "pdf",
+                }
+            ],
+            "questions": [
+                {
+                    "id": "q",
+                    "question": "?",
+                    "query_language": "de",
+                    "supported": True,
+                    "required_evidence": [
+                        {"document_id": "../doc", "contains": "x"}
+                    ],
+                }
+            ],
+        }
+        with self.assertRaisesRegex(
+            quality_campaign.BenchmarkError, "safe logical IDs"
+        ):
+            quality_campaign.validate_manifest_shape(manifest)
+
+        manifest["documents"][0]["id"] = "doc"
+        manifest["questions"][0]["required_evidence"][0]["document_id"] = "doc"
+        manifest["questions"][0]["id"] = "question/one"
+        with self.assertRaisesRegex(
+            quality_campaign.BenchmarkError, "safe logical IDs"
+        ):
+            quality_campaign.validate_manifest_shape(manifest)
+
+    def test_external_corpus_manifest_rejects_control_characters_in_filename(self) -> None:
+        manifest = {
+            "schema": 1,
+            "corpus_id": "x",
+            "documents": [
+                {
+                    "id": "doc", "file": "bad\nname.pdf", "sha256": "0" * 64,
+                    "size_bytes": 0, "language": "de", "document_type": "pdf",
+                }
+            ],
+            "questions": [
+                {
+                    "id": "q", "question": "?", "query_language": "de",
+                    "supported": True,
+                    "required_evidence": [{"document_id": "doc", "contains": "x"}],
+                }
+            ],
+        }
+        with self.assertRaisesRegex(quality_campaign.BenchmarkError, "control characters"):
+            quality_campaign.validate_manifest_shape(manifest)
+
+    def test_tika_extraction_rejects_no_text_placeholder_as_quality_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            source = corpus / "document.pdf"
+            source.write_bytes(b"synthetic-pdf")
+            manifest = {
+                "schema": 1,
+                "corpus_id": "synthetic",
+                "documents": [
+                    {
+                        "id": "doc",
+                        "file": source.name,
+                        "sha256": quality_campaign.sha256_file(source),
+                        "size_bytes": source.stat().st_size,
+                        "language": "de",
+                        "document_type": "pdf",
+                    }
+                ],
+                "questions": [
+                    {
+                        "id": "q",
+                        "question": "Ist Text vorhanden?",
+                        "query_language": "de",
+                        "supported": False,
+                        "required_evidence": [],
+                    }
+                ],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "tika"
+            args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                container="open-webui",
+                tika_url="http://tika:9998/tika/json/md",
+                output_dir=str(output),
+            )
+            raw = json.dumps(
+                {"tk:content": quality_campaign.NO_TEXT_PLACEHOLDER}
+            ).encode()
+            with patch.object(quality_campaign, "tika_extract", return_value=raw):
+                self.assertEqual(quality_campaign.run_tika(args), 3)
+            row = json.loads(
+                (output / "results.jsonl").read_text(encoding="utf-8").splitlines()[0]
+            )
+            self.assertEqual(row["outcome"], "quality-fail")
+            self.assertFalse(row["checks"]["usable_content"])
+            self.assertEqual(
+                (output / "extraction" / "doc.txt").read_text(encoding="utf-8"),
+                "",
+            )
+
+    def test_tika_extraction_reports_invalid_json_as_runtime_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            source = corpus / "document.pdf"
+            source.write_bytes(b"synthetic-pdf")
+            manifest = {
+                "schema": 1,
+                "corpus_id": "synthetic",
+                "documents": [
+                    {
+                        "id": "doc",
+                        "file": source.name,
+                        "sha256": quality_campaign.sha256_file(source),
+                        "size_bytes": source.stat().st_size,
+                        "language": "de",
+                        "document_type": "pdf",
+                    }
+                ],
+                "questions": [
+                    {
+                        "id": "q",
+                        "question": "Ist Text vorhanden?",
+                        "query_language": "de",
+                        "supported": False,
+                        "required_evidence": [],
+                    }
+                ],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "tika"
+            args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                container="open-webui",
+                tika_url="http://tika:9998/tika/json/md",
+                output_dir=str(output),
+            )
+            with patch.object(
+                quality_campaign, "tika_extract", return_value=b"not-json"
+            ):
+                self.assertEqual(quality_campaign.run_tika(args), 2)
+            row = json.loads(
+                (output / "results.jsonl").read_text(encoding="utf-8").splitlines()[0]
+            )
+            self.assertEqual(row["outcome"], "infra-fail")
+            self.assertIn("invalid JSON/UTF-8", row["diagnostics"][0])
+
+    def test_gold_validation_binds_questions_to_exact_tika_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            source = corpus / "policy.pdf"
+            source.write_bytes(b"synthetic-pdf")
+            manifest = {
+                "schema": 1,
+                "corpus_id": "gold-synthetic",
+                "documents": [
+                    {
+                        "id": "policy",
+                        "file": source.name,
+                        "sha256": quality_campaign.sha256_file(source),
+                        "size_bytes": source.stat().st_size,
+                        "language": "de",
+                        "document_type": "pdf",
+                    }
+                ],
+                "questions": [],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            tika_output = root / "tika"
+            tika_args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                container="open-webui",
+                tika_url="http://tika:9998/tika/json/md",
+                output_dir=str(tika_output),
+            )
+            raw = json.dumps(
+                {"tk:content": "Richtlinie P-17 gilt ab 4. September 2026."}
+            ).encode()
+            with patch.object(quality_campaign, "tika_extract", return_value=raw):
+                self.assertEqual(quality_campaign.run_tika(tika_args), 0)
+
+            manifest["questions"] = [
+                {
+                    "id": "q1",
+                    "question": "Welche Richtlinie gilt?",
+                    "query_language": "fr",
+                    "answer_language": "fr",
+                    "supported": True,
+                    "required_evidence": [
+                        {"document_id": "policy", "contains": "Richtlinie P-17"}
+                    ],
+                    "exact_values": {"identifiers": ["P-17"]},
+                }
+            ]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            output = root / "gold"
+            args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                tika_results=str(tika_output),
+                output_dir=str(output),
+            )
+            self.assertEqual(quality_campaign.run_gold_validate(args), 0)
+            summary = json.loads(
+                (output / "gold-summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(summary["by_language_pair"], {"fr->de": 1})
+            self.assertEqual(summary["supported_questions"], 1)
+
+            manifest["questions"][0]["required_evidence"][0]["contains"] = "NICHT VORHANDEN"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            failed = root / "gold-failed"
+            args.output_dir = str(failed)
+            self.assertEqual(quality_campaign.run_gold_validate(args), 3)
+            row = json.loads(
+                (failed / "results.jsonl").read_text(encoding="utf-8").splitlines()[0]
+            )
+            self.assertEqual(row["outcome"], "quality-fail")
+            self.assertIn("anchor not found", row["diagnostics"][0])
+
+    def test_retrieval_case_scores_required_exact_and_conflicting_evidence(self) -> None:
+        question = {
+            "supported": True,
+            "required_evidence": [{"document_id": "d1", "contains": "REF-81"}],
+            "acceptable_evidence": [],
+            "conflicting_evidence": [{"document_id": "d2", "contains": "archived"}],
+            "exact_values": {"identifiers": ["REF-81"], "dates": ["4. September 2026"]},
+        }
+        chunks = [
+            {"chunk_id": "c0", "document_id": "d2", "text": "archived old rule"},
+            {"chunk_id": "c1", "document_id": "d1", "text": "REF-81 gilt am 4. September 2026"},
+        ]
+        score = quality_campaign.retrieval_case(question, chunks, 2)
+        self.assertEqual(score["first_relevant_rank"], 2)
+        self.assertFalse(score["recall_at_1"])
+        self.assertTrue(score["recall_at_3"])
+        self.assertTrue(score["required_support_recovered"])
+        self.assertTrue(score["exact_values_ok"])
+        self.assertEqual(score["conflicting_chunks"], 1)
+
+    def test_retrieval_runner_excludes_unsupported_questions_from_recall(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            document = corpus / "policy.txt"
+            document.write_text(
+                "Richtlinie P-17 gilt ab 4. September 2026.\n",
+                encoding="utf-8",
+            )
+            digest = quality_campaign.sha256_file(document)
+            manifest = {
+                "schema": 1,
+                "corpus_id": "synthetic",
+                "documents": [
+                    {
+                        "id": "policy",
+                        "file": "policy.txt",
+                        "sha256": digest,
+                        "size_bytes": document.stat().st_size,
+                        "language": "de",
+                        "document_type": "text",
+                    }
+                ],
+                "questions": [
+                    {
+                        "id": "supported",
+                        "question": "Welche Richtlinie gilt?",
+                        "query_language": "de",
+                        "supported": True,
+                        "required_evidence": [
+                            {"document_id": "policy", "contains": "P-17"}
+                        ],
+                        "exact_values": {"identifiers": ["P-17"]},
+                    },
+                    {
+                        "id": "unsupported",
+                        "question": "Wie hoch ist die Vertragsstrafe?",
+                        "query_language": "fr",
+                        "supported": False,
+                        "required_evidence": [],
+                    },
+                ],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            rankings_path = root / "rankings.jsonl"
+            rankings_path.write_text(
+                "\n".join(
+                    [
+                        json.dumps(
+                            {
+                                "question_id": "supported",
+                                "arm_id": "control-jina-dense-k4-1500-200",
+                                "ranked_chunks": [
+                                    {
+                                        "chunk_id": "policy:0",
+                                        "document_id": "policy",
+                                        "text": "Richtlinie P-17 gilt ab 4. September 2026.",
+                                        "score": 0.9,
+                                    }
+                                ],
+                            }
+                        ),
+                        json.dumps(
+                            {
+                                "question_id": "unsupported",
+                                "arm_id": "control-jina-dense-k4-1500-200",
+                                "ranked_chunks": [
+                                    {
+                                        "chunk_id": "policy:1",
+                                        "document_id": "policy",
+                                        "text": "Richtlinie P-17 gilt ab 4. September 2026.",
+                                        "score": 0.4,
+                                    }
+                                ],
+                            }
+                        ),
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            output = root / "retrieval"
+            args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                rankings=str(rankings_path),
+                arms=None,
+                arm="control-jina-dense-k4-1500-200",
+                output_dir=str(output),
+            )
+            self.assertEqual(quality_campaign.run_retrieval_score(args), 0)
+            summary = json.loads(
+                (output / "retrieval-summary.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(summary["questions"], 2)
+            self.assertEqual(summary["recall_eligible_questions"], 1)
+            self.assertEqual(summary["recall_at_1"], 1.0)
+            self.assertEqual(
+                summary["by_language_pair"]["fr->none"]["recall_eligible_questions"],
+                0,
+            )
+
+            alternate_rankings = root / "rankings-small.jsonl"
+            alternate_rankings.write_text(
+                rankings_path.read_text(encoding="utf-8").replace(
+                    "control-jina-dense-k4-1500-200",
+                    "small-chunk-jina-dense-k4-1000-100",
+                ),
+                encoding="utf-8",
+            )
+            alternate_output = root / "retrieval-small"
+            alternate_args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                rankings=str(alternate_rankings),
+                arms=None,
+                arm="small-chunk-jina-dense-k4-1000-100",
+                output_dir=str(alternate_output),
+            )
+            self.assertEqual(quality_campaign.run_retrieval_score(alternate_args), 0)
+
+            compare_output = root / "comparison"
+            compare_args = SimpleNamespace(
+                result_dir=[str(output), str(alternate_output)],
+                output_dir=str(compare_output),
+            )
+            self.assertEqual(quality_campaign.run_retrieval_compare(compare_args), 0)
+            comparison_path = compare_output / "retrieval-comparison.json"
+            comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+            self.assertIsNone(comparison["selection"])
+            self.assertEqual(len(comparison["arms"]), 2)
+
+            freeze_output = root / "freeze"
+            freeze_args = SimpleNamespace(
+                comparison=str(comparison_path),
+                selected_result_dir=str(output),
+                selection_note="Control retained for synthetic regression.",
+                output_dir=str(freeze_output),
+            )
+            self.assertEqual(quality_campaign.run_retrieval_freeze(freeze_args), 0)
+            frozen_retrieval = json.loads(
+                (freeze_output / "frozen-retrieval.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                frozen_retrieval["selected_arm"]["id"],
+                "control-jina-dense-k4-1500-200",
+            )
+
+            fixed_output = root / "fixed"
+            fixed_args = SimpleNamespace(
+                freeze=str(freeze_output / "frozen-retrieval.json"),
+                corpus_dir=str(corpus),
+                output_dir=str(fixed_output),
+            )
+            self.assertEqual(quality_campaign.run_fixed_export(fixed_args), 0)
+            frozen = json.loads(
+                (fixed_output / "fixed-evidence.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                frozen["rankings_sha256"], quality_campaign.sha256_file(rankings_path)
+            )
+            self.assertEqual(
+                frozen["retrieval_freeze_sha256"],
+                quality_campaign.sha256_file(freeze_output / "frozen-retrieval.json"),
+            )
+
+    def test_retrieval_scoring_requires_gold_questions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            corpus = root / "corpus"
+            corpus.mkdir()
+            document = corpus / "doc.pdf"
+            document.write_bytes(b"%PDF-1.7\n")
+            manifest = {
+                "schema": 1,
+                "corpus_id": "step5",
+                "documents": [
+                    {
+                        "id": "doc",
+                        "file": "doc.pdf",
+                        "sha256": quality_campaign.sha256_file(document),
+                        "size_bytes": document.stat().st_size,
+                        "language": "de",
+                        "document_type": "pdf",
+                    }
+                ],
+                "questions": [],
+            }
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            rankings = root / "rankings.jsonl"
+            rankings.write_text("", encoding="utf-8")
+            args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                rankings=str(rankings),
+                arms=None,
+                arm="control-jina-dense-k4-1500-200",
+                output_dir=str(root / "out"),
+            )
+            with self.assertRaisesRegex(
+                quality_campaign.BenchmarkError, "at least one gold question"
+            ):
+                quality_campaign.run_retrieval_score(args)
+
+    def test_named_retrieval_arms_require_fresh_indexes(self) -> None:
+        document, arms = quality_campaign.load_arms(ROOT / "examples/benchmark/retrieval-arms.json")
+        self.assertEqual(document["control"], "control-jina-dense-k4-1500-200")
+        self.assertTrue(all(arm["fresh_index_required"] for arm in arms.values()))
+        self.assertLessEqual(len(arms), 8)
+
+    def test_fixed_evidence_prompt_forbids_external_fact_filling(self) -> None:
+        prompt = quality_campaign.fixed_prompt(
+            {
+                "question": "Welche Frist gilt?",
+                "query_language": "de",
+                "answer_language": "de",
+                "evidence": [
+                    {"document_id": "d", "chunk_id": "c", "text": "Die Frist beträgt drei Monate."}
+                ],
+            }
+        )
+        self.assertIn("only from the fixed retrieved evidence", prompt)
+        self.assertIn("Do not use external/model knowledge", prompt)
+        self.assertIn("[d:c]", prompt)
+
+    def test_campaign_dispatcher_is_public_benchmark_surface(self) -> None:
+        dispatcher = (BENCH / "benchmark.sh").read_text(encoding="utf-8")
+        self.assertIn("bc250 advanced benchmark campaign audit", dispatcher)
+        self.assertIn("bc250 advanced benchmark campaign corpus-inventory", dispatcher)
+        self.assertIn("bc250 advanced benchmark campaign gold-validate", dispatcher)
+        self.assertIn("bc250 advanced benchmark campaign retrieval-compare", dispatcher)
+        self.assertIn("bc250 advanced benchmark campaign retrieval-freeze", dispatcher)
+        self.assertIn("bc250 advanced benchmark campaign fixed-export --freeze", dispatcher)
+        self.assertIn('exec python3 "$CAMPAIGN" "$@"', dispatcher)
+
 
 
 class CredentialHardeningTests(unittest.TestCase):
@@ -326,7 +954,7 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             generation.resolve_think_policy(
-                "exp-lfm25-8b-a1b-unsloth-q6-k-xl", "auto"
+                "exp-qwen35-4b-unsloth-q6-k", "auto"
             ),
             "false",
         )
@@ -341,8 +969,8 @@ class GenerationPolicyTests(unittest.TestCase):
             "false",
         )
         self.assertEqual(
-            generation.resolve_think_policy("exp-qwen38-27b-unsloth-ud-iq3-s", "auto"),
-            "medium",
+            generation.resolve_think_policy("exp-qwen38-27b-ista-gsq-rco-iq3-s", "auto"),
+            "true",
         )
         qwen_payload = generation.generate_payload(
             "prod-qwen35-9b-unsloth-q6-k:latest",
@@ -356,7 +984,7 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertEqual(qwen_payload["options"]["top_p"], 0.8)
         self.assertEqual(qwen_payload["options"]["top_k"], 20)
         self.assertEqual(qwen_payload["options"]["min_p"], 0.0)
-        self.assertEqual(qwen_payload["options"]["presence_penalty"], 0.0)
+        self.assertEqual(qwen_payload["options"]["presence_penalty"], 1.5)
         self.assertEqual(qwen_payload["options"]["repeat_penalty"], 1.0)
 
     def test_explicit_nonthinking_records_literal_reasoning_contamination_without_hiding_raw_output(self) -> None:
@@ -395,20 +1023,20 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertEqual(generation.latency_budget(96, 512, "false", "prod-qwen35-9b"), 96)
         self.assertEqual(
             generation.latency_budget(
-                96, 512, "false", "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+                96, 512, "false", "exp-qwen35-4b-unsloth-q6-k"
             ),
             96,
         )
         self.assertEqual(
             generation.latency_budget(
-                96, 512, "omit", "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+                96, 512, "omit", "exp-qwen35-4b-unsloth-q6-k"
             ),
             96,
         )
         self.assertEqual(generation.latency_budget(96, 512, "medium", "prod-gpt-oss20b"), 512)
         self.assertEqual(
             generation.latency_budget(
-                96, 512, "omit", "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"
+                96, 512, "omit", "exp-gemma4-12b-google-qat-q4-0"
             ),
             512,
         )
@@ -528,7 +1156,7 @@ class CategoryPolicyTests(unittest.TestCase):
 
     def test_package_contract_rejects_missing_shared_profile(self) -> None:
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        del document["profiles"]["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]
+        del document["profiles"]["exp-granite42-3b-ibm-q6-k"]
         with tempfile.TemporaryDirectory() as temporary:
             profile_path = Path(temporary) / "model-profiles.json"
             profile_path.write_text(json.dumps(document), encoding="utf-8")
@@ -538,7 +1166,7 @@ class CategoryPolicyTests(unittest.TestCase):
                 common.BenchmarkError, "missing qualification profiles"
             ):
                 common.package_model_contract(
-                    "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+                    "exp-granite42-3b-ibm-q6-k"
                 )
 
     def test_ocr_prompts_preserve_source_language_and_structure(self) -> None:
@@ -551,7 +1179,7 @@ class CategoryPolicyTests(unittest.TestCase):
         minicpm_prompt = category.OCR_PROMPTS["minicpm"].lower()
         self.assertIn("table row", minicpm_prompt)
         self.assertIn("do not translate", minicpm_prompt)
-        self.assertEqual(set(category.OCR_PROMPTS), {"glm", "ovis", "minicpm"})
+        self.assertEqual(set(category.OCR_PROMPTS), {"glm", "ovis", "minicpm", "lfm3-vl"})
         self.assertEqual(category.ocr_kind("exp-glm-ocr-ggml-q8-0:latest"), "glm")
         self.assertEqual(category.ocr_kind("exp-ovisocr2-abiray-q8-0:latest"), "ovis")
         self.assertEqual(
@@ -888,6 +1516,9 @@ def parse_ports(value: str) -> list[int]:
             )
             if item["id"] == "bash-model-list"
         )
+        self.assertTrue(case["prompt"].startswith("OUTPUT CONTRACT — follow this before solving the task:"))
+        self.assertIn("The first line must be exactly: #!/usr/bin/env bash", case["prompt"])
+        self.assertIn("Do not use Markdown, backticks, code fences, labels, or explanation.", case["prompt"])
         bad = '#!/usr/bin/env bash\necho "$1/*.Modelfile" | sort\nexit 2\n'
         result = category.evaluate_agent_output(bad, case)
         self.assertTrue(result["syntax_ok"])
@@ -1446,6 +2077,14 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         ids = {case["id"] for case in cases}
         self.assertIn("de-fr-recommendation-modality", ids)
         self.assertIn("fr-de-obligation-modality", ids)
+        self.assertIn("de-fr-negated-recommendation-modality", ids)
+        self.assertIn("fr-de-prohibition-no-obligation-modality", ids)
+        self.assertIn("de-fr-no-obligation-modality", ids)
+        self.assertIn("de-fr-permission-prohibition-modality", ids)
+        self.assertIn("fr-de-permission-prohibition-modality", ids)
+        for case in cases:
+            if "modality" in case["id"]:
+                self.assertEqual(case.get("semantic_contract"), "modality")
 
     def test_translation_identifier_fragment_is_not_meaningful_translation(self) -> None:
         fragment = "AB-42 4 septembre 2026"
@@ -1952,6 +2591,52 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertTrue(category.translation_content_checks(valid, case)[0])
         self.assertNotIn("required_any", case)
 
+    def test_translation_modality_cases_reuse_package_clause_local_authority(self) -> None:
+        cases = json.loads(
+            (ROOT / "examples/benchmark/translation-office.json").read_text(encoding="utf-8")
+        )
+        by_id = {case["id"]: case for case in cases}
+        observed = {
+            "de-fr-negated-recommendation-modality": (
+                (
+                    "Le fournisseur devrait soumettre le rapport au plus tard lundi. "
+                    "La référence NR-42-K reste inchangée."
+                ),
+                "negated recommendation / temporal polarity",
+            ),
+            "fr-de-prohibition-no-obligation-modality": (
+                (
+                    "Der Lieferant muss den Bericht nach Montag nicht einreichen. "
+                    "Die Referenz PR-77-Z bleibt unverändert."
+                ),
+                "prohibition weakened to no-obligation",
+            ),
+        }
+        for case_id, (content, expected) in observed.items():
+            with self.subTest(case_id=case_id):
+                detail = category.translation_modality_detail(by_id[case_id], content)
+                self.assertIsNotNone(detail)
+                self.assertIn(expected, detail)
+                ok, failures = openwebui_workflow.owui_translation_checks(
+                    content, by_id[case_id]
+                )
+                self.assertFalse(ok)
+                self.assertEqual(failures, ["modality"])
+
+        faithful = {
+            "de-fr-negated-recommendation-modality": (
+                "Le fournisseur ne devrait pas soumettre le rapport avant lundi. "
+                "La référence NR-42-K reste inchangée."
+            ),
+            "fr-de-prohibition-no-obligation-modality": (
+                "Der Lieferant darf den Bericht nach Montag nicht einreichen. "
+                "Die Referenz PR-77-Z bleibt unverändert."
+            ),
+        }
+        for case_id, content in faithful.items():
+            with self.subTest(case_id=case_id, faithful=True):
+                self.assertIsNone(category.translation_modality_detail(by_id[case_id], content))
+
     def test_translation_direction_is_explicit_package_policy(self) -> None:
         case = {"source_language": "fr", "target_language": "de", "input": "Bonjour."}
         prompt = category.translation_prompt(case)
@@ -2041,8 +2726,50 @@ class TelemetryTests(unittest.TestCase):
     def test_revalidation_context_diagnostic_is_concise_and_policy_explicit(self) -> None:
         source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
         self.assertIn('"previous_prompt_eval_count": previous_prompt_eval_count', source)
-        self.assertIn("effective prompt evaluation capped at", source)
-        self.assertIn("accepted by current context-truncation policy", source)
+        self.assertIn("Context truncation observed", source)
+        self.assertIn("accepted by current context policy", source)
+
+    def test_revalidation_summary_distinguishes_suite_case_and_coverage_semantics(self) -> None:
+        source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
+        self.assertIn("Quality suites", source)
+        self.assertIn("Qualification cases", source)
+        self.assertIn("FULL — all scheduled qualification paths executed", source)
+        self.assertIn("Translation delivery integrity: PASS", source)
+        self.assertIn("Reasoning repetition exhausted the generation budget", source)
+
+    def test_revalidation_translation_integrity_report_preserves_semantic_detail(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result_dir = root / "owui" / "translation"
+            result_dir.mkdir(parents=True)
+            (result_dir / "results.jsonl").write_text(
+                json.dumps(
+                    {
+                        "category": "owui-translation",
+                        "case_id": "fr-de-prohibition-no-obligation-modality",
+                        "product_guard": "pass-withheld",
+                        "raw_failure_kinds": ["modality"],
+                        "raw_semantic_detail": (
+                            "clause 1: prohibition weakened to no-obligation "
+                            "(ne doit pas -> muss nicht)"
+                        ),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            source = BENCH / "revalidate.sh"
+            script = (
+                f'source "{source}" help >/dev/null\n'
+                f'RAW="{root}"\n'
+                'product_integrity_report\n'
+            )
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertIn("Translation delivery integrity: PASS", completed.stdout)
+            self.assertIn("prohibition weakened to no-obligation", completed.stdout)
+            self.assertIn("delivery withheld", completed.stdout)
 
     def test_revalidation_surfaces_tight_resource_headroom_without_weakening_floor(self) -> None:
         source = (BENCH / "revalidate.sh").read_text(encoding="utf-8")
@@ -2109,10 +2836,14 @@ class TelemetryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "results.jsonl"
             rows = [
-                common.result_record(category="task", model="m", case_id="a", result_type="qualification", outcome="pass"),
+                common.result_record(
+                    category="task", model="m", case_id="a", result_type="qualification",
+                    outcome="pass", metrics={"wall_s": 4.0},
+                ),
                 common.result_record(
                     category="task", model="m", case_id="b", result_type="qualification", outcome="quality-fail",
                     failure_kinds=["language"], diagnostics=["output-budget"],
+                    metrics={"wall_s": 10.0},
                 ),
             ]
             path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
@@ -2122,6 +2853,17 @@ class TelemetryTests(unittest.TestCase):
             self.assertEqual(summary["quality"], "mixed")
             self.assertEqual(summary["failure_kinds"], {"language": 1})
             self.assertEqual(summary["diagnostics"], {"output-budget": 1})
+            self.assertEqual(
+                summary["quality_latency_by_model"]["m"],
+                {
+                    "pass": 1,
+                    "quality-fail": 1,
+                    "incomplete": 0,
+                    "skipped": 0,
+                    "median_wall_s": 7.0,
+                    "timed_cases": 2,
+                },
+            )
             self.assertEqual(
                 summary["quality_failures"],
                 [{
@@ -2134,6 +2876,8 @@ class TelemetryTests(unittest.TestCase):
             text = summary_txt.read_text(encoding="utf-8")
             self.assertIn("Quality           MIXED", text)
             self.assertIn("m / b: language", text)
+            self.assertIn("Quality + latency by model", text)
+            self.assertIn("median wall 7.00s", text)
 
     def test_result_directory_is_canonical_and_refuses_reuse(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2883,7 +3627,7 @@ quality_state
         self.assertEqual(advanced["options"]["top_p"], 0.8)
         self.assertEqual(advanced["options"]["top_k"], 20)
         self.assertEqual(advanced["options"]["min_p"], 0.0)
-        self.assertEqual(advanced["options"]["presence_penalty"], 0.0)
+        self.assertEqual(advanced["options"]["presence_penalty"], 1.5)
         self.assertEqual(advanced["options"]["repeat_penalty"], 1.0)
 
         deep = category.usecase_request_controls(
@@ -2942,6 +3686,29 @@ quality_state
         self.assertEqual(repetition_record["outcome"], "quality-fail")
         self.assertEqual(repetition_record["failure_kinds"], ["repetition"])
         self.assertIn("repetition-loop", repetition_record["diagnostics"])
+        self.assertIn("visible-answer-empty", repetition_record["diagnostics"])
+
+        tail_loop = "\n".join(
+            [f"unique reasoning step {index}" for index in range(60)]
+            + ["recheck solved backup plan"] * 30
+        )
+        tail_record = category._usecase_result_record(
+            case=production_case,
+            model="prod-qwen35-9b-unsloth-q6-k",
+            row=row,
+            ok=False,
+            problems=["missing answer"],
+            content="",
+            thinking=tail_loop,
+            telemetry={},
+            wall=1.0,
+            done_reason="length",
+        )
+        self.assertEqual(tail_record["outcome"], "incomplete")
+        self.assertIn("repetition-indicators", tail_record["diagnostics"])
+        self.assertTrue(
+            any("tail repetition indicators" in item for item in tail_record["diagnostics"])
+        )
 
     def test_rag_cycle_residency_loss_is_infrastructure_failure(self) -> None:
         self.assertEqual(category.rag_cycle_outcome(True, False), ("infra-fail", ["coexistence"], 1))
@@ -3462,12 +4229,14 @@ status_run --raw
             output = completed.stdout.lower()
             self.assertIn("state          : completed", output)
             self.assertIn(
-                "coverage:             partial (optional agent not installed)", output
+                "coverage:             partial — optional agent not installed", output
             )
             self.assertIn(
-                "coverage       : partial (optional agent not installed)", output
+                "coverage       : partial — optional agent not installed", output
             )
             self.assertIn("coverage=partial", output)
+            self.assertIn("quality suites:", output)
+            self.assertIn("qualification cases:", output)
             self.assertNotIn("state          : incomplete", output)
             source_text = source.read_text(encoding="utf-8")
             self.assertIn('status) status_run "${@:2}" ;;', source_text)
@@ -3611,6 +4380,25 @@ status_run --raw
             row = json.loads(paths.results_jsonl.read_text(encoding="utf-8"))
             self.assertEqual(row["failure_kinds"], ["restoration"])
 
+    def test_revalidation_qualification_case_counts_aggregate_canonical_summaries(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            t = Path(temporary)
+            first = t / "a"
+            first.mkdir()
+            (first / "summary.json").write_text(
+                json.dumps({"qualification_counts": {"pass": 2, "quality-fail": 1, "incomplete": 3, "skipped": 1}}),
+                encoding="utf-8",
+            )
+            broken = t / "b"
+            broken.mkdir()
+            (broken / "summary.json").write_text("not-json\n", encoding="utf-8")
+            source = ROOT / "cmd/benchmark/revalidate.sh"
+            script = f'source "{source}" help >/dev/null\nRAW="{t}"\nqualification_case_counts\n'
+            completed = subprocess.run(
+                ["bash", "-c", script], text=True, capture_output=True, check=True
+            )
+            self.assertEqual(completed.stdout.strip(), "2 1 1 3 1")
+
     def test_quality_cause_report_surfaces_corrupt_or_missing_canonical_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             t = Path(temporary)
@@ -3647,6 +4435,8 @@ status_run --raw
         self.assertIn("Run completion", summary)
         self.assertIn("Infrastructure", summary)
         self.assertIn("Model quality", summary)
+        self.assertIn("Quality suites", summary)
+        self.assertIn("Qualification cases", summary)
         self.assertIn("Product integrity", summary)
         self.assertIn("Topology restoration", summary)
         self.assertNotIn("PASSED", summary)
@@ -3762,7 +4552,7 @@ status_run --raw
                     {"name": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest"},
                     {"name": "exp-minicpm-v47-1b-openbmb-q4-k-m:latest"},
                     {"name": "embed-jina-v5-small-retrieval-q4-k-m:latest"},
-                    {"name": "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest"},
+                    {"name": "exp-lfm3-1.7b-liquidai-q6-k:latest"},
                 ]
 
         with patch.dict(os.environ, {"BENCH_INCLUDE_EXPERIMENTS": "0"}, clear=False):
@@ -3775,7 +4565,7 @@ status_run --raw
             selected,
             [
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
-                "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest",
+                "exp-lfm3-1.7b-liquidai-q6-k:latest",
             ],
         )
 

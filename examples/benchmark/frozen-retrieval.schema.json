@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bc250.local/schema/frozen-retrieval-v1.json",
+  "title": "BC-250 frozen retrieval selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "corpus_id",
+    "selected_arm",
+    "selection_note",
+    "comparison_sha256",
+    "source_retrieval_result",
+    "inputs",
+    "selected_metrics"
+  ],
+  "properties": {
+    "schema": {"const": 1},
+    "corpus_id": {"type": "string", "minLength": 1},
+    "selected_arm": {"type": "object"},
+    "selection_note": {"type": "string", "minLength": 1},
+    "comparison_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_retrieval_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["meta_sha256", "summary_sha256", "retrieval_summary_sha256"],
+      "properties": {
+        "meta_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "summary_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "retrieval_summary_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest", "arms", "rankings"],
+      "properties": {
+        "manifest": {"$ref": "#/$defs/input"},
+        "arms": {"$ref": "#/$defs/input"},
+        "rankings": {"$ref": "#/$defs/input"}
+      }
+    },
+    "selected_metrics": {"type": "object"}
+  },
+  "$defs": {
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "sha256"],
+      "properties": {
+        "file": {"type": "string", "pattern": "^[^/\\\\]+$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

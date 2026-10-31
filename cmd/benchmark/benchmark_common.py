@@ -209,6 +209,32 @@ def translation_literal_integrity_mismatch(source: str, target: str) -> str | No
     return str(result) if result is not None else None
 
 
+def translation_modality_mismatch(
+    source: str,
+    target: str,
+    source_language: str,
+    target_language: str,
+) -> str | None:
+    """Use the package translation filter as the clause-local modality authority."""
+    module = translation_contract_module()
+    checker = getattr(module, "modality_mismatch", None)
+    if not callable(checker):
+        raise BenchmarkError("translation contract does not define modality_mismatch")
+    pair = (source_language.casefold(), target_language.casefold())
+    if pair == ("de", "fr"):
+        model_id = getattr(module, "DE_FR_MODEL", None)
+    elif pair == ("fr", "de"):
+        model_id = getattr(module, "FR_DE_MODEL", None)
+    else:
+        raise BenchmarkError(
+            f"package translation modality authority supports only DE↔FR, got {pair!r}"
+        )
+    if not isinstance(model_id, str) or not model_id:
+        raise BenchmarkError("translation contract has incomplete model identifiers")
+    result = checker(source, target, model_id)
+    return str(result) if result is not None else None
+
+
 def package_model_contract(model: str) -> dict[str, Any] | None:
     """Return the package model contract, failing clearly if package metadata is malformed."""
     try:
@@ -1072,6 +1098,35 @@ def write_result_summary(
     infrastructure = "fail" if counts["infra-fail"] else (
         "pass" if records else "not-run"
     )
+    quality_latency_by_model: dict[str, dict[str, Any]] = {}
+    for model in sorted({str(row.get("model") or "unknown") for row in records}):
+        model_rows = [
+            row
+            for row in records
+            if str(row.get("model") or "unknown") == model
+            and row.get("result_type") == "qualification"
+        ]
+        if not model_rows:
+            continue
+        model_counts = {
+            name: 0
+            for name in ("pass", "quality-fail", "incomplete", "skipped")
+        }
+        wall_values: list[float] = []
+        for row in model_rows:
+            outcome = str(row.get("outcome") or "")
+            if outcome in model_counts:
+                model_counts[outcome] += 1
+            metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+            wall = metrics.get("wall_s")
+            if isinstance(wall, (int, float)) and not isinstance(wall, bool):
+                wall_values.append(float(wall))
+        quality_latency_by_model[model] = {
+            **model_counts,
+            "median_wall_s": statistics.median(wall_values) if wall_values else None,
+            "timed_cases": len(wall_values),
+        }
+
     aggregates = category_aggregates(records, category)
     summary = {
         "schema_version": RESULT_SCHEMA_VERSION,
@@ -1087,6 +1142,7 @@ def write_result_summary(
         "incomplete_cases": incomplete_cases,
         "infrastructure_failure_kinds": dict(sorted(infra_failures.items())),
         "diagnostics": dict(sorted(diagnostics.items())),
+        "quality_latency_by_model": quality_latency_by_model,
         "aggregates": aggregates,
     }
     if structure is not None:
@@ -1123,6 +1179,19 @@ def write_result_summary(
         f"Qual incomplete   {qualification_counts['incomplete']}",
         f"Infra-fail        {counts['infra-fail']}",
     ]
+    timed_models = {
+        model: values
+        for model, values in quality_latency_by_model.items()
+        if values.get("median_wall_s") is not None
+    }
+    if timed_models:
+        lines += ["", "Quality + latency by model"]
+        for model, values in timed_models.items():
+            lines.append(
+                f"  {model}: {values['pass']} pass / {values['quality-fail']} quality-fail / "
+                f"{values['incomplete']} incomplete / {values['skipped']} skipped; "
+                f"median wall {values['median_wall_s']:.2f}s ({values['timed_cases']} timed)"
+            )
     if structure == "fail" and completeness is not None:
         lines += ["", "Structural completeness"]
         for key, label in (

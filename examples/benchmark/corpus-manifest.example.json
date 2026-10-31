@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "corpus_id": "example-external-corpus",
+  "description": "Schema example only; replace hashes/metadata for an external corpus. Do not add real corpus PDFs to the repository.",
+  "documents": [
+    {
+      "id": "example-policy-de",
+      "file": "policy-de.pdf",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "size_bytes": 0,
+      "language": "de",
+      "document_type": "pdf",
+      "source": "https://example.invalid/public-source",
+      "extraction_gold": {
+        "required": [
+          "Richtlinie P-17"
+        ],
+        "identifiers": [
+          "P-17"
+        ]
+      }
+    }
+  ],
+  "questions": [
+    {
+      "id": "example-policy-de-de",
+      "question": "Welche Richtlinie gilt?",
+      "query_language": "de",
+      "answer_language": "de",
+      "supported": true,
+      "required_evidence": [
+        {
+          "document_id": "example-policy-de",
+          "contains": "Richtlinie P-17"
+        }
+      ],
+      "acceptable_evidence": [],
+      "conflicting_evidence": [],
+      "exact_values": {
+        "identifiers": [
+          "P-17"
+        ]
+      },
+      "answer_oracle": {
+        "required": [
+          "P-17"
+        ]
+      }
+    }
+  ]
+}

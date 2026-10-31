@@ -8,6 +8,42 @@ The package deliberately separates three operator questions:
 
 Revalidation does not choose settings. Tuning and A/B comparisons are explicit benchmark commands.
 
+## Office/RAG quality campaign foundation
+
+The 0.20.0-1 source candidate adds a staged campaign surface while preserving the accepted predecessor roles and RAG settings as controls. It also adds one explicit Office - Generalist candidate and additional managed challengers for qualification:
+
+```bash
+bc250 advanced benchmark campaign audit
+bc250 advanced benchmark campaign corpus-inventory --corpus-dir DIR --corpus-id ID
+bc250 advanced benchmark campaign corpus-validate --manifest CORPUS.json --corpus-dir DIR
+bc250 advanced benchmark campaign tika-extract --manifest CORPUS.json --corpus-dir DIR
+bc250 advanced benchmark campaign gold-validate --manifest CORPUS.json --corpus-dir DIR --tika-results TIKA_RESULT_DIR
+bc250 advanced benchmark campaign retrieval-score --manifest CORPUS.json --corpus-dir DIR --rankings RANKINGS.jsonl --arm ARM
+bc250 advanced benchmark campaign retrieval-compare --result-dir RETRIEVAL_RESULT_DIR --result-dir RETRIEVAL_RESULT_DIR [...]
+bc250 advanced benchmark campaign retrieval-freeze --comparison RETRIEVAL_COMPARISON.json --selected-result-dir RETRIEVAL_RESULT_DIR --selection-note TEXT
+bc250 advanced benchmark campaign fixed-export --freeze FROZEN-RETRIEVAL.json --corpus-dir DIR
+bc250 advanced benchmark campaign fixed-replay --bundle FIXED-EVIDENCE.json MODEL [MODEL ...]
+```
+
+`campaign audit` is the Step-3 control audit. It compares the checked-in campaign snapshot against the actual packaged Modelfiles, product-role request policy and Open WebUI retrieval desired state. A mismatch is reported as configuration drift; the audit never rewrites a production setting. The campaign snapshot deliberately records the current qualified controls separately from setting hypotheses such as an alternative Qwen thinking sampler.
+
+The real PDF corpus is **external benchmark input**. `corpus-inventory` is the Step-4 starting point: it recursively inventories external PDFs without copying them, records deterministic safe logical IDs, relative paths, SHA-256, byte size, PDF-header sanity and byte-identical duplicates, and leaves language/source annotation explicitly unresolved for review. Symlinked PDFs are rejected so the inventory cannot silently escape the declared corpus root. The inventory is measurement evidence, not a finished gold manifest.
+
+`corpus-validate` validates path-safe logical document/question IDs, safe relative paths, SHA-256, size, languages and gold-evidence references and writes a corpus lock into the result directory. A corpus manifest may deliberately contain `questions: []` during Steps 4–5 so provenance and Tika extraction can be established before Step 6 creates gold questions. Retrieval scoring and fixed-evidence export still require at least one gold question. Logical IDs are restricted to `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` because they become evidence artifact names. The tooling never copies the source PDFs into the repository/package fixture tree. `tika-extract` streams each external file through the private Open WebUI-container → Tika path, saves raw JSON and extracted text in benchmark evidence, and scores only conservative literal extraction gold when such gold is present. Missing/blank `tk:content` and the pinned Open WebUI placeholder `<No text content found>` are scored as no usable extraction rather than document text. It does not use embeddings or generation.
+
+`gold-validate` is the Step-6 gate between extraction and retrieval. It requires a non-empty gold-question set and binds it to the exact Step-5 Tika evidence: corpus ID/hash/size provenance must match, every required/acceptable/conflicting evidence entry needs a literal anchor that actually exists in the extracted text, and exact identifiers/names/dates/amounts must be present in the annotated supporting documents. It reports the observed language-pair coverage without inventing an automatic 45/45 balance threshold. Human review still decides whether the question set is representative.
+
+`retrieval-score` intentionally consumes a ranked-chunk JSONL export instead of implementing a second package-owned chunker/indexer. This prevents the quality campaign from silently measuring a home-grown retrieval pipeline rather than the actual product path. The JSONL contract is documented by `retrieval-rankings.schema.json`. It reports Recall@1/@3/@5, reciprocal rank, required/alternate support recovery, conflicting chunks, exact-value recovery and separate DE→DE / FR→FR / DE→FR / FR→DE dimensions when present. Unsupported questions are retained for later fixed-evidence/model checks but are reported as `recall=N/A` and excluded from Recall/MRR aggregates because they have no relevant passage by definition. The named arms in `retrieval-arms.json` are bounded hypotheses and every arm requires a fresh index.
+
+`retrieval-compare` accepts two or more completed retrieval-only result directories only when they use the exact same corpus manifest and retrieval-arm authority. It preserves per-arm and per-language-pair metrics but deliberately does **not** choose a winner. After review, `retrieval-freeze` requires an explicit selection note and copies the selected manifest, arm authority and ranking export by SHA-256 into a self-contained frozen retrieval contract. Old result-directory paths are therefore not the authority for later model comparison.
+
+`fixed-export` accepts only that explicit Step-9 frozen retrieval contract. It freezes the exact retrieved chunks and metadata together with the retrieval-freeze and ranking-export SHA-256 values. `fixed-replay` can then feed those identical chunks to multiple answer models, separating retrieval quality from reading/reasoning/grounding quality. The replay prompt treats retrieved evidence as data rather than instructions and forbids filling unsupported facts from model knowledge. Promotion remains role-specific and requires later DEVICE evidence; these campaign commands do not promote models or change Open WebUI configuration.
+
+### Development versus DEVICE execution boundary
+
+The quality-campaign source may be developed in the main workbench while the previously built candidate is still being qualified elsewhere. A command documented in the post-release workbench is **not** assumed to exist on the currently installed candidate. Real-corpus Tika/retrieval/model evidence becomes DEVICE evidence only after an RPM containing the corresponding campaign tooling is built and installed. Keeping the corpus files on the appliance is fine; do not improvise source-only campaign commands against an older installed package and then label the result as qualification evidence.
+
+
 ## Canonical benchmark results
 
 Every benchmark invocation owns one isolated result directory. The default is under
@@ -167,7 +203,11 @@ failure. NUL-safe `xargs -0 -r ... basename` is accepted for the basename contra
 while omitting `-r` remains an empty-input robustness miss. The benchmark does not
 execute generated Bash/Python as root, does not exercise/qualify native Ollama `tool_calls`,
 and does not claim arbitrary behavioral correctness. Intrinsic `tools=true` capability
-therefore remains distinct from the validation contract actually proven on BC-250.
+therefore remains distinct from the validation contract actually proven on BC-250. The final
+2026-10-31 DEVICE closure passed the canonical Bash/Python/JSON mini-regression 3/3 after
+changing only the Bash case to the contract-first raw-output wording.
+
+Long-running qualification scripts should emit explicit operator progress (step/case/repeat start and completion/result) so a healthy long run is distinguishable from a stalled harness.
 
 Generation canonical summaries expose more than headline decode throughput: cold request wall time and
 actual `cold_load_s` are separate, optional 4K/16K deep-context lanes report target versus actual prompt
@@ -193,11 +233,16 @@ bc250 advanced benchmark translation [--think auto|true|false] [MODEL ...]
 
 Records target-language adherence, semantic anchors, preserved identifiers/numbers,
 source-language leakage, meaningful-content checks, answer/thinking sizes, prompt/eval
-counts and timings, load/wall time and device telemetry. `--think auto` preserves the
-runtime default; `--think true` and `--think false` make a direct-transform reasoning
-contract explicit and record it in result provenance. Explicit-vs-implicit direction
-belongs here as a comparison; routine revalidation tests only the packaged production
-translation preset.
+counts and timings, load/wall time and device telemetry. Modality-labelled cases also call
+the package-owned clause-local translation authority used by the Open WebUI delivery
+guard; benchmark code does not maintain an independent adjacency/substring modality
+parser. When that authority finds a change, the exact semantic detail is retained in CSV
+and JSONL diagnostics (for example `negated recommendation / temporal polarity was
+lost` or `prohibition weakened to no-obligation`). `--think auto` preserves the runtime
+default; `--think true` and `--think false` make a direct-transform reasoning contract
+explicit and record it in result provenance. Explicit-vs-implicit direction belongs here
+as a comparison; routine revalidation tests only the packaged production translation
+preset.
 
 
 For packaged generation models, `reasoning_request_policy=nonthinking-first-pass` is an explicit
@@ -206,6 +251,18 @@ shows that a provider/model template can still serialize a literal `<think>...</
 response despite that request. The generation benchmark therefore preserves the raw provider response and
 records `reasoning-present-despite-think-false` rather than silently stripping it. Product presentation is a
 separate role/UI contract and must not be inferred from benchmark cleanup.
+
+Model-comparison reports should present quality and latency together. The 2026-10-31
+Qwen3.5 Advanced DEVICE block is the reference example: `think=true` passed 15/15 at
+about 32.65 s median, while `think=false` passed 12/15 at about 9.83 s median and
+deterministically violated one scheduling constraint 3/3. A faster arm with a repeatable
+quality regression is not a promotion win. The subsequent minimal `presence_penalty=1.5`
+intervention retained `think=true` and reproduced 14/14 PASS twice; the 0.20.0-1 source
+candidate adopts that one sampler change rather than reopening broad sampler fishing.
+Reasoning-budget exhaustion with no visible answer remains `INCOMPLETE` unless the strict
+repetition oracle fires, but the evidence now also records diagnostic-only tail repetition
+indicators so operators can see an exhausted check-loop even when it does not cross the
+quality-fail threshold.
 
 ## Direct RAG
 
@@ -279,9 +336,12 @@ and restore the original setting before returning. Restoration failure is an
 infrastructure failure.
 
 `owui-translation` and `owui-rag` do not tune configuration. `owui-translation`
-qualifies the canonical eight-case DE↔FR screen through the actual package-owned
+qualifies the packaged DE↔FR regression corpus through the actual package-owned
 production role IDs, so the live model-specific direction Filter and 2048-token preset are
-part of the path. `owui-rag` qualifies the currently configured Open WebUI RAG path with
+part of the path. The corpus includes the historically known recommendation-strengthening
+case plus negated-recommendation/temporal-polarity, prohibition/no-obligation,
+no-obligation and permission/prohibition controls. A raw semantic failure may therefore
+remain a model-quality failure while the finalized product path passes by withholding it. `owui-rag` qualifies the currently configured Open WebUI RAG path with
 deterministic multi-turn grounding/citation checks. Its MODEL argument may be an exact active
 Open WebUI preset ID or an Ollama base model that maps to exactly one active preset. The
 benchmark resolves that relationship through authenticated Open WebUI metadata before creating
@@ -329,8 +389,7 @@ report 40/40 routed, but revalidation does not hard-code that number as the gene
 success rule.
 
 Case-quality `rc=3` is recorded and does not abort the worker. Other benchmark/helper
-errors are infrastructure failures. Final status reports run completion, infrastructure,
-model quality, product integrity and topology restoration separately. Worker liveness and the age of the last real
+errors are infrastructure failures. Final status reports run completion, infrastructure, model quality, product integrity and topology restoration separately. Human summaries additionally separate `Quality suites` from `Qualification cases`: suite outcomes describe the higher-level qualification paths, while case counts report the underlying pass/quality-fail/incomplete/skipped records. `Coverage: FULL — all scheduled qualification paths executed` describes execution scope only and never implies that every quality case passed. Worker liveness and the age of the last real
 progress event are also separate; a free-running pulse is never presented as proof
 of benchmark progress.
 
@@ -338,8 +397,7 @@ Harness v4.9 keeps the dedicated GPT-OSS/Jina coexistence test as the authoritat
 deep GPT-OSS resource check and omits GPT-OSS from the redundant generic edge sweep.
 Successful roles/edge/Open-WebUI phase boundaries use lightweight checkpoints; full
 snapshots remain at preflight, agent-topology transitions, final restoration and failures.
-Non-severe context truncation is surfaced under `Diagnostics` without changing PASS
-criteria; severe early truncation remains an infrastructure qualification failure. The
+Non-severe context truncation is surfaced under `Diagnostics` with explicit requested→evaluated token counts and the wording that it is accepted by current context policy, without changing PASS criteria; severe early truncation remains an infrastructure qualification failure. The
 same section also reports tight resource headroom when MemAvailable falls below 512 MiB
 while remaining above the unchanged 128 MiB hard floor, and accepted use cases that reach
 their output budget. These are visibility signals, not relaxed acceptance criteria.

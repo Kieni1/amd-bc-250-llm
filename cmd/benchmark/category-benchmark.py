@@ -47,6 +47,7 @@ from benchmark_common import (
     semantic_identifier_equivalent,
     translation_direction_wrappers,
     translation_literal_integrity_mismatch,
+    translation_modality_mismatch,
     translation_numeric_values,
     translation_system_prompt,
     write_benchmark_metadata,
@@ -1395,8 +1396,13 @@ OCR_PROMPTS = {
         "Preserve wording, identifiers, numbers, line grouping, and table row/column "
         "associations. Do not translate, summarize, or add commentary."
     ),
+    "lfm3-vl": (
+        "Extract all readable text from the image in natural human reading order. "
+        "Preserve wording, identifiers, numbers, line grouping, and table row/column "
+        "associations. Do not translate, summarize, or add commentary."
+    ),
 }
-OCR_DIRECT_EXTRACTION = frozenset({"ovis", "minicpm"})
+OCR_DIRECT_EXTRACTION = frozenset({"ovis", "minicpm", "lfm3-vl"})
 
 
 def ocr_kind(model: str) -> str:
@@ -2103,6 +2109,15 @@ def translation_messages(case: dict[str, Any], model: str) -> list[dict[str, str
                 f"explanation.\n\n{case['input']}"
             ),
         }]
+    if profile == "index-translate-explicit-direction-v1":
+        target = names.get(case["target_language"], case["target_language"])
+        return [{
+            "role": "user",
+            "content": (
+                f"请将以下文本翻译为{target}，直接输出翻译结果，不要进行任何解释。\n\n"
+                f"{case['input']}"
+            ),
+        }]
     if profile == "translate-gemma-explicit-direction-v1":
         direction = (case["source_language"], case["target_language"])
         try:
@@ -2139,6 +2154,24 @@ def translation_failure_kinds(
     if not preserved_ok:
         failures.append("preservation")
     return list(dict.fromkeys(failures))
+
+
+def translation_modality_detail(case: dict[str, Any], content: str) -> str | None:
+    """Return the package-owned clause-local semantic mismatch for modality cases."""
+    semantic_contract = str(case.get("semantic_contract") or "").casefold()
+    if semantic_contract != "modality" and "modality" not in str(case.get("id") or "").casefold():
+        return None
+    source = case.get("input")
+    source_language = case.get("source_language")
+    target_language = case.get("target_language")
+    if not all(isinstance(value, str) and value for value in (source, source_language, target_language)):
+        return None
+    return translation_modality_mismatch(
+        source,
+        content,
+        source_language,
+        target_language,
+    )
 
 
 def translation_content_checks(
@@ -2222,6 +2255,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
         "required_ok",
         "forbidden_ok",
         "preserved_ok",
+        "semantic_detail",
         "language_hint",
         "language_ok",
         "think_policy",
@@ -2257,8 +2291,11 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                             "num_predict": int(case.get("num_predict", translation_num_predict))
                         },
                     }
-                    if think_policy != "auto":
-                        payload["think"] = think_policy == "true"
+                    effective_think_policy = think_policy
+                    if think_policy == "auto" and translation_prompt_profile(model) == "index-translate-explicit-direction-v1":
+                        effective_think_policy = "false"
+                    if effective_think_policy != "auto":
+                        payload["think"] = effective_think_policy == "true"
                     sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
                     start_time = time.monotonic()
                     try:
@@ -2284,7 +2321,8 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         content, case["target_language"]
                     )
                     language_ok = language_hint == "match"
-                    semantic_ok = required_ok and meaningful_ok
+                    semantic_detail = translation_modality_detail(case, content)
+                    semantic_ok = required_ok and meaningful_ok and semantic_detail is None
                     ok = (
                         bool(content.strip())
                         and language_ok
@@ -2307,11 +2345,13 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         modality_case=modality_case,
                     )
                     diagnostics: list[str] = []
+                    if semantic_detail is not None:
+                        diagnostics.append(semantic_detail)
                     if done_reason == "length":
                         diagnostics.append("output-budget")
                         if not content.strip() and thinking.strip():
                             diagnostics.append("thinking-budget")
-                    if think_policy == "false" and thinking.strip():
+                    if effective_think_policy == "false" and thinking.strip():
                         diagnostics.append("thinking-present-despite-false")
                     outcome = "pass" if ok else "quality-fail"
 
@@ -2326,9 +2366,10 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         "required_ok": int(required_ok),
                         "forbidden_ok": int(forbidden_ok),
                         "preserved_ok": int(preserved_ok),
+                        "semantic_detail": semantic_detail or "",
                         "language_hint": language_hint,
                         "language_ok": int(language_ok),
-                        "think_policy": think_policy,
+                        "think_policy": effective_think_policy,
                         "answer_chars": len(content),
                         "thinking_chars": len(thinking),
                         "wall_s": f"{wall:.3f}",
@@ -2378,6 +2419,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                             done_reason=done_reason,
                             source_language=case["source_language"],
                             target_language=case["target_language"],
+                            semantic_detail=semantic_detail,
                             response=content,
                             thinking=thinking,
                             telemetry=telemetry,
@@ -2427,6 +2469,36 @@ def _reasoning_repetition(text: str) -> str | None:
         word, count = Counter(words).most_common(1)[0]
         if count / len(words) > 0.30:
             return f"reasoning token {word!r} repeated {count}/{len(words)} words"
+    return None
+
+
+def _reasoning_repetition_indicator(text: str) -> str | None:
+    """Return a diagnostic-only tail repetition signal for exhausted reasoning.
+
+    This is intentionally looser than the quality-fail repetition oracle above. It
+    is used only when a reasoning-enabled request has already exhausted its output
+    budget without a visible answer, so it adds operator context without turning
+    every long reasoning trace into a repetition failure.
+    """
+    lines = [
+        re.sub(r"^\s*(?:[-*]|\d+[.)])\s*", "", line).strip().casefold()
+        for line in text.splitlines()
+    ]
+    lines = [line for line in lines if line]
+    if len(lines) >= 20:
+        tail = lines[-min(80, len(lines)) :]
+        distinct = len(set(tail))
+        if distinct / len(tail) < 0.75:
+            return f"tail repetition indicators: {distinct}/{len(tail)} distinct reasoning lines"
+
+    words = re.findall(r"\w+", text.casefold())
+    if len(words) >= 160:
+        tail_words = words[-min(320, len(words)) :]
+        shingles = [tuple(tail_words[index : index + 5]) for index in range(len(tail_words) - 4)]
+        if shingles:
+            shingle, count = Counter(shingles).most_common(1)[0]
+            if count >= 4:
+                return f"tail phrase repeated {count} times: {' '.join(shingle)!r}"
     return None
 
 
@@ -2499,10 +2571,15 @@ def _usecase_result_record(
         diagnostics.append("output-budget")
         if reasoning_budget_exhausted:
             diagnostics.extend(["thinking-budget", "visible-answer-empty"])
+            repetition_indicator = _reasoning_repetition_indicator(thinking)
+            if repetition_indicator:
+                diagnostics.extend(["repetition-indicators", repetition_indicator])
             if controls["budget_is_production_contract"]:
                 diagnostics.append("production-contract-budget")
         elif reasoning_repetition:
             diagnostics.append("repetition-loop")
+            if not content.strip():
+                diagnostics.append("visible-answer-empty")
             if repetition_detail:
                 diagnostics.append(repetition_detail)
     outcome = "incomplete" if reasoning_budget_exhausted else ("pass" if ok else "quality-fail")

@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bc250.local/schema/corpus-inventory-v1.json",
+  "title": "BC-250 external PDF corpus inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "corpus_id",
+    "documents"
+  ],
+  "properties": {
+    "schema": {
+      "const": 1
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/document"
+      }
+    }
+  },
+  "$defs": {
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "language",
+        "source",
+        "notes"
+      ],
+      "properties": {
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "de",
+            "fr",
+            "en",
+            "mixed",
+            null
+          ]
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "file",
+        "sha256",
+        "size_bytes",
+        "document_type",
+        "mime_type",
+        "pdf_header_valid",
+        "annotation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^[^\\u0000-\\u001F]+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "document_type": {
+          "const": "pdf"
+        },
+        "mime_type": {
+          "const": "application/pdf"
+        },
+        "pdf_header_valid": {
+          "type": "boolean"
+        },
+        "duplicate_of": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "annotation": {
+          "$ref": "#/$defs/annotation"
+        }
+      }
+    }
+  }
+}

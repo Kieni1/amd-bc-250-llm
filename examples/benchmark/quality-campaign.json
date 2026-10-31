@@ -1,0 +1,425 @@
+{
+  "schema": 1,
+  "campaign_id": "bc250-office-rag-quality-2026q4",
+  "purpose": "DE/FR-first office model and document/RAG qualification on BC-250",
+  "language_weights": {
+    "de": 0.45,
+    "fr": 0.45,
+    "en": 0.1
+  },
+  "controls": [
+    {
+      "id": "standard-control",
+      "role": "standard",
+      "status": "incumbent",
+      "model_id": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+      "product_role_id": "bc250-office-standard",
+      "modelfile": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 32768,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 64
+      },
+      "system_prompt_sha256": "7ff53284ee7989ef0c0f696e93a510f1c44d2b00e3a0e894d84b657379f68b36",
+      "expected_request_policy": {},
+      "comparison_purpose": "Fast everyday German/French office assistant control.",
+      "expected_base_model_id": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest"
+    },
+    {
+      "id": "generalist-0.20.0-candidate",
+      "role": "generalist",
+      "status": "production-candidate",
+      "model_id": "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k",
+      "product_role_id": "bc250-office-generalist",
+      "modelfile": "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 32768,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "repeat_penalty": 1.0
+      },
+      "system_prompt_sha256": "8782c0bec6e23b74c418eadb950acea22253262e10e05aefbd0d4c86047a679b",
+      "expected_request_policy": {
+        "think": false,
+        "max_tokens": 4096
+      },
+      "comparison_purpose": "User-directed 0.20.0 generalist candidate; qualify DE/FR office quality, refusal behavior, latency and grounding before acceptance.",
+      "expected_base_model_id": "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k:latest"
+    },
+    {
+      "id": "documents-control",
+      "role": "documents-rag",
+      "status": "incumbent",
+      "model_id": "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl",
+      "product_role_id": "bc250-office-documents",
+      "modelfile": "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_ctx": 32768,
+        "num_keep": 256,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 64
+      },
+      "system_prompt_sha256": "f1608ea36db3e02720f763d4ae60e58ead8598a7509fed2ba2d8fe7c6bc74701",
+      "expected_request_policy": {},
+      "comparison_purpose": "Document-grounded answer model control after retrieval is frozen.",
+      "expected_base_model_id": "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest"
+    },
+    {
+      "id": "higher-quality-control",
+      "role": "higher-quality",
+      "status": "incumbent",
+      "model_id": "prod-qwen35-9b-unsloth-q6-k",
+      "product_role_id": "bc250-office-advanced",
+      "modelfile": "prod-qwen35-9b-unsloth-q6-k.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 32768,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "system_prompt_sha256": "2934224339d943d5a4a2c99843104789e1e67d2a36fc1a85ee85f62ac368996e",
+      "expected_request_policy": {
+        "think": true,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "repeat_penalty": 1.0,
+        "max_tokens": 6144
+      },
+      "comparison_purpose": "Higher-quality office control; DEVICE research retained think=true and independently reproduced presence_penalty=1.5 as the source candidate for runaway-reasoning mitigation.",
+      "expected_base_model_id": "prod-qwen35-9b-unsloth-q6-k:latest"
+    },
+    {
+      "id": "structured-control",
+      "role": "structured",
+      "status": "incumbent",
+      "model_id": "prod-qwen35-9b-unsloth-q6-k",
+      "product_role_id": "bc250-office-advanced-structured",
+      "modelfile": "prod-qwen35-9b-unsloth-q6-k.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 32768,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "repeat_penalty": 1.0
+      },
+      "system_prompt_sha256": "2934224339d943d5a4a2c99843104789e1e67d2a36fc1a85ee85f62ac368996e",
+      "expected_request_policy": {
+        "think": false,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 0.0,
+        "repeat_penalty": 1.0,
+        "max_tokens": 6144
+      },
+      "comparison_purpose": "Strict structured-output control with reasoning disabled.",
+      "expected_base_model_id": "prod-qwen35-9b-unsloth-q6-k:latest"
+    },
+    {
+      "id": "deep-control",
+      "role": "deep-reasoning",
+      "status": "incumbent",
+      "model_id": "prod-gpt-oss20b-ggml-org-mxfp4",
+      "product_role_id": "bc250-office-deep-reasoning",
+      "modelfile": "prod-gpt-oss20b-ggml-org-mxfp4.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_ctx": 16384,
+        "num_keep": 256,
+        "temperature": 1.0,
+        "top_p": 1.0,
+        "top_k": 0
+      },
+      "system_prompt_sha256": "16ea8427321e8bdca766d0b5109b17cf16c1897747859036f1e4df023b61b7ea",
+      "expected_request_policy": {
+        "keep_alive": "2m"
+      },
+      "comparison_purpose": "Deep reasoning control; test whether tuned Qwen 9B can remove this separate role.",
+      "expected_base_model_id": "prod-gpt-oss20b-ggml-org-mxfp4:latest"
+    },
+    {
+      "id": "translation-de-fr-control",
+      "role": "translation-de-fr",
+      "status": "incumbent",
+      "model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
+      "product_role_id": "bc250-office-translation-de-fr",
+      "modelfile": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 8192,
+        "num_predict": 2048,
+        "temperature": 0
+      },
+      "expected_request_policy": {
+        "max_tokens": 2048
+      },
+      "comparison_purpose": "Deterministic DE→FR translation control.",
+      "product_system_prompt_sha256": "1d5759e7110efeee7f076717039bdc0cc3bf8f70e965fab7f431c8227b14fdd3",
+      "expected_base_model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest"
+    },
+    {
+      "id": "translation-fr-de-control",
+      "role": "translation-fr-de",
+      "status": "incumbent",
+      "model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl",
+      "product_role_id": "bc250-office-translation-fr-de",
+      "modelfile": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 8192,
+        "num_predict": 2048,
+        "temperature": 0
+      },
+      "expected_request_policy": {
+        "max_tokens": 2048
+      },
+      "comparison_purpose": "Deterministic FR→DE translation control.",
+      "product_system_prompt_sha256": "1d5759e7110efeee7f076717039bdc0cc3bf8f70e965fab7f431c8227b14fdd3",
+      "expected_base_model_id": "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest"
+    },
+    {
+      "id": "task-control",
+      "role": "openwebui-task",
+      "status": "incumbent",
+      "model_id": "task-lfm25-1.2b-instruct-liquidai-q6-k",
+      "product_role_id": null,
+      "modelfile": "task-lfm25-1.2b-instruct-liquidai-q6-k.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_keep": 256,
+        "num_ctx": 4096,
+        "num_predict": 128,
+        "temperature": 0.1,
+        "top_k": 50,
+        "repeat_penalty": 1.05
+      },
+      "expected_request_policy": {},
+      "comparison_purpose": "Open WebUI title/tag/retrieval-query task control.",
+      "expected_task_state": {
+        "TASK_MODEL": "task-lfm25-1.2b-instruct-liquidai-q6-k:latest",
+        "TASK_MODEL_EXTERNAL": null,
+        "TASK_MODEL_PARAMS": {},
+        "ENABLE_TITLE_GENERATION": true,
+        "ENABLE_TAGS_GENERATION": true,
+        "ENABLE_FOLLOW_UP_GENERATION": false,
+        "ENABLE_AUTOCOMPLETE_GENERATION": false,
+        "ENABLE_SEARCH_QUERY_GENERATION": false,
+        "ENABLE_RETRIEVAL_QUERY_GENERATION": false
+      },
+      "task_prompt_sha256": {
+        "TITLE_GENERATION_PROMPT_TEMPLATE": "16825ec62b857d2556922f125e36af1fe862a7b4d8ed03d7099a29ecc7df85ce",
+        "TAGS_GENERATION_PROMPT_TEMPLATE": "b8539d67b89f3c90c0cde4c854e32273a492edde28ef345a968182f699a43eb3",
+        "QUERY_GENERATION_PROMPT_TEMPLATE": "47b9b029e393606ef7e6acbb4150347b7f46b2679f3ab82161e7c1cab7219ace"
+      }
+    },
+    {
+      "id": "embedding-control",
+      "role": "retrieval-embedding",
+      "status": "incumbent",
+      "model_id": "embed-jina-v5-small-retrieval-q4-k-m",
+      "product_role_id": null,
+      "modelfile": "embed-jina-v5-small-retrieval-q4-k-m.Modelfile",
+      "expected_modelfile_parameters": {
+        "num_gpu": 99,
+        "num_ctx": 4096
+      },
+      "expected_request_policy": {},
+      "comparison_purpose": "Multilingual retrieval embedding control."
+    }
+  ],
+  "retrieval_control": {
+    "content_extraction_engine": "tika",
+    "tika_server_version": "4",
+    "text_splitter": "token",
+    "markdown_header_splitter": true,
+    "chunk_size": 1500,
+    "chunk_overlap": 200,
+    "embedding_model": "embed-jina-v5-small-retrieval-q4-k-m",
+    "query_prefix": "Query: ",
+    "content_prefix": "Document: ",
+    "search": "dense",
+    "top_k": 4,
+    "relevance_threshold": 0
+  },
+  "setting_hypotheses": [
+    {
+      "id": "qwen35-presence-penalty-20261031",
+      "model_id": "prod-qwen35-9b-unsloth-q6-k",
+      "role": "higher-quality",
+      "status": "source-integrated-device-regression-pending",
+      "request_policy": {
+        "think": true,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "repeat_penalty": 1.0
+      },
+      "comparison": "accepted 1.13 higher-quality control with presence_penalty=0.0",
+      "reason": "Two independent DEVICE intervention batches were 14/14 PASS while preserving reasoning-sensitive controls; keep think=true and avoid further sampler fishing. Final next-candidate DEVICE regression remains required."
+    }
+  ],
+  "challengers": [
+    {
+      "id": "lfm3-1.7b",
+      "upstream": "LiquidAI/LFM3-1.7B-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "standard",
+        "structured",
+        "openwebui-task"
+      ],
+      "note": "Official Q6_K fast-office/task challenger; DE/FR qualification required."
+    },
+    {
+      "id": "lfm3-1.7b-uncensored",
+      "upstream": "AtomicChat/LFM3-1.7B-Uncensored-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "standard",
+        "structured"
+      ],
+      "note": "Community Q6_K safety-ablated control paired with official LFM3."
+    },
+    {
+      "id": "nemotron-3.5-bolt-e4b",
+      "upstream": "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB",
+      "package_state": "package-managed",
+      "target_roles": [
+        "documents-rag",
+        "higher-quality",
+        "deep-reasoning"
+      ],
+      "note": "Official Q4_K_M grounding/instruction challenger."
+    },
+    {
+      "id": "nemotron-3.5-bolt-e4b-uncensored-generalist",
+      "upstream": "AtomicChat/NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-GGUF",
+      "package_state": "production-candidate",
+      "target_roles": [
+        "generalist",
+        "standard",
+        "higher-quality"
+      ],
+      "note": "User-directed Q6_K generalist candidate; must be qualified as behavior-modified community weights."
+    },
+    {
+      "id": "granite-4.2-3b",
+      "upstream": "ibm-granite/granite-4.2-3b",
+      "package_state": "already-experimental",
+      "target_roles": [
+        "standard",
+        "documents-rag",
+        "structured"
+      ],
+      "note": "Enterprise/multilingual efficiency control already packaged."
+    },
+    {
+      "id": "spark-x2.6-4b",
+      "upstream": "XHToken/Spark-X2.6-4B-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "higher-quality",
+        "structured"
+      ],
+      "note": "Official compact wildcard; DE/FR quality must be proven locally."
+    },
+    {
+      "id": "spark-x2.6-4b-uncensored",
+      "upstream": "abenzerps/Spark-X2.6-4B-Uncensored-GSQ-RCO-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "higher-quality",
+        "structured"
+      ],
+      "note": "Community GSQ-RCO IQ3_M wildcard paired with official Spark."
+    },
+    {
+      "id": "qwen35-9b-defiant",
+      "upstream": "DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP-GGUF",
+      "package_state": "reactivated-package-managed",
+      "target_roles": [
+        "higher-quality",
+        "deep-reasoning"
+      ],
+      "note": "Reactivated Q6_K community/uncensored control; historical retirement remains documented."
+    },
+    {
+      "id": "index-translate-2b",
+      "upstream": "IndexTeam/Index-Translate-2B-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "translation-de-fr",
+        "translation-fr-de"
+      ],
+      "note": "Dedicated constrained translation efficiency challenger, greedy/think=false."
+    },
+    {
+      "id": "index-translate-9b",
+      "upstream": "IndexTeam/Index-Translate-9B-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "translation-de-fr",
+        "translation-fr-de"
+      ],
+      "note": "Dedicated constrained translation quality challenger, greedy/think=false."
+    },
+    {
+      "id": "lfm3-vl-2b",
+      "upstream": "LiquidAI/LFM3-VL-2B-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "ocr-vision"
+      ],
+      "note": "Compact multilingual OCR/document-vision Q6_K challenger."
+    },
+    {
+      "id": "neohorse1-9b",
+      "upstream": "TokenRhythm/NeoHorse-1-9B-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "agent"
+      ],
+      "note": "Official NeoHorse agent challenger; Agent lane only."
+    },
+    {
+      "id": "neohorse1-9b-uncensored",
+      "upstream": "mradermacher/NeoHorse-1-9-Uncensored-i1-GGUF",
+      "package_state": "package-managed",
+      "target_roles": [
+        "agent"
+      ],
+      "note": "Community uncensored NeoHorse Agent comparator; Agent lane only."
+    },
+    {
+      "id": "qwen3-embedding-0.6b",
+      "upstream": "packaged-experiment",
+      "package_state": "already-packaged",
+      "target_roles": [
+        "retrieval-embedding"
+      ],
+      "note": "Direct retrieval challenger to Jina v5 small."
+    }
+  ]
+}

@@ -356,10 +356,12 @@ mark_partial_coverage() {
 coverage_display() {
   local coverage
   coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
-  if [[ "$coverage" == partial ]] && awk -F '\t' '$4=="coverage" && $5=="skipped" && ($3=="agent" || $3=="agent-add-on") {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
-    printf 'partial (optional Agent not installed)\n'
+  if [[ "$coverage" == full ]]; then
+    printf 'FULL — all scheduled qualification paths executed\n'
+  elif [[ "$coverage" == partial ]] && awk -F '\t' '$4=="coverage" && $5=="skipped" && ($3=="agent" || $3=="agent-add-on") {found=1} END{exit !found}' "$EVENTS" 2>/dev/null; then
+    printf 'PARTIAL — optional Agent not installed\n'
   else
-    printf '%s\n' "$coverage"
+    printf '%s\n' "${coverage^^}"
   fi
 }
 
@@ -551,8 +553,36 @@ event_age() {
 }
 
 quality_counts() {
-  [[ -r "$EVENTS" ]] || { echo "0 0 0"; return; }
+  [[ -r "$EVENTS" ]] || { echo "0 0 0 0"; return; }
   awk -F '\t' '$4=="quality" {if($5=="pass")p++; else if($5=="quality-fail")q++; else if($5=="skipped")s++; else if($5=="incomplete")i++} END{print p+0,q+0,s+0,i+0}' "$EVENTS"
+}
+
+qualification_case_counts() {
+  [[ -d "$RAW" ]] || { echo "0 0 0 0"; return; }
+  python3 - "$RAW" <<'PY_CASE_COUNTS'
+import json
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+counts = {"pass": 0, "quality-fail": 0, "skipped": 0, "incomplete": 0}
+invalid = 0
+for path in sorted(root.rglob("summary.json")):
+    try:
+        summary = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        invalid += 1
+        continue
+    values = summary.get("qualification_counts") if isinstance(summary, dict) else None
+    if not isinstance(values, dict):
+        continue
+    for key in counts:
+        try:
+            counts[key] += int(values.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            continue
+print(counts["pass"], counts["quality-fail"], counts["skipped"], counts["incomplete"], invalid)
+PY_CASE_COUNTS
 }
 
 quality_state() {
@@ -628,7 +658,13 @@ dashboard_text() {
   else
     printf '\nInfrastructure       %s so far\n' "${infra_state^^}"
   fi
-  printf 'Model quality        %s pass / %s quality-fail / %s incomplete / %s skipped\n' "$p" "$q" "$incomplete" "$skipped"
+  local case_p case_q case_skipped case_incomplete case_invalid
+  read -r case_p case_q case_skipped case_incomplete case_invalid <<<"$(qualification_case_counts)"
+  printf 'Model quality        %s\n' "$(quality_state | tr '[:lower:]' '[:upper:]')"
+  printf 'Quality suites       %s PASS / %s MIXED / %s REVIEW / %s SKIPPED\n' "$p" "$q" "$incomplete" "$skipped"
+  printf 'Qualification cases  %s pass / %s quality-fail / %s incomplete / %s skipped' "$case_p" "$case_q" "$case_incomplete" "$case_skipped"
+  ((case_invalid == 0)) || printf ' / %s summary unavailable' "$case_invalid"
+  printf '\n'
   printf 'Coverage             %s\n' "$(coverage_display)"
   printf '\nRecent results\n'
   recent_step_results
@@ -727,6 +763,13 @@ follow_run() {
     printf 'Infrastructure:       %s\n' "$(cat "$INFRA_STATE_FILE" 2>/dev/null || echo unknown)"
     printf 'Product integrity:    %s\n' "$(product_integrity_state)"
     printf 'Model quality:        %s\n' "$(cat "$QUALITY_STATE_FILE" 2>/dev/null || quality_state)"
+    local suite_p suite_q suite_skipped suite_incomplete case_p case_q case_skipped case_incomplete case_invalid
+    read -r suite_p suite_q suite_skipped suite_incomplete <<<"$(quality_counts)"
+    read -r case_p case_q case_skipped case_incomplete case_invalid <<<"$(qualification_case_counts)"
+    printf 'Quality suites:       %s PASS / %s MIXED / %s REVIEW / %s SKIPPED\n' "$suite_p" "$suite_q" "$suite_incomplete" "$suite_skipped"
+    printf 'Qualification cases:  %s pass / %s quality-fail / %s incomplete / %s skipped' "$case_p" "$case_q" "$case_incomplete" "$case_skipped"
+    ((case_invalid == 0)) || printf ' / %s summary unavailable' "$case_invalid"
+    printf '\n'
     printf 'Topology restoration: %s\n' "$(cat "$RESTORATION_STATE_FILE" 2>/dev/null || echo unknown)"
     printf 'Coverage:             %s\n' "$(coverage_display)"
     if [[ $export_state == pass && -n $export_path ]]; then
@@ -1480,9 +1523,9 @@ record_edge_diagnostics() {
   while IFS=$'\t' read -r model case_id previous prompt_eval; do
     [[ -n $model ]] || continue
     if [[ $previous =~ ^[0-9]+$ ]]; then
-      record_event "$label" diagnostic info "$model $case_id: effective prompt evaluation capped at $prompt_eval tokens ($previous requested); accepted by current context-truncation policy"
+      record_event "$label" diagnostic info "$model $case_id: Context truncation observed ($previous requested → $prompt_eval evaluated); accepted by current context policy."
     else
-      record_event "$label" diagnostic info "$model $case_id: effective prompt evaluation capped at $prompt_eval tokens; accepted by current context-truncation policy"
+      record_event "$label" diagnostic info "$model $case_id: Context truncation observed ($prompt_eval evaluated; requested count unavailable); accepted by current context policy."
     fi
   done < <(jq -r '.diagnostics[]? | select(.kind == "context-truncation") | [.model, .case_id, ((.previous_prompt_eval_count // "")|tostring), (.prompt_eval_count|tostring)] | @tsv' "$sanity_json")
   while IFS=$'\t' read -r model mem hard tight; do
@@ -1798,8 +1841,15 @@ else:
     for category, detail in category_summaries:
         print(f"  {category}: {detail}")
     for (_key, entry) in sorted(roots.items(), key=lambda kv: kv[0]):
-        causes = ", ".join(entry["causes"]) or ("output budget exhausted" if entry["state"] == "incomplete" else "quality-fail")
-        print(f"  {entry['case_id']}: {causes} [{entry['state']}]")
+        diagnostics = set(entry["diagnostics"])
+        if entry["causes"] == ("repetition",) and "output-budget" in diagnostics:
+            detail = "Reasoning repetition exhausted the generation budget"
+            if "visible-answer-empty" in diagnostics:
+                detail += "; no user-visible answer was produced"
+            print(f"  {entry['case_id']}: {detail}. [{entry['state']}]")
+        else:
+            causes = ", ".join(entry["causes"]) or ("output budget exhausted" if entry["state"] == "incomplete" else "quality-fail")
+            print(f"  {entry['case_id']}: {causes} [{entry['state']}]")
         if entry["diagnostics"]:
             print(f"    context: {', '.join(sorted(entry['diagnostics']))}")
         print(f"    parity paths: {', '.join(sorted(entry['paths']))}")
@@ -1871,16 +1921,22 @@ for path in sorted(root.rglob("results.jsonl")):
             (
                 str(row.get("case_id") or "unknown"),
                 [str(value) for value in row.get("raw_failure_kinds") or []],
+                str(row.get("raw_semantic_detail") or "").strip(),
             )
         )
 
 if guarded:
+    kinds = {kind for _case_id, failures, _detail in guarded for kind in failures}
+    if kinds == {"modality"}:
+        label = "raw model modality failure"
+    else:
+        label = "raw model translation-integrity failure"
     print(
-        f"  owui-translation: PASS — {len(guarded)} translation-integrity failure"
-        f"{'s' if len(guarded) != 1 else ''} detected; delivery withheld"
+        f"  Translation delivery integrity: PASS — {len(guarded)} {label}"
+        f"{'s' if len(guarded) != 1 else ''} detected; incorrect delivery withheld."
     )
-    for case_id, failures in guarded:
-        causes = ", ".join(failures) or "quality-fail"
+    for case_id, failures, semantic_detail in guarded:
+        causes = semantic_detail or ", ".join(failures) or "quality-fail"
         print(
             f"    {case_id}: raw model quality-fail ({causes}); "
             "delivery withheld"
@@ -1893,8 +1949,9 @@ diagnostic_count() {
 }
 
 create_summary() {
-  local out="$WORK/revalidation-summary.txt" p q skipped incomplete quality coverage diagnostics run_state integrity
+  local out="$WORK/revalidation-summary.txt" p q skipped incomplete case_p case_q case_skipped case_incomplete case_invalid quality coverage diagnostics run_state integrity
   read -r p q skipped incomplete <<<"$(quality_counts)"; quality="$(quality_state)"
+  read -r case_p case_q case_skipped case_incomplete case_invalid <<<"$(qualification_case_counts)"
   coverage="$(cat "$COVERAGE_STATE_FILE" 2>/dev/null || echo unknown)"
   diagnostics="$(diagnostic_count)"
   run_state="$(tr '[:lower:]' '[:upper:]' < "$RUN_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
@@ -1910,10 +1967,14 @@ create_summary() {
     echo
     printf 'Run completion  %s\n' "$run_state"
     printf 'Infrastructure  %s\n' "$(tr '[:lower:]' '[:upper:]' < "$INFRA_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
-    printf 'Model quality   %s       %s pass / %s quality-fail / %s incomplete / %s skipped\n' "${quality^^}" "$p" "$q" "$incomplete" "$skipped"
+    printf 'Model quality   %s\n' "${quality^^}"
+    printf 'Quality suites  %s PASS / %s MIXED / %s REVIEW / %s SKIPPED\n' "$p" "$q" "$incomplete" "$skipped"
+    printf 'Qualification cases %s pass / %s quality-fail / %s incomplete / %s skipped' "$case_p" "$case_q" "$case_incomplete" "$case_skipped"
+    ((case_invalid == 0)) || printf ' / %s summary unavailable' "$case_invalid"
+    printf '\n'
     printf 'Product integrity %s\n' "${integrity^^}"
     printf 'Topology restoration %s\n' "$(tr '[:lower:]' '[:upper:]' < "$RESTORATION_STATE_FILE" 2>/dev/null || echo UNKNOWN)"
-    printf 'Coverage        %s\n' "$(coverage_display | tr '[:lower:]' '[:upper:]')"
+    printf 'Coverage        %s\n' "$(coverage_display)"
     ((diagnostics == 0)) || printf 'Diagnostics     %d informational\n' "$diagnostics"
     echo
     echo "Quality failures"

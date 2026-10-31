@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "control": "control-jina-dense-k4-1500-200",
+  "arms": [
+    {
+      "id": "control-jina-dense-k4-1500-200",
+      "chunk_size": 1500,
+      "chunk_overlap": 200,
+      "top_k": 4,
+      "search": "dense",
+      "embedding_model": "embed-jina-v5-small-retrieval-q4-k-m",
+      "fresh_index_required": true
+    },
+    {
+      "id": "small-chunk-jina-dense-k4-1000-100",
+      "chunk_size": 1000,
+      "chunk_overlap": 100,
+      "top_k": 4,
+      "search": "dense",
+      "embedding_model": "embed-jina-v5-small-retrieval-q4-k-m",
+      "fresh_index_required": true
+    },
+    {
+      "id": "large-chunk-jina-dense-k4-2000-200",
+      "chunk_size": 2000,
+      "chunk_overlap": 200,
+      "top_k": 4,
+      "search": "dense",
+      "embedding_model": "embed-jina-v5-small-retrieval-q4-k-m",
+      "fresh_index_required": true
+    },
+    {
+      "id": "broader-jina-dense-k6-1500-200",
+      "chunk_size": 1500,
+      "chunk_overlap": 200,
+      "top_k": 6,
+      "search": "dense",
+      "embedding_model": "embed-jina-v5-small-retrieval-q4-k-m",
+      "fresh_index_required": true
+    },
+    {
+      "id": "qwen-dense-k4-1500-200",
+      "chunk_size": 1500,
+      "chunk_overlap": 200,
+      "top_k": 4,
+      "search": "dense",
+      "embedding_model": "embed-qwen3-0.6b-q8-0",
+      "fresh_index_required": true
+    },
+    {
+      "id": "hybrid-jina-k4-1500-200",
+      "chunk_size": 1500,
+      "chunk_overlap": 200,
+      "top_k": 4,
+      "search": "hybrid",
+      "embedding_model": "embed-jina-v5-small-retrieval-q4-k-m",
+      "fresh_index_required": true,
+      "precondition": "Use only if the product path supports the hybrid/BM25 configuration being evaluated."
+    }
+  ]
+}

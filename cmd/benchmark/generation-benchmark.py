@@ -341,7 +341,7 @@ def resolve_think_policy(model: str, requested: str) -> str:
     contract = package_model_contract(model)
     if contract is not None:
         profile = contract.get("profile") if isinstance(contract.get("profile"), dict) else {}
-        if profile.get("reasoning_request_policy") == "nonthinking-first-pass":
+        if profile.get("reasoning_request_policy") in {"nonthinking-first-pass", "request-think-false", "request-think-false-bounded-4096"}:
             return "false"
         # Other packaged models without an explicit Open WebUI request policy
         # deliberately do not infer request-time reasoning from capability/name.
