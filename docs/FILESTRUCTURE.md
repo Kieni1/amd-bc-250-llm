@@ -64,6 +64,9 @@ intentionally empty on a stock install; packaged model definitions live under
 | `/var/lib/bc250-llm-server/ollama/task/` | Task store, port 11435 |
 | `/var/lib/bc250-llm-server/ollama/embedding/` | Embedding store, port 11437 |
 | `/var/lib/bc250-llm-server/ollama/agent/` | Exclusive agent store, port 11436 |
+| `/var/lib/bc250-llm-server/openwebui-runtime/` | RPM-owned runtime-injection projection for the pinned Open WebUI compatibility hook; not mutable operator/application state |
+| `/var/lib/bc250-llm-server/openwebui-preupgrade-version` | One-shot Open WebUI migration provenance (`%ghost`, root-only); consumed after the migration snapshot decision succeeds |
+| `/var/lib/bc250-llm-server/preupgrade-package-modelfiles.json` | One-shot package Modelfile transition provenance (`%ghost`, root-only); model entries are consumed as reconciliation completes |
 | `/var/lib/ollama/` | Persistent upstream/Ollama-owned state outside ordinary RPM file ownership |
 | `/var/lib/bc250-llm-server/revalidation/` | Root-only revalidation work state; completed state remains inspectable until explicit cleanup or the next run |
 | `/var/lib/bc250-llm-server/revalidation/results/` | Root-only canonical revalidation evidence history; operator export copies are written to the invocation/output directory |

@@ -1004,49 +1004,115 @@ step_11_maintenance
         pre = spec.split("%pre\n", 1)[1].split("%post\n", 1)[0]
         capture = pre.index("owui_previous_version=")
         live_probe = pre.index("http://127.0.0.1:3000/api/version", capture)
-        preserve_capture = pre.index('owui_previous_version=$owui_existing_capture', live_probe)
-        packaged_fallback = pre.index("/usr/share/bc250-llm-server/runtime.env", preserve_capture)
-        write_capture = pre.index('> "$owui_version_tmp"', packaged_fallback)
+        preserved_capture = pre.index("owui_existing_version", live_probe)
+        packaged_fallback = pre.index("/usr/share/bc250-llm-server/runtime.env", preserved_capture)
+        write_capture = pre.index('"proven": proven_text == "true"', packaged_fallback)
         stop = pre.index("systemctl stop open-webui.service", write_capture)
         self.assertLess(capture, live_probe)
-        self.assertLess(live_probe, preserve_capture)
-        self.assertLess(preserve_capture, packaged_fallback)
+        self.assertLess(live_probe, preserved_capture)
+        self.assertLess(preserved_capture, packaged_fallback)
         self.assertLess(packaged_fallback, write_capture)
         self.assertLess(write_capture, stop)
-        self.assertIn("BC250_OPEN_WEBUI_VERSION=", pre)
-        self.assertIn("owui_version_valid", pre)
+        self.assertIn("live-runtime", pre)
+        self.assertIn("previous-capture", pre)
+        self.assertIn("old-package-hint", pre)
+        self.assertIn('owui_previous_proven=false', pre)
         self.assertIn("chmod 0600", pre)
         self.assertIn('mv -f "$owui_version_tmp" "$owui_version_state"', pre)
 
-    def test_installer_uses_and_cleans_preupgrade_version_only_after_verified_backup(self) -> None:
+    def test_installer_uses_only_proven_openwebui_version_to_skip_backup(self) -> None:
         source = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn("openwebui_captured_previous_version()", source)
-        self.assertIn('current="$(openwebui_previous_version)"', source)
+        self.assertIn("openwebui_captured_previous_provenance()", source)
+        self.assertIn('provenance="$(openwebui_previous_provenance)"', source)
         backup = source[
             source.index("prepare_openwebui_migration_backup() {"):
             source.index("step_8_application_services() {")
         ]
+        self.assertIn('[[ "$proven" == true', backup)
+        self.assertIn('backup_from=unknown', backup)
+        self.assertIn("unproven previous-version hint", backup)
         verify = backup.index('[[ -f "$OWUI_UPGRADE_BACKUP" && -f "$OWUI_UPGRADE_BACKUP.sha256" ]]')
         cleanup = backup.rindex('rm -f -- "$OWUI_PREUPGRADE_VERSION_FILE"')
         self.assertLess(verify, cleanup)
 
-    def test_installer_previous_version_uses_valid_captured_state_when_live_probe_is_empty(self) -> None:
+    def test_installer_structured_previous_version_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp) / "previous-version"
-            state.write_text("0.12.4\n", encoding="utf-8")
             body = (
                 f'OWUI_PREUPGRADE_VERSION_FILE="{state}"\n'
                 "openwebui_running_version() { return 0; }\n"
-                "openwebui_previous_version\n"
+                "openwebui_previous_provenance\n"
+            )
+
+            state.write_text(
+                '{"schema":1,"version":"0.12.4","source":"live-runtime","proven":true}\n',
+                encoding="utf-8",
             )
             result = source_probe(body)
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertEqual(result.stdout.strip(), "0.12.4")
+            self.assertEqual(result.stdout.strip(), "0.12.4\tlive-runtime\ttrue")
+
+            state.write_text("0.12.4\n", encoding="utf-8")
+            result = source_probe(body)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(result.stdout.strip(), "0.12.4\tlegacy-capture\tfalse")
 
             state.write_text("bad version / injection\n", encoding="utf-8")
             result = source_probe(body)
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertEqual(result.stdout.strip(), "")
+
+    def test_unproven_equal_openwebui_hint_still_creates_conservative_backup(self) -> None:
+        body = r'''
+OWUI_DATA="$2/openwebui"
+OWUI_DB="$OWUI_DATA/webui.db"
+OWUI_PREUPGRADE_VERSION_FILE="$2/previous-version"
+BC250_OPEN_WEBUI_VERSION=0.12.5
+mkdir -p "$OWUI_DATA"
+: > "$OWUI_DB"
+printf '%s\n' '{"schema":1,"version":"0.12.5","source":"old-package-hint","proven":false}' > "$OWUI_PREUPGRADE_VERSION_FILE"
+helper="$2/backup-helper"
+cat > "$helper" <<'SH'
+#!/usr/bin/env bash
+set -e
+archive="$BC250_TEST_TMP/openwebui-$1-to-$2.tar.gz"
+: > "$archive"
+: > "$archive.sha256"
+printf 'Open WebUI upgrade backup: %s\n' "$archive"
+SH
+chmod +x "$helper"
+export BC250_TEST_TMP="$2"
+openwebui_running_version() { return 0; }
+openwebui_upgrade_backup_helper() { printf '%s\n' "$BC250_TEST_TMP/backup-helper"; }
+systemctl() { return 0; }
+prepare_openwebui_migration_backup
+[[ ! -e "$OWUI_PREUPGRADE_VERSION_FILE" ]]
+'''
+        result = source_probe(body)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("unproven previous-version hint", result.stdout)
+        self.assertIn("openwebui-unknown-to-0.12.5.tar.gz", result.stdout)
+        self.assertNotIn("migration rollback snapshot not required", result.stdout)
+
+    def test_proven_equal_openwebui_version_safely_skips_backup(self) -> None:
+        body = r'''
+OWUI_DATA="$2/openwebui"
+OWUI_DB="$OWUI_DATA/webui.db"
+OWUI_PREUPGRADE_VERSION_FILE="$2/previous-version"
+BC250_OPEN_WEBUI_VERSION=0.12.5
+mkdir -p "$OWUI_DATA"
+: > "$OWUI_DB"
+printf '%s\n' '{"schema":1,"version":"0.12.5","source":"live-runtime","proven":true}' > "$OWUI_PREUPGRADE_VERSION_FILE"
+openwebui_running_version() { return 0; }
+openwebui_upgrade_backup_helper() { echo "backup helper must not run" >&2; return 1; }
+prepare_openwebui_migration_backup
+[[ ! -e "$OWUI_PREUPGRADE_VERSION_FILE" ]]
+'''
+        result = source_probe(body)
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("Open WebUI data is already at version 0.12.5", result.stdout)
+        self.assertIn("migration rollback snapshot not required", result.stdout)
+        self.assertNotIn("backup helper must not run", result.stdout)
 
     def test_openwebui_upgrade_backup_is_full_stopped_state_and_self_verified(self) -> None:
         source = (ROOT / "cmd/maintenance/backup-upgrade-state.sh").read_text(encoding="utf-8")

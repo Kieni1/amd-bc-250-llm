@@ -610,30 +610,72 @@ openwebui_running_version() {
     jq -r '.version // empty' 2>/dev/null || true
 }
 
-openwebui_captured_previous_version() {
-  local value=''
+openwebui_captured_previous_provenance() {
   [[ -r "$OWUI_PREUPGRADE_VERSION_FILE" ]] || return 0
-  IFS= read -r value < "$OWUI_PREUPGRADE_VERSION_FILE" || true
-  [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || return 0
-  printf '%s\n' "$value"
+  python3 - "$OWUI_PREUPGRADE_VERSION_FILE" <<'PY_OWUI_CAPTURE'
+import json
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    raw = path.read_text(encoding="utf-8").strip()
+except OSError:
+    raise SystemExit(0)
+
+version_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
+try:
+    document = json.loads(raw)
+except json.JSONDecodeError:
+    # 1.13 used a plain version capture with ambiguous provenance. Preserve it
+    # only as an unproven hint so it can never suppress a conservative backup.
+    if version_re.fullmatch(raw):
+        print(f"{raw}\tlegacy-capture\tfalse")
+    raise SystemExit(0)
+
+if not isinstance(document, dict) or document.get("schema") != 1:
+    raise SystemExit(0)
+version = document.get("version")
+source = document.get("source")
+proven = document.get("proven")
+if not isinstance(version, str) or version_re.fullmatch(version) is None:
+    raise SystemExit(0)
+if source not in {"live-runtime", "previous-capture", "old-package-hint", "legacy-capture"}:
+    raise SystemExit(0)
+if not isinstance(proven, bool):
+    raise SystemExit(0)
+print(f"{version}\t{source}\t{'true' if proven else 'false'}")
+PY_OWUI_CAPTURE
 }
 
-openwebui_previous_version() {
-  local current=''
+openwebui_previous_provenance() {
+  local current='' captured=''
   current="$(openwebui_running_version)"
-  if [[ -z "$current" ]]; then
-    current="$(openwebui_captured_previous_version)"
+  if [[ -n "$current" ]]; then
+    printf '%s\tlive-runtime\ttrue\n' "$current"
+    return 0
   fi
-  printf '%s\n' "$current"
+  captured="$(openwebui_captured_previous_provenance)"
+  if [[ -n "$captured" ]]; then
+    printf '%s\n' "$captured"
+  fi
+  return 0
 }
 
 prepare_openwebui_migration_backup() {
-  local data="${OWUI_DATA:-/var/lib/open-webui}" db current helper output
+  local data="${OWUI_DATA:-/var/lib/open-webui}" db current source proven provenance helper output backup_from
   db="${OWUI_DB:-$data/webui.db}"
   [[ -f "$db" ]] || return 0
-  current="$(openwebui_previous_version)"
-  if [[ -n "$current" && "$current" == "$BC250_OPEN_WEBUI_VERSION" ]]; then
-    echo "Open WebUI data is already running on $current; migration rollback snapshot not required."
+  current=''
+  source=''
+  proven='false'
+  provenance="$(openwebui_previous_provenance)"
+  if [[ -n "$provenance" ]]; then
+    IFS=$'\t' read -r current source proven <<< "$provenance"
+  fi
+  if [[ "$proven" == true && -n "$current" && "$current" == "$BC250_OPEN_WEBUI_VERSION" ]]; then
+    echo "Open WebUI data is already at version $current; migration rollback snapshot not required."
     rm -f -- "$OWUI_PREUPGRADE_VERSION_FILE"
     return 0
   fi
@@ -642,14 +684,20 @@ prepare_openwebui_migration_backup() {
     echo "ERROR: Open WebUI upgrade backup helper is unavailable: $helper" >&2
     return 1
   }
-  if [[ -n "$current" ]]; then
-    echo "Existing Open WebUI data requires a pre-migration rollback snapshot ($current -> $BC250_OPEN_WEBUI_VERSION)."
-  else
-    echo "Existing Open WebUI data detected; previous version could not be determined."
+  if [[ "$proven" == true && -n "$current" ]]; then
+    echo "Open WebUI migration snapshot: $current -> $BC250_OPEN_WEBUI_VERSION"
+    backup_from=$current
+  elif [[ -n "$current" ]]; then
+    echo "Existing Open WebUI data has an unproven previous-version hint ($current from ${source:-unknown})."
     echo "Creating a conservative rollback snapshot before convergence to $BC250_OPEN_WEBUI_VERSION."
+    backup_from=unknown
+  else
+    echo "Existing Open WebUI data detected; previous runtime version could not be proven."
+    echo "Creating a conservative rollback snapshot before convergence to $BC250_OPEN_WEBUI_VERSION."
+    backup_from=unknown
   fi
   systemctl stop open-webui.service
-  output="$("$helper" "${current:-unknown}" "$BC250_OPEN_WEBUI_VERSION")" || return
+  output="$("$helper" "$backup_from" "$BC250_OPEN_WEBUI_VERSION")" || return
   printf '%s\n' "$output"
   OWUI_UPGRADE_BACKUP="${output##*: }"
   [[ -f "$OWUI_UPGRADE_BACKUP" && -f "$OWUI_UPGRADE_BACKUP.sha256" ]] || {

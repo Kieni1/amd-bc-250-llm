@@ -71,7 +71,7 @@ source/provenance state, runtime Modelfile drift, registration state and an
 overall `CURRENT`, `MISSING`, `PACKAGE UPDATE PENDING`, `DRIFT` or `UNKNOWN` result. It requires root
 because manager-owned GGUF/state directories are protected.
 
-On RPM upgrade, `%pre` records hashes only for runtime Modelfiles that the previously installed package can prove still match its own rendered definition. If the new package changes that definition and source/registration remain current, `status` reports `PACKAGE UPDATE PENDING`. A runtime file that does not match the captured package hash is never relabelled as expected convergence; it remains `DRIFT`/local-or-unknown. The provenance record is advisory state and does not override source, registration or ownership checks.
+On RPM upgrade, `%pre` records hashes only for runtime Modelfiles that the previously installed package can prove still match its own rendered definition. If the new package changes that definition and source/registration remain current, `status` reports `PACKAGE UPDATE PENDING`. A runtime file that does not match the captured package hash is never relabelled as expected convergence; it remains `DRIFT`/local-or-unknown. The provenance record is advisory state and does not override source, registration or ownership checks. It is transition-scoped: successful convergence removes that model's entry atomically, preserves unrelated entries, and removes the state file when no pending package transitions remain.
 
 During the pre-1.0 greenfield phase, all active package model sources use `tracking`; the `pinned`
 policy remains part of the contract for the later 1.0 stabilization step. Schema-4 state separates `configured_ref` from acquired identity. A valid tracking artifact remains current across a pinned→tracking/ref migration during ordinary `apply`; metadata is upgraded in place and only `refresh` advances the moving source.
@@ -139,8 +139,12 @@ llama.cpp. MTP remains download-only, so it supports source `status/apply/refres
 
 ### `purge-retired`
 
-Purges only models explicitly present in the package retired-model catalog,
-retaining the existing misplaced-registration and fail-closed protections.
+Purges only models explicitly present in the current package `models/retired-models.json` retirement registry,
+retaining the existing misplaced-registration and fail-closed protections. That registry is the actionable cleanup
+authority for the current package. The historical `models/modelfiles-retired/` tree is immutable provenance, not
+cleanup authority: a newly retired model does not require an archived Modelfile, and a deliberately reactivated
+model may still have a historical archived Modelfile without becoming purge-eligible. Reactivation therefore
+removes the model from the current retirement registry; it never rewrites historical archive evidence.
 
 ## Greenfield command contract
 

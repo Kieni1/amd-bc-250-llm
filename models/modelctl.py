@@ -1385,6 +1385,51 @@ def preupgrade_modelfile_state_path() -> Path:
     return Path(override) if override else PREUPGRADE_MODELFILE_STATE
 
 
+def consume_preupgrade_modelfile_provenance(model: dict, runtime: Path | None) -> None:
+    """Retire one model's one-shot package-update transition evidence atomically."""
+    if runtime is None:
+        return
+    state_path = preupgrade_modelfile_state_path()
+    try:
+        document = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return
+    if not isinstance(document, dict) or document.get("schema") != 1:
+        return
+    entries = document.get("runtime_modelfiles")
+    if not isinstance(entries, dict):
+        return
+    entry = entries.get(str(runtime))
+    if not isinstance(entry, dict):
+        return
+    if entry.get("model_id") != model.get("id") or entry.get("category") != model.get("category"):
+        return
+
+    remaining = dict(entries)
+    remaining.pop(str(runtime), None)
+    if not remaining:
+        try:
+            state_path.unlink(missing_ok=True)
+        except OSError as error:
+            raise ModelError(f"cannot retire pre-upgrade Modelfile provenance: {error}") from error
+        return
+
+    updated = dict(document)
+    updated["runtime_modelfiles"] = remaining
+    temporary = state_path.with_name(f".{state_path.name}.tmp.{os.getpid()}")
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text(
+            json.dumps(updated, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        temporary.chmod(0o600)
+        os.replace(temporary, state_path)
+    except OSError as error:
+        raise ModelError(f"cannot retire pre-upgrade Modelfile provenance: {error}") from error
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def package_modelfile_update_pending(model: dict, runtime: Path | None) -> bool:
     """Return True only when pre-upgrade evidence proves package-owned drift."""
     if runtime is None or not runtime.is_file():
@@ -1984,6 +2029,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                         current_skipped += 1
                     else:
                         print("    already current; skipping")
+                    consume_preupgrade_modelfile_provenance(model, runtime_template)
                     continue
                 show_header(label, model["provider"])
                 reason = reconciliation_reason(
@@ -2002,6 +2048,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 if registrations is not None:
                     registrations.add(model["name"])
                 remove_hf_backing_registration(ollama_bin, host, model)
+                consume_preupgrade_modelfile_provenance(model, runtime_template)
                 print("    registered with Ollama; source blobs are Ollama-managed")
                 continue
 
@@ -2114,11 +2161,13 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
             ):
                 if summarize_current and not source_metadata_changed:
                     current_skipped += 1
+                    consume_preupgrade_modelfile_provenance(model, runtime_template)
                     continue
                 show_header(label, model["provider"])
                 if source_metadata_changed:
                     print("    refreshed source metadata/permissions")
                 print("    already current; skipping")
+                consume_preupgrade_modelfile_provenance(model, runtime_template)
                 continue
             show_header(label, model["provider"])
             reason = reconciliation_reason(
@@ -2136,6 +2185,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 raise ModelError("ollama create failed")
             if registrations is not None:
                 registrations.add(model["name"])
+            consume_preupgrade_modelfile_provenance(model, runtime_template)
             print("    registered with Ollama")
         except (ModelError, OSError) as error:
             show_header(label, model["provider"])

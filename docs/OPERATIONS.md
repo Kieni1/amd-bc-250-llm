@@ -68,7 +68,7 @@ sudo bc250 install --models-only
 sudo bc250 install --owui-token-file FILE
 ```
 
-For an RPM upgrade with an existing Open WebUI database, RPM `%pre` unconditionally requests OWUI stop, proves `ActiveState=inactive`, and holds its boot drop-in before the new Quadlet can restart. `bc250 install` is the supported continuation: it verifies the stopped-state rollback snapshot before re-enabling/starting the new image. See `OPERATIONS.md` for restore steps.
+For an RPM upgrade with an existing Open WebUI database, RPM `%pre` unconditionally requests OWUI stop, proves `ActiveState=inactive`, and holds its boot drop-in before the new Quadlet can restart. `bc250 install` is the supported continuation: it verifies the stopped-state rollback snapshot before re-enabling/starting the new image. See `OPERATIONS.md` for restore steps. Migration naming uses only proven runtime-version evidence; an old-package runtime pin is retained as a diagnostic hint but cannot suppress a snapshot or claim that the database has already run under that version.
 
 Normal mode prints a setup plan covering root growth, Fedora/package/Ollama,
 TTM/swap, 40-CU, storage headroom, models, Open WebUI and reboot state; it applies

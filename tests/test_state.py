@@ -163,6 +163,176 @@ class StateTests(unittest.TestCase):
                     modelctl.compact_inspection_details(local),
                 )
 
+    def test_preupgrade_modelfile_provenance_is_consumed_per_model(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state = root / "preupgrade.json"
+            runtime_a = root / "a.Modelfile"
+            runtime_b = root / "b.Modelfile"
+            runtime_a.write_text("FROM a\n", encoding="utf-8")
+            runtime_b.write_text("FROM b\n", encoding="utf-8")
+            state.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "captured_from": "bc250-llm-server-0.14.1-1.13.fc44.x86_64",
+                        "runtime_modelfiles": {
+                            str(runtime_a): {
+                                "model_id": "prod-a",
+                                "category": "production",
+                                "sha256": modelctl.sha256(runtime_a),
+                            },
+                            str(runtime_b): {
+                                "model_id": "prod-b",
+                                "category": "production",
+                                "sha256": modelctl.sha256(runtime_b),
+                            },
+                        },
+                    }
+                ) + "\n",
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"BC250_PREUPGRADE_MODELFILE_STATE": str(state)}):
+                modelctl.consume_preupgrade_modelfile_provenance(
+                    {"id": "prod-a", "category": "production"}, runtime_a
+                )
+                remaining = json.loads(state.read_text(encoding="utf-8"))
+                self.assertNotIn(str(runtime_a), remaining["runtime_modelfiles"])
+                self.assertIn(str(runtime_b), remaining["runtime_modelfiles"])
+                self.assertEqual(state.stat().st_mode & 0o777, 0o600)
+
+                modelctl.consume_preupgrade_modelfile_provenance(
+                    {"id": "prod-b", "category": "production"}, runtime_b
+                )
+                self.assertFalse(state.exists())
+
+    def test_preupgrade_modelfile_provenance_wrong_model_is_not_consumed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state = root / "preupgrade.json"
+            runtime = root / "a.Modelfile"
+            runtime.write_text("FROM a\n", encoding="utf-8")
+            state.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "runtime_modelfiles": {
+                            str(runtime): {
+                                "model_id": "prod-a",
+                                "category": "production",
+                                "sha256": modelctl.sha256(runtime),
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"BC250_PREUPGRADE_MODELFILE_STATE": str(state)}):
+                modelctl.consume_preupgrade_modelfile_provenance(
+                    {"id": "prod-other", "category": "production"}, runtime
+                )
+            self.assertTrue(state.exists())
+
+    def test_apply_current_summary_consumes_completed_transition_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "model.gguf"
+            source.write_bytes(b"weights")
+            template = root / "prod-test.Modelfile"
+            template.write_text(
+                "# BC250 category: production\n"
+                "# Ollama model: prod-test\n"
+                "FROM __BC250_SOURCE__\n"
+                "PARAMETER num_gpu 99\n"
+                "PARAMETER num_keep 256\n",
+                encoding="utf-8",
+            )
+            model = {
+                "id": "prod-test",
+                "name": "prod-test",
+                "category": "production",
+                "provider": "ollama",
+                "repository": "example/model",
+                "revision": "latest",
+                "gguf": source.name,
+                "sha256": "",
+                "from": str(source),
+                "template": template,
+                "modelfile": template.name,
+                "origin": "packaged",
+                "source_metadata": {"policy": "tracking"},
+            }
+            runtime_root = root / "runtime"
+            runtime_root.mkdir()
+            runtime = runtime_root / template.name
+            runtime.write_text(
+                modelctl.rendered_modelfile_content(template, model, source),
+                encoding="utf-8",
+            )
+            defaults = {
+                "category": "production",
+                "destination": str(root),
+                "download_namespace": "test",
+                "modelfile_destination": str(runtime_root),
+                "ollama_host": "127.0.0.1:11434",
+                "min_free_bytes": 0,
+            }
+            with patch.object(modelctl.os, "chown"), patch.object(modelctl.os, "chmod"):
+                modelctl.write_state(
+                    modelctl.state_path(source), model, modelctl.sha256(source), 0
+                )
+            provenance = root / "preupgrade.json"
+            provenance.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "runtime_modelfiles": {
+                            str(runtime): {
+                                "model_id": "prod-test",
+                                "category": "production",
+                                "sha256": modelctl.sha256(runtime),
+                            }
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                command="apply",
+                revision=None,
+                sha256=None,
+                destination=None,
+                min_free_bytes=None,
+                token_file=None,
+                host=None,
+                hf_session={"resolved": False, "token": ""},
+            )
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "HF_HOME": str(root / "hf"),
+                        "DOWNLOAD_DIR": str(root / "downloads"),
+                        "BC250_MODELCTL_CURRENT_SUMMARY": "1",
+                        "BC250_PREUPGRADE_MODELFILE_STATE": str(provenance),
+                    },
+                    clear=False,
+                ),
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(modelctl, "ollama_identity", return_value=(0, 0)),
+                patch.object(
+                    modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"
+                ),
+                patch.object(modelctl, "registered_models", return_value={"prod-test"}),
+                patch.object(modelctl, "run_as_ollama") as run_as_ollama,
+                patch.object(modelctl.os, "chown"),
+                patch.object(modelctl.os, "chmod"),
+            ):
+                self.assertEqual(modelctl.apply_models(defaults, [model], args), 0)
+            run_as_ollama.assert_not_called()
+            self.assertFalse(provenance.exists())
+
     def test_apply_migrates_legacy_pinned_state_without_refreshing_tracking_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
