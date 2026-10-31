@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Accepted runtime/dependency baseline: `bc250-llm-server-0.14.1-1.12` — Open WebUI 0.12.5, Ollama 0.40.13 and Tika 4.2.0 completed the dependency-depth, RAG endurance/restart and full authenticated DEVICE campaign. Current SOURCE candidate: `bc250-llm-server-0.14.1-1.13`; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
+Current accepted package: `bc250-llm-server-0.14.1-1.13`. Current source candidate: `bc250-llm-server-0.20.0-1`, retaining the accepted Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline while adding the quality-campaign/model refresh. Exact 0.20.0-1 BUILD/DEVICE acceptance is still pending; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
 Release 1.13 keeps the accepted 1.12 runtime/model/RAG baseline unchanged and adds bounded package hardening/UX: fail no-usable-text ingestion clearly, retain knowable rollback provenance, distinguish proven package Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior.
 
@@ -74,6 +74,12 @@ Document/knowledge synchronization is loopback-only by default and token-file sy
 
 ## Models
 
+The 0.20.0-1 source candidate adds **Office - Generalist** as a new curated candidate backed by
+`prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`. It is a community safety-ablated Nemotron
+variant and remains pending DEVICE qualification; existing Standard/Documents/Advanced/Deep/Translation
+roles are not silently repointed. New official and community challengers are opt-in except where the
+catalog explicitly marks a production candidate.
+
 ```bash
 bc250 model list                    # ordinary combined catalog view
 bc250 model inspect MODEL --json    # authoritative package metadata view
@@ -139,6 +145,8 @@ bc250 advanced benchmark generation --profile edge --mode production
 bc250 advanced benchmark embeddings
 bc250 advanced benchmark ocr
 bc250 advanced benchmark task
+bc250 advanced benchmark campaign audit
+# Real corpus stays external; on an installed campaign-capable candidate use corpus-inventory -> corpus-validate -> tika-extract -> gold-validate -> retrieval-score -> retrieval-compare -> retrieval-freeze -> fixed-export -> fixed-replay.
 
 sudo bc250 advanced agent enter
 bc250 advanced benchmark agent   # static output/tool-format contract; not native Ollama tool_calls qualification

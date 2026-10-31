@@ -321,13 +321,14 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("output budget", commands)
         self.assertIn("Model-quality findings", quality)
 
-    def test_current_model_docs_distinguish_retired_qwen_distill(self) -> None:
+    def test_current_model_docs_distinguish_retired_qwen_distill_and_general(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
         experiments = (ROOT / "models/experiments/README.md").read_text(encoding="utf-8")
         for text in (readme, ollama, experiments):
             self.assertIn("exp-qwen38-4b-distill-empero-q6-k", text)
             self.assertIn("exp-qwen38-4b-empero-q6-k", text)
+            self.assertIn("retired", text.lower())
         self.assertNotIn("Qwen3.8 therefore remains an opt-in experiment", ollama)
         self.assertNotIn("intentional in 0.10", experiments)
 
@@ -360,24 +361,27 @@ class DocumentationTests(unittest.TestCase):
         self.assertEqual(workbench["kind"], "release-workbench")
         _version, _release, nvr = current_identity()
         self.assertEqual(workbench["release"]["nvr"], nvr)
-        self.assertEqual(workbench["release"]["state"], "1.13-source-candidate")
+        self.assertEqual(workbench["release"]["state"], "0.20.0-1-source-frozen-awaiting-authoritative-build")
         self.assertNotIn("checkpoint", workbench)
-        self.assertIn("1.13", workbench["next_work"]["current_batch"])
-        self.assertIn("package-hardening", workbench["next_work"]["current_batch"].casefold())
+        self.assertIn("0.20.0-1", workbench["next_work"]["current_batch"])
+        self.assertIn("quality", workbench["next_work"]["current_batch"].casefold())
+        self.assertIn("steps 3-9", workbench["next_work"]["current_batch"].casefold())
+        self.assertIn("retrieval", workbench["next_work"]["current_batch"].casefold())
         self.assertTrue(workbench["next_work"]["next_batch"].strip())
-        self.assertIn("1.12 is the accepted", workbench["long_term"]["direction"])
+        self.assertIn("tika", workbench["next_work"]["next_batch"].casefold())
+        self.assertIn("0.14.1-1.13 remains DEVICE-accepted", workbench["long_term"]["direction"])
         self.assertIn("1.13", workbench["long_term"]["direction"])
-        self.assertIn("Exact 0.14.1-1.12", workbench["validation"]["device_acceptance"])
+        self.assertIn("Exact 0.14.1-1.13", workbench["validation"]["device_acceptance"])
         rpm_check = workbench["validation"]["rpm_package_check"]
         self.assertIn("1.13", rpm_check)
-        self.assertIn("BUILD evidence", rpm_check)
+        self.assertIn("does not transfer", rpm_check)
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
     def test_ollama_docs_match_effective_vulkan_environment_contract(self) -> None:
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
-        _version, release, _nvr = current_identity()
+        _version, _release, _nvr = current_identity()
         self.assertIn("Package standard: **Ollama v0.40.13**", ollama)
-        self.assertIn(f"release {release}", ollama)
+        self.assertIn("0.20.0-1", ollama)
         self.assertIn("four-lane service topology", ollama)
         self.assertIn("0.40.13 review found no upstream change requiring different values", ollama)
         self.assertIn("Release 1.12 refreshed and DEVICE-qualified", ollama)

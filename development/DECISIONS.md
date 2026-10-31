@@ -1018,7 +1018,7 @@ reasoning serialization, or product presentation of testing models changes.
 
 **Status:** ACTIVE — carried into 0.14.1-1.12.
 
-**Decision:** Revalidation and support-bundle workflows keep package-private working/history state under package-controlled `/var/lib`/`/run` paths, but final artifacts intended for transfer are exported to the invoking operator. The default export target is the invoking working directory, with explicit `--output-dir` support; existing operator-selected directories are never chmod/chowned as a side effect. Exported archives are owned by the invoking user and mode `0600`. Endpoint evidence is published as `.json` only after successful JSON parsing; failed/non-JSON captures use diagnostic files instead. Revalidation machine state exposes independent completion, infrastructure, model-quality, product-integrity, topology-restoration and coverage dimensions.
+**Decision:** Revalidation and support-bundle workflows keep package-private working/history state under package-controlled `/var/lib`/`/run` paths, but final artifacts intended for transfer are exported to the invoking operator. The default export target is the invoking working directory, with explicit `--output-dir` support; existing operator-selected directories are never chmod/chowned as a side effect. Exported archives are owned by the invoking user and mode `0600`. Endpoint evidence is published as `.json` only after successful JSON parsing; failed/non-JSON captures use diagnostic files instead. Revalidation machine state exposes independent completion, infrastructure, model-quality, product-integrity, topology-restoration and coverage dimensions. Human summaries keep suite-level outcomes separate from individual qualification-case counts, describe FULL coverage as execution scope rather than quality success, and distinguish raw translation-model failure from successful delivery-integrity withholding.
 
 **Why:** Root-only internal state is appropriate for service/recovery operation, but an operator-facing export must be directly transferable and must not mutate unrelated filesystem policy. Evidence filenames and completion wording must also truthfully describe what has actually been validated so automated consumers can trust the artifact contract.
 
@@ -1037,7 +1037,7 @@ reasoning serialization, or product presentation of testing models changes.
 
 ## DEC-042 — Treat 1.12 as accepted runtime baseline and make 1.13 a bounded package/UX hardening release
 
-**Status:** ACTIVE — 0.14.1-1.13 candidate.
+**Status:** ACTIVE — accepted on exact 0.14.1-1.13 DEVICE candidate.
 
 **Decision:** Release 1.13 keeps the exact 1.12 Ollama/Open WebUI/Tika pins, four-lane topology,
 model catalog and RAG tuning unchanged. It fixes package-owned semantics and operator presentation
@@ -1058,7 +1058,124 @@ to reopen the architecture. Its remaining actionable product defect and several 
 sit at package boundaries. Fixing those narrowly improves correctness and upgrade comprehension without
 mixing in the separate model/RAG quality campaign or changing already accepted runtime bytes.
 
+**DEVICE result:** exact 1.13 passed the focused changed-surface campaign, reboot persistence, final health/verify and full packaged revalidation infrastructure/product-integrity/restoration dimensions. One non-blocking boundary remains honestly `NOT_TESTED`: pre-upgrade exclusion of an operator-modified runtime Modelfile from package provenance; do not reinstall 1.12 solely to manufacture that coverage.
+
 **Retest only if:** no-text/duplicate ingestion semantics, Open WebUI migration provenance, model
-Modelfile provenance/status classification or optional-model reconciliation UX changes. DEVICE coverage
-for 1.13 should focus on those changed paths plus final health/verify rather than repeating the broad 1.12
-runtime campaign unless another change invalidates that baseline.
+Modelfile provenance/status classification or optional-model reconciliation UX changes.
+
+## DEC-043 — Make upgrade provenance confidence-bearing and one-shot
+
+**Status:** ACTIVE — carried into 0.20.0-1 source candidate.
+
+**Decision:** Open WebUI migration provenance distinguishes a version proven by a live runtime or preserved proven capture from a version merely declared by the old installed package. Only proven evidence may establish that persistent application state crossed a runtime-version boundary or suppress a conservative migration snapshot. An old package pin remains a diagnostic hint. Package-generated runtime Modelfile provenance likewise explains one package transition only: successful reconciliation atomically consumes that model entry, unrelated pending entries remain, and the state file disappears when the final transition is consumed.
+
+The pinned Open WebUI/Tika compatibility hook is version-scoped. Source contracts bind it to the dependency versions it was written for so a future dependency bump requires explicit review. Its `/var/lib/bc250-llm-server/openwebui-runtime/` projection is RPM-owned runtime injection, not mutable operator/application state.
+
+**Why:** Interrupted upgrades can leave RPM metadata ahead of the runtime version that actually opened the persistent database. Treating declaration as proof can suppress a rollback snapshot incorrectly. Transition evidence also becomes misleading if it survives after convergence. Confidence and lifecycle therefore belong in the provenance contract itself.
+
+**Retest only if:** Open WebUI migration capture/snapshot logic, package Modelfile reconciliation, provenance state format, or the pinned compatibility-hook dependency contract changes.
+
+## DEC-044 — Establish the model/RAG campaign as an external-data measurement contract
+
+**Status:** ACTIVE — carried into 0.20.0-1 source candidate.
+
+**Decision:** The next model/RAG campaign begins with measurement infrastructure rather than immediate model integration. Current production Modelfiles, product request policies, task prompts and RAG desired state are snapshotted as controls and audited for drift. Real testing PDFs remain external; the package stores only schema/tooling plus corpus hashes/metadata/gold annotations in run evidence. Tika extraction is evaluated before embeddings, retrieval is scored without answer generation from ranked chunks produced by the actual product path, and fixed retrieved evidence is replayed only after retrieval is frozen. Named retrieval arms require a fresh index and remain bounded rather than forming a Cartesian experiment grid. Challenger names in the campaign manifest are proposals until a concrete package-managed DEVICE campaign requires their integration.
+
+Deliberately unsupported questions remain useful for later grounding tests but are not included in Recall/MRR aggregates because no relevant passage exists by definition. Fixed-evidence exports retain the ranking-export digest so answer-model comparisons can prove they consumed the same retrieval evidence.
+
+**Why:** This separates extraction, retrieval and answer-model failures; preserves a reproducible DE/FR-first control baseline; and keeps the real benchmark corpus out of git, Source0 and RPM payloads. It also prevents benchmark convenience code from becoming an accidental second retrieval implementation.
+
+**Retest only if:** campaign control semantics, external-corpus boundary, retrieval scoring, fixed-evidence format or production role/RAG controls change.
+
+
+## DEC-045 — Separate campaign development from DEVICE execution and require an explicit retrieval freeze
+
+**Status:** ACTIVE — carried into 0.20.0-1 source candidate.
+
+**Decision:** Main-chat/workbench development may add quality-campaign commands, schemas and source tests while a separately built package is still undergoing DEVICE qualification, but those source changes are not DEVICE evidence and commands that exist only in the workbench must not be presented as available on the currently installed candidate. The real PDF corpus remains external and may be safely retained on the appliance, but authoritative corpus/Tika/retrieval evidence is produced only by an installed candidate that actually contains the corresponding campaign tooling.
+
+The campaign sequence is enforced in the tooling: Step-5 Tika evidence is bound to corpus hashes before Step-6 gold evidence can qualify; gold support anchors must exist in the exact extracted text; scored retrieval arms may be compared descriptively but no winner is selected automatically; Step 9 requires an explicit operator/reviewer selection note and freezes the selected arm plus exact manifest/arm/ranking hashes. Fixed-evidence export consumes that frozen retrieval contract rather than an arbitrary ranking file.
+
+**Why:** Mixing workbench development with sidechat DEVICE qualification can accidentally turn planned commands or model-quality observations into claims about installed bytes. Likewise, allowing fixed-evidence generation directly from an arbitrary retrieval export would weaken the campaign order and make later model comparisons harder to reproduce. Explicit source/DEVICE separation plus a one-way retrieval freeze keeps provenance and attribution intact.
+
+**Retest only if:** campaign command availability/evidence boundaries, Tika-to-gold binding, retrieval comparison/freeze semantics, or fixed-evidence provenance changes.
+
+## DEC-046 — Preserve closed model-selection evidence and reuse the translation semantic authority
+
+**Status:** ACTIVE — carried into 0.20.0-1 source candidate.
+
+**Decision:** Completed DEVICE quality evidence remains an input to the next campaign and must not be
+silently restarted as if it were unresolved. For Qwen3.5 Advanced, retain the production `think=true`
+policy: the controlled 2026-10-31 block passed 15/15 strict cases versus 12/15 for `think=false`; the
+faster non-thinking arm failed one constraint-scheduling task 3/3. The remaining Qwen investigation is
+frequency/severity of excessive or repetitive thinking, not a global thinking on/off decision.
+
+The broad translation tournament also remains closed under its historical evidence. Translate-Gemma stays
+the production control and EuroLLM stays retired after its Round-1 `muss nicht` language-switch stop
+criterion. New translation evidence expands regression coverage rather than reopening that old selection:
+recommendation→obligation strengthening, negated recommendation/temporal-polarity loss and
+prohibition→no-obligation weakening are deterministic known Translate-Gemma failure families. Package
+benchmarks must use the same clause-local modality authority as the product delivery guard instead of
+ad-hoc substring/adjacency matching, and should preserve the precise semantic mismatch in evidence.
+
+The Agent incumbent/challenger comparison is now closed without promotion. Ornith achieved 12/18
+strict PASS across two runs and remained strong on Python/JSON, while the packaged Qwen3.5 4B
+challenger achieved only 5/18 despite being much faster. Ornith's narrow Bash raw-output weakness
+is addressed by a contract-first canonical Bash qualification prompt; the stronger file-direct wording
+is rejected because it produced a no-final-answer failure. Ornith remains the Agent default.
+
+**Why:** Repeating already-closed selection questions wastes DEVICE time and can erase important negative
+candidate evidence. Reusing one semantic authority also prevents evaluator drift: the recent custom
+translation harness demonstrated false failures when it required contiguous words even though the modality
+was correct. Precise shared semantics plus raw evidence are more trustworthy than multiple independent
+literal parsers.
+
+**Retest only if:** the production Qwen reasoning policy/sampler changes; materially new Qwen evidence
+overturns the controlled constraint result; translation semantic authority changes; a materially different
+translation candidate enters a real DEVICE campaign; or a future Agent candidate establishes a genuine
+promotion case.
+
+
+## 2026-10-31 — Refresh the 0.20.0 model campaign and add a separate Generalist candidate
+
+**Decision:** Refresh the active package-managed candidate set from the 2026-10-31 upstream scan. Add official/community LFM3, Nemotron, Index-Translate, Spark-X2.6, LFM3-VL, Defiant-Fable and NeoHorse candidates; retire nine experiments that no longer answer a distinct product question. Deliberately reactivate Defiant-Fable because the current campaign now includes community/uncensored controls; retain its historical retirement record rather than rewriting it.
+
+Add `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` as a new **Office - Generalist** production candidate and curated Open WebUI role. Do not repoint Standard, Documents, Advanced/Higher Quality, Deep, Translation, task or embedding roles. The Generalist candidate uses AtomicChat's behavior-modified Q6_K weights, NVIDIA's 1.0/0.95 sampler, request-level `think=false`, and a 4096-token output ceiling. Its community/safety-ablated provenance is part of the qualification contract; the upstream harmless-prompt KL limitation must not be hidden by the package naming.
+
+Use upstream/model-specific sampler contracts where clear: Liquid LFM3/LFM3-VL low-temperature general profile; Index-Translate greedy + no thinking; NeoHorse published agent sampler; Spark 1.0/0.95; Qwen3.5 4B complete non-thinking profile. Keep production Qwen3.5 9B reasoning enabled, but integrate the later reproduced minimal `presence_penalty=1.5` intervention for the normal Advanced/raw higher-quality policy; do not broaden that change to Advanced Structured without separate evidence.
+
+**Why:** The prior catalog accumulated controls whose questions are already answered, while the new small-model/translation/grounding/vision/Agent releases create sharper role-specific hypotheses. A separate Generalist role allows the user-directed uncensored Nemotron evaluation without erasing the accepted Qwen Advanced control. Retirement reduces test cost and cognitive load without deleting provider/operator data.
+
+**Required evidence:** New definitions are SOURCE/package state only until a later exact RPM is built and installed. DEVICE qualification must cover provider acquisition/registration, Open WebUI desired state, DE/FR office quality, visible-answer reliability, latency/memory, behavior drift/refusal characteristics for community variants, translation integrity for Index, OCR/vision for LFM3-VL, and Agent raw-format/topology behavior for NeoHorse.
+
+## DEC-047 — Start the 0.20 product line and integrate the closed quality/performance research
+
+**Status:** ACTIVE — 0.20.0-1 source candidate.
+
+**Decision:** The next product milestone is `Version: 0.20.0`, `Release: 1`. From this point, product
+features/behavior advance RPM `Version`, a new product version begins at release 1, packaging-only fixes
+increment `Release`, and later product bugfix/feature milestones advance patch/minor version. Do not use
+an RPM `Epoch` merely to rename the pre-1.0 line. Exact `0.14.1-1.13` remains the accepted predecessor
+baseline; its BUILD/DEVICE evidence does not transfer to 0.20.0-1.
+
+For Qwen3.5 Advanced, retain `think=true` and the existing 0.7/0.8/top-k-20 sampler but change only
+request-level `presence_penalty` from 0.0 to 1.5. The original runaway/no-final-answer pathology was
+reproduced (7/8 on the problematic task, one 6144-token exhaustion), while the minimal intervention
+passed 14/14 twice independently and preserved the reasoning-sensitive controls. Advanced Structured
+remains its separately qualified `think=false`, presence-penalty-0.0 policy until separately retuned.
+
+For Agent qualification, retain Ornith and put the strict Bash output contract before the task: raw Bash
+only, no Markdown/backticks/fences/labels/explanation, exact `#!/usr/bin/env bash` first line. The
+Qwen3.5 4B Agent challenger is not promoted because its reliability regression was broader than Ornith's
+format-only weakness. The final DEVICE closure confirmed the canonical Bash/Python/JSON mini-regression at 3/3 PASS with only the Bash wording changed.
+
+For hardware policy, retain 1850 MHz as the normal production ceiling. The bounded 2000 MHz A/B improved
+short prompt/prefill throughput by about 9% but decode by only about 1%, increased power/temperature, and
+hit the thermal cutoff under heavy sustained prefill. Keep 2000 MHz as an explicit operator experiment
+and report prefill and decode separately rather than as one generic LLM-performance number.
+
+**Why:** These are reproduced, bounded findings with clear product meaning. Integrating the minimal Qwen
+and Agent changes now gives the final closure block an exact source contract to verify, while preserving
+the accepted model roles, translation fail-closed boundary and safe hardware default.
+
+**Required evidence:** the final research closure handover is consumed. Freeze/build exact 0.20.0-1 and run focused DEVICE regression for the changed Qwen/Agent/translation/model-registration/Open WebUI surfaces before promoting the candidate to accepted release state.

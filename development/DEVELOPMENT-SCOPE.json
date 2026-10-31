@@ -18,12 +18,19 @@
         "quality-checks/main/**",
         "quality-checks/task/**",
         "quality-checks/translation/**",
-        "quality-checks/utils/**"
+        "quality-checks/utils/**",
+        "examples/benchmark/quality-campaign.json",
+        "examples/benchmark/corpus-manifest.schema.json",
+        "examples/benchmark/corpus-inventory.schema.json",
+        "examples/benchmark/corpus-manifest.example.json",
+        "examples/benchmark/retrieval-arms.json",
+        "examples/benchmark/retrieval-rankings.schema.json",
+        "examples/benchmark/frozen-retrieval.schema.json"
       ],
       "status": "active"
     },
     "coding-agent": {
-      "baseline_sha256": "bfc89a3f9ed47513780769e9eda79a2708c76896e81643c61d803709f10ba396",
+      "baseline_sha256": "37323956a597880137b64c112ef84a895f316ec66fdd51968fdd612c3b153391",
       "description": "Coding/Gitea agent workflow helpers; retained under bc250 advanced code.",
       "focused_tests": [],
       "paths": [
@@ -336,7 +343,8 @@
       "watch_paths": [
         "config/openwebui/desired-state.json",
         "config/containers/open-webui.container",
-        "models/model-profiles.json"
+        "models/model-profiles.json",
+        "config/openwebui/runtime/**"
       ]
     },
     "reset": {

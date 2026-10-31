@@ -4,9 +4,9 @@ BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD B
 It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Accepted runtime/dependency baseline: `bc250-llm-server-0.14.1-1.12` (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full, governor 0.4.14). Exact 1.12 completed the dependency-depth, RAG endurance/restart and full authenticated DEVICE campaign.
+Current accepted package: `bc250-llm-server-0.14.1-1.13`. It retains the 1.12-qualified runtime/dependency stack (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full, governor 0.4.14), and its focused changed-surface DEVICE campaign plus full packaged revalidation accepted the exact 1.13 candidate.
 
-Current source candidate: `bc250-llm-server-0.14.1-1.13`. It keeps the accepted 1.12 runtime/model/RAG baseline and adds bounded package hardening and operator UX: reject no-usable-text extraction, retain known rollback provenance, distinguish package-originated Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior. GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority for final release selection.
+Release `bc250-llm-server-0.14.1-1.13` remains the accepted predecessor baseline. The current source candidate is `bc250-llm-server-0.20.0-1`: it carries the bounded 1.13 hardening forward, establishes the DE/FR-first office/RAG measurement contracts, refreshes the managed model tournament, adds Office - Generalist, integrates the reproduced Qwen Advanced presence-penalty intervention, and keeps Ornith with contract-first Bash qualification wording. Exact 0.20.0-1 BUILD/DEVICE evidence is still required; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority for final release selection.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -117,7 +117,8 @@ if that step was skipped. The default endpoint is unencrypted HTTP; see
 | Standard office work | `prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl` |
 | Documents and RAG | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` |
 | German–French translation | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` via explicit DE→FR / FR→DE Open WebUI roles |
-| General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` via normal Advanced (`think=true`) and explicit Advanced Structured (`think=false`) roles |
+| Generalist (0.20.0 candidate) | `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` via Office - Generalist (`think=false`, bounded output); community safety-ablated weights, pending DEVICE qualification |
+| General / higher-quality office | `prod-qwen35-9b-unsloth-q6-k` via Advanced (`think=true`, `presence_penalty=1.5`) and explicit Advanced Structured (`think=false`, retained `presence_penalty=0.0`) roles |
 | Deep reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` |
 | Retrieval embedding | `embed-jina-v5-small-retrieval-q4-k-m` |
 | Open WebUI task model | `task-lfm25-1.2b-instruct-liquidai-q6-k` |
@@ -130,15 +131,15 @@ reached the campaign's 512 MiB safety floor after only a few resident subruns. Q
 separate higher-quality general-office option; this RAG decision is about sustained memory margin,
 not a semantic-quality failure.
 
-The packaged comparison catalog retains active measured challengers, including
-`exp-granite42-3b-ibm-q6-k`, the distinct Qwen3.8 27B quality/deployability profiles,
-and the compact `agentic-qwen35-4b-khazarai-q6-k` /
-`agentic-gemma4-e4b-sol-fable-q4-k-m` coding challengers. Exhausted task/translation comparisons are
-kept only in the retired source set and are not
-exposed through normal model discovery. The installed retirement catalog lets
+The 0.20.0-1 source candidate refreshes the comparison catalog around live product questions. Official
+LFM3-1.7B, Nemotron 3.5 Bolt E4B, Index-Translate 2B/9B, LFM3-VL-2B and Spark-X2.6-4B are paired with
+bounded community/uncensored controls, including AtomicChat LFM3/Nemotron, DavidAU Defiant-Fable,
+GSQ-RCO Spark and NeoHorse agent variants. `exp-granite42-3b-ibm-q6-k`, the two ISTA Qwen3.8 27B
+quality/deployability profiles and the compact Agent challengers remain active controls. Eight exhausted
+experiments were removed from active discovery and recorded in the current retirement registry and are no longer exposed through normal discovery. The installed retirement catalog lets
 `sudo bc250 model status` identify stale package-retired registrations and
 `sudo bc250 model purge-retired` remove only those explicitly catalogued models.
-The 1.10 model-management architecture makes model capabilities declarative across the fleet: catalog metadata owns intrinsic modalities/capabilities/provider ownership and runtime lane, profiles own BC-250 qualification/role policy, and Modelfiles remain runtime-parameter authority. MiniCPM-V therefore exposes its vision/OCR testing capabilities without name heuristics, while reasoning/tool capability remains separate from product request policy. Agent profiles also state the narrower `static-output-contract` validation boundary, so intrinsic tool capability is not confused with proven native `tool_calls`. The optional LFM2.5/Gemma/MiniCPM challengers remain qualification candidates only and do not change any production role or baseline install selection.
+The 1.10 model-management architecture makes model capabilities declarative across the fleet: catalog metadata owns intrinsic modalities/capabilities/provider ownership and runtime lane, profiles own BC-250 qualification/role policy, and Modelfiles remain runtime-parameter authority. MiniCPM-V therefore exposes its vision/OCR testing capabilities without name heuristics, while reasoning/tool capability remains separate from product request policy. Agent profiles also state the narrower `static-output-contract` validation boundary, so intrinsic tool capability is not confused with proven native `tool_calls`. New official/community challengers remain qualification candidates unless explicitly marked otherwise. The only new curated production candidate is Office - Generalist; it does not replace Standard, Documents, Advanced, Deep, Translation, task or embedding roles before DEVICE qualification.
 
 Experimental models are never silent replacements for the defaults above. During `bc250 install`,
 required role models are converged first; entries that are already fully current are summarized rather
@@ -154,13 +155,12 @@ These are starting points, not a fixed production set. Packaged and
 operator-added `.Modelfile` definitions remain easy to replace for hardware,
 quality and quantization comparisons. The main lane keeps models warm for 20 minutes
 for responsive chat, the compact task lane unloads after each request, and the Jina
-embedding lane keeps its small retrieval model warm for 10 minutes. The former task
-candidate `exp-qwen38-4b-distill-empero-q6-k` is retired from normal discovery: it
-scored much better in focused task tests, but simultaneous residency with GPT-OSS
-OOM-killed the task service and safe serialization would reintroduce large-model
-cold starts. Do not confuse it with the separate active general comparison
-`exp-qwen38-4b-empero-q6-k`. The Jina embedding model uses a non-commercial license;
-review every model's current license before use.
+embedding lane keeps its small retrieval model warm for 10 minutes. The former task candidate `exp-qwen38-4b-distill-empero-q6-k` and the old Qwen3.8 4B general
+comparison `exp-qwen38-4b-empero-q6-k` are both retired from normal discovery for different reasons: the task candidate failed the
+co-residency envelope, while the later general comparison no longer answers a distinct campaign question
+beside current Qwen3.5/LFM3/Granite/Spark controls. The Jina embedding model uses a non-commercial license;
+community/uncensored candidates may also have different upstream licenses and intentionally modified refusal
+behavior, so review each model's current license/provenance before use.
 
 ## Daily commands
 
@@ -198,7 +198,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 Release 0.14.1-1.12 is the accepted runtime/dependency DEVICE baseline. It updated Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full while retaining the four-lane Vulkan/iGPU topology, model set and retrieval tuning; the completed DEVICE campaign also covered malformed-input containment, broad Tika formats, RAG endurance, parallel ingestion, restart persistence and full authenticated revalidation.
 
-Release 0.14.1-1.13 is the bounded next candidate. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces.
+Release 0.14.1-1.13 is the current DEVICE-accepted package baseline. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces. The numbered 0.20.0-1 source candidate now carries the subsequent quality-campaign/model work separately.
 
 Release 0.14.1-1.9 remains an older broad device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
@@ -248,7 +248,7 @@ Repository groups:
 - [`docs/OPENWEBUI.md`](docs/OPENWEBUI.md): Open WebUI setup, desired state, roles and API boundary.
 - [`docs/OLLAMA.md`](docs/OLLAMA.md): Ollama runtime topology, profiles and safe updates.
 - [`docs/RAG.md`](docs/RAG.md): office-document/RAG lifecycle and retrieval policy.
-- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation.
+- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation. The 0.20.0-1 quality campaign foundation audits current settings, keeps real PDFs external, separates Tika/retrieval from generation, validates gold evidence against exact extraction output, and requires an explicit retrieval freeze before fixed-evidence replay without changing production defaults.
 - [`docs/QUALITY-CHECKS.md`](docs/QUALITY-CHECKS.md): candidate-quality screens and evidence semantics.
 - [`docs/SECURITY.md`](docs/SECURITY.md): hardening, network exposure and secret handling.
 - [`docs/HTTPS.md`](docs/HTTPS.md): TLS publication example and checklist.
