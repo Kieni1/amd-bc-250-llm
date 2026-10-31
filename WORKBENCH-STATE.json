@@ -12,31 +12,31 @@
   "kind": "release-workbench",
   "long_term": {
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses",
-    "direction": "stock-first local office AI appliance; exact prior DEVICE evidence is retained as historical baseline evidence, while 0.14.1-1.12 is the current SOURCE release candidate (bounded dependency refresh)",
+    "direction": "stock-first local office AI appliance; exact 0.14.1-1.12 is the accepted dependency/integration DEVICE baseline, while 0.14.1-1.13 is the current package-hardening/UX SOURCE candidate",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "Batch 15 complete \u2014 GitHub advisory-hermeticity correction after the first 1.12 Fedora build. The hard release gate/build itself passed, but four advisory tests leaked into root-only /run or /var/cache or assumed a root caller. Current SOURCE sandboxes installer runtime/Hugging Face cache paths and isolates privilege-sensitive status/Open WebUI token validation behind testable helpers. Exact affected tests PASS under UID 65534; the full 15-module advisory set PASS 534/534 in an unprivileged writable checkout.",
-    "integration": "0.14.1-1.12 SOURCE dependency-refresh candidate. Runtime architecture/model set/retrieval tuning remain unchanged; changed surfaces are Ollama 0.40.13, Open WebUI 0.12.5 policy/retrieval integration and Tika 4.2.0.",
-    "next_batch": "Rerun blocking Ruff/ShellCheck and the authoritative Fedora 44 SRPM-first build on the current post-fix 1.12 bytes. Require advisory quality PASS, package-critical %check, payload validation, rpmlint and release evidence before selecting exact-RPM DEVICE acceptance."
+    "current_batch": "1.13 package-hardening/UX batch: reject semantically empty Tika extraction, retain known Open WebUI rollback provenance, distinguish proven package-originated Modelfile updates from local/unknown drift, clarify duplicate-content and optional-model reconciliation UX, and retain dependency-depth harness corrections.",
+    "integration": "0.14.1-1.13 SOURCE candidate carries forward the accepted 1.12 runtime/dependency baseline unchanged and changes only package-owned ingestion guards, upgrade provenance, model-state UX, installer wording, tests and secondary documentation.",
+    "next_batch": "Freeze and build the 1.13 candidate, then run focused DEVICE regressions for the changed ingestion, rollback-provenance, model-reconciliation and optional-model UX paths plus final health/verify. Keep model/RAG quality work separate unless deliberately selected."
   },
   "release": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "nvr": "bc250-llm-server-0.14.1-1.12",
-    "rpm_release": "1.12",
-    "state": "1.12-source-release-candidate-unbuilt",
+    "nvr": "bc250-llm-server-0.14.1-1.13",
+    "rpm_release": "1.13",
+    "state": "1.13-source-candidate",
     "version": "0.14.1"
   },
   "schema": 2,
   "validation": {
-    "device_acceptance": "Exact 0.14.1-1.10 RPM model-management/lifecycle evidence remains a focused historical DEVICE baseline; prior 1.9 broad evidence remains historical as well. No 0.14.1-1.12 DEVICE acceptance exists; changed Ollama/Open WebUI/Tika bytes and 0.12.5 policy/prefix behavior require focused exact-RPM acceptance after authoritative build.",
-    "device_baseline": "1.9 remains the broad accepted runtime/product regression baseline; exact 1.10 retains focused model-management/lifecycle DEVICE PASS. Neither transfers PASS to the changed 1.12 runtime bytes.",
-    "package_critical": "Current post-fix 0.14.1-1.12 SOURCE package-critical validation remains PASS (156/156 tests). The first 1.12 GitHub candidate also passed RPM %check, but that BUILD evidence predates the current source fixes.",
-    "release_preflight": "Current post-fix 0.14.1-1.12 release preflight PASS: release-pipeline 27/27 plus current-guidance/clean-core checks. First GitHub candidate hard preflight also passed before the advisory-hermeticity fixes.",
-    "rpm_package_check": "First 0.14.1-1.12 GitHub candidate completed authoritative SRPM rebuild, payload validation and rpmlint (0 errors, 0 warnings), but its advisory report found UID/host-path-sensitive tests. Current fixed SOURCE differs and therefore needs a new authoritative BUILD before DEVICE acceptance.",
-    "source0_smoke": "Exact 0.14.1-1.12 Source0 smoke PASS: build/bc250-llm-server-0.14.1.tar.gz contains 370 source files, safe paths and no generated build/cache artifacts.",
-    "source_checks": "Current post-fix 0.14.1-1.12 SOURCE: previously 717/717 repository tests passed in split runs; exact affected install/operations/state modules now PASS 112/112 under UID 65534, and the complete 15-module advisory set PASS 534/534 under an unprivileged writable checkout mirroring GitHub. Documentation RUF059 cleanup remains included.",
-    "static_lint": "The first 1.12 GitHub candidate passed blocking Ruff/ShellCheck, but current post-build-fix SOURCE changed shell/tests, so that PASS does not transfer. Ruff/ShellCheck remain blocking rerun gates for the current bytes."
+    "device_acceptance": "Exact 0.14.1-1.12 is DEVICE-accepted for the completed dependency/integration scope. That evidence remains the runtime baseline; 1.13 requires focused changed-surface DEVICE regression after its exact RPM is selected.",
+    "device_baseline": "Exact 0.14.1-1.12 is the current accepted runtime/dependency baseline, including Open WebUI 0.12.5, Ollama 0.40.13, Tika 4.2.0, RAG endurance/restart persistence and full authenticated revalidation.",
+    "package_critical": "1.13 source validation is tracked from the current package-hardening/UX bytes; do not transfer SOURCE or BUILD results from 1.12 to changed files.",
+    "release_preflight": "1.13 current-state/release checks must describe 1.12 as accepted baseline and 1.13 as the new source candidate.",
+    "rpm_package_check": "No 1.13 BUILD evidence is recorded in workbench state until the exact 1.13 package is built through the release authority.",
+    "source0_smoke": "1.13 Source0 identity is established only from the final frozen source tree.",
+    "source_checks": "Current 1.13 changes are limited to active/boundary-active package surfaces plus regression tests and current documentation.",
+    "static_lint": "Static validation results belong to the exact bytes on which they were executed and are not transferred from older releases."
   }
 }

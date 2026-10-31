@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.1-1.13 - 2026-10-31
+
+- Carry forward the fully DEVICE-accepted 1.12 dependency/runtime baseline unchanged while hardening the Open WebUI/Tika ingestion boundary: missing, blank or `<No text content found>` extraction now fails with explicit no-usable-text guidance instead of being stored as successful knowledge content.
+- Preserve useful Open WebUI migration provenance across RPM upgrade by capturing a reliably knowable previous runtime version before the migration hold stops the old service, and consume that capture only after the stopped-state rollback snapshot is verified.
+- Distinguish proven package-originated Modelfile updates from local/unknown runtime drift: RPM `%pre` records hashes only for Modelfiles that still match the previously installed package, `status` reports those sole-definition changes as `PACKAGE UPDATE PENDING`, and unresolved or operator-modified state remains `DRIFT`.
+- Clarify optional-model reconciliation UX: the installer now says it may review, reconcile or install optional models, explains that validated model data is reused, and reports package-update and local-drift counts separately.
+- Make duplicate Knowledge ingestion an explicit expected policy outcome in reusable dependency-depth tests and present a clearer duplicate-content reason while preserving the original document. Retain the corrected Tika Markdown marker normalization and unambiguous XLSX oracle.
+- Refresh current operator/development documentation for exact 1.12 DEVICE acceptance and the bounded 1.13 package-hardening/UX candidate; keep the 1.12 dimensional revalidation, `NOT CHECKED`, support-bundle verification and internal-vs-operator evidence wording patterns.
+
 ## 0.14.1-1.12 - 2026-10-30
 
 - Update the package-qualified application stack to Ollama 0.40.13, Open WebUI 0.12.5 and Apache Tika 4.2.0-full with exact Ollama payload checksum and immutable container-image digests; keep governor 0.4.14 unchanged.
