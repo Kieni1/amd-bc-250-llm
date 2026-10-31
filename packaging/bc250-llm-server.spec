@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.14.1
-Release:        1.12%{?dist}
+Release:        1.13%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -138,11 +138,163 @@ python3 scripts/install-manifest.py \
   --define "bashcompletiondir=%{_datadir}/bash-completion/completions"
 
 %pre
+# Before replacing package model definitions, preserve proof for runtime Modelfiles
+# that still exactly match the previously installed package. The new model manager
+# uses this narrow evidence to distinguish expected package-definition updates from
+# local/unknown drift during post-upgrade reconciliation.
+if [ "$1" -gt 1 ] && [ -x /usr/libexec/bc250-llm-server/modelctl ]; then
+  model_provenance_state=/var/lib/bc250-llm-server/preupgrade-package-modelfiles.json
+  old_package_nvr="$(rpm -q bc250-llm-server 2>/dev/null || true)"
+  python3 - "$model_provenance_state" "$old_package_nvr" <<'PY_MODEL_PROVENANCE' || :
+import hashlib
+import importlib.util
+import json
+import re
+import sys
+from importlib.machinery import SourceFileLoader
+from pathlib import Path
+
+state_path = Path(sys.argv[1])
+old_nvr = sys.argv[2]
+modelctl_path = Path("/usr/libexec/bc250-llm-server/modelctl")
+
+
+def digest(path: Path) -> str:
+    value = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            value.update(block)
+    return value.hexdigest()
+
+
+def valid_entry(path_text: str, entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    recorded = entry.get("sha256")
+    if not isinstance(recorded, str) or re.fullmatch(r"[0-9a-f]{64}", recorded) is None:
+        return False
+    path = Path(path_text)
+    try:
+        return path.is_file() and digest(path) == recorded
+    except OSError:
+        return False
+
+
+entries: dict[str, dict[str, str]] = {}
+try:
+    existing = json.loads(state_path.read_text(encoding="utf-8"))
+except (OSError, json.JSONDecodeError):
+    existing = {}
+if isinstance(existing, dict) and existing.get("schema") == 1:
+    old_entries = existing.get("runtime_modelfiles")
+    if isinstance(old_entries, dict):
+        for path_text, entry in old_entries.items():
+            if isinstance(path_text, str) and valid_entry(path_text, entry):
+                entries[path_text] = dict(entry)
+
+try:
+    loader = SourceFileLoader("bc250_preupgrade_modelctl", str(modelctl_path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    if spec is None:
+        raise RuntimeError("cannot load installed model manager")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    loader.exec_module(module)
+    # Capture only RPM-packaged model definitions. Operator catalogs may
+    # legitimately override package model IDs and must never be reclassified
+    # as package-originated update provenance.
+    for defaults, models in module.load_all_catalogs(directories=[module.PACKAGED_MODEL_DIR]):
+        for model in models:
+            if model.get("provider") == "download-only":
+                continue
+            output = None
+            if model.get("provider") != "ollama-hf":
+                output = module.model_path(defaults, model)
+            runtime = module.runtime_modelfile_path(defaults, model, output)
+            status, _detail = module.inspect_runtime_modelfile(model, runtime, output)
+            if status != "current" or runtime is None or not runtime.is_file():
+                continue
+            entries[str(runtime)] = {
+                "model_id": str(model.get("id", "")),
+                "category": str(model.get("category", "")),
+                "sha256": digest(runtime),
+            }
+except Exception:
+    # Provenance capture improves operator classification only. Never make an
+    # otherwise valid package upgrade depend on this optional evidence surface.
+    pass
+
+if entries:
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    document = {
+        "schema": 1,
+        "captured_from": old_nvr,
+        "runtime_modelfiles": entries,
+    }
+    temporary = state_path.with_name(f"{state_path.name}.tmp")
+    temporary.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.chmod(0o600)
+    temporary.replace(state_path)
+PY_MODEL_PROVENANCE
+fi
+
 # On upgrades with existing Open WebUI state, stop the currently running
 # service before the new Quadlet payload can become eligible through any
 # subsequent daemon-reload.  Keep boot enablement held until bc250 install
 # creates and verifies the stopped-state rollback snapshot.
 if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
+  # Capture migration provenance while the old RPM payload and, where possible,
+  # the old Open WebUI runtime are still available. The guided installer consumes
+  # this only after the stopped-state rollback snapshot has been verified.
+  owui_version_state=/var/lib/bc250-llm-server/openwebui-preupgrade-version
+  owui_previous_version=''
+  owui_existing_capture=''
+  owui_version_valid() {
+    [ -n "$1" ] && [ "${#1}" -le 64 ] || return 1
+    case "$1" in
+      [A-Za-z0-9]*) ;;
+      *) return 1 ;;
+    esac
+    case "$1" in
+      *[!A-Za-z0-9._+-]*) return 1 ;;
+      *) return 0 ;;
+    esac
+  }
+  if [ -r "$owui_version_state" ]; then
+    IFS= read -r owui_existing_capture < "$owui_version_state" || :
+    owui_version_valid "$owui_existing_capture" || owui_existing_capture=''
+  fi
+  if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+    owui_previous_version="$(curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/api/version 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)"
+  fi
+  owui_version_valid "$owui_previous_version" || owui_previous_version=''
+  # If an earlier package transaction already stopped Open WebUI but guided
+  # migration never completed, preserve the original captured runtime version
+  # rather than relabelling the still-old database with a newer package pin.
+  if [ -z "$owui_previous_version" ] && [ -n "$owui_existing_capture" ]; then
+    owui_previous_version=$owui_existing_capture
+  fi
+  if [ -z "$owui_previous_version" ] && [ -r /usr/share/bc250-llm-server/runtime.env ]; then
+    while IFS= read -r owui_runtime_line; do
+      case "$owui_runtime_line" in
+        BC250_OPEN_WEBUI_VERSION=*)
+          owui_previous_version=${owui_runtime_line#BC250_OPEN_WEBUI_VERSION=}
+          break
+          ;;
+      esac
+    done < /usr/share/bc250-llm-server/runtime.env
+    owui_version_valid "$owui_previous_version" || owui_previous_version=''
+  fi
+  if [ -n "$owui_previous_version" ]; then
+    install -d -m 0750 /var/lib/bc250-llm-server
+    owui_version_tmp="${owui_version_state}.tmp.$$"
+    (umask 077; printf '%s\n' "$owui_previous_version" > "$owui_version_tmp")
+    chmod 0600 "$owui_version_tmp"
+    mv -f "$owui_version_tmp" "$owui_version_state"
+  else
+    rm -f "$owui_version_state"
+  fi
+
   # Always request a stop: is-active can transiently report activating/deactivating,
   # and migration safety depends on the proved final state, not the sampled state.
   systemctl stop open-webui.service >/dev/null 2>&1 || :
@@ -227,6 +379,7 @@ fi
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/secrets
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+%ghost %attr(0600,root,root) /var/lib/bc250-llm-server/openwebui-preupgrade-version
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/package-gates
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/resilience
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation
@@ -263,6 +416,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Oct 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.13
+- Carry forward the accepted 1.12 runtime baseline while rejecting semantically empty Tika/Open WebUI extraction as a clear ingestion failure.
+- Preserve known Open WebUI migration provenance and distinguish proven package Modelfile updates from local/unknown drift during upgrade reconciliation.
+- Clarify duplicate-content and optional-model reconciliation UX and retain dependency-depth harness corrections.
+
 * Fri Oct 30 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.12
 - Update Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full using exact payload/container digests while retaining the established BC-250 topology and model set.
 - Harden Open WebUI privacy/network defaults, persist the Jina embedding prefixes through the 0.12.5 retrieval API, pin the 1000-chunk embedding save buffer, and refresh Tika qualification to 4.2.0.

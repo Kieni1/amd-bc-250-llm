@@ -241,6 +241,7 @@
         "config/openwebui/functions/*.py",
         "config/openwebui/models.json",
         "config/openwebui/prompts/*",
+        "config/openwebui/runtime/**",
         "docs/OPENWEBUI.md"
       ],
       "status": "active"

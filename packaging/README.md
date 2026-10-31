@@ -29,7 +29,7 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current clean-core candidate is `bc250-llm-server-0.14.1-1.12.fc44.x86_64`.
+Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current next-release candidate is `bc250-llm-server-0.14.1-1.13.fc44.x86_64`; exact 1.12 is the accepted dependency/runtime DEVICE baseline.
 
 ## Validation and build boundary
 

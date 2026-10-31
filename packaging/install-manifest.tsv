@@ -15,6 +15,8 @@ dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
 dir	0755	-	{share}/ollama-profiles
 dir	0755	-	{share}/openwebui
+dir	0755	-	/var/lib/bc250-llm-server/openwebui-runtime
+file	0644	config/openwebui/runtime/sitecustomize.py	/var/lib/bc250-llm-server/openwebui-runtime/sitecustomize.py
 dir	0755	-	{config}
 dir	0755	-	{config}/models.d
 dir	0755	-	{sysconfdir}/cyan-skillfish-governor-smu
