@@ -45,6 +45,18 @@ source files under `/srv/bc250-documents/`, Open WebUI-managed copies under
 backups. The package contains only blank managed-document templates under
 `/usr/share/bc250-llm-server/examples/document/`.
 
+For the office/RAG quality campaign, the prepared public testing PDFs follow an even stricter benchmark boundary: they remain in an operator-supplied external directory and are never copied into Source0, RPM payloads, package fixtures, release ZIPs or git history. The package ships only the corpus schema, a synthetic manifest example, campaign tooling and evidence formats. A corpus manifest records path-safe logical ID, relative filename, SHA-256, size, language/document type, extraction gold and question/evidence annotations. Logical document/question IDs are deliberately filename-safe because benchmark evidence is written under those IDs.
+
+The campaign separates the path deliberately:
+
+```text
+external PDF -> Tika extraction quality -> gold evidence/questions
+             -> actual product retrieval ranking -> retrieval-only scoring
+             -> frozen ranked evidence -> answer-model comparison
+```
+
+The retrieval scorer does not recreate Open WebUI chunking. It consumes ranked chunks exported from the product path, so changes to `CHUNK_SIZE`, overlap, Top-K, embedding model or dense/hybrid mode are evaluated only after a clean reindex under one named arm. Step-6 gold annotations are first checked against the exact Tika extraction evidence so retrieval is not scored against passages that the product never extracted. Supported questions contribute Recall/MRR; deliberately unsupported questions are kept for later grounding checks but do not lower retrieval recall simply because no supporting passage exists. Retrieval arms are compared descriptively; Step 9 requires an explicit selection note and freezes the selected arm plus exact manifest/arm/ranking hashes before fixed-evidence model comparison. The current `1500/200`, Jina v5, dense, Top-K 4 configuration remains the control until corpus evidence justifies a change.
+
 ## 1. Back up Open WebUI before knowledge synchronization
 
 If the instance already contains useful data, take a stopped full snapshot. The

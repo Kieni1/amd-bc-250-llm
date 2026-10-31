@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from typing import Any
 
+SUPPORTED_OPENWEBUI_VERSION = "0.12.5"
+SUPPORTED_TIKA_VERSION = "4.2.0-full"
 TIKA4_MARKDOWN_SUFFIX = "/tika/json/md"
 NO_TEXT_PLACEHOLDER = "<No text content found>"
 NO_USABLE_TEXT_REASON = (

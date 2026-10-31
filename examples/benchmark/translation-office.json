@@ -191,7 +191,8 @@
       "doivent être observées"
     ],
     "preserve": [],
-    "min_words": 5
+    "min_words": 5,
+    "semantic_contract": "modality"
   },
   {
     "id": "de-fr-obligation-modality",
@@ -208,7 +209,8 @@
       "devraient être payées"
     ],
     "preserve": [],
-    "min_words": 5
+    "min_words": 5,
+    "semantic_contract": "modality"
   },
   {
     "id": "fr-de-recommendation-modality",
@@ -230,7 +232,8 @@
         "beachtet",
         "eingehalten"
       ]
-    ]
+    ],
+    "semantic_contract": "modality"
   },
   {
     "id": "fr-de-obligation-modality",
@@ -247,6 +250,88 @@
       "sollten vor Einzug"
     ],
     "preserve": [],
-    "min_words": 5
+    "min_words": 5,
+    "semantic_contract": "modality"
+  },
+  {
+    "id": "de-fr-negated-recommendation-modality",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Der Lieferant sollte den Bericht nicht vor Montag einreichen. Referenz NR-42-K bleibt unverändert.",
+    "required": [
+      "NR-42-K"
+    ],
+    "preserve": [
+      "NR-42-K"
+    ],
+    "forbidden": [],
+    "min_words": 7,
+    "semantic_contract": "modality"
+  },
+  {
+    "id": "fr-de-prohibition-no-obligation-modality",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Le fournisseur ne doit pas soumettre le rapport après lundi. La référence PR-77-Z reste inchangée.",
+    "required": [
+      "PR-77-Z"
+    ],
+    "preserve": [
+      "PR-77-Z"
+    ],
+    "forbidden": [],
+    "min_words": 7,
+    "semantic_contract": "modality"
+  },
+  {
+    "id": "de-fr-no-obligation-modality",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Der Lieferant muss den Bericht am Montag nicht einreichen. Referenz NO-18-X bleibt unverändert.",
+    "required": [
+      "NO-18-X"
+    ],
+    "preserve": [
+      "NO-18-X"
+    ],
+    "forbidden": [],
+    "min_words": 7,
+    "semantic_contract": "modality"
+  },
+  {
+    "id": "de-fr-permission-prohibition-modality",
+    "source_language": "de",
+    "target_language": "fr",
+    "input": "Mitarbeiter dürfen den Besprechungsraum bis 18:00 nutzen. Sie dürfen die Kennung AX-88-P nicht ändern. Der Leiter muss den Schlüssel danach abgeben.",
+    "required": [
+      "AX-88-P"
+    ],
+    "preserve": [
+      "AX-88-P"
+    ],
+    "numeric_values": [
+      "18"
+    ],
+    "forbidden": [],
+    "min_words": 12,
+    "semantic_contract": "modality"
+  },
+  {
+    "id": "fr-de-permission-prohibition-modality",
+    "source_language": "fr",
+    "target_language": "de",
+    "input": "Les employés peuvent utiliser la salle de réunion jusqu'à 18:00. Ils ne peuvent pas modifier l'identifiant AX-88-P. Le responsable doit rendre la clé ensuite.",
+    "required": [
+      "AX-88-P"
+    ],
+    "preserve": [
+      "AX-88-P"
+    ],
+    "numeric_values": [
+      "18"
+    ],
+    "forbidden": [],
+    "min_words": 12,
+    "semantic_contract": "modality"
   }
 ]

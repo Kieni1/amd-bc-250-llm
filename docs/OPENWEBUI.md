@@ -1,6 +1,6 @@
 # Open WebUI
 
-Current 0.14.1-1.13 source candidate (carrying the accepted 1.12 runtime baseline): **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
+Current DEVICE-accepted 0.14.1-1.13 package (carrying the 1.12-qualified runtime baseline): **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -65,6 +65,12 @@ pinned-version shim makes duplicate-content rejection explicit: the content is a
 Knowledge collection. Recoverable Tika extraction remains successful. The guard is deliberately tied to
 the pinned Open WebUI 0.12.5 behavior and must be revalidated or removed when the Open WebUI pin changes.
 
+The projected runtime hook under `/var/lib/bc250-llm-server/openwebui-runtime/` is **RPM-owned runtime
+injection**, not mutable Open WebUI/operator state. Its source authority remains the packaged
+`config/openwebui/runtime/` tree; the `/var/lib` projection exists only because the file must be bind-mounted
+into the container. Source tests bind the compatibility contract to Open WebUI 0.12.5 and Tika 4.2.0-full so
+a dependency change requires explicit review instead of silently carrying the shim forward.
+
 Open WebUI is a Podman Quadlet. Its generated `open-webui.service` is transient and is not directly
 `systemctl enable`d. The package controls boot publication by installing/removing the Quadlet `[Install]`
 drop-in and reloading systemd; successful publication is verified by the generated unit being wanted by
@@ -84,11 +90,11 @@ environment variables:
   code execution/interpreter, memories and community sharing off;
 - package-owned BC-250 workspace model presets from the versioned
   `config/openwebui/models.json` payload;
-- active workspace overrides for the five production implementation models and
+- active workspace overrides for the six production implementation models and
   the dedicated task model. During pre-v1 testing these records are deliberately
   visible so operators can compare curated roles with raw implementations;
-- authenticated-read (`user:*:read`) grants on the seven active production presets,
-  the six package implementation/task overrides, and package-managed testing records
+- authenticated-read (`user:*:read`) grants on the eight active curated presets,
+  the seven package implementation/task overrides, and package-managed testing records
   dynamically discovered on the normal main/task lanes.
 
 The operator owns users, credentials, custom prompts, unrelated workspace models,
@@ -220,6 +226,7 @@ Open WebUI 0.12 also adds several network/tool surfaces that are outside the app
 | Office – Documents | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` | active |
 | Office – Translation DE → FR | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
 | Office – Translation FR → DE | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
+| Office – Generalist | `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0-1 candidate |
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Advanced Structured | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` | active |
@@ -228,14 +235,19 @@ For the current 16 GiB profile, **Office – Documents** is the production RAG/d
 The September 2026 product-path campaign found both Documents/Gemma E4B and Advanced/Qwen 9B
 functionally strong in short sessions, but only Gemma retained comfortable memory headroom during
 continuous residency. Keep Advanced as an optional heavier general-office role rather than treating
-it as an equivalent long-lived RAG default.
+it as an equivalent long-lived RAG default. The 0.20.0-1 Advanced request policy keeps `think=true`
+and the existing 0.7/0.8/top-k-20 sampler but changes request-level `presence_penalty` to 1.5 after
+two independent DEVICE intervention batches passed 14/14. Advanced Structured remains a distinct
+`think=false`, `presence_penalty=0.0` contract. Office - Generalist is a separate community-Nemotron
+candidate and does not silently replace Advanced.
 
 The two active Translate-Gemma roles reproduce the selected Stage-2E product contract.
 Both use the exact installed `openwebui/prompts/translation-explicit-direction-v1.txt`
 prompt, `max_tokens=2048`, and leave `think` unspecified. The package-owned non-global
 `bc250_translation_direction` Filter prepends only the tested DE→FR or FR→DE wrapper to
 the current text user message. Its post-generation `outlet()` performs the bounded modality/literal
-integrity check. Package qualification follows direct `/api/chat/completions` with
+integrity check. DEVICE closure now confirms end-to-end withholding for recommendation→obligation,
+negated-recommendation/temporal-polarity loss, and prohibition→no-obligation weakening. Package qualification follows direct `/api/chat/completions` with
 `/api/chat/completed` before scoring the final assistant message, because tagged Open WebUI releases
 do not rewrite the direct completion HTTP response with outlet-filter changes.
 
@@ -364,14 +376,14 @@ supported API setup/drift workflow are therefore authoritative for package-owned
 application state; the Quadlet is limited to process bootstrap/runtime controls.
 The package provides two distinct backup classes. Scheduled `bc250 maintenance` config and
 identity/user backups remain scoped recovery artifacts and are not complete RAG backups. For an
-Open WebUI version migration with an existing database—including the current 0.12.5 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` first captures the trustworthy previous Open WebUI version from the old live API when available, falling back to the still-installed old package runtime metadata. It then unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer consumes that capture when naming the stopped-state rollback snapshot; `unknown` is retained only when neither source provides reliable provenance. The capture is removed only after the rollback archive and checksum have been verified. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
+Open WebUI version migration with an existing database—including the current 0.12.5 transition and earlier 0.12.x schema-bearing upgrades—RPM `%pre` records structured previous-version provenance before stopping the old runtime. A version observed from the live API is `proven`; a previously preserved proven runtime capture remains proven across an interrupted package transaction; the still-installed old RPM `runtime.env` is only an `old-package-hint`. An unproven package hint is useful for diagnostics but can never prove that the persistent database successfully crossed that runtime-version boundary, and equality between such a hint and the new target never suppresses the conservative rollback snapshot. Legacy plain 1.13 captures are also treated as unproven because their original evidence source is ambiguous. RPM `%pre` then unconditionally requests `open-webui.service` stop, proves `ActiveState=inactive`, and removes its boot-enablement drop-in before the new Quadlet payload can become restart-eligible. The guided installer names a versioned snapshot only from proven evidence; otherwise it uses `unknown` and reports the hint separately. The capture is removed only after the rollback archive and checksum have been verified. The guided installer then creates a stopped-state, SQLite-integrity-checked archive of the complete
 `/var/lib/open-webui` persistent tree, validates archive members, writes a SHA-256 sidecar and only
 then allows the newly pinned image to start. That rollback snapshot is migration safety, not a
 replacement for the normal retention policy. The archive preserves numeric ownership, ACLs and
 xattrs; the supported restore sequence is documented in [`OPERATIONS.md`](OPERATIONS.md).
 
 For a later Open WebUI update, smoke-test normal chat, title/tag tasks, document
-upload/extraction, embedding/retrieval, the seven active package presets and an
+upload/extraction, embedding/retrieval, the eight active package presets and an
 authenticated `bc250 advanced openwebui status` before changing the pin.
 
 ## Deferred candidates

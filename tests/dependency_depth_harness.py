@@ -15,6 +15,7 @@ import zipfile
 MARKDOWN_ESCAPE_RE = re.compile(r"\\([`*_{}\[\]()#+.!|>\-])")
 XLSX_MARKER = "BC250_DEPTH_XLSX_OK"
 DOCX_MARKER = "BC250_DEPTH_DOCX_OK"
+NO_TEXT_PLACEHOLDER = "<No text content found>"
 OPENWEBUI_DUPLICATE_CONTENT_MESSAGES = (
     "Duplicate content detected. Please provide unique content to proceed.",
     "Duplicate document content — this content is already present in the knowledge collection.",
@@ -117,3 +118,14 @@ def expected_duplicate_rejection(status: str, error: str | None) -> bool:
         and bool(error)
         and any(message in error for message in OPENWEBUI_DUPLICATE_CONTENT_MESSAGES)
     )
+
+
+def expected_no_usable_text_rejection(status: str, content: str | None) -> bool:
+    """Primary corrupt/textless oracle: failed/rejected and nothing usable indexed."""
+    stored = (content or "").strip()
+    return status in {"failed", "rejected"} and stored == ""
+
+
+def no_usable_text_error_present(error: str | None) -> bool:
+    """Secondary wording oracle; use only when the harness actually captured the error."""
+    return bool(error) and "no usable text" in error.casefold()

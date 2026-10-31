@@ -8,6 +8,7 @@ import sys
 import types
 import unittest
 import zipfile
+from enum import Enum
 from pathlib import Path
 
 from tests import dependency_depth_harness as DEPTH
@@ -116,6 +117,17 @@ class RagBaselineTests(unittest.TestCase):
             manifest,
         )
 
+    def test_openwebui_runtime_shim_dependency_pins_force_review(self) -> None:
+        response = _GuardResponse({"tk:content": "usable"})
+        module, _requests = _load_tika_guard(response)
+        runtime_env = {}
+        for line in (ROOT / "config/runtime.env").read_text(encoding="utf-8").splitlines():
+            if "=" in line and not line.lstrip().startswith("#"):
+                key, value = line.split("=", 1)
+                runtime_env[key] = value
+        self.assertEqual(runtime_env["BC250_OPEN_WEBUI_VERSION"], module.SUPPORTED_OPENWEBUI_VERSION)
+        self.assertEqual(runtime_env["BC250_TIKA_VERSION"], module.SUPPORTED_TIKA_VERSION)
+
     def test_openwebui_tika_guard_rejects_missing_blank_and_placeholder_content(self) -> None:
         for payload in (
             {},
@@ -153,7 +165,7 @@ class RagBaselineTests(unittest.TestCase):
         fake_package = types.ModuleType("open_webui")
         fake_constants = types.ModuleType("open_webui.constants")
 
-        class UpstreamErrors:
+        class UpstreamErrors(str, Enum):
             DUPLICATE_CONTENT = "Duplicate content detected. Please provide unique content to proceed."
             EMPTY_CONTENT = "empty"
 
@@ -169,7 +181,7 @@ class RagBaselineTests(unittest.TestCase):
                 fake_constants.ERROR_MESSAGES.DUPLICATE_CONTENT,
                 module.DUPLICATE_CONTENT_REASON,
             )
-            self.assertEqual(fake_constants.ERROR_MESSAGES.EMPTY_CONTENT, "empty")
+            self.assertEqual(fake_constants.ERROR_MESSAGES.EMPTY_CONTENT.value, "empty")
             module.install_openwebui_error_wording()
             self.assertEqual(
                 fake_constants.ERROR_MESSAGES.DUPLICATE_CONTENT,
@@ -225,6 +237,15 @@ class RagBaselineTests(unittest.TestCase):
         first_put = requests.put  # type: ignore[attr-defined]
         module.install_tika_empty_content_guard(requests)
         self.assertIs(requests.put, first_put)  # type: ignore[attr-defined]
+
+    def test_dependency_depth_no_usable_text_oracle_uses_state_and_indexed_content(self) -> None:
+        self.assertTrue(DEPTH.expected_no_usable_text_rejection("failed", ""))
+        self.assertTrue(DEPTH.expected_no_usable_text_rejection("rejected", None))
+        self.assertFalse(DEPTH.expected_no_usable_text_rejection("completed", ""))
+        self.assertFalse(DEPTH.expected_no_usable_text_rejection("failed", DEPTH.NO_TEXT_PLACEHOLDER))
+        self.assertFalse(DEPTH.expected_no_usable_text_rejection("failed", "recovered text"))
+        self.assertTrue(DEPTH.no_usable_text_error_present("Document extraction failed: no usable text was found."))
+        self.assertFalse(DEPTH.no_usable_text_error_present(None))
 
     def test_dependency_depth_tika_marker_oracle_normalizes_markdown_escapes(self) -> None:
         raw = DEPTH.DOCX_MARKER.replace("_", r"\_")

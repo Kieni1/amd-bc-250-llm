@@ -40,6 +40,7 @@ from benchmark_common import (
     semantic_identifier_equivalent,
     semantic_invoice_identifiers,
     translation_literal_integrity_mismatch,
+    translation_modality_mismatch,
     translation_numeric_values,
     write_benchmark_metadata,
     write_result_summary,
@@ -559,6 +560,23 @@ def translation_numeric_values_for_checks(text: str) -> set[Decimal]:
     return {Decimal(value) for value in translation_numeric_values(text)}
 
 
+def owui_translation_modality_detail(case: dict[str, Any], content: str) -> str | None:
+    semantic_contract = str(case.get("semantic_contract") or "").casefold()
+    if semantic_contract != "modality" and "modality" not in str(case.get("id") or "").casefold():
+        return None
+    source = case.get("input")
+    source_language = case.get("source_language")
+    target_language = case.get("target_language")
+    if not all(isinstance(value, str) and value for value in (source, source_language, target_language)):
+        return None
+    return translation_modality_mismatch(
+        source,
+        content,
+        source_language,
+        target_language,
+    )
+
+
 def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
     folded = translation_acceptance_text(content)
     required_ok = all(
@@ -591,11 +609,15 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
         str(case.get("input") or ""), content
     ) is None
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
-    modality_case = "modality" in str(case.get("id") or "").casefold()
+    modality_case = (
+        str(case.get("semantic_contract") or "").casefold() == "modality"
+        or "modality" in str(case.get("id") or "").casefold()
+    )
+    semantic_detail = owui_translation_modality_detail(case, content)
     failures: list[str] = []
     if not content.strip():
         failures.append("empty-output")
-    if not required_ok:
+    if not required_ok or semantic_detail is not None:
         failures.append("modality" if modality_case else "semantic")
     elif not meaningful_ok:
         failures.append("semantic")
@@ -820,7 +842,11 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
             raw_content = response_text(result)
             raw_ok, raw_failure_kinds = owui_translation_checks(raw_content, case)
             final_ok, final_failure_kinds = owui_translation_checks(content, case)
+            raw_semantic_detail = owui_translation_modality_detail(case, raw_content)
             withheld = translation_withheld(content)
+            final_semantic_detail = (
+                None if withheld else owui_translation_modality_detail(case, content)
+            )
 
             if withheld and not raw_ok:
                 # The raw model produced a protected integrity failure and the
@@ -867,6 +893,8 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                     raw_response=raw_content,
                     raw_translation_outcome="pass" if raw_ok else "quality-fail",
                     raw_failure_kinds=raw_failure_kinds,
+                    raw_semantic_detail=raw_semantic_detail,
+                    final_semantic_detail=final_semantic_detail,
                     product_guard=guard_outcome,
                     delivered_translation=delivered_translation,
                     outlet_finalized=True,

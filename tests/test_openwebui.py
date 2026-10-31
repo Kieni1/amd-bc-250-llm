@@ -35,6 +35,7 @@ REQUIRED_READ = {"principal_type": "user", "principal_id": "*", "permission": "r
 
 PRODUCTION_MODEL_IDS = {
     "bc250-office-standard",
+    "bc250-office-generalist",
     "bc250-office-documents",
     "bc250-office-translation-de-fr",
     "bc250-office-translation-fr-de",
@@ -43,6 +44,7 @@ PRODUCTION_MODEL_IDS = {
     "bc250-office-deep-reasoning",
     "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
     "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+    "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k:latest",
     "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
     "prod-qwen35-9b-unsloth-q6-k:latest",
     "prod-gpt-oss20b-ggml-org-mxfp4:latest",
@@ -198,6 +200,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k:latest",
                 "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
                 "prod-qwen35-9b-unsloth-q6-k:latest",
                 "prod-gpt-oss20b-ggml-org-mxfp4:latest",
@@ -423,6 +426,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             {
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
                 "prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl:latest",
+                "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k:latest",
                 "prod-translate-gemma4-sub-e4b-17s-q4-k-xl:latest",
                 "prod-qwen35-9b-unsloth-q6-k:latest",
                 "prod-gpt-oss20b-ggml-org-mxfp4:latest",
@@ -431,6 +435,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         )
         for model_id in (
             "bc250-office-standard",
+            "bc250-office-generalist",
             "bc250-office-translation-de-fr",
             "bc250-office-translation-fr-de",
             "bc250-office-advanced",
@@ -450,14 +455,16 @@ class OpenWebUIStatusTests(unittest.TestCase):
         structured_policy = models["bc250-office-advanced-structured"]["params"]["custom_params"]
         self.assertEqual(advanced_policy["think"], True)
         self.assertEqual(structured_policy["think"], False)
-        for key in ("temperature", "top_p", "top_k", "min_p", "presence_penalty", "repeat_penalty"):
+        for key in ("temperature", "top_p", "top_k", "min_p", "repeat_penalty"):
             self.assertEqual(structured_policy[key], advanced_policy[key])
+        self.assertEqual(advanced_policy["presence_penalty"], 1.5)
+        self.assertEqual(structured_policy["presence_penalty"], 0.0)
         self.assertEqual(models["bc250-office-advanced"]["params"]["max_tokens"], 6144)
         self.assertEqual(models["bc250-office-advanced-structured"]["params"]["max_tokens"], 6144)
         self.assertEqual(advanced_policy["temperature"], 0.7)
         self.assertEqual(advanced_policy["top_p"], 0.8)
         self.assertEqual(advanced_policy["top_k"], 20)
-        self.assertEqual(advanced_policy["presence_penalty"], 0.0)
+        self.assertEqual(advanced_policy["presence_penalty"], 1.5)
         self.assertEqual(advanced_policy["repeat_penalty"], 1.0)
         self.assertNotIn("keep_alive", models["bc250-office-standard"]["params"])
         self.assertNotIn("keep_alive", models["bc250-office-advanced"]["params"])
@@ -474,7 +481,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         import json
 
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        del document["profiles"]["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]
+        del document["profiles"]["exp-lfm3-1.7b-liquidai-q6-k"]
         with tempfile.TemporaryDirectory() as temporary:
             profile_path = Path(temporary) / "model-profiles.json"
             profile_path.write_text(json.dumps(document), encoding="utf-8")
@@ -484,7 +491,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 OPENWEBUI.ApiError, "missing qualification profiles"
             ):
                 OPENWEBUI.package_testing_model_policy(
-                    "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+                    "exp-lfm3-1.7b-liquidai-q6-k"
                 )
 
     def test_testing_inventory_expands_normal_lanes_with_model_specific_policy(self) -> None:
@@ -497,7 +504,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                     "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest",
                     "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest",
                     "exp-minicpm-v47-1b-openbmb-q4-k-m:latest",
-                    "exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest",
+                    "exp-lfm3-1.7b-liquidai-q6-k:latest",
                 ],
                 "task": ["task-extra:latest"],
             },
@@ -521,9 +528,9 @@ class OpenWebUIStatusTests(unittest.TestCase):
             minicpm["meta"]["bc250_qualification"]["intended_role"],
             "document-vision-ocr-challenger",
         )
-        lfm8 = models["exp-lfm25-8b-a1b-unsloth-q6-k-xl:latest"]
-        self.assertFalse(lfm8["meta"]["capabilities"]["vision"])
-        self.assertNotIn("think", lfm8["params"].get("custom_params", {}))
+        lfm3 = models["exp-lfm3-1.7b-liquidai-q6-k:latest"]
+        self.assertFalse(lfm3["meta"]["capabilities"]["vision"])
+        self.assertNotIn("think", lfm3["params"].get("custom_params", {}))
         task = models["task-extra:latest"]
         self.assertEqual(task["meta"]["bc250_lane"], "task")
         self.assertFalse(task["meta"]["capabilities"]["builtin_tools"])
@@ -572,7 +579,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                     "top_p": 0.8,
                     "top_k": 20,
                     "min_p": 0.0,
-                    "presence_penalty": 0.0,
+                    "presence_penalty": 1.5,
                     "repeat_penalty": 1.0,
                 },
             )
@@ -641,8 +648,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
         output = io.StringIO()
         with redirect_stdout(output):
             self.assertEqual(OPENWEBUI.status(FakeClient(), True), 0)
-        self.assertIn("curated presets       : 7/7 current", output.getvalue())
-        self.assertIn("base-model overrides  : 6/6 current", output.getvalue())
+        self.assertIn("curated presets       : 8/8 current", output.getvalue())
+        self.assertIn("base-model overrides  : 7/7 current", output.getvalue())
 
     def test_status_detects_missing_base_override_with_correct_terminology(self) -> None:
         responses = status_responses()
@@ -746,7 +753,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
             for method, path, payload in client.calls
             if method == "POST" and path == "/api/v1/models/model/access/update"
         ]
-        self.assertEqual(len(updates), 13)
+        self.assertEqual(len(updates), 15)
         standard_update = next(payload for payload in updates if payload["id"] == "bc250-office-standard")
         self.assertIn(unrelated, standard_update["access_grants"])
         self.assertIn(REQUIRED_READ, standard_update["access_grants"])
@@ -1226,13 +1233,25 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "bc250-office-translation-de-fr",
                 "Sie sollten nicht unterschreiben.",
                 "Vous devriez signer.",
-                "negative recommendation",
+                "negated recommendation / temporal polarity",
             ),
             (
                 "bc250-office-translation-fr-de",
                 "Vous ne devriez pas signer.",
                 "Sie sollten unterschreiben.",
-                "negative recommendation",
+                "negated recommendation / temporal polarity",
+            ),
+            (
+                "bc250-office-translation-de-fr",
+                "Der Lieferant sollte den Bericht nicht vor Montag einreichen.",
+                "Le fournisseur devrait remettre le rapport au plus tard lundi.",
+                "negated recommendation / temporal polarity",
+            ),
+            (
+                "bc250-office-translation-fr-de",
+                "Le fournisseur ne doit pas soumettre le rapport après lundi.",
+                "Der Lieferant muss den Bericht nach Montag nicht einreichen.",
+                "prohibition weakened to no-obligation",
             ),
             (
                 "bc250-office-translation-de-fr",
@@ -1260,6 +1279,43 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "bc250-office-translation-de-fr",
             )
         )
+
+        generic_prohibition = module.modality_mismatch(
+            "Sie darf nicht unterschreiben.",
+            "Elle peut signer.",
+            "bc250-office-translation-de-fr",
+        )
+        self.assertEqual(generic_prohibition, "clause 1: prohibition may have been weakened or lost")
+
+        new_guard_regressions = (
+            (
+                "bc250-office-translation-de-fr",
+                "Der Lieferant sollte den Bericht nicht vor Montag einreichen. Referenz NR-42-K bleibt unverändert.",
+                "Le fournisseur devrait soumettre le rapport au plus tard lundi. La référence NR-42-K reste inchangée.",
+                "negated recommendation / temporal polarity",
+            ),
+            (
+                "bc250-office-translation-fr-de",
+                "Le fournisseur ne doit pas soumettre le rapport après lundi. La référence PR-77-Z reste inchangée.",
+                "Der Lieferant muss den Bericht nach Montag nicht einreichen. Die Referenz PR-77-Z bleibt unverändert.",
+                "prohibition weakened to no-obligation",
+            ),
+        )
+        for model_id, source, target, reason in new_guard_regressions:
+            with self.subTest(model_id=model_id, reason=reason):
+                guarded = asyncio.run(
+                    module.Filter().outlet(
+                        {
+                            "model": model_id,
+                            "messages": [
+                                {"role": "user", "content": module.WRAPPERS[model_id] + source},
+                                {"role": "assistant", "content": target},
+                            ],
+                        }
+                    )
+                )
+                self.assertIn("Translation withheld", guarded["messages"][-1]["content"])
+                self.assertIn(reason, guarded["messages"][-1]["content"])
 
     def test_deep_residency_filter_evicts_and_verifies_competing_lanes(self) -> None:
         with mock.patch.object(DEEP, "_resident_models", side_effect=[["embed-model"], [], ["task-model"], []]), \

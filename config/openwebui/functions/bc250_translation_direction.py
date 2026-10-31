@@ -197,14 +197,16 @@ def _modality_change_reason(
                 if model_id == DE_FR_MODEL
                 else "obligation weakened to permission (doit -> darf)"
             )
-        if source_mode == "prohibition" and target_mode != "prohibition":
+        if source_mode == "prohibition" and target_mode == "no-obligation":
             return (
-                "prohibition/negation may have been lost (darf nicht)"
+                "prohibition weakened to no-obligation (darf nicht -> n'est pas obligé de)"
                 if model_id == DE_FR_MODEL
-                else "prohibition/negation may have been lost (ne ... pas)"
+                else "prohibition weakened to no-obligation (ne doit pas -> muss nicht)"
             )
+        if source_mode == "prohibition" and target_mode != "prohibition":
+            return "prohibition may have been weakened or lost"
         if source_mode == "recommendation-negated" and target_mode == "recommendation":
-            return "negative recommendation polarity was lost"
+            return "negated recommendation / temporal polarity was lost"
         if source_mode == "recommendation" and target_mode == "recommendation-negated":
             return "recommendation polarity changed"
         if source_mode == "no-obligation" and target_mode == "obligation":
@@ -212,7 +214,7 @@ def _modality_change_reason(
         if source_mode == "obligation" and target_mode == "no-obligation":
             return "obligation weakened to no-obligation"
     if "prohibition" in source_events and "prohibition" not in target_events:
-        return "prohibition/negation may have been lost"
+        return "prohibition may have been weakened or lost"
     if len(source_events) == len(target_events):
         changed = [
             index
