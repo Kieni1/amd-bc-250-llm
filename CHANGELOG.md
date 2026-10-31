@@ -9,6 +9,7 @@
 - Retain Ornith as the Agent default and make the canonical Bash qualification prompt contract-first: raw Bash only, no Markdown/backticks/fences/labels, exact `#!/usr/bin/env bash` first line. The final DEVICE closure passed the canonical Bash/Python/JSON mini-regression 3/3 with only the Bash wording changed.
 - Preserve the current Translate-Gemma model and fail-closed semantic authority; carry the three confirmed recommendation/negation/prohibition failure families into shared direct/Open WebUI regressions rather than restarting the retired EuroLLM comparison. Final DEVICE closure confirmed end-to-end withholding for the newly added temporal-polarity and prohibition→no-obligation failures.
 - Add external-data quality-campaign infrastructure for corpus inventory, Tika extraction scoring, gold-evidence validation, retrieval-only comparison/freeze and fixed-evidence replay without packaging the real PDF corpus.
+- Harden the new campaign evidence contracts before DEVICE use: require every retrieval ranking row to name its exact arm, reject schema-invalid corpus scalar/null forms consistently at runtime, and reject non-local retrieval fixture identities before comparison/freeze.
 - Keep the 1850 MHz normal hardware ceiling. DEVICE A/B showed ~9% prefill gain but ~1% decode gain at 2000 MHz with materially higher power/temperature and a heavy-prefill thermal cutoff, so 2000 MHz remains operator-test-only.
 
 ## 0.14.1-1.13 - 2026-10-31
