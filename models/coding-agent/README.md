@@ -19,8 +19,9 @@ main/task/embedding lanes. Current choices are:
 - `agentic-qwen25-coder7b-unsloth-q5-k-m` — retained as an alternative coding
   model, but no longer the package default;
 - `agentic-qwable9b-empero-q6-k` — active 9B native-reasoning challenger;
-- `agentic-qwen35-4b-khazarai-q6-k` — compact Qwen3.5 Q6_K agentic-coding
-  challenger with the supplied precise-coding sampling profile;
+- `agentic-qwen35-4b-khazarai-q6-k` — retired from active discovery after the
+  2026-10-31 DEVICE comparison; it was much faster than Ornith but showed broader
+  Bash/Python/JSON instruction and format regressions;
 - `agentic-gemma4-e4b-sol-fable-q4-k-m` — compact Gemma 4 E4B Q4_K_M
   challenger using a conservative 16K deterministic BC-250 test profile;
 - `agentic-gemma4-12b-fable5-tau2-q4-k-m` — retained 12B Gemma 4 comparison

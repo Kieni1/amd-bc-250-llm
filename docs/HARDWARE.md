@@ -151,12 +151,20 @@ showed lower power/temperature but about a five-percent prefill cost, so it is n
 the package default.
 
 Use 2000 MHz only as an explicit operator experiment and validate the individual
-board. `bc250 verify` warns if the observed active clock is above the configured
-normal maximum, which helps catch a forgotten D-Bus/performance override.
+board. A 2026-10-31 fixed-clock DEVICE A/B reinforces that boundary: decode moved only
+about 45.38 -> 45.80 tok/s (~0.9%), while short prompt/prefill throughput moved about
+614.8 -> 671.6 tok/s (~9.2%). The cost was materially higher power/temperature; the
+heavy sustained prefill arm at 2000 MHz reached about 83 C / 184 W and hit the bounded
+82.5 C test cutoff before completion, while 1850 MHz completed at about 75.8 C / 165 W.
+Therefore 1850 MHz remains the normal production ceiling on the tested cooling setup;
+2000 MHz is useful only as a temporary prefill-oriented operator experiment, not a new
+default. Benchmark/performance reporting should keep prefill/prompt-evaluation throughput
+separate from decode throughput because core-clock sensitivity differs sharply.
 
-Frequency and voltage remain the operator's responsibility. Validate every
-change with representative inference, temperature monitoring, output checks and
-GPU-reset logs. CU tools do not alter governor policy.
+`bc250 verify` warns if the observed active clock is above the configured normal maximum,
+which helps catch a forgotten D-Bus/performance override. Frequency and voltage remain
+the operator's responsibility. Validate every change with representative inference,
+temperature monitoring, output checks and GPU-reset logs. CU tools do not alter governor policy.
 
 ## Live CU routing
 

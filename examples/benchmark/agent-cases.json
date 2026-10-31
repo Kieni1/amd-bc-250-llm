@@ -8,7 +8,7 @@
       "sort",
       "exit 2"
     ],
-    "prompt": "Write a Bash script that accepts one directory argument and prints only the basenames of *.Modelfile files directly in that directory, sorted lexicographically. Exit with status 2 when the argument is missing. Handle spaces in paths safely. Return only the script, with no Markdown fences or explanation.",
+    "prompt": "OUTPUT CONTRACT — follow this before solving the task:\n- Return raw Bash only.\n- Do not use Markdown, backticks, code fences, labels, or explanation.\n- The first line must be exactly: #!/usr/bin/env bash\n\nTASK: Write a Bash script that accepts one directory argument and prints only the basenames of *.Modelfile files directly in that directory, sorted lexicographically. Exit with status 2 when the argument is missing. Handle spaces in paths safely.",
     "raw_only": true,
     "bash_contract": "modelfile-list",
     "required_any": [
