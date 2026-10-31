@@ -4,10 +4,9 @@ BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD B
 It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Accepted release baseline: `bc250-llm-server-0.14.1-1.9` (Ollama 0.40.8, Open WebUI 0.12.3, Tika 4.1.0-full, governor 0.4.14).
+Accepted runtime/dependency baseline: `bc250-llm-server-0.14.1-1.12` (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full, governor 0.4.14). Exact 1.12 completed the dependency-depth, RAG endurance/restart and full authenticated DEVICE campaign.
 
-Current source candidate: `bc250-llm-server-0.14.1-1.12` (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full). Exact `0.14.1-1.10` remains the focused packaged DEVICE evidence baseline; 1.11 supplied the accepted evidence/export/CI corrections, and 1.12 is the dependency-refresh candidate. GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority, so 1.12 is not DEVICE-accepted until that exact RPM is built and exercised.
-Release 1.12 keeps the established four-lane topology, model set, retrieval tuning and persistent-state paths while refreshing the three application runtimes and tightening Open WebUI privacy/retrieval defaults.
+Current source candidate: `bc250-llm-server-0.14.1-1.13`. It keeps the accepted 1.12 runtime/model/RAG baseline and adds bounded package hardening and operator UX: reject no-usable-text extraction, retain known rollback provenance, distinguish package-originated Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior. GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority for final release selection.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -190,16 +189,18 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 |---|---|
 | Cyan Skillfish governor v0.4.14 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
 | Ollama v0.40.13 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.12.5 and Tika v4.2.0-full | Digest-pinned 1.12 candidate; API-driven baseline setup, explicit privacy/fail-closed policy and document extraction |
+| Open WebUI v0.12.5 and Tika v4.2.0-full | 1.12 DEVICE-accepted runtime baseline; 1.13 adds no-text/duplicate ingestion UX hardening without changing the dependency pins |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | Document lifecycle | Local DE/FR/bilingual preparation, human review, provenance validation and Open WebUI knowledge sync |
 | Operations | Status, verification, benchmark, maintenance and diagnostics |
 | CU tools | Live WGP manager with saved boot restoration and compact status verification |
 
-Release 0.14.1-1.12 is the current SOURCE candidate. It carries forward the accepted metadata-first model contract and 1.11 evidence/export/CI corrections while updating Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full. The package keeps the proven four-lane Vulkan/iGPU topology and existing retrieval tuning, but makes the 0.12.5 Jina query/content prefixes persistent desired state, pins the new 1000-chunk document-embedding buffer, and explicitly disables admin cross-user chat access/export, OpenAI passthrough, runtime version checks and untrusted remote-code loading. Exact prior RPM evidence remains historical baseline evidence only; 1.12 requires its own authoritative Fedora 44 build and focused runtime/UI/document DEVICE acceptance.
+Release 0.14.1-1.12 is the accepted runtime/dependency DEVICE baseline. It updated Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full while retaining the four-lane Vulkan/iGPU topology, model set and retrieval tuning; the completed DEVICE campaign also covered malformed-input containment, broad Tika formats, RAG endurance, parallel ingestion, restart persistence and full authenticated revalidation.
 
-Release 0.14.1-1.9 remains the accepted device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
+Release 0.14.1-1.13 is the bounded next candidate. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces.
+
+Release 0.14.1-1.9 remains an older broad device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
 Open WebUI RPM migrations with existing state are held until a verified stopped-state rollback
 snapshot exists; recovery from that archive is documented in

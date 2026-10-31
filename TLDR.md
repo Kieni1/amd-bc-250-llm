@@ -3,11 +3,9 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Accepted broad regression baseline: `bc250-llm-server-0.14.1-1.9` — stock Fedora AMDGPU/Mesa clean-core baseline. Exact `0.14.1-1.10` is the focused packaged model-management/lifecycle DEVICE evidence baseline. Current SOURCE candidate `bc250-llm-server-0.14.1-1.12` updates Ollama to 0.40.13, Open WebUI to 0.12.5 and Tika to 4.2.0-full while carrying forward the 1.11 evidence/export/CI corrections; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
+Accepted runtime/dependency baseline: `bc250-llm-server-0.14.1-1.12` — Open WebUI 0.12.5, Ollama 0.40.13 and Tika 4.2.0 completed the dependency-depth, RAG endurance/restart and full authenticated DEVICE campaign. Current SOURCE candidate: `bc250-llm-server-0.14.1-1.13`; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
-Release 1.12 is the current SOURCE candidate. The model/lane architecture stays unchanged; the dependency refresh adds Open WebUI privacy/fail-closed defaults, persists the Jina query/content prefixes through the 0.12.5 retrieval API, pins the 1000-chunk embedding buffer, and refreshes Tika qualification to 4.2.0. Exact 1.12 BUILD and focused changed-surface DEVICE acceptance are still required.
-
-Release 1.9 remains the accepted device baseline with unified MTP presentation and the focused Managed Documents fixes from 1.8 acceptance.
+Release 1.13 keeps the accepted 1.12 runtime/model/RAG baseline unchanged and adds bounded package hardening/UX: fail no-usable-text ingestion clearly, retain knowable rollback provenance, distinguish proven package Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior.
 
 ## Install
 
