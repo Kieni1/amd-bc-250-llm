@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Releases through 1.11 retained the device-proven 0.40.8 runtime; release 1.12 deliberately refreshes the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. LFM3 support is runtime capability only and does not promote a new BC-250 model. Prior 0.40.8/0.40.6 DEVICE evidence remains regression baseline only and does not transfer DEVICE acceptance to 0.40.13 bytes.
+Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. LFM3 support is runtime capability only and does not promote a new BC-250 model.
 
 ## Install and verify
 
@@ -62,12 +62,11 @@ headroom.
 The 0.40.13 source still exposes the package's existing lane controls directly: `OLLAMA_VULKAN`,
 `OLLAMA_IGPU_ENABLE`, `GGML_VK_VISIBLE_DEVICES`, `OLLAMA_CONTEXT_LENGTH`,
 `OLLAMA_KV_CACHE_TYPE`, `OLLAMA_NUM_PARALLEL`, `OLLAMA_MAX_LOADED_MODELS`,
-`OLLAMA_KEEP_ALIVE`, `OLLAMA_MODELS`, `OLLAMA_HOST` and `OLLAMA_NO_CLOUD`. The 1.12 refresh
-therefore keeps the device-proven four-lane values rather than translating them to new knobs.
+`OLLAMA_KEEP_ALIVE`, `OLLAMA_MODELS`, `OLLAMA_HOST` and `OLLAMA_NO_CLOUD`. The 1.13 package retains the 1.12 DEVICE-accepted four-lane values rather than translating them to new knobs.
 
 Ollama also exposes llama.cpp automatic-fit controls (`LLAMA_ARG_FIT` /
 `LLAMA_ARG_FIT_TARGET`) and queue/load/transfer tuning. BC-250 leaves those at upstream defaults:
-there is no new 1.12 evidence that overriding the fit target, load timeout, request queue or transfer
+there is no accepted evidence that overriding the fit target, load timeout, request queue or transfer
 parallelism improves this UMA appliance, and pre-emptively pinning them would turn a runtime refresh
 into an unrelated scheduler policy change. Recheck model placement, UMA headroom and load behavior on
 the exact 0.40.13 DEVICE build before promoting any such tuning.
@@ -97,7 +96,7 @@ GGML_VK_VISIBLE_DEVICES=0
 
 These settings select the intended stock Vulkan/iGPU path and are part of the normal appliance configuration. The 0.40.13 review found no upstream change requiring different values for `OLLAMA_VULKAN=1`, `OLLAMA_IGPU_ENABLE=1`, `GGML_VK_VISIBLE_DEVICES=0`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_MAX_LOADED_MODELS=1`, Flash Attention, keep-alive policy, or the package's q8/q4 KV-cache profiles. Keep those settings unless exact BC-250 evidence shows a regression.
 
-Ollama 0.40.12 updated llama.cpp, so the selected 1.12 RPM must exercise representative small/large production models on Vulkan and check for device-loss/OOM regressions before DEVICE acceptance. The 0.40.9 streaming-failure improvement is also a reason to keep benchmark completion/error oracles strict rather than accepting partial output as success.
+Ollama 0.40.12 updated llama.cpp; the completed 1.12 DEVICE campaign exercised the 0.40.13 runtime across normal lanes, streaming/residency/error handling and combined RAG without a runtime regression. The 1.13 package does not change those runtime bytes, so DEVICE retesting should focus on the package-owned surfaces changed by 1.13 unless later work alters model/runtime configuration. The 0.40.9 streaming-failure improvement is also a reason to keep benchmark completion/error oracles strict rather than accepting partial output as success.
 
 For more accurate Vulkan free-memory information the upstream docs suggest `cap_perfmon`; this package does **not** grant that capability automatically. An operator may test it deliberately after locating the real binary:
 

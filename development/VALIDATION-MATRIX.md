@@ -1,25 +1,21 @@
 # BC-250 validation matrix — current package baseline and next-release workbench
 
-Current release identity: `bc250-llm-server-0.14.1-1.12`.
+Current release identity: `bc250-llm-server-0.14.1-1.13`.
 
-Release identity 1.12 is assigned to the current SOURCE dependency-refresh candidate. Prior exact-RPM evidence remains historical baseline evidence; no 1.12 RPM exists until the authoritative Fedora 44 build completes. This matrix tracks only the evidence needed to move the workbench forward. Detailed historical qualification remains in Git history and compact handover archives; it does not transfer PASS status to changed bytes.
+Exact `0.14.1-1.12` is the accepted dependency/integration DEVICE baseline. Release 1.13 is a bounded package-hardening/UX candidate that deliberately retains the 1.12 Ollama/Open WebUI/Tika pins, four-lane topology, model set and RAG tuning. Evidence never transfers across changed bytes: 1.12 runtime acceptance is baseline evidence, while 1.13 must prove its changed ingestion/provenance/UX surfaces and normal final health.
 
 | Area | Current state | Next evidence |
 |---|---|---|
-| Release identity | `0.14.1-1.12` assigned to current SOURCE candidate; prior exact-RPM evidence remains historical only | run blocking lint, freeze exact 1.12 Source0/spec, then authoritative Fedora 44 build |
-| Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during product work and bounded cleanup |
-| 1.12 SOURCE checks | dependency/settings integration complete; all 24 repository modules pass in split runs (717/717 after the persisted-prefix apply regression), package-critical 156/156 and release preflight 27/27. The first GitHub build exposed four UID/host-path-sensitive advisory tests; the current SOURCE fixes them and the exact 15-module advisory set passes 534/534 under an unprivileged writable checkout | rerun Ruff/ShellCheck and the authoritative Fedora 44 build for the changed post-build-fix bytes |
-| 1.10 model architecture | exact 1.10 RPM model-management/lifecycle DEVICE campaign PASS; metadata-first contract, schema-4 tracking, provider-aware lifecycle and Open WebUI model architecture remains accepted | do not reopen accepted architecture without affected evidence; retest only changed next-release surfaces |
-| RPM `%check` | first 1.12 GitHub SRPM rebuild passed package-critical `%check`; current post-build-fix SOURCE retains local package-critical PASS 156/156 | rerun on the changed current SOURCE before selecting release authority |
-| Release preflight | current workbench release-pipeline preflight PASS: 27/27 plus current-guidance/clean-core/scope checks | rerun after next release identity/freeze |
-| Static lint | first 1.12 GitHub build passed Ruff/ShellCheck on the pre-fix bytes; current post-build-fix SOURCE differs and therefore has no transferred lint PASS | rerun the blocking lint gate on the current bytes |
-| Source0/spec freeze | the first 1.12 GitHub run froze/built an earlier candidate, but the current advisory-hermeticity fixes change SOURCE bytes | refreeze only after current-byte lint/source checks pass |
-| RPM payload / rpmlint | first 1.12 GitHub candidate passed payload validation and configured rpmlint with 0 errors/0 warnings; those BUILD results belong to the pre-fix bytes only | rerun authoritative build/payload/rpmlint on the current SOURCE |
-| GitHub authority | explicit selected `workflow_dispatch` remains artifact authority; main pushes and PRs provide CI evidence, superseded push/PR runs cancel while dispatch authority runs do not | capture next-release `release-evidence.json` + `release-selection.json` from selected build |
-| Runtime/UI baseline | prior exact RPMs provide historical model/runtime evidence; 1.12 changes Ollama/Open WebUI/Tika bytes | verify four lanes/Vulkan, role switching, persisted Jina prefixes, Tika extraction and one managed-document/RAG flow after build |
-| Managed Documents correctness | accepted prior boundary remains unchanged by current workbench edits | do not rerun large document campaign unless affected code/evidence changes |
-| Exact-RPM core functionality / changed-surface acceptance | prior lifecycle/atomicity evidence remains historical; 1.12 source is not yet built | after 1.12 build, run bounded runtime/UI/document delta acceptance plus normal topology/verify restoration |
-| Product-roadmap baseline | stock-first local office-AI direction unchanged; 1.12 is a bounded dependency/settings refresh | return to measurable document/retrieval and German–French workflow quality after 1.12 acceptance |
+| Release identity | `0.14.1-1.13` assigned to current SOURCE candidate; exact 1.12 remains accepted DEVICE baseline | freeze/build the final 1.13 bytes after all intended next-release changes are merged |
+| Clean-core architecture | active GFX/private-RADV/package-owned patched-kernel surface absent | maintain absence during bounded package work |
+| 1.12 DEVICE baseline | dependency-depth A–E complete: Open WebUI 0.12.5, Ollama 0.40.13, Tika 4.2.0, malformed-input containment, RAG endurance/restarts, full authenticated revalidation and final health accepted | do not reopen broad 1.12 testing unless a changed 1.13 surface invalidates it |
+| 1.13 ingestion hardening | package-owned Open WebUI shim rejects missing/blank/placeholder Tika content and provides explicit no-usable-text/duplicate wording | focused exact-RPM malformed/empty/image-only/recoverable extraction regression plus normal health/verify |
+| 1.13 upgrade provenance | RPM `%pre` preserves knowable Open WebUI previous-version provenance and captures hashes only for runtime Modelfiles still proven current under the old package | upgrade from exact 1.12 and verify rollback naming plus `PACKAGE UPDATE PENDING` vs local `DRIFT` classification |
+| Optional-model UX | installer says review/reconcile/install, reuses validated data and separates package-update from local-drift counts | exercise upgrade with installed optional models whose packaged Modelfile changed |
+| Duplicate-content policy | duplicate Knowledge content is expected rejection, not infrastructure failure; reusable harness recognizes the exact policy outcome | duplicate upload remains explicit, original document remains usable, failed-upload cleanup/orphan state checked where evidence is available |
+| Harness corrections | Tika Markdown escapes normalized narrowly; XLSX marker/oracle unambiguous; no-text placeholder is not successful content | retain these semantics in future dependency-depth reuse |
+| GitHub authority | explicit selected `workflow_dispatch` remains artifact authority; push/PR runs provide CI evidence | capture 1.13 release evidence/selection only from the final selected build |
+| Product-quality work | model/RAG quality campaign remains active separately; DE/FR are primary languages | do not mix quality/model promotion changes into 1.13 unless deliberately selected and separately evidenced |
 
 ## Current stop conditions
 

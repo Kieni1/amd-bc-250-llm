@@ -1027,10 +1027,38 @@ reasoning serialization, or product presentation of testing models changes.
 
 ## DEC-041 — Refresh application runtimes without changing appliance topology
 
-**Status:** ACTIVE — 0.14.1-1.12 candidate.
+**Status:** ACTIVE — accepted in exact 0.14.1-1.12 DEVICE baseline.
 
 **Decision:** Release 1.12 updates the package-qualified runtime pins to Ollama 0.40.13, Open WebUI 0.12.5 and Apache Tika 4.2.0-full while retaining the existing four-lane Ollama topology, Vulkan/iGPU settings, context/KV-cache profiles, model set, RAG chunking/top-K policy and persistent-state paths. Open WebUI 0.12.5 is integrated as a policy-bearing upgrade rather than a tag-only change: BC-250 disables administrator cross-user chat access/export, OpenAI passthrough, upstream version checks and remote-code trust for local embedding/reranking models; pins the new document-embedding save buffer to 1000 chunks; and converges the Jina `Query: ` / `Document: ` prefixes through the new persisted retrieval API. Tika keeps its private, capability-dropped container boundary and moves to the 4.2.0 full image by immutable OCI index digest; its deterministic qualification marker is version-neutral.
 
 **Why:** The three upstream releases provide security/stability/runtime improvements without requiring a topology redesign. Open WebUI 0.12.5 also turns previously environment-only embedding prefixes into persisted administrator state, so relying on bootstrap environment alone would allow upgraded databases to drift from the package Jina retrieval contract. Explicit fail-closed settings make upstream defaults irrelevant to the appliance policy. Tika 4.2.0 strengthens server-side limits and request-config trust by default; the package uses `/tika`, not the changed `/unpack` default, so no compatibility shim is justified. Ollama 0.40.13 changes runtime bytes/llama.cpp and adds LFM3 capability, but runtime support does not imply model promotion.
 
-**Retest:** authoritative 1.12 build plus focused DEVICE checks for all normal Ollama lanes/Vulkan logs, representative generation/embedding/reasoning behavior, Open WebUI migration and production-role switching, persisted embedding-prefix drift/convergence, Tika `/version` + `/tika` extraction, one real managed-document/RAG path, and repeated convergence.
+**Retest:** completed on exact 1.12 DEVICE across normal Ollama lanes/runtime lifecycle, Open WebUI migration/roles, persisted embedding prefixes, broad Tika extraction, malformed input, real RAG ingestion/endurance/restarts and final authenticated revalidation. Reopen only when later changes affect those surfaces.
+
+## DEC-042 — Treat 1.12 as accepted runtime baseline and make 1.13 a bounded package/UX hardening release
+
+**Status:** ACTIVE — 0.14.1-1.13 candidate.
+
+**Decision:** Release 1.13 keeps the exact 1.12 Ollama/Open WebUI/Tika pins, four-lane topology,
+model catalog and RAG tuning unchanged. It fixes package-owned semantics and operator presentation
+around the accepted runtime: semantically empty Tika extraction fails instead of becoming successful
+placeholder content; the failure names no usable extracted text without assuming corruption; duplicate
+Knowledge content is described as intentional duplicate rejection; known prior Open WebUI version
+provenance is preserved across the migration hold; and optional-model status distinguishes a proven
+older package-generated Modelfile (`PACKAGE UPDATE PENDING`) from local/unknown `DRIFT`.
+
+Package-update classification is evidence-based. RPM `%pre` records a runtime Modelfile hash only when
+the previously installed model manager proves that runtime file still matches the old package definition.
+The new manager compares the untouched runtime file with that captured hash before using the package-update
+label. Missing evidence, a changed hash, source drift or registration drift never gets relabelled as an
+expected package update.
+
+**Why:** The completed 1.12 DEVICE campaign accepted the dependency/runtime stack and identified no reason
+to reopen the architecture. Its remaining actionable product defect and several operator-clarity findings
+sit at package boundaries. Fixing those narrowly improves correctness and upgrade comprehension without
+mixing in the separate model/RAG quality campaign or changing already accepted runtime bytes.
+
+**Retest only if:** no-text/duplicate ingestion semantics, Open WebUI migration provenance, model
+Modelfile provenance/status classification or optional-model reconciliation UX changes. DEVICE coverage
+for 1.13 should focus on those changed paths plus final health/verify rather than repeating the broad 1.12
+runtime campaign unless another change invalidates that baseline.
