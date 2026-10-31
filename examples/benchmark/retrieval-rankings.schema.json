@@ -6,6 +6,7 @@
   "additionalProperties": true,
   "required": [
     "question_id",
+    "arm_id",
     "ranked_chunks"
   ],
   "properties": {

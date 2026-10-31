@@ -142,6 +142,68 @@ class QualityCampaignFoundationTests(unittest.TestCase):
         self.assertEqual(list(documents), ["doc"])
         self.assertEqual(questions, [])
 
+    def test_external_corpus_manifest_runtime_matches_declared_scalar_types(self) -> None:
+        base = {
+            "schema": 1,
+            "corpus_id": "strict-types",
+            "documents": [
+                {
+                    "id": "doc",
+                    "file": "doc.pdf",
+                    "sha256": "0" * 64,
+                    "size_bytes": 0,
+                    "language": "de",
+                    "document_type": "pdf",
+                }
+            ],
+            "questions": [
+                {
+                    "id": "q",
+                    "question": "Welche Angabe gilt?",
+                    "query_language": "de",
+                    "supported": True,
+                    "required_evidence": [
+                        {"document_id": "doc", "contains": "Angabe", "page": 1}
+                    ],
+                }
+            ],
+        }
+        cases = (
+            ("schema", lambda value: value.__setitem__("schema", True), "schema must be 1"),
+            (
+                "size_bytes",
+                lambda value: value["documents"][0].__setitem__("size_bytes", True),
+                "size_bytes must be a non-negative integer",
+            ),
+            (
+                "evidence_page",
+                lambda value: value["questions"][0]["required_evidence"][0].__setitem__(
+                    "page", True
+                ),
+                "evidence page must be >= 1",
+            ),
+            (
+                "acceptable_evidence_null",
+                lambda value: value["questions"][0].__setitem__(
+                    "acceptable_evidence", None
+                ),
+                "acceptable_evidence must be an array",
+            ),
+            (
+                "conflicting_evidence_null",
+                lambda value: value["questions"][0].__setitem__(
+                    "conflicting_evidence", None
+                ),
+                "conflicting_evidence must be an array",
+            ),
+        )
+        for label, mutate, expected in cases:
+            with self.subTest(label=label):
+                manifest = json.loads(json.dumps(base))
+                mutate(manifest)
+                with self.assertRaisesRegex(quality_campaign.BenchmarkError, expected):
+                    quality_campaign.validate_manifest_shape(manifest)
+
     def test_external_corpus_manifest_rejects_path_escape(self) -> None:
         manifest = {
             "schema": 1,
@@ -425,6 +487,30 @@ class QualityCampaignFoundationTests(unittest.TestCase):
         self.assertTrue(score["exact_values_ok"])
         self.assertEqual(score["conflicting_chunks"], 1)
 
+    def test_retrieval_rankings_require_explicit_arm_identity(self) -> None:
+        schema = json.loads(
+            (ROOT / "examples/benchmark/retrieval-rankings.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("arm_id", schema["required"])
+        with tempfile.TemporaryDirectory() as tmp:
+            rankings = Path(tmp) / "rankings.jsonl"
+            rankings.write_text(
+                json.dumps(
+                    {
+                        "question_id": "q",
+                        "ranked_chunks": [],
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                quality_campaign.BenchmarkError, "arm_id must be non-empty text"
+            ):
+                quality_campaign.load_rankings(rankings)
+
     def test_retrieval_runner_excludes_unsupported_questions_from_recall(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -527,6 +613,47 @@ class QualityCampaignFoundationTests(unittest.TestCase):
             self.assertEqual(
                 summary["by_language_pair"]["fr->none"]["recall_eligible_questions"],
                 0,
+            )
+
+            wrong_arm_rankings = root / "rankings-wrong-arm.jsonl"
+            wrong_arm_rankings.write_text(
+                rankings_path.read_text(encoding="utf-8").replace(
+                    "control-jina-dense-k4-1500-200",
+                    "small-chunk-jina-dense-k4-1000-100",
+                ),
+                encoding="utf-8",
+            )
+            wrong_arm_args = SimpleNamespace(
+                manifest=str(manifest_path),
+                corpus_dir=str(corpus),
+                rankings=str(wrong_arm_rankings),
+                arms=None,
+                arm="control-jina-dense-k4-1500-200",
+                output_dir=str(root / "retrieval-wrong-arm"),
+            )
+            with self.assertRaisesRegex(
+                quality_campaign.BenchmarkError, "declares arm.*expected"
+            ):
+                quality_campaign.run_retrieval_score(wrong_arm_args)
+
+            retrieval_summary_path = output / "retrieval-summary.json"
+            retrieval_summary = json.loads(
+                retrieval_summary_path.read_text(encoding="utf-8")
+            )
+            original_rankings_name = retrieval_summary["inputs"]["rankings"]["name"]
+            retrieval_summary["inputs"]["rankings"]["name"] = "../rankings.jsonl"
+            retrieval_summary_path.write_text(
+                json.dumps(retrieval_summary, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(
+                quality_campaign.BenchmarkError, "must be a local file name"
+            ):
+                quality_campaign.retrieval_result_record(output)
+            retrieval_summary["inputs"]["rankings"]["name"] = original_rankings_name
+            retrieval_summary_path.write_text(
+                json.dumps(retrieval_summary, indent=2) + "\n",
+                encoding="utf-8",
             )
 
             alternate_rankings = root / "rankings-small.jsonl"

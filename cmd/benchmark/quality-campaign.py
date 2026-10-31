@@ -341,7 +341,7 @@ def validate_manifest_shape(
         {"schema", "corpus_id", "description", "documents", "questions"},
         "corpus manifest",
     )
-    if document.get("schema") != 1:
+    if type(document.get("schema")) is not int or document["schema"] != 1:
         raise BenchmarkError("corpus manifest schema must be 1")
     if not isinstance(document.get("corpus_id"), str) or not document["corpus_id"]:
         raise BenchmarkError("corpus manifest requires corpus_id")
@@ -401,7 +401,7 @@ def validate_manifest_shape(
             raise BenchmarkError(
                 f"document {doc_id}: sha256 must be 64 lowercase hex characters"
             )
-        if not isinstance(size, int) or size < 0:
+        if type(size) is not int or size < 0:
             raise BenchmarkError(
                 f"document {doc_id}: size_bytes must be a non-negative integer"
             )
@@ -517,8 +517,6 @@ def validate_manifest_shape(
                 f"question {question_id}: required_evidence must be an array"
             )
         acceptable = question.get("acceptable_evidence", [])
-        if acceptable is None:
-            acceptable = []
         if not isinstance(acceptable, list):
             raise BenchmarkError(
                 f"question {question_id}: acceptable_evidence must be an array"
@@ -540,8 +538,6 @@ def validate_manifest_shape(
             "conflicting_evidence",
         ):
             values = question.get(key, [])
-            if values is None:
-                values = []
             if not isinstance(values, list):
                 raise BenchmarkError(f"question {question_id}: {key} must be an array")
             for evidence in values:
@@ -565,7 +561,7 @@ def validate_manifest_shape(
                         f"question {question_id}: evidence contains must be text"
                     )
                 page = evidence.get("page")
-                if page is not None and (not isinstance(page, int) or page < 1):
+                if page is not None and (type(page) is not int or page < 1):
                     raise BenchmarkError(
                         f"question {question_id}: evidence page must be >= 1"
                     )
@@ -1298,9 +1294,7 @@ def load_rankings(path: Path) -> dict[str, dict[str, Any]]:
         if not isinstance(chunks, list):
             raise BenchmarkError(f"ranking {qid}: ranked_chunks must be an array")
         declared_arm = row.get("arm_id")
-        if declared_arm is not None and (
-            not isinstance(declared_arm, str) or not declared_arm
-        ):
+        if not isinstance(declared_arm, str) or not declared_arm:
             raise BenchmarkError(f"ranking {qid}: arm_id must be non-empty text")
         seen_chunks: set[str] = set()
         for index, chunk in enumerate(chunks, start=1):
@@ -1439,8 +1433,10 @@ def run_retrieval_score(args: argparse.Namespace) -> int:
     for question in questions:
         qid = str(question["id"])
         ranking = rankings[qid]
-        if ranking.get("arm_id") not in {None, args.arm}:
-            raise BenchmarkError(f"ranking {qid} declares arm {ranking.get('arm_id')}, expected {args.arm}")
+        if ranking["arm_id"] != args.arm:
+            raise BenchmarkError(
+                f"ranking {qid} declares arm {ranking['arm_id']}, expected {args.arm}"
+            )
         chunks = ranking["ranked_chunks"]
         score = retrieval_case(question, chunks, int(arm["top_k"]))
         pair = language_pair(question, documents)
@@ -1578,7 +1574,12 @@ def retrieval_result_record(result_dir: Path) -> dict[str, Any]:
             or re.fullmatch(r"[0-9a-f]{64}", str(item.get("sha256") or "")) is None
         ):
             raise BenchmarkError(f"retrieval result has invalid {key} input identity: {result_dir}")
-        fixture = result_dir / "fixtures" / item["name"]
+        fixture_name = item["name"]
+        if Path(fixture_name).name != fixture_name:
+            raise BenchmarkError(
+                f"retrieval result {key} input must be a local file name: {fixture_name}"
+            )
+        fixture = result_dir / "fixtures" / fixture_name
         if not fixture.is_file() or sha256_file(fixture) != item["sha256"]:
             raise BenchmarkError(f"retrieval result fixture mismatch for {key}: {fixture}")
     if retrieval.get("corpus_id") != meta.get("corpus_id"):
@@ -1841,9 +1842,9 @@ def run_fixed_export(args: argparse.Namespace) -> int:
     top_k = int(arm["top_k"])
     for question in questions:
         qid = str(question["id"])
-        if rankings[qid].get("arm_id") not in {None, arm_id}:
+        if rankings[qid]["arm_id"] != arm_id:
             raise BenchmarkError(
-                f"ranking {qid} declares arm {rankings[qid].get('arm_id')}, expected {arm_id}"
+                f"ranking {qid} declares arm {rankings[qid]['arm_id']}, expected {arm_id}"
             )
         chunks = rankings[qid]["ranked_chunks"][:top_k]
         bundle_cases.append(
