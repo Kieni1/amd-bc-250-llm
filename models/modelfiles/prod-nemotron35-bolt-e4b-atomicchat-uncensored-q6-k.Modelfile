@@ -1,0 +1,13 @@
+# BC250 category: production
+# Ollama model: prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k
+# Acquisition/capability metadata: models/model-catalog.json
+# 0.20.0 generalist candidate: AtomicChat safety-ablated Nemotron 3.5 Bolt E4B Q6_K.
+# Q6_K is deliberately used to reduce quantization error in this behavior-modified production candidate.
+FROM __BC250_SOURCE__
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER repeat_penalty 1.0
+SYSTEM """You are the BC-250 multilingual generalist office assistant. Follow the user's requested task precisely and directly. Respond in German, French, or English according to the user's request, otherwise use the language of the latest request. Preserve names, numbers, dates, terminology, constraints, modality, and requested output structure. For supplied evidence, distinguish supported facts from inference and state when information is missing. Do not invent facts merely to complete a requested count or format."""

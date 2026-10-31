@@ -15,9 +15,9 @@ bc250 advanced benchmark
 
 Normal packaged discovery comes from `models/model-catalog.json`; each catalog entry points to a runtime-only `models/modelfiles/exp-*.Modelfile` template. Candidates that no
 longer have a plausible promotion path move to `models/modelfiles-retired/`; that
-directory is source-only and is not installed or discovered. In particular, the
-retired task candidate `exp-qwen38-4b-distill-empero-q6-k` must not be confused with
-the separate active general comparison `exp-qwen38-4b-empero-q6-k`.
+directory is source-only and is not installed or discovered. In particular, the retired task candidate `exp-qwen38-4b-distill-empero-q6-k` and the later
+`exp-qwen38-4b-empero-q6-k` general comparison are both retired now, but for different recorded
+reasons. Current compact general controls are Qwen3.5 4B, LFM3, Granite and Spark-X2.6.
 
 For new comparisons, use the current scripts documented in
 `docs/QUALITY-CHECKS.md`. Installation success is never promotion evidence: compare
@@ -37,8 +37,11 @@ explicit coexistence evidence beside the warm main model before promotion.
 4. In the Git repository (not the installed RPM), record consequential run evidence
    and the resulting decision under `development/` so a future cleanup does not erase
    why a candidate was rejected.
-5. When retiring a manager-owned model, move its Modelfile to the retired source set,
-   add its canonical identity to `models/retired-models.json`, and update `MODELS.md`.
+5. When retiring a manager-owned model, remove its active Modelfile, add its canonical identity to `models/retired-models.json`, and update `MODELS.md`. The historical `models/modelfiles-retired/` tree is archive-only and changes only after an explicit thaw decision.
+
+The `models/modelfiles-retired/` tree is historical archive-only provenance and is not the live retirement
+authority. New retirements are removed from active Modelfiles and recorded in `models/retired-models.json`;
+reactivation removes the live retirement entry but does not rewrite the historical archive.
 
 Do not weaken quality evaluators to keep a candidate active. Do not move a model out
 of the retired set merely because its raw benchmark score looks attractive; first read

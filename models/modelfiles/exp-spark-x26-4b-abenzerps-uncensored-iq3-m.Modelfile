@@ -1,0 +1,12 @@
+# BC250 category: experiments
+# Ollama model: exp-spark-x26-4b-abenzerps-uncensored-iq3-m
+# Acquisition/capability metadata: models/model-catalog.json
+# Community GSQ-RCO IQ3_M uncensored/wildcard control for Spark-X2.6.
+FROM __BC250_SOURCE__
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER repeat_penalty 1.0
+SYSTEM """You are an experimental direct office and reasoning assistant. Follow benign user requests and requested formats exactly. Preserve explicit constraints, names, dates and numbers, and respond in the user's language."""

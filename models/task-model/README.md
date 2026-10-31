@@ -69,10 +69,11 @@ Use cheap rejection and expensive acceptance. A new candidate should normally pa
 6. real first-turn persistence; and only then
 7. true concurrent overlap/stability.
 
-`exp-qwen3-4b-lmstudio-q6-k` is the current safety regression case: it scored 5/6
-twice, but both exact-source task staging and a 4096-context task-tuned alias caused
-global OOM and killed the warm main model. Do not retest it for the concurrent task
-role unless the hardware/topology memory envelope changes. After any OOM experiment, use `quality-checks/task/30-appliance-recovery-check.sh` to
+`exp-qwen3-4b-lmstudio-q6-k` is a historical safety regression case and is now retired: it scored 5/6
+twice, but both exact-source task staging and a 4096-context task-tuned alias caused global OOM and
+killed the warm main model. Do not retest it for the concurrent task role unless the hardware/topology
+memory envelope changes. The next compact task comparison is the official `exp-lfm3-1.7b-liquidai-q6-k`
+against the current LFM2.5 1.2B task model, with quality and true-overlap residency measured separately. After any OOM experiment, use `quality-checks/task/30-appliance-recovery-check.sh` to
 prove normal services, reload/warm GPT-OSS when necessary, confirm main residency and an
 empty task lane, and detect any new serious faults caused by the recovery probe. The
 preceding experiment's OOM remains visible as historical context but is not itself a

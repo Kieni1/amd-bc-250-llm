@@ -1,0 +1,10 @@
+# BC250 category: experiments
+# Ollama model: exp-index-translate-9b-indexteam-q4-k-m
+# Acquisition/capability metadata: models/model-catalog.json
+# Official Index-Translate 9B Q4_K_M dedicated DE/FR translation challenger.
+FROM __BC250_SOURCE__
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 8192
+PARAMETER num_predict 2048
+PARAMETER temperature 0

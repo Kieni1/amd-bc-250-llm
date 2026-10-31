@@ -34,26 +34,35 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertTrue(entries)
         self.assertTrue(all(path.is_file() and path.suffix == ".Modelfile" for path in entries))
 
-    def test_modelfile_retired_is_not_packaged_or_discovered(self) -> None:
-        retired = ROOT / "models/modelfiles-retired"
-        retired = {path.stem for path in retired.glob("*.Modelfile")}
+    def test_historical_retired_modelfiles_are_not_packaged_or_discovered(self) -> None:
+        archived = {path.stem for path in (ROOT / "models/modelfiles-retired").glob("*.Modelfile")}
         manifest = (ROOT / "packaging/install-manifest.tsv").read_text(encoding="utf-8")
         self.assertNotIn("modelfiles-retired", manifest)
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("MODELFILE_SOURCE_DIR", None)
             roots = modelctl.model_directories()
-        self.assertNotIn(retired, roots)
         self.assertTrue(all("retired" not in str(path) for path in roots))
-        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
-        self.assertTrue(retired.isdisjoint(active))
 
-    def test_retired_catalog_exactly_matches_source_retired(self) -> None:
-        retired = ROOT / "models/modelfiles-retired"
-        expected = {path.stem for path in retired.glob("*.Modelfile")}
+        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
+        current_retired = {
+            item["name"]
+            for item in json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))["models"]
+        }
+        self.assertTrue(active.isdisjoint(current_retired))
+        # Historical archive provenance may overlap an explicitly reactivated current model.
+        self.assertIn("exp-qwen35-9b-davidau-defiant-fable-q6-k", archived & active)
+
+    def test_retired_catalog_is_current_actionable_state_not_historical_archive(self) -> None:
+        archived = {path.stem for path in (ROOT / "models/modelfiles-retired").glob("*.Modelfile")}
         catalog = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
-        actual = {item["name"] for item in catalog["models"]}
-        self.assertEqual(actual, expected)
+        current_retired = {item["name"] for item in catalog["models"]}
+        active = {model["name"] for model in modelctl.discover_models([MODELFILES])}
+        self.assertTrue(active.isdisjoint(current_retired))
+        self.assertIn("exp-qwen38-27b-unsloth-ud-iq3-s", current_retired)
+        self.assertNotIn("exp-qwen38-27b-unsloth-ud-iq3-s", archived)
+        self.assertIn("exp-qwen35-9b-davidau-defiant-fable-q6-k", archived)
+        self.assertNotIn("exp-qwen35-9b-davidau-defiant-fable-q6-k", current_retired)
 
     def test_every_packaged_modelfile_is_discovered_and_strictly_valid(self) -> None:
         models = modelctl.discover_models([MODELFILES])
@@ -90,7 +99,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
 
     def test_profile_schema_rejects_missing_policy_fields(self) -> None:
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        model_id = "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+        model_id = "exp-granite42-3b-ibm-q6-k"
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "model-profiles.json"
             broken = json.loads(json.dumps(document))
@@ -101,7 +110,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
 
     def test_shared_profile_contract_rejects_missing_catalog_model(self) -> None:
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        model_id = "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+        model_id = "exp-granite42-3b-ibm-q6-k"
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "model-profiles.json"
             broken = json.loads(json.dumps(document))
@@ -139,7 +148,7 @@ class ModelfileDiscoveryTests(unittest.TestCase):
 
     def test_agent_prepare_requirement_is_derived_from_runtime_lane_category(self) -> None:
         document = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
-        model_id = "exp-lfm25-8b-a1b-unsloth-q6-k-xl"
+        model_id = "exp-granite42-3b-ibm-q6-k"
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "model-catalog.json"
             broken = json.loads(json.dumps(document))
@@ -170,17 +179,17 @@ class ModelfileDiscoveryTests(unittest.TestCase):
     def test_inspect_json_separates_capability_qualification_and_runtime_authority(self) -> None:
         defaults, model = modelctl.resolve_one_model(
             "all",
-            "exp-lfm25-8b-a1b-unsloth-q6-k-xl",
+            "task-lfm25-1.2b-instruct-liquidai-q6-k",
             directories=[MODELFILES],
             source=ROOT / "models/mtp/models.toml",
         )
         payload = modelctl.model_inspect_payload(defaults, model, effective=False)
         self.assertEqual(payload["capabilities"]["reasoning"], "candidate")
-        self.assertEqual(payload["qualification"]["qualified_context_target"], 8192)
+        self.assertEqual(payload["qualification"]["qualified_context_target"], 4096)
         self.assertNotIn("effective", payload["runtime"])
         effective = modelctl.effective_runtime_view(defaults, model)
-        self.assertEqual(effective["parameters"]["num_ctx"], "8192")
-        self.assertEqual(effective["renderer"], "lfm2")
+        self.assertEqual(effective["parameters"]["num_ctx"], "4096")
+        self.assertIsNone(effective["renderer"])
 
     def test_operator_overlay_rejects_visible_files_without_modelfile_suffix(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -292,51 +301,44 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertEqual(source["policy"], "tracking")
         self.assertEqual(source["reproducibility"], "tracking-ref")
 
-    def test_optional_2026_10_model_challengers_are_bounded_and_not_recommended(self) -> None:
-        names = {
-            "exp-lfm25-8b-a1b-unsloth-q6-k-xl",
-            "agentic-lfm25-24b-a2b-unsloth-q3-k-xl",
-            "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m",
-            "exp-minicpm-v47-1b-openbmb-q4-k-m",
+    def test_2026_10_quality_campaign_models_are_managed_and_bounded(self) -> None:
+        expected = {
+            "exp-lfm3-1.7b-liquidai-q6-k",
+            "exp-lfm3-1.7b-atomicchat-uncensored-q6-k",
+            "exp-nemotron35-bolt-e4b-nvidia-q4-k-m",
+            "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k",
+            "exp-index-translate-2b-indexteam-q4-k-m",
+            "exp-index-translate-9b-indexteam-q4-k-m",
+            "exp-lfm3-vl-2b-liquidai-q6-k",
+            "exp-spark-x26-4b-xhtoken-q4-k-m",
+            "exp-spark-x26-4b-abenzerps-uncensored-iq3-m",
+            "exp-qwen35-9b-davidau-defiant-fable-q6-k",
+            "agentic-neohorse1-9b-tokenrhythm-q4-k-m",
+            "agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m",
         }
         discovered = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
-        self.assertTrue(names <= discovered.keys())
-        self.assertTrue(names.isdisjoint(modelctl.recommended_model_ids()))
+        self.assertTrue(expected <= discovered.keys())
+        recommended = modelctl.recommended_model_ids()
+        self.assertIn("prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k", recommended)
+        self.assertTrue((expected - {"prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k"}).isdisjoint(recommended))
 
-        lfm8 = (MODELFILES / "exp-lfm25-8b-a1b-unsloth-q6-k-xl.Modelfile").read_text()
-        self.assertEqual(discovered["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]["sha256"], "")
-        self.assertEqual(discovered["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]["source_metadata"]["policy"], "tracking")
-        self.assertEqual(discovered["exp-lfm25-8b-a1b-unsloth-q6-k-xl"]["revision"], "latest")
-        self.assertIn("RENDERER lfm2", lfm8)
-        self.assertIn("PARSER lfm2", lfm8)
-        self.assertIn("PARAMETER num_ctx 8192", lfm8)
-        self.assertNotIn("CAPABILITY thinking", lfm8)
-
-        lfm24 = (MODELFILES / "agentic-lfm25-24b-a2b-unsloth-q3-k-xl.Modelfile").read_text()
-        self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["sha256"], "")
-        self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["source_metadata"]["policy"], "tracking")
-        self.assertIn("RENDERER lfm2-thinking", lfm24)
-        self.assertIn("PARSER lfm2-thinking", lfm24)
-        self.assertIn("CAPABILITY thinking", lfm24)
-        self.assertIn("PARAMETER num_ctx 8192", lfm24)
-        self.assertIn("PARAMETER num_predict 3072", lfm24)
-        self.assertEqual(discovered["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["category"], "agentic")
-
-        gemma = (MODELFILES / "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m.Modelfile").read_text()
-        self.assertEqual(discovered["exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"]["sha256"], "")
-        self.assertEqual(discovered["exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"]["source_metadata"]["policy"], "tracking")
-        self.assertEqual(discovered["exp-gemma4-12b-hauhaucs-uncensored-q4-k-m"]["revision"], "latest")
-        self.assertIn("RENDERER gemma4-large", gemma)
-        self.assertIn("PARSER gemma4", gemma)
-        self.assertIn("CAPABILITY thinking", gemma)
-
-        minicpm = discovered["exp-minicpm-v47-1b-openbmb-q4-k-m"]
-        self.assertEqual(minicpm["provider"], "ollama-hf")
-        self.assertEqual(minicpm["from"], "hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M")
+        lfm = (MODELFILES / "exp-lfm3-1.7b-liquidai-q6-k.Modelfile").read_text()
+        self.assertIn("PARAMETER temperature 0.1", lfm)
+        self.assertIn("PARAMETER top_k 50", lfm)
+        self.assertIn("PARAMETER repeat_penalty 1.1", lfm)
+        nemotron = (MODELFILES / "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k.Modelfile").read_text()
+        self.assertIn("PARAMETER temperature 1.0", nemotron)
+        self.assertIn("PARAMETER top_p 0.95", nemotron)
+        index = (MODELFILES / "exp-index-translate-2b-indexteam-q4-k-m.Modelfile").read_text()
+        self.assertIn("PARAMETER temperature 0", index)
+        self.assertIn("PARAMETER num_ctx 8192", index)
 
         profiles = json.loads((ROOT / "models" / "model-profiles.json").read_text())["profiles"]
-        self.assertEqual(profiles["agentic-lfm25-24b-a2b-unsloth-q3-k-xl"]["residency_policy"], "agent-mode-only")
-        self.assertEqual(profiles["exp-minicpm-v47-1b-openbmb-q4-k-m"]["profile_class"], "specialized-vision")
+        self.assertEqual(profiles["prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k"]["reasoning_request_policy"], "request-think-false-bounded-4096")
+        self.assertEqual(profiles["exp-lfm3-vl-2b-liquidai-q6-k"]["profile_class"], "specialized-vision")
+        self.assertEqual(profiles["agentic-neohorse1-9b-tokenrhythm-q4-k-m"]["agent_validation"], "static-output-contract")
+        catalog = json.loads((ROOT / "models" / "model-catalog.json").read_text())["models"]
+        self.assertEqual(catalog["exp-qwen35-9b-davidau-defiant-fable-q6-k"]["capabilities"]["modalities"], ["text"])
 
     def test_embedding_modelfiles_are_bounded_to_dedicated_4k_lane(self) -> None:
         for name in (
@@ -371,25 +373,18 @@ class ModelfileDiscoveryTests(unittest.TestCase):
         self.assertIn("PARAMETER temperature 0", coder)
         self.assertIn("PARAMETER top_p 0.95", coder)
 
-    def test_new_agentic_challenger_profiles_are_discoverable_and_bounded(self) -> None:
-        expected = {
-            "agentic-qwen35-4b-khazarai-q6-k",
-            "agentic-gemma4-e4b-sol-fable-q4-k-m",
-        }
+    def test_agentic_challenger_profiles_keep_live_candidates_and_retire_failed_qwen(self) -> None:
         discovered = {
             model["name"]: model for model in modelctl.discover_models([MODELFILES])
         }
-        self.assertTrue(expected <= discovered.keys())
-        self.assertTrue(all(discovered[name]["category"] == "agentic" for name in expected))
+        self.assertIn("agentic-gemma4-e4b-sol-fable-q4-k-m", discovered)
+        self.assertEqual(discovered["agentic-gemma4-e4b-sol-fable-q4-k-m"]["category"], "agentic")
+        self.assertNotIn("agentic-qwen35-4b-khazarai-q6-k", discovered)
 
-        qwen = (MODELFILES / "agentic-qwen35-4b-khazarai-q6-k.Modelfile").read_text()
-        self.assertIn("PARAMETER num_ctx 32768", qwen)
-        self.assertIn("PARAMETER num_predict 3072", qwen)
-        self.assertIn("PARAMETER temperature 0.6", qwen)
-        self.assertIn("PARAMETER top_p 0.95", qwen)
-        self.assertIn("PARAMETER top_k 20", qwen)
-        self.assertIn("PARAMETER min_p 0.0", qwen)
-        self.assertIn("PARAMETER repeat_penalty 1.0", qwen)
+        retired = json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))
+        retired_names = {row["name"] for row in retired["models"]}
+        self.assertIn("agentic-qwen35-4b-khazarai-q6-k", retired_names)
+        self.assertFalse((MODELFILES / "agentic-qwen35-4b-khazarai-q6-k.Modelfile").exists())
 
         gemma = (MODELFILES / "agentic-gemma4-e4b-sol-fable-q4-k-m.Modelfile").read_text()
         self.assertIn("PARAMETER num_ctx 16384", gemma)
@@ -1724,7 +1719,7 @@ class StatusTests(unittest.TestCase):
         profiles = document["profiles"]
         self.assertEqual(profiles["prod-qwen35-9b-unsloth-q6-k"]["reasoning_request_policy"], "request-think-true-bounded-6144")
         self.assertNotIn("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", profiles)
-        self.assertEqual(profiles["exp-qwen38-27b-unsloth-ud-iq3-s"]["qualified_context_target"], 8192)
+        self.assertNotIn("exp-qwen38-27b-unsloth-ud-iq3-s", profiles)
         self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-s"]["profile_class"], "experimental-quality")
         self.assertEqual(profiles["exp-qwen38-27b-ista-gsq-rco-iq3-xxs"]["profile_class"], "experimental-deployability")
         self.assertTrue(profiles["prod-translate-gemma4-sub-e4b-17s-q4-k-xl"]["specialized"])
@@ -1733,11 +1728,18 @@ class StatusTests(unittest.TestCase):
     def test_pressure_heavy_qwen_profiles_are_retired_or_bounded_for_next_device_gate(self) -> None:
         q36_active = MODELFILES / "exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
         q36_retired = ROOT / "models/modelfiles-retired/exp-qwen36-35b-a3b-unsloth-ud-iq3-s.Modelfile"
-        q38 = (MODELFILES / "exp-qwen38-27b-unsloth-ud-iq3-s.Modelfile").read_text(encoding="utf-8")
+        q38_active = MODELFILES / "exp-qwen38-27b-unsloth-ud-iq3-s.Modelfile"
+        retired_registry = {
+            item["name"]
+            for item in json.loads((ROOT / "models/retired-models.json").read_text(encoding="utf-8"))["models"]
+        }
+        ista = (MODELFILES / "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile").read_text(encoding="utf-8")
         self.assertFalse(q36_active.exists())
         self.assertTrue(q36_retired.exists())
-        self.assertIn("PARAMETER num_ctx 8192", q38)
-        self.assertNotIn("PARAMETER num_ctx 16384", q38)
+        self.assertFalse(q38_active.exists())
+        self.assertIn("exp-qwen38-27b-unsloth-ud-iq3-s", retired_registry)
+        self.assertIn("PARAMETER num_ctx 8192", ista)
+        self.assertNotIn("PARAMETER num_ctx 16384", ista)
 
 if __name__ == "__main__":
     unittest.main()

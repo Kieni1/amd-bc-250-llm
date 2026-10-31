@@ -75,7 +75,7 @@ inspection command: it reports source/provenance validity, current-definition an
 runtime-Modelfile drift, registration state and a recommended reconciliation action.
 Intentionally unselected optional models are reported as `OPTIONAL — not installed` or
 `OPTIONAL — source cached, not registered`. Cached source bytes alone do not create desired
-active state and do not trigger an apply/refresh recommendation. `PACKAGE UPDATE PENDING` is used when pre-upgrade evidence proves the selected runtime Modelfile still matched the prior package and the new package definition is the only mismatch. `DRIFT` remains reserved for selected/desired runtime state that is missing, locally changed, or otherwise inconsistent.
+active state and do not trigger an apply/refresh recommendation. `PACKAGE UPDATE PENDING` is used when pre-upgrade evidence proves the selected runtime Modelfile still matched the prior package and the new package definition is the only mismatch. `DRIFT` remains reserved for selected/desired runtime state that is missing, locally changed, or otherwise inconsistent. The pre-upgrade record is one-transition evidence: after a model successfully converges, its entry is retired atomically; unrelated pending entries remain, and the file is removed when the last transition is consumed.
 `--online` additionally checks moving upstream revisions without mutating local state.
 In normal mode the agent Ollama API is intentionally stopped, so full read-only
 `status agentic MODEL` may report registration as unavailable/UNKNOWN. That is not a reason
@@ -233,9 +233,9 @@ clarifies the package-owned tag prompt so broad and specific tags share one arra
 one raw JSON object is allowed. The model, strict evaluator and 128-token tag budget are
 unchanged pending focused device retest. The previous Gemma 3 1B fallback/control is
 retired to the retired source set after its weak ~2/6 current-task behavior.
-`exp-qwen3-4b-lmstudio-q6-k` remains an experiment but is explicitly rejected for
+`exp-qwen3-4b-lmstudio-q6-k` was retained at that time as an experiment but explicitly rejected for
 concurrent background-task deployment because both task staging attempts caused global
-OOM and warm-main loss.
+OOM and warm-main loss. It is now retired from active discovery because the Qwen3.5 compact controls supersede that question.
 
 ### German/French translation role
 
@@ -273,6 +273,17 @@ only as a broader office/RAG experiment;
 its translation deployment path is closed under current evidence. The old experimental
 Translate-Gemma identity is also retired after promotion to the production name.
 
+The 2026-10-31 DEVICE follow-up does not reopen that selection. It reused the package
+clause-local modality authority and expanded the documented Translate-Gemma weakness to
+three deterministic semantic families: recommendation → obligation strengthening,
+negated recommendation / temporal polarity loss, and FR→DE prohibition → no-obligation
+weakening. Nine of twelve richer semantic families passed, so this remains a
+context-sensitive weakness rather than a blanket modal-translation failure. The package
+regression fixture now carries those families and relevant permission/prohibition and
+no-obligation controls. Final DEVICE closure confirmed end-to-end Open WebUI withholding
+for the newly added temporal-polarity and prohibition→no-obligation failures; the production
+translation roles and fail-closed delivery guard remain unchanged.
+
 The Stage-2E evidence archive is
 `bc250-translation-stage2e-config-bundle-20260917-232916.tar.gz`, SHA-256
 `63fa90ea1187b7c878da0067d3f0be91e5a9e9faadbb4c919c7ed2a374f80c1c`.
@@ -281,6 +292,25 @@ and installed `0.11.2-0.5.fc44` subsequently completed revalidation v4.1 with th
 canonical `owui-translation` stage passing. The Stage-2E hard corpus remains separate
 historical selection evidence; the real-device package path is now verified through the
 0.5 release.
+
+### 2026-10-31 Qwen3.5 Advanced quality follow-up
+
+A controlled DEVICE block retained the production Advanced `think=true` policy: it passed
+15/15 strict office cases at about 32.65 s median, while the same model with only
+`think=false` passed 12/15 at about 9.83 s median and failed one constraint-scheduling
+case 3/3. The faster non-thinking arm is therefore not a production replacement.
+
+A later reliability run reproduced the intermittent runaway-reasoning/no-final-answer
+pathology on the production sampler: the problematic backup task passed 7/8, with the
+failed repeat exhausting the full 6144-token budget after about 151.5 s and returning no
+visible answer. A minimal intervention changing only request-level `presence_penalty` from
+0.0 to 1.5 then passed 14/14 twice independently, including 8/8 backup, 4/4 constraint
+and 2/2 structured cases in each batch. The first controlled comparison reduced median
+backup latency from about 91.6 s to 48.1 s and reasoning volume from about 13.9k to 7.7k
+characters. The 0.20.0-1 source candidate therefore keeps `think=true` and adopts
+`presence_penalty=1.5` for the normal Advanced/raw higher-quality request policy. Advanced
+Structured remains its separately qualified `think=false` policy with the previous
+`presence_penalty=0.0` until that lane is independently retuned.
 
 ### Production residency follow-up
 
@@ -294,7 +324,7 @@ residency OOM-killed the task service. Making every main request ephemeral avoid
 that overlap but imposed roughly large-model cold-load latency on subsequent chat,
 so the package keeps the proven warm main lane. The later LFM2.5 1.2B Q6_K task
 model passed true overlap without additional swap growth and replaced Gemma as the
-default; the unsafe Qwen3.8 4B task candidate moved to the retired source set. Agentic/coding
+default; the unsafe Qwen3.8 4B task candidate removed from active discovery and recorded in the current retirement registry. Agentic/coding
 results are separate because agent mode is exclusive by design.
 
 ### Retired / exhausted catalog
@@ -322,7 +352,7 @@ Other older retired entries remain documented by their Modelfiles, decision hist
 retired catalog. Do not resurrect them because of an isolated benchmark score; require a
 new role, changed hardware/runtime envelope or other explicit retest condition.
 
-Active experiments must retain a current comparison purpose. The former production LFM translation identity and Gemma4 26B remain retired, but 1.5 adds a new LFM2.5 8B A1B fast-office challenger and a separate LFM2.5 24B A2B exclusive-agent challenger. TIR remains a broader office/RAG comparison, while general-main, OCR, embedding, document-vision and agent experiments keep their separate lanes.
+Active experiments must retain a current comparison purpose. The 0.20.0 workbench deliberately prunes nine exhausted general/task/quant controls while adding the 2026-10-31 role-specific official/community candidate set. TIR remains a broader office/RAG control, the two ISTA 27B profiles remain distinct quality/headroom ceilings, and OCR, embedding, translation and Agent candidates retain separate lanes.
 
 Use the role-specific lanes before changing defaults:
 
@@ -349,27 +379,59 @@ separately below.
 <!-- ACTIVE_EXPERIMENTS:BEGIN -->
 ```text
 exp-gemma4-12b-google-qat-q4-0
-exp-gemma4-12b-hauhaucs-uncensored-q4-k-m
 exp-glm-ocr-ggml-q8-0
-exp-lfm25-8b-a1b-unsloth-q6-k-xl
-exp-minicpm-v47-1b-openbmb-q4-k-m
-exp-gpt-oss20b-davidau-neo-mxfp4-moe4
-exp-gpt-oss20b-unsloth-ud-q4-k-xl
 exp-granite42-3b-ibm-q6-k
+exp-index-translate-2b-indexteam-q4-k-m
+exp-index-translate-9b-indexteam-q4-k-m
+exp-lfm3-1.7b-atomicchat-uncensored-q6-k
+exp-lfm3-1.7b-liquidai-q6-k
+exp-lfm3-vl-2b-liquidai-q6-k
+exp-minicpm-v47-1b-openbmb-q4-k-m
+exp-nemotron35-bolt-e4b-nvidia-q4-k-m
 exp-ovisocr2-abiray-q8-0
-exp-qwen3-4b-lmstudio-q6-k
 exp-qwen35-4b-unsloth-q6-k
+exp-qwen35-9b-davidau-defiant-fable-q6-k
 exp-qwen35-9b-hauhaucs-uncensored-q6-k
 exp-qwen38-27b-ista-gsq-rco-iq3-s
 exp-qwen38-27b-ista-gsq-rco-iq3-xxs
-exp-qwen38-27b-unsloth-ud-iq3-s
-exp-qwen38-4b-empero-q6-k
-exp-qwen38-9b-empero-q6-k
+exp-spark-x26-4b-abenzerps-uncensored-iq3-m
+exp-spark-x26-4b-xhtoken-q4-k-m
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
 ```
 <!-- ACTIVE_EXPERIMENTS:END -->
 
-## 2026-10-21 optional challenger additions
+## 2026-10-31 model-campaign refresh
+
+The next-release workbench adds candidates only where they answer a current product question. The new
+curated **Office - Generalist** candidate is `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`,
+using the AtomicChat Q6_K safety-ablated Nemotron Bolt weights with NVIDIA's 1.0/0.95 sampler and a
+request-level `think=false` / 4096-output product policy. It is intentionally separate from the accepted
+Qwen3.5 Advanced/Higher Quality role and requires DEVICE qualification before it becomes accepted product
+evidence. AtomicChat reports materially altered refusal behavior and also discloses a harmless-prompt KL
+gate miss; treat that as part of the qualification burden, not as a hidden equivalence to official Bolt.
+
+Role-specific additions:
+
+- `exp-lfm3-1.7b-liquidai-q6-k` and `exp-lfm3-1.7b-atomicchat-uncensored-q6-k`: official and safety-ablated fast-office controls at 32K qualified context using Liquid's `temperature=0.1`, `top_k=50`, `repeat_penalty=1.1` general profile.
+- `exp-nemotron35-bolt-e4b-nvidia-q4-k-m`: official Documents/RAG grounding challenger, distinct from the uncensored Generalist candidate.
+- `exp-index-translate-2b-indexteam-q4-k-m` / `exp-index-translate-9b-indexteam-q4-k-m`: dedicated translation challengers, greedy `temperature=0` with request-level thinking disabled and the Index explicit-direction prompt.
+- `exp-lfm3-vl-2b-liquidai-q6-k`: compact document-vision/OCR challenger using Liquid's 0.1/1.0/50/1.1 profile; 8K is the initial BC-250 qualification target even though the upstream model supports 128K.
+- `exp-spark-x26-4b-xhtoken-q4-k-m` / `exp-spark-x26-4b-abenzerps-uncensored-iq3-m`: official and community compact-reasoning wildcards at a conservative 32K target; upstream defaults are 1.0/0.95 and DE/FR fit must be proven locally.
+- `exp-qwen35-9b-davidau-defiant-fable-q6-k`: deliberately reactivated community/uncensored Qwen control because the campaign scope changed; this does not rewrite its historical retirement. Its runtime sampler follows the publisher's general thinking profile without adding a package-specific penalty. Upstream advertises optional vision through a separate projector, but this package entry is intentionally text-only because that projector is not part of its managed execution contract.
+- `agentic-neohorse1-9b-tokenrhythm-q4-k-m` / `agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m`: official/community Agent candidates using the NeoHorse published 1.0/0.95/top-k20/presence-1.5 thinking profile on the exclusive Agent lane.
+
+Eight no-longer-useful experiments are removed from the active source set: `exp-qwen3-4b-lmstudio-q6-k`,
+`exp-gpt-oss20b-davidau-neo-mxfp4-moe4`, `exp-gpt-oss20b-unsloth-ud-q4-k-xl`,
+`exp-qwen38-4b-empero-q6-k`, `exp-qwen38-9b-empero-q6-k`, `exp-qwen38-27b-unsloth-ud-iq3-s`,
+`exp-gemma4-12b-hauhaucs-uncensored-q4-k-m`, and `exp-lfm25-8b-a1b-unsloth-q6-k-xl`.
+Retirement changes current package discovery/definitions only; it does not authorize deleting operator/provider model data. The historical `models/modelfiles-retired/` archive is not rewritten by this cleanup; current retirement identity is recorded in `models/retired-models.json`.
+
+The existing `exp-qwen35-4b-unsloth-q6-k` non-thinking control now carries the complete upstream
+non-thinking sampler (`0.7/0.8/top-k20/min-p0/presence-1.5/repeat-1`) and explicit `think=false`
+qualification policy. Existing production Qwen3.5 9B is **not** retuned here: DEVICE evidence still
+supports keeping `think=true`, while repetition/verbosity frequency remains a separate investigation.
+
+## Historical: 2026-10-21 optional challenger additions
 
 Release 1.5 adds comparison profiles only; no production/default role changes.
 
@@ -383,7 +445,7 @@ Promotion requires BC-250 evidence for registration/capabilities, visible output
 ## Agent/coding lifecycle
 
 `agentic-ornith15-9b-ornith-q5-k-m` remains the package-default Agent when that add-on is
-explicitly installed, but Agent is not part of the core appliance install baseline. Starting with
+explicitly installed, but Agent is not part of the core appliance install baseline. The 2026-10-31 final DEVICE closure confirmed the contract-first Bash prompt alongside unchanged canonical Python/JSON prompts at 3/3 PASS. Starting with
 Current revalidation reports the Agent phase as optional coverage unavailable/skipped
 when no Agent model is installed; that does not fail the core appliance. If Agent is present,
 revalidation still qualifies its exclusive lane and runtime/topology faults remain real
@@ -421,15 +483,18 @@ cleanup decision from one comparable dataset. Notable additions are:
 | `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in retired/history |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-s` | admin/testing-only 8K quality/reasoning profile; `think=true`; mechanically strong but memory-tight |
 | `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |
-| `exp-qwen38-27b-unsloth-ud-iq3-s` | experimental/admin-only pressure-heavy non-routine dense 27B control at 8K; retain only if quality value justifies the pressure |
-| `exp-qwen38-4b-empero-q6-k` | compact Qwen3.8 4B reasoning comparison using the upstream Q6_K artifact |
-| `exp-qwen38-9b-empero-q6-k` | 9B distilled native-reasoning comparison against production Qwen3.5 and GPT-OSS |
-| `exp-gpt-oss20b-unsloth-ud-q4-k-xl` | Unsloth UD-Q4_K_XL control quant for GPT-OSS quality/residency comparisons at a conservative 16K context |
+| `exp-lfm3-1.7b-liquidai-q6-k` / `exp-lfm3-1.7b-atomicchat-uncensored-q6-k` | official/community fast-office controls; test DE/FR office quality, structured output, task-model potential and refusal drift |
+| `exp-nemotron35-bolt-e4b-nvidia-q4-k-m` | official Documents/RAG grounding challenger against production Gemma E4B |
+| `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0 Office - Generalist production candidate; community safety-ablated weights require explicit DEVICE quality/refusal/latency qualification |
+| `exp-index-translate-2b-indexteam-q4-k-m` / `exp-index-translate-9b-indexteam-q4-k-m` | dedicated translation efficiency/quality challengers against Translate-Gemma, including the known DE↔FR modality/negation corpus |
+| `exp-spark-x26-4b-xhtoken-q4-k-m` / `exp-spark-x26-4b-abenzerps-uncensored-iq3-m` | compact official/community reasoning wildcards; DE/FR usefulness must be proven locally |
+| `exp-qwen35-9b-davidau-defiant-fable-q6-k` | community/uncensored Advanced control reactivated for the new campaign; compare to production Qwen without assuming publisher benchmarks transfer |
 | `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
 | `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
 | `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; retain as the baseline while product-path completion/extraction is qualified |
 | `agentic-qwable9b-empero-q6-k` | active 9B coding/agent challenger; retain for the next comparative funnel |
-| `agentic-qwen35-4b-khazarai-q6-k` | new compact Qwen3.5 agentic-coding challenger; Q6_K with the Qwen precise-coding sampling profile; qualification pending |
+| `agentic-qwen35-4b-khazarai-q6-k` | retired from active discovery after two DEVICE comparison runs produced 5/18 strict PASS versus Ornith 12/18; speed advantage did not offset broader Bash/Python/JSON compliance regressions |
+| `agentic-neohorse1-9b-tokenrhythm-q4-k-m` / `agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m` | official/community NeoHorse Agent challengers; compare strict raw-format usefulness/latency only after the current Ornith/Qwen bounded investigation is classified |
 | `agentic-gemma4-e4b-sol-fable-q4-k-m` | new compact Gemma 4 E4B agentic/coding challenger; conservative 16K deterministic BC-250 test profile; qualification pending |
 | `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use comparison; retain until the E4B challenger establishes whether a final 12B comparison is useful |
 | `agentic-qwen25-coder7b-unsloth-q5-k-m` | legacy coding comparison; lifecycle decision remains pending canonical campaign-evidence reconciliation |

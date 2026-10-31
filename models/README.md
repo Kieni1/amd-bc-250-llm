@@ -40,7 +40,7 @@ form is the machine-readable contract; the human display is convenience output. 
 read-only fleet/runtime-state view and normally needs `sudo` for the protected GGUF/state tree.
 It reports source/provenance validity, Modelfile drift and registration state. Intentionally
 unselected optional models are `OPTIONAL`, with a distinction between not installed and source
-cached/not registered; they do not receive repair advice until explicitly selected. `PACKAGE UPDATE PENDING` identifies a selected model whose only Modelfile mismatch is proven to be an older package-generated definition captured before upgrade. `DRIFT` is
+cached/not registered; they do not receive repair advice until explicitly selected. `PACKAGE UPDATE PENDING` identifies a selected model whose only Modelfile mismatch is proven to be an older package-generated definition captured before upgrade. That proof is consumed after successful reconciliation, so an already-completed package transition cannot later reclassify a manual reappearance of the old Modelfile as expected package drift. `DRIFT` is
 reserved for desired runtime state that is otherwise missing, locally modified, or not provably package-originated. `--online` checks moving upstream
 revisions without mutating local state; normal status output points to that option when upstream
 state was not checked. `--verbose` adds source repository/revision/SHA and resolved paths.
@@ -189,9 +189,11 @@ For live source/blob pairs whose bytes are identical, `bc250 storage dedupe` use
 conservative 16 MiB XFS range while batching ranges per pair into one `xfs_io` process.
 Dedupe state is stored in the schema-4 sidecar and survives normal model reconciliation.
 
-Package-retired definitions remain source-only under `models/modelfiles-retired/`;
-installed `retired-models.json` contains the canonical identity/paths needed for safe
-cleanup. `sudo bc250 model purge-retired` previews and removes only those explicit
+Historical retired Modelfiles remain source-only under the archive-only `models/modelfiles-retired/` tree.
+Installed `retired-models.json` is the **current actionable retirement authority** and may therefore include
+new retirements with no archived Modelfile, or omit a historically archived model that was deliberately
+reactivated. The archive is provenance, not live cleanup state. `retired-models.json` contains the canonical
+identity/paths needed for safe cleanup. `sudo bc250 model purge-retired` previews and removes only those explicit
 package-retired models, refuses uncertain or misplaced registration state, and never
 targets arbitrary unmanaged operator models.
 

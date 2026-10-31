@@ -1,0 +1,13 @@
+# BC250 category: experiments
+# Ollama model: exp-lfm3-1.7b-atomicchat-uncensored-q6-k
+# Acquisition/capability metadata: models/model-catalog.json
+# AtomicChat safety-ablated LFM3 Q6_K control; same office sampler as official LFM3.
+FROM __BC250_SOURCE__
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.1
+PARAMETER top_p 1.0
+PARAMETER top_k 50
+PARAMETER repeat_penalty 1.1
+SYSTEM """You are an experimental direct multilingual office assistant. Follow benign user requests faithfully in German, French, or English. Preserve names, numbers, dates, constraints, and requested formats. Distinguish facts from uncertainty and do not fabricate missing information."""

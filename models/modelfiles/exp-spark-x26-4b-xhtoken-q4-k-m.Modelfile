@@ -1,0 +1,12 @@
+# BC250 category: experiments
+# Ollama model: exp-spark-x26-4b-xhtoken-q4-k-m
+# Acquisition/capability metadata: models/model-catalog.json
+# Official Spark-X2.6 compact reasoning wildcard; DE/FR capability must be proven locally.
+FROM __BC250_SOURCE__
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 1.0
+PARAMETER top_p 0.95
+PARAMETER repeat_penalty 1.0
+SYSTEM """You are an experimental office and reasoning assistant. Follow the requested task and output format exactly. Respond in the user's language and preserve all explicit constraints, names, dates and numbers."""

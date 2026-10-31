@@ -42,6 +42,34 @@
       "residency_policy": "agent-mode-only",
       "specialized": true
     },
+    "agentic-neohorse1-9b-tokenrhythm-q4-k-m": {
+      "agent_validation": "static-output-contract",
+      "comparison_role": "agent",
+      "intended_role": "agentic-challenger",
+      "owui_testing_exposure": "forbidden",
+      "product_context_default": null,
+      "profile_class": "agentic-experimental",
+      "qualified_context_target": 16384,
+      "reasoning_request_policy": "agent-role-defined",
+      "recommended": false,
+      "residency_policy": "agent-mode-only",
+      "specialized": true,
+      "output_token_expectation": 3072
+    },
+    "agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m": {
+      "agent_validation": "static-output-contract",
+      "comparison_role": "agent",
+      "intended_role": "uncensored-agentic-challenger",
+      "owui_testing_exposure": "forbidden",
+      "product_context_default": null,
+      "profile_class": "agentic-experimental",
+      "qualified_context_target": 16384,
+      "reasoning_request_policy": "agent-role-defined",
+      "recommended": false,
+      "residency_policy": "agent-mode-only",
+      "specialized": true,
+      "output_token_expectation": 3072
+    },
     "agentic-ornith15-9b-ornith-q5-k-m": {
       "agent_validation": "static-output-contract",
       "comparison_role": "agent",
@@ -73,20 +101,6 @@
       "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
-      "owui_testing_exposure": "forbidden",
-      "product_context_default": null,
-      "profile_class": "agentic-experimental",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "agent-role-defined",
-      "recommended": false,
-      "residency_policy": "agent-mode-only",
-      "specialized": true
-    },
-    "agentic-qwen35-4b-khazarai-q6-k": {
-      "agent_validation": "static-output-contract",
-      "comparison_role": "agent",
-      "intended_role": "agentic-challenger",
-      "output_token_expectation": 3072,
       "owui_testing_exposure": "forbidden",
       "product_context_default": null,
       "profile_class": "agentic-experimental",
@@ -135,19 +149,6 @@
       "residency_policy": "experimental",
       "specialized": false
     },
-    "exp-gemma4-12b-hauhaucs-uncensored-q4-k-m": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "documents-quality",
-      "intended_role": "office-document-quality-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 16384,
-      "reasoning_request_policy": "native-thinking-capable",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": true
-    },
     "exp-glm-ocr-ggml-q8-0": {
       "agent_validation": "not-applicable",
       "comparison_role": "ocr-vision",
@@ -160,32 +161,6 @@
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": true
-    },
-    "exp-gpt-oss20b-davidau-neo-mxfp4-moe4": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "deep-reasoning",
-      "intended_role": "deep-reasoning-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 16384,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-gpt-oss20b-unsloth-ud-q4-k-xl": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "deep-reasoning",
-      "intended_role": "deep-reasoning-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 16384,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
     },
     "exp-granite42-3b-ibm-q6-k": {
       "agent_validation": "not-applicable",
@@ -200,15 +175,69 @@
       "residency_policy": "experimental",
       "specialized": false
     },
-    "exp-lfm25-8b-a1b-unsloth-q6-k-xl": {
+    "exp-index-translate-2b-indexteam-q4-k-m": {
       "agent_validation": "not-applicable",
-      "comparison_role": "office-fast",
-      "intended_role": "fast-office-rag-translation-challenger",
+      "comparison_role": "translation-de-fr",
+      "intended_role": "translation-efficiency-challenger",
+      "owui_testing_exposure": "testing",
+      "product_context_default": null,
+      "profile_class": "translation-experimental",
+      "qualified_context_target": 8192,
+      "reasoning_request_policy": "request-think-false",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": true,
+      "output_token_expectation": 2048
+    },
+    "exp-index-translate-9b-indexteam-q4-k-m": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "translation-de-fr",
+      "intended_role": "translation-quality-challenger",
+      "owui_testing_exposure": "testing",
+      "product_context_default": null,
+      "profile_class": "translation-experimental",
+      "qualified_context_target": 8192,
+      "reasoning_request_policy": "request-think-false",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": true,
+      "output_token_expectation": 2048
+    },
+    "exp-lfm3-1.7b-atomicchat-uncensored-q6-k": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "office-standard",
+      "intended_role": "uncensored-fast-office-control",
       "owui_testing_exposure": "testing",
       "product_context_default": null,
       "profile_class": "experimental-quality",
+      "qualified_context_target": 32768,
+      "reasoning_request_policy": "neutral-default",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": false
+    },
+    "exp-lfm3-1.7b-liquidai-q6-k": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "office-standard",
+      "intended_role": "fast-office-task-challenger",
+      "owui_testing_exposure": "testing",
+      "product_context_default": null,
+      "profile_class": "experimental-quality",
+      "qualified_context_target": 32768,
+      "reasoning_request_policy": "neutral-default",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": false
+    },
+    "exp-lfm3-vl-2b-liquidai-q6-k": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "ocr-vision",
+      "intended_role": "document-vision-ocr-challenger",
+      "owui_testing_exposure": "testing",
+      "product_context_default": null,
+      "profile_class": "specialized-vision",
       "qualified_context_target": 8192,
-      "reasoning_request_policy": "nonthinking-first-pass",
+      "reasoning_request_policy": "specialized",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": true
@@ -226,6 +255,19 @@
       "residency_policy": "experimental",
       "specialized": true
     },
+    "exp-nemotron35-bolt-e4b-nvidia-q4-k-m": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "documents-rag",
+      "intended_role": "documents-grounding-challenger",
+      "owui_testing_exposure": "testing",
+      "product_context_default": null,
+      "profile_class": "experimental-quality",
+      "qualified_context_target": 32768,
+      "reasoning_request_policy": "benchmark-think-on-off",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": false
+    },
     "exp-ovisocr2-abiray-q8-0": {
       "agent_validation": "not-applicable",
       "comparison_role": "ocr-vision",
@@ -239,19 +281,6 @@
       "residency_policy": "experimental",
       "specialized": true
     },
-    "exp-qwen3-4b-lmstudio-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
     "exp-qwen35-4b-unsloth-q6-k": {
       "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
@@ -260,7 +289,20 @@
       "product_context_default": null,
       "profile_class": "experimental-quality",
       "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
+      "reasoning_request_policy": "request-think-false",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": false
+    },
+    "exp-qwen35-9b-davidau-defiant-fable-q6-k": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "advanced-reasoning",
+      "intended_role": "community-uncensored-advanced-control",
+      "owui_testing_exposure": "testing",
+      "product_context_default": null,
+      "profile_class": "experimental-quality",
+      "qualified_context_target": 32768,
+      "reasoning_request_policy": "benchmark-think-on-off",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": false
@@ -306,41 +348,28 @@
       "residency_policy": "experimental",
       "specialized": false
     },
-    "exp-qwen38-27b-unsloth-ud-iq3-s": {
+    "exp-spark-x26-4b-abenzerps-uncensored-iq3-m": {
       "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 8192,
-      "reasoning_request_policy": "request-think-medium",
-      "recommended": false,
-      "residency_policy": "experimental-pressure-heavy-non-routine",
-      "specialized": false
-    },
-    "exp-qwen38-4b-empero-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning-challenger",
+      "intended_role": "community-uncensored-reasoning-wildcard",
       "owui_testing_exposure": "testing",
       "product_context_default": null,
       "profile_class": "experimental-quality",
       "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
+      "reasoning_request_policy": "benchmark-thinking",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": false
     },
-    "exp-qwen38-9b-empero-q6-k": {
+    "exp-spark-x26-4b-xhtoken-q4-k-m": {
       "agent_validation": "not-applicable",
       "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning-challenger",
+      "intended_role": "compact-reasoning-wildcard",
       "owui_testing_exposure": "testing",
       "product_context_default": null,
       "profile_class": "experimental-quality",
       "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
+      "reasoning_request_policy": "benchmark-thinking",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": false
@@ -396,6 +425,20 @@
       "recommended": true,
       "residency_policy": "pre-evict-task-embedding-then-keep-alive-2m",
       "specialized": false
+    },
+    "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "generalist",
+      "intended_role": "office-generalist-implementation",
+      "owui_testing_exposure": "curated",
+      "product_context_default": 32768,
+      "profile_class": "production-candidate",
+      "qualified_context_target": 32768,
+      "reasoning_request_policy": "request-think-false-bounded-4096",
+      "recommended": true,
+      "residency_policy": "default",
+      "specialized": false,
+      "output_token_expectation": 4096
     },
     "prod-qwen35-9b-unsloth-q6-k": {
       "agent_validation": "not-applicable",
