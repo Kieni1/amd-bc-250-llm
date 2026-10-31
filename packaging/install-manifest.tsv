@@ -70,6 +70,7 @@ file	0755	cmd/benchmark/category-benchmark.py	{libexec}/category-benchmark.py
 file	0755	cmd/benchmark/runtime-benchmark.py	{libexec}/runtime-benchmark.py
 file	0755	cmd/benchmark/openwebui-benchmark.py	{libexec}/openwebui-benchmark.py
 file	0755	cmd/benchmark/benchmark_common.py	{libexec}/benchmark_common.py
+file	0755	cmd/benchmark/quality-campaign.py	{libexec}/quality-campaign.py
 file	0755	cmd/benchmark/revalidate.sh	{libexec}/revalidate.sh
 file	0644	cmd/qualification/resilience_common.py	{libexec}/qualification/resilience_common.py
 file	0755	cmd/qualification/package_gate_capture.py	{libexec}/qualification/package_gate_capture.py
@@ -84,6 +85,13 @@ file	0644	examples/benchmark/usecase-office.json	{share}/benchmark/usecase-offic
 file	0644	examples/benchmark/translation-office.json	{share}/benchmark/translation-office.json
 file	0644	examples/benchmark/rag-cycle.json	{share}/benchmark/rag-cycle.json
 file	0644	examples/benchmark/rag-quality-office.json	{share}/benchmark/rag-quality-office.json
+file	0644	examples/benchmark/quality-campaign.json	{share}/benchmark/quality-campaign.json
+file	0644	examples/benchmark/corpus-manifest.schema.json	{share}/benchmark/corpus-manifest.schema.json
+file	0644	examples/benchmark/corpus-inventory.schema.json	{share}/benchmark/corpus-inventory.schema.json
+file	0644	examples/benchmark/corpus-manifest.example.json	{share}/benchmark/corpus-manifest.example.json
+file	0644	examples/benchmark/retrieval-arms.json	{share}/benchmark/retrieval-arms.json
+file	0644	examples/benchmark/retrieval-rankings.schema.json	{share}/benchmark/retrieval-rankings.schema.json
+file	0644	examples/benchmark/frozen-retrieval.schema.json	{share}/benchmark/frozen-retrieval.schema.json
 file	0644	examples/benchmark/ocr/manifest.json	{share}/benchmark/ocr/manifest.json
 file	0644	examples/benchmark/ocr/office-de.png	{share}/benchmark/ocr/office-de.png
 file	0644	examples/benchmark/ocr/office-fr.png	{share}/benchmark/ocr/office-fr.png

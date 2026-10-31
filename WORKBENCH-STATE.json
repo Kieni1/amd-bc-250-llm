@@ -6,37 +6,38 @@
     "selection_record": "release-selection.json",
     "workflow": ".github/workflows/build-rpm.yml"
   },
+  "current_batch": "0.20.0-1 source freeze complete in main-chat preparation; exact Source0/spec inputs are the next authoritative build inputs.",
   "history": {
     "note": "Detailed reconstruction/GFX history is intentionally not active state. Compact rationale is retained under development/handovers/archive and Git history."
   },
   "kind": "release-workbench",
   "long_term": {
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses",
-    "direction": "stock-first local office AI appliance; exact 0.14.1-1.12 is the accepted dependency/integration DEVICE baseline, while 0.14.1-1.13 is the current package-hardening/UX SOURCE candidate",
+    "direction": "stock-first local office AI appliance; exact 0.14.1-1.13 remains DEVICE-accepted with the 1.12-qualified Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline, while 0.20.0-1 is the next source candidate with the refreshed quality-campaign/model surface.",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "1.13 package-hardening/UX batch: reject semantically empty Tika extraction, retain known Open WebUI rollback provenance, distinguish proven package-originated Modelfile updates from local/unknown drift, clarify duplicate-content and optional-model reconciliation UX, and retain dependency-depth harness corrections.",
-    "integration": "0.14.1-1.13 SOURCE candidate carries forward the accepted 1.12 runtime/dependency baseline unchanged and changes only package-owned ingestion guards, upgrade provenance, model-state UX, installer wording, tests and secondary documentation.",
-    "next_batch": "Freeze and build the 1.13 candidate, then run focused DEVICE regressions for the changed ingestion, rollback-provenance, model-reconciliation and optional-model UX paths plus final health/verify. Keep model/RAG quality work separate unless deliberately selected."
+    "current_batch": "0.20.0-1 source is reconciled and frozen for release preparation: Steps 3-9 quality-campaign/retrieval contracts, refreshed official/community model set, Office - Generalist, Qwen Advanced presence_penalty=1.5, contract-first Ornith Bash policy, and final translation containment closure are integrated.",
+    "integration": "Retain accepted Standard/Documents/Deep/Translation/task/embedding controls and Qwen think=true. Office - Generalist remains a new AtomicChat Nemotron candidate; Qwen Advanced changes only presence_penalty 0.0 -> 1.5; Ornith remains Agent default with contract-first Bash qualification wording; Translate-Gemma retains the fail-closed guard covering all three confirmed semantic weakness families.",
+    "next_batch": "Build exact frozen 0.20.0-1 through the authoritative GitHub/Fedora 44 workflow, then run focused DEVICE confirmation on those exact bytes before corpus/Tika/gold/retrieval execution."
   },
   "release": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "nvr": "bc250-llm-server-0.14.1-1.13",
-    "rpm_release": "1.13",
-    "state": "1.13-source-candidate",
-    "version": "0.14.1"
+    "nvr": "bc250-llm-server-0.20.0-1",
+    "rpm_release": "1",
+    "state": "0.20.0-1-source-frozen-awaiting-authoritative-build",
+    "version": "0.20.0"
   },
   "schema": 2,
   "validation": {
-    "device_acceptance": "Exact 0.14.1-1.12 is DEVICE-accepted for the completed dependency/integration scope. That evidence remains the runtime baseline; 1.13 requires focused changed-surface DEVICE regression after its exact RPM is selected.",
-    "device_baseline": "Exact 0.14.1-1.12 is the current accepted runtime/dependency baseline, including Open WebUI 0.12.5, Ollama 0.40.13, Tika 4.2.0, RAG endurance/restart persistence and full authenticated revalidation.",
-    "package_critical": "1.13 source validation is tracked from the current package-hardening/UX bytes; do not transfer SOURCE or BUILD results from 1.12 to changed files.",
-    "release_preflight": "1.13 current-state/release checks must describe 1.12 as accepted baseline and 1.13 as the new source candidate.",
-    "rpm_package_check": "No 1.13 BUILD evidence is recorded in workbench state until the exact 1.13 package is built through the release authority.",
-    "source0_smoke": "1.13 Source0 identity is established only from the final frozen source tree.",
-    "source_checks": "Current 1.13 changes are limited to active/boundary-active package surfaces plus regression tests and current documentation.",
+    "device_acceptance": "Exact 0.14.1-1.13 is DEVICE-acceptable: focused changed surfaces, reboot persistence, health/verify, full revalidation infrastructure, product integrity and topology restoration passed. One honest non-blocking limitation remains NOT_TESTED: the pre-upgrade operator-modified Modelfile exclusion boundary.",
+    "device_baseline": "Exact 0.14.1-1.13 is the current accepted package baseline. Its runtime/dependency stack remains Open WebUI 0.12.5, Ollama 0.40.13 and Tika 4.2.0 inherited from the accepted 1.12 dependency-depth campaign.",
+    "package_critical": "0.20.0-1 source candidate includes Steps 3-9 campaign infrastructure, refreshed 2026-10-31 model definitions, Office - Generalist, Qwen Advanced presence_penalty=1.5, contract-first Ornith Bash qualification wording, and expanded translation semantic containment regressions. Exact 0.20.0-1 BUILD/DEVICE evidence is still required.",
+    "release_preflight": "Exact 1.13 remains BUILD/DEVICE-accepted. 0.20.0-1 is the next source identity and changes model definitions, curated Open WebUI desired state, Advanced request sampling and campaign coverage; new BUILD and focused DEVICE evidence are mandatory.",
+    "rpm_package_check": "Exact 1.13 BUILD/DEVICE evidence does not transfer to 0.20.0-1. The next RPM must prove registration/convergence for new provider-managed models, Generalist/Open WebUI policy behavior, Qwen Advanced presence_penalty=1.5, contract-first Agent behavior, and translation containment on the exact new bytes.",
+    "source0_smoke": "0.20.0-1 source integration is complete and frozen for Source0/spec release preparation; BUILD/DEVICE evidence must bind to these exact bytes.",
+    "source_checks": "Active/boundary-active model catalog/profile/Modelfile/Open WebUI/benchmark/docs surfaces are updated coherently; nine obsolete experiments are represented in current package-managed retirement state while the frozen historical retired-Modelfile/archive baseline remains untouched.",
     "static_lint": "Static validation results belong to the exact bytes on which they were executed and are not transferred from older releases."
   }
 }

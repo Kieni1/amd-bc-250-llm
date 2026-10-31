@@ -29,7 +29,7 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. For a new product version, start at `Release: 1`; maintenance/package revisions may use a simple numeric or dotted numeric release according to the active release line. Do not encode development labels, chat milestones or branch names in the installable NEVRA. The current next-release candidate is `bc250-llm-server-0.14.1-1.13.fc44.x86_64`; exact 1.12 is the accepted dependency/runtime DEVICE baseline.
+Use normal RPM `Version` / `Release` identity. Product milestones advance `Version`; each new product version starts at `Release: 1`. Packaging-only rebuilds/fixes increment `Release` (`0.20.0-2`, `0.20.0-3`), product bugfixes increment the patch version (`0.20.1-1`), and later feature milestones increment the minor version (`0.21.0-1`). Do not move backward in RPM version ordering and do not introduce an `Epoch` merely to rename pre-1.0 milestones. Exact `bc250-llm-server-0.14.1-1.13.fc44.x86_64` remains the accepted predecessor baseline; the next source candidate is `bc250-llm-server-0.20.0-1`.
 
 ## Validation and build boundary
 
@@ -117,6 +117,11 @@ rebuild artifact.
   only declared appliance-owned state and never uses unbounded autoremove.
 - Operator-editable configuration uses `%config(noreplace)` or lives outside RPM
   ownership.
+- Upgrade-transition evidence such as
+  `/var/lib/bc250-llm-server/preupgrade-package-modelfiles.json` is package-managed
+  internal state, declared with the package's `%ghost` state convention. Each model
+  entry is consumed after successful reconciliation; the file disappears when no
+  package transition remains pending.
 
 ## Release checklist
 

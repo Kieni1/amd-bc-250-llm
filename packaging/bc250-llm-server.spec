@@ -9,8 +9,8 @@
 %global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
-Version:        0.14.1
-Release:        1.13%{?dist}
+Version:        0.20.0
+Release:        1%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -248,7 +248,11 @@ if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
   # this only after the stopped-state rollback snapshot has been verified.
   owui_version_state=/var/lib/bc250-llm-server/openwebui-preupgrade-version
   owui_previous_version=''
-  owui_existing_capture=''
+  owui_previous_source=''
+  owui_previous_proven='false'
+  owui_existing_version=''
+  owui_existing_source=''
+  owui_existing_proven='false'
   owui_version_valid() {
     [ -n "$1" ] && [ "${#1}" -le 64 ] || return 1
     case "$1" in
@@ -261,20 +265,66 @@ if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
     esac
   }
   if [ -r "$owui_version_state" ]; then
-    IFS= read -r owui_existing_capture < "$owui_version_state" || :
-    owui_version_valid "$owui_existing_capture" || owui_existing_capture=''
+    owui_existing_record="$(python3 - "$owui_version_state" <<'PY_OWUI_READ' || :
+import json
+import re
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    raw = path.read_text(encoding="utf-8").strip()
+except OSError:
+    raise SystemExit(0)
+version_re = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
+try:
+    document = json.loads(raw)
+except json.JSONDecodeError:
+    if version_re.fullmatch(raw):
+        print(f"{raw}|legacy-capture|false")
+    raise SystemExit(0)
+if not isinstance(document, dict) or document.get("schema") != 1:
+    raise SystemExit(0)
+version = document.get("version")
+source = document.get("source")
+proven = document.get("proven")
+if not isinstance(version, str) or version_re.fullmatch(version) is None:
+    raise SystemExit(0)
+if source not in {"live-runtime", "previous-capture", "old-package-hint", "legacy-capture"}:
+    raise SystemExit(0)
+if not isinstance(proven, bool):
+    raise SystemExit(0)
+print(f"{version}|{source}|{'true' if proven else 'false'}")
+PY_OWUI_READ
+)"
+    if [ -n "$owui_existing_record" ]; then
+      owui_existing_version=${owui_existing_record%%|*}
+      owui_existing_rest=${owui_existing_record#*|}
+      owui_existing_source=${owui_existing_rest%%|*}
+      owui_existing_proven=${owui_existing_rest##*|}
+      owui_version_valid "$owui_existing_version" || owui_existing_version=''
+    fi
   fi
   if command -v curl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
     owui_previous_version="$(curl -fsS --connect-timeout 2 --max-time 3 http://127.0.0.1:3000/api/version 2>/dev/null | jq -r '.version // empty' 2>/dev/null || true)"
   fi
   owui_version_valid "$owui_previous_version" || owui_previous_version=''
-  # If an earlier package transaction already stopped Open WebUI but guided
-  # migration never completed, preserve the original captured runtime version
-  # rather than relabelling the still-old database with a newer package pin.
-  if [ -z "$owui_previous_version" ] && [ -n "$owui_existing_capture" ]; then
-    owui_previous_version=$owui_existing_capture
-  fi
-  if [ -z "$owui_previous_version" ] && [ -r /usr/share/bc250-llm-server/runtime.env ]; then
+  if [ -n "$owui_previous_version" ]; then
+    owui_previous_source=live-runtime
+    owui_previous_proven=true
+  # A proven capture from an interrupted earlier package transaction remains
+  # stronger than the old RPM's declared runtime pin. Legacy/plain 1.13 state
+  # is retained only as an unproven hint because its origin is ambiguous.
+  elif [ -n "$owui_existing_version" ]; then
+    owui_previous_version=$owui_existing_version
+    if [ "$owui_existing_proven" = true ]; then
+      owui_previous_source=previous-capture
+      owui_previous_proven=true
+    else
+      owui_previous_source=${owui_existing_source:-legacy-capture}
+      owui_previous_proven=false
+    fi
+  elif [ -r /usr/share/bc250-llm-server/runtime.env ]; then
     while IFS= read -r owui_runtime_line; do
       case "$owui_runtime_line" in
         BC250_OPEN_WEBUI_VERSION=*)
@@ -284,11 +334,29 @@ if [ "$1" -gt 1 ] && [ -f /var/lib/open-webui/webui.db ]; then
       esac
     done < /usr/share/bc250-llm-server/runtime.env
     owui_version_valid "$owui_previous_version" || owui_previous_version=''
+    if [ -n "$owui_previous_version" ]; then
+      owui_previous_source=old-package-hint
+      owui_previous_proven=false
+    fi
   fi
   if [ -n "$owui_previous_version" ]; then
     install -d -m 0750 /var/lib/bc250-llm-server
     owui_version_tmp="${owui_version_state}.tmp.$$"
-    (umask 077; printf '%s\n' "$owui_previous_version" > "$owui_version_tmp")
+    python3 - "$owui_version_tmp" "$owui_previous_version" "$owui_previous_source" "$owui_previous_proven" <<'PY_OWUI_WRITE'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+version, source, proven_text = sys.argv[2:5]
+document = {
+    "schema": 1,
+    "version": version,
+    "source": source,
+    "proven": proven_text == "true",
+}
+path.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY_OWUI_WRITE
     chmod 0600 "$owui_version_tmp"
     mv -f "$owui_version_tmp" "$owui_version_state"
   else
@@ -380,6 +448,7 @@ fi
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/openwebui-preupgrade-version
+%ghost %attr(0600,root,root) /var/lib/bc250-llm-server/preupgrade-package-modelfiles.json
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/package-gates
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/resilience
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/revalidation
@@ -416,6 +485,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sat Oct 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-1
+- Start the 0.20 product line with the refreshed DE/FR-first model tournament and Office - Generalist candidate while retaining the accepted 1.13 runtime/dependency baseline.
+- Add campaign infrastructure for external corpus characterization, Tika extraction, gold evidence, retrieval-only comparison/freeze and fixed-evidence replay without packaging the real PDF corpus.
+- Integrate reproduced model-quality findings: keep Qwen Advanced thinking enabled, set its request-level presence penalty to 1.5, retain Ornith with contract-first Bash qualification wording, and keep Translate-Gemma behind the fail-closed semantic guard.
+- Retain 1850 MHz as the normal hardware ceiling; keep 2000 MHz as an explicit operator experiment because prefill gains do not justify its thermal/power cost as a default.
 * Sat Oct 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.14.1-1.13
 - Carry forward the accepted 1.12 runtime baseline while rejecting semantically empty Tika/Open WebUI extraction as a clear ingestion failure.
 - Preserve known Open WebUI migration provenance and distinguish proven package Modelfile updates from local/unknown drift during upgrade reconciliation.

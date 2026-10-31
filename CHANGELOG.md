@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.0-1 - 2026-10-31
+
+- Start the new product-version line at `0.20.0-1`: `Version` now tracks BC-250 product milestones and RPM `Release` restarts at `1` for a new version; exact `0.14.1-1.13` remains the accepted predecessor baseline.
+- Refresh the role-specific model campaign against the 2026-10-31 upstream landscape: add official LFM3, Nemotron 3.5 Bolt, Index-Translate, LFM3-VL and Spark-X2.6 candidates together with bounded community/uncensored controls, while retiring nine experiments that no longer answer a live product question.
+- Add `Office - Generalist` as a curated 0.20.0 candidate backed by AtomicChat's uncensored Nemotron 3.5 Bolt E4B Q6_K; keep Qwen3.5 9B as the Advanced/Higher Quality implementation and preserve the accepted reasoning-enabled role.
+- Integrate reproduced Qwen Advanced DEVICE research by keeping `think=true` and changing only request-level `presence_penalty` from `0.0` to `1.5`; two independent intervention batches were 14/14 PASS, while `think=false` remains rejected by deterministic constraint failures.
+- Retain Ornith as the Agent default and make the canonical Bash qualification prompt contract-first: raw Bash only, no Markdown/backticks/fences/labels, exact `#!/usr/bin/env bash` first line. The final DEVICE closure passed the canonical Bash/Python/JSON mini-regression 3/3 with only the Bash wording changed.
+- Preserve the current Translate-Gemma model and fail-closed semantic authority; carry the three confirmed recommendation/negation/prohibition failure families into shared direct/Open WebUI regressions rather than restarting the retired EuroLLM comparison. Final DEVICE closure confirmed end-to-end withholding for the newly added temporal-polarity and prohibition→no-obligation failures.
+- Add external-data quality-campaign infrastructure for corpus inventory, Tika extraction scoring, gold-evidence validation, retrieval-only comparison/freeze and fixed-evidence replay without packaging the real PDF corpus.
+- Keep the 1850 MHz normal hardware ceiling. DEVICE A/B showed ~9% prefill gain but ~1% decode gain at 2000 MHz with materially higher power/temperature and a heavy-prefill thermal cutoff, so 2000 MHz remains operator-test-only.
+
 ## 0.14.1-1.13 - 2026-10-31
 
 - Carry forward the fully DEVICE-accepted 1.12 dependency/runtime baseline unchanged while hardening the Open WebUI/Tika ingestion boundary: missing, blank or `<No text content found>` extraction now fails with explicit no-usable-text guidance instead of being stored as successful knowledge content.
@@ -689,7 +700,7 @@
 - Correct storage accounting for protected roots, add canonical model/lane names to dedupe/prune output, record model identity in schema-3 sidecars, and skip only previously recorded unchanged dedupe pairs. Legacy/unrecorded pairs are reported without claiming physical reclaimability.
 - Preserve current production defaults, warm-main/task/embedding residency policy, exclusive agent topology, 16 MiB XFS dedupe ranges, harness-4.0 semantics and quality thresholds.
 
-## 0.11.0-1.14 - 2026-09-11
+## 0.11.0-0.20.0 - 2026-09-11
 
 - Harden translation candidate evidence before more real-device comparison: direct screening now uses a 1024-token default, model-appropriate Hunyuan/Translate-Gemma prompt contracts, numeric-value preservation, and correct `rc=3` propagation; authenticated Open WebUI screening adds request/resource telemetry, selected stable-field preset-delta checks, restoration verification, and credential scanning.
 - Make compact task candidate screens compare baseline and challenger on the same dedicated task Ollama runtime, record the effective title/tag/query budgets and `keep_alive=0` contract, preserve `rc=3`, reject unknown pre-existing temporary task registrations, and clean the task-lane candidate on exit.
