@@ -284,7 +284,10 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('standalone MTP artifacts are included in the same catalog overview', source)
         self.assertIn('MTP requires explicit selection', source)
         self.assertIn('Standalone MTP artifacts remain explicit opt-ins', source)
-        self.assertIn('Review or install optional models now? [y/N]:', source)
+        self.assertIn('Review, reconcile, or install optional models now? [y/N]:', source)
+        self.assertIn('Already-installed optional models may have package-owned registrations/Modelfiles reconciled', source)
+        self.assertIn('package-update=${package_update_count:-0}', source)
+        self.assertIn('local-drift=${local_drift_count:-0}', source)
         self.assertNotIn('bc250 model apply mtp', source)
         for old in ("BC250_PRODUCTION_SELECTION", "BC250_TASK_SELECTION", "BC250_AGENTIC_SELECTION", "BC250_EMBEDDING_SELECTION", "BC250_EXPERIMENT_SELECTION", "BC250_MTP_SELECTION"):
             self.assertNotIn(old, source)
@@ -983,6 +986,67 @@ step_11_maintenance
         self.assertIn("systemctl daemon-reload", hold_block)
         self.assertIn("public/boot publication remains held", source)
         self.assertIn("verified Open WebUI upgrade backup was not produced", source)
+
+    def test_rpm_preupgrade_captures_package_modelfile_provenance(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        pre = spec.split("%pre\n", 1)[1].split("%post\n", 1)[0]
+        self.assertIn("preupgrade-package-modelfiles.json", pre)
+        self.assertIn("directories=[module.PACKAGED_MODEL_DIR]", pre)
+        self.assertIn("/usr/libexec/bc250-llm-server/modelctl", pre)
+        self.assertIn("inspect_runtime_modelfile", pre)
+        self.assertIn('status != "current"', pre)
+        self.assertIn('"runtime_modelfiles": entries', pre)
+        self.assertIn("temporary.chmod(0o600)", pre)
+        self.assertIn("valid_entry", pre)
+
+    def test_rpm_preupgrade_captures_openwebui_version_before_stop(self) -> None:
+        spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
+        pre = spec.split("%pre\n", 1)[1].split("%post\n", 1)[0]
+        capture = pre.index("owui_previous_version=")
+        live_probe = pre.index("http://127.0.0.1:3000/api/version", capture)
+        preserve_capture = pre.index('owui_previous_version=$owui_existing_capture', live_probe)
+        packaged_fallback = pre.index("/usr/share/bc250-llm-server/runtime.env", preserve_capture)
+        write_capture = pre.index('> "$owui_version_tmp"', packaged_fallback)
+        stop = pre.index("systemctl stop open-webui.service", write_capture)
+        self.assertLess(capture, live_probe)
+        self.assertLess(live_probe, preserve_capture)
+        self.assertLess(preserve_capture, packaged_fallback)
+        self.assertLess(packaged_fallback, write_capture)
+        self.assertLess(write_capture, stop)
+        self.assertIn("BC250_OPEN_WEBUI_VERSION=", pre)
+        self.assertIn("owui_version_valid", pre)
+        self.assertIn("chmod 0600", pre)
+        self.assertIn('mv -f "$owui_version_tmp" "$owui_version_state"', pre)
+
+    def test_installer_uses_and_cleans_preupgrade_version_only_after_verified_backup(self) -> None:
+        source = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("openwebui_captured_previous_version()", source)
+        self.assertIn('current="$(openwebui_previous_version)"', source)
+        backup = source[
+            source.index("prepare_openwebui_migration_backup() {"):
+            source.index("step_8_application_services() {")
+        ]
+        verify = backup.index('[[ -f "$OWUI_UPGRADE_BACKUP" && -f "$OWUI_UPGRADE_BACKUP.sha256" ]]')
+        cleanup = backup.rindex('rm -f -- "$OWUI_PREUPGRADE_VERSION_FILE"')
+        self.assertLess(verify, cleanup)
+
+    def test_installer_previous_version_uses_valid_captured_state_when_live_probe_is_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp) / "previous-version"
+            state.write_text("0.12.4\n", encoding="utf-8")
+            body = (
+                f'OWUI_PREUPGRADE_VERSION_FILE="{state}"\n'
+                "openwebui_running_version() { return 0; }\n"
+                "openwebui_previous_version\n"
+            )
+            result = source_probe(body)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(result.stdout.strip(), "0.12.4")
+
+            state.write_text("bad version / injection\n", encoding="utf-8")
+            result = source_probe(body)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(result.stdout.strip(), "")
 
     def test_openwebui_upgrade_backup_is_full_stopped_state_and_self_verified(self) -> None:
         source = (ROOT / "cmd/maintenance/backup-upgrade-state.sh").read_text(encoding="utf-8")

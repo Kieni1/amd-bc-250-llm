@@ -68,8 +68,10 @@ into the profile: the rendered Modelfile remains their authority.
 
 Read-only installed-state inspection. It reports definition origin, verified
 source/provenance state, runtime Modelfile drift, registration state and an
-overall `CURRENT`, `MISSING`, `DRIFT` or `UNKNOWN` result. It requires root
+overall `CURRENT`, `MISSING`, `PACKAGE UPDATE PENDING`, `DRIFT` or `UNKNOWN` result. It requires root
 because manager-owned GGUF/state directories are protected.
+
+On RPM upgrade, `%pre` records hashes only for runtime Modelfiles that the previously installed package can prove still match its own rendered definition. If the new package changes that definition and source/registration remain current, `status` reports `PACKAGE UPDATE PENDING`. A runtime file that does not match the captured package hash is never relabelled as expected convergence; it remains `DRIFT`/local-or-unknown. The provenance record is advisory state and does not override source, registration or ownership checks.
 
 During the pre-1.0 greenfield phase, all active package model sources use `tracking`; the `pinned`
 policy remains part of the contract for the later 1.0 stabilization step. Schema-4 state separates `configured_ref` from acquired identity. A valid tracking artifact remains current across a pinned→tracking/ref migration during ordinary `apply`; metadata is upgraded in place and only `refresh` advances the moving source.

@@ -57,6 +57,7 @@ OPERATOR_MODEL_DIR = INSTALLED_CONFIG / "models.d"
 RETIRED_CATALOG = INSTALLED_SHARE / "retired-models.json"
 MODEL_CATALOG = INSTALLED_SHARE / "model-catalog.json"
 MODEL_PROFILES = INSTALLED_SHARE / "model-profiles.json"
+PREUPGRADE_MODELFILE_STATE = Path(f"/var/lib/{PROJECT}/preupgrade-package-modelfiles.json")
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
@@ -136,6 +137,7 @@ class ModelInspection:
     overall_status: str
     remote_status: str = "not checked"
     remote_detail: str = ""
+    modelfile_drift_kind: str = ""
 
 
 def set_appliance_mode(mode: str) -> None:
@@ -1378,6 +1380,39 @@ def status_token(token_file: Path | None) -> str:
     return os.environ.get("HF_TOKEN", "").strip()
 
 
+def preupgrade_modelfile_state_path() -> Path:
+    override = os.environ.get("BC250_PREUPGRADE_MODELFILE_STATE", "").strip()
+    return Path(override) if override else PREUPGRADE_MODELFILE_STATE
+
+
+def package_modelfile_update_pending(model: dict, runtime: Path | None) -> bool:
+    """Return True only when pre-upgrade evidence proves package-owned drift."""
+    if runtime is None or not runtime.is_file():
+        return False
+    state_path = preupgrade_modelfile_state_path()
+    try:
+        document = json.loads(state_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(document, dict) or document.get("schema") != 1:
+        return False
+    entries = document.get("runtime_modelfiles")
+    if not isinstance(entries, dict):
+        return False
+    entry = entries.get(str(runtime))
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("model_id") != model.get("id") or entry.get("category") != model.get("category"):
+        return False
+    recorded = entry.get("sha256")
+    if not isinstance(recorded, str) or re.fullmatch(r"[0-9a-f]{64}", recorded) is None:
+        return False
+    try:
+        return sha256(runtime) == recorded
+    except OSError:
+        return False
+
+
 def inspect_model_state(
     defaults: dict,
     model: dict,
@@ -1406,6 +1441,13 @@ def inspect_model_state(
     modelfile_status, _modelfile_detail = inspect_runtime_modelfile(
         model, runtime, output
     )
+    modelfile_drift_kind = ""
+    if modelfile_status == "drift":
+        modelfile_drift_kind = (
+            "package-update"
+            if package_modelfile_update_pending(model, runtime)
+            else "local-or-unknown"
+        )
 
     if model["provider"] == "download-only":
         registration_status = "not applicable"
@@ -1431,6 +1473,13 @@ def inspect_model_state(
         overall = "OPTIONAL"
     elif source_status == "missing":
         overall = "MISSING"
+    elif (
+        modelfile_status == "drift"
+        and modelfile_drift_kind == "package-update"
+        and source_status in {"current", "ollama-managed"}
+        and registration_status == "current"
+    ):
+        overall = "PACKAGE UPDATE PENDING"
     elif "drift" in statuses or "missing" in statuses:
         overall = "DRIFT"
     elif "unavailable" in statuses:
@@ -1478,6 +1527,7 @@ def inspect_model_state(
         overall_status=overall,
         remote_status=remote_status,
         remote_detail=remote_detail,
+        modelfile_drift_kind=modelfile_drift_kind,
     )
 
 
@@ -2866,7 +2916,7 @@ def recommended_status_action(inspection: ModelInspection) -> str | None:
         if category == "mtp" and not model.get("enabled", False):
             return f"sudo bc250 model refresh mtp {name} --include-disabled"
         return f"sudo bc250 model refresh {category} {name}"
-    if inspection.overall_status in {"MISSING", "DRIFT"}:
+    if inspection.overall_status in {"MISSING", "DRIFT", "PACKAGE UPDATE PENDING"}:
         if category == "mtp" and not model.get("enabled", False):
             return f"sudo bc250 advanced mtp prepare {name}"
         return f"sudo bc250 model apply {category} {name}"
@@ -2893,6 +2943,8 @@ def compact_inspection_details(inspection: ModelInspection) -> list[str]:
         return ["agent lane inactive", "deferred"]
     if inspection.overall_status == "CURRENT":
         return ["CURRENT"]
+    if inspection.overall_status == "PACKAGE UPDATE PENDING":
+        return ["PACKAGE UPDATE PENDING"]
     if inspection.overall_status == "OPTIONAL":
         if inspection.registration_status == "unavailable":
             if inspection.source_status in {"current", "drift"}:
@@ -2915,7 +2967,11 @@ def compact_inspection_details(inspection: ModelInspection) -> list[str]:
         modelfile = {
             "current": "Modelfile current",
             "missing": "Modelfile missing",
-            "drift": "Modelfile drift",
+            "drift": (
+                "package Modelfile update pending"
+                if inspection.modelfile_drift_kind == "package-update"
+                else "local/unknown Modelfile drift"
+            ),
             "unavailable": "Modelfile unavailable",
         }.get(inspection.modelfile_status, f"Modelfile {inspection.modelfile_status}")
         details.append(modelfile)

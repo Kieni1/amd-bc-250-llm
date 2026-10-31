@@ -73,6 +73,96 @@ class StateTests(unittest.TestCase):
             self.assertEqual(drift.overall_status, "DRIFT")
             self.assertEqual(drift.modelfile_status, "drift")
 
+
+    def test_modelfile_drift_distinguishes_proven_package_update_from_local_change(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "model.gguf"
+            source.write_bytes(b"weights")
+            old_template = root / "old.Modelfile"
+            old_template.write_text(
+                "# BC250 category: production\n"
+                "# Ollama model: prod-test\n"
+                "FROM __BC250_SOURCE__\n"
+                "PARAMETER num_gpu 99\n"
+                "PARAMETER num_keep 256\n"
+                "PARAMETER temperature 0.7\n",
+                encoding="utf-8",
+            )
+            new_template = root / "prod-test.Modelfile"
+            new_template.write_text(
+                old_template.read_text(encoding="utf-8").replace(
+                    "PARAMETER temperature 0.7", "PARAMETER temperature 1.0"
+                ),
+                encoding="utf-8",
+            )
+            model = {
+                "id": "prod-test", "name": "prod-test", "category": "production",
+                "provider": "ollama", "repository": "example/model",
+                "revision": "latest", "gguf": source.name, "sha256": "",
+                "template": new_template, "modelfile": new_template.name,
+                "origin": "packaged", "from": str(source),
+            }
+            with patch.object(modelctl.os, "chown"), patch.object(modelctl.os, "chmod"):
+                modelctl.write_state(
+                    modelctl.state_path(source), model, modelctl.sha256(source), 1
+                )
+            runtime_root = root / "runtime"
+            runtime_root.mkdir()
+            runtime = runtime_root / new_template.name
+            runtime.write_text(
+                modelctl.rendered_modelfile_content(old_template, model, source),
+                encoding="utf-8",
+            )
+            provenance = root / "preupgrade.json"
+            provenance.write_text(
+                json.dumps(
+                    {
+                        "schema": 1,
+                        "runtime_modelfiles": {
+                            str(runtime): {
+                                "model_id": "prod-test",
+                                "category": "production",
+                                "sha256": modelctl.sha256(runtime),
+                            }
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            defaults = {
+                "destination": str(root),
+                "modelfile_destination": str(runtime_root),
+                "ollama_host": "127.0.0.1:11434",
+            }
+            with patch.dict(
+                os.environ, {"BC250_PREUPGRADE_MODELFILE_STATE": str(provenance)}
+            ):
+                pending = modelctl.inspect_model_state(
+                    defaults, model, registrations={"prod-test"}
+                )
+                self.assertEqual(pending.overall_status, "PACKAGE UPDATE PENDING")
+                self.assertEqual(pending.modelfile_drift_kind, "package-update")
+                self.assertEqual(
+                    modelctl.compact_inspection_details(pending),
+                    ["PACKAGE UPDATE PENDING"],
+                )
+                self.assertEqual(
+                    modelctl.recommended_status_action(pending),
+                    "sudo bc250 model apply production prod-test",
+                )
+
+                runtime.write_text("FROM /operator/modified.gguf\n", encoding="utf-8")
+                local = modelctl.inspect_model_state(
+                    defaults, model, registrations={"prod-test"}
+                )
+                self.assertEqual(local.overall_status, "DRIFT")
+                self.assertEqual(local.modelfile_drift_kind, "local-or-unknown")
+                self.assertIn(
+                    "local/unknown Modelfile drift",
+                    modelctl.compact_inspection_details(local),
+                )
+
     def test_apply_migrates_legacy_pinned_state_without_refreshing_tracking_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

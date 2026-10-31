@@ -32,6 +32,7 @@ BACKUP_EXPORT_STATE="NOT CONFIGURED (optional)"
 HF_SESSION_FILE="$RUNTIME_DIR/install-hf-session"
 OWUI_SETUP_STATE="not-run"
 OWUI_UPGRADE_BACKUP=""
+OWUI_PREUPGRADE_VERSION_FILE="${BC250_OWUI_PREUPGRADE_VERSION_FILE:-/var/lib/bc250-llm-server/openwebui-preupgrade-version}"
 
 terminal_color_enabled() { [[ -t 1 && ${TERM:-dumb} != dumb && -z ${NO_COLOR:-} ]]; }
 completion_emphasis_begin() {
@@ -424,23 +425,25 @@ step_7_models() {
   echo "Standalone MTP artifacts remain explicit opt-ins; broad groups never acquire them."
   local selection="${BC250_MODEL_SELECTION:-}" review=""
   if input_is_interactive && [[ "${BC250_ASSUME_YES:-0}" != 1 && -z "$selection" ]]; then
-    read -r -p "Review or install optional models now? [y/N]: " review
+    echo "Already-installed optional models may have package-owned registrations/Modelfiles reconciled; validated model data is reused where possible."
+    read -r -p "Review, reconcile, or install optional models now? [y/N]: " review
     case "${review,,}" in
       y|yes)
         echo
         echo "Checking optional model state in parallel; standalone MTP artifacts are included in the same catalog overview. This may take several minutes. Please wait..."
-        local optional_status current_count optional_count unavailable_count drift_count deferred_count
+        local optional_status current_count optional_count unavailable_count package_update_count local_drift_count deferred_count
         local mtp_ready_count mtp_missing_count mtp_drift_count
         optional_status="$(bc250 model status all --include-disabled --compact 2>&1 || true)"
         current_count="$(grep -c '\[CURRENT\]' <<< "$optional_status" || true)"
         optional_count="$(grep -c '\[OPTIONAL' <<< "$optional_status" || true)"
         unavailable_count="$(grep -ci '\[OPTIONAL, registration unavailable\]' <<< "$optional_status" || true)"
-        drift_count="$(grep -c '\[DRIFT' <<< "$optional_status" || true)"
+        package_update_count="$(grep -c '\[PACKAGE UPDATE PENDING' <<< "$optional_status" || true)"
+        local_drift_count="$(grep -c '\[DRIFT' <<< "$optional_status" || true)"
         deferred_count="$(grep -ci 'deferred' <<< "$optional_status" || true)"
         mtp_ready_count="$(grep -c '\[FETCHED, VERIFIED\]' <<< "$optional_status" || true)"
         mtp_missing_count="$(grep -c '\[NOT FETCHED\]' <<< "$optional_status" || true)"
         mtp_drift_count="$(grep -c '\[SOURCE DRIFT\]' <<< "$optional_status" || true)"
-        echo "Ollama status: current=${current_count:-0} optional=${optional_count:-0} selected drift=${drift_count:-0} deferred=${deferred_count:-0}"
+        echo "Ollama status: current=${current_count:-0} optional=${optional_count:-0} package-update=${package_update_count:-0} local-drift=${local_drift_count:-0} deferred=${deferred_count:-0}"
         echo "MTP status: ready=${mtp_ready_count:-0} not-fetched=${mtp_missing_count:-0} source-drift=${mtp_drift_count:-0}"
         ((unavailable_count == 0)) || echo "  Optional catalog entries unavailable for registration: ${unavailable_count} (non-blocking)"
         echo "Model catalog/status:"
@@ -607,13 +610,31 @@ openwebui_running_version() {
     jq -r '.version // empty' 2>/dev/null || true
 }
 
+openwebui_captured_previous_version() {
+  local value=''
+  [[ -r "$OWUI_PREUPGRADE_VERSION_FILE" ]] || return 0
+  IFS= read -r value < "$OWUI_PREUPGRADE_VERSION_FILE" || true
+  [[ "$value" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$ ]] || return 0
+  printf '%s\n' "$value"
+}
+
+openwebui_previous_version() {
+  local current=''
+  current="$(openwebui_running_version)"
+  if [[ -z "$current" ]]; then
+    current="$(openwebui_captured_previous_version)"
+  fi
+  printf '%s\n' "$current"
+}
+
 prepare_openwebui_migration_backup() {
   local data="${OWUI_DATA:-/var/lib/open-webui}" db current helper output
   db="${OWUI_DB:-$data/webui.db}"
   [[ -f "$db" ]] || return 0
-  current="$(openwebui_running_version)"
+  current="$(openwebui_previous_version)"
   if [[ -n "$current" && "$current" == "$BC250_OPEN_WEBUI_VERSION" ]]; then
     echo "Open WebUI data is already running on $current; migration rollback snapshot not required."
+    rm -f -- "$OWUI_PREUPGRADE_VERSION_FILE"
     return 0
   fi
   helper="$(openwebui_upgrade_backup_helper)"
@@ -635,6 +656,7 @@ prepare_openwebui_migration_backup() {
     echo "ERROR: verified Open WebUI upgrade backup was not produced." >&2
     return 1
   }
+  rm -f -- "$OWUI_PREUPGRADE_VERSION_FILE"
 }
 
 step_8_application_services() {

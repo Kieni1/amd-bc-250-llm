@@ -40,8 +40,8 @@ form is the machine-readable contract; the human display is convenience output. 
 read-only fleet/runtime-state view and normally needs `sudo` for the protected GGUF/state tree.
 It reports source/provenance validity, Modelfile drift and registration state. Intentionally
 unselected optional models are `OPTIONAL`, with a distinction between not installed and source
-cached/not registered; they do not receive repair advice until explicitly selected. `DRIFT` is
-reserved for desired runtime state that is actually unmet. `--online` checks moving upstream
+cached/not registered; they do not receive repair advice until explicitly selected. `PACKAGE UPDATE PENDING` identifies a selected model whose only Modelfile mismatch is proven to be an older package-generated definition captured before upgrade. `DRIFT` is
+reserved for desired runtime state that is otherwise missing, locally modified, or not provably package-originated. `--online` checks moving upstream
 revisions without mutating local state; normal status output points to that option when upstream
 state was not checked. `--verbose` adds source repository/revision/SHA and resolved paths.
 `--compact` uses the same inspector for one-line state output. Fully current ordinary entries

@@ -91,7 +91,9 @@ lane is shown as deferred without waiting on that stopped Ollama instance, and M
 source state such as `[FETCHED, VERIFIED]` / `[NOT FETCHED]`. An explicit MTP ID/index/range selection
 prepares and verifies the download-only GGUF; it does not register Ollama or start llama.cpp. Broad
 `recommended`, `production` and `all` selections exclude MTP, as do generic combined `apply all` /
-`refresh all`. Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter
+`refresh all`. The optional prompt explicitly says **review, reconcile, or install** because already-installed
+optional models may need a package-owned registration/Modelfile update after an RPM upgrade; verified
+model data is reused wherever possible. Use global indexes, ranges, exact names, `recommended`, `production` or `all`; Enter
 skips optional extras only. `bc250 advanced mtp prepare ID` remains the direct specialist path.
 For non-TTY runs use `BC250_MODEL_SELECTION`. The original stdin mode is retained
 across transcript PTY creation, so unattended runs never become interactive by

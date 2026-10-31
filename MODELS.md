@@ -75,8 +75,7 @@ inspection command: it reports source/provenance validity, current-definition an
 runtime-Modelfile drift, registration state and a recommended reconciliation action.
 Intentionally unselected optional models are reported as `OPTIONAL — not installed` or
 `OPTIONAL — source cached, not registered`. Cached source bytes alone do not create desired
-active state and do not trigger an apply/refresh recommendation. `DRIFT` is reserved for a
-selected/desired runtime definition whose registration or content is actually missing or inconsistent.
+active state and do not trigger an apply/refresh recommendation. `PACKAGE UPDATE PENDING` is used when pre-upgrade evidence proves the selected runtime Modelfile still matched the prior package and the new package definition is the only mismatch. `DRIFT` remains reserved for selected/desired runtime state that is missing, locally changed, or otherwise inconsistent.
 `--online` additionally checks moving upstream revisions without mutating local state.
 In normal mode the agent Ollama API is intentionally stopped, so full read-only
 `status agentic MODEL` may report registration as unavailable/UNKNOWN. That is not a reason
