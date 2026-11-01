@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 PROJECT = "bc250-llm-server"
@@ -124,6 +124,20 @@ def validate_model_catalog_document(
         filename = _require_string(source_info, "filename", f"{context}: source")
         if Path(filename).name != filename or filename in {".", ".."}:
             raise ModelContractError(f"{context}: source filename must be a filename")
+        remote_path_value = source_info.get("remote_path", filename)
+        if not isinstance(remote_path_value, str) or not remote_path_value:
+            raise ModelContractError(f"{context}: source remote_path must be a non-empty string")
+        remote_path = PurePosixPath(remote_path_value)
+        if (
+            remote_path.is_absolute()
+            or "\\" in remote_path_value
+            or any(part in {"", ".", ".."} for part in remote_path.parts)
+            or remote_path.name != filename
+        ):
+            raise ModelContractError(
+                f"{context}: source remote_path must be a safe relative repository path "
+                "ending in filename"
+            )
         digest = source_info.get("expected_sha256", "")
         if not isinstance(digest, str) or (digest and re.fullmatch(r"[0-9a-f]{64}", digest) is None):
             raise ModelContractError(f"{context}: invalid expected_sha256")
@@ -154,6 +168,10 @@ def validate_model_catalog_document(
                     f"{context}: local_path must be absolute and end in filename"
                 )
         else:
+            if "remote_path" in source_info:
+                raise ModelContractError(
+                    f"{context}: ollama-hf sources use provider_ref, not remote_path"
+                )
             provider_ref = _require_string(source_info, "provider_ref", f"{context}: source")
             remote = re.fullmatch(
                 r"hf\.co/(?P<repository>[^/\s]+/[^/:\s]+):[^\s]+", provider_ref

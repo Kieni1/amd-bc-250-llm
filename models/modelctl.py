@@ -316,6 +316,7 @@ def load_packaged_model(path: Path, model_id: str, entry: dict) -> dict:
         "repository": source["repository"],
         "revision": source["revision"],
         "gguf": source["filename"],
+        "remote_path": source.get("remote_path", source["filename"]),
         "sha256": source.get("expected_sha256", ""),
         "from": runtime_from,
         "modelfile": entry["runtime"]["modelfile"],
@@ -1213,6 +1214,10 @@ def inspect_local_source(state: dict, model: dict, output: Path) -> tuple[str, s
         for key in ("repository", "gguf")
         if state.get(key) != model.get(key)
     ]
+    if state.get("remote_path", state.get("gguf")) != model.get(
+        "remote_path", model.get("gguf")
+    ):
+        changed.append("remote_path")
     if policy == "pinned":
         state_ref = state.get("configured_ref", state.get("revision"))
         if state_ref != model.get("revision"):
@@ -1327,8 +1332,8 @@ def remote_file_sha256(model: dict, token: str = "") -> str:
     revision = "main" if model["revision"] == "latest" else model["revision"]
     repository = urllib.parse.quote(model["repository"], safe="/")
     revision_q = urllib.parse.quote(revision, safe="")
-    filename = urllib.parse.quote(model["gguf"], safe="")
-    url = f"https://huggingface.co/{repository}/resolve/{revision_q}/{filename}"
+    remote_path = urllib.parse.quote(model.get("remote_path", model["gguf"]), safe="/")
+    url = f"https://huggingface.co/{repository}/resolve/{revision_q}/{remote_path}"
     headers = {"User-Agent": f"{PROJECT}/model-status"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
@@ -1634,6 +1639,7 @@ def write_state(
         "resolved_revision": resolved_revision,
         "source_policy": policy,
         "gguf": model["gguf"],
+        "remote_path": model.get("remote_path", model["gguf"]),
         "sha256": checksum,
         "acquired_sha256": checksum,
         "size": stat_result.st_size,
@@ -2069,6 +2075,8 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                     state.get("schema") != 4
                     or state.get("configured_ref") != model.get("revision")
                     or state.get("source_policy") != source_policy(model)
+                    or state.get("remote_path", state.get("gguf"))
+                    != model.get("remote_path", model.get("gguf"))
                     or state.get("acquired_sha256") != checksum
                     or state.get("size") != current.st_size
                     or state.get("mtime_ns") != current.st_mtime_ns
@@ -2101,7 +2109,8 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                     )
                 staging = download_root / model["id"]
                 ensure_directory(staging, uid, gid)
-                staged = staging / model["gguf"]
+                remote_path = model.get("remote_path", model["gguf"])
+                staged = staging / remote_path
                 staged.unlink(missing_ok=True)
                 if token is None:
                     session = getattr(args, "hf_session", None)
@@ -2112,13 +2121,13 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                         if isinstance(session, dict):
                             session["resolved"] = True
                             session["token"] = token
-                command = [hf_bin, "download", model["repository"], model["gguf"]]
+                command = [hf_bin, "download", model["repository"], remote_path]
                 if model["revision"] != "latest":
                     command.extend(("--revision", model["revision"]))
                 command.extend(("--local-dir", str(staging)))
                 print(
                     f"    downloading {model['repository']} @ {model['revision']}: "
-                    f"{model['gguf']}"
+                    f"{remote_path}"
                 )
                 if (
                     run_as_ollama(

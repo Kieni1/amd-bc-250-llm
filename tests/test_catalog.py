@@ -146,6 +146,146 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(modelctl.ModelError, "ownership does not match ollama-hf provider contract"):
                 modelctl.load_model_catalog(path)
 
+    def test_manager_owned_remote_path_is_safe_and_used_by_nemotron(self) -> None:
+        document = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
+        model_id = "prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k"
+        entry = document["models"][model_id]
+        source = entry["source"]
+        remote_path = (
+            "NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K/"
+            "NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K-00001-of-00001.gguf"
+        )
+        self.assertEqual(entry["provider"], "ollama")
+        self.assertEqual(
+            entry["ownership"],
+            {"registration": "bc250", "source": "bc250", "state": "bc250"},
+        )
+        self.assertEqual(source["remote_path"], remote_path)
+        self.assertEqual(Path(source["remote_path"]).name, source["filename"])
+
+        discovered = {model["name"]: model for model in modelctl.discover_models([MODELFILES])}
+        model = discovered[model_id]
+        self.assertEqual(model["remote_path"], remote_path)
+        self.assertEqual(model["from"], source["local_path"])
+
+        for invalid in (
+            "../" + source["filename"],
+            f"nested/../{source['filename']}",
+            "nested/other.gguf",
+        ):
+            with self.subTest(remote_path=invalid), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "model-catalog.json"
+                broken = json.loads(json.dumps(document))
+                broken["models"][model_id]["source"]["remote_path"] = invalid
+                path.write_text(json.dumps(broken), encoding="utf-8")
+                with self.assertRaisesRegex(
+                    modelctl.ModelError,
+                    "remote_path must be a safe relative repository path",
+                ):
+                    modelctl.load_model_catalog(path)
+
+    def test_apply_manager_owned_nested_remote_path_uses_hf_repository_path(self) -> None:
+        remote_path = "nested/model.gguf"
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            output = root / "models" / "model.gguf"
+            runtime = root / "runtime" / "prod-test.Modelfile"
+            template = root / "template.Modelfile"
+            template.write_text(
+                "FROM __BC250_SOURCE__\n"
+                "PARAMETER num_gpu 99\n"
+                "PARAMETER num_keep 256\n",
+                encoding="utf-8",
+            )
+            model = {
+                "id": "prod-test",
+                "name": "prod-test",
+                "category": "production",
+                "provider": "ollama",
+                "origin": "packaged",
+                "repository": "example/repo",
+                "revision": "latest",
+                "gguf": "model.gguf",
+                "remote_path": remote_path,
+                "sha256": "",
+                "source_metadata": {"policy": "tracking"},
+                "template": template,
+                "modelfile": "prod-test.Modelfile",
+            }
+            defaults = {
+                "category": "production",
+                "download_namespace": "production",
+                "ollama_host": "127.0.0.1:11434",
+                "min_free_bytes": 0,
+            }
+            inspection = modelctl.ModelInspection(
+                model=model,
+                source_path=output,
+                state_path=output.with_name("model.gguf.bc250.json"),
+                source_status="missing",
+                source_detail="missing",
+                source_checksum="",
+                runtime_modelfile=runtime,
+                modelfile_status="missing",
+                registration_status="missing",
+                overall_status="DRIFT",
+            )
+            args = argparse.Namespace(
+                command="apply", revision=None, sha256=None, host=None, destination=None,
+                min_free_bytes=None, token_file=None, hf_session={"resolved": False, "token": ""},
+            )
+            completed = modelctl.subprocess.CompletedProcess(["tool"], 0)
+            commands: list[list[str]] = []
+
+            def run(command, _environment, *, terminal=False):
+                commands.append(command)
+                if len(command) > 1 and command[1] == "download":
+                    local_dir = Path(command[command.index("--local-dir") + 1])
+                    staged = local_dir / remote_path
+                    staged.parent.mkdir(parents=True, exist_ok=True)
+                    staged.write_bytes(b"gguf")
+                return completed
+
+            with (
+                patch.dict(os.environ, {
+                    "DOWNLOAD_DIR": str(root / "downloads"),
+                    "HF_HOME": str(root / "hf"),
+                }),
+                patch.object(modelctl.os, "geteuid", return_value=0),
+                patch.object(modelctl, "ollama_identity", return_value=(1000, 1000)),
+                patch.object(modelctl, "command_path", side_effect=lambda name: f"/usr/bin/{name}"),
+                patch.object(modelctl, "registered_models", return_value=set()),
+                patch.object(modelctl, "inspect_model_state", return_value=inspection),
+                patch.object(
+                    modelctl.shutil,
+                    "disk_usage",
+                    return_value=shutil._ntuple_diskusage(10**12, 0, 10**12),
+                ),
+                patch.object(modelctl, "hf_token", return_value=""),
+                patch.object(modelctl, "run_as_ollama", side_effect=run),
+                patch.object(modelctl, "sha256", return_value="a" * 64),
+                patch.object(modelctl, "atomic_replace"),
+                patch.object(modelctl, "ensure_file_permissions", return_value=False),
+                patch.object(modelctl, "write_state"),
+                patch.object(modelctl, "write_runtime_modelfile", return_value=True),
+                patch.object(modelctl, "consume_preupgrade_modelfile_provenance"),
+                patch.object(modelctl.os, "chown"),
+                patch.object(modelctl.os, "chmod"),
+            ):
+                self.assertEqual(modelctl.apply_models(defaults, [model], args), 0)
+
+            self.assertEqual(
+                commands[0],
+                [
+                    "/usr/bin/hf", "download", "example/repo", remote_path,
+                    "--local-dir", str(root / "downloads" / "prod-test"),
+                ],
+            )
+            self.assertEqual(
+                commands[1],
+                ["/usr/bin/ollama", "create", "prod-test", "-f", str(runtime)],
+            )
+
     def test_agent_prepare_requirement_is_derived_from_runtime_lane_category(self) -> None:
         document = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
         model_id = "exp-granite42-3b-ibm-q6-k"
@@ -1145,6 +1285,43 @@ class SelectionTests(unittest.TestCase):
 
 
 class StatusTests(unittest.TestCase):
+    def test_manager_owned_remote_path_is_part_of_source_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "model.gguf"
+            output.write_bytes(b"gguf")
+            stat_result = output.stat()
+            checksum = modelctl.sha256(output)
+            model = {
+                "id": "prod-test",
+                "name": "prod-test",
+                "category": "production",
+                "provider": "ollama",
+                "repository": "example/repo",
+                "revision": "latest",
+                "gguf": "model.gguf",
+                "remote_path": "new/model.gguf",
+                "sha256": "",
+                "source_metadata": {"policy": "tracking"},
+            }
+            state = {
+                "schema": 4,
+                "repository": "example/repo",
+                "revision": "latest",
+                "configured_ref": "latest",
+                "source_policy": "tracking",
+                "gguf": "model.gguf",
+                "remote_path": "old/model.gguf",
+                "sha256": checksum,
+                "acquired_sha256": checksum,
+                "size": stat_result.st_size,
+                "mtime_ns": stat_result.st_mtime_ns,
+                "ctime_ns": stat_result.st_ctime_ns,
+            }
+            status, detail, recorded = modelctl.inspect_local_source(state, model, output)
+        self.assertEqual(status, "drift")
+        self.assertIn("remote_path", detail)
+        self.assertEqual(recorded, checksum)
+
     def test_compact_status_exposes_state_rich_picker_labels(self) -> None:
         model = {
             "id": "prod-test",
