@@ -29,7 +29,7 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. Product milestones advance `Version`; each new product version starts at `Release: 1`. Packaging-only rebuilds/fixes increment `Release` (`0.20.0-2`, `0.20.0-3`), product bugfixes increment the patch version (`0.20.1-1`), and later feature milestones increment the minor version (`0.21.0-1`). Do not move backward in RPM version ordering and do not introduce an `Epoch` merely to rename pre-1.0 milestones. Exact `bc250-llm-server-0.14.1-1.13.fc44.x86_64` remains the accepted predecessor baseline; the next source candidate is `bc250-llm-server-0.20.0-1`.
+Use normal RPM `Version` / `Release` identity. Product milestones advance `Version`; each new product version starts at `Release: 1`. Packaging-only rebuilds/fixes increment `Release` (`0.20.0-2`, `0.20.0-3`), product bugfixes increment the patch version (`0.20.1-1`), and later feature milestones increment the minor version (`0.21.0-1`). Do not move backward in RPM version ordering and do not introduce an `Epoch` merely to rename pre-1.0 milestones. Exact `bc250-llm-server-0.14.1-1.13.fc44.x86_64` remains the accepted predecessor baseline; the next source candidate is `bc250-llm-server-0.20.0-2`.
 
 ## Validation and build boundary
 

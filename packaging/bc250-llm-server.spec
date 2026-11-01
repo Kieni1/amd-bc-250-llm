@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.20.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -485,6 +485,10 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Nov 01 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-2
+- Correct Office - Generalist acquisition after DEVICE convergence showed Ollama 0.40.13 rejects AtomicChat's nested AD-Q6_K registry tag as a sharded GGUF.
+- Download the exact nested Hugging Face GGUF under BC-250 manager ownership, record its repository path and acquired digest, and register the local file with Ollama.
+- Keep the selected Nemotron weights, model ID, sampler, Open WebUI role policy and all other 0.20.0 behavior unchanged.
 * Sat Oct 31 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-1
 - Start the 0.20 product line with the refreshed DE/FR-first model tournament and Office - Generalist candidate while retaining the accepted 1.13 runtime/dependency baseline.
 - Add campaign infrastructure for external corpus characterization, Tika extraction, gold evidence, retrieval-only comparison/freeze and fixed-evidence replay without packaging the real PDF corpus.
