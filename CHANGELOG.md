@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.0-2 - 2026-11-01
+
+- Correct the Office - Generalist acquisition defect found on the first 0.20.0 DEVICE convergence: Ollama 0.40.13 rejects AtomicChat's `AD-Q6_K` registry tag because the GGUF is stored under a shard-style repository directory.
+- Switch only that candidate from Ollama-managed registry pulling to BC-250-managed Hugging Face acquisition of the exact nested Q6_K GGUF, preserving local SHA-256/state provenance before Ollama registration.
+- Extend the shared model source contract with an optional safe relative `remote_path` for manager-owned repository files whose remote location differs from the canonical local basename; bind download, online SHA lookup and source-state drift detection to that path.
+- Keep the Generalist model ID, selected weights, runtime sampler, `think=false` request policy, 4096 output ceiling and all other 0.20.0 product behavior unchanged. `0.20.0-1` remains BUILD evidence only and is not DEVICE-accepted.
+
 ## 0.20.0-1 - 2026-10-31
 
 - Start the new product-version line at `0.20.0-1`: `Version` now tracks BC-250 product milestones and RPM `Release` restarts at `1` for a new version; exact `0.14.1-1.13` remains the accepted predecessor baseline.
