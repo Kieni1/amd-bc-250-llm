@@ -6,37 +6,37 @@
     "selection_record": "release-selection.json",
     "workflow": ".github/workflows/build-rpm.yml"
   },
-  "current_batch": "0.20.0-1 source freeze complete in main-chat preparation; exact Source0/spec inputs are the next authoritative build inputs.",
+  "current_batch": "0.20.0-2 source correction integrated after the 0.20.0-1 DEVICE convergence defect; exact corrected inputs are the next authoritative build candidate.",
   "history": {
     "note": "Detailed reconstruction/GFX history is intentionally not active state. Compact rationale is retained under development/handovers/archive and Git history."
   },
   "kind": "release-workbench",
   "long_term": {
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses",
-    "direction": "stock-first local office AI appliance; exact 0.14.1-1.13 remains DEVICE-accepted with the 1.12-qualified Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline, while 0.20.0-1 is the next source candidate with the refreshed quality-campaign/model surface.",
+    "direction": "stock-first local office AI appliance; exact 0.14.1-1.13 remains DEVICE-accepted with the 1.12-qualified Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline, while 0.20.0-2 is the next source candidate with the refreshed quality-campaign/model surface.",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "0.20.0-1 source is reconciled and frozen for release preparation: Steps 3-9 quality-campaign/retrieval contracts, refreshed official/community model set, Office - Generalist, Qwen Advanced presence_penalty=1.5, contract-first Ornith Bash policy, and final translation containment closure are integrated.",
-    "integration": "Retain accepted Standard/Documents/Deep/Translation/task/embedding controls and Qwen think=true. Office - Generalist remains a new AtomicChat Nemotron candidate; Qwen Advanced changes only presence_penalty 0.0 -> 1.5; Ornith remains Agent default with contract-first Bash qualification wording; Translate-Gemma retains the fail-closed guard covering all three confirmed semantic weakness families.",
-    "next_batch": "Build exact frozen 0.20.0-1 through the authoritative GitHub/Fedora 44 workflow, then run focused DEVICE confirmation on those exact bytes before corpus/Tika/gold/retrieval execution."
+    "current_batch": "0.20.0-2 corrects the Generalist acquisition path discovered during 0.20.0-1 DEVICE convergence while retaining the integrated Steps 3-9 quality-campaign/retrieval contracts and all other 0.20.0 model/RAG/Qwen/Agent/translation behavior unchanged.",
+    "integration": "Retain accepted Standard/Documents/Deep/Translation/task/embedding controls and Qwen think=true. Office - Generalist remains the AtomicChat Nemotron candidate, now acquired as a BC-250-managed nested Hugging Face GGUF because Ollama 0.40.13 rejects its registry tag as sharded; Qwen Advanced, Ornith and Translate-Gemma policies are otherwise unchanged.",
+    "next_batch": "Build exact 0.20.0-2 through the authoritative GitHub/Fedora 44 workflow, install that exact RPM, and resume the focused DEVICE convergence/changed-surface gate before corpus/Tika/gold/retrieval execution."
   },
   "release": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "nvr": "bc250-llm-server-0.20.0-1",
-    "rpm_release": "1",
-    "state": "0.20.0-1-source-frozen-awaiting-authoritative-build",
+    "nvr": "bc250-llm-server-0.20.0-2",
+    "rpm_release": "2",
+    "state": "0.20.0-2-source-corrected-awaiting-authoritative-build",
     "version": "0.20.0"
   },
   "schema": 2,
   "validation": {
     "device_acceptance": "Exact 0.14.1-1.13 is DEVICE-acceptable: focused changed surfaces, reboot persistence, health/verify, full revalidation infrastructure, product integrity and topology restoration passed. One honest non-blocking limitation remains NOT_TESTED: the pre-upgrade operator-modified Modelfile exclusion boundary.",
     "device_baseline": "Exact 0.14.1-1.13 is the current accepted package baseline. Its runtime/dependency stack remains Open WebUI 0.12.5, Ollama 0.40.13 and Tika 4.2.0 inherited from the accepted 1.12 dependency-depth campaign.",
-    "package_critical": "0.20.0-1 source candidate includes Steps 3-9 campaign infrastructure, refreshed 2026-10-31 model definitions, Office - Generalist, Qwen Advanced presence_penalty=1.5, contract-first Ornith Bash qualification wording, and expanded translation semantic containment regressions. Exact 0.20.0-1 BUILD/DEVICE evidence is still required.",
-    "release_preflight": "Exact 1.13 remains BUILD/DEVICE-accepted. 0.20.0-1 is the next source identity and changes model definitions, curated Open WebUI desired state, Advanced request sampling and campaign coverage; new BUILD and focused DEVICE evidence are mandatory.",
-    "rpm_package_check": "Exact 1.13 BUILD/DEVICE evidence does not transfer to 0.20.0-1. The next RPM must prove registration/convergence for new provider-managed models, Generalist/Open WebUI policy behavior, Qwen Advanced presence_penalty=1.5, contract-first Agent behavior, and translation containment on the exact new bytes.",
-    "source0_smoke": "0.20.0-1 source integration is complete and frozen for Source0/spec release preparation; BUILD/DEVICE evidence must bind to these exact bytes.",
+    "package_critical": "0.20.0-2 retains the 0.20.0 campaign/model/Qwen/Agent/translation source behavior and corrects Office - Generalist acquisition from unsupported Ollama registry-tag pulling to manager-owned direct retrieval of the exact nested AtomicChat Q6_K GGUF.",
+    "release_preflight": "Exact 1.13 remains BUILD/DEVICE-accepted. 0.20.0-1 built successfully but failed DEVICE normal convergence on the Generalist Ollama-HF registry path; 0.20.0-2 is the corrected source identity and requires new BUILD plus focused DEVICE evidence.",
+    "rpm_package_check": "Exact 1.13 BUILD/DEVICE evidence does not transfer to 0.20.0-2. The 0.20.0-1 DEVICE run additionally stopped before full normal topology because Ollama rejected the AtomicChat Generalist registry tag as sharded; 0.20.0-2 must prove manager-owned nested-GGUF acquisition/registration, second convergence idempotence, normal topology restoration, and the already-planned focused changed-surface checks.",
+    "source0_smoke": "0.20.0-2 source correction is integrated; authoritative BUILD evidence must bind to these exact corrected bytes before DEVICE acceptance resumes.",
     "source_checks": "Active/boundary-active model catalog/profile/Modelfile/Open WebUI/benchmark/docs surfaces are updated coherently; nine obsolete experiments are represented in current package-managed retirement state while the frozen historical retired-Modelfile/archive baseline remains untouched.",
     "static_lint": "Static validation results belong to the exact bytes on which they were executed and are not transferred from older releases."
   }

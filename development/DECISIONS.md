@@ -1179,3 +1179,15 @@ and Agent changes now gives the final closure block an exact source contract to 
 the accepted model roles, translation fail-closed boundary and safe hardware default.
 
 **Required evidence:** the final research closure handover is consumed. Freeze/build exact 0.20.0-1 and run focused DEVICE regression for the changed Qwen/Agent/translation/model-registration/Open WebUI surfaces before promoting the candidate to accepted release state.
+
+## DEC-047 — Own nested AtomicChat Generalist acquisition in modelctl and advance RPM Release
+
+**Status:** ACTIVE — 0.20.0-2 corrective source candidate.
+
+**Decision:** Keep `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` as the Office - Generalist candidate with the same AtomicChat Q6_K weights, model ID, sampler and request policy, but change its acquisition provider from `ollama-hf` to manager-owned `ollama`. The AtomicChat repository stores the selected GGUF under `NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K/`; Ollama 0.40.13 rejects the corresponding registry tag as a sharded GGUF during normal convergence. Add an optional safe `source.remote_path` to the shared model contract so modelctl can download that exact nested Hugging Face file, store it under the canonical local basename, record the remote path plus acquired digest in manager state and create the friendly Ollama registration from the local file. `ollama-hf` entries remain provider-owned and continue to use `provider_ref`.
+
+Advance RPM `Release` from `1` to `2` while keeping `Version: 0.20.0`. The correction changes package acquisition/integration mechanics for an otherwise unchanged 0.20 product candidate; it does not introduce a new product feature or model-selection decision. The successful 0.20.0-1 GitHub build remains BUILD evidence for those bytes but DEVICE acceptance did not complete because first convergence failed before normal topology was established.
+
+**Why:** The failure is deterministic provider/layout incompatibility, not a model-quality result. Direct Hugging Face acquisition is the upstream-documented way to obtain the selected GGUF and fits BC-250's existing manager-owned tracking/source-provenance semantics. A generic repository-relative path field is clearer and safer than special-casing one repository or teaching the model manager to merge arbitrary shards.
+
+**Retest only if:** nested manager-owned Hugging Face acquisition/state semantics change, AtomicChat relocates the selected file, the Generalist model/role changes, or a future Ollama version is deliberately adopted with a qualified provider-managed path.
