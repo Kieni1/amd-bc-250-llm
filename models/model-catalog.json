@@ -1319,10 +1319,10 @@
       "native_context_max": 65536,
       "ownership": {
         "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
+        "source": "bc250",
+        "state": "bc250"
       },
-      "provider": "ollama-hf",
+      "provider": "ollama",
       "runtime": {
         "agent_prepare_required": false,
         "lane": "main",
@@ -1331,10 +1331,11 @@
       "source": {
         "expected_sha256": "",
         "filename": "NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K-00001-of-00001.gguf",
+        "local_path": "/var/lib/bc250-llm-server/gguf/production/NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K-00001-of-00001.gguf",
         "policy": "tracking",
-        "provider_ref": "hf.co/AtomicChat/NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-GGUF:AD-Q6_K",
+        "remote_path": "NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K/NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-AD-Q6_K-00001-of-00001.gguf",
         "repository": "AtomicChat/NVIDIA-Nemotron-3.5-Bolt-E4B-Uncensored-GGUF",
-        "reproducibility": "provider-managed-tracking",
+        "reproducibility": "tracking-ref",
         "revision": "latest"
       }
     },

@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. The accepted 1.13 package did not promote LFM3; 0.20.0-1 adds explicit LFM3/LFM3-VL candidates while retaining Ollama 0.40.13; those model definitions remain source candidates until the exact 0.20.0-1 RPM is built and DEVICE-qualified.
+Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. The accepted 1.13 package did not promote LFM3; 0.20.0-2 adds explicit LFM3/LFM3-VL candidates while retaining Ollama 0.40.13; those model definitions remain source candidates until the exact 0.20.0-2 RPM is built and DEVICE-qualified.
 
 ## Install and verify
 
@@ -53,7 +53,7 @@ intentional: real-device testing showed that the retired task candidate
 while making the main lane ephemeral adds a large cold-start penalty to normal chat.
 That exact Distill candidate is now retired-source only, not an opt-in packaged
 experiment. The similarly named `exp-qwen38-4b-empero-q6-k` general comparison is also
-retired from active discovery in the 0.20.0-1 source candidate because current Qwen3.5/LFM3/Granite/Spark controls supersede it. GPT-OSS 20B with warm Jina remains the production memory-edge
+retired from active discovery in the 0.20.0-2 source candidate because current Qwen3.5/LFM3/Granite/Spark controls supersede it. GPT-OSS 20B with warm Jina remains the production memory-edge
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 

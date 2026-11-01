@@ -75,6 +75,11 @@ On RPM upgrade, `%pre` records hashes only for runtime Modelfiles that the previ
 
 During the pre-1.0 greenfield phase, all active package model sources use `tracking`; the `pinned`
 policy remains part of the contract for the later 1.0 stabilization step. Schema-4 state separates `configured_ref` from acquired identity. A valid tracking artifact remains current across a pinned→tracking/ref migration during ordinary `apply`; metadata is upgraded in place and only `refresh` advances the moving source.
+Manager-owned Hugging Face sources may additionally declare `source.remote_path` when the repository file
+is stored below a subdirectory while the canonical local `filename` remains a basename. `remote_path` must
+be a safe relative POSIX repository path ending in that filename. It is part of source provenance/state and
+is used for both download and online SHA metadata lookup. Ollama-managed `ollama-hf` entries continue to
+use `provider_ref` instead and may not declare `remote_path`.
 
 `--online` is opt-in. For manager-owned sources whose catalog policy is `tracking`
 (`latest`, `main`, or another intentionally moving ref), it compares remote file SHA metadata with the

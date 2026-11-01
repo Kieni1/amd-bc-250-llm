@@ -307,7 +307,7 @@ visible answer. A minimal intervention changing only request-level `presence_pen
 0.0 to 1.5 then passed 14/14 twice independently, including 8/8 backup, 4/4 constraint
 and 2/2 structured cases in each batch. The first controlled comparison reduced median
 backup latency from about 91.6 s to 48.1 s and reasoning volume from about 13.9k to 7.7k
-characters. The 0.20.0-1 source candidate therefore keeps `think=true` and adopts
+characters. The 0.20.0-2 source candidate therefore keeps `think=true` and adopts
 `presence_penalty=1.5` for the normal Advanced/raw higher-quality request policy. Advanced
 Structured remains its separately qualified `think=false` policy with the previous
 `presence_penalty=0.0` until that lane is independently retuned.
@@ -409,6 +409,11 @@ request-level `think=false` / 4096-output product policy. It is intentionally se
 Qwen3.5 Advanced/Higher Quality role and requires DEVICE qualification before it becomes accepted product
 evidence. AtomicChat reports materially altered refusal behavior and also discloses a harmless-prompt KL
 gate miss; treat that as part of the qualification burden, not as a hidden equivalence to official Bolt.
+The AtomicChat Q6_K file is stored under a repository subdirectory whose Ollama registry tag is treated as
+sharded by Ollama 0.40.13. BC-250 therefore owns this candidate's source acquisition: modelctl downloads
+the exact repository-relative GGUF path, records the acquired digest in manager state, and registers the
+local file with Ollama. This is an acquisition/provenance correction only; the selected weights, sampler,
+role policy and model ID are unchanged.
 
 Role-specific additions:
 
