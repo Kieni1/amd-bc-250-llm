@@ -48,7 +48,7 @@ The repository keeps `quality-checks/main/`, `quality-checks/task/`, `quality-ch
 
 ## 2026-10-31 model refresh
 
-The 0.20.0-1 source candidate adds package-managed role-specific candidates without transferring DEVICE acceptance from 1.13.
+The 0.20.0-2 source candidate adds package-managed role-specific candidates without transferring DEVICE acceptance from 1.13.
 The campaign manifest is the authority for comparison intent. In particular, Office - Generalist
 (`prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`) must be compared as a behavior-modified community
 candidate, not treated as equivalent to official NVIDIA Bolt. Test DE/FR office quality and instruction

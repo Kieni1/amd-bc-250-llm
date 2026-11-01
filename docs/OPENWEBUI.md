@@ -226,7 +226,7 @@ Open WebUI 0.12 also adds several network/tool surfaces that are outside the app
 | Office – Documents | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` | active |
 | Office – Translation DE → FR | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
 | Office – Translation FR → DE | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
-| Office – Generalist | `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0-1 candidate |
+| Office – Generalist | `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0-2 candidate |
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Advanced Structured | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` | active |
@@ -235,7 +235,7 @@ For the current 16 GiB profile, **Office – Documents** is the production RAG/d
 The September 2026 product-path campaign found both Documents/Gemma E4B and Advanced/Qwen 9B
 functionally strong in short sessions, but only Gemma retained comfortable memory headroom during
 continuous residency. Keep Advanced as an optional heavier general-office role rather than treating
-it as an equivalent long-lived RAG default. The 0.20.0-1 Advanced request policy keeps `think=true`
+it as an equivalent long-lived RAG default. The 0.20.0-2 Advanced request policy keeps `think=true`
 and the existing 0.7/0.8/top-k-20 sampler but changes request-level `presence_penalty` to 1.5 after
 two independent DEVICE intervention batches passed 14/14. Advanced Structured remains a distinct
 `think=false`, `presence_penalty=0.0` contract. Office - Generalist is a separate community-Nemotron

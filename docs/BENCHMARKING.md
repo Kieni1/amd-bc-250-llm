@@ -10,7 +10,7 @@ Revalidation does not choose settings. Tuning and A/B comparisons are explicit b
 
 ## Office/RAG quality campaign foundation
 
-The 0.20.0-1 source candidate adds a staged campaign surface while preserving the accepted predecessor roles and RAG settings as controls. It also adds one explicit Office - Generalist candidate and additional managed challengers for qualification:
+The 0.20.0-2 source candidate adds a staged campaign surface while preserving the accepted predecessor roles and RAG settings as controls. It also adds one explicit Office - Generalist candidate and additional managed challengers for qualification:
 
 ```bash
 bc250 advanced benchmark campaign audit
@@ -257,7 +257,7 @@ Qwen3.5 Advanced DEVICE block is the reference example: `think=true` passed 15/1
 about 32.65 s median, while `think=false` passed 12/15 at about 9.83 s median and
 deterministically violated one scheduling constraint 3/3. A faster arm with a repeatable
 quality regression is not a promotion win. The subsequent minimal `presence_penalty=1.5`
-intervention retained `think=true` and reproduced 14/14 PASS twice; the 0.20.0-1 source
+intervention retained `think=true` and reproduced 14/14 PASS twice; the 0.20.0-2 source
 candidate adopts that one sampler change rather than reopening broad sampler fishing.
 Reasoning-budget exhaustion with no visible answer remains `INCOMPLETE` unless the strict
 repetition oracle fires, but the evidence now also records diagnostic-only tail repetition

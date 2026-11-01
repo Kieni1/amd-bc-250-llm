@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current accepted package: `bc250-llm-server-0.14.1-1.13`. Current source candidate: `bc250-llm-server-0.20.0-1`, retaining the accepted Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline while adding the quality-campaign/model refresh. Exact 0.20.0-1 BUILD/DEVICE acceptance is still pending; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
+Current accepted package: `bc250-llm-server-0.14.1-1.13`. Current source candidate: `bc250-llm-server-0.20.0-2`, retaining the accepted Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline while adding the quality-campaign/model refresh. Exact 0.20.0-2 BUILD/DEVICE acceptance is still pending; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority.
 
 Release 1.13 keeps the accepted 1.12 runtime/model/RAG baseline unchanged and adds bounded package hardening/UX: fail no-usable-text ingestion clearly, retain knowable rollback provenance, distinguish proven package Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior.
 
@@ -74,7 +74,7 @@ Document/knowledge synchronization is loopback-only by default and token-file sy
 
 ## Models
 
-The 0.20.0-1 source candidate adds **Office - Generalist** as a new curated candidate backed by
+The 0.20.0-2 source candidate adds **Office - Generalist** as a new curated candidate backed by
 `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`. It is a community safety-ablated Nemotron
 variant and remains pending DEVICE qualification; existing Standard/Documents/Advanced/Deep/Translation
 roles are not silently repointed. New official and community challengers are opt-in except where the

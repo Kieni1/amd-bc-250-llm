@@ -6,7 +6,7 @@ hardware profiles, diagnostics and optional specialist tools.
 
 Current accepted package: `bc250-llm-server-0.14.1-1.13`. It retains the 1.12-qualified runtime/dependency stack (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full, governor 0.4.14), and its focused changed-surface DEVICE campaign plus full packaged revalidation accepted the exact 1.13 candidate.
 
-Release `bc250-llm-server-0.14.1-1.13` remains the accepted predecessor baseline. The current source candidate is `bc250-llm-server-0.20.0-1`: it carries the bounded 1.13 hardening forward, establishes the DE/FR-first office/RAG measurement contracts, refreshes the managed model tournament, adds Office - Generalist, integrates the reproduced Qwen Advanced presence-penalty intervention, and keeps Ornith with contract-first Bash qualification wording. Exact 0.20.0-1 BUILD/DEVICE evidence is still required; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority for final release selection.
+Release `bc250-llm-server-0.14.1-1.13` remains the accepted predecessor baseline. The current source candidate is `bc250-llm-server-0.20.0-2`: it carries the bounded 1.13 hardening forward, establishes the DE/FR-first office/RAG measurement contracts, refreshes the managed model tournament, adds Office - Generalist, integrates the reproduced Qwen Advanced presence-penalty intervention, and keeps Ornith with contract-first Bash qualification wording. Exact 0.20.0-2 BUILD/DEVICE evidence is still required; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority for final release selection. The prior 0.20.0-1 build reached DEVICE installation but normal model convergence stopped when Ollama rejected the AtomicChat Generalist registry tag as a sharded GGUF; 0.20.0-2 corrects only that acquisition path by downloading the exact nested GGUF under BC-250 manager ownership before local Ollama registration.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -131,7 +131,7 @@ reached the campaign's 512 MiB safety floor after only a few resident subruns. Q
 separate higher-quality general-office option; this RAG decision is about sustained memory margin,
 not a semantic-quality failure.
 
-The 0.20.0-1 source candidate refreshes the comparison catalog around live product questions. Official
+The 0.20.0-2 source candidate refreshes the comparison catalog around live product questions. Official
 LFM3-1.7B, Nemotron 3.5 Bolt E4B, Index-Translate 2B/9B, LFM3-VL-2B and Spark-X2.6-4B are paired with
 bounded community/uncensored controls, including AtomicChat LFM3/Nemotron, DavidAU Defiant-Fable,
 GSQ-RCO Spark and NeoHorse agent variants. `exp-granite42-3b-ibm-q6-k`, the two ISTA Qwen3.8 27B
@@ -198,7 +198,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 Release 0.14.1-1.12 is the accepted runtime/dependency DEVICE baseline. It updated Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full while retaining the four-lane Vulkan/iGPU topology, model set and retrieval tuning; the completed DEVICE campaign also covered malformed-input containment, broad Tika formats, RAG endurance, parallel ingestion, restart persistence and full authenticated revalidation.
 
-Release 0.14.1-1.13 is the current DEVICE-accepted package baseline. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces. The numbered 0.20.0-1 source candidate now carries the subsequent quality-campaign/model work separately.
+Release 0.14.1-1.13 is the current DEVICE-accepted package baseline. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces. The numbered 0.20.0-2 source candidate now carries the subsequent quality-campaign/model work separately.
 
 Release 0.14.1-1.9 remains an older broad device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
@@ -248,7 +248,7 @@ Repository groups:
 - [`docs/OPENWEBUI.md`](docs/OPENWEBUI.md): Open WebUI setup, desired state, roles and API boundary.
 - [`docs/OLLAMA.md`](docs/OLLAMA.md): Ollama runtime topology, profiles and safe updates.
 - [`docs/RAG.md`](docs/RAG.md): office-document/RAG lifecycle and retrieval policy.
-- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation. The 0.20.0-1 quality campaign foundation audits current settings, keeps real PDFs external, separates Tika/retrieval from generation, validates gold evidence against exact extraction output, and requires an explicit retrieval freeze before fixed-evidence replay without changing production defaults.
+- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation. The 0.20.0-2 quality campaign foundation audits current settings, keeps real PDFs external, separates Tika/retrieval from generation, validates gold evidence against exact extraction output, and requires an explicit retrieval freeze before fixed-evidence replay without changing production defaults.
 - [`docs/QUALITY-CHECKS.md`](docs/QUALITY-CHECKS.md): candidate-quality screens and evidence semantics.
 - [`docs/SECURITY.md`](docs/SECURITY.md): hardening, network exposure and secret handling.
 - [`docs/HTTPS.md`](docs/HTTPS.md): TLS publication example and checklist.
