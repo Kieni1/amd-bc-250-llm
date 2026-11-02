@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.20.0-3 - 2026-11-01
+
+- Finalize the corrective 0.20.0 respin after the 0.20.0-2 DEVICE long run and focused Qwen sampler A/B. `0.20.0-3` is the selected SOURCE candidate; BUILD and exact-RPM DEVICE acceptance remain separate.
+
+- Correct the installed quality-campaign Tika interface after 0.20.0-2 DEVICE testing showed that an ordinary operator invocation cannot see the rootful Quadlet container namespace. `campaign tika-extract` remains operator-owned and now bridges only its Podman access through the package-supported rootful boundary, keeping evidence files unprivileged while Tika remains private.
+- Separate translation clock preservation from generic numeric preservation in the benchmark oracle. Locale-equivalent forms such as `18:00` and French `18h00` now compare by semantic clock value while identifiers, currency/percentage literals, modality and standalone numeric values remain strict.
+- Reuse one shared translation-preservation helper across direct and Open WebUI qualification and reuse one semantic-time extractor across translation/RAG acceptance, removing duplicated evaluator code without changing the runtime fail-closed translation guard.
+- Keep Qwen Advanced on the existing `think=true`, `temperature=0.7`, `top_p=0.8`, `top_k=20`, `min_p=0`, `presence_penalty=1.5`, `repeat_penalty=1.0` policy. A focused 72-vs-72 Advanced DEVICE A/B against the upstream-aligned `1.0/0.95` sampler reduced the aggregate tail rate from 62.5% to 51.39% but did not improve the dominant `advanced-constraint` family, slightly regressed `advanced-insufficient`, and worsened p95 latency/reasoning size; both arms were 72/72 semantically correct, so the candidate does not justify promotion.
+- Deliberately thaw/review/refreeze the four stable frozen components: coding-agent now validates Agent model registration before sending source, maintenance pruning reuses the protected package Open WebUI credential instead of storing a second key, OCR exposes read-only status/help, and MTP receives user-facing clarification without runtime changes. Archive-only history remains untouched.
+- Refresh current operator documentation around normal day-to-day use, installation success criteria, protected credentials, reset consequences, specialist-tool opt-in boundaries and current interim DEVICE and finalized SOURCE state without reducing historical or engineering detail.
+
 ## 0.20.0-2 - 2026-11-01
 
 - Correct the Office - Generalist acquisition defect found on the first 0.20.0 DEVICE convergence: Ollama 0.40.13 rejects AtomicChat's `AD-Q6_K` registry tag because the GGUF is stored under a shard-style repository directory.
