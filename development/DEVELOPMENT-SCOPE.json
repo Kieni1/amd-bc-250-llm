@@ -30,9 +30,12 @@
       "status": "active"
     },
     "coding-agent": {
-      "baseline_sha256": "37323956a597880137b64c112ef84a895f316ec66fdd51968fdd612c3b153391",
+      "baseline_sha256": "397e67671587634d3891019a1781eaf6ffa69537343608bb915ed37cb49959d6",
       "description": "Coding/Gitea agent workflow helpers; retained under bc250 advanced code.",
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_catalog.py",
+        "tests/test_documentation.py"
+      ],
       "paths": [
         "models/coding-agent/**",
         "examples/benchmark/agent-cases.json"
@@ -46,6 +49,10 @@
         "cmd/system/agent-mode.sh",
         "config/systemd/ollama-agent.service",
         "models/modelctl.py"
+      ],
+      "notes": [
+        "Explicit 2026-11-01 thaw/refreeze refreshed the helper against the canonical Agent lifecycle: it now checks both Agent API reachability and configured-model registration before sending source content.",
+        "The README distinguishes current active candidates from retired historical challengers and treats generated code as untrusted output that still needs review/tests."
       ]
     },
     "global-docs-coordination": {
@@ -136,11 +143,15 @@
       "status": "active"
     },
     "maintenance-companion": {
-      "baseline_sha256": "db7d97ff2bb4e211910610ade545ad7fd08b6c56ab5d318215c93a694084c4df",
+      "baseline_sha256": "bd3b214c72448deff40bce16174e41a0de314b05f6c3dc47c914772249ee3631",
       "description": "Local maintenance timers, backups/restores, safe power and WOL/companion integration; frozen after canonical bc250 dispatcher migration.",
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_maintenance.py",
+        "tests/test_documentation.py"
+      ],
       "notes": [
-        "Regression tests are intentionally outside the frozen implementation hash; test maintenance must not thaw the component or block a release build."
+        "Regression tests remain outside the frozen implementation hash; test maintenance must not thaw the component by itself.",
+        "Explicit 2026-11-01 thaw/refreeze consolidated pruning authentication onto the protected package Open WebUI credential file. Legacy inline OWUI_API_KEY remains read-compatible only when that protected file is absent; new setup never writes a second key and removes the legacy inline copy once the shared credential exists."
       ],
       "paths": [
         "cmd/maintenance/**",
@@ -191,13 +202,16 @@
       "status": "active"
     },
     "mtp": {
-      "baseline_sha256": "abc60ae5ccbec63c917788561456d57c9acc893140ff73befeec040e4d3b0916",
+      "baseline_sha256": "487b9373378f252605d8468dc02272bad5fa5af7882b1c9f146639c0398e9385",
       "description": "Standalone llama.cpp MTP models and comparison helpers; retained under the advanced namespace with modelctl-backed list/status/prepare handling.",
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_documentation.py",
+        "tests/test_catalog.py"
+      ],
       "notes": [
         "Frozen implementation retained after an explicit pre-1.0 thaw/refreeze: the remaining qwen35-9b convenience alias was removed so the MTP CLI accepts exact catalog IDs only.",
-        "Runtime model behavior and lifecycle semantics were unchanged by this bounded CLI/input cleanup.",
-        "The baseline also includes the earlier cross-cutting schema-1 capability/ownership metadata in the MTP catalog."
+        "The baseline includes the earlier cross-cutting schema-1 capability/ownership metadata in the MTP catalog.",
+        "Explicit 2026-11-01 review found no runtime/lifecycle change justified; only the frozen README was expanded to make MTP opt-in status, residency behavior and the external llama.cpp compatibility reference clearer to users."
       ],
       "paths": [
         "models/mtp/**"
@@ -213,9 +227,13 @@
       ]
     },
     "ocr": {
-      "baseline_sha256": "8885b3003f0050452783ecca37ed9885109fd06bb1d9fc3fe161910ecb7aedf2",
+      "baseline_sha256": "f48cf1ef230b3cafe1c50466ff5a608f67c67b69ebdaa3eb37f7fc0da793d64d",
       "description": "Dedicated OCR helper inside the managed-document command owner; frozen after canonical bc250 dispatcher migration.",
-      "focused_tests": [],
+      "focused_tests": [
+        "tests/test_rag.py",
+        "tests/test_catalog.py",
+        "tests/test_documentation.py"
+      ],
       "paths": [
         "cmd/documents/ocr.sh",
         "examples/benchmark/ocr/**"
@@ -228,6 +246,9 @@
         "models/modelctl.py",
         "models/modelfiles/exp-glm-ocr-ggml-q8-0.Modelfile",
         "models/modelfiles/exp-ovisocr2-abiray-q8-0.Modelfile"
+      ],
+      "notes": [
+        "Explicit 2026-11-01 thaw/refreeze added a read-only status path and expanded operator help so users can distinguish list/status/install/show/test without confusing experimental OCR with the normal Tika document pipeline."
       ]
     },
     "openwebui-product": {

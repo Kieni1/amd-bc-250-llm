@@ -1191,3 +1191,47 @@ Advance RPM `Release` from `1` to `2` while keeping `Version: 0.20.0`. The corre
 **Why:** The failure is deterministic provider/layout incompatibility, not a model-quality result. Direct Hugging Face acquisition is the upstream-documented way to obtain the selected GGUF and fits BC-250's existing manager-owned tracking/source-provenance semantics. A generic repository-relative path field is clearer and safer than special-casing one repository or teaching the model manager to merge arbitrary shards.
 
 **Retest only if:** nested manager-owned Hugging Face acquisition/state semantics change, AtomicChat relocates the selected file, the Generalist model/role changes, or a future Ollama version is deliberately adopted with a qualified provider-managed path.
+
+## DEC-048 — Make campaign Tika privilege explicit and separate clock semantics from numeric translation grading
+
+**Status:** ACTIVE — integrated in finalized 0.20.0-3 SOURCE; BUILD/DEVICE acceptance pending.
+
+**Decision:** Keep the packaged rootful Open WebUI/Tika Quadlet topology unchanged and keep Tika private. `bc250 advanced benchmark campaign tika-extract` remains an ordinary operator command. The campaign keeps corpus/evidence handling in the invoking user context and crosses only the package-owned Podman boundary through a narrowly scoped `sudo` call; it validates the rootful `open-webui` container before extraction and reports an explicit boundary/authentication failure instead of falling through to the operator rootless namespace. Do not require the whole benchmark command to run as root and do not publish Tika on a host port merely to avoid the namespace boundary.
+
+For translation qualification, keep the runtime fail-closed integrity filter unchanged. Move semantic clock preservation into shared benchmark-only logic so locale-equivalent forms such as `18:00` and `18h00` compare as the same clock value. The two existing 18:00 modality fixtures declare that clock value as a preservation requirement instead of misusing generic `numeric_values=18`. Direct and Open WebUI qualification share the same preservation helper, and the existing semantic time extractor is shared rather than duplicated.
+
+Qwen Advanced remains `think=true`, `presence_penalty=1.5` with the existing `temperature=0.7`, `top_p=0.8` sampler. The completed 0.20.0-2 long-run soak established the reliability question: 258 Advanced requests produced 154 REVIEW results and 153 repeated-reasoning/tail observations, while Structured was 172/172 PASS. A later focused 72-vs-72 Advanced DEVICE A/B against the upstream-aligned `temperature=1.0`, `top_p=0.95` sampler preserved semantic correctness on both arms but produced mixed reliability evidence: aggregate tails improved by 11.11 percentage points, the dominant `advanced-constraint` case did not improve, `advanced-insufficient` regressed slightly, and p95 wall/reasoning tails worsened. Therefore 0.20.0-3 retains the current sampler and records the tail family as a known model-quality REVIEW rather than promoting the candidate.
+
+**Why:** DEVICE evidence distinguishes two issues cleanly. The Tika failure is an installed-interface defect caused by rootless/rootful Podman namespace mismatch, not Tika extraction quality. The `18:00`/`18h00` result is the opposite: the product preserved the clock semantics, while the benchmark conflated a time component with a standalone number. Fixing each at its correct layer preserves the product/runtime boundary and reduces duplicated evaluator code.
+
+**Retest only if:** the container privilege/topology model changes, campaign extraction stops using the Open WebUI container path, translation preservation semantics change, or the runtime integrity guard deliberately expands to clock values.
+
+## DEC-049 — Deliberately thaw, refresh and refreeze stable specialist/maintenance components
+
+**Status:** CLOSED — bounded 2026-11-01 maintenance pass completed; all four components refrozen after review.
+
+**Decision:** Explicitly thaw the four components marked `frozen` in `development/DEVELOPMENT-SCOPE.json` for one bounded consistency/usability review, while leaving every `archive_only` component untouched. Refreeze them immediately after the justified changes below and record fresh baselines rather than allowing an incidental frozen-hash update.
+
+- **coding-agent:** keep Ornith and the canonical Agent lifecycle unchanged. Before sending source text, the helper now proves the Agent API is reachable **and** the configured coding model is actually registered. Failure guidance names the supported `prepare → enter` or `normal → prepare → enter` recovery sequence. The README separates active candidates from retired historical challengers and reminds users that generated code remains untrusted until reviewed/tested.
+- **maintenance-companion:** remove new-setup duplication of the Open WebUI administrator API key. Pruning now uses the protected package credential path (`/var/lib/bc250-llm-server/secrets/openwebui-admin.key`), rejects unsafe token-file states, and stores only `OWUI_API_KEY_FILE` plus policy in `maintenance.env`. A valid legacy inline key remains a compatibility reader only when the protected file is absent; once the shared credential exists, setup removes the legacy inline copy.
+- **MTP:** retain implementation/runtime behavior. Expand the frozen README so ordinary users can see that MTP is an optional specialist comparison path, understand direct-run versus compare residency behavior, and understand that the reviewed external llama.cpp revision is a compatibility reference rather than a hidden package runtime dependency.
+- **OCR:** keep OCR experimental and separate from normal Tika Documents/RAG. Add a read-only `bc250 ocr status glm|ovis` path and improve help/docs so `list`, `status`, `install`, `show` and `test` have distinct operator meanings.
+
+**Why:** Frozen means “stable until deliberately reopened”, not “never review again”. Current package evolution created a real maintenance credential duplication and left some specialist help behind the current Agent/model-manager UX. The explicit thaw prevents accidental hash churn, while immediate refreeze preserves the purpose of the scope governor. Archive-only material is historical provenance and is not normalized to current conventions.
+
+**Refrozen baselines:** coding-agent `397e67671587634d3891019a1781eaf6ffa69537343608bb915ed37cb49959d6`; maintenance-companion `bd3b214c72448deff40bce16174e41a0de314b05f6c3dc47c914772249ee3631`; MTP `487b9373378f252605d8468dc02272bad5fa5af7882b1c9f146639c0398e9385`; OCR `f48cf1ef230b3cafe1c50466ff5a608f67c67b69ebdaa3eb37f7fc0da793d64d`.
+
+**Retest only if:** a listed thaw condition is met again, one of the watched cross-component interfaces changes, or new DEVICE evidence identifies an actual defect in these stable paths. Documentation/test maintenance outside a frozen implementation hash does not by itself justify another thaw.
+
+
+## DEC-050 — Compare Qwen Advanced against the upstream general-thinking sampler before changing product policy
+
+**Status:** CLOSED — focused DEVICE comparison complete; retain current production policy.
+
+**Decision:** Keep the current Advanced request policy (`think=true`, `temperature=0.7`, `top_p=0.8`, `top_k=20`, `min_p=0.0`, `presence_penalty=1.5`, `repeat_penalty=1.0`, 6144-token ceiling). Do not promote the upstream-aligned `temperature=1.0`, `top_p=0.95` candidate from this evidence. Keep the three Advanced cases `advanced-backup`, `advanced-constraint` and `advanced-insufficient`, plus the two Structured controls, as the stable comparison set for future model/settings work.
+
+**Evidence:** The focused DEVICE run completed 72 Advanced observations per arm with zero request CHECK_ERRORs and 72/72 semantic correctness for both. Aggregate tail rate improved from 45/72 (62.5%) to 37/72 (51.39%), difference -11.11 percentage points with approximate 95% CI [-27.18, +4.96]. The effect was not consistent: `advanced-backup` improved 70.83% → 33.33%, `advanced-constraint` stayed 100% → 100%, and `advanced-insufficient` moved 16.67% → 20.83%. Candidate median wall time was similar (38.52 s → 39.39 s), while p95 wall worsened 87.69 s → 110.04 s and p95 reasoning chars worsened 13,695 → 16,703. Structured controls remained 24/24 semantic PASS with zero tail events. JSON/JSONL evidence audit passed. Final privileged health/status captures were unavailable because the sudo timestamp expired after the long read-only run; that is environment evidence and does not invalidate the A/B.
+
+**Why:** The candidate shows a real benefit on one workload but no improvement on the dominant failure family, a slight regression on another, and worse upper-tail cost. That is not a clear product-level reliability win. The existing sampler therefore remains the least disruptive qualified control, while the repeated-reasoning/latency family remains an explicit model-quality REVIEW.
+
+**Retest only if:** the Advanced sampler/policy changes, the Qwen3.5 weights/runtime changes materially, or a later candidate replaces Qwen for the Higher Quality role. Do not run another generic soak without a new concrete hypothesis.
