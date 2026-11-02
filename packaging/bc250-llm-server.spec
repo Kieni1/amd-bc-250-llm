@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.20.0
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -485,6 +485,10 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Sun Nov 01 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-3
+- Require the quality-campaign Tika extraction path to run in the rootful Podman namespace and document the supported sudo invocation.
+- Accept locale-equivalent clock rendering in translation qualification while keeping the runtime integrity guard and standalone numeric/literal checks strict.
+- Share translation preservation/time evaluator helpers across direct and Open WebUI benchmark paths; retain the current Qwen Advanced sampler after the focused DEVICE A/B found no clear overall reliability win for the 1.0/0.95 candidate.
 * Sun Nov 01 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-2
 - Correct Office - Generalist acquisition after DEVICE convergence showed Ollama 0.40.13 rejects AtomicChat's nested AD-Q6_K registry tag as a sharded GGUF.
 - Download the exact nested Hugging Face GGUF under BC-250 manager ownership, record its repository path and acquired digest, and register the local file with Ollama.
