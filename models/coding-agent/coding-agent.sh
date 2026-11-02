@@ -64,9 +64,24 @@ for cmd in curl jq mktemp; do
   }
 done
 
-if ! curl -fsS --connect-timeout 2 --max-time 3 "${OLLAMA_URL}/api/tags" >/dev/null 2>&1; then
+tags_file="$(mktemp)"
+if ! curl -fsS --connect-timeout 2 --max-time 3 "${OLLAMA_URL}/api/tags" > "$tags_file" 2>/dev/null; then
+  rm -f "$tags_file"
   echo "ERROR: exclusive coding-agent backend is not active at ${OLLAMA_URL}." >&2
-  echo "Enter agent mode first: sudo bc250 advanced agent enter" >&2
+  echo "Prepare the model while normal mode is active, then enter Agent mode:" >&2
+  echo "  sudo bc250 advanced agent prepare $MODEL" >&2
+  echo "  sudo bc250 advanced agent enter" >&2
+  exit 1
+fi
+if ! jq -e --arg model "$MODEL" \
+    '(.models // []) | any(.[]; ((.name // .model // "") | sub(":latest$"; "")) == $model)' \
+    "$tags_file" >/dev/null; then
+  rm -f "$tags_file"
+  echo "ERROR: Agent mode is active, but the configured coding model is not registered: $MODEL" >&2
+  echo "Restore normal mode, prepare that model, then re-enter Agent mode:" >&2
+  echo "  sudo bc250 advanced agent normal" >&2
+  echo "  sudo bc250 advanced agent prepare $MODEL" >&2
+  echo "  sudo bc250 advanced agent enter" >&2
   exit 1
 fi
 
@@ -74,7 +89,7 @@ input_file="$(mktemp)"
 response_file="$(mktemp)"
 prompt_file="$(mktemp)"
 raw_response="$(mktemp)"
-trap 'rm -f "$input_file" "$response_file" "$prompt_file" "$raw_response" "${tmp_out:-}"' EXIT
+trap 'rm -f "$tags_file" "$input_file" "$response_file" "$prompt_file" "$raw_response" "${tmp_out:-}"' EXIT
 
 if [[ "$input" == "-" ]]; then
   cat > "$input_file"

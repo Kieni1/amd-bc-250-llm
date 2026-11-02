@@ -1,5 +1,11 @@
 # Model management
 
+## For normal appliance users
+
+You normally do **not** need to manage raw model registrations. Use the curated Office roles in Open WebUI and let `sudo bc250 install` / package convergence maintain their required registrations. Use `bc250 model ...` when diagnosing a model, preparing an explicit experiment, or following a documented operator workflow. Specialist MTP/OCR/Agent paths are opt-in and are not routine health checks.
+
+See the role-oriented table in [`../MODELS.md`](../MODELS.md) when the question is “which model should I use?”; this document explains the underlying model-management machinery.
+
 The guided installer establishes the required production/task/embedding baseline, then offers one
 unified indexed optional view across Ollama-backed production, experiments, agentic, embedding and
 task entries plus standalone MTP candidates. An explicit MTP ID/index/range selection prepares and

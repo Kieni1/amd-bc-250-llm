@@ -542,7 +542,12 @@ class ModelfileDiscoveryTests(unittest.TestCase):
             "CODING_AGENT_MODEL:-agentic-ornith15-9b-ornith-q5-k-m", helper
         )
         self.assertIn("CODING_AGENT_NUM_PREDICT:-3072", helper)
+        self.assertIn('"${OLLAMA_URL}/api/tags"', helper)
         self.assertIn('"${OLLAMA_URL}/api/chat"', helper)
+        self.assertIn("configured coding model is not registered", helper)
+        self.assertIn("sudo bc250 advanced agent normal", helper)
+        self.assertIn("sudo bc250 advanced agent prepare $MODEL", helper)
+        self.assertIn("sudo bc250 advanced agent enter", helper)
         self.assertIn("think:true", helper)
         self.assertIn(".message.content", helper)
         self.assertIn('[[ "$done" != true ]]', helper)

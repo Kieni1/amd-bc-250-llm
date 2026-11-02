@@ -1,36 +1,53 @@
 # Isolated coding and agentic models
 
-## Setup
+## Setup and normal lifecycle
+
+The coding helper uses the exclusive Agent lane on port `11436`. Prepare the model
+while the appliance is in normal mode, enter Agent mode only for the work itself,
+and restore normal topology afterwards:
 
 ```bash
-sudo bc250 model apply agentic
+sudo bc250 advanced agent prepare agentic-ornith15-9b-ornith-q5-k-m
+bc250 advanced agent topology
+sudo bc250 advanced agent enter
 
-# Current measured coding-helper starting point
-sudo bc250 model apply agentic agentic-ornith15-9b-ornith-q5-k-m
+# run coding/agent work here
+
+sudo bc250 advanced agent normal
+bc250 advanced agent topology
 ```
+
+The helper checks both that the Agent backend is reachable and that the configured
+`CODING_AGENT_MODEL` is actually registered before it sends source text. If Agent
+mode is active with the wrong model, it stops with the exact recovery sequence
+instead of forwarding a request that cannot succeed.
 
 The package ships static `ollama-agent.service` on port `11436` with its own model
 store. It has no boot enablement and is intentionally exclusive with the
-main/task/embedding lanes. Current choices are:
+main/task/embedding lanes. Current active candidates are:
 
-- `agentic-ornith15-9b-ornith-q5-k-m` — current default. Temperature 0 with a
-  3072-token Bash/Python budget passed all 3 agent fixtures in three consecutive
-  real BC-250 runs with identical final answers;
-- `agentic-qwen25-coder7b-unsloth-q5-k-m` — retained as an alternative coding
-  model, but no longer the package default;
+- `agentic-ornith15-9b-ornith-q5-k-m` — current measured default and the canonical
+  package Agent qualification target;
+- `agentic-qwen25-coder7b-unsloth-q5-k-m` — retained coding alternative;
 - `agentic-qwable9b-empero-q6-k` — active 9B native-reasoning challenger;
-- `agentic-qwen35-4b-khazarai-q6-k` — retired from active discovery after the
-  2026-10-31 DEVICE comparison; it was much faster than Ornith but showed broader
-  Bash/Python/JSON instruction and format regressions;
-- `agentic-gemma4-e4b-sol-fable-q4-k-m` — compact Gemma 4 E4B Q4_K_M
-  challenger using a conservative 16K deterministic BC-250 test profile;
-- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — retained 12B Gemma 4 comparison
-  until the E4B challenger establishes whether another 12B round is useful.
+- `agentic-gemma4-e4b-sol-fable-q4-k-m` — compact Gemma 4 E4B challenger;
+- `agentic-gemma4-12b-fable5-tau2-q4-k-m` — larger Gemma comparison candidate;
+- `agentic-lfm25-24b-a2b-unsloth-q3-k-xl` — larger MoE/A2B agent comparison;
+- `agentic-neohorse1-9b-tokenrhythm-q4-k-m` and
+  `agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m` — NeoHorse 9B candidates
+  kept for explicit agent comparison.
 
-With no selection, `bc250 model apply agentic` lists the choices and prompts. Registration temporarily switches to agent mode and restores normal mode afterwards. Keep port `11436`
-blocked from untrusted networks. Add `http://host.containers.internal:11436` to
-Open WebUI only when interactive agent access is wanted. Use this service
-exclusively rather than alongside a large main-model workload.
+The previously tested `agentic-qwen35-4b-khazarai-q6-k` is retired from active
+discovery after the 2026-10-31 DEVICE comparison: it was much faster than Ornith
+but showed broader Bash/Python/JSON instruction and output-format regressions.
+Historical evidence remains in the retired/provenance material rather than the
+active candidate list.
+
+With no model selection, `sudo bc250 model apply agentic` lists active choices and
+prompts. Agent model reconciliation may temporarily switch topology and restores
+normal mode afterwards. Keep port `11436` blocked from untrusted networks. Add
+`http://host.containers.internal:11436` to Open WebUI only for a deliberate
+interactive Agent experiment; ordinary office use should leave the Agent lane inactive.
 
 ## Local coding helper
 
@@ -53,8 +70,9 @@ budget is 3072 tokens; set `CODING_AGENT_NUM_PREDICT` to another positive intege
 for a deliberate comparison. A truncation failure is evidence to adjust/test the
 budget, not permission to keep a partial file.
 
-Generated output is never applied automatically; review it and run the real test
-suite. `bc250 advanced benchmark agent` checks Bash/Python syntax and small static semantic
+Generated output is never applied automatically. Treat it like a patch from an
+untrusted contributor: inspect the full file/diff, run the real project tests, and
+only then copy or commit it. `bc250 advanced benchmark agent` checks Bash/Python syntax and small static semantic
 requirements without executing model-generated code, including raw-output
 format/reasoning contamination, space-safe Bash patterns, explicit Python range
 rejection and JSON key shapes. Agent qualification profiles therefore use

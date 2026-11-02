@@ -1,5 +1,7 @@
 # Experimental model subtree
 
+Experiments are not normal Office roles. Ordinary users should choose the curated roles in Open WebUI; this catalog exists for bounded comparison, qualification and promotion work. Installing or registering an experiment does not promote it and is not evidence that it is safer, faster or better for office work.
+
 This directory contains helper logic for operator-selected comparison models. The
 canonical **current model status, active experiment catalog, retirement reasons and
 measured promotion evidence** live in [`../../MODELS.md`](../../MODELS.md). Do not

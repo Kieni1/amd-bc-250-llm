@@ -12,6 +12,20 @@ the MTP category entirely, even when `--include-disabled` is supplied. In `bc250
 an opt-in preparation request. `bc250 advanced mtp prepare` remains the specialist equivalent. MTP
 entries intentionally have no Ollama Modelfile.
 
+
+## Should I use MTP?
+
+For normal office chat, Documents/RAG, translation or Agent work: **no**. MTP is a
+specialist llama.cpp comparison path used to answer one narrow question: whether
+model-native speculative decoding improves the same model enough on BC-250 hardware
+to justify the extra runtime complexity. It does not replace the packaged Ollama
+lanes, is never part of normal convergence, and is not required for appliance health.
+
+Use it only when you intentionally want to reproduce/extend MTP performance evidence.
+A direct `run` temporarily drains resident Ollama models and restores the exact
+pre-run residency set afterwards; `compare` intentionally leaves Ollama cold because
+that is the benchmark-isolation contract. Normal services are not reconfigured.
+
 ## Current package policy
 
 Broad MTP qualification is closed for the current BC-250/runtime combination. The active catalog
@@ -82,10 +96,14 @@ Files are stored below `/var/lib/bc250-llm-server/gguf/mtp/`.
 
 ## Runtime preflight
 
-The RPM does not provide llama.cpp. The reviewed baseline is release `b10964`
-(commit `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4`), but another release is accepted
-when its CLI supports the required MTP, cache, context, GPU-offload and flash-attention
-options. Every qualification run must capture the exact executable/build and flags.
+The RPM deliberately does not provide llama.cpp, so MTP never becomes a hidden
+runtime dependency of the appliance. The last reviewed compatibility baseline is
+release `b10964` (commit `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4`). A different
+build may be used only when its CLI supports the required MTP, cache, context,
+GPU-offload and flash-attention options; every qualification run records the exact
+executable/build and flags so results remain attributable. The recorded baseline is
+a compatibility reference, not an instruction to downgrade a separately managed
+llama.cpp installation.
 
 `bc250 advanced mtp run` now performs a bounded fail-fast preflight before launch:
 
@@ -162,5 +180,5 @@ to qualify speculative decoding.
 
 Do not claim an MTP win from tok/s alone. Final qualification still requires useful answer
 quality, draft acceptance, memory/swap behavior, runtime stability and clean normal-appliance
-state after the run. After this pre-flight polish, do not extend the framework again until
-real BC-250 evidence identifies a concrete measurement or runtime defect.
+state after the run. Do not extend this framework again unless real BC-250 evidence identifies
+a concrete measurement, safety or runtime defect; MTP is deliberately a bounded specialist path.

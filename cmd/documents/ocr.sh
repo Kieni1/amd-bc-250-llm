@@ -11,11 +11,15 @@ usage() {
   cat <<'EOF_USAGE'
 Usage:
   bc250 ocr list
+  sudo bc250 ocr status glm|ovis
   sudo bc250 ocr install glm|ovis
   bc250 ocr show glm|ovis
   bc250 ocr test glm|ovis IMAGE
 
-OCR is experimental. Test real German/French/English office pages before use.
+OCR is experimental and separate from the normal Tika document path. `list` shows
+packaged candidates, `status` shows source/registration state, `install` prepares
+one candidate, and `test` runs one local image without changing Documents/RAG state.
+Test real German/French/English office pages before relying on OCR output.
 EOF_USAGE
 }
 
@@ -35,6 +39,11 @@ run_ollama() {
 case "${1:-}" in
   list)
     "$MANAGER" list experiments | awk 'NR==1 || /exp-(glm-ocr|ovisocr2)-/'
+    ;;
+  status)
+    [[ $# -eq 2 ]] || { echo "ERROR: bc250 ocr status requires glm|ovis." >&2; echo "Run: bc250 ocr --help" >&2; exit 2; }
+    model="$(model_name "$2")"
+    "$MANAGER" status experiments "$model" --verbose
     ;;
   install)
     [[ $# -eq 2 ]] || { echo "ERROR: bc250 ocr install requires glm|ovis." >&2; echo "Run: bc250 ocr --help" >&2; exit 2; }
