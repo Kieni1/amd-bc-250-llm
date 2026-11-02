@@ -63,6 +63,18 @@ zone or referenced service definition cannot be inspected, verification fails cl
 claiming the LAN boundary is clean. A remote `curl -f http://SERVER_IP/` check still validates intended
 HTTP reachability from a second LAN machine.
 
+## Protected Open WebUI package credential
+
+Package workflows that need authenticated local Open WebUI access share the root-only credential at
+`/var/lib/bc250-llm-server/secrets/openwebui-admin.key`. Treat this as an appliance secret:
+
+- do not copy it into shell history, documentation or `maintenance.env`;
+- do not relax its permissions or replace it with a symlink;
+- regenerate/reconcile it with `sudo bc250 advanced openwebui init` rather than hand-editing it;
+- maintenance stores only the credential **path** plus pruning/backup policy. A legacy inline maintenance key is read only for upgrade compatibility and is removed by maintenance setup once the protected package credential is available.
+
+This credential is for local package automation; it does not make Open WebUI or the unauthenticated Ollama ports safe for external exposure.
+
 ## Confidential documents and knowledge bases
 
 For confidential RAG use, require authentication, keep knowledge bases private
@@ -106,6 +118,7 @@ code on a confidential appliance.
 Open WebUI is configured with `OFFLINE_MODE=true` and `HF_HUB_OFFLINE=1`, with
 automatic embedding/reranking/Whisper model updates disabled. This reduces
 application-initiated outbound traffic but is not a network isolation boundary.
-Keep firewalld/nginx policy authoritative. `bc250 advanced openwebui` uses a
-temporary administrator credential only when explicitly run and does not store it.
+Keep firewalld/nginx policy authoritative. `bc250 advanced openwebui` may use an explicit
+temporary administrator credential for one invocation, while `init`/package automation can establish
+the protected root-only credential documented above. Neither mechanism changes the network boundary.
 Agent/coding mode is exclusive and the agent service remains disabled at boot.

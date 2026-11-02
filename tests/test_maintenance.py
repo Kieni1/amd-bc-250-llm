@@ -185,12 +185,17 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("TIME=19:15", result.stdout)
         self.assertIn("COUNT=5", result.stdout)
 
-    def test_invalid_stored_pruning_api_key_requires_replacement(self) -> None:
+    def test_pruning_setup_migrates_legacy_inline_key_to_shared_protected_file(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
         with tempfile.TemporaryDirectory() as temporary:
-            config = Path(temporary) / "maintenance.env"
+            tmp = Path(temporary)
+            config = tmp / "maintenance.env"
+            token_file = tmp / "openwebui-admin.key"
+            token_file.write_text("shared-package-key\n", encoding="utf-8")
+            token_file.chmod(0o600)
             config.write_text(
-                "OWUI_API_KEY=bad token\n"
+                f"OWUI_API_KEY_FILE={token_file}\n"
+                "OWUI_API_KEY=legacy-inline-key\n"
                 "MAX_AGE_DAYS=90\n"
                 "MAX_TOTAL_GB=20\n"
                 "DRY_RUN=1\n",
@@ -199,12 +204,11 @@ class MaintenanceTests(unittest.TestCase):
             command = (
                 "source " + str(script) + "; "
                 "enable_units() { :; }; "
-                "setup_pruning; "
-                "printf 'TOKEN=%s\n' \"$(get_setting OWUI_API_KEY '')\""
+                "setup_pruning"
             )
             result = subprocess.run(
                 ["bash", "-c", command],
-                input="y\nreplacement-key\n\n\n",
+                input="y\n\n\n",
                 env=os.environ | {"BC250_MAINTENANCE_CONFIG": str(config)},
                 text=True,
                 stdout=subprocess.PIPE,
@@ -212,12 +216,11 @@ class MaintenanceTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stdout)
-            self.assertIn(
-                "The stored Open WebUI API key contains unsupported characters",
-                result.stdout,
-            )
-            self.assertIn("TOKEN=replacement-key", result.stdout)
-            self.assertNotIn("OWUI_API_KEY=bad token", config.read_text(encoding="utf-8"))
+            self.assertIn("Removed the legacy inline Open WebUI key", result.stdout)
+            current = config.read_text(encoding="utf-8")
+            self.assertIn(f"OWUI_API_KEY_FILE={token_file}", current)
+            self.assertNotIn("OWUI_API_KEY=legacy-inline-key", current)
+            self.assertIn("DRY_RUN=1", current)
 
     def test_wol_interface_prompt_explains_ip_address_and_reprompts(self) -> None:
         script = ROOT / "cmd/maintenance/maintenance.sh"
@@ -305,7 +308,7 @@ class MaintenanceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             config = Path(temporary) / "maintenance.env"
             config.write_text(
-                "OWUI_API_KEY=REPLACE_WITH_ADMIN_API_KEY\n"
+                f"OWUI_API_KEY_FILE={Path(temporary) / 'missing-openwebui-admin.key'}\n"
                 "MAX_AGE_DAYS=90\nMAX_TOTAL_GB=20\nDRY_RUN=1\n",
                 encoding="utf-8",
             )
@@ -321,9 +324,9 @@ class MaintenanceTests(unittest.TestCase):
                 check=False,
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("API key is not configured", result.stdout)
+            self.assertIn("protected Open WebUI maintenance credential is unavailable or invalid", result.stdout)
             self.assertIn("Dry run: enabled", result.stdout)
-            self.assertNotIn("REPLACE_WITH_ADMIN_API_KEY", result.stdout)
+            self.assertIn("sudo bc250 advanced openwebui init", result.stdout)
 
         source = script.read_text(encoding="utf-8")
         self.assertIn("prune) preflight_prune && run_task prune-uploads", source)
@@ -644,6 +647,39 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("Warm-up:            disabled (configured model=", source)
         self.assertIn("Night power:        disabled (configured action=", source)
         self.assertIn("last_scheduled=%s", source)
+
+    def test_pruning_protected_credential_rejects_symlink_and_broad_permissions(self) -> None:
+        script = ROOT / "cmd/maintenance/prune-uploads.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            target = tmp / "token-target"
+            target.write_text("valid-token\n", encoding="utf-8")
+            target.chmod(0o600)
+            link = tmp / "token-link"
+            link.symlink_to(target)
+            base_env = os.environ | {
+                "OWUI_API_KEY_FILE": str(link),
+                "MAX_AGE_DAYS": "1",
+                "MAX_TOTAL_GB": "0",
+                "DRY_RUN": "1",
+            }
+            symlinked = subprocess.run(
+                [str(script)], env=base_env, text=True, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, check=False
+            )
+            self.assertNotEqual(symlinked.returncode, 0)
+            self.assertIn("must not be a symlink", symlinked.stdout)
+
+            broad = tmp / "broad-token"
+            broad.write_text("valid-token\n", encoding="utf-8")
+            broad.chmod(0o640)
+            broadly_accessible = subprocess.run(
+                [str(script)],
+                env=base_env | {"OWUI_API_KEY_FILE": str(broad)},
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False
+            )
+            self.assertNotEqual(broadly_accessible.returncode, 0)
+            self.assertIn("must not be group/world accessible", broadly_accessible.stdout)
 
     def test_pruning_reports_small_files_without_rounding_to_zero_mib(self) -> None:
         script = ROOT / "cmd/maintenance/prune-uploads.sh"

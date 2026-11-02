@@ -39,6 +39,31 @@ This is the canonical operator reference for day-to-day administration. It combi
 
 Use `bc250 --help` for the grouped command list. Commands that modify host or service-owned data normally require `sudo`.
 
+### Common operator workflows
+
+For normal office operation, prefer the smallest supported command that answers the question:
+
+```bash
+# "Is the appliance okay?"
+sudo bc250 status
+sudo bc250 health
+sudo bc250 verify
+
+# "What package/runtime am I actually running?"
+bc250 version
+
+# "Are maintenance/backups configured?"
+sudo bc250 maintenance status
+
+# "What model state is installed?"
+sudo bc250 model status production --compact
+
+# "What managed document state is active?"
+sudo bc250 document status
+```
+
+Do not start full qualification, Agent mode, MTP, OCR or destructive storage/reset operations merely as a routine health check. Those commands exist for explicit development, recovery or specialist work and can intentionally mutate runtime state.
+
 ### Qualification evidence inventory
 
 Use `bc250 advanced qualification list [--json]` to inventory package-gate and resilience
@@ -662,18 +687,15 @@ post-configuration checks. `setup --defaults` enables verified local
 backups only. Manual maintenance runs show
 only the current systemd invocation instead of a historical journal tail. Timer status uses
 `last_scheduled=` so a successful manual run is not confused with timer history. Upload
-pruning preflights the protected Open WebUI credential before starting its unit; a
-missing/placeholder key fails with the active age/ceiling/dry-run policy and never
-prints the credential. `clean-cache` requires confirmation and removes only rebuildable
+pruning preflights the protected package Open WebUI credential before starting its unit. New maintenance setup does **not** ask the operator to copy a second API key into `maintenance.env`; it uses `/var/lib/bc250-llm-server/secrets/openwebui-admin.key` through `OWUI_API_KEY_FILE`. A missing, symlinked, malformed or too-broadly-readable token file fails before pruning and never prints the credential. Existing pre-migration `OWUI_API_KEY=` configuration remains a read-only compatibility path; once the protected package key exists, rerunning pruning setup removes that legacy inline copy. `clean-cache` requires confirmation and removes only rebuildable
 Hugging Face cache, dangling Podman images and old **system-wide** journal archives;
 model and Open WebUI data are retained. Interactive setup can also configure dry-run
 upload pruning, model warm-up and an after-hours power action. `companion enable`
 prepares restricted SSH :22 access for the stable safe-shutdown request and keeps
 HTTP :80 as the office-readiness endpoint; it does not expose internal Ollama/UI
 ports. `backup-export enable` is optional and requires `/usr/bin/rrsync` from the
-Fedora `rsync-rrsync` package. Configuration is stored in root-readable
-`/etc/bc250-llm-server/maintenance.env`. See [`OPERATIONS.md`](OPERATIONS.md)
-and [`OPERATIONS.md`](OPERATIONS.md).
+Fedora `rsync-rrsync` package. Maintenance policy is stored in root-readable
+`/etc/bc250-llm-server/maintenance.env`; the Open WebUI API key itself stays in the separate root-only package secrets directory rather than being duplicated into that policy file.
 
 ### Coding and experiments
 
@@ -693,11 +715,7 @@ not silently strip the fence because that would hide a model output-contract fai
 
 `CODING_AGENT_MODEL` selects an installed agentic model; `OLLAMA_HOST`/`OLLAMA_URL`
 override its endpoint, and `CODING_AGENT_NUM_PREDICT` overrides the positive output
-token budget (default 3072). `bc250 advanced code run` uses `/api/chat` with `think:true` and writes
-only terminal non-empty `message.content`. It returns `3` and leaves an existing output
-file unchanged if completion is nonterminal, stops at `done_reason=length`, or final
-content contains literal reasoning markers. Coding helpers do not stage, push, approve
-or merge without the command's explicit local action.
+token budget (default 3072). Prepare the model in normal mode, enter Agent mode for the task, and restore normal topology afterwards. `bc250 advanced code run` first verifies that the Agent API is reachable **and** that the configured model is registered, then uses `/api/chat` with `think:true` and writes only terminal non-empty `message.content`. It returns `3` and leaves an existing output file unchanged if completion is nonterminal, stops at `done_reason=length`, or final content contains literal reasoning markers. Coding helpers do not stage, push, approve or merge without the command's explicit local action.
 
 Prepare a candidate first with `sudo bc250 advanced mtp prepare ID`; the explicit helper exposes
 the packaged disabled experiments without making them part of normal convergence.
@@ -1172,8 +1190,7 @@ permission repair after every backup run.
 ### Open WebUI credentials
 
 The external companion does not need an Open WebUI API key for WOL, readiness,
-safe shutdown or backup transport. `OWUI_API_KEY` remains a BC-250-local
-protected maintenance credential.
+safe shutdown or backup transport. The canonical local maintenance credential is the package-owned root-only file `/var/lib/bc250-llm-server/secrets/openwebui-admin.key`; `maintenance.env` stores only `OWUI_API_KEY_FILE` plus policy values. A legacy inline `OWUI_API_KEY=` is still read for upgrade compatibility when the protected package key is absent, but new setup never writes one and removes the inline copy once the shared protected credential is available.
 
 ### Schedule and retention convention
 

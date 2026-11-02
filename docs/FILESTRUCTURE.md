@@ -42,7 +42,7 @@ belongs under `/var`, `/run`, `/etc` operator configuration, or `/srv` document 
 |---|---|
 | `/etc/bc250-llm-server/models.d/*.Modelfile` | Added or same-name overridden models |
 | `/etc/bc250-llm-server/mtp-models.toml` | Download-only MTP catalog |
-| `/etc/bc250-llm-server/maintenance.env` | Optional maintenance policy |
+| `/etc/bc250-llm-server/maintenance.env` | Optional maintenance policy and protected-credential path; new setup does not store the Open WebUI API key inline |
 | `/etc/cyan-skillfish-governor-smu/config.toml` | Governor policy |
 | `/etc/nginx/default.d/bc250-llm-server.conf` | Trusted-LAN HTTP endpoint |
 | `/etc/systemd/system/ollama*.service.d/` | Runtime profile overrides |
@@ -71,6 +71,7 @@ intentionally empty on a stock install; packaged model definitions live under
 | `/var/lib/bc250-llm-server/revalidation/` | Root-only revalidation work state; completed state remains inspectable until explicit cleanup or the next run |
 | `/var/lib/bc250-llm-server/revalidation/results/` | Root-only canonical revalidation evidence history; operator export copies are written to the invocation/output directory |
 | `/var/lib/bc250-llm-server/secrets/open-webui.env` | Persistent root-only Open WebUI signing secret |
+| `/var/lib/bc250-llm-server/secrets/openwebui-admin.key` | Root-only package automation credential used by authenticated local Open WebUI workflows such as document sync and maintenance pruning |
 | `/var/lib/bc250-llm-server/swap/` | Optional disk swap file |
 | `/var/cache/bc250-llm-server/huggingface/` | Download cache and staging |
 | `/srv/bc250-documents/` | Operator-owned authoritative document tree, `root:root` mode `0750` |

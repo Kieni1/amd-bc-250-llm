@@ -3,11 +3,42 @@
 set -Eeuo pipefail
 umask 0077
 OWUI_URL="${OWUI_URL:-http://127.0.0.1:3000}"
-OWUI_API_KEY="${OWUI_API_KEY:?Set OWUI_API_KEY in /etc/bc250-llm-server/maintenance.env}"
-[[ "$OWUI_API_KEY" != "REPLACE_WITH_ADMIN_API_KEY" ]] || { echo "ERROR: replace the placeholder OWUI_API_KEY first." >&2; exit 1; }
+OWUI_API_KEY_FILE="${OWUI_API_KEY_FILE:-/var/lib/bc250-llm-server/secrets/openwebui-admin.key}"
 MAX_AGE_DAYS="${MAX_AGE_DAYS:-90}"
 MAX_TOTAL_GB="${MAX_TOTAL_GB:-100}"
 DRY_RUN="${DRY_RUN:-0}"
+
+resolve_owui_api_key() {
+  local mode token
+  if [[ -L "$OWUI_API_KEY_FILE" ]]; then
+    echo "ERROR: Open WebUI token file must not be a symlink: $OWUI_API_KEY_FILE" >&2
+    return 1
+  fi
+  if [[ -f "$OWUI_API_KEY_FILE" ]]; then
+    [[ -r "$OWUI_API_KEY_FILE" ]] || {
+      echo "ERROR: Open WebUI token file is not readable: $OWUI_API_KEY_FILE" >&2
+      return 1
+    }
+    mode="$(stat -c '%a' "$OWUI_API_KEY_FILE" 2>/dev/null || true)"
+    [[ -n "$mode" ]] && (( (8#$mode & 8#077) == 0 )) || {
+      echo "ERROR: Open WebUI token file must not be group/world accessible: $OWUI_API_KEY_FILE" >&2
+      return 1
+    }
+    IFS= read -r token < "$OWUI_API_KEY_FILE" || true
+  else
+    # Compatibility reader for pre-migration maintenance.env files. New setup
+    # never writes an inline API key; it uses the package-owned protected file.
+    token="${OWUI_API_KEY:-}"
+  fi
+  [[ -n "$token" && "$token" != REPLACE_WITH_ADMIN_API_KEY && "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || {
+    echo "ERROR: Open WebUI maintenance credential is unavailable or malformed." >&2
+    echo "Run: sudo bc250 advanced openwebui init" >&2
+    return 1
+  }
+  printf '%s' "$token"
+}
+
+OWUI_API_KEY="$(resolve_owui_api_key)" || exit 1
 
 [[ "$MAX_AGE_DAYS" =~ ^[0-9]+$ ]] || { echo "ERROR: MAX_AGE_DAYS must be integer." >&2; exit 1; }
 [[ "$MAX_TOTAL_GB" =~ ^[0-9]+$ ]] || { echo "ERROR: MAX_TOTAL_GB must be integer." >&2; exit 1; }

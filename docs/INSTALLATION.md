@@ -21,6 +21,19 @@ curl -f http://SERVER_IP/
 Open `http://SERVER_IP/` from the trusted LAN. The guided installer can initialize the Open WebUI administrator and package-owned API baseline;
 it becomes the administrator.
 
+### What a healthy installation looks like
+
+After installation and any requested reboot, a normal appliance should be easy to recognize:
+
+- `sudo bc250 status` shows the normal main/task/embedding topology and no unexpected Agent mode;
+- `sudo bc250 health --json` completes without a product-health failure;
+- `sudo bc250 verify --summary` completes cleanly;
+- Open WebUI loads through nginx on the trusted LAN, while ports `11434`–`11437` remain blocked by the firewall;
+- the Open WebUI administrator credential is stored only in the protected package credential path and is reused by package maintenance/document tooling instead of copied into operator policy files;
+- optional specialist tools (Agent, OCR and MTP) stay inactive until an operator explicitly uses them.
+
+If these checks disagree, stop before importing important office data and use the relevant troubleshooting section in [`OPERATIONS.md`](OPERATIONS.md).
+
 ### Services and ports
 
 | Service | Listener | Purpose |

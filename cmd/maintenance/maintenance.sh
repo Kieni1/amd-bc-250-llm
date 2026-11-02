@@ -11,6 +11,7 @@ CONTRACT_DOC="${BC250_MAINTENANCE_CONTRACT:-/usr/share/doc/bc250-llm-server/docs
 ACCESS_HELPER="${BC250_MAINTENANCE_ACCESS_HELPER:-/usr/libexec/bc250-llm-server/maintenance-companion.sh}"
 SAFE_POWER_HELPER="${BC250_SAFE_POWER_HELPER:-/usr/libexec/bc250-llm-server/safe-power.sh}"
 POWER_CONTROL_USER="${BC250_POWER_CONTROL_USER:-bc250-power-control}"
+DEFAULT_OWUI_API_KEY_FILE="/var/lib/bc250-llm-server/secrets/openwebui-admin.key"
 
 # Future restore ownership belongs here: `bc250 maintenance restore config|users`.
 # Do not expose it until rollback, confirmation and exact-device restore qualification are designed.
@@ -106,6 +107,76 @@ set_setting() {
   ' "$CONFIG" > "$temporary"
   install -m0600 -- "$temporary" "$CONFIG"
   rm -f -- "$temporary"
+}
+
+unset_setting() {
+  local key="$1" temporary
+  [[ "$key" =~ ^[A-Z][A-Z0-9_]*$ ]] || {
+    echo "ERROR: invalid setting name: $key" >&2
+    exit 1
+  }
+  temporary="$(mktemp "${CONFIG}.XXXXXX")"
+  awk -v key="$key" '$0 !~ "^" key "=" { print }' "$CONFIG" > "$temporary"
+  install -m0600 -- "$temporary" "$CONFIG"
+  rm -f -- "$temporary"
+}
+
+maintenance_credential_state() {
+  local token_file legacy mode token
+  token_file="$(get_setting OWUI_API_KEY_FILE "$DEFAULT_OWUI_API_KEY_FILE")"
+  if [[ -L "$token_file" ]]; then
+    printf '%s' 'invalid-token-file-symlink'
+    return 1
+  fi
+  if [[ -f "$token_file" && -r "$token_file" ]]; then
+    mode="$(stat -c '%a' "$token_file" 2>/dev/null || true)"
+    token="$(<"$token_file")"
+    if [[ -n "$mode" ]] && (( (8#$mode & 8#077) == 0 )) && [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
+      printf 'protected-file:%s' "$token_file"
+      return 0
+    fi
+    printf 'invalid-token-file:%s' "$token_file"
+    return 1
+  fi
+  legacy="$(get_setting OWUI_API_KEY '')"
+  if [[ -n "$legacy" && "$legacy" != REPLACE_WITH_ADMIN_API_KEY && "$legacy" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
+    printf '%s' 'legacy-inline-key'
+    return 0
+  fi
+  printf 'missing:%s' "$token_file"
+  return 1
+}
+
+prefer_shared_maintenance_credential() {
+  local state
+  state="$(maintenance_credential_state 2>/dev/null || true)"
+  case "$state" in
+    protected-file:*)
+      if [[ -n "$(get_setting OWUI_API_KEY '')" ]]; then
+        unset_setting OWUI_API_KEY
+        echo "Removed the legacy inline Open WebUI key from maintenance.env; pruning now uses the protected package credential."
+      fi
+      return 0
+      ;;
+    legacy-inline-key)
+      echo "WARNING: using a legacy inline Open WebUI key from maintenance.env." >&2
+      echo "Run 'sudo bc250 advanced openwebui init' to establish the shared protected credential, then rerun maintenance setup." >&2
+      return 0
+      ;;
+    invalid-token-file-symlink)
+      echo "ERROR: protected Open WebUI credential must not be a symlink." >&2
+      return 1
+      ;;
+    invalid-token-file:*)
+      echo "ERROR: protected Open WebUI credential is unreadable, malformed or too broadly accessible: ${state#*:}" >&2
+      return 1
+      ;;
+    *)
+      echo "ERROR: Open WebUI maintenance credential is unavailable." >&2
+      echo "Run 'sudo bc250 advanced openwebui init' first; maintenance no longer asks users to store a second API key." >&2
+      return 1
+      ;;
+  esac
 }
 
 ask_yes_no() {
@@ -287,38 +358,13 @@ PY_SCHEDULE
 }
 
 setup_pruning() {
-  local token age ceiling prompt
+  local age ceiling
   if ! ask_yes_no "Configure upload pruning policy? It starts in DRY-RUN and will not delete anything yet" no; then
     disable_units owui-prune.timer
     return
   fi
 
-  token="$(get_setting OWUI_API_KEY '')"
-  if [[ -z "$token" || "$token" == REPLACE_WITH_ADMIN_API_KEY ]]; then
-    prompt="Open WebUI administrator API key"
-    token=''
-  elif [[ ! "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
-    echo "The stored Open WebUI API key contains unsupported characters; enter a replacement." >&2
-    prompt="New Open WebUI administrator API key"
-    token=''
-  elif ask_yes_no "Keep the existing stored Open WebUI API key" yes; then
-    prompt=''
-  else
-    prompt="New Open WebUI administrator API key"
-    token=''
-  fi
-  while [[ -n "$prompt" ]]; do
-    read -r -s -p "$prompt: " token || {
-      echo >&2
-      echo "ERROR: interactive input ended before setup was complete." >&2
-      exit 1
-    }
-    echo
-    if [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]]; then
-      break
-    fi
-    echo "The API key is empty or contains unsupported characters; please enter it again." >&2
-  done
+  prefer_shared_maintenance_credential || return 1
 
   while true; do
     age="$(ask_nonnegative_integer "Age threshold in days (0 disables age-based pruning)" "$(get_setting MAX_AGE_DAYS 90)")"
@@ -327,12 +373,12 @@ setup_pruning() {
     echo "At least one pruning rule must be enabled; set an age threshold or storage ceiling above zero." >&2
   done
 
-  set_setting OWUI_API_KEY "$token"
+  set_setting OWUI_API_KEY_FILE "$(get_setting OWUI_API_KEY_FILE "$DEFAULT_OWUI_API_KEY_FILE")"
   set_setting MAX_AGE_DAYS "$age"
   set_setting MAX_TOTAL_GB "$ceiling"
   set_setting DRY_RUN 1
   enable_units owui-prune.timer
-  echo "Upload pruning is enabled in DRY_RUN=1 mode. No uploads will be deleted until you review a manual run and explicitly set DRY_RUN=0."
+  echo "Upload pruning is enabled in DRY_RUN=1 mode. It uses the protected Open WebUI package credential and will not delete uploads until you review a manual run and explicitly set DRY_RUN=0."
 }
 
 setup_warmup() {
@@ -439,7 +485,7 @@ backup_summary() {
 }
 
 show_status() {
-  local api_state='not configured' warmup_state='disabled' power_state='disabled'
+  local api_state='not configured' credential_state warmup_state='disabled' power_state='disabled'
   if [[ -e "$CONFIG" && ! -r "$CONFIG" ]]; then
     echo "ERROR: maintenance configuration is private; run status with sudo." >&2
     return 1
@@ -448,7 +494,12 @@ show_status() {
     echo "Maintenance is not initialized. Run: sudo bc250 maintenance setup --defaults"
     return 0
   }
-  [[ "$(get_setting OWUI_API_KEY '')" != REPLACE_WITH_ADMIN_API_KEY && -n "$(get_setting OWUI_API_KEY '')" ]] && api_state=configured
+  credential_state="$(maintenance_credential_state 2>/dev/null || true)"
+  case "$credential_state" in
+    protected-file:*) api_state="protected package credential" ;;
+    legacy-inline-key) api_state="legacy inline key (migration recommended)" ;;
+    invalid-*) api_state="invalid credential state" ;;
+  esac
   if systemctl is-enabled --quiet owui-warmup.timer 2>/dev/null; then warmup_state=enabled; fi
   if systemctl is-enabled --quiet bc250-night-shutdown.timer 2>/dev/null; then power_state=enabled; fi
 
@@ -457,7 +508,7 @@ show_status() {
   echo "Schedules"
   for unit in "${ALL_TIMERS[@]}"; do timer_line "$unit"; done
   echo
-  echo "Policy (API key redacted)"
+  echo "Policy"
   printf '  Backups kept:       config=%s users=%s\n' "$(get_setting KEEP_CONFIG 7)" "$(get_setting KEEP_USERS 14)"
   printf '  Upload pruning:     age=%sd ceiling=%sGiB\n' \
     "$(get_setting MAX_AGE_DAYS 90)" "$(get_setting MAX_TOTAL_GB 20)"
@@ -466,7 +517,7 @@ show_status() {
   else
     echo "  Dry run:            disabled"
   fi
-  printf '  API key:            %s\n' "$api_state"
+  printf '  Open WebUI auth:    %s\n' "$api_state"
   if [[ "$warmup_state" == enabled ]]; then
     printf '  Warm-up:            enabled model=%s keep_alive=%s\n' \
       "$(get_setting WARMUP_MODEL prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl)" \
@@ -510,18 +561,19 @@ run_unit() {
 run_task() { run_unit "$1" "owui-maintenance@$1.service"; }
 
 preflight_prune() {
-  local key
-  key="$(get_setting OWUI_API_KEY '')"
-  [[ -n "$key" && "$key" != REPLACE_WITH_ADMIN_API_KEY ]] && return 0
-  printf '%s\n' \
+  if prefer_shared_maintenance_credential >/dev/null; then
+    return 0
+  fi
+  printf '%s
+' \
     'Upload pruning cannot run.' \
     '' \
-    'Reason: Open WebUI API key is not configured.' \
+    'Reason: the protected Open WebUI maintenance credential is unavailable or invalid.' \
     '' \
     "Current policy: age=$(get_setting MAX_AGE_DAYS 90)d; ceiling=$(get_setting MAX_TOTAL_GB 20)GiB" \
     "Dry run: $([[ $(get_setting DRY_RUN 1) == 1 ]] && echo enabled || echo disabled)" \
-    'Configure the protected Open WebUI credential and retry.' \
-    'No uploads were changed.' >&2
+    'Run: sudo bc250 advanced openwebui init' \
+    'Then rerun maintenance setup/status and retry. No uploads were changed.' >&2
   return 1
 }
 
