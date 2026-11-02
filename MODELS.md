@@ -7,6 +7,23 @@ host settings outside the appliance or document them before rerunning `install`.
 Operator Modelfiles under `/etc/bc250-llm-server/models.d/` remain the supported
 way to override packaged model definitions.
 
+## Which model should I use?
+
+Most office users should choose a curated Open WebUI **Office** role instead of a raw model ID:
+
+| Need | Recommended role | Backing model/policy |
+|---|---|---|
+| Routine drafting, rewriting and questions | **Office – Standard** | Gemma 4 E2B production baseline |
+| Questions grounded in reviewed local documents | **Office – Documents** | Gemma 4 E4B RAG answer baseline |
+| General work that benefits from a broader style/knowledge mix | **Office – Generalist** | Nemotron 3.5 Bolt E4B candidate; next-release DEVICE qualification still in progress |
+| Harder reasoning/general office tasks | **Office – Advanced** | Qwen3.5 9B with thinking enabled; current reliability-tail review remains open |
+| Predictable JSON/structured output | **Office – Advanced Structured** | same Qwen base with thinking disabled and separate request policy |
+| Explicit German↔French translation | **Translation DE→FR / FR→DE** | Translate-Gemma with fail-closed delivery checks |
+| Expensive deep reasoning | **Office – Deep** | GPT-OSS 20B; use when latency/memory cost is justified |
+| Coding/agent work | `bc250 advanced agent` | Ornith default on exclusive Agent lane |
+
+Raw `prod-*`, `exp-*`, `agentic-*` and MTP entries are useful for comparison and qualification. They are not a requirement for normal office users, and an experimental catalog entry is not a promotion decision.
+
 ## Stores and roles
 
 | Category | Name prefix | Ollama service | Purpose |
@@ -307,10 +324,28 @@ visible answer. A minimal intervention changing only request-level `presence_pen
 0.0 to 1.5 then passed 14/14 twice independently, including 8/8 backup, 4/4 constraint
 and 2/2 structured cases in each batch. The first controlled comparison reduced median
 backup latency from about 91.6 s to 48.1 s and reasoning volume from about 13.9k to 7.7k
-characters. The 0.20.0-2 source candidate therefore keeps `think=true` and adopts
-`presence_penalty=1.5` for the normal Advanced/raw higher-quality request policy. Advanced
-Structured remains its separately qualified `think=false` policy with the previous
-`presence_penalty=0.0` until that lane is independently retuned.
+characters.
+
+The completed 0.20.0-2 DEVICE long run showed that this intervention did **not**
+eliminate the full Advanced reasoning-tail family. Across 430 completed requests,
+Structured was 172/172 PASS with about 0.59 s median wall time and no tail observations.
+Advanced completed 258 requests: 104 PASS, 154 REVIEW and 153 known repeated-reasoning/
+tail observations (~59%), with about 31.9 s median wall time and a ~127.5 s maximum.
+`advanced-constraint` was 86/86 REVIEW; `advanced-backup` was 51/86 REVIEW; and
+`advanced-insufficient` was 17/86 REVIEW.
+
+A focused DEVICE A/B then compared the current `temperature=0.7, top_p=0.8` control
+against Qwen3.5-9B's upstream-aligned `temperature=1.0, top_p=0.95` thinking sampler with
+all other request policy held constant. Both arms were 72/72 semantically correct. The
+candidate reduced the aggregate tail rate from 62.5% to 51.39%, but `advanced-constraint`
+remained 100% tailing, `advanced-insufficient` regressed slightly, and p95 wall time and
+reasoning size worsened. The result is therefore mixed rather than a promotion win.
+
+0.20.0-3 retains the current `think=true`, `temperature=0.7`, `top_p=0.8`, `top_k=20`,
+`min_p=0.0`, `presence_penalty=1.5`, `repeat_penalty=1.0`, 6144-token Advanced policy and
+records the repeated-reasoning/latency family as a known model-quality REVIEW. Preserve
+all three Advanced cases for future model/settings comparisons. Advanced Structured remains
+its separately qualified `think=false` policy with `presence_penalty=0.0`.
 
 ### Production residency follow-up
 

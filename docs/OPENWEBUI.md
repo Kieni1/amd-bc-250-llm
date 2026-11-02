@@ -216,6 +216,24 @@ explicitly adopted and tested.
 
 Open WebUI 0.12 also adds several network/tool surfaces that are outside the appliance contract. The package explicitly keeps direct integrations, external tool servers, Tool Search, channels/encrypted channels, Apps, subagents, realtime voice, web search and Google Drive/OneDrive integrations disabled at bootstrap and persisted where supported. Skills are not enabled/adopted by this release; in 0.12.5 Skills remain outside the appliance contract; the upstream optional lazy-loading feature does not change that package policy.
 
+## Choosing an Office role
+
+Open WebUI should present the curated Office presets as the normal user-facing surface.
+Raw `prod-*`/`exp-*` implementations stay useful for comparison, but users should not
+need to understand quantization names or runtime lanes for ordinary work.
+
+- **Standard**: routine drafting, rewriting, summarization and questions.
+- **Documents**: answers grounded in reviewed local Knowledge/RAG.
+- **Translation DE → FR / FR → DE**: explicit direction-controlled translation with
+  fail-closed semantic delivery checks.
+- **Generalist**: broader 0.20.0 candidate for general office work; still under
+  exact-RPM DEVICE qualification.
+- **General / Higher Quality (Advanced)**: Qwen reasoning role for harder tasks; current
+  reliability-tail review is still open, so prefer Standard when extra reasoning is not needed.
+- **Advanced Structured**: same Qwen base with a separate non-thinking policy for concise,
+  predictable structured output.
+- **Deep Reasoning**: highest-cost reasoning path; use only when its latency/memory cost is justified.
+
 ## Package model presets
 
 `bc250 advanced openwebui` imports package-owned workspace presets:
@@ -226,7 +244,7 @@ Open WebUI 0.12 also adds several network/tool surfaces that are outside the app
 | Office – Documents | `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl` | active |
 | Office – Translation DE → FR | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
 | Office – Translation FR → DE | `prod-translate-gemma4-sub-e4b-17s-q4-k-xl` | active |
-| Office – Generalist | `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0-2 candidate |
+| Office – Generalist | `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0 candidate; interim DEVICE convergence passed |
 | Office – General / Higher Quality | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Advanced Structured | `prod-qwen35-9b-unsloth-q6-k` | active |
 | Office – Deep Reasoning | `prod-gpt-oss20b-ggml-org-mxfp4` | active |
@@ -235,11 +253,14 @@ For the current 16 GiB profile, **Office – Documents** is the production RAG/d
 The September 2026 product-path campaign found both Documents/Gemma E4B and Advanced/Qwen 9B
 functionally strong in short sessions, but only Gemma retained comfortable memory headroom during
 continuous residency. Keep Advanced as an optional heavier general-office role rather than treating
-it as an equivalent long-lived RAG default. The 0.20.0-2 Advanced request policy keeps `think=true`
-and the existing 0.7/0.8/top-k-20 sampler but changes request-level `presence_penalty` to 1.5 after
-two independent DEVICE intervention batches passed 14/14. Advanced Structured remains a distinct
-`think=false`, `presence_penalty=0.0` contract. Office - Generalist is a separate community-Nemotron
-candidate and does not silently replace Advanced.
+it as an equivalent long-lived RAG default. The current Advanced control keeps `think=true`
+and the existing 0.7/0.8/top-k-20 sampler with request-level `presence_penalty=1.5`; two earlier
+DEVICE intervention batches passed 14/14, but interim repeated DEVICE testing later reproduced a
+broader reasoning-tail/latency family. Keep that policy as the comparison control while the long
+reliability soak is reviewed rather than treating the intervention as fully closed. Advanced
+Structured remains a distinct `think=false`, `presence_penalty=0.0` contract and has not shown the
+same tail family. Office - Generalist is a separate community-Nemotron candidate and does not
+silently replace Advanced.
 
 The two active Translate-Gemma roles reproduce the selected Stage-2E product contract.
 Both use the exact installed `openwebui/prompts/translation-explicit-direction-v1.txt`

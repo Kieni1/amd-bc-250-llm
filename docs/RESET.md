@@ -17,6 +17,17 @@ appliance state.
 
 ## Reset the dedicated appliance
 
+### Before you reset
+
+Reset is intentionally destructive. Before confirming it:
+
+1. export/copy any Open WebUI chats, accounts or application state you intend to keep;
+2. copy `/var/backups/bc250-llm-server` off the appliance if those local backups matter;
+3. confirm the authoritative `/srv/bc250-documents` tree is complete and backed up according to your office policy;
+4. record any custom model/operator configuration under `/etc/bc250-llm-server` that you may want to recreate later.
+
+The command preserves `/srv/bc250-documents`, but preservation on the same disk is **not** a backup against disk loss. Open WebUI application state and package-managed model/runtime state are removed.
+
 ```bash
 sudo bc250 reset --help
 sudo bc250 reset

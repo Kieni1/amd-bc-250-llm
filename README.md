@@ -4,15 +4,23 @@ BC-250 LLM Server is a Fedora 44 appliance for private, local office AI on AMD B
 It provides a Vulkan-oriented Ollama stack, Open WebUI, managed document workflows, model management,
 hardware profiles, diagnostics and optional specialist tools.
 
-Current accepted package: `bc250-llm-server-0.14.1-1.13`. It retains the 1.12-qualified runtime/dependency stack (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full, governor 0.4.14), and its focused changed-surface DEVICE campaign plus full packaged revalidation accepted the exact 1.13 candidate.
+Current accepted DEVICE baseline: `bc250-llm-server-0.14.1-1.13`. It retains the 1.12-qualified runtime/dependency stack (Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full, governor 0.4.14), and its focused changed-surface DEVICE campaign plus full packaged revalidation accepted the exact 1.13 candidate.
 
-Release `bc250-llm-server-0.14.1-1.13` remains the accepted predecessor baseline. The current source candidate is `bc250-llm-server-0.20.0-2`: it carries the bounded 1.13 hardening forward, establishes the DE/FR-first office/RAG measurement contracts, refreshes the managed model tournament, adds Office - Generalist, integrates the reproduced Qwen Advanced presence-penalty intervention, and keeps Ornith with contract-first Bash qualification wording. Exact 0.20.0-2 BUILD/DEVICE evidence is still required; GitHub/Fedora 44 selected workflow-dispatch artifacts remain release authority for final release selection. The prior 0.20.0-1 build reached DEVICE installation but normal model convergence stopped when Ollama rejected the AtomicChat Generalist registry tag as a sharded GGUF; 0.20.0-2 corrects only that acquisition path by downloading the exact nested GGUF under BC-250 manager ownership before local Ollama registration.
+The selected next SOURCE candidate is **`bc250-llm-server-0.20.0-3`**. DEVICE testing of the interim `0.20.0-2` candidate confirmed the Nemotron Generalist acquisition repair, repeated convergence/idempotence, normal Open WebUI publication/topology and Agent restoration. It also exposed a rootful-Podman privilege mismatch in the campaign Tika operator path and a translation clock-preservation oracle false negative; 0.20.0-3 corrects both, refreshes deliberately thawed/refrozen specialist and maintenance surfaces, and improves current operator documentation. A focused Qwen Advanced sampler A/B did not clearly justify replacing the existing `0.7/0.8` sampler, so production policy remains unchanged and its repeated-reasoning/latency tail stays a known model-quality REVIEW. GitHub/Fedora 44 BUILD evidence and exact-RPM DEVICE acceptance remain separate and must be collected for these exact finalized SOURCE bytes.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
 operator controls. It is not an Internet-facing appliance, and neither model
 outputs nor experimental hardware settings should be treated as production
 assurances.
+
+## What this appliance is for
+
+For an ordinary office user, the intended entry point is Open WebUI at `http://SERVER_IP/` and the curated **Office** roles: Standard for routine drafting, Documents for grounded work over reviewed local knowledge, Translation for explicit DE↔FR translation, Generalist/Advanced for harder general work, and Deep only when the extra latency is justified. Users should not need to manage raw model names for normal work.
+
+For the appliance operator, the normal lifecycle is intentionally small: `bc250 status`, `bc250 health`, `bc250 verify`, controlled model/document updates, verified local backups, and occasional package upgrades. Advanced benchmark, Agent, MTP and OCR commands are opt-in specialist tools; they are not prerequisites for a healthy office appliance.
+
+The filesystem corpus under `/srv/bc250-documents` remains the source of truth for managed organizational knowledge. Preparation stops at a human-review boundary before content becomes active Open WebUI Knowledge, so the appliance never silently promotes raw files into trusted organizational context.
 
 ## Install
 
@@ -80,7 +88,7 @@ sudo bc250 support-bundle   # redacted mode-0600 archive exported to this direct
 
 Release qualification adds `sudo bc250 advanced qualification capture` and the durable
 `sudo bc250 advanced resilience ...` manager. See [`docs/QUALIFICATION.md`](docs/QUALIFICATION.md)
-for the closed gate format, Tika 4.1 bounded smoke, interruption semantics and
+for the closed gate format, Tika 4.2 bounded smoke, interruption semantics and
 post-reboot Lane 26 resume rules. `sudo bc250 advanced qualification list` inventories package-gate and
 resilience evidence; `qualification clean` is dry-run-first and only prunes old terminal evidence.
 
@@ -131,7 +139,7 @@ reached the campaign's 512 MiB safety floor after only a few resident subruns. Q
 separate higher-quality general-office option; this RAG decision is about sustained memory margin,
 not a semantic-quality failure.
 
-The 0.20.0-2 source candidate refreshes the comparison catalog around live product questions. Official
+The finalized 0.20.0-3 SOURCE retains the 0.20.0 comparison catalog around live product questions. Official
 LFM3-1.7B, Nemotron 3.5 Bolt E4B, Index-Translate 2B/9B, LFM3-VL-2B and Spark-X2.6-4B are paired with
 bounded community/uncensored controls, including AtomicChat LFM3/Nemotron, DavidAU Defiant-Fable,
 GSQ-RCO Spark and NeoHorse agent variants. `exp-granite42-3b-ibm-q6-k`, the two ISTA Qwen3.8 27B
@@ -198,7 +206,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 Release 0.14.1-1.12 is the accepted runtime/dependency DEVICE baseline. It updated Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full while retaining the four-lane Vulkan/iGPU topology, model set and retrieval tuning; the completed DEVICE campaign also covered malformed-input containment, broad Tika formats, RAG endurance, parallel ingestion, restart persistence and full authenticated revalidation.
 
-Release 0.14.1-1.13 is the current DEVICE-accepted package baseline. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces. The numbered 0.20.0-2 source candidate now carries the subsequent quality-campaign/model work separately.
+Release 0.14.1-1.13 is the current DEVICE-accepted package baseline. It does not change those dependency/model/RAG pins. Its package-owned changes are ingestion failure semantics and wording, upgrade provenance, model-reconciliation provenance/UX, and the corresponding regression/documentation surfaces. The selected 0.20.0-3 SOURCE candidate carries the subsequent quality-campaign/model work separately; exact BUILD and DEVICE acceptance remain pending.
 
 Release 0.14.1-1.9 remains an older broad device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
@@ -248,7 +256,7 @@ Repository groups:
 - [`docs/OPENWEBUI.md`](docs/OPENWEBUI.md): Open WebUI setup, desired state, roles and API boundary.
 - [`docs/OLLAMA.md`](docs/OLLAMA.md): Ollama runtime topology, profiles and safe updates.
 - [`docs/RAG.md`](docs/RAG.md): office-document/RAG lifecycle and retrieval policy.
-- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation. The 0.20.0-2 quality campaign foundation audits current settings, keeps real PDFs external, separates Tika/retrieval from generation, validates gold evidence against exact extraction output, and requires an explicit retrieval freeze before fixed-evidence replay without changing production defaults.
+- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md): benchmarks, qualification and result interpretation. The 0.20.0-3 quality-campaign foundation audits current settings, keeps real PDFs external, separates Tika/retrieval from generation, validates gold evidence against exact extraction output, and requires an explicit retrieval freeze before fixed-evidence replay without changing production defaults.
 - [`docs/QUALITY-CHECKS.md`](docs/QUALITY-CHECKS.md): candidate-quality screens and evidence semantics.
 - [`docs/SECURITY.md`](docs/SECURITY.md): hardening, network exposure and secret handling.
 - [`docs/HTTPS.md`](docs/HTTPS.md): TLS publication example and checklist.

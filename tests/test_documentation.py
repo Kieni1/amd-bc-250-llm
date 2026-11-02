@@ -127,6 +127,23 @@ class DocumentationTests(unittest.TestCase):
         self.assertNotIn("remains only in the retired as historical", openwebui)
         self.assertNotIn("0.14.1-1.7 release line", scope)
 
+    def test_current_user_docs_reflect_wip_and_shared_credential_contract(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        tldr = (ROOT / "TLDR.md").read_text(encoding="utf-8")
+        qualification = (ROOT / "docs/QUALIFICATION.md").read_text(encoding="utf-8")
+        security = (ROOT / "docs/SECURITY.md").read_text(encoding="utf-8")
+        files = (ROOT / "docs/FILESTRUCTURE.md").read_text(encoding="utf-8")
+        maintenance_example = (ROOT / "config/maintenance/owui-maintenance.env").read_text(encoding="utf-8")
+
+        self.assertIn("selected next SOURCE candidate", readme)
+        self.assertIn("no authoritative release identity", tldr)
+        self.assertIn("pinned Tika 4.2.0 parser", qualification)
+        self.assertNotIn("pinned Tika 4.1 parser", qualification)
+        self.assertIn("/var/lib/bc250-llm-server/secrets/openwebui-admin.key", security)
+        self.assertIn("/var/lib/bc250-llm-server/secrets/openwebui-admin.key", files)
+        self.assertIn("OWUI_API_KEY_FILE=", maintenance_example)
+        self.assertNotIn("OWUI_API_KEY=", maintenance_example)
+
     def test_current_operator_reference_is_gfx_free(self) -> None:
         operations = (ROOT / "docs/OPERATIONS.md").read_text(encoding="utf-8")
         self.assertNotIn("GFX", operations)
@@ -355,22 +372,21 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("Keep every existing `tests/test_*.py` module", strategy)
         self.assertIn("full suite is advisory", strategy)
 
-    def test_workbench_records_current_release_without_reconstruction_checkpoints(self) -> None:
+    def test_workbench_records_finalized_source_without_promoting_build_or_device(self) -> None:
         workbench = json.loads((ROOT / "WORKBENCH-STATE.json").read_text(encoding="utf-8"))
         self.assertEqual(workbench["schema"], 2)
         self.assertEqual(workbench["kind"], "release-workbench")
         _version, _release, nvr = current_identity()
         self.assertEqual(workbench["release"]["nvr"], nvr)
-        self.assertEqual(workbench["release"]["state"], "0.20.0-2-source-corrected-awaiting-authoritative-build")
+        self.assertEqual(workbench["release"]["state"], "source-finalized-awaiting-authoritative-build-and-device")
         self.assertNotIn("checkpoint", workbench)
-        self.assertIn("0.20.0-2", workbench["next_work"]["current_batch"])
-        self.assertIn("quality", workbench["next_work"]["current_batch"].casefold())
-        self.assertIn("steps 3-9", workbench["next_work"]["current_batch"].casefold())
-        self.assertIn("retrieval", workbench["next_work"]["current_batch"].casefold())
+        self.assertIn("source finalized", workbench["current_batch"].casefold())
+        self.assertIn("selected finalized source candidate", workbench["long_term"]["direction"].casefold())
+        self.assertIn("qwen", workbench["next_work"]["current_batch"].casefold())
+        self.assertIn("refreez", workbench["next_work"]["current_batch"].casefold())
         self.assertTrue(workbench["next_work"]["next_batch"].strip())
-        self.assertIn("tika", workbench["next_work"]["next_batch"].casefold())
-        self.assertIn("0.14.1-1.13 remains DEVICE-accepted", workbench["long_term"]["direction"])
-        self.assertIn("1.13", workbench["long_term"]["direction"])
+        self.assertIn("authoritative fedora 44 github build", workbench["next_work"]["next_batch"].casefold())
+        self.assertIn("0.14.1-1.13", workbench["long_term"]["direction"])
         self.assertIn("Exact 0.14.1-1.13", workbench["validation"]["device_acceptance"])
         rpm_check = workbench["validation"]["rpm_package_check"]
         self.assertIn("1.13", rpm_check)
@@ -381,7 +397,7 @@ class DocumentationTests(unittest.TestCase):
         ollama = (ROOT / "docs/OLLAMA.md").read_text(encoding="utf-8")
         _version, _release, _nvr = current_identity()
         self.assertIn("Package standard: **Ollama v0.40.13**", ollama)
-        self.assertIn("0.20.0-2", ollama)
+        self.assertIn("0.20.0", ollama)
         self.assertIn("four-lane service topology", ollama)
         self.assertIn("0.40.13 review found no upstream change requiring different values", ollama)
         self.assertIn("Release 1.12 refreshed and DEVICE-qualified", ollama)

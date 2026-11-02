@@ -137,6 +137,6 @@ space-management QoL only; it never changes qualification results.
 
 ## 1.8 package-gate corrections
 
-The Tika extraction smoke uses an alphanumeric deterministic marker that is preserved literally by the pinned Tika 4.1 parser. A failed extraction records both the expected marker and observed extracted text so parser-formatting changes are diagnosable rather than reported as a generic RAG failure.
+The Tika extraction smoke uses an alphanumeric deterministic marker that is preserved literally by the pinned Tika 4.2.0 parser. A failed extraction records both the expected marker and observed extracted text so parser-formatting changes are diagnosable rather than reported as a generic RAG failure.
 
 `bc250 verify` validates operational appliance health **and package-owned live runtime identity**. It is still not release authority: package acceptance additionally requires the authoritative `bc250 advanced qualification` evidence and the applicable release/device gates.
