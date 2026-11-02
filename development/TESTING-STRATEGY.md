@@ -13,6 +13,31 @@ Testing has three jobs:
 
 Do not revive the old reconstruction milestone ladder or historical GFX qualification campaign.
 
+## Development cadence: prove each fact once at the right layer
+
+Do not repeatedly run release-wide checks while the source is still changing. Use three explicit stages:
+
+### Open WIP
+
+When the user asks to **start working on the next release**, change source/tests/docs as needed but keep the release open. Run only the smallest useful changed-surface feedback:
+
+- syntax/compile/parsing for changed files;
+- focused unit tests for the changed behavior;
+- affected contract/schema tests;
+- a scope/integrity check only when the change actually touches a governed/frozen boundary.
+
+Do not infer a version/release bump, release preparation, full source archive, cumulative patch regeneration or final artifact verification from “start working”, “next RPM”, or similar WIP language. Intermediate snapshots are development conveniences, not release authority.
+
+### Prepare release
+
+When the user explicitly asks to **prepare the release**, close the intended source scope first, then perform release/version bookkeeping once and run one coherent source-integration pass. Re-run only checks invalidated by any late edit. This is where current guidance, source scope, release identity and relevant package-critical contracts should converge.
+
+### Finalize/release
+
+When the user explicitly asks to **finalize/release**, run the package-defined blocking SOURCE/release gates in the appropriate environment, generate the authoritative source/changed-files/patch artifacts, and verify their integrity/round-trip once. GitHub/Fedora 44 remains authoritative for BUILD evidence, and exact-RPM DEVICE evidence remains separate.
+
+A useful rule is: **focused tests prove the change; integration checks prove source coherence; artifact checks prove release representation; GitHub proves the build; DEVICE proves the installed product.** Do not duplicate the same fact at every layer without a concrete regression reason.
+
 ## Test layers
 
 ### Release-critical preflight
@@ -110,8 +135,8 @@ installed NEVRA
 kernel/device identity when relevant
 exact commands
 observed result
-classification (PASS / FAIL / INCOMPLETE / HARNESS_ERROR / REVIEW)
+block classification (`PASS` / `DEFECT` / `CHECK_ERROR` / `NOT_TESTED` / `REVIEW`); keep model-level `INCOMPLETE` or other evaluator outcomes inside the block evidence rather than overloading the block result
 cleanup/restoration result for stateful tests
 ```
 
-A wrapper timeout, missing optional fixture, root-permission mismatch or stale expectation is a harness/environment problem until product failure is demonstrated.
+A wrapper timeout, missing optional fixture, root-permission mismatch or stale expectation is `CHECK_ERROR`/harness-environment evidence until product failure is demonstrated. A generic nonzero return is never enough to classify `DEFECT`.
