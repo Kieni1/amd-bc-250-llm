@@ -481,16 +481,23 @@ Current OCR test set:
 | `exp-glm-ocr-ggml-q8-0` | current fidelity leader on packaged office fixtures |
 | `exp-ovisocr2-abiray-q8-0` | faster page-to-Markdown/table alternative |
 
-Use `bc250 ocr` for reproducible ingestion tests rather than exposing OCR models
+Use `bc250 ocr` for reproducible OCR preparation rather than exposing OCR models
 as normal chat models:
 
 ```bash
 bc250 ocr list
+sudo bc250 ocr status glm
+sudo bc250 ocr install glm
+bc250 ocr show glm
 bc250 ocr test glm /PATH/TO/ONE-SCANNED-PAGE.png
 ```
 
-Use the engine names reported by `bc250 ocr list`. For the current experimental
-OCR workflow, process page images individually, preserve page order, and review
+`list` is package/catalog discovery. `status` shows whether the selected OCR source and
+Ollama registration are actually current, while `show` asks Ollama for the registered
+runtime metadata. `test` does not modify Open WebUI Knowledge or the managed corpus; it
+prints OCR output for operator review. Use the engine names reported by `bc250 ocr list`.
+For the current experimental OCR workflow, process page images individually, preserve
+page order, and review
 the OCR output against the source. If that text should enter the managed corpus,
 retain the exact source file under the collection's `sources/`, create a proper
 Markdown draft under `working/` using the packaged `examples/document/document-template.md`

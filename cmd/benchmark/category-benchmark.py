@@ -45,10 +45,11 @@ from benchmark_common import (
     resolve_package_resource,
     result_record,
     semantic_identifier_equivalent,
+    semantic_time_values,
     translation_direction_wrappers,
-    translation_literal_integrity_mismatch,
     translation_modality_mismatch,
     translation_numeric_values,
+    translation_preservation_ok,
     translation_system_prompt,
     write_benchmark_metadata,
     write_result_summary,
@@ -1776,24 +1777,6 @@ def _semantic_dates(text: str) -> set[tuple[int, int, int]]:
     return values
 
 
-def _semantic_times(text: str) -> set[tuple[int, int]]:
-    """Extract unambiguous 24-hour and AM/PM times for acceptance checks."""
-    values: set[tuple[int, int]] = set()
-    folded = unicodedata.normalize("NFKC", text).casefold()
-    for match in re.finditer(r"(?<!\d)([01]?\d|2[0-3]):([0-5]\d)(?!\d)", folded):
-        values.add((int(match.group(1)), int(match.group(2))))
-    for match in re.finditer(r"(?<!\d)(1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)\b", folded):
-        hour = int(match.group(1))
-        minute = int(match.group(2) or 0)
-        period = match.group(3)[0]
-        if period == "a":
-            hour = 0 if hour == 12 else hour
-        else:
-            hour = 12 if hour == 12 else hour + 12
-        values.add((hour, minute))
-    return values
-
-
 def _is_standalone_semantic_date(term: str) -> bool:
     folded = unicodedata.normalize("NFKC", term).casefold().strip()
     if re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}", folded):
@@ -1809,7 +1792,7 @@ def _is_standalone_semantic_date(term: str) -> bool:
 
 def _is_standalone_semantic_time(term: str) -> bool:
     folded = unicodedata.normalize("NFKC", term).casefold().strip()
-    if re.fullmatch(r"(?:[01]?\d|2[0-3]):[0-5]\d", folded):
+    if re.fullmatch(r"(?:[01]?\d|2[0-3])\s*(?::|h)\s*[0-5]\d", folded):
         return True
     return re.fullmatch(
         r"(?:1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*(?:a\.?m\.?|p\.?m\.?)",
@@ -1831,8 +1814,8 @@ def _semantic_acceptance_equivalent(text: str, term: str) -> bool:
         if expected_dates and expected_dates.issubset(_semantic_dates(text)):
             return True
     if _is_standalone_semantic_time(term):
-        expected_times = _semantic_times(term)
-        if expected_times and expected_times.issubset(_semantic_times(text)):
+        expected_times = semantic_time_values(term)
+        if expected_times and expected_times.issubset(semantic_time_values(text)):
             return True
     return bool(
         _is_standalone_semantic_invoice(term)
@@ -2196,15 +2179,13 @@ def translation_content_checks(
     forbidden_ok = not any(
         acceptance_text(term) in folded for term in case.get("forbidden", [])
     )
-    preserved_ok = all(
-        acceptance_text(term) in folded for term in case.get("preserve", [])
+    preserved_ok = translation_preservation_ok(
+        str(case.get("input") or ""),
+        content,
+        preserve=case.get("preserve", []),
+        numeric_values=case.get("numeric_values", []),
+        normalize=acceptance_text,
     )
-    expected_numbers = {Decimal(str(value)) for value in case.get("numeric_values", [])}
-    if expected_numbers:
-        preserved_ok = preserved_ok and expected_numbers.issubset(numeric_values(content))
-    preserved_ok = preserved_ok and translation_literal_integrity_mismatch(
-        str(case.get("input") or ""), content
-    ) is None
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     return required_ok, forbidden_ok, preserved_ok, meaningful_ok
 

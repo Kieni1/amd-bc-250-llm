@@ -10,9 +10,11 @@ bundles without changing production model or RAG configuration.
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import json
 import mimetypes
+import os
 import re
 import subprocess
 import sys
@@ -925,8 +927,69 @@ with urllib.request.urlopen(request, timeout=120) as response:
 '''.strip()
 
 
+@functools.lru_cache(maxsize=8)
+def rootful_podman_command(container: str) -> tuple[str, ...]:
+    """Return the package-owned Podman command prefix for a rootful container.
+
+    Benchmark evidence remains operator-owned.  Only the Podman namespace crossing
+    is privileged, rather than requiring the whole campaign command to run as root.
+    """
+    if os.geteuid() == 0:
+        prefix = ("podman",)
+    else:
+        try:
+            credential = subprocess.run(
+                ["sudo", "-n", "true"],
+                capture_output=True,
+                check=False,
+                timeout=10,
+            )
+        except FileNotFoundError as exc:
+            raise BenchmarkError(
+                "sudo is required to access the package-owned rootful Podman namespace"
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            raise BenchmarkError("sudo credential check timed out") from exc
+        if credential.returncode != 0:
+            try:
+                credential = subprocess.run(["sudo", "-v"], check=False, timeout=60)
+            except subprocess.TimeoutExpired as exc:
+                raise BenchmarkError("sudo authentication timed out") from exc
+            if credential.returncode != 0:
+                raise BenchmarkError(
+                    "cannot authenticate access to the package-owned rootful Podman "
+                    "namespace; run sudo -v and retry the same unprivileged "
+                    "tika-extract command"
+                )
+        prefix = ("sudo", "-n", "podman")
+
+    try:
+        visible = subprocess.run(
+            [*prefix, "inspect", container],
+            capture_output=True,
+            check=False,
+            timeout=20,
+        )
+    except FileNotFoundError as exc:
+        raise BenchmarkError(
+            "podman is required for the private Tika extraction benchmark"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise BenchmarkError(
+            f"timed out while checking package container {container!r}"
+        ) from exc
+    if visible.returncode != 0:
+        detail = visible.stderr.decode("utf-8", "replace").strip()
+        raise BenchmarkError(
+            f"package Open WebUI container {container!r} is not available in the "
+            f"rootful Podman namespace: {detail or 'podman inspect failed'}"
+        )
+    return prefix
+
+
 def tika_extract(path: Path, endpoint: str, container: str) -> bytes:
     mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    podman = rootful_podman_command(container)
     try:
         source = path.open("rb")
     except OSError as exc:
@@ -935,7 +998,7 @@ def tika_extract(path: Path, endpoint: str, container: str) -> bytes:
         with source:
             result = subprocess.run(
                 [
-                    "podman", "exec", "-i", container, "python", "-c",
+                    *podman, "exec", "-i", container, "python", "-c",
                     TIKA_CONTAINER_SCRIPT, endpoint, mime, path.name,
                 ],
                 stdin=source,
@@ -2034,7 +2097,10 @@ def parser() -> argparse.ArgumentParser:
     corpus.add_argument("--corpus-dir", required=True)
     corpus.add_argument("--output-dir")
 
-    tika = sub.add_parser("tika-extract", help="evaluate Tika extraction independently through the private container path")
+    tika = sub.add_parser(
+        "tika-extract",
+        help="evaluate Tika extraction through the package-owned rootful container path",
+    )
     tika.add_argument("--manifest", required=True)
     tika.add_argument("--corpus-dir", required=True)
     tika.add_argument("--container", default="open-webui")

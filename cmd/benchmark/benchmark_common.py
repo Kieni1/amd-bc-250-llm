@@ -20,7 +20,7 @@ import sys
 import threading
 import time
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -198,6 +198,82 @@ def translation_numeric_values(text: str) -> set[Any]:
     if not callable(normalizer):
         raise BenchmarkError("translation contract does not define numeric_values")
     return set(normalizer(text))
+
+
+def semantic_time_values(text: str) -> set[tuple[int, int]]:
+    """Extract unambiguous clock values across common office renderings.
+
+    Benchmark quality checks may accept locale-equivalent presentation such as
+    ``18:00`` and French ``18h00`` while still requiring the underlying clock
+    value to survive translation unchanged.  This is deliberately benchmark
+    semantics, not an expansion of the runtime fail-closed literal filter.
+    """
+    values: set[tuple[int, int]] = set()
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    for match in re.finditer(
+        r"(?<!\d)([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)(?!\d)", folded
+    ):
+        values.add((int(match.group(1)), int(match.group(2))))
+    for match in re.finditer(
+        r"(?<!\d)(1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?)\b",
+        folded,
+    ):
+        hour = int(match.group(1))
+        minute = int(match.group(2) or 0)
+        period = match.group(3)[0]
+        if period == "a":
+            hour = 0 if hour == 12 else hour
+        else:
+            hour = 12 if hour == 12 else hour + 12
+        values.add((hour, minute))
+    return values
+
+
+def _standalone_semantic_time(text: str) -> bool:
+    folded = unicodedata.normalize("NFKC", text).casefold().strip()
+    return re.fullmatch(
+        r"(?:[01]?\d|2[0-3])\s*(?::|h)\s*[0-5]\d", folded
+    ) is not None or re.fullmatch(
+        r"(?:1[0-2]|0?[1-9])(?:[:.]([0-5]\d))?\s*(?:a\.?m\.?|p\.?m\.?)",
+        folded,
+    ) is not None
+
+
+def translation_preservation_ok(
+    source: str,
+    target: str,
+    *,
+    preserve: Iterable[Any] = (),
+    numeric_values: Iterable[Any] = (),
+    normalize: Callable[[str], str],
+) -> bool:
+    """Evaluate benchmark-only translation preservation requirements once.
+
+    Direct and Open WebUI translation benchmarks share this quality oracle so
+    presentation-equivalent clock values, numeric preservation and the runtime
+    literal-integrity authority cannot drift between the two paths.
+    """
+    folded = normalize(target)
+    target_times = semantic_time_values(target)
+    for raw_term in preserve:
+        term = str(raw_term)
+        expected_times = semantic_time_values(term)
+        if _standalone_semantic_time(term) and expected_times:
+            if not expected_times.issubset(target_times):
+                return False
+        elif normalize(term) not in folded:
+            return False
+
+    observed_numbers = translation_numeric_values(target)
+    for raw_value in numeric_values:
+        expected = translation_numeric_values(str(raw_value))
+        if not expected or not expected.issubset(observed_numbers):
+            return False
+
+    source_times = semantic_time_values(source)
+    if source_times and not source_times.issubset(target_times):
+        return False
+    return translation_literal_integrity_mismatch(source, target) is None
 
 
 def translation_literal_integrity_mismatch(source: str, target: str) -> str | None:

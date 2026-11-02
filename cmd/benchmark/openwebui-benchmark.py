@@ -19,7 +19,6 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable
-from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -39,9 +38,8 @@ from benchmark_common import (
     result_record,
     semantic_identifier_equivalent,
     semantic_invoice_identifiers,
-    translation_literal_integrity_mismatch,
     translation_modality_mismatch,
-    translation_numeric_values,
+    translation_preservation_ok,
     write_benchmark_metadata,
     write_result_summary,
 )
@@ -555,11 +553,6 @@ def translation_acceptance_text(text: str) -> str:
     return " ".join(normalized.casefold().split())
 
 
-def translation_numeric_values_for_checks(text: str) -> set[Decimal]:
-    """Use the package runtime translation numeric authority."""
-    return {Decimal(value) for value in translation_numeric_values(text)}
-
-
 def owui_translation_modality_detail(case: dict[str, Any], content: str) -> str | None:
     semantic_contract = str(case.get("semantic_contract") or "").casefold()
     if semantic_contract != "modality" and "modality" not in str(case.get("id") or "").casefold():
@@ -597,17 +590,13 @@ def owui_translation_checks(content: str, case: dict[str, Any]) -> tuple[bool, l
     forbidden_ok = not any(
         translation_acceptance_text(term) in folded for term in case.get("forbidden", [])
     )
-    preserved_ok = all(
-        translation_acceptance_text(term) in folded for term in case.get("preserve", [])
+    preserved_ok = translation_preservation_ok(
+        str(case.get("input") or ""),
+        content,
+        preserve=case.get("preserve", []),
+        numeric_values=case.get("numeric_values", []),
+        normalize=translation_acceptance_text,
     )
-    expected_numbers = {Decimal(str(value)) for value in case.get("numeric_values", [])}
-    if expected_numbers:
-        preserved_ok = preserved_ok and expected_numbers.issubset(
-            translation_numeric_values_for_checks(content)
-        )
-    preserved_ok = preserved_ok and translation_literal_integrity_mismatch(
-        str(case.get("input") or ""), content
-    ) is None
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     modality_case = (
         str(case.get("semantic_contract") or "").casefold() == "modality"

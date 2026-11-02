@@ -10,7 +10,7 @@ Revalidation does not choose settings. Tuning and A/B comparisons are explicit b
 
 ## Office/RAG quality campaign foundation
 
-The 0.20.0-2 source candidate adds a staged campaign surface while preserving the accepted predecessor roles and RAG settings as controls. It also adds one explicit Office - Generalist candidate and additional managed challengers for qualification:
+The finalized 0.20.0-3 SOURCE retains the staged campaign surface while preserving the accepted predecessor roles and RAG settings as controls. It also retains one explicit Office - Generalist candidate and additional managed challengers for qualification:
 
 ```bash
 bc250 advanced benchmark campaign audit
@@ -29,7 +29,7 @@ bc250 advanced benchmark campaign fixed-replay --bundle FIXED-EVIDENCE.json MODE
 
 The real PDF corpus is **external benchmark input**. `corpus-inventory` is the Step-4 starting point: it recursively inventories external PDFs without copying them, records deterministic safe logical IDs, relative paths, SHA-256, byte size, PDF-header sanity and byte-identical duplicates, and leaves language/source annotation explicitly unresolved for review. Symlinked PDFs are rejected so the inventory cannot silently escape the declared corpus root. The inventory is measurement evidence, not a finished gold manifest.
 
-`corpus-validate` validates path-safe logical document/question IDs, safe relative paths, SHA-256, size, languages and gold-evidence references and writes a corpus lock into the result directory. A corpus manifest may deliberately contain `questions: []` during Steps 4–5 so provenance and Tika extraction can be established before Step 6 creates gold questions. Retrieval scoring and fixed-evidence export still require at least one gold question. Logical IDs are restricted to `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` because they become evidence artifact names. The tooling never copies the source PDFs into the repository/package fixture tree. `tika-extract` streams each external file through the private Open WebUI-container → Tika path, saves raw JSON and extracted text in benchmark evidence, and scores only conservative literal extraction gold when such gold is present. Missing/blank `tk:content` and the pinned Open WebUI placeholder `<No text content found>` are scored as no usable extraction rather than document text. It does not use embeddings or generation.
+`corpus-validate` validates path-safe logical document/question IDs, safe relative paths, SHA-256, size, languages and gold-evidence references and writes a corpus lock into the result directory. A corpus manifest may deliberately contain `questions: []` during Steps 4–5 so provenance and Tika extraction can be established before Step 6 creates gold questions. Retrieval scoring and fixed-evidence export still require at least one gold question. Logical IDs are restricted to `[A-Za-z0-9][A-Za-z0-9._-]{0,127}` because they become evidence artifact names. The tooling never copies the source PDFs into the repository/package fixture tree. `tika-extract` remains an ordinary operator command even though the packaged Open WebUI/Tika containers live in the rootful Podman/Quadlet namespace. The campaign keeps its evidence/output files operator-owned and crosses only the package-runtime boundary through a narrowly scoped `sudo` Podman call; when no sudo credential is active it authenticates that boundary before continuing. Tika stays private and is not published on a host port. It streams each external file through the private Open WebUI-container → Tika path, saves raw JSON and extracted text in benchmark evidence, and scores only conservative literal extraction gold when such gold is present. Missing/blank `tk:content` and the pinned Open WebUI placeholder `<No text content found>` are scored as no usable extraction rather than document text. It does not use embeddings or generation.
 
 `gold-validate` is the Step-6 gate between extraction and retrieval. It requires a non-empty gold-question set and binds it to the exact Step-5 Tika evidence: corpus ID/hash/size provenance must match, every required/acceptable/conflicting evidence entry needs a literal anchor that actually exists in the extracted text, and exact identifiers/names/dates/amounts must be present in the annotated supporting documents. It reports the observed language-pair coverage without inventing an automatic 45/45 balance threshold. Human review still decides whether the question set is representative.
 
@@ -42,6 +42,19 @@ The real PDF corpus is **external benchmark input**. `corpus-inventory` is the S
 ### Development versus DEVICE execution boundary
 
 The quality-campaign source may be developed in the main workbench while the previously built candidate is still being qualified elsewhere. A command documented in the post-release workbench is **not** assumed to exist on the currently installed candidate. Real-corpus Tika/retrieval/model evidence becomes DEVICE evidence only after an RPM containing the corresponding campaign tooling is built and installed. Keeping the corpus files on the appliance is fine; do not improvise source-only campaign commands against an older installed package and then label the result as qualification evidence.
+
+### Qwen Advanced focused policy experiment
+
+The 0.20.0-2 DEVICE long run closed the need for more generic Qwen soaking: Structured was 172/172 PASS, while Advanced produced 154 REVIEW results across 258 requests and 153 repeated-reasoning/tail observations. One bounded DEVICE A/B then compared the current Advanced control with Qwen3.5-9B's upstream-aligned general-thinking sampler while holding model, prompts, reasoning mode, penalties and output ceiling constant:
+
+```text
+control:   think=true, temperature=0.7, top_p=0.8,  top_k=20, min_p=0.0, presence_penalty=1.5, repeat_penalty=1.0, max_tokens=6144
+candidate: think=true, temperature=1.0, top_p=0.95, top_k=20, min_p=0.0, presence_penalty=1.5, repeat_penalty=1.0, max_tokens=6144
+```
+
+Across 72 Advanced observations per arm, semantic correctness was 72/72 for both. Tail rate changed from 45/72 (62.5%) to 37/72 (51.39%), an -11.11 percentage-point difference with an approximate 95% CI of [-27.18, +4.96]. The improvement was workload-specific: `advanced-backup` improved from 70.83% to 33.33%, `advanced-constraint` remained 100% on both arms, and `advanced-insufficient` moved from 16.67% to 20.83%. Candidate p95 wall time worsened from about 87.69 s to 110.04 s and p95 reasoning volume from about 13,695 to 16,703 characters. Structured controls remained 24/24 semantically correct with zero tail events.
+
+The candidate therefore does **not** justify a production sampler change. Keep the current 0.7/0.8 Advanced control and retain the repeated-reasoning/latency family as a model-quality `REVIEW`. Preserve the three Advanced prompts `advanced-backup`, `advanced-constraint` and `advanced-insufficient`, plus the two Structured controls `structured-json-semantic` and `structured-arithmetic`, for future model/settings comparisons. Do not reopen broad sampler fishing without a new concrete hypothesis.
 
 
 ## Canonical benchmark results
@@ -231,12 +244,12 @@ not a general model ranking score.
 bc250 advanced benchmark translation [--think auto|true|false] [MODEL ...]
 ```
 
-Records target-language adherence, semantic anchors, preserved identifiers/numbers,
+Records target-language adherence, semantic anchors, preserved identifiers/numbers/clock values,
 source-language leakage, meaningful-content checks, answer/thinking sizes, prompt/eval
 counts and timings, load/wall time and device telemetry. Modality-labelled cases also call
 the package-owned clause-local translation authority used by the Open WebUI delivery
 guard; benchmark code does not maintain an independent adjacency/substring modality
-parser. When that authority finds a change, the exact semantic detail is retained in CSV
+parser. Clock preservation is benchmark-quality policy rather than part of the runtime fail-closed literal guard: locale-equivalent forms such as `18:00` and `18h00` compare by their clock value, while ordinary numeric values remain strict. When the modality authority finds a change, the exact semantic detail is retained in CSV
 and JSONL diagnostics (for example `negated recommendation / temporal polarity was
 lost` or `prohibition weakened to no-obligation`). `--think auto` preserves the runtime
 default; `--think true` and `--think false` make a direct-transform reasoning contract
@@ -256,13 +269,13 @@ Model-comparison reports should present quality and latency together. The 2026-1
 Qwen3.5 Advanced DEVICE block is the reference example: `think=true` passed 15/15 at
 about 32.65 s median, while `think=false` passed 12/15 at about 9.83 s median and
 deterministically violated one scheduling constraint 3/3. A faster arm with a repeatable
-quality regression is not a promotion win. The subsequent minimal `presence_penalty=1.5`
-intervention retained `think=true` and reproduced 14/14 PASS twice; the 0.20.0-2 source
-candidate adopts that one sampler change rather than reopening broad sampler fishing.
-Reasoning-budget exhaustion with no visible answer remains `INCOMPLETE` unless the strict
-repetition oracle fires, but the evidence now also records diagnostic-only tail repetition
-indicators so operators can see an exhausted check-loop even when it does not cross the
-quality-fail threshold.
+quality regression is not a promotion win. The subsequent minimal `presence_penalty=1.5` intervention retained `think=true`
+and reproduced 14/14 PASS twice, so it remains the current Advanced control instead of
+reopening broad sampler fishing. Interim repeated DEVICE use later showed that a broader
+reasoning-tail family still exists: repeated-line/n-gram tails and material latency
+outliers recur on Advanced while Structured stays consistently short/clean. That remains a known model-quality `REVIEW`. The completed focused 0.7/0.8 versus 1.0/0.95 A/B did not produce a clear overall reliability win, so 0.20.0-3 retains the existing sampler. Preserve the repeated-prompt set, raw reasoning, final answer, latency and tail flags for any later model/settings comparison. Reasoning-budget exhaustion with no visible answer remains `INCOMPLETE`
+unless the strict repetition oracle fires; diagnostic tail indicators remain visible even
+when they do not cross the quality-fail threshold.
 
 ## Direct RAG
 

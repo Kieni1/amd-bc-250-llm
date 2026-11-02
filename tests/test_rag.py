@@ -3,8 +3,11 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import os
 import re
+import subprocess
 import sys
+import tempfile
 import types
 import unittest
 import zipfile
@@ -307,11 +310,37 @@ class RagBaselineTests(unittest.TestCase):
         ):
             self.assertIn(command, guide)
         self.assertIn("bc250 document ingest", guide)
+        self.assertIn("bc250 ocr list", guide)
+        self.assertIn("sudo bc250 ocr status glm", guide)
+        self.assertIn("sudo bc250 ocr install glm", guide)
+        self.assertIn("bc250 ocr test glm", guide)
         for lifecycle in (
             "init", "prepare-batch", "review", "validate", "activate",
             "supersede", "status", "ingest",
         ):
             self.assertIn(lifecycle, guide)
+
+    def test_ocr_status_routes_to_verbose_experiment_status(self) -> None:
+        script = ROOT / "cmd/documents/ocr.sh"
+        with tempfile.TemporaryDirectory() as temporary:
+            tmp = Path(temporary)
+            manager = tmp / "modelctl"
+            log = tmp / "args.txt"
+            manager.write_text(
+                "#!/usr/bin/env bash\nprintf '%s\n' \"$*\" > \"$OCR_ARGS_LOG\"\n",
+                encoding="utf-8",
+            )
+            manager.chmod(0o755)
+            result = subprocess.run(
+                [str(script), "status", "glm"],
+                env=os.environ | {"MODEL_MANAGER": str(manager), "OCR_ARGS_LOG": str(log)},
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertEqual(
+                log.read_text(encoding="utf-8").strip(),
+                "status experiments exp-glm-ocr-ggml-q8-0 --verbose",
+            )
 
     def test_package_contains_no_office_document_payloads(self) -> None:
         forbidden = {

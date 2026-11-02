@@ -307,11 +307,10 @@
       "AX-88-P"
     ],
     "preserve": [
-      "AX-88-P"
+      "AX-88-P",
+      "18:00"
     ],
-    "numeric_values": [
-      "18"
-    ],
+    "numeric_values": [],
     "forbidden": [],
     "min_words": 12,
     "semantic_contract": "modality"
@@ -325,11 +324,10 @@
       "AX-88-P"
     ],
     "preserve": [
-      "AX-88-P"
+      "AX-88-P",
+      "18:00"
     ],
-    "numeric_values": [
-      "18"
-    ],
+    "numeric_values": [],
     "forbidden": [],
     "min_words": 12,
     "semantic_contract": "modality"

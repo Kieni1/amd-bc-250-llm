@@ -266,7 +266,7 @@
       "id": "qwen35-presence-penalty-20261031",
       "model_id": "prod-qwen35-9b-unsloth-q6-k",
       "role": "higher-quality",
-      "status": "source-integrated-device-regression-pending",
+      "status": "device-long-run-review",
       "request_policy": {
         "think": true,
         "temperature": 0.7,
@@ -277,7 +277,117 @@
         "repeat_penalty": 1.0
       },
       "comparison": "accepted 1.13 higher-quality control with presence_penalty=0.0",
-      "reason": "Two independent DEVICE intervention batches were 14/14 PASS while preserving reasoning-sensitive controls; keep think=true and avoid further sampler fishing. Final next-candidate DEVICE regression remains required."
+      "reason": "The 0.20.0-2 long DEVICE soak completed 430 requests: Structured was 172/172 PASS, while Advanced produced 154 REVIEW results across 258 requests and 153 known repeated-reasoning/tail observations. Keep this policy as the exact control, but the earlier short 14/14 intervention is no longer sufficient to close the reliability question.",
+      "device_evidence": {
+        "candidate": "0.20.0-2",
+        "total_requests": 430,
+        "advanced_requests": 258,
+        "advanced_pass": 104,
+        "advanced_review": 154,
+        "advanced_tail_observations": 153,
+        "advanced_median_wall_s": 31.9,
+        "advanced_max_wall_s": 127.5,
+        "structured_requests": 172,
+        "structured_pass": 172
+      }
+    },
+    {
+      "id": "qwen35-upstream-thinking-sampler-20261101",
+      "model_id": "prod-qwen35-9b-unsloth-q6-k",
+      "role": "higher-quality",
+      "status": "device-comparison-complete-retain-control",
+      "request_policy": {
+        "think": true,
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 20,
+        "min_p": 0.0,
+        "presence_penalty": 1.5,
+        "repeat_penalty": 1.0,
+        "max_tokens": 6144
+      },
+      "comparison": "current Advanced control: think=true, temperature=0.7, top_p=0.8, top_k=20, min_p=0.0, presence_penalty=1.5, repeat_penalty=1.0, max_tokens=6144",
+      "reason": "Focused DEVICE A/B completed cleanly. The 1.0/0.95 candidate reduced aggregate tail rate but did not improve the dominant advanced-constraint family, slightly regressed advanced-insufficient, and worsened p95 latency/reasoning size; retain the current 0.7/0.8 production sampler.",
+      "experiment_contract": {
+        "advanced_cases": [
+          "advanced-backup",
+          "advanced-constraint",
+          "advanced-insufficient"
+        ],
+        "structured_controls": [
+          "structured-json-semantic",
+          "structured-arithmetic"
+        ],
+        "change_only": [
+          "temperature",
+          "top_p"
+        ],
+        "keep_constant": [
+          "model",
+          "think",
+          "top_k",
+          "min_p",
+          "presence_penalty",
+          "repeat_penalty",
+          "max_tokens",
+          "prompts"
+        ],
+        "primary_measures": [
+          "semantic_pass",
+          "tail_flags",
+          "wall_s",
+          "reasoning_chars",
+          "done_reason"
+        ]
+      },
+      "device_evidence": {
+        "advanced_observations_per_arm": 72,
+        "control_tail_count": 45,
+        "control_tail_rate": 0.625,
+        "candidate_tail_count": 37,
+        "candidate_tail_rate": 0.5139,
+        "tail_rate_difference_percentage_points": -11.11,
+        "approx_95ci_percentage_points": [
+          -27.18,
+          4.96
+        ],
+        "semantic_pass_control": "72/72",
+        "semantic_pass_candidate": "72/72",
+        "case_tail_rates": {
+          "advanced-backup": {
+            "control": 0.7083,
+            "candidate": 0.3333
+          },
+          "advanced-constraint": {
+            "control": 1.0,
+            "candidate": 1.0
+          },
+          "advanced-insufficient": {
+            "control": 0.1667,
+            "candidate": 0.2083
+          }
+        },
+        "median_wall_s": {
+          "control": 38.52,
+          "candidate": 39.39
+        },
+        "p95_wall_s": {
+          "control": 87.69,
+          "candidate": 110.04
+        },
+        "p95_reasoning_chars": {
+          "control": 13695,
+          "candidate": 16703
+        },
+        "structured_controls": {
+          "requests": 24,
+          "semantic_pass": 24,
+          "tail_events": 0
+        },
+        "request_check_errors": 0,
+        "evidence_audit": "PASS"
+      },
+      "decision": "retain-current-control"
     }
   ],
   "challengers": [

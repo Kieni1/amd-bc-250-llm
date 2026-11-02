@@ -54,7 +54,19 @@ class QualityCampaignFoundationTests(unittest.TestCase):
         self.assertEqual(by_id["lfm3-1.7b"]["package_state"], "package-managed")
         self.assertEqual(by_id["nemotron-3.5-bolt-e4b"]["package_state"], "package-managed")
         self.assertEqual(by_id["qwen3-embedding-0.6b"]["package_state"], "already-packaged")
-        self.assertEqual(manifest["setting_hypotheses"][0]["status"], "source-integrated-device-regression-pending")
+        self.assertEqual(manifest["setting_hypotheses"][0]["status"], "device-long-run-review")
+        by_hypothesis = {row["id"]: row for row in manifest["setting_hypotheses"]}
+        candidate = by_hypothesis["qwen35-upstream-thinking-sampler-20261101"]
+        self.assertEqual(candidate["status"], "device-comparison-complete-retain-control")
+        self.assertIs(candidate["request_policy"]["think"], True)
+        self.assertEqual(candidate["request_policy"]["temperature"], 1.0)
+        self.assertEqual(candidate["request_policy"]["top_p"], 0.95)
+        self.assertEqual(candidate["decision"], "retain-current-control")
+        self.assertEqual(candidate["device_evidence"]["semantic_pass_control"], "72/72")
+        self.assertEqual(candidate["device_evidence"]["semantic_pass_candidate"], "72/72")
+        self.assertEqual(candidate["request_policy"]["presence_penalty"], 1.5)
+        self.assertEqual(candidate["request_policy"]["repeat_penalty"], 1.0)
+        self.assertEqual(candidate["request_policy"]["max_tokens"], 6144)
 
     def test_corpus_inventory_records_external_pdf_provenance_and_duplicates(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -284,6 +296,30 @@ class QualityCampaignFoundationTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(quality_campaign.BenchmarkError, "control characters"):
             quality_campaign.validate_manifest_shape(manifest)
+
+    def test_tika_extraction_crosses_rootful_namespace_without_rooting_campaign(self) -> None:
+        quality_campaign.rootful_podman_command.cache_clear()
+        completed = subprocess.CompletedProcess
+        with patch.object(quality_campaign.os, "geteuid", return_value=1000), patch.object(
+            quality_campaign.subprocess,
+            "run",
+            side_effect=[
+                completed(["sudo", "-n", "true"], 1, b"", b"credential required"),
+                completed(["sudo", "-v"], 0, b"", b""),
+                completed(["sudo", "-n", "podman", "inspect", "open-webui"], 0, b"{}", b""),
+            ],
+        ) as run:
+            self.assertEqual(
+                quality_campaign.rootful_podman_command("open-webui"),
+                ("sudo", "-n", "podman"),
+            )
+        self.assertEqual(run.call_args_list[0].args[0], ["sudo", "-n", "true"])
+        self.assertEqual(run.call_args_list[1].args[0], ["sudo", "-v"])
+        self.assertEqual(
+            run.call_args_list[2].args[0],
+            ["sudo", "-n", "podman", "inspect", "open-webui"],
+        )
+        quality_campaign.rootful_podman_command.cache_clear()
 
     def test_tika_extraction_rejects_no_text_placeholder_as_quality_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2505,7 +2541,7 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         self.assertEqual(category.numeric_values("0.125 %"), {category.Decimal("0.125")})
         self.assertEqual(category.numeric_values("0,125 %"), {category.Decimal("0.125")})
         self.assertEqual(
-            openwebui_workflow.translation_numeric_values_for_checks("CHF 0.125"),
+            {category.Decimal(value) for value in common.translation_numeric_values("CHF 0.125")},
             {category.Decimal("0.125")},
         )
 
@@ -4422,6 +4458,28 @@ status_run --raw
         valid_modality = "Die Besorgungsregeln sollten bei einer neuen Vermietung eingehalten werden."
         ok, failures = openwebui_workflow.owui_translation_checks(valid_modality, modality)
         self.assertTrue(ok, failures)
+
+    def test_translation_preservation_accepts_locale_equivalent_clock_rendering(self) -> None:
+        case = {
+            "input": "Die Sitzung endet um 18:00. Kennung AX-88-P bleibt unverändert.",
+            "required": ["AX-88-P"],
+            "preserve": ["AX-88-P", "18:00"],
+            "numeric_values": [],
+            "forbidden": [],
+            "min_words": 5,
+        }
+        translated = "La séance se termine à 18h00. L’identifiant AX-88-P reste inchangé."
+
+        direct = category.translation_content_checks(translated, case)
+        self.assertTrue(direct[2], direct)
+        ok, failures = openwebui_workflow.owui_translation_checks(translated, case)
+        self.assertTrue(ok, failures)
+
+        changed = translated.replace("18h00", "19h00")
+        self.assertFalse(category.translation_content_checks(changed, case)[2])
+        ok, failures = openwebui_workflow.owui_translation_checks(changed, case)
+        self.assertFalse(ok)
+        self.assertIn("preservation", failures)
 
     def test_owui_rag_model_resolution_prefers_exact_active_preset(self) -> None:
         class Client:
