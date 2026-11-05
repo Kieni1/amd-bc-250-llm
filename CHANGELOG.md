@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.20.0-4 - 2026-11-05
+
+- Promote the package-owned Open WebUI Documents/RAG default from dense K4 to dense K6, keeping Gemma, Jina v5 small, 1500/200 token chunking, threshold zero and all non-RAG roles unchanged. Qualification on the exact installed RPM remains outstanding.
+- Harden the use-case evaluator against unsafe cross-field digit-separator removal, preserve numeric magnitude and currency display equivalence, enforce strict raw JSON only for declared contracts, and reject length-terminated use-case output as completed. Keep repetition and partial-output diagnoses distinct.
+- Add focused positive/adversarial SOURCE tests, including repeated desired-state application, numeric/identifier boundaries, strict JSON and translation locale regressions. More extensive semantic-office oracles remain follow-up work rather than a release prerequisite. The benchmark retrieval-control audit is aligned to K6; historical K4 comparison arms are preserved.
+
+
 ## 0.20.0-3 - 2026-11-01
 
 - Finalize the corrective 0.20.0 respin after the 0.20.0-2 DEVICE long run and focused Qwen sampler A/B. `0.20.0-3` is the selected SOURCE candidate; BUILD and exact-RPM DEVICE acceptance remain separate.

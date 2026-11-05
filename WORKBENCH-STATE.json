@@ -6,38 +6,38 @@
     "selection_record": "release-selection.json",
     "workflow": ".github/workflows/build-rpm.yml"
   },
-  "current_batch": "0.20.0-3 SOURCE finalized: retain the current Qwen Advanced sampler after the completed focused DEVICE A/B; include the Tika rootful-Podman operator-boundary fix, translation clock-equivalence oracle correction, deliberate frozen-component refresh and current operator documentation improvements. Await authoritative GitHub BUILD and focused exact-RPM DEVICE confirmation.",
+  "current_batch": "0.20.0-4 SOURCE finalized: promote dense Documents/RAG K6, align current campaign audit, and correct selected numeric/identifier, strict-JSON and completion evaluator defects. 0.20.0-3 remains accepted SOURCE/BUILD/DEVICE; authoritative 0.20.0-4 GitHub BUILD and exact DEVICE qualification are pending.",
   "history": {
     "note": "Detailed reconstruction/GFX history is intentionally not active state. Compact rationale is retained under development/handovers/archive and Git history."
   },
   "kind": "release-workbench",
   "long_term": {
     "change_discipline": "separate cleanup from runtime/model upgrades and measure complexity before adding new harnesses",
-    "direction": "stock-first local office AI appliance; exact 0.14.1-1.13 remains DEVICE-accepted with the 1.12-qualified Open WebUI 0.12.5 / Ollama 0.40.13 / Tika 4.2.0 runtime baseline. 0.20.0-3 is the selected finalized SOURCE candidate; BUILD and DEVICE acceptance do not transfer from earlier bytes.",
+    "direction": "Stock-first private DE/FR office AI appliance. Exact 0.20.0-3 remains SOURCE/BUILD/DEVICE accepted with Open WebUI 0.12.5, Ollama 0.40.13, Tika 4.2.0 and normal stock hardware policies. Exact 0.14.1-1.13 remains a historical accepted predecessor, not the current upgrade baseline.",
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "Finalized 0.20.0-3 retains the DEVICE-proven 0.20.0-2 Generalist repair, fixes the rootful-Podman Tika campaign boundary and translation clock grading, and deliberately refreshes/refreezes coding-agent, maintenance-companion, MTP and OCR. Qwen Advanced remains on the existing 0.7/0.8 sampler because the focused 72-vs-72 A/B did not show a clear overall reliability win.",
+    "current_batch": "0.20.0-4 SOURCE K6 promotion and focused evaluator/campaign-contract corrections; no production model, request sampler, dependency or hardware change. 0.20.0-3 is the accepted upgrade predecessor.",
     "integration": "Retain accepted Standard/Documents/Deep/Translation/task/embedding controls, corrected manager-owned AtomicChat Generalist acquisition, Ornith Agent policy and Qwen think=true Advanced control. Maintenance now reuses the protected package Open WebUI credential instead of creating a second inline key; MTP/OCR remain specialist opt-in paths.",
-    "next_batch": "Run the authoritative Fedora 44 GitHub build from these exact SOURCE bytes. On the resulting exact RPM, focus DEVICE regression on the normal-operator Tika campaign path, translation clock/oracle cases, final health/verify/topology, reboot persistence and a clean accepted-baseline upgrade path; then begin the real external-corpus extraction/retrieval campaign."
+    "next_batch": "Select the authoritative GitHub/Fedora 44 BUILD from finalized 0.20.0-4 SOURCE. The sidechat then tests exact 0.20.0-3→0.20.0-4 candidate upgrade/convergence/idempotence/reboot and effective K6, changed evaluator/Tika paths and evidence integrity. Broad Phase-C office research remains non-blocking."
   },
   "release": {
     "fedora": "44",
     "name": "bc250-llm-server",
-    "nvr": "bc250-llm-server-0.20.0-3",
-    "rpm_release": "3",
+    "nvr": "bc250-llm-server-0.20.0-4",
+    "rpm_release": "4",
     "state": "source-finalized-awaiting-authoritative-build-and-device",
     "version": "0.20.0"
   },
   "schema": 2,
   "validation": {
-    "device_acceptance": "Exact 0.14.1-1.13 is DEVICE-acceptable: focused changed surfaces, reboot persistence, health/verify, full revalidation infrastructure, product integrity and topology restoration passed. One honest non-blocking limitation remains NOT_TESTED: the pre-upgrade operator-modified Modelfile exclusion boundary.",
-    "device_baseline": "Exact 0.14.1-1.13 is the current accepted package baseline. Its runtime/dependency stack remains Open WebUI 0.12.5, Ollama 0.40.13 and Tika 4.2.0 inherited from the accepted 1.12 dependency-depth campaign.",
-    "package_critical": "0.20.0-3 source scope is closed: it includes the DEVICE-proven Generalist repair, Tika/translation corrections, deliberate frozen-component refresh and documentation updates. Qwen Advanced production policy remains unchanged after the focused sampler A/B returned mixed reliability evidence with no semantic regression on either arm.",
-    "release_preflight": "Exact 1.13 remains BUILD/DEVICE-accepted. 0.20.0-1 built successfully but failed DEVICE normal convergence on the Generalist registry path. 0.20.0-2 repaired that path and DEVICE testing confirmed Generalist acquisition, repeated convergence/idempotence, normal publication/topology, Agent restoration and long-run stability. Its remaining findings drove the 0.20.0-3 Tika/operator-boundary and translation-oracle corrections; the focused Qwen sampler A/B retained the current 0.7/0.8 production policy. 0.20.0-3 now awaits authoritative BUILD and exact-RPM DEVICE acceptance.",
-    "rpm_package_check": "Exact 1.13 remains the accepted predecessor BUILD/DEVICE baseline, but that evidence is regression context only and does not transfer to changed 0.20.0-3 bytes. 0.20.0-3 is the selected finalized SOURCE candidate; authoritative BUILD and exact-RPM DEVICE evidence must bind to this source identity.",
-    "source0_smoke": "0.20.0-3 source scope is closed and finalized for authoritative build after focused changed-surface validation and artifact round-trip; BUILD/DEVICE acceptance remain separate.",
-    "source_checks": "Frozen coding-agent, maintenance-companion, MTP and OCR components were deliberately thawed, reviewed, updated only where justified, and refrozen with documented fresh hashes; archive-only historical material remains untouched. Current operator docs and release-state surfaces are aligned to finalized 0.20.0-3 SOURCE.",
-    "static_lint": "Static validation results belong to the exact bytes on which they were executed and are not transferred from older releases."
+    "device_acceptance": "Exact 0.20.0-3 DEVICE-accepted; historical Exact 0.14.1-1.13 also accepted as a predecessor. Exact 0.20.0-4 DEVICE NOT_TESTED until the selected GitHub RPM is installed and qualified.",
+    "device_baseline": "Exact 0.20.0-3 is accepted SOURCE/BUILD/DEVICE: 0.14.1-1.13 upgrade predecessor proved, repeated convergence/idempotence, reboot persistence, 62 OK / 0 WARN / 0 FAIL, Tika normal operator, canonical topology. New 0.20.0-4 DEVICE acceptance pending.",
+    "package_critical": "0.20.0-4 source scope: dense RAG TOP_K=6, campaign audit K6, and focused evaluator hardening. SOURCE critical tests must pass for these exact bytes; GitHub/Fedora 44 %check remains authoritative BUILD.",
+    "release_preflight": "0.20.0-3 SOURCE/BUILD/DEVICE closed. 0.20.0-4 SOURCE selected/finalized for GitHub authority build, pending proof by final validation artifacts; exact binary DEVICE acceptance remains untested.",
+    "rpm_package_check": "Exact 0.20.0-4 SOURCE candidate is not a built RPM. Selected GitHub/Fedora 44 SRPM→RPM rebuild, payload, rpmlint and release-selection evidence remain required.",
+    "source0_smoke": "0.20.0-4 SOURCE is finalized as a candidate for GitHub build; Source0/spec freeze must bind to the exact candidate commit during authoritative BUILD.",
+    "source_checks": "K6 and corresponding campaign audit have aligned SOURCE contracts; evaluator numeric/identifier, raw strict JSON and completion regressions are selected; no frozen specialist implementation changed.",
+    "static_lint": "Ruff/ShellCheck are blocking release-candidate checks and must be executed for the finalized exact source in an appropriate environment. Prior-run test results do not transfer."
   }
 }

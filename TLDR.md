@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current accepted DEVICE package: `bc250-llm-server-0.14.1-1.13`. The selected next SOURCE candidate is **`bc250-llm-server-0.20.0-3`**. Interim 0.20.0-2 DEVICE testing confirmed the Generalist convergence repair, repeated convergence and Agent restoration, while exposing the campaign Tika rootful-Podman boundary defect and one translation clock-oracle false negative. 0.20.0-3 fixes those contracts, refreshes stable specialist/maintenance surfaces and keeps the current Qwen Advanced sampler after a focused DEVICE A/B found no clear overall reliability win from the 1.0/0.95 candidate. GitHub BUILD evidence and exact-RPM DEVICE acceptance are still pending for the finalized 0.20.0-3 bytes.
+Current accepted DEVICE package: **`bc250-llm-server-0.20.0-3`**. The selected next SOURCE candidate is **`bc250-llm-server-0.20.0-4`** with K6 dense Documents/RAG, K6 quality-campaign control audit and focused evaluator-integrity corrections. Gemma/Jina, existing model and sampler policies, and runtime dependencies are retained. GitHub BUILD and exact-RPM DEVICE acceptance are pending for 0.20.0-4; there is no authoritative release identity for a 0.20.0-4 RPM until its selected GitHub build evidence exists.
 
 Release 1.13 keeps the accepted 1.12 runtime/model/RAG baseline unchanged and adds bounded package hardening/UX: fail no-usable-text ingestion clearly, retain knowable rollback provenance, distinguish proven package Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior.
 
@@ -89,9 +89,9 @@ Document/knowledge synchronization is loopback-only by default and token-file sy
 
 ## Models
 
-The finalized 0.20.0-3 SOURCE retains **Office - Generalist** as a new curated candidate backed by
+The accepted 0.20.0-3 package and selected 0.20.0-4 SOURCE retain **Office - Generalist** as a new curated candidate backed by
 `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`. It is a community safety-ablated Nemotron
-variant and remains pending DEVICE qualification; existing Standard/Documents/Advanced/Deep/Translation
+variant whose Generalist acquisition and topology passed 0.20.0-3 DEVICE qualification; existing Standard/Documents/Advanced/Deep/Translation
 roles are not silently repointed. New official and community challengers are opt-in except where the
 catalog explicitly marks a production candidate.
 
