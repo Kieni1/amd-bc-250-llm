@@ -5,6 +5,7 @@ import copy
 import hashlib
 import importlib.util
 import io
+import json
 import os
 import sys
 import tempfile
@@ -226,6 +227,33 @@ class OpenWebUIStatusTests(unittest.TestCase):
         self.assertEqual(task_payload["openwebui_012_extra"], {"nested": [1, 2, 3]})
         for key, value in OPENWEBUI.desired_task().items():
             self.assertEqual(task_payload[key], value)
+
+    def test_rag_k6_default_converges_repeatedly_without_hybrid_or_role_changes(self) -> None:
+        expected = OPENWEBUI.desired_rag()
+        self.assertEqual(expected["TOP_K"], 6)
+        self.assertFalse(expected["ENABLE_RAG_HYBRID_SEARCH"])
+        self.assertEqual(expected["CHUNK_SIZE"], 1500)
+        self.assertEqual(expected["CHUNK_OVERLAP"], 200)
+        self.assertEqual(expected["RELEVANCE_THRESHOLD"], 0)
+        client = FakeApplyClient()
+        for _ in range(2):
+            OPENWEBUI.apply(client)
+        payloads = [payload for method, path, payload in client.calls
+                    if method == "POST" and path == "/api/v1/retrieval/config/update"]
+        self.assertEqual(len(payloads), 2)
+        self.assertEqual(payloads[0], payloads[1])
+        self.assertEqual(payloads[0], expected)
+
+    def test_rag_operator_desired_state_override_is_explicit(self) -> None:
+        # BC250_OWUI_DESIRED_STATE is the supported package-wide override;
+        # unrelated Open WebUI user-owned preferences stay outside this payload.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "desired-state.json"
+            custom = copy.deepcopy(OPENWEBUI.load_desired_state())
+            custom["rag"]["TOP_K"] = 5
+            path.write_text(json.dumps(custom), encoding="utf-8")
+            with mock.patch.dict(os.environ, {"BC250_OWUI_DESIRED_STATE": str(path)}):
+                self.assertEqual(OPENWEBUI.load_desired_state()["rag"]["TOP_K"], 5)
 
     def test_apply_converges_persisted_embedding_prefixes(self) -> None:
         client = FakeApplyClient()

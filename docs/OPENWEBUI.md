@@ -1,6 +1,6 @@
 # Open WebUI
 
-Current DEVICE-accepted 0.14.1-1.13 package (carrying the 1.12-qualified runtime baseline): **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
+Current DEVICE-accepted 0.20.0-3 package (retaining the 1.12-qualified runtime stack): **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
 are recorded in `/usr/share/bc250-llm-server/runtime.env`.
 
 The package uses two layers deliberately:
@@ -11,6 +11,18 @@ The package uses two layers deliberately:
    package authority for persisted providers/task/embedding/RAG settings and the
    small local/offline application-policy subset owned by the appliance;
    `bc250 advanced openwebui` applies it through supported administrator APIs.
+
+The selected `0.20.0-4` SOURCE defines the canonical Documents/RAG default as
+**dense Jina v5 small / token chunks 1500 with 200 overlap / TOP_K=6 /
+threshold 0**, with Gemma still generating answers. `TOP_K` is a retrieval
+limit, not a guarantee that every question returns six chunks. The accepted
+`0.20.0-3` RPM retains K4; K6 becomes the installed package default only after
+the new exact candidate is built, installed and qualified. `bc250 advanced openwebui apply` converges the
+package-owned retrieval settings, including TOP_K; changing those values
+only in the Open WebUI administrator UI is reported as drift, not a persistent
+package exception. A deliberately supplied `BC250_OWUI_DESIRED_STATE` file
+remains the explicit alternate desired-state authority. Unrelated operator-owned
+models, Knowledge, prompts and user preferences remain outside convergence.
 
 The package never edits `webui.db` directly and does not store the administrator
 password or the temporary API/session token used for setup. It does persist a

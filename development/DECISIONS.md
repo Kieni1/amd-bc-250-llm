@@ -1194,7 +1194,7 @@ Advance RPM `Release` from `1` to `2` while keeping `Version: 0.20.0`. The corre
 
 ## DEC-048 — Make campaign Tika privilege explicit and separate clock semantics from numeric translation grading
 
-**Status:** ACTIVE — integrated in finalized 0.20.0-3 SOURCE; BUILD/DEVICE acceptance pending.
+**Status:** ACCEPTED in exact 0.20.0-3 SOURCE/BUILD/DEVICE.
 
 **Decision:** Keep the packaged rootful Open WebUI/Tika Quadlet topology unchanged and keep Tika private. `bc250 advanced benchmark campaign tika-extract` remains an ordinary operator command. The campaign keeps corpus/evidence handling in the invoking user context and crosses only the package-owned Podman boundary through a narrowly scoped `sudo` call; it validates the rootful `open-webui` container before extraction and reports an explicit boundary/authentication failure instead of falling through to the operator rootless namespace. Do not require the whole benchmark command to run as root and do not publish Tika on a host port merely to avoid the namespace boundary.
 
@@ -1235,3 +1235,13 @@ Qwen Advanced remains `think=true`, `presence_penalty=1.5` with the existing `te
 **Why:** The candidate shows a real benefit on one workload but no improvement on the dominant failure family, a slight regression on another, and worse upper-tail cost. That is not a clear product-level reliability win. The existing sampler therefore remains the least disruptive qualified control, while the repeated-reasoning/latency family remains an explicit model-quality REVIEW.
 
 **Retest only if:** the Advanced sampler/policy changes, the Qwen3.5 weights/runtime changes materially, or a later candidate replaces Qwen for the Higher Quality role. Do not run another generic soak without a new concrete hypothesis.
+
+## DEC-051 — Promote K6 for Documents/RAG; retain model roles and separate Phase-C model research
+
+**Status:** SOURCE FINALIZED for 0.20.0-4 — authoritative BUILD and exact-candidate DEVICE evidence pending.
+
+**Decision:** Promote only the package-owned dense RAG retrieval `TOP_K` default from 4 to 6. Retain Jina v5 small, token chunks `1500/200`, threshold zero, Gemma Documents/RAG generation and all other production model/request policies. The DEVICE external-corpus retrieval and end-to-end comparison motivates the product change; representative returned-count behavior and upgrade persistence still require exact-candidate DEVICE qualification. `TOP_K` is a limit rather than a required exact returned count. Keep the package-authoritative desired-state semantics and documented explicit desired-state override.
+
+**Evaluator scope:** Correct confirmed SOURCE numeric/identifier false matches and completion/strict-format false passes with case-specific checks and preservation of raw evidence. Do not use provisional Phase-C office-model scoring to change production models or thinking/output-budget settings. DE/FR remain co-primary; English remains the secondary office-quality control.
+
+**Release boundary:** SOURCE has been prepared under `0.20.0-4`. GitHub/Fedora 44 selected BUILD and exact-RPM DEVICE acceptance remain separate and are not yet claimed.

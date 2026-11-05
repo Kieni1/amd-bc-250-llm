@@ -258,7 +258,7 @@
     "query_prefix": "Query: ",
     "content_prefix": "Document: ",
     "search": "dense",
-    "top_k": 4,
+    "top_k": 6,
     "relevance_threshold": 0
   },
   "setting_hypotheses": [
