@@ -46,6 +46,7 @@ class QualityCampaignFoundationTests(unittest.TestCase):
             summary = json.loads((Path(tmp) / "audit" / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(summary["qualification_counts"]["pass"], 11)
             self.assertEqual(summary["qualification_counts"]["quality-fail"], 0)
+            self.assertEqual(quality_campaign.load_object(quality_campaign.DEFAULT_CAMPAIGN, "campaign")["retrieval_control"]["top_k"], 6)
 
     def test_campaign_manifest_tracks_managed_challengers_and_source_integrated_sampler(self) -> None:
         manifest = json.loads((ROOT / "examples/benchmark/quality-campaign.json").read_text(encoding="utf-8"))
@@ -1885,6 +1886,58 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             with self.subTest(case=case, text=text):
                 self.assertFalse(category._acceptance_ok(text, case)[0])
 
+    def test_acceptance_currency_typography_preserves_magnitude_and_fields(self) -> None:
+        equivalent = (
+            ("CHF 319.50", "Facture CHF 319,50; référence ZH-204"),
+            ("CHF 15 000", "Le montant est CHF 15’000."),
+            ("CHF 15'000", "Die Summe beträgt CHF 15 000."),
+            ("CHF 1 250.00", "CHF 1 250,00 sind fällig."),
+        )
+        for expected, response in equivalent:
+            with self.subTest(expected=expected):
+                self.assertTrue(category._acceptance_ok(response, {"required": [expected]})[0])
+        unequal = (
+            ("CHF 840.00", "CHF 84000"),
+            ("CHF 15 000", "CHF 150 000"),
+            ("CHF 319.50", "EUR 319,50"),
+            ("C-9021", "C-902104.09.2026"),
+        )
+        for expected, response in unequal:
+            with self.subTest(expected=expected):
+                self.assertFalse(category._acceptance_ok(response, {"required": [expected]})[0])
+        self.assertTrue(category._acceptance_ok(
+            "C-9021\n04.09.2026", {"required": ["C-9021"]}
+        )[0])
+
+    def test_usecase_strict_raw_json_contract_rejects_fences_and_duplicate_keys(self) -> None:
+        case = {"strict_json": True, "required_json_keys": ["date", "reference"]}
+        valid = '{"date":"2026-09-04","reference":"AB-42"}'
+        self.assertTrue(category._acceptance_ok(valid, case)[0])
+        invalid = (
+            f"```json\n{valid}\n```",
+            '{"date":"2026-09-04","reference":"AB-42","date":"2026-09-05"}',
+            '{"date":"2026-09-04"}',
+            '{"date":"2026-09-04","reference":NaN}',
+            "Some introductory prose " + valid,
+        )
+        for response in invalid:
+            with self.subTest(response=response):
+                self.assertFalse(category._acceptance_ok(response, case)[0])
+        # Non-JSON contracts must not silently turn stricter.
+        self.assertTrue(category._acceptance_ok("AB-42", {"required": ["AB-42"]})[0])
+
+    def test_usecase_length_terminated_visible_answer_cannot_pass(self) -> None:
+        row = {"timestamp": "2026-11-05T12:00:00+01:00"}
+        record = category._usecase_result_record(
+            case={"id": "short", "prompt": "Return only a short answer"},
+            model="prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl",
+            row=row, ok=True, problems=[], content="The answer is 42",
+            thinking="", telemetry={}, wall=1.0, done_reason="length",
+        )
+        self.assertEqual(record["outcome"], "incomplete")
+        self.assertFalse(record["passed"])
+        self.assertIn("incomplete output: done_reason=length", record["problems"])
+
     def test_acceptance_supports_explicit_alternatives_and_numeric_values(self) -> None:
         case = {
             "required_any_groups": [
@@ -2477,12 +2530,12 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
         normalized = category.acceptance_text(text)
         self.assertIn("must not", normalized)
         self.assertIn("hx-47-beta", normalized)
-        self.assertIn("chf184750", normalized.replace(" ", ""))
+        self.assertIn("chf 184,750", normalized)
 
     def test_translation_acceptance_normalizes_hyphens_and_locale_numbers(self) -> None:
         actual = "Facture INV‑4821 : CHF 319,50; référence ZH‑204."
         self.assertIn(category.acceptance_text("INV-4821"), category.acceptance_text(actual))
-        self.assertIn(category.acceptance_text("CHF 319.50"), category.acceptance_text(actual))
+        self.assertTrue(category._acceptance_ok(actual, {"required": ["CHF 319.50"]})[0])
         self.assertIn(category.acceptance_text("ZH-204"), category.acceptance_text(actual))
         self.assertEqual(category.acceptance_text(r"BC250\_RAG\_MARKER"), category.acceptance_text("BC250_RAG_MARKER"))
 

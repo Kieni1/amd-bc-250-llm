@@ -1808,7 +1808,51 @@ def _is_standalone_semantic_invoice(term: str) -> bool:
     ) is not None
 
 
+_CURRENCY_NUMBER = r"(?:\d{1,3}(?:[ \u00a0.'’]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)"
+
+
+def _standalone_currency(text: str) -> tuple[str, frozenset[Decimal]] | None:
+    """Recognize a single labelled amount without swallowing nearby fields."""
+    folded = unicodedata.normalize("NFKC", text).strip()
+    from_decimal = re.fullmatch(
+        rf"(CHF|EUR|USD)[ \t]+({_CURRENCY_NUMBER})", folded, re.IGNORECASE,
+    )
+    if from_decimal:
+        code, amount = from_decimal.group(1), from_decimal.group(2)
+    else:
+        after_decimal = re.fullmatch(
+            rf"({_CURRENCY_NUMBER})[ \t]+(CHF|EUR|USD)", folded, re.IGNORECASE,
+        )
+        if not after_decimal:
+            return None
+        amount, code = after_decimal.group(1), after_decimal.group(2)
+    # Parse with the shared numeric authority, never by removing separators.
+    # Ambiguous values (e.g. 1,250) may not automatically match either value.
+    values = numeric_values(amount)
+    if len(values) != 1:
+        return None
+    return code.upper(), frozenset(values)
+
+
+def _semantic_currency_equivalent(text: str, term: str) -> bool:
+    expected = _standalone_currency(term)
+    if expected is None:
+        return False
+    folded = unicodedata.normalize("NFKC", text)
+    patterns = (
+        rf"(?<!\w)(?:CHF|EUR|USD)[ \t]+{_CURRENCY_NUMBER}(?!\w)",
+        rf"(?<!\w){_CURRENCY_NUMBER}[ \t]+(?:CHF|EUR|USD)(?!\w)",
+    )
+    for pattern in patterns:
+        for match in re.finditer(pattern, folded, re.IGNORECASE):
+            if _standalone_currency(match.group(0)) == expected:
+                return True
+    return False
+
+
 def _semantic_acceptance_equivalent(text: str, term: str) -> bool:
+    if _semantic_currency_equivalent(text, term):
+        return True
     if _is_standalone_semantic_date(term):
         expected_dates = _semantic_dates(term)
         if expected_dates and expected_dates.issubset(_semantic_dates(text)):
@@ -1836,6 +1880,35 @@ def _bounded_acceptance_match(text: str, term: str) -> bool:
     if not needle:
         return False
     return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", folded) is not None
+
+
+def _strict_json_problems(text: str, case: dict[str, Any]) -> list[str]:
+    """Validate raw JSON-only output when the case explicitly requires it."""
+    if not case.get("strict_json"):
+        return []
+
+    def unique_pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        obj: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in obj:
+                raise ValueError(f"duplicate JSON key: {key}")
+            obj[key] = value
+        return obj
+
+    def reject_constant(token: str) -> None:
+        raise ValueError(f"non-finite JSON value: {token}")
+
+    try:
+        value = json.loads(text, object_pairs_hook=unique_pairs, parse_constant=reject_constant)
+    except ValueError as exc:
+        return [f"invalid raw JSON-only output: {exc}"]
+    if not isinstance(value, dict):
+        return ["JSON-only output must be an object"]
+    missing = [
+        str(key) for key in case.get("required_json_keys", [])
+        if key not in value
+    ]
+    return [f"missing JSON key: {key}" for key in missing]
 
 
 def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
@@ -1879,6 +1952,7 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
     ]
     problems = [f"missing {term}" for term in missing]
     problems.extend(f"forbidden {term}" for term in present_forbidden)
+    problems.extend(_strict_json_problems(text, case))
     return not problems, problems
 
 
@@ -2039,7 +2113,9 @@ def acceptance_text(text: str) -> str:
     # Paired Markdown emphasis around semantic words is presentation only. Keep
     # underscores inside identifiers untouched by requiring non-word boundaries.
     text = re.sub(r"(?<!\w)([*_]{1,3})(?=\w)(.+?)(?<=\w)\1(?!\w)", r"\2", text)
-    text = re.sub(r"(?<=\d)[\s.,'’](?=\d)", "", text)
+    # Do not strip digit separators: the former global substitution silently
+    # changed CHF 840.00 into CHF 84000 and joined identifiers across lines.
+    # Compare numeric presentation only in a field-specific semantic matcher.
     return " ".join(text.casefold().split())
 
 
@@ -2161,31 +2237,34 @@ def translation_content_checks(
     content: str, case: dict[str, Any]
 ) -> tuple[bool, bool, bool, bool]:
     folded = acceptance_text(content)
-    required_ok = all(
-        acceptance_text(term) in folded for term in case.get("required", [])
-    )
+    def required_match(term: str) -> bool:
+        # Preserve the existing translation lexeme semantics (e.g. Genf in
+        # 'Genfer') but use strict field-safe handling for currency and dates.
+        if _standalone_currency(term) or _is_standalone_semantic_date(term) or _is_standalone_semantic_time(term):
+            return _bounded_acceptance_match(content, term) or _semantic_acceptance_equivalent(content, term)
+        return acceptance_text(term) in folded
+
+    required_ok = all(required_match(str(term)) for term in case.get("required", []))
     choices = case.get("required_any", [])
     if choices:
-        required_ok = required_ok and any(
-            acceptance_text(term) in folded for term in choices
-        )
+        required_ok = required_ok and any(required_match(str(term)) for term in choices)
     for raw_group in case.get("required_any_groups", []):
         if not isinstance(raw_group, list) or not raw_group:
             required_ok = False
             continue
-        required_ok = required_ok and any(
-            acceptance_text(term) in folded for term in raw_group
-        )
+        required_ok = required_ok and any(required_match(str(term)) for term in raw_group)
     forbidden_ok = not any(
         acceptance_text(term) in folded for term in case.get("forbidden", [])
     )
+    preserve = [str(term) for term in case.get("preserve", [])]
+    currency_preserve = [term for term in preserve if _standalone_currency(term)]
     preserved_ok = translation_preservation_ok(
         str(case.get("input") or ""),
         content,
-        preserve=case.get("preserve", []),
+        preserve=[term for term in preserve if term not in currency_preserve],
         numeric_values=case.get("numeric_values", []),
         normalize=acceptance_text,
-    )
+    ) and all(_semantic_currency_equivalent(content, term) for term in currency_preserve)
     meaningful_ok = len(normalize_words(content)) >= int(case.get("min_words", 6))
     return required_ok, forbidden_ok, preserved_ok, meaningful_ok
 
@@ -2537,8 +2616,13 @@ def _usecase_result_record(
 ) -> dict[str, Any]:
     controls = usecase_request_controls(case, model)
     exhaustion, repetition_detail = _reasoning_exhaustion(content, thinking, done_reason)
-    reasoning_budget_exhausted = exhaustion == "incomplete"
     reasoning_repetition = exhaustion == "repetition"
+    reasoning_budget_exhausted = done_reason == "length" and not reasoning_repetition
+    if done_reason == "length":
+        ok = False
+        problems = list(problems)
+        if "incomplete output: done_reason=length" not in problems:
+            problems.append("incomplete output: done_reason=length")
     if ok:
         failures: list[str] = []
     elif reasoning_repetition:
@@ -2678,10 +2762,13 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 )
                 ok, problems = _acceptance_ok(content, case)
                 done_reason = str(response.get("done_reason") or "")
+                if done_reason == "length":
+                    ok = False
+                    problems.append("incomplete output: done_reason=length")
                 exhaustion, _repetition_detail = _reasoning_exhaustion(
                     content, thinking, done_reason
                 )
-                reasoning_budget_exhausted = exhaustion == "incomplete"
+                reasoning_budget_exhausted = done_reason == "length" and exhaustion != "repetition"
                 passed += int(ok)
                 incomplete += int(reasoning_budget_exhausted)
                 quality_failed += int((not ok) and not reasoning_budget_exhausted)

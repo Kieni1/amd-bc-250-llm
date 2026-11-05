@@ -10,7 +10,7 @@ Revalidation does not choose settings. Tuning and A/B comparisons are explicit b
 
 ## Office/RAG quality campaign foundation
 
-The finalized 0.20.0-3 SOURCE retains the staged campaign surface while preserving the accepted predecessor roles and RAG settings as controls. It also retains one explicit Office - Generalist candidate and additional managed challengers for qualification:
+The selected 0.20.0-4 SOURCE retains the staged campaign surface, preserves accepted 0.20.0-3 model roles, and aligns the current dense RAG control with K6. It also retains one explicit Office - Generalist candidate and additional managed challengers for qualification:
 
 ```bash
 bc250 advanced benchmark campaign audit
@@ -156,6 +156,20 @@ thinking-only completion therefore has `sha256: null` and cannot be presented as
 visible-output evidence. If a run completes without any visible answer, the measurement is recorded
 as `INCOMPLETE`; output/thinking budget diagnostics remain explicit and no throughput or quality
 threshold is weakened.
+
+## Use-case evaluator contracts (0.20.0-4 SOURCE)
+
+`bc250 advanced benchmark usecase` keeps raw Ollama responses and records
+completion separately from semantic acceptance. A response with
+`done_reason=length` cannot be marked PASS, including when a partial visible
+answer contains required keywords. Repetition loops retain separate failure
+diagnostics. Per-case `strict_json: true` enforces a raw JSON object (no
+Markdown fences, preamble, duplicate keys or non-finite numbers); optional
+`required_json_keys` lists mandatory top-level keys. These controls are used
+only where a fixture declares them. Numeric checks preserve monetary magnitude
+and identifiers instead of globally deleting digit separators. Currency
+rendering differences (such as `CHF 319.50` versus `319,50 CHF`) are accepted
+only when currency code and numeric value agree. No raw response is rewritten.
 
 ## Embeddings
 
