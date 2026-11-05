@@ -18,6 +18,33 @@ SPEC.loader.exec_module(MODULE)
 
 
 class QualificationInventoryTests(unittest.TestCase):
+    def test_parse_time_accepts_z_and_explicit_utc_offset(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            fallback = Path(temporary) / "evidence.json"
+            fallback.write_text("{}", encoding="utf-8")
+            zulu = MODULE.parse_time("2026-11-05T17:00:00Z", fallback)
+            explicit = MODULE.parse_time("2026-11-05T17:00:00+00:00", fallback)
+            self.assertEqual(zulu, datetime(2026, 11, 5, 17, tzinfo=UTC))
+            self.assertEqual(zulu, explicit)
+
+    def test_cleanup_accepts_z_and_explicit_utc_offset(self) -> None:
+        rows = [
+            {
+                "kind": "package-gate",
+                "path": "/tmp/evidence-old-zulu",
+                "created_at": "2025-01-01T00:00:00Z",
+                "terminal": True,
+            },
+            {
+                "kind": "package-gate",
+                "path": "/tmp/evidence-old-offset",
+                "created_at": "2025-01-01T00:00:00+00:00",
+                "terminal": True,
+            },
+        ]
+        chosen = MODULE.clean_candidates(rows, older_than_days=30, keep_latest=0)
+        self.assertEqual({row["path"] for row in chosen}, {row["path"] for row in rows})
+
     def test_cleanup_policy_keeps_recent_latest_and_nonterminal_evidence(self) -> None:
         now = datetime.now(UTC)
         rows = []

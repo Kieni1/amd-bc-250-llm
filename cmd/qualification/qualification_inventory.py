@@ -37,7 +37,7 @@ def utc_now() -> str:
 def parse_time(value: Any, fallback: Path) -> datetime:
     if isinstance(value, str) and value:
         try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+            return datetime.fromisoformat(value).astimezone(UTC)
         except ValueError:
             pass
     return datetime.fromtimestamp(fallback.stat().st_mtime, tz=UTC)
@@ -215,7 +215,7 @@ def clean_candidates(rows: list[dict[str, Any]], *, older_than_days: int, keep_l
         for row in group:
             if row["path"] in protected or not row["terminal"]:
                 continue
-            created = datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00")).astimezone(UTC)
+            created = datetime.fromisoformat(str(row["created_at"])).astimezone(UTC)
             if created > cutoff:
                 continue
             chosen.append(row)

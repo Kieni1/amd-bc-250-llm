@@ -16,7 +16,7 @@ import sys
 import time
 import unicodedata
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from html.parser import HTMLParser
 from pathlib import Path
@@ -65,7 +65,7 @@ OWUI_DESIRED_STATE = resolve_package_resource(
 
 
 def iso_now() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
 def safe_float(value: Any) -> float:

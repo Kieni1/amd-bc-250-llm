@@ -19,14 +19,13 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-
-import tomllib
 
 
 def _load_shared_model_contract_module():

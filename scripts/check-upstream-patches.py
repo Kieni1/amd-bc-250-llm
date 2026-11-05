@@ -9,9 +9,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 UPSTREAMS = ROOT / "packaging/upstreams.toml"

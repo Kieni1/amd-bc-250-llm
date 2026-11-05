@@ -8,10 +8,9 @@ import os
 import re
 import subprocess
 import sys
+import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
-
-import tomllib
 
 ROOT = Path(__file__).resolve().parent.parent
 SPEC = ROOT / "packaging/bc250-llm-server.spec"

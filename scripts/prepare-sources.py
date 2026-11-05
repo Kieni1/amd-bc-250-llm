@@ -16,9 +16,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 LOCK = ROOT / "packaging/upstreams.toml"
