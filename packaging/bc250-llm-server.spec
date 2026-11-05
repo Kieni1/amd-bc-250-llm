@@ -10,7 +10,7 @@
 
 Name:           bc250-llm-server
 Version:        0.20.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -485,6 +485,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Thu Nov 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-4
+- Promote the package-owned Open WebUI Documents/RAG dense retrieval default to K6, retaining Gemma, Jina v5 small, 1500/200 token chunks, and threshold zero.
+- Align the package quality-campaign retrieval audit with the qualified K6 baseline while retaining historical K4 experimental arms.
+- Harden use-case scoring against unsafe numeric/identifier normalization and incomplete output; enforce strict raw JSON where the fixture contract requires it, with focused adversarial regressions.
+- Retain the accepted 0.20.0-3 Ollama/Open WebUI/Tika, model-role, Qwen, translation-guard, and specialist runtime configuration without unrelated upgrades.
 * Sun Nov 01 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-3
 - Require the quality-campaign Tika extraction path to run in the rootful Podman namespace and document the supported sudo invocation.
 - Accept locale-equivalent clock rendering in translation qualification while keeping the runtime integrity guard and standalone numeric/literal checks strict.

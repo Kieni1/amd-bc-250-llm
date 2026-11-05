@@ -439,7 +439,7 @@ class PackagingTests(unittest.TestCase):
         self.assertEqual(desired["rag"]["TEXT_SPLITTER"], "token")
         self.assertEqual(desired["rag"]["CHUNK_SIZE"], 1500)
         self.assertEqual(desired["rag"]["CHUNK_OVERLAP"], 200)
-        self.assertEqual(desired["rag"]["TOP_K"], 4)
+        self.assertEqual(desired["rag"]["TOP_K"], 6)
         self.assertFalse(desired["task"]["ENABLE_RETRIEVAL_QUERY_GENERATION"])
         self.assertTrue(desired["task"]["ENABLE_TITLE_GENERATION"])
         self.assertTrue(desired["task"]["ENABLE_TAGS_GENERATION"])
