@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Compare one packaged experimental task candidate against the package-owned
-# Open WebUI task default. This is candidate evidence only; it never changes defaults.
+# Compare one packaged task candidate against the package-owned Open WebUI task
+# default. Candidates are either main-lane exp-* experiments (temporarily mirrored
+# onto the task lane) or non-default task-* challengers that the model manager
+# registers on the task lane itself. This is candidate evidence only; it never
+# changes defaults.
 if [[ "${BASH_SOURCE[0]}" != "$0" ]]; then
     printf '%s\n' 'REFUSED: execute this script with bash; do not source it.' >&2
     return 0
@@ -23,11 +26,20 @@ QUALITY_FAILED=0
 TASK_CANDIDATE_CREATED=0
 
 [[ -n "$CANDIDATE" ]] || {
-    echo "usage: $0 EXPERIMENT-MODEL [ROUNDS]" >&2
+    echo "usage: $0 EXPERIMENT-OR-TASK-MODEL [ROUNDS]" >&2
     exit 2
 }
-[[ "$CANDIDATE" == exp-* ]] || {
-    echo 'ERROR: candidate must be a packaged exp-* model.' >&2
+CANDIDATE="${CANDIDATE%:latest}"
+case "$CANDIDATE" in
+    exp-*) CANDIDATE_KIND=experiment ;;
+    task-*) CANDIDATE_KIND=task ;;
+    *)
+        echo 'ERROR: candidate must be a packaged exp-* or task-* model.' >&2
+        exit 2
+        ;;
+esac
+[[ "$CANDIDATE" != "$BASELINE" ]] || {
+    echo 'ERROR: candidate is the current package task default; nothing to compare.' >&2
     exit 2
 }
 [[ "$ROUNDS" =~ ^[1-9][0-9]*$ ]] || {
@@ -248,10 +260,17 @@ capture_state "$OUT/setup/state-before"
 cp /usr/libexec/bc250-llm-server/category-benchmark.py "$OUT/setup/category-benchmark.py"
 cp /usr/share/bc250-llm-server/benchmark/task-cases.json "$OUT/setup/task-cases.json"
 
-sudo bc250 model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
-model_present "$MAIN_URL" "$CANDIDATE" || { echo 'ERROR: candidate is not registered on main Ollama.' >&2; exit 1; }
+if [[ "$CANDIDATE_KIND" == task ]]; then
+    # A packaged task-category challenger is a normal model-manager registration
+    # on the task lane. Use it directly and leave it registered afterwards.
+    sudo bc250 model apply task "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
+    model_present "$TASK_URL" "$CANDIDATE" || { echo 'ERROR: task candidate is not registered on task Ollama.' >&2; exit 1; }
+else
+    sudo bc250 model apply experiments "$CANDIDATE" 2>&1 | tee "$OUT/setup/candidate-apply.txt"
+    model_present "$MAIN_URL" "$CANDIDATE" || { echo 'ERROR: candidate is not registered on main Ollama.' >&2; exit 1; }
+fi
 model_present "$TASK_URL" "$BASELINE" || { echo 'ERROR: packaged task baseline is not registered.' >&2; exit 1; }
-register_candidate_on_task
+[[ "$CANDIDATE_KIND" == task ]] || register_candidate_on_task
 systemctl show -p Environment ollama-task.service > "$OUT/setup/task-service-environment.txt"
 jq -n --arg model "$BASELINE" '{model:$model}' \
     | curl -fsS -H 'Content-Type: application/json' --data-binary @- "$TASK_URL/api/show" \

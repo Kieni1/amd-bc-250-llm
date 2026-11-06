@@ -67,6 +67,7 @@ PARAM_REGEX='^(amdgpu\.gttsize|ttm\.pages_limit|ttm\.page_pool_size|amdgpu\.ppfe
 # overrides; candidate selection belongs exclusively to bc250 advanced benchmark.
 readonly E2B_MODEL=prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl
 readonly E4B_MODEL=prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl
+readonly GENERALIST_MODEL=prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k
 readonly TRANSLATION_ROLE_MODEL=prod-translate-gemma4-sub-e4b-17s-q4-k-xl
 readonly QWEN_MODEL=prod-qwen35-9b-unsloth-q6-k
 readonly GPT_OSS_MODEL=prod-gpt-oss20b-ggml-org-mxfp4
@@ -75,11 +76,13 @@ readonly TASK_MODEL=task-lfm25-1.2b-instruct-liquidai-q6-k
 readonly AGENT_MODEL=agentic-ornith15-9b-ornith-q5-k-m
 readonly OWUI_RAG_MODEL=bc250-office-documents
 readonly -a PACKAGE_PROD_MODELS=(
-  "$E2B_MODEL" "$E4B_MODEL" "$TRANSLATION_ROLE_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
+  "$E2B_MODEL" "$E4B_MODEL" "$GENERALIST_MODEL" "$TRANSLATION_ROLE_MODEL" "$QWEN_MODEL" "$GPT_OSS_MODEL"
 )
 # GPT-OSS receives its deeper performance/resource qualification in the dedicated
 # GPT-OSS/Jina coexistence step. Avoid repeating that expensive context workload in
 # the generic production edge sweep.
+# Candidate Generalist is included in product/use-case revalidation, but its
+# unmeasured edge-performance floor remains a separate DEVICE qualification.
 readonly -a EDGE_GENERIC_MODELS=(
   "$E2B_MODEL" "$E4B_MODEL" "$TRANSLATION_ROLE_MODEL" "$QWEN_MODEL"
 )

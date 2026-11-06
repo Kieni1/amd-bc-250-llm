@@ -20,9 +20,9 @@ set -Eeuo pipefail
 umask 077
 
 BASELINE='prod-gpt-oss20b-ggml-org-mxfp4'
+# Only active catalog experiments; both earlier IQ3_S candidates are retired.
 CANDIDATES=(
-  'exp-qwen38-27b-ista-gsq-rco-iq3-s'
-  'exp-qwen38-27b-unsloth-ud-iq3-s'
+  'exp-qwen38-27b-ista-gsq-rco-iq3-xxs'
 )
 
 MAIN_URL='http://127.0.0.1:11434'

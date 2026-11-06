@@ -15,7 +15,7 @@ Most office users should choose a curated Open WebUI **Office** role instead of 
 |---|---|---|
 | Routine drafting, rewriting and questions | **Office – Standard** | Gemma 4 E2B production baseline |
 | Questions grounded in reviewed local documents | **Office – Documents** | Gemma 4 E4B RAG answer baseline |
-| General work that benefits from a broader style/knowledge mix | **Office – Generalist** | Nemotron 3.5 Bolt E4B candidate; next-release DEVICE qualification still in progress |
+| General work that benefits from a broader style/knowledge mix | **Office – Generalist** | Nemotron 3.5 Bolt E4B candidate; next-release DEVICE qualification still pending |
 | Harder reasoning/general office tasks | **Office – Advanced** | Qwen3.5 9B with thinking enabled; current reliability-tail review remains open |
 | Predictable JSON/structured output | **Office – Advanced Structured** | same Qwen base with thinking disabled and separate request policy |
 | Explicit German↔French translation | **Translation DE→FR / FR→DE** | Translate-Gemma with fail-closed delivery checks |
@@ -46,8 +46,8 @@ During pre-v1 comparison testing Open WebUI discovers models installed on the no
 and task (`11435`) providers and maintains package-managed testing records without treating an
 unavailable lane as empty. Curated `bc250-office-*` roles remain the product contracts. Raw
 production/task models and ordinary-size experiments remain ordinary-user comparison surfaces, while
-Qwen3.6 35B is retired after repeated 8K pressure failures; Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only;
-ISTA IQ3_XXS remains the ordinary-user deployability comparison. Embedding and exclusive agent lanes
+Qwen3.6 35B, Qwen3.8 27B Unsloth, and ISTA IQ3_S are retired from active comparison;
+ISTA IQ3_XXS remains the ordinary-user deployability comparison. New Heretic tests are admin-only; they are not curated office roles. Embedding and exclusive agent lanes
 remain outside the normal chat selector.
 
 MTP is different from the agent lane: it shares catalog/provenance handling with `bc250 model`, but
@@ -242,7 +242,7 @@ remain concise so evidence-note edits do not trigger needless Ollama reconciliat
 
 ### Task role
 
-`task-lfm25-1.2b-instruct-liquidai-q6-k` is the sole active task-lane model. Its
+`task-lfm25-1.2b-instruct-liquidai-q6-k` was the sole active task-lane model when this 2026-09-17 evidence was recorded; the 0.20.0-5 SOURCE also includes optional `task-lfm3-1.7b-liquidai-q6-k` as an unpromoted challenger. Its
 promotion evidence remains 15/18 direct, 15/18 through authenticated Open WebUI with
 package-owned prompts, and 9/9 true-overlap trials beside warm GPT-OSS. Installed
 0.11.3-0.2 still produced one `tags-de` format miss by emitting two JSON objects; 0.11.3-0.3
@@ -370,7 +370,7 @@ mirrored in `models/retired-models.json` so stale installed registrations remain
 distinguishable from operator-created unmanaged models and can be removed safely with
 `bc250 model purge-retired`.
 
-The retired set currently contains 21 definitions. Important recent role changes are:
+The historical retired-Modelfile archive contains 21 definitions, while the live retirement registry also records newer retirements without rewriting that archive. Important role changes are:
 
 | Model | Why it is retired from routine discovery |
 |---|---|
@@ -387,7 +387,7 @@ Other older retired entries remain documented by their Modelfiles, decision hist
 retired catalog. Do not resurrect them because of an isolated benchmark score; require a
 new role, changed hardware/runtime envelope or other explicit retest condition.
 
-Active experiments must retain a current comparison purpose. The 0.20.0 workbench deliberately prunes nine exhausted general/task/quant controls while adding the 2026-10-31 role-specific official/community candidate set. TIR remains a broader office/RAG control, the two ISTA 27B profiles remain distinct quality/headroom ceilings, and OCR, embedding, translation and Agent candidates retain separate lanes.
+Active experiments must retain a current comparison purpose. The 2026-11-05 OPEN WIP review further prunes redundant comparisons; only ISTA IQ3_XXS remains for the Deep fit gate. The official LFM3 1.7B is now a dedicated non-default task-lane challenger. OCR, embedding, translation and Agent remain separate qualification tracks. Prior 2026-10-31 choices below are preserved as dated history, not a current inventory.
 
 Use the role-specific lanes before changing defaults:
 
@@ -413,31 +413,71 @@ separately below.
 
 <!-- ACTIVE_EXPERIMENTS:BEGIN -->
 ```text
-exp-gemma4-12b-google-qat-q4-0
+exp-gemma4-12b-unsloth-qat-ud-q4-k-xl
+exp-gemma4-e4b-sc117-heretic-qat-q4-k-xl
 exp-glm-ocr-ggml-q8-0
-exp-granite42-3b-ibm-q6-k
 exp-index-translate-2b-indexteam-q4-k-m
 exp-index-translate-9b-indexteam-q4-k-m
-exp-lfm3-1.7b-atomicchat-uncensored-q6-k
-exp-lfm3-1.7b-liquidai-q6-k
-exp-lfm3-vl-2b-liquidai-q6-k
-exp-minicpm-v47-1b-openbmb-q4-k-m
-exp-nemotron35-bolt-e4b-nvidia-q4-k-m
 exp-ovisocr2-abiray-q8-0
-exp-qwen35-4b-unsloth-q6-k
-exp-qwen35-9b-davidau-defiant-fable-q6-k
-exp-qwen35-9b-hauhaucs-uncensored-q6-k
-exp-qwen38-27b-ista-gsq-rco-iq3-s
+exp-qwen35-9b-llmfan46-heretic-q6-k
 exp-qwen38-27b-ista-gsq-rco-iq3-xxs
-exp-spark-x26-4b-abenzerps-uncensored-iq3-m
 exp-spark-x26-4b-xhtoken-q4-k-m
 exp-tir-qwen35-9b-nonthinking-v2-q6-k
 ```
 <!-- ACTIVE_EXPERIMENTS:END -->
 
-## 2026-10-31 model-campaign refresh
+## 2026-11-05 model-review OPEN WIP (not a release or DEVICE promotion)
 
-The next-release workbench adds candidates only where they answer a current product question. The new
+The current experiment catalog retains **10** models: the two OCR candidates, Index-Translate
+9B and conditional 2B efficiency variant, TIR Structured candidate, ISTA IQ3_XXS Deep fit
+candidate, official Spark-X reasoning wildcard, Unsloth QAT UD-Q4_K_XL Gemma 4 12B,
+and two **admin-only text-only** Heretic Qwen3.5 9B / Gemma 4 E4B controls. The superseded
+Google naive 12B Q4_0 source was retired under its original identity; replacement is
+`exp-gemma4-12b-unsloth-qat-ud-q4-k-xl` at **16K** context and requires real K6 RAG
+quality, latency and concurrent-lane memory tests before any decision. The official
+LFM3 1.7B Q6_K contender has moved from experiment/main into `task-lfm3-1.7b-liquidai-q6-k`
+on the **11435 task lane**, with 4096 context, `think=false` qualification and no fixed SYSTEM
+prompt. Production task LFM2.5 1.2B remains unchanged.
+
+The retired catalog now includes the ten low-value `exp-*` controls rejected by the review,
+the old LFM3 experiment identity, the old Google Gemma 12B identity and the legacy Qwen2.5
+Coder 7B Agent model. Removing a catalog definition **does not delete device registrations or GGUFs**;
+retired cleanup is separate, explicit and confirmation-gated (`sudo bc250 model purge-retired`).
+The historical Modelfiles archive is deliberately unchanged. Index-Translate 2B remains an
+unpromoted conditional efficiency candidate: **test it only if 9B proves better than the production
+translation role**. Do not automatically broaden the live test matrix.
+
+**Licensing:** catalog entries carry selected upstream license identifiers and caution notes;
+inspect with `bc250 model inspect MODEL --json`. Jina v5 small's **CC BY-NC 4.0** means
+commercial use requires the appropriate rights, regardless of whether the operator is a nonprofit.
+Qwen3 Embedding 0.6B (Apache 2.0) stays as an explicit alternative requiring reindexing and
+retrieval qualification. LFM3 and production LFM2.5 use the vendor's LFM Open License v1.0;
+review its current conditions before commercial distribution. Heretic GGUF derivatives carry
+community provenance and must not be treated as production-qualified by publisher statistics.
+
+The two Heretic controls have `owui_testing_exposure: forbidden`, so the package creates no Open WebUI
+record for them. Admins still see the raw provider models, but a raw chat uses provider defaults: the
+Qwen3.5 control then thinks, because `think=false` is not sent. Compare the controls only through
+`bc250 advanced benchmark`, which applies their `request-think-false` profile. The Qwen control's
+upstream source is llmfan46's `Qwen3.5-9B-ultra-uncensored-heretic-v2-GGUF` (Q6_K). Confirm the pull
+succeeds on DEVICE before relying on it; `v1` is a separate upstream build with different refusal/KL
+figures.
+
+**Deferred** (not active catalog): Apertus 1.5 8B translation trial until a suitable
+*instruct* GGUF with verified Ollama 0.40.13/Vulkan execution is demonstrated; currently
+indexed text variants do not satisfy that gate. No additional OCR or Agent model added.
+Apertus Q8 alone is memory-tight and cannot be accepted on upstream benchmarks.
+
+Suggested short DEVICE funnel: task LFM3 vs LFM2.5 → Index-Translate 9B vs Translate-Gemma
+(DE/FR numbers, dates, CHF, article references) → Gemma 12B K6 RAG + residency → TIR
+Structured → ISTA IQ3_XXS Deep → two admin-only Heretic controls. **No default role changes
+without DEVICE acceptance**.
+
+## Historical: 2026-10-31 model-campaign refresh (superseded inventory)
+
+> Dated 2026-10-31 SOURCE state only. The active model inventory above and the 2026-11-05 OPEN WIP review supersede the experiment names and candidate counts in this section; retired entries below are historical evidence, not selectable current models.
+
+The then-planned workbench added candidates only where they answered a current product question. The new
 curated **Office - Generalist** candidate is `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`,
 using the AtomicChat Q6_K safety-ablated Nemotron Bolt weights with NVIDIA's 1.0/0.95 sampler and a
 request-level `think=false` / 4096-output product policy. It is intentionally separate from the accepted
@@ -514,30 +554,22 @@ reproduced. Qualified request defaults and experimental qualification metadata l
 Open WebUI model-policy document and are also consumed by production-mode benchmark requests.
 
 Production roles stay stable until a measured replacement wins its real use case.
-The current operator comparison pool intentionally retains older Qwen/Gemma/GPT
-variants alongside newer candidates so the next full BC-250 run can make the
-cleanup decision from one comparable dataset. Notable additions are:
+The present comparison pool is deliberately small. The historical 2026-10-31 campaign
+below is not an active-model selection authority.
 
-| Model | Why it exists |
+| Model | Current test purpose |
 |---|---|
-| `exp-qwen36-35b-a3b-unsloth-ud-iq3-s` | **retired** after the 8K fallback still produced repeated sub-512 MiB headroom and pressure resets; retained only in retired/history |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-s` | admin/testing-only 8K quality/reasoning profile; `think=true`; mechanically strong but memory-tight |
-| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | 8K deployability-oriented ISTA profile; corrected long-run scoring found no mechanical mismatch and materially more memory headroom than IQ3_S; retain the distinct lower-pressure role rather than collapsing the two ISTA profiles |
-| `exp-lfm3-1.7b-liquidai-q6-k` / `exp-lfm3-1.7b-atomicchat-uncensored-q6-k` | official/community fast-office controls; test DE/FR office quality, structured output, task-model potential and refusal drift |
-| `exp-nemotron35-bolt-e4b-nvidia-q4-k-m` | official Documents/RAG grounding challenger against production Gemma E4B |
-| `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k` | 0.20.0 Office - Generalist production candidate; community safety-ablated weights require explicit DEVICE quality/refusal/latency qualification |
-| `exp-index-translate-2b-indexteam-q4-k-m` / `exp-index-translate-9b-indexteam-q4-k-m` | dedicated translation efficiency/quality challengers against Translate-Gemma, including the known DE↔FR modality/negation corpus |
-| `exp-spark-x26-4b-xhtoken-q4-k-m` / `exp-spark-x26-4b-abenzerps-uncensored-iq3-m` | compact official/community reasoning wildcards; DE/FR usefulness must be proven locally |
-| `exp-qwen35-9b-davidau-defiant-fable-q6-k` | community/uncensored Advanced control reactivated for the new campaign; compare to production Qwen without assuming publisher benchmarks transfer |
-| `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | direct/non-thinking 9B comparison for office and RAG response behavior |
-| `exp-granite42-3b-ibm-q6-k` | compact multilingual/RAG/structured-output comparison |
-| `agentic-ornith15-9b-ornith-q5-k-m` | promoted agent default; retain as the baseline while product-path completion/extraction is qualified |
-| `agentic-qwable9b-empero-q6-k` | active 9B coding/agent challenger; retain for the next comparative funnel |
-| `agentic-qwen35-4b-khazarai-q6-k` | retired from active discovery after two DEVICE comparison runs produced 5/18 strict PASS versus Ornith 12/18; speed advantage did not offset broader Bash/Python/JSON compliance regressions |
-| `agentic-neohorse1-9b-tokenrhythm-q4-k-m` / `agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m` | official/community NeoHorse Agent challengers; compare strict raw-format usefulness/latency only after the current Ornith/Qwen bounded investigation is classified |
-| `agentic-gemma4-e4b-sol-fable-q4-k-m` | new compact Gemma 4 E4B agentic/coding challenger; conservative 16K deterministic BC-250 test profile; qualification pending |
-| `agentic-gemma4-12b-fable5-tau2-q4-k-m` | 12B Gemma 4 agent/tool-use comparison; retain until the E4B challenger establishes whether a final 12B comparison is useful |
-| `agentic-qwen25-coder7b-unsloth-q5-k-m` | legacy coding comparison; lifecycle decision remains pending canonical campaign-evidence reconciliation |
+| `exp-gemma4-12b-unsloth-qat-ud-q4-k-xl` | Unsloth 12B QAT UD K6 Documents/RAG quality and resident-memory candidate (16K) |
+| `exp-glm-ocr-ggml-q8-0` / `exp-ovisocr2-abiray-q8-0` | local OCR fidelity leader and structure/speed alternative; test tables/forms once |
+| `exp-index-translate-9b-indexteam-q4-k-m` | DE/FR main translation challenger; explicit amounts/dates/article/length guard |
+| `exp-index-translate-2b-indexteam-q4-k-m` | conditional efficiency trial **only after** 9B wins |
+| `exp-tir-qwen35-9b-nonthinking-v2-q6-k` | Advanced Structured non-thinking format/latency control |
+| `exp-qwen38-27b-ista-gsq-rco-iq3-xxs` | exclusive/near-exclusive Deep quality and 16GB fit gate |
+| `exp-spark-x26-4b-xhtoken-q4-k-m` | one bounded compact reasoning wildcard run |
+| `exp-qwen35-9b-llmfan46-heretic-q6-k` | admin-only text uncensored Advanced control (not promoted) |
+| `exp-gemma4-e4b-sc117-heretic-qat-q4-k-xl` | admin-only text Generalist/Standard QAT comparison (not promoted) |
+| `task-lfm3-1.7b-liquidai-q6-k` | non-default **task** challenger, 4K, strict task JSON and warm-main coexistence |
+| `agentic-ornith15-9b-ornith-q5-k-m` | existing Agent default |
 
 Package-owned model metadata is deliberately split by authority. `models/model-catalog.json` owns
 intrinsic Ollama-model facts: acquisition identity, provider/source ownership, runtime lane and

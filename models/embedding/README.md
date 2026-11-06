@@ -11,7 +11,7 @@ Embeddings use the dedicated `ollama-embedding.service` on port `11437`. Current
 - `embed-jina-v5-small-retrieval-q4-k-m` — retrieval recommendation;
 - `embed-qwen3-0.6b-q8-0` — alternative for comparison or licensing needs.
 
-Jina is CC-BY-NC-4.0; review that restriction before commercial use. The
+Jina is CC-BY-NC-4.0; commercial use requires the appropriate rights, including for a nonprofit if the use itself is commercial. See catalog `license` metadata. The
 fresh Open WebUI RAG baseline uses Jina `Query: ` / `Document: ` prefixes. Qwen
 is Apache-2.0 and should use an English task instruction on queries with no
 content prefix. Changing the embedding model or prefixes requires reindexing.

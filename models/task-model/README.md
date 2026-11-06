@@ -19,7 +19,12 @@ model store. It is part of required normal mode. With no selection,
 
 Current packaged task model:
 
-- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **production default and only active task-lane model**. Promotion evidence remains 15/18 direct, 15/18 through the actual Open WebUI title/tag/query endpoints with package-owned prompts, and 9/9 true-overlap trials while warm GPT-OSS remained resident.
+- `task-lfm25-1.2b-instruct-liquidai-q6-k` — **production default**. Promotion evidence remains 15/18 direct, 15/18 through the actual Open WebUI title/tag/query endpoints with package-owned prompts, and 9/9 true-overlap trials while warm GPT-OSS remained resident.
+
+- `task-lfm3-1.7b-liquidai-q6-k` — **optional, non-default challenger** at 4K context; requires `think=false` task checks with the package-owned prompts, JSON correctness and warm-main true-overlap evidence. Its former `exp-lfm3-1.7b-liquidai-q6-k` main-lane identity is retired.
+  - Measure it with `quality-checks/task/10-candidate-screen.sh task-lfm3-1.7b-liquidai-q6-k`. The screen installs the challenger with `bc250 model apply task` and keeps it registered. `bc250 advanced benchmark task` sends `think=false` because the profile requests it, and flags any reasoning that still appears.
+  - Promotion is more than a `TASK_MODEL` switch. Open WebUI 0.12.5 does not send `think` on task calls by default. `TASK_MODEL_PARAMS` lands in Ollama `options`, where `think` has no effect. Only a model record's **`params.custom_params.think=false`** is mapped to Ollama's top-level `think` field. Task calls are also not exempt from model access checks, so a promoted LFM3 needs a user-readable Open WebUI task-model record with `params: {"custom_params": {"think": false}}`. Do not put this setting in `TASK_MODEL_PARAMS` or infer promotion from the benchmark-only `think=false` request.
+  - On DEVICE, verify that the live title, tag and query endpoints then return no reasoning and stay within the 128-token budget.
 
 The previous `task-gemma3-1b-unsloth-ud-q4-k-xl` fallback/control is retired to the retired source set after its ~2/6 current task result. Reinstall it only as an explicit historical experiment, not as a routine fallback.
 
@@ -72,7 +77,7 @@ Use cheap rejection and expensive acceptance. A new candidate should normally pa
 `exp-qwen3-4b-lmstudio-q6-k` is a historical safety regression case and is now retired: it scored 5/6
 twice, but both exact-source task staging and a 4096-context task-tuned alias caused global OOM and
 killed the warm main model. Do not retest it for the concurrent task role unless the hardware/topology
-memory envelope changes. The next compact task comparison is the official `exp-lfm3-1.7b-liquidai-q6-k`
+memory envelope changes. The next compact task comparison is the official `task-lfm3-1.7b-liquidai-q6-k`
 against the current LFM2.5 1.2B task model, with quality and true-overlap residency measured separately. After any OOM experiment, use `quality-checks/task/30-appliance-recovery-check.sh` to
 prove normal services, reload/warm GPT-OSS when necessary, confirm main residency and an
 empty task lane, and detect any new serious faults caused by the recovery probe. The

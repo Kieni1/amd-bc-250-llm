@@ -28,7 +28,7 @@ main/task/embedding lanes. Current active candidates are:
 
 - `agentic-ornith15-9b-ornith-q5-k-m` — current measured default and the canonical
   package Agent qualification target;
-- `agentic-qwen25-coder7b-unsloth-q5-k-m` — retained coding alternative;
+- `agentic-qwen25-coder7b-unsloth-q5-k-m` — **retired** legacy coding alternative; no longer in active discovery;
 - `agentic-qwable9b-empero-q6-k` — active 9B native-reasoning challenger;
 - `agentic-gemma4-e4b-sol-fable-q4-k-m` — compact Gemma 4 E4B challenger;
 - `agentic-gemma4-12b-fable5-tau2-q4-k-m` — larger Gemma comparison candidate;
@@ -45,7 +45,9 @@ active candidate list.
 
 With no model selection, `sudo bc250 model apply agentic` lists active choices and
 prompts. Agent model reconciliation may temporarily switch topology and restores
-normal mode afterwards. Keep port `11436` blocked from untrusted networks. Add
+normal mode afterwards. In the 0.20.0-5 OPEN WIP, the scheduled office warmup no longer starts the main Ollama lane while Agent mode is active, and changing the main-lane profile does not terminate that Agent session. Safe-power likewise defers while the Agent lane is active. These are SOURCE changes requiring DEVICE verification; an ordinary `bc250 model apply` against a normal lane can still intentionally leave Agent mode, with an operator notice.
+
+Keep port `11436` blocked from untrusted networks. Add
 `http://host.containers.internal:11436` to Open WebUI only for a deliberate
 interactive Agent experiment; ordinary office use should leave the Agent lane inactive.
 
