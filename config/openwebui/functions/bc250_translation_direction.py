@@ -2,6 +2,8 @@
 
 import re
 import unicodedata
+from collections import Counter
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 DE_FR_MODEL = "bc250-office-translation-de-fr"
@@ -406,6 +408,138 @@ def _integrity_tokens(text: str) -> set[str]:
     return found
 
 
+# Compare the same calendar value across written German/French dates before
+# comparing the remaining numbers. Reject unsupported/invalid dates rather than
+# falsely treating 03.11.2026 and 4 novembre 2026 as equivalent.
+_DATE_MONTHS = {
+    "januar": 1, "janvier": 1, "jan": 1, "janv": 1,
+    "februar": 2, "février": 2, "fevrier": 2, "feb": 2, "febr": 2, "fév": 2, "févr": 2, "fev": 2, "fevr": 2,
+    "märz": 3, "maerz": 3, "mars": 3, "mär": 3, "mrz": 3,
+    "april": 4, "avril": 4, "apr": 4, "avr": 4,
+    "mai": 5, "may": 5,
+    "juni": 6, "juin": 6, "jun": 6,
+    "juli": 7, "juillet": 7, "jul": 7, "juil": 7,
+    "august": 8, "août": 8, "aout": 8, "aug": 8,
+    "september": 9, "septembre": 9, "sep": 9, "sept": 9,
+    "oktober": 10, "octobre": 10, "okt": 10, "oct": 10,
+    "november": 11, "novembre": 11, "nov": 11,
+    "dezember": 12, "décembre": 12, "decembre": 12, "dez": 12, "déc": 12, "dec": 12,
+}
+_DATE_MONTH_WORDS = "|".join(sorted((re.escape(w) for w in _DATE_MONTHS), key=len, reverse=True))
+_DATE_PATTERNS = (
+    re.compile(r"(?<![\w-])(?P<day>\d{1,2})\.(?P<month>\d{1,2})\.(?P<year>\d{4})(?![\w-])"),
+    re.compile(r"(?<![\w-])(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})(?![\w-])"),
+    re.compile(
+        rf"(?<![\w-])(?P<day>\d{{1,2}})(?:\.|er)?\s+(?P<month>{_DATE_MONTH_WORDS})\.?\s+(?P<year>\d{{4}})(?![\w-])",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _date_numbers(text: str) -> tuple[Counter[tuple[int, int, int]], str]:
+    """Return recognized real dates and remaining source text, preserving unknowns."""
+    dates: Counter[tuple[int, int, int]] = Counter()
+    occupied: list[tuple[int, int]] = []
+    for pattern in _DATE_PATTERNS:
+        for match in pattern.finditer(text):
+            if any(match.start() < end and start < match.end() for start, end in occupied):
+                continue
+            month_text = match.group("month").casefold()
+            month = _DATE_MONTHS.get(month_text)
+            if month is None:
+                month = int(month_text)
+            try:
+                day = int(match.group("day"))
+                year = int(match.group("year"))
+                date(year, month, day)
+            except ValueError:
+                continue
+            dates[(year, month, day)] += 1
+            occupied.append(match.span())
+    remainder = list(text)
+    for start, end in occupied:
+        remainder[start:end] = " " * (end - start)
+    return dates, "".join(remainder)
+
+
+# Minute-bearing clock renderings only: 14:30, 14h30, 14 h 30 and Swiss 14.30 Uhr.
+# Hour-only forms (14 Uhr, 14 h, 14h) stay plain numbers so they also match
+# durations such as 8 Stunden -> 8 h.
+_CLOCK_PATTERNS = (
+    re.compile(r"(?<![\w.,-])(?P<hour>[01]?\d|2[0-3])\s*(?::|h)\s*(?P<minute>[0-5]\d)(?!\w)", re.IGNORECASE),
+    re.compile(r"(?<![\w.,-])(?P<hour>[01]?\d|2[0-3])\.(?P<minute>[0-5]\d)(?=\s*uhr\b)", re.IGNORECASE),
+)
+
+
+def _clock_numbers(text: str) -> tuple[Counter[tuple[int, int]], str]:
+    values: Counter[tuple[int, int]] = Counter()
+    remainder = list(text)
+    for pattern in _CLOCK_PATTERNS:
+        for match in pattern.finditer("".join(remainder)):
+            values[(int(match.group("hour")), int(match.group("minute")))] += 1
+            remainder[match.start():match.end()] = " " * (match.end() - match.start())
+    return values, "".join(remainder)
+
+
+# A stand-alone value: digits with in-number separators, or space-grouped
+# thousands (10 450.00, 1 250). Unlike _NUMBER_TOKEN, a separator followed by a
+# space ("2025, 1200", "Art. 5, 6") ends the value, so list punctuation that
+# differs between DE and FR cannot merge two numbers into one.
+_PLAIN_NUMBER = r"\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d+(?:[.,'’]\d+)*"
+# Ordinal and hour suffixes that a translation adds or drops: 1er, 2e, 2ème, 9h.
+_NUMBER_SUFFIX = r"(?:ère|ere|er|re|ème|eme|e|h)?"
+
+
+def _number_signatures(text: str) -> Counter[frozenset[Decimal]]:
+    """Protect plain numeric magnitudes, including article numbers and durations."""
+    values: Counter[frozenset[Decimal]] = Counter()
+    # Identifiers are checked separately; their embedded digits are not stand-alone values.
+    normalized = _literal_match_text(text)
+    for token in sorted(_integrity_tokens(normalized), key=len, reverse=True):
+        normalized = normalized.replace(_literal_match_text(token), " ")
+    for match in re.finditer(
+        rf"(?<![\w-])(?P<amount>{_PLAIN_NUMBER}){_NUMBER_SUFFIX}(?![\w-])", normalized
+    ):
+        possible = decimal_interpretations(match.group("amount"))
+        if possible:
+            values[possible] += 1
+    return values
+
+
+def _value(number: int) -> frozenset[Decimal]:
+    return frozenset({Decimal(number)})
+
+
+def _plain_number_mismatch(source: str, target: str) -> str | None:
+    """Compare dates, clock times and remaining numbers as multisets.
+
+    The target may render a value in a different but equivalent form (an hour-only
+    "14 Uhr" for "14:00", a written month for an abbreviated one), so the day/year
+    of target dates and the hour/minute of target clock times also count as
+    available plain numbers. A source value is never satisfied twice.
+    """
+    source_dates, source_rest = _date_numbers(source)
+    target_dates, target_rest = _date_numbers(target)
+    if source_dates - target_dates:
+        return "source calendar date missing or changed in translation"
+    source_clocks, source_rest = _clock_numbers(source_rest)
+    target_clocks, target_rest = _clock_numbers(target_rest)
+    available = _number_signatures(target_rest)
+    for (year, _month, day), count in target_dates.items():
+        available[_value(day)] += count
+        available[_value(year)] += count
+    for (hour, minute), count in target_clocks.items():
+        available[_value(hour)] += count
+        available[_value(minute)] += count
+    for (hour, minute), count in (source_clocks - target_clocks).items():
+        if minute != 0 or available[_value(hour)] < count:
+            return "source clock time missing or changed in translation"
+        available[_value(hour)] -= count
+    if _number_signatures(source_rest) - available:
+        return "source numeric value missing or changed in translation"
+    return None
+
+
 def literal_integrity_mismatch(source: str, target: str) -> str | None:
     target_folded = _literal_match_text(target)
     for token in sorted(_integrity_tokens(source)):
@@ -430,7 +564,7 @@ def literal_integrity_mismatch(source: str, target: str) -> str | None:
             "source percentage missing from translation "
             f"({_format_interpretations(interpretations)}%)"
         )
-    return None
+    return _plain_number_mismatch(source, target)
 
 
 def translation_integrity_error(body: dict) -> str | None:
@@ -458,6 +592,16 @@ class Filter:
         messages = body.get("messages")
         if not isinstance(messages, list):
             raise TypeError("BC-250 translation role requires a messages list")
+        # Open WebUI attachment/RAG content is not in the typed message that the
+        # outlet integrity guard can verify. Fail closed instead of translating
+        # an unbounded selection of retrieved chunks as if it were the document.
+        if body.get("files") or body.get("sources"):
+            raise ValueError("BC-250 translation file context/attachment is not supported; paste the source text")
+        if any(
+            isinstance(message, dict) and (message.get("files") or message.get("sources"))
+            for message in messages
+        ):
+            raise ValueError("BC-250 translation attachment is not supported; paste the source text")
 
         for message in reversed(messages):
             if not isinstance(message, dict) or message.get("role") != "user":
