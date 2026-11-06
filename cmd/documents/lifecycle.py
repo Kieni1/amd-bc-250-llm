@@ -1204,7 +1204,8 @@ def validate_entries(
         if target is None:
             message = (
                 f"{path.name}: translation_of target does not exist in the proposed corpus: "
-                f"{counterpart}"
+                f"{counterpart}; for a DE revision update, activate the matching reviewed FR re-translation "
+                "in the same batch, or supersede the old FR translation first"
             )
             (errors if must_resolve else warnings).append(message)
             continue
@@ -1502,6 +1503,8 @@ def cmd_supersede(args: argparse.Namespace) -> None:
         ) from exc
 
     print(f"  superseded: {target.name}")
+    print("  Next action: run 'sudo bc250 document ingest' to remove this superseded")
+    print("  revision from Open WebUI Knowledge, then verify with 'sudo bc250 document status --knowledge'.")
     if warnings or post_warnings:
         print(f"  validation warnings: {post_warnings}")
 

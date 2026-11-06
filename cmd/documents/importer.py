@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 
 DEFAULT_ROOT = Path(os.environ.get("BC250_RAG_ROOT", "/srv/bc250-documents"))
 DEFAULT_URL = os.environ.get("OPEN_WEBUI_URL", "http://127.0.0.1:3000").rstrip("/")
+PACKAGE_API_KEY = Path("/var/lib/bc250-llm-server/secrets/openwebui-admin.key")
 SCOPES = ("public", "confidential")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 TOP_LEVEL_KEYS = {
@@ -435,13 +436,46 @@ def expected_knowledge(root: Path) -> dict[str, str]:
         if not scope_dir.is_dir():
             continue
         for collection_dir in sorted(p for p in scope_dir.iterdir() if p.is_dir()):
-            if not (collection_dir / "active").is_dir():
+            active = collection_dir / "active"
+            superseded = collection_dir / "superseded"
+            if not active.is_dir() and not superseded.is_dir():
                 continue
+            if active.is_symlink() or superseded.is_symlink():
+                raise ValueError(f"managed collection has symlinked active/superseded directory: {collection_dir}")
             for lane in ("original", "translation"):
                 result[knowledge_name(scope, collection_dir.name, lane)] = (
                     knowledge_description(scope, collection_dir.name, lane)
                 )
     return result
+
+
+def known_superseded_knowledge(root: Path) -> dict[str, Path]:
+    """Map lanes with local superseded revisions to their ``superseded/`` directory.
+
+    Only lanes proven by local lifecycle moves are returned, never remote-only data.
+    The lane uses the same ``route()`` policy as active ingestion, so a French
+    revision tagged ``fr`` or with an explicit authority role is not misfiled.
+    """
+    names: dict[str, Path] = {}
+    for scope in SCOPES:
+        directory = root / scope
+        if not directory.is_dir() or directory.is_symlink():
+            continue
+        for collection in directory.iterdir():
+            if not collection.is_dir() or collection.is_symlink():
+                continue
+            archived = collection / "superseded"
+            if not archived.is_dir() or archived.is_symlink():
+                continue
+            for path in archived.glob("*.md"):
+                if path.is_symlink() or not path.is_file():
+                    continue
+                try:
+                    lane, _language = route(front_matter(path))
+                except (OSError, ValueError, UnicodeError):
+                    continue
+                names[knowledge_name(scope, collection.name, lane)] = archived
+    return names
 
 
 def print_plan(root: Path, docs: list[Document], warnings: list[str]) -> None:
@@ -587,6 +621,10 @@ class OpenWebUI:
         return validate_diff_result(result)
 
     def upload(self, knowledge_id: str, doc: Document) -> None:
+        # Prevent filename-based multipart header injection. A file name comes
+        # from operator-owned corpus state, not a trusted protocol constant.
+        if not doc.path.name or any(c in doc.path.name for c in ('\r', '\n', '"')):
+            raise ValueError(f"unsafe multipart filename: {doc.path.name!r}")
         content = doc.path.read_bytes()
         file_hash = hashlib.sha256(content).hexdigest()
         metadata = json.dumps({"knowledge_id": knowledge_id, "file_hash": file_hash})
@@ -725,9 +763,15 @@ def token_from(args: object) -> str:
     if args.token_file:
         return read_protected_token_file(Path(args.token_file))
     token = os.environ.get("OPEN_WEBUI_API_KEY", "").strip()
-    if not token:
-        raise ValueError("provide --token-file or OPEN_WEBUI_API_KEY")
-    return token
+    if token:
+        return token
+    # Share the protected appliance credential used by setup, verify and status.
+    if not PACKAGE_API_KEY.exists() and not PACKAGE_API_KEY.is_symlink():
+        raise ValueError(
+            f"package Open WebUI admin key not found at {PACKAGE_API_KEY}; "
+            "complete `sudo bc250 install`, or provide --token-file or OPEN_WEBUI_API_KEY"
+        )
+    return read_protected_token_file(PACKAGE_API_KEY)
 
 
 def sync(
@@ -751,7 +795,12 @@ def sync(
     grouped = groups(docs)
     expected = expected_knowledge(root)
     by_key = {(doc.kb_name, doc.path.name): doc for doc in docs}
-    names = set(grouped) | (set(expected) if args.prune else set())
+    # An empty lane may still hold a known superseded revision. Query only
+    # those lanes; never infer consent to delete unrelated remote-only data.
+    superseded_dirs = known_superseded_knowledge(root)
+    names = set(grouped) | set(superseded_dirs)
+    if args.prune:
+        names |= set(expected)
 
     for name in sorted(names):
         members = grouped.get(name, [])
@@ -812,17 +861,29 @@ def sync(
 
         if deleted:
             if args.prune:
-                ids = [
-                    str(item["file_id"])
-                    for item in deleted
-                    if isinstance(item, dict) and item.get("file_id")
-                ]
+                ids = [str(item["file_id"]) for item in deleted]
                 print(f"  prune:   {len(ids)} stale remote file(s)")
                 api.cleanup(kb_id, ids)
             else:
-                print(
-                    "  NOTE: stale remote files kept; rerun with --prune to remove them explicitly."
-                )
+                # Only lifecycle-proven superseded files are safe to remove
+                # automatically. Other remote files may be operator-owned and
+                # still require explicit --prune consent.
+                superseded = superseded_dirs.get(name)
+                known = {
+                    str(item["file_id"])
+                    for item in deleted
+                    if superseded is not None
+                    and isinstance(item.get("filename"), str)
+                    and item["filename"] not in {"", ".", ".."}
+                    and Path(item["filename"]).name == item["filename"]
+                    and not (superseded / item["filename"]).is_symlink()
+                    and (superseded / item["filename"]).is_file()
+                }
+                if known:
+                    print(f"  remove:  {len(known)} known superseded revision(s)")
+                    api.cleanup(kb_id, sorted(known))
+                if len(known) < len(deleted):
+                    print("  NOTE: other stale remote files kept; use --prune to remove explicitly.")
 
     print(
         "\nSync complete. Review Open WebUI Knowledge permissions before exposing any collection to other users."

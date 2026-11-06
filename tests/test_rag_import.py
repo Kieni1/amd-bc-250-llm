@@ -451,7 +451,8 @@ class RagImportTests(unittest.TestCase):
                 {"[PUBLIC] COLLECTION — Originals", "[PUBLIC] COLLECTION — Français"},
             )
         source = SCRIPT.read_text(encoding="utf-8")
-        self.assertIn("set(grouped) | (set(expected) if args.prune else set())", source)
+        self.assertIn("names = set(grouped) | set(superseded_dirs)", source)
+        self.assertIn("if args.prune:\n        names |= set(expected)", source)
 
 
     def test_lifecycle_init_creates_three_inbox_lanes_and_dry_run_is_nonmutating(self) -> None:

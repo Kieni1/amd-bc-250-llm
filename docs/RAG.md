@@ -55,7 +55,7 @@ external PDF -> Tika extraction quality -> gold evidence/questions
              -> frozen ranked evidence -> answer-model comparison
 ```
 
-The retrieval scorer does not recreate Open WebUI chunking. It consumes ranked chunks exported from the product path, so changes to `CHUNK_SIZE`, overlap, Top-K, embedding model or dense/hybrid mode are evaluated only after a clean reindex under one named arm. Step-6 gold annotations are first checked against the exact Tika extraction evidence so retrieval is not scored against passages that the product never extracted. Supported questions contribute Recall/MRR; deliberately unsupported questions are kept for later grounding checks but do not lower retrieval recall simply because no supporting passage exists. Retrieval arms are compared descriptively; Step 9 requires an explicit selection note and freezes the selected arm plus exact manifest/arm/ranking hashes before fixed-evidence model comparison. The current `1500/200`, Jina v5, dense, Top-K 4 configuration remains the control until corpus evidence justifies a change.
+The retrieval scorer does not recreate Open WebUI chunking. It consumes ranked chunks exported from the product path, so changes to `CHUNK_SIZE`, overlap, Top-K, embedding model or dense/hybrid mode are evaluated only after a clean reindex under one named arm. Step-6 gold annotations are first checked against the exact Tika extraction evidence so retrieval is not scored against passages that the product never extracted. Supported questions contribute Recall/MRR; deliberately unsupported questions are kept for later grounding checks but do not lower retrieval recall simply because no supporting passage exists. Retrieval arms are compared descriptively; Step 9 requires an explicit selection note and freezes the selected arm plus exact manifest/arm/ranking hashes before fixed-evidence model comparison. The earlier K4 arm remains a historical comparison control. The **0.20.0-5 SOURCE** Documents/RAG default is Jina v5, dense, 1500/200 and **Top-K 6** (the currently accepted 0.20.0-3 RPM still uses K4); its measurement is from the direct Open WebUI/Tika path, not yet from the separately normalized managed corpus.
 
 ## 1. Back up Open WebUI before knowledge synchronization
 
@@ -144,7 +144,7 @@ and throughput and rejects inconsistent embedding dimensions; do not select an e
 
 ## 3. Fresh-install Open WebUI baseline
 
-The packaged Quadlet now uses the **moderate BC-250 profile** by default:
+The reviewed Open WebUI **desired-state configuration**, applied by `sudo bc250 advanced openwebui apply` and the installer, sets the current BC-250 profile. The Quadlet supplies transport/bootstrap settings, not the effective retrieval policy:
 
 | Setting | Moderate standard | Conservative alternative |
 |---|---:|---:|
@@ -157,7 +157,7 @@ The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 | Chunk min-size target | `0` (disabled) | `0` |
 | Chunk size | `1500` | `1000` |
 | Chunk overlap | `200` | `100` |
-| Top K | `4` | `5` |
+| Top K | `6` | `5` |
 | Relevance threshold | `0` | `0` |
 | Hybrid search | Off initially | Off initially |
 | Embedding batch size | `1` | `1` |
@@ -168,7 +168,7 @@ The packaged Quadlet now uses the **moderate BC-250 profile** by default:
 | Retrieval-query generation | Off for baseline | Off for baseline |
 | Reranker | None | None |
 
-The **moderate** 1500/200/Top-K-4 profile is the package standard for the 32K
+The **moderate** 1500/200/Top-K-6 profile is the package standard for the 32K
 document model: it gives each retrieval hit more surrounding office-document
 context while keeping the injected context well below the model window. The
 **conservative** 1000/100/Top-K-5 profile is useful when testing a larger model,
@@ -179,7 +179,7 @@ claims.
 Open WebUI persists many Admin settings in `webui.db`. The installer therefore
 offers `bc250 advanced openwebui init`, which applies the reviewed package-owned
 provider/task/RAG state through supported APIs. The Quadlet remains the safe
-bootstrap baseline; later intentional operator overrides are not reset silently.
+bootstrap baseline. Package-owned retrieval settings, including TOP_K, are **re-converged** by later `apply`/install; administrative UI edits are drift unless placed in a deliberately selected supported alternate desired-state policy.
 
 The fresh-install `RAG_TEMPLATE` is intentionally source-grounded: if the retrieved
 context does not support the requested fact, it asks the answer model to state that
@@ -333,6 +333,8 @@ The supported first-pass workflow is one local command, not a separate conversio
 sudo bc250 document init public municipal-regulations
 # copy PDF or DOCX sources into the appropriate inbox lane
 sudo bc250 document prepare-batch public municipal-regulations --dry-run
+# Prerequisite: the optional local Agent model must already be installed:
+sudo bc250 model apply agentic agentic-ornith15-9b-ornith-q5-k-m
 sudo bc250 document prepare-batch public municipal-regulations
 sudo bc250 document review public municipal-regulations
 sudo bc250 document validate public municipal-regulations --include-working
@@ -342,7 +344,10 @@ sudo bc250 document activate public municipal-regulations --all-ready
 `prepare-batch` extracts PDF text locally with `pdfinfo`/`pdftotext` and reads DOCX OOXML locally with the
 Python standard library, then uses the exclusive local agent lane on `127.0.0.1:11436` for conservative
 normalization. If the agent lane is inactive it enters agent mode for the batch and restores normal topology
-afterwards.
+afterwards. The normalization model is an **optional Agent add-on**, not part of the baseline install;
+install/verify its registration before beginning document preparation. Its coding-Agent profile is
+not independent evidence that normalization of legal material is semantically correct; the mandatory
+human review remains the acceptance gate.
 The agent call uses Ollama `/api/chat` with native thinking kept separate from final `message.content`; truncated, empty, fenced or literal reasoning-contaminated final output is rejected before a draft is written. Fidelity checks run only against that validated final Markdown.
 No external OCR, conversion, translation or hosted document API is used. Automation writes **only** to
 `working/`; it never promotes generated text directly into `active/`.
@@ -380,7 +385,7 @@ normalized draft with the original source before marking it ready. The agent out
 not an authoritative transformation until reviewed.
 
 Activation is explicit and all-or-nothing for the requested batch. The complete projected active corpus is
-validated before any filesystem mutation; ambiguous multiple replacements for the same `document_family` and language are rejected. A reviewed replacement supersedes the previous active revision while retaining old evidence, and a runtime move failure rolls back the activation transaction.
+validated before any filesystem mutation; ambiguous multiple replacements for the same `document_family` and language are rejected. A reviewed replacement supersedes the previous active revision while retaining old evidence, and a runtime move failure rolls back the activation transaction. After activation, **run `sudo bc250 document ingest`** to remove known superseded revisions from the Knowledge index. A DE revision with an active FR translation must be updated together with the matching FR re-translation in the same activation batch (or supersede FR first); otherwise the translation-of reference correctly fails closed.
 
 `bc250 document status [SCOPE [COLLECTION]]` gives the concise operator view: active documents, drafts that
 need review, ready drafts, pending inbox sources, superseded revisions, currentness-review count, paired DE/FR
@@ -425,14 +430,13 @@ the package-owned corpus tree.
 Before ingestion, use `bc250 document validate`/`status` to review the local lifecycle state without contacting Open WebUI. Then sync only reviewed `active/*.md` files:
 
 ```bash
-sudo install -m 0600 -o root -g root /PATH/TO/KEY /etc/bc250-llm-server/rag-api-key
-sudo bc250 document ingest --token-file /etc/bc250-llm-server/rag-api-key
+sudo bc250 document ingest
+# Optional: --token-file /PATH/TO/PRIVATE-OVERRIDE.key
 ```
 
 `ingest` validates the lifecycle schema before using the package-pinned Open WebUI incremental
 knowledge API. Unchanged files are skipped and changed Markdown is uploaded before the stale remote copy is
-removed. If stale cleanup fails after a successful replacement upload, ingestion stops with the new copy preserved and reports that the old copy may still exist; fix the API/permission problem and rerun ingestion. Local removals are reported but retained remotely unless `--prune` is explicitly supplied. The
-credential must be a non-empty private regular file (normally `0600`) and must not be a symlink; it is never stored in the corpus.
+removed. If stale cleanup fails after a successful replacement upload, ingestion stops with the new copy preserved and reports that the old copy may still exist; fix the API/permission problem and rerun ingestion. Known superseded files (matching a local `superseded/` file and the remote diff filename) are removed automatically **after successful uploads**; all unrelated stale remote files stay indexed until `--prune` is explicitly supplied. If a removed collection disappears entirely from disk, its remote Knowledge base still requires an explicit administrative review/cleanup. The default credential is the protected package admin key under `/var/lib/bc250-llm-server/secrets/`. An explicit `--token-file` override must be a non-empty private regular file (normally `0600`) and must not be a symlink; neither key is stored in the corpus.
 
 Incremental-sync responses are validated before filenames or remote file IDs are used. A
 missing/malformed knowledge ID, filename, stale-file ID, deletion ID or count is treated as
@@ -472,7 +476,11 @@ Use OCR only for image-only or poorly extracted scans. OCR is preprocessing: it
 produces text for an operator to review, not a valid managed document and not a
 replacement for the answer model. Text-native managed PDF and DOCX sources use
 `bc250 document prepare-batch`; Tika remains the Open WebUI/ad-hoc office-document
-path rather than the managed preparation path.
+path rather than the managed preparation path. **Evidence boundary:** the accepted Tika extraction,
+retrieval and K6 comparison applies to direct Open WebUI uploads, not to this
+managed PDF/DOCX → normalized Markdown pipeline. A separate bounded managed-path
+retrieval qualification is still required; use only external DEVICE-resident corpus
+material and keep its document specifics outside source/workbench artifacts.
 
 Current OCR test set:
 
@@ -632,9 +640,19 @@ latency and should earn its place through measured retrieval improvement.
 - Do not expose Tika or Ollama ports to untrusted networks.
 - Treat `/var/lib/open-webui/webui.db`, `/var/lib/open-webui/uploads/` and
   `/var/lib/open-webui/vector_db/` as confidential data.
-- `bc250 maintenance run backup` does **not** include uploads or vector data. Use
-  a stopped full `/var/lib/open-webui` snapshot on encrypted storage when the
-  RAG corpus must be recoverable.
+- In the `0.20.0-5` SOURCE, scheduled maintenance includes a separate verified
+  `backup-documents` archive of authoritative `/srv/bc250-documents` sources,
+  reviewed active/superseded Markdown and collection provenance. Local archives
+  are **not** off-device recovery until verified copies have been pulled to the Pi.
+- `bc250 maintenance run backup` still **does not** back up Open WebUI `uploads/`
+  or `vector_db/`. Recreate those from the restored corpus using managed-document
+  ingest and a clean reindex; take an encrypted stopped snapshot of the entire
+  `/var/lib/open-webui` tree if that derived live state must also be preserved.
+- Reinstating an Open WebUI database on a new host needs the original signing/encryption
+  secret from **separate private escrow**; it is intentionally not in the Pi export.
+  Never assume a config backup alone is a complete disaster-recovery proof.
+- For a replacement-device procedure and Pi pull scope, see
+  [`OPERATIONS.md`](OPERATIONS.md). Restoration and Pi/WOL are not DEVICE-qualified yet.
 
 ## Choosing the document path
 
