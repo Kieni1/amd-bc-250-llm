@@ -145,7 +145,10 @@ remove_official_ollama() {
 remove_main_package() {
   heading "6. REMOVE BC-250 RPM"
   rpm -q bc250-llm-server.x86_64 >/dev/null 2>&1 || { echo "bc250-llm-server.x86_64 is already absent."; return; }
-  dnf remove -y bc250-llm-server.x86_64 || { echo "ERROR: RPM removal failed; persistent data was retained." >&2; return 1; }
+  dnf remove -y bc250-llm-server.x86_64 || {
+    echo "ERROR: RPM removal failed. The earlier reset steps already stopped services and changed runtime/profiles; the final persistent-data deletion was NOT started. Investigate before retrying." >&2
+    return 1
+  }
 }
 
 remove_persistent_data() {

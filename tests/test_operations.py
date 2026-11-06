@@ -95,25 +95,12 @@ class StatusTests(unittest.TestCase):
         self.assertIn("Package:", source)
         self.assertIn("bc250-llm-server 2>/dev/null", source)
 
-    def test_ollama_profile_apply_is_nounset_safe(self) -> None:
+    def test_ollama_balanced_returns_to_packaged_profile_without_starting_agent_host(self) -> None:
         source = (ROOT / "cmd/system/ollama-profile.sh").read_text(encoding="utf-8")
-        start = source.index("apply_profile() {")
-        end = source.index("\n}", start) + 2
-        function = source[start:end]
-        command = (
-            "set -u\n"
-            "PROFILE_DIR=/definitely/missing\n"
-            "require_root(){ :; }\n"
-            + function
-            + "\napply_profile balanced"
-        )
-        result = subprocess.run(
-            ["bash", "-c", command],
-            text=True, capture_output=True, check=False,
-        )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("missing profile /definitely/missing/balanced.conf", result.stderr)
-        self.assertNotIn("unbound variable", result.stderr)
+        self.assertIn("balanced|reset) reset_profile", source)
+        self.assertIn("systemctl try-restart ollama.service", source)
+        self.assertNotIn("systemctl restart ollama.service", source)
+        self.assertNotIn("max-context) ", source)
 
     def test_status_surfaces_topology_aware_overall_state(self) -> None:
         source = (ROOT / "cmd/monitoring/status.sh").read_text(encoding="utf-8")

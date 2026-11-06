@@ -403,7 +403,19 @@ step_7_models() {
   local owui_desired_file="${BC250_OWUI_DESIRED_STATE:-/usr/share/bc250-llm-server/openwebui/desired-state.json}"
   local required_csv
   [[ -r "$owui_models_file" ]] || owui_models_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/models.json"
-  [[ -r "$owui_desired_file" ]] || owui_desired_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
+  if [[ -n "${BC250_OWUI_DESIRED_STATE:-}" ]]; then
+    [[ -f "$owui_desired_file" && -r "$owui_desired_file" && ! -L "$owui_desired_file" ]] || {
+      echo "ERROR: BC250_OWUI_DESIRED_STATE must be a readable regular non-symlink file: $owui_desired_file" >&2; return 1;
+    }
+    local mode owner
+    mode="$(stat -c %a -- "$owui_desired_file")" || return 1
+    owner="$(stat -c %u -- "$owui_desired_file")" || return 1
+    (( (8#$mode & 022) == 0 && owner == 0 )) || {
+      echo "ERROR: desired-state override must be root-owned and not group/world writable." >&2; return 1;
+    }
+  else
+    [[ -r "$owui_desired_file" ]] || owui_desired_file="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
+  fi
   required_csv="$({
     jq -r '.models[] | select(.is_active == true) | .base_model_id // empty | sub(":latest$"; "")' "$owui_models_file"
     jq -r '(.task.TASK_MODEL // empty | sub(":latest$"; "")), (.embedding.RAG_EMBEDDING_MODEL // empty | sub(":latest$"; ""))' "$owui_desired_file"
@@ -1004,7 +1016,9 @@ verify_local_maintenance_setup() {
     return 1
   }
   bc250 maintenance status >/dev/null
-  for unit in owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer; do
+  # Keep in step with maintenance.sh ALL_TIMERS (tests/test_unit_lists_02005.py).
+  for unit in owui-backup-config.timer owui-backup-users.timer owui-backup-documents.timer \
+      owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer; do
     if systemctl is-enabled --quiet "$unit" 2>/dev/null; then
       systemctl is-active --quiet "$unit" || {
         echo "ERROR: enabled maintenance timer is not active: $unit" >&2
