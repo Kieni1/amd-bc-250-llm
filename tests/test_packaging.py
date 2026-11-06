@@ -681,10 +681,9 @@ class PackagingTests(unittest.TestCase):
             f"readonly TASK_MODEL={task}",
             (ROOT / "cmd/benchmark/revalidate.sh").read_text(encoding="utf-8"),
         )
-        self.assertIn(
-            f'--arg model "{task}"',
-            (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8"),
-        )
+        verifier = (ROOT / "cmd/monitoring/verify-server.sh").read_text(encoding="utf-8")
+        self.assertIn('.task.TASK_MODEL // empty', verifier)
+        self.assertIn('--arg model "$desired_task_model"', verifier)
         catalog = json.loads((ROOT / "models/model-catalog.json").read_text(encoding="utf-8"))
         profiles = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
         self.assertIn(task, catalog["models"])

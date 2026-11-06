@@ -22,7 +22,7 @@ appliance state.
 Reset is intentionally destructive. Before confirming it:
 
 1. export/copy any Open WebUI chats, accounts or application state you intend to keep;
-2. copy `/var/backups/bc250-llm-server` off the appliance if those local backups matter;
+2. copy and verify `/var/backups/bc250-llm-server` off the appliance, including the managed-documents backup and `.sha256` sidecars, if recovery matters;
 3. confirm the authoritative `/srv/bc250-documents` tree is complete and backed up according to your office policy;
 4. record any custom model/operator configuration under `/etc/bc250-llm-server` that you may want to recreate later.
 

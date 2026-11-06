@@ -13,7 +13,6 @@ dir	0755	-	{share}/examples/raspi-wol
 dir	0755	-	{share}/examples/document
 dir	0755	-	{share}/model-management
 dir	0755	-	{share}/model-management/modelfiles
-dir	0755	-	{share}/ollama-profiles
 dir	0755	-	{share}/openwebui
 dir	0755	-	/var/lib/bc250-llm-server/openwebui-runtime
 file	0644	config/openwebui/runtime/sitecustomize.py	/var/lib/bc250-llm-server/openwebui-runtime/sitecustomize.py
@@ -117,6 +116,7 @@ file	0755	cmd/system/reset.sh	{libexec}/reset.sh
 file	0755	cmd/monitoring/verify-server.sh	{libexec}/verify.sh
 file	0755	examples/raspi-wol/enable-wol.sh	{libexec}/enable-wol.sh
 file	0755	cmd/maintenance/*.sh	{libexec}/
+file	0755	cmd/maintenance/knowledge-prune-refs.py	{libexec}/knowledge-prune-refs.py
 file	0755	models/coding-agent/coding-agent.sh	{libexec}/coding-agent/coding-agent.sh
 file	0755	models/coding-agent/commit-agent.sh	{libexec}/coding-agent/commit-agent.sh
 file	0755	models/coding-agent/gitea-review.sh	{libexec}/coding-agent/gitea-review.sh
@@ -129,7 +129,6 @@ file	0755	live-manager-src/bc250-cu-live-manager.sh	{bindir}/bc250-cu-live-manag
 file	0644	live-manager-src/README.md	{share}/cu-live-manager/README-upstream.md
 text	0644	{live_manager_commit}	{share}/cu-live-manager/SOURCE-REVISION
 
-file	0644	config/ollama-profiles/*.conf	{share}/ollama-profiles/
 dir	0755	-	{share}/openwebui/functions
 dir	0755	-	{share}/openwebui/prompts
 file	0644	config/openwebui/models.json	{share}/openwebui/models.json
@@ -157,6 +156,13 @@ file	0644	examples/raspi-wol/bc250-wake.service	{share}/examples/raspi-wol/bc250
 file	0644	examples/raspi-wol/bc250-wake.timer	{share}/examples/raspi-wol/bc250-wake.timer
 file	0644	examples/raspi-wol/bc250-wake.env.example	{share}/examples/raspi-wol/bc250-wake.env.example
 file	0644	examples/raspi-wol/bc250-wol.env.example	{share}/examples/raspi-wol/bc250-wol.env.example
+file	0644	examples/raspi-wol/bc250-pi-ssh-config.example	{share}/examples/raspi-wol/bc250-pi-ssh-config.example
+file	0755	examples/raspi-wol/pull-bc250-backups.sh	{share}/examples/raspi-wol/pull-bc250-backups.sh
+file	0755	examples/raspi-wol/request-bc250-shutdown.sh	{share}/examples/raspi-wol/request-bc250-shutdown.sh
+file	0644	examples/raspi-wol/bc250-pull-backups.service	{share}/examples/raspi-wol/bc250-pull-backups.service
+file	0644	examples/raspi-wol/bc250-pull-backups.timer	{share}/examples/raspi-wol/bc250-pull-backups.timer
+file	0644	examples/raspi-wol/bc250-request-shutdown.service	{share}/examples/raspi-wol/bc250-request-shutdown.service
+file	0644	examples/raspi-wol/bc250-request-shutdown.timer	{share}/examples/raspi-wol/bc250-request-shutdown.timer
 file	0755	examples/raspi-wol/wake-bc250.sh	{share}/examples/raspi-wol/wake-bc250.sh
 file	0644	examples/document/pilot-evaluation.tsv	{share}/examples/document/pilot-evaluation.tsv
 file	0644	examples/document/document-template.md	{share}/examples/document/document-template.md

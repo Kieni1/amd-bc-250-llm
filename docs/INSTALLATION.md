@@ -5,7 +5,9 @@ This is the canonical installation/deployment guide for the BC-250 LLM appliance
 ## Deployment and service layout
 
 The default deployment is a pre-production service for one trusted office LAN.
-It is not suitable for direct Internet exposure.
+It is not suitable for direct Internet exposure. The last accepted DEVICE package is
+`0.20.0-3`; `0.20.0-5` is a finalized SOURCE candidate, not yet an installable qualified
+release. Install only a selected, hash-verified GitHub RPM under the normal gates.
 
 ### Check the stack
 

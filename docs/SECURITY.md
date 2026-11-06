@@ -82,7 +82,12 @@ or restricted to the necessary users/groups, disable public/open sharing, and
 leave cloud model/API connections and web search disabled unless an operator
 explicitly approves them. `/var/lib/open-webui/webui.db`, `uploads/` and
 `vector_db/` contain or derive from confidential material; protect their backups
-accordingly. Keep the authoritative `/srv/bc250-documents` tree `root:root` mode `0750`; the importer creates private knowledge bases owned by the Open WebUI API-key account and does not publish them. Configure group access explicitly after sync. See [`RAG.md`](RAG.md).
+accordingly. The `0.20.0-5` SOURCE adds a managed-document source archive
+and optional scope-limited read-only Pi export. Encrypt the off-device copies:
+these archives may contain confidential business data. The exported archives
+deliberately omit the original Open WebUI encryption secret and package admin
+key; preserve the original secret separately in secure escrow if encrypted
+fields must survive replacement-device recovery. Keep the authoritative `/srv/bc250-documents` tree `root:root` mode `0750`; the importer creates private knowledge bases owned by the Open WebUI API-key account and does not publish them. Configure group access explicitly after sync. See [`RAG.md`](RAG.md).
 
 ## Add HTTPS or stop services
 

@@ -84,7 +84,7 @@ intentionally empty on a stock install; packaged model definitions live under
 | `/var/lib/open-webui/webui.db` | Accounts, chats, settings and knowledge metadata; confidential |
 | `/var/lib/open-webui/uploads/` | Uploaded source documents; confidential |
 | `/var/lib/open-webui/vector_db/` | Derived retrieval/vector index data; confidential |
-| `/var/backups/bc250-llm-server/` | Maintenance backups; config/users directories reserve the dormant `bc250-backup-export` group for optional read-only Pi export, while rollback data stays private |
+| `/var/backups/bc250-llm-server/` | Verified `config/`, `users/` and `documents/` backup archives with SHA-256 sidecars; optional read-only Pi export is scope-separated and `rollback/` stays private |
 | `/var/log/bc250-llm-install.log` | Guided-installer transcript |
 
 Most generated package/application state under `/var/lib/bc250-llm-server` and

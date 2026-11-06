@@ -6,11 +6,11 @@
 %global project_share %{_datadir}/bc250-llm-server
 %global project_config %{_sysconfdir}/bc250-llm-server
 %global payload_filelist %{_builddir}/%{name}-%{version}.files
-%global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
+%global bc250_units ollama.service ollama-task.service ollama-embedding.service ollama-agent.service cyan-skillfish-governor-smu.service owui-backup-config.timer owui-backup-users.timer owui-backup-documents.timer owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer bc250-enable-wol.service
 
 Name:           bc250-llm-server
 Version:        0.20.0
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
@@ -138,6 +138,15 @@ python3 scripts/install-manifest.py \
   --define "bashcompletiondir=%{_datadir}/bash-completion/completions"
 
 %pre
+# %posttrans receives the same count on installation and upgrade. Carry the
+# transaction kind from %pre via a private, disposable rpm-state marker.
+bc250_tx_dir=/var/lib/rpm-state/bc250-llm-server
+install -d -m 0700 "$bc250_tx_dir"
+if [ "$1" -gt 1 ]; then
+  : > "$bc250_tx_dir/upgrade"
+else
+  rm -f "$bc250_tx_dir/upgrade"
+fi
 # Before replacing package model definitions, preserve proof for runtime Modelfiles
 # that still exactly match the previously installed package. The new model manager
 # uses this narrow evidence to distinguish expected package-definition updates from
@@ -394,7 +403,9 @@ fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 
 %posttrans
-if [ "$1" -gt 1 ] 2>/dev/null; then
+bc250_tx_dir=/var/lib/rpm-state/bc250-llm-server
+if [ -f "$bc250_tx_dir/upgrade" ]; then
+  rm -f "$bc250_tx_dir/upgrade"
   echo "BC-250 LLM appliance package transaction completed."
   echo "Open WebUI remains held until package setup/migration completes."
 else
@@ -430,6 +441,7 @@ fi
 systemctl daemon-reload >/dev/null 2>&1 || :
 systemctl reload nginx.service >/dev/null 2>&1 || :
 if [ "$1" -eq 0 ]; then
+  rm -rf /var/lib/rpm-state/bc250-llm-server
   cat <<'EOF_POSTUN'
 BC-250 LLM server package removed. Persistent data was not deleted.
 Review /etc/bc250-llm-server, /etc/cyan-skillfish-governor-smu,
@@ -445,8 +457,8 @@ fi
 %ghost %dir %attr(0750,root,root) /srv/bc250-documents
 %ghost %dir %attr(0750,root,ollama) /var/lib/bc250-llm-server
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/secrets
-%ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
-%ghost %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
+%ghost %config(noreplace) %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/open-webui.env
+%ghost %config(noreplace) %attr(0600,root,root) /var/lib/bc250-llm-server/secrets/openwebui-admin.key
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/openwebui-preupgrade-version
 %ghost %attr(0600,root,root) /var/lib/bc250-llm-server/preupgrade-package-modelfiles.json
 %ghost %dir %attr(0700,root,root) /var/lib/bc250-llm-server/package-gates
@@ -479,12 +491,19 @@ fi
 %ghost %dir %attr(0710,root,bc250-backup-export) /var/backups/bc250-llm-server
 %ghost %dir %attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/config
 %ghost %dir %attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/users
+%ghost %dir %attr(0750,root,bc250-backup-export) /var/backups/bc250-llm-server/documents
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/config
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/users
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Fri Nov 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-5
+- Carry the 0.20.0-4 K6 Documents/RAG and evaluator changes forward with translation-integrity, managed-document lifecycle, model-workflow and Agent/warmup/safe-power corrections; production model roles and runtime pins are unchanged.
+- Prune redundant experiment identities without deleting installed weights and stage optional role-specific challengers; nothing is promoted without DEVICE evidence.
+- Add Knowledge-aware fail-closed upload pruning with a matching dry run, a verified managed-document backup and its read-only export scope, WAL-safe identity restore and staging outside the export scopes.
+- Ship Raspberry Pi examples: a mirror plus hardlinked-snapshot backup pull that skips in-progress archives, pull/shutdown units, a forced-command shutdown client and readiness-checked wake.
+- Remove the unused share copy of the Ollama runtime profiles; upgrades keep maintenance timers as configured, so rerun maintenance setup to enable the documents backup timer.
 * Thu Nov 05 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-4
 - Promote the package-owned Open WebUI Documents/RAG dense retrieval default to K6, retaining Gemma, Jina v5 small, 1500/200 token chunks, and threshold zero.
 - Align the package quality-campaign retrieval audit with the qualified K6 baseline while retaining historical K4 experimental arms.
