@@ -5,7 +5,7 @@ umask 0077
 OWUI_URL="${OWUI_URL:-http://127.0.0.1:3000}"
 OWUI_API_KEY_FILE="${OWUI_API_KEY_FILE:-/var/lib/bc250-llm-server/secrets/openwebui-admin.key}"
 MAX_AGE_DAYS="${MAX_AGE_DAYS:-90}"
-MAX_TOTAL_GB="${MAX_TOTAL_GB:-100}"
+MAX_TOTAL_GB="${MAX_TOTAL_GB:-20}"
 DRY_RUN="${DRY_RUN:-0}"
 
 resolve_owui_api_key() {
@@ -199,6 +199,41 @@ if ((unknown_age > 0 || unknown_size > 0)); then
   log "WARNING: preserving uncertain metadata from automatic pruning (unknown_age=${unknown_age} unknown_size=${unknown_size})."
 fi
 
+# MC1: never prune a file referenced by ANY visible Knowledge collection.
+# This is deliberately fail-closed if the paginated inventory is unavailable,
+# incomplete or changes while scanning. DRY_RUN reads the same (read-only)
+# inventory so its plan matches a real run; if the inventory fails there,
+# the dry run reports that a real run would abort and plans nothing.
+protected_file="$tmpdir/knowledge-file-ids"
+knowledge_helper="${BC250_KNOWLEDGE_PRUNE_HELPER:-/usr/libexec/bc250-llm-server/knowledge-prune-refs.py}"
+[[ -f "$knowledge_helper" ]] || knowledge_helper="$(dirname -- "$0")/knowledge-prune-refs.py"
+if ! OWUI_URL="$OWUI_URL" OWUI_API_KEY="$OWUI_API_KEY" python3 "$knowledge_helper" "$protected_file"; then
+  if [[ "$DRY_RUN" == 1 ]]; then
+    log "WARNING: Knowledge-linked file safety could not be verified; a real run would abort without deleting. No candidates planned."
+    exit 0
+  fi
+  log "ERROR: Knowledge-linked file safety could not be verified. No remote files deleted."
+  exit 1
+fi
+is_protected() {
+  [[ -f "$protected_file" ]] && grep -Fqx -- "$1" "$protected_file"
+}
+# Linked Knowledge files are outside the upload retention pool entirely.
+# They must not drive the size ceiling for ordinary attachments.
+protected_count=0
+protected_bytes=0
+for row in "${rows[@]}"; do
+  IFS=$'\t' read -r ts size id <<< "$row"
+  if is_protected "$id"; then
+    protected_count=$((protected_count+1))
+    if ((size >= 0)); then
+      protected_bytes=$((protected_bytes+size))
+      total=$((total-size))
+    fi
+  fi
+done
+log "Knowledge protected=$protected_count excluded=$(human_bytes "$protected_bytes") eligible_known_total=$(human_bytes "$total")"
+
 deleted=0; freed=0; failures=0
 delete_one(){
   local ts="$1" size="$2" id="$3" reason="$4" age_label="unknown" size_label="unknown"
@@ -223,7 +258,12 @@ remaining=()
 for row in "${rows[@]}"; do
   IFS=$'\t' read -r ts size id <<< "$row"
   if (( MAX_AGE_DAYS > 0 && ts > 0 && size >= 0 && ts < cutoff )); then
-    delete_one "$ts" "$size" "$id" "age>${MAX_AGE_DAYS}d" || remaining+=("$row")
+    if is_protected "$id"; then
+      log "PROTECTED Knowledge-linked file id=$id (age); never deleting"
+      remaining+=("$row")
+    else
+      delete_one "$ts" "$size" "$id" "age>${MAX_AGE_DAYS}d" || remaining+=("$row")
+    fi
   else
     remaining+=("$row")
   fi
@@ -235,6 +275,10 @@ if ((MAX_TOTAL_GB > 0)); then
     # Files without a trustworthy age or size are never selected by the
     # storage ceiling. An administrator must review them in Open WebUI.
     ((ts > 0 && size >= 0)) || continue
+    if is_protected "$id"; then
+      log "PROTECTED Knowledge-linked file id=$id (size); never deleting"
+      continue
+    fi
     delete_one "$ts" "$size" "$id" "size-ceiling" || true
   done
   if ((total > max_total_bytes)); then
