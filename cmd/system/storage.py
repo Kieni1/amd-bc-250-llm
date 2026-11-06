@@ -195,6 +195,24 @@ def write_dedupe_record(state_path: Path, source: Path, blob: Path, state: dict)
     os.replace(temporary, state_path)
 
 
+def mark_pruned_source(state_path: Path) -> None:
+    """Persist verified-registration provenance before removing the source copy."""
+    current = load_json(state_path)
+    if not isinstance(current, dict) or not SHA256_RE.fullmatch(str(current.get("sha256", ""))):
+        raise RuntimeError(f"cannot preserve invalid model provenance: {state_path}")
+    updated = dict(current)
+    updated["source_pruned"] = True
+    original = state_path.stat()
+    temporary = state_path.with_name(f".{state_path.name}.prune-tmp")
+    try:
+        temporary.write_text(json.dumps(updated, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        os.chown(temporary, original.st_uid, original.st_gid)
+        os.chmod(temporary, original.st_mode & 0o777)
+        os.replace(temporary, state_path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def status() -> int:
     free = shutil.disk_usage(GGUF if GGUF.exists() else "/").free
     gguf_bytes = tree_bytes(GGUF)
@@ -377,8 +395,10 @@ def prune_sources(yes: bool) -> int:
             print(f"  skip changed/unverified: {source_label(source, state, names)}")
             continue
         removed += source.stat().st_size
+        # The sidecar is a durable tombstone: an intact Ollama registration
+        # remains CURRENT across offline `bc250 install` until explicit refresh.
+        mark_pruned_source(source.with_name(source.name + ".bc250.json"))
         source.unlink()
-        source.with_name(source.name + ".bc250.json").unlink(missing_ok=True)
         print(f"  removed {source_label(source, state, names)}: {source}")
     print(f"Removed offline source data: {human(removed)}")
     return 0

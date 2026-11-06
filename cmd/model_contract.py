@@ -10,6 +10,7 @@ from typing import Any
 
 PROJECT = "bc250-llm-server"
 DEFAULT_MODEL_ROOT = Path(f"/usr/share/{PROJECT}/model-management")
+DEFAULT_OPENWEBUI_ROOT = Path(f"/usr/share/{PROJECT}/openwebui")
 _SOURCE_ROOT = Path(__file__).resolve().parents[1]
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
@@ -252,6 +253,14 @@ def validate_model_catalog_document(
                 f"{context}: translation_profile requires generation benchmark support"
             )
 
+        # Optional upstream rights metadata: recording it is not permission to deploy.
+        license_info = entry.get("license")
+        if license_info is not None:
+            if not isinstance(license_info, dict):
+                raise ModelContractError(f"{context}: license must be an object")
+            _require_string(license_info, "id", f"{context}: license")
+            _require_string(license_info, "use_note", f"{context}: license")
+
         native = entry.get("native_context_max")
         if native is not None and (type(native) is not int or native <= 0):
             raise ModelContractError(
@@ -364,6 +373,86 @@ def load_model_profiles(
     return validate_model_profiles_document(
         _load_json(path), source=path, catalog=validated_catalog
     )
+
+
+
+def required_baseline_model_ids(
+    *, roles_path: Path | None = None, desired_path: Path | None = None
+) -> frozenset[str]:
+    """Derive the required baseline from active roles and task/embedding policy.
+
+    Experiment, Agent and alternate task/embedding models remain optional until
+    a role or desired-state setting explicitly selects them. This is the same
+    baseline selection policy used by the installer's required-model step.
+    """
+    def source_or_installed(filename: str) -> Path:
+        local = _SOURCE_ROOT / "config/openwebui" / filename
+        return local if local.is_file() else DEFAULT_OPENWEBUI_ROOT / filename
+
+    roles = roles_path or Path(os.environ.get("BC250_OWUI_MODELS_FILE") or source_or_installed("models.json"))
+    desired_override = os.environ.get("BC250_OWUI_DESIRED_STATE")
+    desired = desired_path or Path(desired_override or source_or_installed("desired-state.json"))
+    if desired_path is None and desired_override:
+        # Same override contract as openwebui-setup, install and verify.
+        if desired.is_symlink() or not desired.is_file():
+            raise ModelContractError(f"desired-state override must be a regular non-symlink file: {desired}")
+        info = desired.stat()
+        if info.st_mode & 0o022 or (os.geteuid() == 0 and info.st_uid != 0):
+            raise ModelContractError(f"desired-state override ownership/permissions are unsafe: {desired}")
+    role_document = _load_json(roles)
+    desired_document = _load_json(desired)
+    role_models = role_document.get("models")
+    if not isinstance(role_models, list):
+        raise ModelContractError(f"{roles}: models must be a list")
+    result: set[str] = set()
+    for role in role_models:
+        if not isinstance(role, dict):
+            raise ModelContractError(f"{roles}: model role must be an object")
+        if role.get("is_active") is True:
+            identity = role.get("base_model_id")
+            if identity:
+                if not isinstance(identity, str):
+                    raise ModelContractError(f"{roles}: invalid base_model_id")
+                result.add(normalize_model_id(identity))
+    for section, setting in (("task", "TASK_MODEL"), ("embedding", "RAG_EMBEDDING_MODEL")):
+        entry = desired_document.get(section)
+        if not isinstance(entry, dict) or not isinstance(entry.get(setting), str):
+            raise ModelContractError(f"{desired}: {section}.{setting} must be a model id")
+        result.add(normalize_model_id(entry[setting]))
+    if not result:
+        raise ModelContractError("required baseline model IDs cannot be empty")
+    return frozenset(result)
+
+
+def validate_testing_visibility_policies(
+    policies: dict[str, Any], profiles: dict[str, dict[str, Any]] | None = None
+) -> None:
+    """Explicit testing visibility must not override forbidden profile safety.
+
+    A hidden testing profile needs an explanatory admin-only description;
+    neither a retired model nor an operator-only entry gains permission here.
+    """
+    if not isinstance(policies, dict):
+        raise ModelContractError("testing_model_policies must be an object")
+    definitions = profiles if profiles is not None else load_model_profiles()
+    for raw_id, policy in policies.items():
+        if not isinstance(policy, dict):
+            raise ModelContractError(f"testing visibility policy {raw_id} must be an object")
+        profile = definitions.get(normalize_model_id(raw_id))
+        if profile is None or "ordinary_user_visible" not in policy:
+            continue
+        visible = policy["ordinary_user_visible"]
+        if not isinstance(visible, bool):
+            raise ModelContractError(f"testing visibility policy {raw_id} must be boolean")
+        exposure = profile.get("owui_testing_exposure")
+        if exposure == "forbidden" and visible:
+            raise ModelContractError(f"{raw_id}: forbidden profile cannot be ordinary-user-visible")
+        if exposure == "testing" and not visible:
+            description = str(policy.get("description", "")).lower()
+            if "admin-only" not in description and "hidden" not in description:
+                raise ModelContractError(
+                    f"{raw_id}: hiding a testing profile requires an explicit admin-only/hidden description"
+                )
 
 
 def model_contract(model_id: str) -> dict[str, Any] | None:

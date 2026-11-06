@@ -60,10 +60,6 @@ PREUPGRADE_MODELFILE_STATE = Path(f"/var/lib/{PROJECT}/preupgrade-package-modelf
 
 OLLAMA_CATEGORIES = ("production", "experiments", "task", "agentic", "embedding")
 NORMAL_CATEGORIES = ("production", "experiments", "task", "embedding")
-OPTIONAL_CATEGORIES = frozenset({"experiments", "agentic"})
-OPTIONAL_MODEL_NAMES = frozenset({
-    "embed-qwen3-0.6b-q8-0",
-})
 CATEGORIES = (*OLLAMA_CATEGORIES, "mtp", "all")
 MTP_RECOMMENDATIONS = {"primary", "alternative"}
 LOW_FREE_BYTES = 20 * 1024**3
@@ -147,6 +143,15 @@ def set_appliance_mode(mode: str) -> None:
     if not command:
         raise ModelError("bc250 dispatcher is required for package-managed model registration")
     action = "leave" if mode == "normal" else "enter"
+    # Normal-lane maintenance deliberately ends the non-persistent Agent session.
+    # Make this side effect explicit before the topology transition.
+    if mode == "normal" and shutil.which("systemctl"):
+        active = subprocess.run(
+            ["systemctl", "is-active", "--quiet", AGENT_OLLAMA_SERVICE],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+        )
+        if active.returncode == 0:
+            print("NOTICE: Agent mode active; leaving it for this model operation.", file=sys.stderr)
     result = subprocess.run(
         [command, "advanced", "agent", action],
         check=False,
@@ -388,9 +393,6 @@ def _operator_metadata_defaults(model: dict, previous: dict | None) -> dict:
 def model_directories(explicit: list[Path] | None = None) -> list[Path]:
     if explicit:
         return explicit
-    override = os.environ.get("MODELFILE_SOURCE_DIR", "")
-    if override:
-        return [Path(value) for value in override.split(os.pathsep) if value]
     source_root = local_source_root()
     if source_root:
         return [source_root / "modelfiles"]
@@ -1170,6 +1172,45 @@ def load_state(path: Path) -> dict:
     return value
 
 
+def orphaned_manager_sources(model: dict, active_path: Path) -> list[Path]:
+    """Inventory outdated GGUF paths with matching package-owned sidecars.
+
+    Never delete based solely on a model ID: another catalog model, operator
+    path or symlink may own the bytes. Listing only vetted owned directories
+    gives the operator an explicit follow-up without an unsafe auto-prune.
+    """
+    if model.get("provider") != "ollama" or not model.get("id"):
+        return []
+    found: list[Path] = []
+    for definition in CATEGORY_DEFAULTS.values():
+        root = Path(definition["destination"])
+        if not root.is_dir() or root.is_symlink():
+            continue
+        for sidecar in root.rglob("*.gguf.bc250.json"):
+            if sidecar.is_symlink() or not sidecar.is_file() or sidecar.parent.is_symlink():
+                continue
+            source = sidecar.with_name(sidecar.name.removesuffix(".bc250.json"))
+            if source == active_path or source.is_symlink() or not source.is_file():
+                continue
+            state = load_state(sidecar)
+            if (
+                state.get("model_id") == model["id"]
+                and state.get("model_name") == model.get("name", model["id"])
+                and state.get("gguf") == source.name
+                and state.get("schema") in {3, 4}
+            ):
+                found.append(source)
+    return sorted(set(found))
+
+
+def report_orphaned_sources(model: dict, active_path: Path) -> None:
+    for candidate in orphaned_manager_sources(model, active_path):
+        print(
+            f"    WARNING: previous manager-owned source remains at {candidate}; "
+            "review its registration/use before manually removing it and its .bc250.json sidecar"
+        )
+
+
 def state_matches(state: dict, model: dict, output: Path) -> bool:
     """Compatibility helper backed by the canonical source-state inspector."""
     return inspect_local_source(state, model, output)[0] == "current"
@@ -1194,6 +1235,22 @@ def inspect_local_source(state: dict, model: dict, output: Path) -> tuple[str, s
     exact catalog provenance and digest agreement.
     """
     if not output.is_file():
+        # `bc250 storage prune-sources` retains validated source provenance.
+        # A pruned source is usable only while the registered Ollama model and
+        # its runtime Modelfile are current. Missing/drifted registrations
+        # require deliberate `model refresh` to reacquire source bytes.
+        recorded = str(state.get("acquired_sha256") or state.get("sha256", ""))
+        if (
+            state.get("source_pruned") is True
+            and re.fullmatch(r"[0-9a-f]{64}", recorded)
+            and all(state.get(key) == model.get(key) for key in ("repository", "gguf"))
+            and state.get("remote_path", state.get("gguf")) == model.get("remote_path", model.get("gguf"))
+            and (source_policy(model) != "pinned" or (
+                state.get("configured_ref", state.get("revision")) == model.get("revision")
+                and (not model.get("sha256") or model.get("sha256") == recorded)
+            ))
+        ):
+            return "pruned", "source intentionally pruned; registered Ollama blob retained", recorded
         return "missing", "GGUF is not present", ""
     try:
         stat_result = output.stat()
@@ -1288,7 +1345,7 @@ def runtime_modelfile_path(
 ) -> Path | None:
     if not model.get("modelfile"):
         return None
-    configured = os.environ.get("MODELFILE_DIR") or defaults.get(
+    configured = os.environ.get("BC250_MODELFILE_DIR") or defaults.get(
         "modelfile_destination", ""
     )
     if configured:
@@ -1462,6 +1519,27 @@ def package_modelfile_update_pending(model: dict, runtime: Path | None) -> bool:
         return False
 
 
+_REQUIRED_BASELINE_CACHE: dict[tuple[str, str], frozenset[str]] = {}
+
+
+def required_baseline_model_ids() -> frozenset[str]:
+    """Return the role/desired-state baseline once per process and override pair.
+
+    An unreadable or invalid Open WebUI role/desired-state file is an operator
+    error with a clear message, not a traceback from every status line.
+    """
+    key = (
+        os.environ.get("BC250_OWUI_MODELS_FILE", ""),
+        os.environ.get("BC250_OWUI_DESIRED_STATE", ""),
+    )
+    if key not in _REQUIRED_BASELINE_CACHE:
+        try:
+            _REQUIRED_BASELINE_CACHE[key] = _SHARED_MODEL_CONTRACT.required_baseline_model_ids()
+        except _SHARED_MODEL_CONTRACT.ModelContractError as error:
+            raise ModelError(f"cannot determine required baseline models: {error}") from error
+    return _REQUIRED_BASELINE_CACHE[key]
+
+
 def inspect_model_state(
     defaults: dict,
     model: dict,
@@ -1509,10 +1587,7 @@ def inspect_model_state(
 
     statuses = {source_status, modelfile_status, registration_status}
     optional_unselected = (
-        (
-            model.get("category") in OPTIONAL_CATEGORIES
-            or model.get("name") in OPTIONAL_MODEL_NAMES
-        )
+        model.get("name") not in required_baseline_model_ids()
         and modelfile_status == "missing"
         and registration_status in {"missing", "unavailable"}
     )
@@ -1520,6 +1595,11 @@ def inspect_model_state(
         # A cached optional source is not desired active state by itself.  Only a
         # runtime Modelfile/registration makes an optional model selected.
         overall = "OPTIONAL"
+    elif source_status == "pruned":
+        overall = (
+            "CURRENT" if registration_status == "current" and modelfile_status == "current"
+            else "DRIFT (PRUNED SOURCE)"
+        )
     elif source_status == "missing":
         overall = "MISSING"
     elif (
@@ -1941,6 +2021,16 @@ def reconciliation_reason(
     return ", ".join(reasons) or "registration reconciliation required"
 
 
+def pruned_registration_reusable(
+    source_status: str, registration_status: str, modelfile_status: str, force_download: bool
+) -> bool:
+    """Offline-converged registrations can be retained, not recreated without GGUF."""
+    return (
+        not force_download and source_status == "pruned"
+        and registration_status == "current" and modelfile_status == "current"
+    )
+
+
 def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -> int:
     """Converge selected models to the current catalog definition."""
     if os.geteuid() != 0:
@@ -1969,8 +2059,8 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
         )
     )
     modelfile_root = (
-        Path(os.environ.get("MODELFILE_DIR", defaults.get("modelfile_destination", "")))
-        if os.environ.get("MODELFILE_DIR") or defaults.get("modelfile_destination")
+        Path(os.environ.get("BC250_MODELFILE_DIR") or defaults.get("modelfile_destination", ""))
+        if os.environ.get("BC250_MODELFILE_DIR") or defaults.get("modelfile_destination")
         else None
     )
     if needs_download:
@@ -2010,7 +2100,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 defaults,
                 model,
                 registrations=registrations,
-                destination=args.destination or os.environ.get("DEST"),
+                destination=args.destination,
             )
             if not summarize_current:
                 show_header(label, model["provider"])
@@ -2058,8 +2148,23 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 continue
 
             output = inspection.source_path or model_path(
-                defaults, model, args.destination or os.environ.get("DEST")
+                defaults, model, args.destination
             )
+            if inspection.source_status == "pruned" and not force_download:
+                if pruned_registration_reusable(
+                    inspection.source_status, inspection.registration_status,
+                    inspection.modelfile_status, force_download,
+                ):
+                    if summarize_current:
+                        current_skipped += 1
+                    else:
+                        print("    registered Ollama model is current; source intentionally pruned")
+                    consume_preupgrade_modelfile_provenance(model, inspection.runtime_modelfile)
+                    continue
+                raise ModelError(
+                    "source was intentionally pruned and registration/Modelfile now differs; "
+                    "run `bc250 model refresh` with network access to restore a verified GGUF"
+                )
             ensure_directory(output.parent, uid, gid)
             metadata = state_path(output)
             source_changed = True
@@ -2169,12 +2274,14 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
             ):
                 if summarize_current and not source_metadata_changed:
                     current_skipped += 1
+                    report_orphaned_sources(model, output)
                     consume_preupgrade_modelfile_provenance(model, runtime_template)
                     continue
                 show_header(label, model["provider"])
                 if source_metadata_changed:
                     print("    refreshed source metadata/permissions")
                 print("    already current; skipping")
+                report_orphaned_sources(model, output)
                 consume_preupgrade_modelfile_provenance(model, runtime_template)
                 continue
             show_header(label, model["provider"])
@@ -2195,6 +2302,7 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
                 registrations.add(model["name"])
             consume_preupgrade_modelfile_provenance(model, runtime_template)
             print("    registered with Ollama")
+            report_orphaned_sources(model, output)
         except (ModelError, OSError) as error:
             show_header(label, model["provider"])
             print(f"    ERROR: {error}", file=sys.stderr)
@@ -2218,6 +2326,12 @@ def apply_models(defaults: dict, models: list[dict], args: argparse.Namespace) -
         return 2
     if all_current:
         return 0
+    if any(
+        model.get("category") == "experiments"
+        and model.get("name") not in required_baseline_model_ids()
+        for model in models
+    ):
+        print("NEXT: run `sudo bc250 advanced openwebui apply` to publish testing model records/visibility.")
     print(f"\nDone: {len(models)} model(s) processed.")
     return 0
 
@@ -2256,6 +2370,8 @@ def show_removal_plan(
             registration_owner = ownership["registration"]
             state_owner = ownership["state"]
             print(f"\n{label}")
+            if model.get("name") in required_baseline_model_ids():
+                print("  WARNING: required by an active role, task or embedding policy; removing it will break that function until restored")
             print(
                 "  Ownership: "
                 f"source={source_owner}, registration={registration_owner}, state={state_owner}"
@@ -2640,6 +2756,7 @@ def model_inspect_payload(
         "capabilities": dict(model.get("capabilities") or {}),
         "native_context_max": model.get("native_context_max"),
         "qualification": profiles.get(model["id"]),
+        "license": model.get("catalog", {}).get("license"),
         "definition_origin": definition_origin(model),
     }
     if model["provider"] in {"download-only", "ollama"}:
@@ -2711,6 +2828,10 @@ def print_model_inspect_payload(payload: dict) -> None:
         f"registration={ownership.get('registration', 'unknown')} "
         f"state={ownership.get('state', 'unknown')}"
     )
+    license_info = payload.get("license") or {}
+    if license_info:
+        print(f"License:            {license_info['id']}")
+        print(f"License note:       {license_info['use_note']}")
     profile = payload.get("qualification") or {}
     if profile:
         print(f"Intended role:      {profile.get('intended_role', 'unknown')}")
@@ -3390,9 +3511,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "purge-retired":
         return purge_retired(yes=args.yes)
 
-    source = args.source or (
-        Path(os.environ["SOURCE_FILE"]) if os.environ.get("SOURCE_FILE") else None
-    )
+    # Only the documented --source flag selects an alternate MTP definition.
+    source = args.source
     directories = args.modelfile_dir
 
     if args.command == "install":
