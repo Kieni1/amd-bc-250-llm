@@ -133,12 +133,17 @@ def modelfile_path(name: str) -> Path:
 
 
 def desired_state() -> dict[str, Any]:
-    return load_object(
-        resolve_package_resource(
-            "config/openwebui/desired-state.json", "openwebui/desired-state.json"
-        ),
-        "Open WebUI desired state",
-    )
+    override = os.environ.get("BC250_OWUI_DESIRED_STATE")
+    path = (Path(override) if override else resolve_package_resource(
+        "config/openwebui/desired-state.json", "openwebui/desired-state.json"
+    ))
+    if override:
+        if path.is_symlink() or not path.is_file():
+            raise BenchmarkError(f"desired-state override must be a regular non-symlink file: {path}")
+        info = path.stat()
+        if info.st_mode & 0o022 or (os.geteuid() == 0 and info.st_uid != 0):
+            raise BenchmarkError(f"desired-state override ownership/permissions are unsafe: {path}")
+    return load_object(path, "Open WebUI desired state")
 
 
 def audit_retrieval_control(expected: dict[str, Any]) -> list[str]:

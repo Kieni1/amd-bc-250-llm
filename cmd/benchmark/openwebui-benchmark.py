@@ -468,6 +468,14 @@ def chat(
     )
 
 
+def response_finish_reason(result: dict[str, Any]) -> str:
+    """Read the model's generation stop reason from the raw completions API."""
+    choices = result.get("choices") if isinstance(result, dict) else None
+    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+        return ""
+    return str(choices[0].get("finish_reason") or "").lower()
+
+
 def response_text(result: dict[str, Any]) -> str:
     choices = result.get("choices") if isinstance(result, dict) else None
     if not isinstance(choices, list) or not choices:
@@ -829,7 +837,11 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
             )
             wall = time.monotonic() - started
             raw_content = response_text(result)
+            finish_reason = response_finish_reason(result)
             raw_ok, raw_failure_kinds = owui_translation_checks(raw_content, case)
+            if finish_reason in {"length", "max_tokens"}:
+                raw_ok = False
+                raw_failure_kinds = list(dict.fromkeys([*raw_failure_kinds, "truncated-output"]))
             final_ok, final_failure_kinds = owui_translation_checks(content, case)
             raw_semantic_detail = owui_translation_modality_detail(case, raw_content)
             withheld = translation_withheld(content)
@@ -858,6 +870,10 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                 guard_outcome = "not-triggered"
                 delivered_translation = True
 
+            if finish_reason in {"length", "max_tokens"}:
+                ok = False
+                failure_kinds = list(dict.fromkeys([*failure_kinds, "truncated-output"]))
+                guard_outcome = "quality-fail-truncated"
             failures += int(not ok)
             append_result(
                 paths.results_jsonl,
@@ -880,6 +896,7 @@ def cmd_owui_translation(args: argparse.Namespace) -> int:
                     target_language=case["target_language"],
                     response=content,
                     raw_response=raw_content,
+                    raw_finish_reason=finish_reason,
                     raw_translation_outcome="pass" if raw_ok else "quality-fail",
                     raw_failure_kinds=raw_failure_kinds,
                     raw_semantic_detail=raw_semantic_detail,

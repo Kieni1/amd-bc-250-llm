@@ -10,7 +10,7 @@ Revalidation does not choose settings. Tuning and A/B comparisons are explicit b
 
 ## Office/RAG quality campaign foundation
 
-The selected 0.20.0-4 SOURCE retains the staged campaign surface, preserves accepted 0.20.0-3 model roles, and aligns the current dense RAG control with K6. It also retains one explicit Office - Generalist candidate and additional managed challengers for qualification:
+The frozen 0.20.0-4 SOURCE established the K6 campaign control. The 0.20.0-5 SOURCE carries that surface forward, preserves accepted 0.20.0-3 production roles and adds bounded task/translation/structured/Deep/Heretic challengers for future qualification; no source-only comparison is a model promotion:
 
 ```bash
 bc250 advanced benchmark campaign audit
@@ -157,7 +157,7 @@ visible-output evidence. If a run completes without any visible answer, the meas
 as `INCOMPLETE`; output/thinking budget diagnostics remain explicit and no throughput or quality
 threshold is weakened.
 
-## Use-case evaluator contracts (0.20.0-4 SOURCE)
+## Use-case evaluator contracts (carried from 0.20.0-4 into 0.20.0-5 SOURCE)
 
 `bc250 advanced benchmark usecase` keeps raw Ollama responses and records
 completion separately from semantic acceptance. A response with

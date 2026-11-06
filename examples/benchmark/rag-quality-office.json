@@ -1,6 +1,6 @@
 {
   "corpus_file": "embedding-office.json",
-  "top_k": 4,
+  "top_k": 6,
   "cases": [
     {
       "id": "current-zurich-lease",

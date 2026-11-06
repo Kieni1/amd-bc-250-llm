@@ -1118,7 +1118,7 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             generation.resolve_think_policy(
-                "exp-qwen35-4b-unsloth-q6-k", "auto"
+                "exp-qwen38-27b-ista-gsq-rco-iq3-xxs", "auto"
             ),
             "false",
         )
@@ -1130,11 +1130,11 @@ class GenerationPolicyTests(unittest.TestCase):
         )
         self.assertEqual(
             generation.resolve_think_policy("exp-qwen36-35b-a3b-unsloth-ud-iq3-s", "auto"),
-            "false",
+            "omit",
         )
         self.assertEqual(
             generation.resolve_think_policy("exp-qwen38-27b-ista-gsq-rco-iq3-s", "auto"),
-            "true",
+            "omit",
         )
         qwen_payload = generation.generate_payload(
             "prod-qwen35-9b-unsloth-q6-k:latest",
@@ -1187,20 +1187,20 @@ class GenerationPolicyTests(unittest.TestCase):
         self.assertEqual(generation.latency_budget(96, 512, "false", "prod-qwen35-9b"), 96)
         self.assertEqual(
             generation.latency_budget(
-                96, 512, "false", "exp-qwen35-4b-unsloth-q6-k"
+                96, 512, "false", "exp-qwen38-27b-ista-gsq-rco-iq3-xxs"
             ),
             96,
         )
         self.assertEqual(
             generation.latency_budget(
-                96, 512, "omit", "exp-qwen35-4b-unsloth-q6-k"
+                96, 512, "omit", "exp-qwen38-27b-ista-gsq-rco-iq3-xxs"
             ),
             96,
         )
         self.assertEqual(generation.latency_budget(96, 512, "medium", "prod-gpt-oss20b"), 512)
         self.assertEqual(
             generation.latency_budget(
-                96, 512, "omit", "exp-gemma4-12b-google-qat-q4-0"
+                96, 512, "omit", "exp-gemma4-12b-unsloth-qat-ud-q4-k-xl"
             ),
             512,
         )
@@ -1295,15 +1295,15 @@ class CategoryPolicyTests(unittest.TestCase):
         class FakeClient:
             def tags(self):
                 return [
-                    {"name": "exp-minicpm-v47-1b-openbmb-q4-k-m:latest"},
-                    {"name": "exp-qwen35-4b-unsloth-q6-k:latest"},
+                    {"name": "exp-glm-ocr-ggml-q8-0:latest"},
+                    {"name": "exp-index-translate-9b-indexteam-q4-k-m:latest"},
                     {"name": "exp-external-ocr:latest"},
                 ]
 
         self.assertEqual(
             category.choose_models(FakeClient(), [], "exp-", "ocr"),
             [
-                "exp-minicpm-v47-1b-openbmb-q4-k-m:latest",
+                "exp-glm-ocr-ggml-q8-0:latest",
                 "exp-external-ocr:latest",
             ],
         )
@@ -1320,7 +1320,7 @@ class CategoryPolicyTests(unittest.TestCase):
 
     def test_package_contract_rejects_missing_shared_profile(self) -> None:
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        del document["profiles"]["exp-granite42-3b-ibm-q6-k"]
+        del document["profiles"]["exp-glm-ocr-ggml-q8-0"]
         with tempfile.TemporaryDirectory() as temporary:
             profile_path = Path(temporary) / "model-profiles.json"
             profile_path.write_text(json.dumps(document), encoding="utf-8")
@@ -1330,7 +1330,7 @@ class CategoryPolicyTests(unittest.TestCase):
                 common.BenchmarkError, "missing qualification profiles"
             ):
                 common.package_model_contract(
-                    "exp-granite42-3b-ibm-q6-k"
+                    "exp-glm-ocr-ggml-q8-0"
                 )
 
     def test_ocr_prompts_preserve_source_language_and_structure(self) -> None:
@@ -1347,7 +1347,7 @@ class CategoryPolicyTests(unittest.TestCase):
         self.assertEqual(category.ocr_kind("exp-glm-ocr-ggml-q8-0:latest"), "glm")
         self.assertEqual(category.ocr_kind("exp-ovisocr2-abiray-q8-0:latest"), "ovis")
         self.assertEqual(
-            category.ocr_kind("exp-minicpm-v47-1b-openbmb-q4-k-m:latest"),
+            category.ocr_kind("external-minicpm:test"),
             "minicpm",
         )
         self.assertEqual(category.ocr_kind("external-minicpm:test"), "minicpm")
@@ -1934,7 +1934,8 @@ find "$1" -maxdepth 1 -type f -name '*.Modelfile' -print0 | xargs -0 -r -n1 base
             row=row, ok=True, problems=[], content="The answer is 42",
             thinking="", telemetry={}, wall=1.0, done_reason="length",
         )
-        self.assertEqual(record["outcome"], "incomplete")
+        self.assertEqual(record["outcome"], "quality-fail")
+        self.assertIn("output-budget", record["diagnostics"])
         self.assertFalse(record["passed"])
         self.assertIn("incomplete output: done_reason=length", record["problems"])
 
@@ -4788,9 +4789,9 @@ status_run --raw
             def tags(self):
                 return [
                     {"name": "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest"},
-                    {"name": "exp-minicpm-v47-1b-openbmb-q4-k-m:latest"},
+                    {"name": "exp-glm-ocr-ggml-q8-0:latest"},
                     {"name": "embed-jina-v5-small-retrieval-q4-k-m:latest"},
-                    {"name": "exp-lfm3-1.7b-liquidai-q6-k:latest"},
+                    {"name": "exp-index-translate-9b-indexteam-q4-k-m:latest"},
                 ]
 
         with patch.dict(os.environ, {"BENCH_INCLUDE_EXPERIMENTS": "0"}, clear=False):
@@ -4803,7 +4804,7 @@ status_run --raw
             selected,
             [
                 "prod-gemma4-e2b-unsloth-qat-ud-q4-k-xl:latest",
-                "exp-lfm3-1.7b-liquidai-q6-k:latest",
+                "exp-index-translate-9b-indexteam-q4-k-m:latest",
             ],
         )
 

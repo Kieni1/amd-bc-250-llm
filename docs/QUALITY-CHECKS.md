@@ -48,7 +48,7 @@ The repository keeps `quality-checks/main/`, `quality-checks/task/`, `quality-ch
 
 ## 2026-10-31 model refresh
 
-The selected 0.20.0-4 SOURCE retains the 0.20.0-3 DEVICE-accepted model roles without transferring that acceptance to changed candidate bytes.
+The frozen 0.20.0-4 SOURCE and subsequent 0.20.0-5 SOURCE retain the 0.20.0-3 DEVICE-accepted production model roles. Changed SOURCE bytes, including the revised evaluator, model challengers and maintenance work, do not inherit BUILD/DEVICE acceptance; a selected 0.20.0-5 RPM will require its own exact-artifact evidence.
 The campaign manifest is the authority for comparison intent. In particular, Office - Generalist
 (`prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`) must be compared as a behavior-modified community
 candidate, not treated as equivalent to official NVIDIA Bolt. Test DE/FR office quality and instruction

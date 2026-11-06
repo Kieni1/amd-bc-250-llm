@@ -16,7 +16,7 @@ import sys
 import time
 import unicodedata
 from collections import Counter
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from html.parser import HTMLParser
 from pathlib import Path
@@ -436,6 +436,15 @@ TASK_PROMPT_KEYS = {
 
 
 def task_prompt_state_path() -> Path:
+    override = os.environ.get("BC250_OWUI_DESIRED_STATE")
+    if override:
+        path = Path(override)
+        if path.is_symlink() or not path.is_file():
+            raise BenchmarkError(f"desired-state override must be a regular non-symlink file: {path}")
+        info = path.stat()
+        if info.st_mode & 0o022 or (os.geteuid() == 0 and info.st_uid != 0):
+            raise BenchmarkError(f"desired-state override ownership/permissions are unsafe: {path}")
+        return path
     return OWUI_DESIRED_STATE
 
 
@@ -498,10 +507,8 @@ def parse_json_object(text: str) -> dict[str, Any] | None:
 
 
 def strict_json_object(text: str) -> bool:
-    try:
-        return isinstance(json.loads(text.strip()), dict)
-    except json.JSONDecodeError:
-        return False
+    """Use the same RFC-compliant duplicate/NaN policy as raw use-case JSON."""
+    return not _strict_json_problems(text, {"strict_json": True})
 
 
 LANGUAGE_MARKERS = {
@@ -578,6 +585,26 @@ def semantic_groups_score(text: str, groups: list[list[str]]) -> tuple[int, int]
 def task_request_options(case: dict[str, Any]) -> dict[str, Any]:
     """Return the explicit Open WebUI-compatible task request budget."""
     return {"num_predict": TASK_NUM_PREDICT.get(str(case.get("type")), 128)}
+
+
+TASK_THINK_FALSE_POLICIES = frozenset(
+    {"request-think-false", "nonthinking-first-pass", "request-think-false-bounded-4096"}
+)
+
+
+def task_think_request(model: str) -> bool | None:
+    """Return the package task-request ``think`` control, or ``None`` to omit it.
+
+    The production task profile (``task-generation``) keeps the provider default,
+    matching today's Open WebUI task calls. A reasoning-capable task challenger
+    whose profile requires ``think=false`` is measured with that control, because
+    promoting it requires a task-model record that sends the same control.
+    """
+    contract = package_model_contract(model.removesuffix(":latest"))
+    profile = contract.get("profile") if isinstance(contract, dict) else None
+    if isinstance(profile, dict) and profile.get("reasoning_request_policy") in TASK_THINK_FALSE_POLICIES:
+        return False
+    return None
 
 
 def task_failure_kinds(
@@ -660,6 +687,9 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     "keep_alive": 0,
                     "options": options,
                 }
+                think_request = task_think_request(model)
+                if think_request is not None:
+                    payload["think"] = think_request
                 sampler = TelemetrySampler(TELEMETRY_INTERVAL).start()
                 start_time = time.monotonic()
                 try:
@@ -731,6 +761,8 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     diagnostics.append("output-budget")
                     if not content.strip() and thinking.strip():
                         diagnostics.append("thinking-budget")
+                if think_request is False and thinking.strip():
+                    diagnostics.append("thinking-present-despite-false")
                 row = {
                     "timestamp": iso_now(), "model": model, "case_id": case["id"],
                     "task": case["type"], "language": case["language"],
@@ -760,7 +792,7 @@ def benchmark_task(args: argparse.Namespace) -> int:
                     timestamp=iso_now(), case=case, response=content, thinking=thinking,
                     valid_json=valid_json, strict_json=strict_json, language_hint=language_hint,
                     telemetry=telemetry, request_options=options, keep_alive=0,
-                    done_reason=done_reason,
+                    done_reason=done_reason, request_think=think_request,
                 ))
                 print(
                     f"  {case['id']}: structure={structure_ok} "
@@ -1306,10 +1338,12 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                     content = str(message.get("content") or "")
                     thinking = str(message.get("thinking") or response.get("thinking") or "")
                     result = evaluate_agent_output(content, case)
-                    accepted = bool(result["accepted"])
+                    done_reason = str(response.get("done_reason") or "")
+                    # Length-truncated output is never an accepted qualification result,
+                    # even when the visible prefix happens to satisfy the validator.
+                    accepted = bool(result["accepted"]) and done_reason != "length"
                     total += 1
                     passed += int(accepted)
-                    done_reason = str(response.get("done_reason") or "")
                     failures: list[str] = []
                     if not content.strip():
                         failures.append("empty-output")
@@ -1322,6 +1356,7 @@ def benchmark_agent(args: argparse.Namespace) -> int:
                     diagnostics: list[str] = []
                     if done_reason == "length":
                         diagnostics.append("output-budget")
+                        failures.append("truncated-output")
                         if not content.strip() and thinking.strip():
                             diagnostics.append("thinking-budget")
                     error = "; ".join(result["problems"])
@@ -1756,36 +1791,48 @@ _MONTH_NUMBERS = {
 }
 
 
+def _real_date(year: int, month: int, day: int) -> tuple[int, int, int] | None:
+    try:
+        date(year, month, day)
+    except ValueError:
+        return None
+    return year, month, day
+
+
 def _semantic_dates(text: str) -> set[tuple[int, int, int]]:
-    """Extract unambiguous office-date values across common DE/EN/FR renderings."""
+    """Extract real office dates from DE/EN/FR word, numeric and ISO forms."""
     values: set[tuple[int, int, int]] = set()
     folded = unicodedata.normalize("NFKC", text).casefold()
     for match in re.finditer(r"(?<!\d)(\d{1,2})\.(\d{1,2})\.(\d{4})(?!\d)", folded):
         day, month, year = map(int, match.groups())
-        if 1 <= day <= 31 and 1 <= month <= 12:
-            values.add((year, month, day))
+        if valid := _real_date(year, month, day):
+            values.add(valid)
+    for match in re.finditer(r"(?<![\d-])(\d{4})-(\d{2})-(\d{2})(?![\d-])", folded):
+        year, month, day = map(int, match.groups())
+        if valid := _real_date(year, month, day):
+            values.add(valid)
     month_words = "|".join(sorted((re.escape(name) for name in _MONTH_NUMBERS), key=len, reverse=True))
     for match in re.finditer(
-        rf"(?<!\d)(\d{{1,2}})\.?\s+({month_words})\s+(\d{{4}})(?!\d)",
+        rf"(?<!\d)(\d{{1,2}})(?:\.|er)?\s+({month_words})\s+(\d{{4}})(?!\d)",
         folded,
     ):
         day = int(match.group(1))
         month = _MONTH_NUMBERS[match.group(2)]
         year = int(match.group(3))
-        if 1 <= day <= 31:
-            values.add((year, month, day))
+        if valid := _real_date(year, month, day):
+            values.add(valid)
     return values
 
 
 def _is_standalone_semantic_date(term: str) -> bool:
     folded = unicodedata.normalize("NFKC", term).casefold().strip()
-    if re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}", folded):
+    if re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}|\d{4}-\d{2}-\d{2}", folded):
         return True
     month_words = "|".join(
         sorted((re.escape(name) for name in _MONTH_NUMBERS), key=len, reverse=True)
     )
     return re.fullmatch(
-        rf"\d{{1,2}}\.?\s+(?:{month_words})\s+\d{{4}}",
+        rf"\d{{1,2}}(?:\.|er)?\s+(?:{month_words})\s+\d{{4}}",
         folded,
     ) is not None
 
@@ -1808,7 +1855,7 @@ def _is_standalone_semantic_invoice(term: str) -> bool:
     ) is not None
 
 
-_CURRENCY_NUMBER = r"(?:\d{1,3}(?:[ \u00a0.'’]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)"
+_CURRENCY_NUMBER = r"(?:\d{1,3}(?:[ \u00a0.,'’]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)"
 
 
 def _standalone_currency(text: str) -> tuple[str, frozenset[Decimal]] | None:
@@ -1879,7 +1926,10 @@ def _bounded_acceptance_match(text: str, term: str) -> bool:
     needle = acceptance_text(term)
     if not needle:
         return False
-    return re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", folded) is not None
+    # A decimal/grouping continuation or identifier suffix is not a token boundary.
+    return re.search(
+        rf"(?<!\w){re.escape(needle)}(?!\w|[.,'’]\d|-[a-z0-9])", folded
+    ) is not None
 
 
 def _strict_json_problems(text: str, case: dict[str, Any]) -> list[str]:
@@ -1949,6 +1999,7 @@ def _acceptance_ok(text: str, case: dict[str, Any]) -> tuple[bool, list[str]]:
         str(term)
         for term in case.get("forbidden", [])
         if _bounded_acceptance_match(text, str(term))
+        or _semantic_acceptance_equivalent(text, str(term))
     ]
     problems = [f"missing {term}" for term in missing]
     problems.extend(f"forbidden {term}" for term in present_forbidden)
@@ -2390,9 +2441,11 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         and forbidden_ok
                         and preserved_ok
                     )
+                    done_reason = str(response.get("done_reason") or "")
+                    if done_reason == "length":
+                        ok = False
                     passed += int(ok)
 
-                    done_reason = str(response.get("done_reason") or "")
                     modality_case = "modality" in str(
                         case.get("id") or ""
                     ).casefold()
@@ -2409,6 +2462,7 @@ def benchmark_translation(args: argparse.Namespace) -> int:
                         diagnostics.append(semantic_detail)
                     if done_reason == "length":
                         diagnostics.append("output-budget")
+                        failures.append("truncated-output")
                         if not content.strip() and thinking.strip():
                             diagnostics.append("thinking-budget")
                     if effective_think_policy == "false" and thinking.strip():
@@ -2617,7 +2671,10 @@ def _usecase_result_record(
     controls = usecase_request_controls(case, model)
     exhaustion, repetition_detail = _reasoning_exhaustion(content, thinking, done_reason)
     reasoning_repetition = exhaustion == "repetition"
-    reasoning_budget_exhausted = done_reason == "length" and not reasoning_repetition
+    reasoning_budget_exhausted = (
+        done_reason == "length" and not content.strip() and bool(thinking.strip())
+        and not reasoning_repetition
+    )
     if done_reason == "length":
         ok = False
         problems = list(problems)
@@ -2768,7 +2825,10 @@ def benchmark_usecase(args: argparse.Namespace) -> int:
                 exhaustion, _repetition_detail = _reasoning_exhaustion(
                     content, thinking, done_reason
                 )
-                reasoning_budget_exhausted = done_reason == "length" and exhaustion != "repetition"
+                reasoning_budget_exhausted = (
+                    done_reason == "length" and not content.strip() and bool(thinking.strip())
+                    and exhaustion != "repetition"
+                )
                 passed += int(ok)
                 incomplete += int(reasoning_budget_exhausted)
                 quality_failed += int((not ok) and not reasoning_budget_exhausted)
@@ -3068,7 +3128,7 @@ def benchmark_rag_quality(args: argparse.Namespace) -> int:
     if answer_model.removesuffix(":latest") not in answer_available:
         raise BenchmarkError(f"RAG-quality answer model is not registered on {args.ollama_url}: {answer_model}")
 
-    top_k = int(os.environ.get("RAG_QUALITY_TOP_K", str(spec.get("top_k", 4))))
+    top_k = int(os.environ.get("RAG_QUALITY_TOP_K", str(spec.get("top_k", 6))))
     default_num_predict = int(os.environ.get("RAG_QUALITY_NUM_PREDICT", "1024"))
     think_policy = args.think
     if top_k < 1:
