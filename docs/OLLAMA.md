@@ -2,7 +2,7 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. The accepted 1.13 package did not promote LFM3; the 0.20.0 line adds explicit LFM3/LFM3-VL candidates while retaining Ollama 0.40.13. Interim 0.20.0-2 DEVICE testing proved normal convergence for the corrected Generalist acquisition and the unchanged four-lane runtime. The selected 0.20.0-4 SOURCE retains the 0.20.0-3 DEVICE-accepted Ollama 0.40.13 and the same topology; authoritative BUILD and exact-RPM DEVICE acceptance remain separate.
+Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. The accepted 1.13 package did not promote LFM3; the 0.20.0 line adds explicit LFM3/LFM3-VL candidates while retaining Ollama 0.40.13. Interim 0.20.0-2 DEVICE testing proved normal convergence for the corrected Generalist acquisition and the unchanged four-lane runtime. The frozen 0.20.0-4 SOURCE and the finalized 0.20.0-5 SOURCE retain the 0.20.0-3 DEVICE-accepted Ollama 0.40.13 pin and four-lane architecture. The 0.20.0-5 workbench adds Agent-safe warmup/profile behavior; those changes are not DEVICE-qualified until an exact future RPM is built and tested.
 
 ## Install and verify
 
@@ -117,16 +117,14 @@ BC-250 comparison runs.
 ```bash
 bc250 advanced ollama-profile status
 sudo bc250 advanced ollama-profile balanced
-sudo bc250 advanced ollama-profile max-context
 sudo bc250 advanced ollama-profile reset
 ```
 
 | Profile | Context | KV cache | Parallel/loaded models |
 |---|---:|---|---|
 | Balanced | 32,768 | q8_0 | 1 / 1 |
-| Max context | 65,536 | q4_0 | 1 / 1 |
 
-Both enable flash attention. `balanced` is the production default. `max-context` remains an explicit operator profile for 65,536-token experiments/needs; its q4_0 KV setting was **not** promoted to the production default after integrated acceptance found Advanced/Qwen instability at the 6,144-token reasoning ceiling. Service profiles do not modify individual Modelfiles.
+`balanced` and `reset` both remove any local profile override and return to the packaged default (q8_0 KV cache). The former `max-context` profile was removed: it changed KV quantisation without increasing the contexts fixed in packaged Modelfiles, and q4_0 KV was not adopted following Advanced/Qwen instability. Both commands use `try-restart` and do **not** activate the main lane during Agent mode. Service defaults do not override individual Modelfile contexts.
 
 ## Benchmark API baseline
 

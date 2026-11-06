@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-PROFILE_DIR="/usr/share/bc250-llm-server/ollama-profiles"
 OVERRIDE_DIR="/etc/systemd/system/ollama.service.d"
 OVERRIDE_FILE="$OVERRIDE_DIR/60-bc250-runtime-profile.conf"
 
@@ -11,8 +10,7 @@ Usage: bc250 advanced ollama-profile COMMAND
 
 Commands:
   status        Show the effective Ollama runtime profile
-  balanced      Use 32K context with q8_0 KV cache
-  max-context   Use 64K context with q4_0 KV cache
+  balanced      Return to the packaged main-lane profile (same as reset)
   reset         Remove the local override and return to the packaged profile
 USAGE
 }
@@ -49,34 +47,22 @@ show_status() {
   done
 }
 
-apply_profile() {
-  local profile="$1" source
-  source="$PROFILE_DIR/$profile.conf"
+reset_profile() {
   require_root
-  [[ -r "$source" ]] || { echo "ERROR: missing profile $source" >&2; exit 1; }
-  install -d -m0755 "$OVERRIDE_DIR"
-  install -m0644 "$source" "$OVERRIDE_FILE"
+  rm -f "$OVERRIDE_FILE"
   systemctl daemon-reload
   if systemctl cat ollama.service >/dev/null 2>&1; then
-    systemctl restart ollama.service
+    # try-restart never starts an inactive main lane; starting it in Agent mode
+    # would stop the Agent lane via systemd Conflicts= and degrade topology.
+    systemctl try-restart ollama.service
   fi
-  echo "Applied Ollama profile: $profile"
+  echo "Using package-owned balanced profile; per-model context remains in Modelfiles."
   show_status
 }
 
 case "${1:-status}" in
   status) show_status ;;
-  balanced) apply_profile balanced ;;
-  max-context) apply_profile max-context ;;
-  reset)
-    require_root
-    rm -f "$OVERRIDE_FILE"
-    systemctl daemon-reload
-    if systemctl cat ollama.service >/dev/null 2>&1; then
-      systemctl restart ollama.service
-    fi
-    echo "Removed the local override; the packaged balanced profile is active."
-    ;;
+  balanced|reset) reset_profile ;;
   -h|--help|help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

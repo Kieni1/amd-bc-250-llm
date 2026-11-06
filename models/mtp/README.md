@@ -96,6 +96,8 @@ Files are stored below `/var/lib/bc250-llm-server/gguf/mtp/`.
 
 ## Runtime preflight
 
+The 0.20.0-5 OPEN WIP safe-power policy protects the default MTP service port 8090 even if an upgraded host retains an older custom protected-port list. This is a shutdown safeguard, not proof that an actual Pi/WOL/long-running MTP job has passed DEVICE qualification. MTP remains opt-in and does not gain a package-managed daemon.
+
 The RPM deliberately does not provide llama.cpp, so MTP never becomes a hidden
 runtime dependency of the appliance. The last reviewed compatibility baseline is
 release `b10964` (commit `b29c606e28a01b1bc8c1351026a0fa6e616bf6c4`). A different

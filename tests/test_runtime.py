@@ -76,7 +76,7 @@ class OcrInstallTests(unittest.TestCase):
         completed = SimpleNamespace(returncode=0)
         with (
             tempfile.TemporaryDirectory() as temporary,
-            patch.dict(os.environ, {"MODELFILE_DIR": temporary}, clear=False),
+            patch.dict(os.environ, {"BC250_MODELFILE_DIR": temporary}, clear=False),
             patch.object(modelctl.os, "geteuid", return_value=0),
             patch.object(modelctl, "ollama_identity", return_value=(1000, 1000)),
             patch.object(modelctl.os, "chown"),

@@ -1,7 +1,7 @@
 [Unit]
 Description=Warm the default model after morning wake
 After=network-online.target ollama.service
-Wants=network-online.target ollama.service
+Wants=network-online.target
 
 [Service]
 Type=oneshot

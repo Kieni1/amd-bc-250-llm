@@ -3,7 +3,13 @@
 set -Eeuo pipefail
 
 log(){ logger -t bc250-safe-power -- "$*"; printf '%s\n' "$*"; }
-SAFE_POWER_PORTS="${SAFE_POWER_PORTS:-${SAFE_SUSPEND_PORTS:-22 80 443 3000 11434 11435 11436 11437}}"
+SAFE_POWER_PORTS="${SAFE_POWER_PORTS:-${SAFE_SUSPEND_PORTS:-22 80 443 3000 8090 11434 11435 11436 11437}}"
+# Old /etc maintenance.env files predate MTP. Always protect its default port
+# even when an older explicitly configured SAFE_POWER_PORTS list is retained.
+case " $SAFE_POWER_PORTS " in
+  *" 8090 "*) ;;
+  *) SAFE_POWER_PORTS="$SAFE_POWER_PORTS 8090" ;;
+esac
 NIGHT_POWER_ACTION="${NIGHT_POWER_ACTION:-poweroff}"
 REQUIRE_WOL="${REQUIRE_WOL:-0}"
 
@@ -44,6 +50,7 @@ fi
 for unit in \
   owui-maintenance@backup-config.service \
   owui-maintenance@backup-users.service \
+  owui-maintenance@backup-documents.service \
   owui-maintenance@prune-uploads.service \
   owui-warmup.service; do
   if systemctl is-active --quiet "$unit"; then
@@ -51,6 +58,13 @@ for unit in \
     exit 0
   fi
 done
+
+# Agent work has gaps between HTTP chunks; absence of a socket is not idle.
+# This does not change explicit forced poweroff or the companion exemption.
+if systemctl is-active --quiet ollama-agent.service; then
+  log "Deferring $NIGHT_POWER_ACTION: exclusive Agent mode is active."
+  exit 0
+fi
 
 if ! command -v ss >/dev/null 2>&1; then
   log "Deferring $NIGHT_POWER_ACTION: TCP activity inspection is unavailable."
@@ -108,6 +122,7 @@ if [[ -n "$connections" ]]; then
       80) protected_label="HTTP connection" ;;
       443) protected_label="HTTPS connection" ;;
       3000) protected_label="Open WebUI connection" ;;
+      8090) protected_label="MTP llama.cpp connection" ;;
       11434) protected_label="main Ollama connection" ;;
       11435) protected_label="task Ollama connection" ;;
       11436) protected_label="agent Ollama connection" ;;
