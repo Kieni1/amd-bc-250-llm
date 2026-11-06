@@ -1,6 +1,6 @@
 # Development memory (Git-only)
 
-`development/` contains maintainer guidance, historical evidence and engineering decisions. It is deliberately absent from the installed RPM payload and is **not** an independent source of runtime/release truth.
+`development/` contains maintainer guidance, historical evidence and engineering decisions. It is deliberately absent from the installed RPM payload and is **not** an independent source of runtime/release truth. As of 2026-11-06, release metadata names the finalized `0.20.0-5` SOURCE (not yet built or DEVICE-accepted); see `VALIDATION-MATRIX.md` before inferring a current RPM from the working tree. Deferred review findings live in `OPEN-FINDINGS.md`.
 
 ## Current authorities
 

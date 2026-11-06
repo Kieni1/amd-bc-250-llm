@@ -6,7 +6,7 @@ hardware profiles, diagnostics and optional specialist tools.
 
 Current accepted DEVICE baseline: **`bc250-llm-server-0.20.0-3`**. Its SOURCE, Fedora 44 GitHub BUILD and exact DEVICE upgrade/convergence/reboot/Tika acceptance are closed. The runtime stack remains Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full and governor 0.4.14.
 
-The selected next SOURCE candidate is **`bc250-llm-server-0.20.0-4`**. It promotes the package-owned Documents/RAG dense retrieval default to K6 while retaining Gemma, Jina v5 small, 1500/200 chunks and threshold zero. It also tightens numeric/identifier, strict-JSON and completion checks in the use-case evaluator and updates the campaign control audit to K6. Model roles, Qwen Advanced sampler, dependencies and hardware policies remain unchanged. Fedora 44 GitHub BUILD and exact-RPM DEVICE acceptance for the new candidate remain separate and pending.
+The **`bc250-llm-server-0.20.0-4` SOURCE is frozen** as an earlier unaccepted candidate. The **`bc250-llm-server-0.20.0-5` SOURCE is finalized**: the original K6 Documents/RAG and evaluator changes are carried forward with translation-integrity safeguards, managed-document lifecycle corrections, experimental-model pruning, model workflow/Agent topology protections, and maintenance/backup/Pi companion fixes. Production role assignments and pinned upstream runtime remain unchanged. Authoritative Fedora 44 GitHub BUILD and exact-RPM DEVICE acceptance are still future independent gates. After upgrading, rerun `sudo bc250 maintenance setup` to enable the documents backup timer.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
@@ -109,10 +109,7 @@ from the single packaged `openwebui/desired-state.json` through supported APIs.
 During the pre-v1 testing phase the normal main/task Open WebUI providers remain available for
 comparison, and `bc250 advanced openwebui` synchronizes their discovered Ollama inventories into
 package-managed testing records. Curated Office roles remain the recommended product paths. Raw
-production/task models and ordinary-size experiments remain visible for comparison, while the
-Qwen3.6 35B is retired from active candidates; Qwen3.8 27B Unsloth and ISTA IQ3_S are admin/testing-only, while IQ3_XXS remains the ordinary-user deployability comparison. Only the package-owned wildcard grant
-on package-managed discovery records may be removed when this visibility policy changes; unrelated
-administrator-created records and grants are preserved.
+production/task models and the selected non-forbidden experiments remain available for comparison. Retired Qwen3.6 35B, Qwen3.8 Unsloth and ISTA IQ3_S are no longer active package-published choices; ISTA IQ3_XXS remains the ordinary-user Deep-fit experiment. New Heretic controls have `forbidden` package exposure (admins may still see raw provider models). Only package-managed discovery records and grants are reconciled; unrelated administrator-created records and grants are preserved.
 Agent `11436` and embedding `11437` remain separate from the chat selector by topology. Arena is
 package-converged off; use `sudo bc250 advanced openwebui init` later
 if that step was skipped. The default endpoint is unencrypted HTTP; see
@@ -139,16 +136,9 @@ reached the campaign's 512 MiB safety floor after only a few resident subruns. Q
 separate higher-quality general-office option; this RAG decision is about sustained memory margin,
 not a semantic-quality failure.
 
-The accepted 0.20.0-3 release and selected 0.20.0-4 SOURCE retain the 0.20.0 comparison catalog around live product questions. Official
-LFM3-1.7B, Nemotron 3.5 Bolt E4B, Index-Translate 2B/9B, LFM3-VL-2B and Spark-X2.6-4B are paired with
-bounded community/uncensored controls, including AtomicChat LFM3/Nemotron, DavidAU Defiant-Fable,
-GSQ-RCO Spark and NeoHorse agent variants. `exp-granite42-3b-ibm-q6-k`, the two ISTA Qwen3.8 27B
-quality/deployability profiles and the compact Agent challengers remain active controls. Eight exhausted
-experiments were removed from active discovery and recorded in the current retirement registry and are no longer exposed through normal discovery. The installed retirement catalog lets
-`sudo bc250 model status` identify stale package-retired registrations and
-`sudo bc250 model purge-retired` remove only those explicitly catalogued models.
-The 1.10 model-management architecture makes model capabilities declarative across the fleet: catalog metadata owns intrinsic modalities/capabilities/provider ownership and runtime lane, profiles own BC-250 qualification/role policy, and Modelfiles remain runtime-parameter authority. MiniCPM-V therefore exposes its vision/OCR testing capabilities without name heuristics, while reasoning/tool capability remains separate from product request policy. Agent profiles also state the narrower `static-output-contract` validation boundary, so intrinsic tool capability is not confused with proven native `tool_calls`. New official/community challengers remain qualification candidates unless explicitly marked otherwise. The only new curated production candidate is Office - Generalist; it does not replace Standard, Documents, Advanced, Deep, Translation, task or embedding roles before DEVICE qualification.
+The accepted 0.20.0-3 release and the 0.20.0-5 SOURCE catalog retain only bounded, role-relevant comparisons. Active experiment candidates include official Index-Translate 9B (with a conditional 2B efficiency variant), TIR Qwen3.5 9B non-thinking, Unsloth Gemma 4 12B QAT, ISTA Qwen3.8 27B IQ3_XXS (the sole remaining Deep fit gate), Spark-X2.6 4B, GLM-OCR and OvisOCR2, and two admin-only Heretic controls. Official LFM3 1.7B is now an **optional `task-*` challenger** on the task lane, not an `exp-*` main-lane model. Redundant Granite 3B, MiniCPM-V, LFM3-VL, DavidAU, ISTA IQ3_S and other eliminated controls have retirement records; they are **not** active discovery or publication targets. Actual candidate identities come from `models/model-catalog.json`; use `bc250 model list` rather than this narrative as the operator inventory. No retirement record deletes previously installed weights automatically.
 
+The manager keeps model capabilities distinct from role-policy and measured quality: the catalog owns provider and intrinsic capability metadata, profiles own qualification/exposure, and Modelfiles own runtime parameters. Native tool capability is not proven by the static Agent output-contract tests. Experimental registration, community model provenance, local memory fit and online model-card claims do not constitute DEVICE promotion; current Standard, Documents, Advanced, Deep, Translation, task and embedding role choices remain unchanged.
 Experimental models are never silent replacements for the defaults above. During `bc250 install`,
 required role models are converged first; entries that are already fully current are summarized rather
 than printed model-by-model. The optional picker shows one indexed overview across ordinary Ollama models and standalone
@@ -166,7 +156,7 @@ for responsive chat, the compact task lane unloads after each request, and the J
 embedding lane keeps its small retrieval model warm for 10 minutes. The former task candidate `exp-qwen38-4b-distill-empero-q6-k` and the old Qwen3.8 4B general
 comparison `exp-qwen38-4b-empero-q6-k` are both retired from normal discovery for different reasons: the task candidate failed the
 co-residency envelope, while the later general comparison no longer answers a distinct campaign question
-beside current Qwen3.5/LFM3/Granite/Spark controls. The Jina embedding model uses a non-commercial license;
+beside current Qwen3.5/LFM3/Spark controls. The Jina embedding model uses a non-commercial license;
 community/uncensored candidates may also have different upstream licenses and intentionally modified refusal
 behavior, so review each model's current license/provenance before use.
 
@@ -206,7 +196,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 Release 0.14.1-1.12 is the accepted runtime/dependency DEVICE baseline. It updated Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full while retaining the four-lane Vulkan/iGPU topology, model set and retrieval tuning; the completed DEVICE campaign also covered malformed-input containment, broad Tika formats, RAG endurance, parallel ingestion, restart persistence and full authenticated revalidation.
 
-Release 0.14.1-1.13 was a historical DEVICE-accepted baseline. Release 0.20.0-3 is now the current accepted package and carries the subsequent quality-campaign/model work, Tika operator-boundary and translation-oracle corrections. The selected 0.20.0-4 SOURCE adds K6 and bounded evaluator fixes; BUILD and DEVICE acceptance for that candidate remain pending.
+Release 0.14.1-1.13 was a historical DEVICE-accepted baseline. Release 0.20.0-3 is now the current accepted package and carries the subsequent quality-campaign/model work, Tika operator-boundary and translation-oracle corrections. The frozen 0.20.0-4 SOURCE proposed K6 and bounded evaluator fixes but never gained transferable BUILD/DEVICE acceptance. Those changes are carried into the finalized 0.20.0-5 SOURCE with subsequent corrections; its authoritative BUILD and DEVICE acceptance have not happened.
 
 Release 0.14.1-1.9 remains an older broad device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.

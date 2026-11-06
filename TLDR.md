@@ -3,7 +3,7 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current accepted DEVICE package: **`bc250-llm-server-0.20.0-3`**. The selected next SOURCE candidate is **`bc250-llm-server-0.20.0-4`** with K6 dense Documents/RAG, K6 quality-campaign control audit and focused evaluator-integrity corrections. Gemma/Jina, existing model and sampler policies, and runtime dependencies are retained. GitHub BUILD and exact-RPM DEVICE acceptance are pending for 0.20.0-4; there is no authoritative release identity for a 0.20.0-4 RPM until its selected GitHub build evidence exists.
+Current accepted DEVICE package: **`bc250-llm-server-0.20.0-3`**. The earlier `bc250-llm-server-0.20.0-4` SOURCE is frozen and superseded, not DEVICE-accepted. **`bc250-llm-server-0.20.0-5` SOURCE is finalized**; it carries K6 dense Documents/RAG and evaluator fixes plus model-catalog, translation, managed-document, topology and maintenance/backup/Pi updates. Production roles and upstream runtime pins are not promoted. Authoritative GitHub BUILD and exact-RPM DEVICE qualification are still pending. After upgrading, rerun `sudo bc250 maintenance setup` to enable the new documents backup timer.
 
 Release 1.13 keeps the accepted 1.12 runtime/model/RAG baseline unchanged and adds bounded package hardening/UX: fail no-usable-text ingestion clearly, retain knowable rollback provenance, distinguish proven package Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior.
 
@@ -89,7 +89,7 @@ Document/knowledge synchronization is loopback-only by default and token-file sy
 
 ## Models
 
-The accepted 0.20.0-3 package and selected 0.20.0-4 SOURCE retain **Office - Generalist** as a new curated candidate backed by
+The accepted 0.20.0-3 package and the 0.20.0-5 SOURCE retain **Office - Generalist** as a new curated candidate backed by
 `prod-nemotron35-bolt-e4b-atomicchat-uncensored-q6-k`. It is a community safety-ablated Nemotron
 variant whose Generalist acquisition and topology passed 0.20.0-3 DEVICE qualification; existing Standard/Documents/Advanced/Deep/Translation
 roles are not silently repointed. New official and community challengers are opt-in except where the

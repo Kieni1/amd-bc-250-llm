@@ -30,7 +30,7 @@
       "status": "active"
     },
     "coding-agent": {
-      "baseline_sha256": "397e67671587634d3891019a1781eaf6ffa69537343608bb915ed37cb49959d6",
+      "baseline_sha256": "8b2de94b974cd4c573a7990d8175d48458db14a13dec7ceb9e43be807a300a06",
       "description": "Coding/Gitea agent workflow helpers; retained under bc250 advanced code.",
       "focused_tests": [
         "tests/test_catalog.py",
@@ -52,7 +52,9 @@
       ],
       "notes": [
         "Explicit 2026-11-01 thaw/refreeze refreshed the helper against the canonical Agent lifecycle: it now checks both Agent API reachability and configured-model registration before sending source content.",
-        "The README distinguishes current active candidates from retired historical challengers and treats generated code as untrusted output that still needs review/tests."
+        "The README distinguishes current active candidates from retired historical challengers and treats generated code as untrusted output that still needs review/tests.",
+        "2026-11-05 OPEN WIP, bounded documentation-only thaw/refreeze: mark retired legacy Qwen2.5 coding challenger; no executable Agent interface or runtime changes.",
+        "2026-11-06 explicit documentation-only thaw/refreeze for 0.20.0-5 OPEN WIP: clarify the existing Agent/MTP interface behavior and source-vs-DEVICE proof boundary; executable content and archived evidence unchanged."
       ]
     },
     "global-docs-coordination": {
@@ -83,6 +85,7 @@
         "development/VALIDATION-MATRIX.md",
         "development/README.md",
         "development/DECISIONS.md",
+        "development/OPEN-FINDINGS.md",
         "docs/FILESTRUCTURE.md",
         "scripts/check-clean-core-absence.sh",
         "scripts/check-current-guidance.sh",
@@ -143,7 +146,7 @@
       "status": "active"
     },
     "maintenance-companion": {
-      "baseline_sha256": "bd3b214c72448deff40bce16174e41a0de314b05f6c3dc47c914772249ee3631",
+      "baseline_sha256": "2ae5a58c409c4b2bd974aa83a7ed96cf6e15ef68a8f8ec650c3646db9ac6d847",
       "description": "Local maintenance timers, backups/restores, safe power and WOL/companion integration; frozen after canonical bc250 dispatcher migration.",
       "focused_tests": [
         "tests/test_maintenance.py",
@@ -151,7 +154,9 @@
       ],
       "notes": [
         "Regression tests remain outside the frozen implementation hash; test maintenance must not thaw the component by itself.",
-        "Explicit 2026-11-01 thaw/refreeze consolidated pruning authentication onto the protected package Open WebUI credential file. Legacy inline OWUI_API_KEY remains read-compatible only when that protected file is absent; new setup never writes a second key and removes the legacy inline copy once the shared credential exists."
+        "Explicit 2026-11-01 thaw/refreeze consolidated pruning authentication onto the protected package Open WebUI credential file. Legacy inline OWUI_API_KEY remains read-compatible only when that protected file is absent; new setup never writes a second key and removes the legacy inline copy once the shared credential exists.",
+        "2026-11-06 OPEN WIP explicit bounded thaw/refreeze for 0.20.0-5: RT1 Agent-safe warmup (no Wants=ollama.service); RT4 defer safe power for Agent and default port 8090; temporary fail-closed Knowledge-aware MC1 safeguard blocks destructive Open WebUI file pruning pending authoritative Knowledge-reference inventory. Subsequent bounded maintenance thaw: MC1 paginated Knowledge inventory with fail-closed behavior; MC2 managed RAG corpus archive and timer/Pi export; MC3 documented replacement recovery constraints; MC4 Pi pull/shutdown/readiness examples; MC5 same-volume staging; MC6 WAL-safe restore; MC7 no forced firewalld activation; MC8 WOL preservation, independent backup attempts, stale warning, configured power-time default and consistent export-account/size defaults. Nightly browser-tab policy remains unchanged pending owner decision. Pi/restore/WOL requires DEVICE qualification. Existing 8090 protection is retained.",
+        "2026-11-06 explicit bounded thaw/refreeze for 0.20.0-5 SOURCE finalization (DEC-054): B1 Pi pull rewritten as rsync mirror + hardlinked dated snapshots that skip archives without a published sidecar, plus Pi pull/shutdown example units; N1 prune dry run reads the Knowledge inventory; N2/N3 backups stage in a sibling non-exported .stage root, publish the sidecar last, clean stale stages, and the corpus backup checks free space, skips an unchanged corpus after re-verifying the newest archive and retries on concurrent change; restore-config made sourceable for hermetic tests; B2 upgrade-enablement note at BACKUP_TIMERS. Pi/restore/WOL still require DEVICE qualification."
       ],
       "paths": [
         "cmd/maintenance/**",
@@ -202,7 +207,7 @@
       "status": "active"
     },
     "mtp": {
-      "baseline_sha256": "487b9373378f252605d8468dc02272bad5fa5af7882b1c9f146639c0398e9385",
+      "baseline_sha256": "80b5d9c4f9f119409e250c4b0bf26ef5ab4d5d06b2ae24ea17861624acb585f5",
       "description": "Standalone llama.cpp MTP models and comparison helpers; retained under the advanced namespace with modelctl-backed list/status/prepare handling.",
       "focused_tests": [
         "tests/test_documentation.py",
@@ -211,7 +216,8 @@
       "notes": [
         "Frozen implementation retained after an explicit pre-1.0 thaw/refreeze: the remaining qwen35-9b convenience alias was removed so the MTP CLI accepts exact catalog IDs only.",
         "The baseline includes the earlier cross-cutting schema-1 capability/ownership metadata in the MTP catalog.",
-        "Explicit 2026-11-01 review found no runtime/lifecycle change justified; only the frozen README was expanded to make MTP opt-in status, residency behavior and the external llama.cpp compatibility reference clearer to users."
+        "Explicit 2026-11-01 review found no runtime/lifecycle change justified; only the frozen README was expanded to make MTP opt-in status, residency behavior and the external llama.cpp compatibility reference clearer to users.",
+        "2026-11-06 explicit documentation-only thaw/refreeze for 0.20.0-5 OPEN WIP: clarify the existing Agent/MTP interface behavior and source-vs-DEVICE proof boundary; executable content and archived evidence unchanged."
       ],
       "paths": [
         "models/mtp/**"

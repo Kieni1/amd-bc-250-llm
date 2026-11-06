@@ -135,8 +135,12 @@ class DocumentationTests(unittest.TestCase):
         files = (ROOT / "docs/FILESTRUCTURE.md").read_text(encoding="utf-8")
         maintenance_example = (ROOT / "config/maintenance/owui-maintenance.env").read_text(encoding="utf-8")
 
-        self.assertIn("selected next SOURCE candidate", readme)
-        self.assertIn("no authoritative release identity", tldr)
+        self.assertIn("0.20.0-5", readme)
+        self.assertIn("SOURCE is finalized", readme)
+        self.assertIn("0.20.0-5", tldr)
+        self.assertIn("SOURCE is finalized", tldr)
+        self.assertIn("bc250-llm-server-0.20.0-5", tldr)
+        self.assertIn("rerun `sudo bc250 maintenance setup`", tldr)
         self.assertIn("pinned Tika 4.2.0 parser", qualification)
         self.assertNotIn("pinned Tika 4.1 parser", qualification)
         self.assertIn("/var/lib/bc250-llm-server/secrets/openwebui-admin.key", security)
@@ -164,6 +168,9 @@ class DocumentationTests(unittest.TestCase):
             blocks = re.findall(r"```(?:bash|text)?\n(.*?)```", text, re.DOTALL)
             for block in blocks:
                 for suffix in re.findall(r"\bbc250-([a-z0-9-]+)\b", block):
+                    if suffix == "documents-" and "bc250-documents-YYYY" in block:
+                        # Managed-corpus archive filename, not a CLI command.
+                        continue
                     self.assertIn(suffix, allowed, f"{relative}: bc250-{suffix}")
 
     def test_privileged_command_examples_use_sudo(self) -> None:
@@ -173,7 +180,7 @@ class DocumentationTests(unittest.TestCase):
             r"bc250\s+advanced\s+openwebui\s+(?:init|apply|save-key)(?:\s|$)",
             r"bc250\s+advanced\s+agent\s+(?:enter|leave|normal|prepare)(?:\s|$)",
             r"bc250\s+model\s+(?:status|install|apply|refresh|unregister|remove|purge-retired)(?:\s|$)",
-            r"bc250\s+advanced\s+ollama-profile\s+(?:balanced|max-context|reset)(?:\s|$)",
+            r"bc250\s+advanced\s+ollama-profile\s+(?:balanced|reset)(?:\s|$)",
             r"bc250\s+advanced\s+benchmark\s+owui-system-context(?:\s|$)",
             r"bc250-40cu(?:\s|$)",
             r"bc250-cu-live-manager(?:\s|$)",
@@ -384,10 +391,10 @@ class DocumentationTests(unittest.TestCase):
         self.assertIn("0.20.0-3", workbench["long_term"]["direction"])
         self.assertIn("k6", workbench["next_work"]["current_batch"].casefold())
         self.assertIn("no production model", workbench["next_work"]["current_batch"].casefold())
-        self.assertIn("0.20.0-3→0.20.0-4", workbench["next_work"]["next_batch"])
+        self.assertIn("0.20.0-3→0.20.0-5", workbench["next_work"]["next_batch"])
         self.assertIn("github", workbench["next_work"]["next_batch"].casefold())
         self.assertIn("Exact 0.20.0-3", workbench["validation"]["device_acceptance"])
-        self.assertIn("0.20.0-4", workbench["validation"]["rpm_package_check"])
+        self.assertIn("0.20.0-5", workbench["validation"]["rpm_package_check"])
         self.assertIn("not a built RPM", workbench["validation"]["rpm_package_check"])
         self.assertEqual(workbench["build_authority"]["selection_event"], "workflow_dispatch")
 
