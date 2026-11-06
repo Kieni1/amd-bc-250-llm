@@ -1,0 +1,11 @@
+# Target (on the Pi): /etc/systemd/system/bc250-request-shutdown.service
+# Optional: the BC-250 already runs its own idle power timer. This asks the
+# package safe-power policy again; exit 0 also covers a normal deferral.
+[Unit]
+Description=Ask the BC-250 to power off if it is idle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/request-bc250-shutdown.sh

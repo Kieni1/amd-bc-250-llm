@@ -52,7 +52,13 @@ ensure_ssh_path() {
     echo "ERROR: sshd is unavailable. Install it first: sudo dnf install openssh-server" >&2
     return 1
   }
-  systemctl enable --now sshd.service firewalld.service
+  systemctl enable --now sshd.service
+  if ! systemctl is-active --quiet firewalld.service; then
+    echo "WARNING: firewalld is inactive; SSH enabled but firewall policy was not modified." >&2
+    echo "Check your existing firewall permits only the intended trusted Pi SSH path." >&2
+    return 0
+  fi
+  command -v firewall-cmd >/dev/null 2>&1 || { echo "ERROR: active firewalld has no firewall-cmd." >&2; return 1; }
   zone="$(firewall_zone)"
   for service in http ssh; do
     firewall-cmd --quiet --zone="$zone" --permanent --query-service="$service" || {
@@ -116,12 +122,15 @@ backup_status() {
   printf '  export account:        %s\n' "$(id "$EXPORT_USER" >/dev/null 2>&1 && echo ready || echo absent)"
   printf '  config directory:      %s\n' "$([[ -d "$BACKUP_ROOT/config" ]] && echo present || echo absent)"
   printf '  users directory:       %s\n' "$([[ -d "$BACKUP_ROOT/users" ]] && echo present || echo absent)"
+  printf '  documents directory:   %s\n' "$([[ -d "$BACKUP_ROOT/documents" ]] && echo present || echo absent)"
   if [[ -r "$auth" ]]; then
     printf '  config key scope:      %s\n' "$(grep -Fq '/config"' "$auth" && echo configured || echo absent)"
     printf '  users key scope:       %s\n' "$(grep -Fq '/users"' "$auth" && echo configured || echo absent)"
+    printf '  documents key scope:   %s\n' "$(grep -Fq '/documents"' "$auth" && echo configured || echo absent)"
   else
     echo '  config key scope:      absent'
     echo '  users key scope:       absent'
+    echo '  documents key scope:   absent'
   fi
   echo "  rollback backups:      not exported"
 }
@@ -136,10 +145,10 @@ backup_enable() {
   ensure_ssh_path
   ensure_account "$EXPORT_USER" "$EXPORT_GROUP" "$EXPORT_HOME"
   install -d -m0710 -o root -g "$EXPORT_GROUP" "$BACKUP_ROOT"
-  install -d -m0750 -o root -g "$EXPORT_GROUP" "$BACKUP_ROOT/config" "$BACKUP_ROOT/users"
-  find "$BACKUP_ROOT/config" "$BACKUP_ROOT/users" -maxdepth 1 -type f \
+  install -d -m0750 -o root -g "$EXPORT_GROUP" "$BACKUP_ROOT/config" "$BACKUP_ROOT/users" "$BACKUP_ROOT/documents"
+  find "$BACKUP_ROOT/config" "$BACKUP_ROOT/users" "$BACKUP_ROOT/documents" -maxdepth 1 -type f \
     \( -name 'owui-config-*.tar.gz' -o -name 'owui-config-*.tar.gz.sha256' \
-       -o -name 'owui-users-*.sql.gz' -o -name 'owui-users-*.sql.gz.sha256' \) \
+       -o -name 'owui-users-*.sql.gz' -o -name 'owui-users-*.sql.gz.sha256' -o -name 'bc250-documents-*.tar.gz' -o -name 'bc250-documents-*.tar.gz.sha256' \) \
     -exec chgrp "$EXPORT_GROUP" {} + -exec chmod 0640 {} +
   cat <<EOF_EXPORT
 Read-only backup export prepared. Private keys stay on the Pi.
@@ -152,6 +161,9 @@ Config scope:
 
 Users scope:
   restrict,command="/usr/bin/rrsync -ro $BACKUP_ROOT/users" ssh-ed25519 AAAA... pi-users-backup
+
+Documents scope:
+  restrict,command="/usr/bin/rrsync -ro $BACKUP_ROOT/documents" ssh-ed25519 AAAA... pi-documents-backup
 
 No additional firewall port is needed; export uses the same restricted SSH :22 path.
 EOF_EXPORT

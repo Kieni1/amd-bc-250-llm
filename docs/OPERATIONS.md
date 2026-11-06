@@ -308,8 +308,8 @@ sudo bc250 document review public COLLECTION
 sudo bc250 document validate public COLLECTION --include-working
 sudo bc250 document activate public COLLECTION --all-ready
 sudo bc250 document status
-sudo bc250 document status public COLLECTION --knowledge --token-file FILE
-sudo bc250 document ingest --token-file FILE [--prune] [--url URL --allow-remote [--allow-confidential-remote]]
+sudo bc250 document status public COLLECTION --knowledge [--token-file FILE]
+sudo bc250 document ingest [--token-file FILE] [--prune] [--url URL --allow-remote [--allow-confidential-remote]]
 ```
 
 The default root is `/srv/bc250-documents`. Each collection has `inbox/german`, `inbox/french`,
@@ -400,7 +400,6 @@ deactivated, the helper refuses to unlink or replace its backing file. The main 
 ```bash
 bc250 advanced ollama-profile status
 sudo bc250 advanced ollama-profile balanced
-sudo bc250 advanced ollama-profile max-context
 sudo bc250 advanced ollama-profile reset
 ```
 
@@ -684,7 +683,7 @@ separate optional decisions after core verification. Local maintenance can be co
 independently. Both top-level choices remain optional/default-No, and Pi/companion setup remains
 separate. Selected setup receives
 post-configuration checks. `setup --defaults` enables verified local
-backups only. Manual maintenance runs show
+configuration, identity and managed-document backups only. Manual maintenance runs show
 only the current systemd invocation instead of a historical journal tail. Timer status uses
 `last_scheduled=` so a successful manual run is not confused with timer history. Upload
 pruning preflights the protected package Open WebUI credential before starting its unit. New maintenance setup does **not** ask the operator to copy a second API key into `maintenance.env`; it uses `/var/lib/bc250-llm-server/secrets/openwebui-admin.key` through `OWUI_API_KEY_FILE`. A missing, symlinked, malformed or too-broadly-readable token file fails before pruning and never prints the credential. Existing pre-migration `OWUI_API_KEY=` configuration remains a read-only compatibility path; once the protected package key exists, rerunning pruning setup removes that legacy inline copy. `clean-cache` requires confirmation and removes only rebuildable
@@ -696,6 +695,18 @@ HTTP :80 as the office-readiness endpoint; it does not expose internal Ollama/UI
 ports. `backup-export enable` is optional and requires `/usr/bin/rrsync` from the
 Fedora `rsync-rrsync` package. Maintenance policy is stored in root-readable
 `/etc/bc250-llm-server/maintenance.env`; the Open WebUI API key itself stays in the separate root-only package secrets directory rather than being duplicated into that policy file.
+
+**Pruning safety (MC1):** `DRY_RUN=1` is the default. Dry and real runs both
+obtain the complete paginated Knowledge-base/file inventory from the installed
+Open WebUI API first. They exclude all linked file IDs, so the dry-run plan matches what a real
+run would delete. A real run fails closed without DELETE requests if the API is unavailable or changes while
+listing. A dry run reports that case as a warning and plans no candidates. This inventory
+path must be checked on the installed Open WebUI 0.12.5 before enabling destructive
+pruning. An unindexed attachment is eligible only under the configured age/size rules.
+An idle browser tab currently counts as activity for safe shutdown, as does an active
+Agent session or MTP traffic on 8090. No idle-browser timeout has been introduced. A
+Pi that cannot actually wake the powered-off device must not be treated as proven WOL.
+`companion enable` does not force-start an inactive firewalld service.
 
 ### Coding and experiments
 
@@ -803,16 +814,26 @@ sudo bc250 maintenance disable
 
 `backup-config` uses SQLite's online backup API, verifies integrity and writes a
 SHA-256 sidecar. It includes Open WebUI accounts, settings and chats but excludes
-bulky uploads, vector data and caches. It is therefore **not a complete RAG
-backup** and cannot restore an ingested document library by itself. `backup-users` is a selective identity
-export and contains password hashes, API keys and access-control data. The package maintenance credential
-`/var/lib/bc250-llm-server/secrets/openwebui-admin.key` is separate root-only appliance state: it is not
-placed in config/users backups or support/revalidation evidence and must be re-established separately if needed.
+bulky uploads, vector data and caches. `backup-users` is a selective identity
+export and contains password hashes, API keys and access-control data.
+`backup-documents` preserves the **managed RAG source of truth** under
+`/srv/bc250-documents` (sources, active and superseded revisions, collection
+metadata and provenance), using a verified archive and sidecar at 18:05 daily.
+Open WebUI uploads and embeddings are rebuildable by `bc250 document ingest`.
+These three backups are not a full appliance image or a backup of GGUF weights.
+
+The Open WebUI encryption secret (`/var/lib/bc250-llm-server/secrets/open-webui.env`)
+and the package admin credential are intentionally **excluded** from readable
+Pi export. Preserve the original `WEBUI_SECRET_KEY` separately in secure encrypted
+off-device escrow if recovering encrypted settings/MFA is required. Do not add
+secrets to the rrsync-readable backups or support bundles. After an approved
+replacement-device restore, re-establish the package admin API key with the
+Open WebUI initialization/key-saving workflow. Losing the original secret can make
+encrypted Open WebUI fields unrecoverable.
 
 Backups under `/var/backups/bc250-llm-server` remain local by default. Treat
-them as confidential recovery points, not protection against theft or disk
-failure. Optional Pi export can be prepared later without changing the backup
-format or using an Open WebUI API key:
+them as confidential recovery points, not protection against theft or disk failure
+unless the Pi has actually pulled and SHA-verified copies. Prepare restricted export:
 
 ```bash
 sudo bc250 maintenance backup-export status
@@ -820,13 +841,12 @@ sudo dnf install rsync-rrsync       # only if export is actually wanted
 sudo bc250 maintenance backup-export enable
 ```
 
-The export uses read-only `/usr/bin/rrsync` over the same restricted SSH :22
-path. It exposes only the normal config/users backup directories, never rollback
-data or `/etc/bc250-llm-server/maintenance.env`. Private SSH keys stay on the Pi.
-The package reserves the export group for stable directory permissions, and the
-backup producers preserve those directory modes on every run. Until the export
-account is explicitly enabled, the reserved group has no members and newly published
-artifacts remain private `0600`; after enablement they are published `0640`.
+The export uses read-only `/usr/bin/rrsync` over restricted SSH :22 with separate
+config/users/documents key scopes; private keys remain on the Pi. Rollback
+archives and `/etc/bc250-llm-server` secrets are never exported. Setup refuses to
+silently activate a previously disabled firewalld service. The producer reserves
+export group ownership and publishes artifacts as 0640 only after the read-only
+export account is enabled.
 
 Before upgrading Open WebUI or moving the complete instance, take a stopped
 filesystem snapshot. On a package upgrade with an existing Open WebUI database, RPM `%pre`
@@ -953,7 +973,7 @@ sudo bc250 maintenance companion status
 sudo bc250 maintenance contract
 ```
 
-`companion enable` enables the existing SSH server/firewall service, keeps HTTP
+`companion enable` enables the SSH server and configures firewalld only when it is already active; it does not force-enable a deliberately inactive firewalld service. It keeps HTTP
 `:80` available as the office-readiness endpoint, and prepares a dedicated
 `bc250-power-control` account whose authorized key must use the forced command
 printed by the helper. It does **not** open `3000` or Ollama ports
@@ -1017,6 +1037,7 @@ sudo bc250 maintenance status
 |---|---|---|
 | Configuration backup | Daily 17:45 | Enabled |
 | Identity backup | Daily 18:00 | Enabled |
+| Managed documents backup | Daily 18:05 | Enabled |
 | Upload prune | Daily 18:10 | Disabled, dry-run |
 | Model warm-up | Weekdays 07:35 | Disabled |
 | Idle power action | Weekdays from 18:30 | Disabled |
@@ -1142,9 +1163,30 @@ Identity backups are published under:
   owui-users-YYYY-MM-DD_HHMMSS.sql.gz.sha256
 ```
 
+Managed document backups are published under:
+
+```text
+/var/backups/bc250-llm-server/documents/
+  bc250-documents-YYYY-MM-DD_HHMMSS.tar.gz
+  bc250-documents-YYYY-MM-DD_HHMMSS.tar.gz.sha256
+```
+
 Only an artifact with its matching SHA-256 sidecar is a complete exportable
-pair. Routine backups are intentionally not a full RAG/document/model image;
-they exclude bulky uploads/vector/cache data and model stores.
+pair. These are **not** a full system image: they exclude rebuildable uploads/vector/cache data, model stores and private encryption secrets.
+
+**How backups are published:**
+- Producers stage in the root-only `/var/backups/bc250-llm-server/.stage/`. It is on the same volume as the backups but outside every export scope.
+- Each producer publishes the archive first and its sidecar last, so an archive without a sidecar is still being written.
+- Stages left by a killed run are removed after one day.
+
+**Corpus backup rules:**
+- If the managed corpus is unchanged since the newest verified archive, the documents backup verifies that archive and skips a new one. `maintenance status` then counts the verification as a fresh backup.
+- The backup refuses to start without room for the uncompressed corpus plus `BC250_BACKUP_RESERVE_MB` (default 1024).
+- If documents change while it archives, it retries (up to three attempts) so the published archive is one consistent state.
+
+**After upgrading from 0.20.0-3 or 0.20.0-4:** rerun `sudo bc250 maintenance setup`. An upgrade never enables
+maintenance timers by itself, so the corpus backup timer `owui-backup-documents.timer` stays off on a host that enabled backups earlier.
+`maintenance status` then warns that no Documents backup was found.
 
 Optional read-only export is prepared with:
 
@@ -1161,16 +1203,17 @@ sudo dnf install rsync-rrsync
 ```
 
 The export account/group is `bc250-backup-export`. Export is read-only through
-SSH/rrsync, uses separate config/users key scopes, does not expose rollback
+SSH/rrsync, uses separate config/users/documents key scopes, does not expose rollback
 backups or maintenance secrets, and does not require another firewall port. The
 forced-command scopes are:
 
 ```text
 restrict,command="/usr/bin/rrsync -ro /var/backups/bc250-llm-server/config"
 restrict,command="/usr/bin/rrsync -ro /var/backups/bc250-llm-server/users"
+restrict,command="/usr/bin/rrsync -ro /var/backups/bc250-llm-server/documents"
 ```
 
-Use independent Ed25519 keys for power control, config backup and users backup.
+Use independent Ed25519 keys for power control, config backup, users backup and documents backup.
 One compromised key should not silently expand into another maintenance scope.
 
 ### Backup permissions when export is enabled
@@ -1180,10 +1223,11 @@ One compromised key should not silently expand into another maintenance scope.
 | `/var/backups/bc250-llm-server` | `bc250-backup-export` | `0710` |
 | `config/` | `bc250-backup-export` | `0750` |
 | `users/` | `bc250-backup-export` | `0750` |
-| published config/users artifacts | `bc250-backup-export` | `0640` |
+| `documents/` | `bc250-backup-export` | `0750` |
+| published config/users/documents artifacts | `bc250-backup-export` | `0640` |
 
 `rollback/` remains private. If backup export is not enabled, the reserved group has
-no user members and config/users artifacts remain private `0600`; the `0750`
+no user members and config/users/documents artifacts remain private `0600`; the `0750`
 directories still retain the dormant group so later export enablement does not require
 permission repair after every backup run.
 
@@ -1199,10 +1243,64 @@ deliberately configures otherwise. The BC-250 owns after-hours shutdown timing;
 the external companion owns morning wake timing. Do not duplicate shutdown
 policy on the companion.
 
-Current BC-250 local backup defaults are configuration at 17:45 and identity at
-18:00, with local retention counts of 7 and 14 respectively. These are producer
+Current BC-250 local backup defaults are configuration at 17:45, identity at
+18:00 and managed documents at 18:05, with local retention counts of 7, 14 and 7 respectively. These are producer
 policy defaults, not proof that a new backup exists. A Pi should discover complete
 artifact/sidecar pairs and may keep a different, longer off-device retention.
+
+
+### Raspberry Pi pull and controlled replacement recovery (SOURCE-only recipe)
+
+Install the provided Pi examples from `examples/raspi-wol/` (installed under
+`/usr/share/bc250-llm-server/examples/raspi-wol/`):
+
+- `bc250-pi-ssh-config.example`: use a verified, pinned `known_hosts`, unique keys and
+  `IdentitiesOnly yes`.
+- `pull-bc250-backups.sh` with `bc250-pull-backups.service`/`.timer`: weekdays at 18:20.
+- `request-bc250-shutdown.sh` with the optional `bc250-request-shutdown.service`/`.timer`:
+  disabled unless enabled on the Pi.
+- `wake-bc250.sh` with `bc250-wake.service`/`.timer`: optional HTTP :80 readiness retries
+  when `BC250_READINESS_URL` is set.
+
+The pull mirrors each read-only scope into `mirror/` (following the BC-250 retention set)
+and then records a dated snapshot of the verified archive/sidecar pairs. The snapshot uses
+hardlinks, so an archive already held in an earlier snapshot costs no extra space.
+Pi storage therefore grows with the number of *distinct* archives over the retention window
+(`BC250_PI_BACKUP_KEEP`, default 14), not with retention × the BC-250 set.
+
+An archive whose sidecar is not yet published (the BC-250 is still writing it) is skipped
+with a warning and collected by the next pull. A scope without any verified pair, an rsync
+failure or a checksum mismatch makes the pull exit non-zero and records no snapshot; the
+mirror keeps whatever was transferred. The pull's SSH session defers the BC-250's 18:30
+power attempts until it finishes, which is intended.
+
+The request client calls the package's restricted forced-command SSH account; exit 0 may
+mean **deferred** rather than powered off. The Pi timers are examples to copy, not
+automatically installed. First test host-key trust, the rrsync scopes, one off-device
+pull, poweroff and a real WOL wake.
+
+For a replacement disk or host, install a compatible release and stop Open WebUI
+before restoring. Copy only verified backup+sidecar pairs from the Pi onto a
+root-private local directory and verify with `sha256sum -c`. Preserve or restore
+the **original** Open WebUI encryption secret from separate encrypted escrow
+before starting the recovered database. The existing helpers are explicitly
+invokable as root (they are not yet a promoted `bc250 maintenance restore` CLI):
+
+```bash
+sudo systemctl stop open-webui.service
+sudo /usr/libexec/bc250-llm-server/restore-config.sh /PRIVATE/owui-config-DATE.tar.gz
+# Use restore-users.sh only when doing a selective identity recovery into a
+# schema-compatible database; config restore already includes account rows.
+```
+
+The managed document archive is a separate source-of-truth restore: check that
+the archive contains only safe regular files/directories, then extract as root
+into an **empty** `/srv/bc250-documents`, preserving owner and metadata. After
+Open WebUI and its original secret are restored, re-establish the admin key,
+start Open WebUI and run managed-document status/ingest to rebuild Knowledge and
+embeddings. Do not overwrite a nonempty live corpus or restore across schema
+revisions without a separate operator review. Restore and Pi procedures still
+require a bounded non-destructive DEVICE exercise before production reliance.
 
 ### Compatibility
 
@@ -1221,3 +1319,17 @@ Release 1.8 keeps that privileged verification unchanged but fixes the non-root 
 `sudo bc250 install` checks Tika after starting the package services. If an already-running Tika container has a version or image digest different from the package pin, only `tika.service` is recreated for that identity mismatch; healthy matching Tika is left running. The installer verifies the expected runtime identity before declaring convergence.
 
 When the optional `needs-restarting` helper is absent, status reports `Reboot required: NOT CHECKED (needs-restarting unavailable)` rather than treating that absence as a health failure.
+
+### Upload-pruning safety gate (0.20.0-5 SOURCE)
+
+Open WebUI's Files API enumerates files that may be referenced by Knowledge.
+Before deleting any eligible file, `prune-uploads.sh` now retrieves the complete
+paginated Knowledge-base list and each base's paginated `/files` references.
+Every referenced file ID is protected; an API failure, invalid pagination,
+unstable total or unavailable helper aborts before any deletion. This SOURCE
+change is not permission to enable `DRY_RUN=0` in production without confirming
+the Knowledge API response and access scope on DEVICE. `DRY_RUN=1` gives a
+Files-only candidate preview; it does **not** yet subtract Knowledge-protected
+IDs, so the actual live policy may delete fewer files than the preview suggests.
+The existing scheduled power policy (including established browser TCP
+sessions) remains unchanged pending operator decisions and DEVICE evidence.

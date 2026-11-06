@@ -1,0 +1,14 @@
+# Target (on the Pi): /etc/systemd/system/bc250-pull-backups.timer
+# 18:20 follows the BC-250 producers (17:45, 18:00, 18:05). An archive still
+# being written is skipped and collected on the next run. The pull's SSH session
+# defers the BC-250's own power-off attempts until it finishes; that is intended.
+[Unit]
+Description=Pull BC-250 backups each workday evening
+
+[Timer]
+OnCalendar=Mon..Fri 18:20
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

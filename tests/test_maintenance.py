@@ -10,6 +10,17 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+_HELPER_DIR = tempfile.TemporaryDirectory()
+# Prune dry runs read the Knowledge inventory like real runs (N1). These tests
+# exercise file-list behaviour, so they use an inventory with no linked files.
+EMPTY_KNOWLEDGE_HELPER = Path(_HELPER_DIR.name) / "no-knowledge-refs.py"
+EMPTY_KNOWLEDGE_HELPER.write_text(
+    'import sys\nopen(sys.argv[1], "w").close()\n', encoding="utf-8"
+)
+
+
+def tearDownModule() -> None:
+    _HELPER_DIR.cleanup()
 
 
 class MaintenanceTests(unittest.TestCase):
@@ -61,10 +72,11 @@ class MaintenanceTests(unittest.TestCase):
         self.assertIn("sudo dnf install rsync-rrsync", companion)
         self.assertIn("rollback backups:      not exported", companion)
         for producer in (config, users):
-            self.assertIn("id bc250-backup-export", producer)
-            self.assertIn('chgrp bc250-backup-export -- "$out" "$out.sha256"', producer)
-            self.assertIn('chmod 0640 -- "$out" "$out.sha256"', producer)
-            self.assertNotIn("chgrp bc250-backup-export -- \"$out\" \"$out.sha256\" || true", producer)
+            self.assertIn('EXPORT_USER="${BC250_BACKUP_EXPORT_USER:-bc250-backup-export}"', producer)
+            self.assertIn('EXPORT_GROUP="${BC250_BACKUP_EXPORT_GROUP:-bc250-backup-export}"', producer)
+            self.assertIn('id "$EXPORT_USER"', producer)
+        # Group rights on the published pair are exercised by
+        # test_backup_roundtrip_02005.ConfigBackupRestoreRoundTrip.
 
     def test_backup_producers_preserve_export_directory_modes_behaviorally(self) -> None:
         producers = (
@@ -253,7 +265,7 @@ class MaintenanceTests(unittest.TestCase):
         by_id = {model["id"]: model for model in models["models"]}
         self.assertIs(by_id["bc250-office-advanced"]["params"]["custom_params"]["think"], True)
         self.assertIs(
-            models["testing_model_policies"]["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]["custom_params"]["think"],
+            models["testing_model_policies"]["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]["custom_params"]["think"],
             False,
         )
         self.assertIn('/api/v1/models/import', helper)
@@ -352,7 +364,7 @@ class MaintenanceTests(unittest.TestCase):
 
     def test_power_action_is_explicit_and_wol_is_optional(self) -> None:
         source = (ROOT / "cmd/maintenance/safe-power.sh").read_text(encoding="utf-8")
-        self.assertIn("22 80 443 3000 11434 11435 11436 11437", source)
+        self.assertIn("22 80 443 3000 8090 11434 11435 11436 11437", source)
         self.assertIn("poweroff or suspend", source)
         self.assertIn("REQUIRE_WOL", source)
         self.assertIn("active protected", source)
@@ -662,6 +674,7 @@ class MaintenanceTests(unittest.TestCase):
                 "MAX_AGE_DAYS": "1",
                 "MAX_TOTAL_GB": "0",
                 "DRY_RUN": "1",
+                "BC250_KNOWLEDGE_PRUNE_HELPER": str(EMPTY_KNOWLEDGE_HELPER),
             }
             symlinked = subprocess.run(
                 [str(script)], env=base_env, text=True, stdout=subprocess.PIPE,
@@ -703,6 +716,7 @@ class MaintenanceTests(unittest.TestCase):
                     "MAX_AGE_DAYS": "1",
                     "MAX_TOTAL_GB": "0",
                     "DRY_RUN": "1",
+                "BC250_KNOWLEDGE_PRUNE_HELPER": str(EMPTY_KNOWLEDGE_HELPER),
                 },
                 text=True,
                 stdout=subprocess.PIPE,
@@ -740,6 +754,7 @@ class MaintenanceTests(unittest.TestCase):
                 "MAX_AGE_DAYS": "0",
                 "MAX_TOTAL_GB": "1",
                 "DRY_RUN": "1",
+                "BC250_KNOWLEDGE_PRUNE_HELPER": str(EMPTY_KNOWLEDGE_HELPER),
             }
             result = subprocess.run(
                 [str(script)],
@@ -826,6 +841,7 @@ class MaintenanceTests(unittest.TestCase):
                 "MAX_AGE_DAYS": "0",
                 "MAX_TOTAL_GB": "1",
                 "DRY_RUN": "1",
+                "BC250_KNOWLEDGE_PRUNE_HELPER": str(EMPTY_KNOWLEDGE_HELPER),
             }
             result = subprocess.run(
                 [str(script)],
@@ -914,6 +930,7 @@ class MaintenanceTests(unittest.TestCase):
                           exit 0
                         fi
                         if [[ "$joined" == *"PRAGMA wal_checkpoint(TRUNCATE);"* ]]; then
+                          printf '0|0|0\n'
                           exit 0
                         fi
                         if [[ "$joined" == *".backup '"* ]]; then
@@ -1028,6 +1045,7 @@ class MaintenanceTests(unittest.TestCase):
                 "MAX_AGE_DAYS": "0",
                 "MAX_TOTAL_GB": "1",
                 "DRY_RUN": "1",
+                "BC250_KNOWLEDGE_PRUNE_HELPER": str(EMPTY_KNOWLEDGE_HELPER),
             }
             result = subprocess.run(
                 [str(script)], env=env, text=True, stdout=subprocess.PIPE,

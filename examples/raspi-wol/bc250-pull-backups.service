@@ -1,0 +1,13 @@
+# Target (on the Pi): /etc/systemd/system/bc250-pull-backups.service
+# Install pull-bc250-backups.sh as /usr/local/bin/pull-bc250-backups.sh first.
+[Unit]
+Description=Pull verified BC-250 backups to this Raspberry Pi
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pull-bc250-backups.sh
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h

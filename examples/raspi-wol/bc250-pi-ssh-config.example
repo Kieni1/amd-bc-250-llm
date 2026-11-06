@@ -1,0 +1,21 @@
+# Install as /etc/bc250/ssh_config on the Raspberry Pi, mode 0600.
+# Replace the hostname and IdentityFile paths. Obtain and pin the BC-250's
+# SSH host key by a trusted channel; do not use StrictHostKeyChecking=no.
+Host bc250-power bc250-config bc250-users bc250-documents
+    HostName BC250_HOST_OR_IP
+    Port 22
+    IdentitiesOnly yes
+    StrictHostKeyChecking yes
+    UserKnownHostsFile /etc/bc250/known_hosts
+Host bc250-power
+    User bc250-power-control
+    IdentityFile /etc/bc250/keys/power_ed25519
+Host bc250-config
+    User bc250-backup-export
+    IdentityFile /etc/bc250/keys/config_ed25519
+Host bc250-users
+    User bc250-backup-export
+    IdentityFile /etc/bc250/keys/users_ed25519
+Host bc250-documents
+    User bc250-backup-export
+    IdentityFile /etc/bc250/keys/documents_ed25519

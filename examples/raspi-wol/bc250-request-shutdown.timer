@@ -1,0 +1,12 @@
+# Target (on the Pi): /etc/systemd/system/bc250-request-shutdown.timer
+# Optional and disabled unless enabled explicitly on the Pi. Runs after the
+# BC-250's own 18:30-19:30 attempts.
+[Unit]
+Description=Late safe-shutdown request to the BC-250 on workdays
+
+[Timer]
+OnCalendar=Mon..Fri 20:00
+Persistent=false
+
+[Install]
+WantedBy=timers.target

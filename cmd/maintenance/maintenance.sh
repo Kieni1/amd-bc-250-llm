@@ -16,7 +16,12 @@ DEFAULT_OWUI_API_KEY_FILE="/var/lib/bc250-llm-server/secrets/openwebui-admin.key
 # Future restore ownership belongs here: `bc250 maintenance restore config|users`.
 # Do not expose it until rollback, confirmation and exact-device restore qualification are designed.
 
-BACKUP_TIMERS=(owui-backup-config.timer owui-backup-users.timer)
+# B2 (accepted during development, see development/OPEN-FINDINGS.md): timers are
+# enabled only by `setup`/`setup --defaults`, never by an RPM upgrade. A host
+# that enabled backups before a timer was added to this list keeps running
+# without it until setup is rerun. This recurs for EVERY timer added here later;
+# before v1.0, add an upgrade step (or a status warning) for newly added timers.
+BACKUP_TIMERS=(owui-backup-config.timer owui-backup-users.timer owui-backup-documents.timer)
 OPTIONAL_TIMERS=(owui-prune.timer owui-warmup.timer bc250-night-shutdown.timer)
 ALL_TIMERS=("${BACKUP_TIMERS[@]}" "${OPTIONAL_TIMERS[@]}")
 
@@ -44,7 +49,7 @@ Set up and inspect privacy-conscious maintenance for the local office appliance.
                     SSH for safe shutdown requests. HTTP remains the office UI.
   backup-export     Inspect or prepare optional read-only rrsync backup export.
   request-shutdown  Ask the package safe-power policy to power off only if idle.
-  run backup        Run configuration and identity backups now, in sequence.
+  run backup        Run configuration, identity and managed-document backups.
   run prune         Run the configured upload-prune policy now.
   run all           Run backups and then pruning.
   clean-cache       Confirm removal of the Hugging Face cache, dangling Podman
@@ -395,13 +400,14 @@ setup_warmup() {
 }
 
 setup_power() {
-  local action time nic wol_tmp
+  local action time nic wol_tmp current_time
   if ! ask_yes_no "Enable automatic weekday after-hours power saving" no; then
     disable_units bc250-night-shutdown.timer
     return
   fi
   action="$(ask_power_action "$(get_setting NIGHT_POWER_ACTION poweroff)")"
-  time="$(ask_power_time "18:30")"
+  current_time="$(sed -n 's/^OnCalendar=Mon\.\.Fri \([0-9][0-9]:[0-9][0-9]\):00$/\1/p' "$POWER_DROPIN" 2>/dev/null | head -n1)"
+  time="$(ask_power_time "${current_time:-18:30}")"
   write_power_schedule "$time"
   set_setting NIGHT_POWER_ACTION "$action"
 
@@ -454,7 +460,7 @@ setup_defaults() {
   require_root
   ensure_config
   set_setting DRY_RUN 1
-  disable_units "${OPTIONAL_TIMERS[@]}" bc250-enable-wol.service
+  disable_units "${OPTIONAL_TIMERS[@]}"
   enable_units "${BACKUP_TIMERS[@]}"
   echo "Enabled verified local backups. Pruning, warm-up and automatic power actions remain disabled."
   show_status
@@ -475,13 +481,22 @@ timer_line() {
 }
 
 backup_summary() {
-  local label="$1" directory="$2" pattern="$3" count=0 newest='none'
+  local label="$1" directory="$2" pattern="$3" count=0 newest='none' newest_time=0 now
   if [[ -d "$directory" ]]; then
     count="$(find "$directory" -maxdepth 1 -type f -name "$pattern" -printf . 2>/dev/null | wc -c)"
     newest="$(find "$directory" -maxdepth 1 -type f -name "$pattern" -printf '%T@ %f\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2- || true)"
     [[ -n "$newest" ]] || newest=none
   fi
   printf '  %-20s count=%-3s newest=%s\n' "$label" "$count" "$newest"
+  if [[ "$newest" != none ]]; then
+    newest_time="$(stat -c %Y "$directory/$newest" 2>/dev/null || echo 0)"
+    now="$(date +%s)"
+    if (( newest_time > 0 && now - newest_time > 172800 )); then
+      printf '  WARNING: %s backup is older than 48 hours.\n' "$label"
+    fi
+  else
+    printf '  WARNING: no %s backup found.\n' "$label"
+  fi
 }
 
 show_status() {
@@ -509,7 +524,7 @@ show_status() {
   for unit in "${ALL_TIMERS[@]}"; do timer_line "$unit"; done
   echo
   echo "Policy"
-  printf '  Backups kept:       config=%s users=%s\n' "$(get_setting KEEP_CONFIG 7)" "$(get_setting KEEP_USERS 14)"
+  printf '  Backups kept:       config=%s users=%s documents=%s\n' "$(get_setting KEEP_CONFIG 7)" "$(get_setting KEEP_USERS 14)" "$(get_setting KEEP_DOCUMENTS 7)"
   printf '  Upload pruning:     age=%sd ceiling=%sGiB\n' \
     "$(get_setting MAX_AGE_DAYS 90)" "$(get_setting MAX_TOTAL_GB 20)"
   if [[ "$(get_setting DRY_RUN 1)" == 1 ]]; then
@@ -540,6 +555,7 @@ show_status() {
   echo "Backups"
   backup_summary "Configuration" "$(get_setting CFG_OUT_DIR /var/backups/bc250-llm-server/config)" 'owui-config-*.tar.gz'
   backup_summary "Identity" "$(get_setting USERS_OUT_DIR /var/backups/bc250-llm-server/users)" 'owui-users-*.sql.gz'
+  backup_summary "Documents" "$(get_setting DOCS_OUT_DIR /var/backups/bc250-llm-server/documents)" 'bc250-documents-*.tar.gz' 
   echo "  Local backups contain private office data and do not protect against failure of this disk."
 }
 
@@ -580,19 +596,21 @@ preflight_prune() {
 run_selected() {
   require_root
   ensure_config
+  local failed=0
   case "${1:-}" in
-    backup)
-      run_task backup-config
-      run_task backup-users
+    backup|all)
+      # Independent backup categories must run even if one fails.
+      run_task backup-config || failed=1
+      run_task backup-users || failed=1
+      run_task backup-documents || failed=1
+      if [[ "$1" == all ]]; then
+        if preflight_prune; then run_task prune-uploads || failed=1; else failed=1; fi
+      fi
       ;;
-    prune) preflight_prune && run_task prune-uploads ;;
-    all)
-      run_task backup-config
-      run_task backup-users
-      preflight_prune && run_task prune-uploads
-      ;;
-    *) echo "ERROR: run requires backup, prune or all." >&2; usage >&2; exit 2 ;;
+    prune) preflight_prune && run_task prune-uploads || failed=1 ;;
+    *) echo "ERROR: run requires backup, prune or all." >&2; usage >&2; return 2 ;;
   esac
+  ((failed == 0))
 }
 
 show_contract() {
@@ -633,7 +651,7 @@ request_companion_shutdown() {
   # path calls the same helper directly so it can carry one exact SSH exemption;
   # copy only the safe-power settings instead of sourcing the private config as
   # shell code or leaking unrelated values such as the Open WebUI API key.
-  safe_power_ports="$(get_setting SAFE_POWER_PORTS '22 80 443 3000 11434 11435 11436 11437')"
+  safe_power_ports="$(get_setting SAFE_POWER_PORTS '22 80 443 3000 8090 11434 11435 11436 11437')"
   night_power_action="$(get_setting NIGHT_POWER_ACTION poweroff)"
   require_wol="$(get_setting REQUIRE_WOL 0)"
 
@@ -660,8 +678,8 @@ clean_cache() {
 
 disable_all() {
   require_root
-  disable_units "${ALL_TIMERS[@]}" bc250-enable-wol.service
-  echo "Disabled maintenance, warm-up, power and Wake-on-LAN schedules. Configuration and data were retained."
+  disable_units "${ALL_TIMERS[@]}"
+  echo "Disabled maintenance, warm-up and power timers. Existing Wake-on-LAN configuration remains available for external wake requests."
 }
 
 main() {
