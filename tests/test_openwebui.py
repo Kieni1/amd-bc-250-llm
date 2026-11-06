@@ -509,7 +509,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         import json
 
         document = json.loads((ROOT / "models/model-profiles.json").read_text(encoding="utf-8"))
-        del document["profiles"]["exp-lfm3-1.7b-liquidai-q6-k"]
+        del document["profiles"]["exp-index-translate-9b-indexteam-q4-k-m"]
         with tempfile.TemporaryDirectory() as temporary:
             profile_path = Path(temporary) / "model-profiles.json"
             profile_path.write_text(json.dumps(document), encoding="utf-8")
@@ -519,7 +519,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 OPENWEBUI.ApiError, "missing qualification profiles"
             ):
                 OPENWEBUI.package_testing_model_policy(
-                    "exp-lfm3-1.7b-liquidai-q6-k"
+                    "exp-index-translate-9b-indexteam-q4-k-m"
                 )
 
     def test_testing_inventory_expands_normal_lanes_with_model_specific_policy(self) -> None:
@@ -529,36 +529,33 @@ class OpenWebUIStatusTests(unittest.TestCase):
             {
                 "main": [
                     "prod-qwen35-9b-unsloth-q6-k:latest",
-                    "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest",
                     "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest",
-                    "exp-minicpm-v47-1b-openbmb-q4-k-m:latest",
-                    "exp-lfm3-1.7b-liquidai-q6-k:latest",
+                    "exp-qwen35-9b-llmfan46-heretic-q6-k:latest",
+                    "exp-glm-ocr-ggml-q8-0:latest",
+                    "exp-index-translate-9b-indexteam-q4-k-m:latest",
                 ],
                 "task": ["task-extra:latest"],
             },
         )
         models = {model["id"]: model for model in effective["models"]}
-        q36 = models["exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"]
-        self.assertTrue(q36["meta"]["hidden"])
-        self.assertFalse(q36["meta"]["bc250_ordinary_user_visible"])
-        self.assertEqual(OPENWEBUI.desired_access_grants(q36), [])
         xxs = models["exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"]
         self.assertFalse(xxs["meta"]["hidden"])
         self.assertTrue(xxs["meta"]["bc250_ordinary_user_visible"])
         self.assertEqual(OPENWEBUI.desired_access_grants(xxs), [REQUIRED_READ])
         self.assertEqual(xxs["meta"]["bc250_qualification"]["profile_role"], "experimental-deployability")
-        minicpm = models["exp-minicpm-v47-1b-openbmb-q4-k-m:latest"]
-        self.assertTrue(minicpm["meta"]["capabilities"]["vision"])
-        self.assertTrue(minicpm["meta"]["capabilities"]["ocr"])
-        self.assertTrue(minicpm["meta"]["capabilities"]["file_context"])
-        self.assertFalse(minicpm["meta"]["capabilities"]["builtin_tools"])
+        ocr = models["exp-glm-ocr-ggml-q8-0:latest"]
+        self.assertTrue(ocr["meta"]["capabilities"]["vision"])
+        self.assertTrue(ocr["meta"]["capabilities"]["ocr"])
+        self.assertTrue(ocr["meta"]["capabilities"]["file_context"])
+        self.assertFalse(ocr["meta"]["capabilities"]["builtin_tools"])
         self.assertEqual(
-            minicpm["meta"]["bc250_qualification"]["intended_role"],
-            "document-vision-ocr-challenger",
+            ocr["meta"]["bc250_qualification"]["intended_role"],
+            "ocr",
         )
-        lfm3 = models["exp-lfm3-1.7b-liquidai-q6-k:latest"]
-        self.assertFalse(lfm3["meta"]["capabilities"]["vision"])
-        self.assertNotIn("think", lfm3["params"].get("custom_params", {}))
+        translation = models["exp-index-translate-9b-indexteam-q4-k-m:latest"]
+        self.assertFalse(translation["meta"]["capabilities"]["vision"])
+        self.assertNotIn("think", translation["params"].get("custom_params", {}))
+        self.assertNotIn("exp-qwen35-9b-llmfan46-heretic-q6-k:latest", models)
         task = models["task-extra:latest"]
         self.assertEqual(task["meta"]["bc250_lane"], "task")
         self.assertFalse(task["meta"]["capabilities"]["builtin_tools"])
@@ -638,7 +635,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
 
         misplaced_policy = copy.deepcopy(document)
         q36 = misplaced_policy["testing_model_policies"][
-            "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+            "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"
         ]
         q36["think"] = q36["custom_params"].pop("think")
         with self.assertRaisesRegex(OPENWEBUI.ApiError, "under custom_params"):
@@ -646,7 +643,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
 
         unknown_policy_param = copy.deepcopy(document)
         q36 = unknown_policy_param["testing_model_policies"][
-            "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+            "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"
         ]
         q36["num_ctx"] = 16_384
         with self.assertRaisesRegex(OPENWEBUI.ApiError, "under custom_params"):
@@ -655,7 +652,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
         for invalid_visibility in ("false", None, 0, 1):
             malformed_visibility = copy.deepcopy(document)
             q36 = malformed_visibility["testing_model_policies"][
-                "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest"
+                "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest"
             ]
             q36["ordinary_user_visible"] = invalid_visibility
             with (
@@ -803,7 +800,7 @@ class OpenWebUIStatusTests(unittest.TestCase):
 
     def test_package_managed_private_testing_model_removes_only_public_read(self) -> None:
         desired = OPENWEBUI.auto_visible_model_record(
-            "exp-qwen36-35b-a3b-unsloth-ud-iq3-s:latest",
+            "exp-qwen38-27b-ista-gsq-rco-iq3-xxs:latest",
             "main",
             {"ordinary_user_visible": False},
         )

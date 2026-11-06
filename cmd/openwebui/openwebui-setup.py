@@ -23,6 +23,7 @@ if (_COMMAND_ROOT / "model_contract.py").is_file() and str(_COMMAND_ROOT) not in
 from model_contract import (
     ModelContractError,
     normalize_model_id,
+    validate_testing_visibility_policies,
 )
 from model_contract import (
     model_contract as _package_model_contract,
@@ -31,6 +32,8 @@ from model_contract import (
 DEFAULT_URL = "http://127.0.0.1:3000"
 DEFAULT_MODELS = Path("/usr/share/bc250-llm-server/openwebui/models.json")
 SOURCE_MODELS = Path(__file__).resolve().parents[2] / "config/openwebui/models.json"
+DEFAULT_RETIRED_MODELS = Path("/usr/share/bc250-llm-server/model-management/retired-models.json")
+SOURCE_RETIRED_MODELS = Path(__file__).resolve().parents[2] / "models/retired-models.json"
 DEFAULT_DESIRED = Path("/usr/share/bc250-llm-server/openwebui/desired-state.json")
 SOURCE_DESIRED = Path(__file__).resolve().parents[2] / "config/openwebui/desired-state.json"
 DEFAULT_FUNCTIONS = Path("/usr/share/bc250-llm-server/openwebui/functions.json")
@@ -62,7 +65,15 @@ _DISCOVERED_MODEL_CACHE: dict[str, list[str]] | None = None
 def desired_file() -> Path:
     override = os.environ.get("BC250_OWUI_DESIRED_STATE")
     if override:
-        return Path(override)
+        path = Path(override)
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeError(f"Open WebUI desired-state override must be a regular non-symlink file: {path}")
+        info = path.stat()
+        if info.st_mode & 0o022:
+            raise RuntimeError(f"Open WebUI desired-state override must not be group/world writable: {path}")
+        if os.geteuid() == 0 and info.st_uid != 0:
+            raise RuntimeError(f"Open WebUI desired-state override must be root-owned when running as root: {path}")
+        return path
     if DEFAULT_DESIRED.is_file():
         return DEFAULT_DESIRED
     return SOURCE_DESIRED
@@ -167,6 +178,10 @@ def load_models() -> dict[str, Any]:
     if not isinstance(policies, dict):
         raise ApiError(f"invalid testing_model_policies in {path}")
     validate_model_request_policy_shape(data)
+    try:
+        validate_testing_visibility_policies(policies)
+    except ModelContractError as exc:
+        raise ApiError(str(exc)) from exc
     return data
 
 
@@ -426,15 +441,42 @@ def auto_visible_model_record(
     return record
 
 
+def retired_package_model_ids() -> set[str]:
+    """Never auto-publish old package identities still installed before opt-in purge.
+
+    Retirement does not delete provider blobs or Ollama registrations. Ignore old
+    registrations when deriving Open WebUI test visibility; any formerly auto-managed
+    records are reconciled through the normal stale-record cleanup after apply.
+    """
+    source = SOURCE_RETIRED_MODELS if SOURCE_RETIRED_MODELS.is_file() else DEFAULT_RETIRED_MODELS
+    try:
+        content = json.loads(source.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ApiError(f"could not load package retired-model registry {source}: {exc}") from exc
+    rows = content.get("models") if isinstance(content, dict) else None
+    if not isinstance(rows, list):
+        raise ApiError(f"invalid package retired-model registry {source}")
+    result = set()
+    for item in rows:
+        name = item.get("name") if isinstance(item, dict) else None
+        if not isinstance(name, str) or not name:
+            raise ApiError(f"invalid retired model entry in {source}")
+        result.add(normalize_model_id(name))
+    return result
+
+
 def effective_model_document(
     document: dict[str, Any], inventory: dict[str, list[str]] | None = None
 ) -> dict[str, Any]:
     models = [dict(model) for model in require_list(document.get("models"), "model records")]
     known = {str(model.get("id")) for model in models}
     policies = testing_model_policies(document)
+    retired = retired_package_model_ids()
     lanes = discover_normal_provider_models() if inventory is None else inventory
     for lane in ("main", "task"):
         for model_id in lanes.get(lane, []):
+            if normalize_model_id(model_id) in retired:
+                continue
             if model_id in known:
                 continue
             exposure, policy = merged_testing_model_policy(model_id, policies)

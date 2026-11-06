@@ -107,6 +107,24 @@ if [[ -n "$OWUI_TOKEN_FILE" ]]; then
   export OWUI_API_KEY
 fi
 
+# One resolution of the Open WebUI desired state for every check below. An
+# explicit override must be safe and readable; it never falls back silently.
+DESIRED_STATE_FILE="${BC250_OWUI_DESIRED_STATE:-/usr/share/bc250-llm-server/openwebui/desired-state.json}"
+if [[ -n "${BC250_OWUI_DESIRED_STATE:-}" ]]; then
+  if [[ -L "$DESIRED_STATE_FILE" || ! -f "$DESIRED_STATE_FILE" || ! -r "$DESIRED_STATE_FILE" ]]; then
+    echo "ERROR: BC250_OWUI_DESIRED_STATE must be a readable regular non-symlink file: $DESIRED_STATE_FILE" >&2
+    exit 2
+  fi
+  desired_mode="$(stat -c %a -- "$DESIRED_STATE_FILE")" || exit 2
+  desired_owner="$(stat -c %u -- "$DESIRED_STATE_FILE")" || exit 2
+  if (( (8#$desired_mode & 022) != 0 || desired_owner != 0 )); then
+    echo "ERROR: desired-state override must be root-owned and not group/world writable: $DESIRED_STATE_FILE" >&2
+    exit 2
+  fi
+elif [[ ! -r "$DESIRED_STATE_FILE" ]]; then
+  DESIRED_STATE_FILE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
+fi
+
 finish_section() {
   ((SUMMARY)) || return 0
   [[ -n "$CURRENT_SECTION" ]] || return 0
@@ -592,12 +610,15 @@ fi
 if ((agent_active == 0)); then
   if ((task_lane_active)); then
     task_tags="$(curl -fsS http://127.0.0.1:11435/api/tags 2>/dev/null || true)"
-    if [[ -n "$task_tags" ]] && jq -e --arg model "task-lfm25-1.2b-instruct-liquidai-q6-k" \
+    # The package desired state, not an independently copied literal, owns the
+    # dedicated task-lane model identity.
+    desired_task_model="$(jq -r '.task.TASK_MODEL // empty | sub(":latest$"; "")' "$DESIRED_STATE_FILE" 2>/dev/null || true)"
+    if [[ -n "$desired_task_model" && -n "$task_tags" ]] && jq -e --arg model "$desired_task_model" \
         'any(.models[]?; (.name | sub(":latest$"; "")) == $model)' \
         <<< "$task_tags" >/dev/null 2>&1; then
       ok "default Open WebUI task model is registered on dedicated task Ollama"
     else
-      bad "default Open WebUI task model is not registered on dedicated task Ollama :11435"
+      bad "desired Open WebUI task model (${desired_task_model:-unavailable}) is missing on task Ollama :11435, or desired state is unreadable"
     fi
   else
     skipped "task model registration unavailable because ollama-task.service is inactive"
@@ -736,10 +757,7 @@ else
 fi
 
 section "Managed documents"
-desired_state="${BC250_OWUI_DESIRED_STATE:-/usr/share/bc250-llm-server/openwebui/desired-state.json}"
-if [[ ! -r "$desired_state" ]]; then
-  desired_state="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/../../config/openwebui/desired-state.json"
-fi
+desired_state="$DESIRED_STATE_FILE"
 rag_embedding_model="$(jq -r '.embedding.RAG_EMBEDDING_MODEL // empty' "$desired_state" 2>/dev/null || true)"
 rag_embedding_url="$(jq -r '.embedding.ollama_config.url // empty' "$desired_state" 2>/dev/null || true)"
 rag_extraction_engine="$(jq -r '.rag.CONTENT_EXTRACTION_ENGINE // empty' "$desired_state" 2>/dev/null || true)"

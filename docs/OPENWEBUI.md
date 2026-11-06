@@ -12,12 +12,11 @@ The package uses two layers deliberately:
    small local/offline application-policy subset owned by the appliance;
    `bc250 advanced openwebui` applies it through supported administrator APIs.
 
-The selected `0.20.0-4` SOURCE defines the canonical Documents/RAG default as
+The frozen `0.20.0-4` SOURCE introduced, and the `0.20.0-5` SOURCE carries forward, the canonical Documents/RAG default as
 **dense Jina v5 small / token chunks 1500 with 200 overlap / TOP_K=6 /
 threshold 0**, with Gemma still generating answers. `TOP_K` is a retrieval
 limit, not a guarantee that every question returns six chunks. The accepted
-`0.20.0-3` RPM retains K4; K6 becomes the installed package default only after
-the new exact candidate is built, installed and qualified. `bc250 advanced openwebui apply` converges the
+`0.20.0-3` RPM retains K4; the K6 setting is **not installed by updating these docs**. It becomes the installed package default only after a finalized `0.20.0-5` RPM is selected, installed and qualified. `bc250 advanced openwebui apply` converges the
 package-owned retrieval settings, including TOP_K; changing those values
 only in the Open WebUI administrator UI is reported as drift, not a persistent
 package exception. A deliberately supplied `BC250_OWUI_DESIRED_STATE` file
@@ -193,8 +192,10 @@ Open WebUI can inject built-in knowledge/chat tools into native-tool-capable mod
 metadata disables them. The package therefore makes the role boundary explicit:
 
 - `Office - Standard`, `Office - General / Higher Quality`, `Office - Advanced Structured`,
-  `Office - Deep Reasoning` and both translation roles disable built-in tools. They answer ordinary questions from model knowledge and
-  still accept pre-injected/attached file context.
+  `Office - Deep Reasoning` disable built-in tools and retain file context for user-provided tasks.
+  Both translation roles disable tools **and file context**: paste the full source text into the
+  message. The integrity filter cannot verify attached/RAG-retrieved chunks and refuses such input,
+  avoiding silent partial translation of a long document.
 - `Office - Documents / RAG` keeps built-in retrieval enabled, but disables unrelated chat-history,
   notes, web, automation and similar tool categories. Knowledge retrieval is therefore concentrated in
   the dedicated document role instead of being silently attempted by general chat roles.
@@ -279,7 +280,12 @@ Both use the exact installed `openwebui/prompts/translation-explicit-direction-v
 prompt, `max_tokens=2048`, and leave `think` unspecified. The package-owned non-global
 `bc250_translation_direction` Filter prepends only the tested DE→FR or FR→DE wrapper to
 the current text user message. Its post-generation `outlet()` performs the bounded modality/literal
-integrity check. DEVICE closure now confirms end-to-end withholding for recommendation→obligation,
+integrity check. The literal check also compares calendar dates, minute-bearing clock times and the
+remaining plain numbers (article numbers, durations, counts, amounts without a currency code) as
+multisets. It accepts equivalent DE/FR renderings such as `14.30 Uhr`/`14h30`, `1. Juli`/`1er juillet`,
+`15. Jan. 2027`/`15 janvier 2027` and `1'200`/`1200`. A number written out in words in one language is
+withheld conservatively. The filter cannot see the model's finish reason, so a length-truncated
+translation is detected only by the benchmark path, not at runtime. DEVICE closure now confirms end-to-end withholding for recommendation→obligation,
 negated-recommendation/temporal-polarity loss, and prohibition→no-obligation weakening. Package qualification follows direct `/api/chat/completions` with
 `/api/chat/completed` before scoring the final assistant message, because tagged Open WebUI releases
 do not rewrite the direct completion HTTP response with outlet-filter changes.
@@ -357,7 +363,7 @@ model and 128-token tag budget are unchanged.
 The dedicated embedding lane uses Jina on `11437`, a 10-minute Ollama keepalive,
 batch size 1 and asynchronous embedding disabled. The reviewed retrieval baseline
 remains token splitting, 1500-token chunks, 200-token overlap, Markdown-header
-splitting, Top K 4, hybrid search off and Tika extraction. Open WebUI is explicitly
+splitting, **Top K 6**, hybrid search off and Tika extraction. Open WebUI is explicitly
 set to `TIKA_SERVER_VERSION=4` so it uses the Tika 4 API; smoke-test representative
 office/PDF extraction after this major Tika refresh. Exact-device testing with genuine LibreOffice-authored DOCX files confirms that Tika 4 serializes real Word bullets as middle-dot-prefixed lines (`· item`) while preserving heading structure, table Markdown, list ordering and list/table facts through Open WebUI extraction and Documents retrieval. Treat this as a Tika 4 Markdown serialization characteristic; no package-side list-marker rewrite is applied.
 
