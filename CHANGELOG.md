@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.20.0-5 - 2026-11-06
+
+- Carry forward the frozen 0.20.0-4 K6 Documents/RAG and evaluator changes without retroactively treating that candidate as BUILD/DEVICE accepted. `0.20.0-3` remains the accepted DEVICE predecessor.
+- Harden translation integrity, managed document revision/Knowledge cleanup, model-source and visibility/required classification workflows, and Agent/warmup/profile/safe-power behavior. Preserve production model-role defaults and frozen MTP runtime.
+- Prune redundant experiment identities without deleting installed models; stage optional LFM3 and role-specific comparison models. No model is promoted without DEVICE evidence.
+- Add fail-closed Knowledge-aware upload pruning, verified managed-document backups and optional Pi export, safer SQLite recovery and Pi pull/shutdown/readiness examples. Off-device backup, restored-secret recovery, real WOL and shutdown policy need DEVICE validation.
+- Synchronize current operator/development/frozen-component documentation.
+- Replace the Pi backup pull example with a mirror plus hardlinked dated snapshots. Pi storage now grows with distinct archives instead of retention × the BC-250 set. An archive whose sidecar is not yet published is skipped rather than failing the pull. Ship Pi `bc250-pull-backups` (weekdays 18:20) and optional `bc250-request-shutdown` units as examples.
+- Stage backups outside the read-only export scopes, publish each sidecar last and clean up stale stages.
+- Corpus backups now:
+  - check free space;
+  - skip an unchanged corpus after re-verifying the newest archive;
+  - retry when documents change during the archive.
+- Prune dry runs now read the same Knowledge inventory as real runs, so the reviewed plan matches the deletions.
+- Remove the unused share copy of the Ollama profiles.
+- The installer verification now includes the documents backup timer.
+- Upgrades still do not enable new maintenance timers, which is accepted during development (DEC-054). After upgrading, rerun `sudo bc250 maintenance setup` to enable `owui-backup-documents.timer`.
+- Secrets escrow remains a documented manual step.
+- Add hermetic behaviour tests for:
+  - the config backup→restore round trip;
+  - the Pi pull;
+  - corpus backup and restore;
+  - prune dry-run fidelity;
+  - installer/contract baseline equivalence;
+  - timer-list agreement.
+- Deferred findings are listed in `development/OPEN-FINDINGS.md`.
+- SOURCE release only: the authoritative GitHub RPM BUILD and exact-RPM DEVICE acceptance are separate gates. `0.20.0-3` remains the last DEVICE-accepted package.
+
 ## 0.20.0-4 - 2026-11-05
 
 - Promote the package-owned Open WebUI Documents/RAG default from dense K4 to dense K6, keeping Gemma, Jina v5 small, 1500/200 token chunking, threshold zero and all non-RAG roles unchanged. Qualification on the exact installed RPM remains outstanding.

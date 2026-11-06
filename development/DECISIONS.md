@@ -1245,3 +1245,54 @@ Qwen Advanced remains `think=true`, `presence_penalty=1.5` with the existing `te
 **Evaluator scope:** Correct confirmed SOURCE numeric/identifier false matches and completion/strict-format false passes with case-specific checks and preservation of raw evidence. Do not use provisional Phase-C office-model scoring to change production models or thinking/output-budget settings. DE/FR remain co-primary; English remains the secondary office-quality control.
 
 **Release boundary:** SOURCE has been prepared under `0.20.0-4`. GitHub/Fedora 44 selected BUILD and exact-RPM DEVICE acceptance remain separate and are not yet claimed.
+
+## DEC-053 — Synchronize 0.20.0-5 operator guidance without release promotion (OPEN WIP, 2026-11-06)
+
+**Status:** DOCUMENTATION-ONLY OPEN WIP; not SOURCE release finalization, BUILD or DEVICE acceptance.
+
+**Decision:** `0.20.0-3` remains the last DEVICE-accepted package. The previous `0.20.0-4` SOURCE and evidence remain frozen and historical. The planned next RPM is `0.20.0-5`; its metadata bump, authoritative GitHub RPM and exact DEVICE trials have not yet been performed. Current docs may describe implemented WIP source features but must distinguish those from installed proof. Historical release/test/decision records remain unchanged.
+
+**Boundary:** Frozen Agent/MTP READMEs receive bounded documentation-only refreezes. This does not authorize executable changes, model promotion or runtime qualification. Maintenance browser-activity shutdown policy stays conservative until the owner decides; real Pi/WOL/backup restore evidence remains open.
+
+## DEC-052 — Prune inactive model controls and qualify role-specific replacements (OPEN WIP, 2026-11-05)
+
+**Status:** ACTIVE WIP DECISION, not SOURCE/BUILD/DEVICE release evidence.
+**Decision:** Preserve all production roles. Retire redundant experiment identities, the old
+Google 12B naive Q4 and legacy Qwen2.5 coding Agent; keep only one ISTA 27B quant.
+Retain OCR leader/alternative and narrowly scoped DE/FR translation/structured controls.
+Stage official LFM3 1.7B as a **non-default task-lane** candidate, Unsloth Gemma 12B QAT
+UD as the Documents/RAG candidate and two *admin-only* Heretic controls. Use the
+existing guarded, case-based DEVICE funnel rather than leaderboards for promotion.
+
+**Licensing boundary:** Jina v5 small carries a CC BY-NC 4.0 restriction; commercial
+products need proper authorization or a qualified/reindexed Apache-2.0 alternative.
+LFM Open License v1.0 requires review against deployment circumstances.
+
+**Safe retirement:** catalog removal is not uninstall/delete. The live retirement registry
+records exact old identities and source paths; `purge-retired` remains confirmation-gated.
+Archived Modelfiles and previously accepted 0.20.0-3 DEVICE evidence are not rewritten.
+
+**Unresolved:** Apertus 1.5 *instruct* GGUF/Vulkan verification; model trials, actual
+memory, throughput, licensing clearance and any future production promotion require
+separate gates. This decision does not thaw MTP or maintenance components.
+
+## DEC-054 — Finalize 0.20.0-5 SOURCE; accept B2 for development, secrets escrow documentation-only (2026-11-06)
+
+**Status:** SOURCE FINALIZED for `0.20.0-5`. The authoritative GitHub/Fedora 44 BUILD and exact-RPM DEVICE acceptance are pending and not claimed.
+
+**Decision:**
+- Release the cumulative 0.20.0-5 SOURCE after the full review fixes:
+  - B1: Pi mirror with hardlinked snapshots, skipping incomplete pairs, units shipped;
+  - N1: faithful prune dry run;
+  - N2/N3: backup staging, space check, unchanged-skip and retry;
+  - N5, N6 and N11;
+  - hermetic behaviour tests.
+- **B2 accepted during development (owner):** RPM upgrades do not enable newly added maintenance timers. The operator reruns `bc250 maintenance setup`. This recurs for every future timer, so it is noted at `maintenance.sh` `BACKUP_TIMERS` and must be solved before v1.0.
+- **B3, documentation-only (owner):** `WEBUI_SECRET_KEY` and the package secrets are escrowed manually off-device as documented. This supersedes the MC3 variant with a root-only local secrets backup.
+- Remaining findings are recorded in `development/OPEN-FINDINGS.md`.
+
+**Boundary:** no model promotion and no change to production model roles.
+- `maintenance-companion` received a bounded thaw and refreeze.
+- `coding-agent`, `mtp` and `ocr` stay frozen and unchanged.
+- `0.20.0-3` remains the last DEVICE-accepted package.
+

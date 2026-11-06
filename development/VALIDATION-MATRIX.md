@@ -1,12 +1,23 @@
-# BC-250 validation matrix — accepted 0.20.0-3 and selected 0.20.0-4 SOURCE
+# BC-250 validation matrix — accepted 0.20.0-3, frozen 0.20.0-4 SOURCE, finalized 0.20.0-5 SOURCE
 
-Current release identity: `bc250-llm-server-0.20.0-4` — selected SOURCE candidate; GitHub/Fedora 44 BUILD and exact-RPM DEVICE acceptance are pending.
+Current release identity: `bc250-llm-server-0.20.0-5` — **SOURCE finalized** (DEC-054) and recorded in VERSION/spec/release-contract/WORKBENCH-STATE. It is not yet built, selected or DEVICE-accepted. The earlier `0.20.0-4` SOURCE is frozen and superseded without BUILD/DEVICE acceptance.
 
 The exact `0.20.0-3` predecessor is SOURCE/BUILD/DEVICE accepted. Its acceptance established upgrade from accepted 1.13, first and second convergence, reboot persistence, health/verify (62 OK, 0 WARN/FAIL), canonical topology and normal-operator Tika smoke. No replay of historical 1.13→0.20.0-3 qualification is required. A changed candidate requires new BUILD/DEVICE evidence.
 
-The 0.20.0-4 SOURCE scope is intentionally narrow: promote the Open WebUI Documents/RAG dense K4 default to K6, align campaign-control audit with K6, and harden identified use-case numeric/identifier, strict JSON and completion evaluator checks. Retain Gemma/Jina, 1500/200, threshold 0, model roles, dependencies and hardware policy. For SOURCE, use focused affected tests, preflight/static gates and package-critical checks; GitHub is the authority for the SRPM→RPM build. For DEVICE, prove 0.20.0-3→exact candidate, convergence/idempotence, reboot, effective K6, focused external DE/FR RAG, changed-oracle regressions and normal health/topology. Phase-C office-model research and historical retrieval arm experiments are not release gates.
+The **historical 0.20.0-4 SOURCE scope** was intentionally narrow: promote the Open WebUI Documents/RAG dense K4 default to K6, align campaign-control audit with K6, and harden identified use-case numeric/identifier, strict JSON and completion evaluator checks. Retain Gemma/Jina, 1500/200, threshold 0, model roles, dependencies and hardware policy. For SOURCE, use focused affected tests, preflight/static gates and package-critical checks; GitHub is the authority for the SRPM→RPM build. For DEVICE, prove 0.20.0-3→exact candidate, convergence/idempotence, reboot, effective K6, focused external DE/FR RAG, changed-oracle regressions and normal health/topology. Phase-C office-model research and historical retrieval arm experiments are not release gates.
 
-The rows below retain earlier qualification context; the release-specific scope above overrides obsolete future-tense historical items.
+The rows below retain earlier qualification context, including now-historical 0.20.0-4 next-gate descriptions. They do not authorize BUILD/DEVICE acceptance or replace the current `0.20.0-5` gate table immediately below.
+
+| 0.20.0-5 gate | Current SOURCE state | Evidence still required |
+|---|---|---|
+| Release identity | spec/contract/workbench bumped to Release: 5 after SOURCE finalization | GitHub `workflow_dispatch` selected SRPM→RPM, then exact-device upgrade from accepted 0.20.0-3 |
+| Product baseline | K6 RAG, guarded translation, evaluator hardening and managed-document supersession/ingest fixes | Exact-device RAG and DE/FR translation probes, supersession, permission/credential checks |
+| Models | Retired redundant experiments, retained current role defaults, staged optional LFM3/Gemma/Index/TIR/Deep/Heretic candidates | Verify actual downloads/Vulkan/resource envelope; qualify before any production promotion |
+| Topology | Agent-safe warmup/profile and safe power, required-model/visibility workflow corrections | Verify Agent session persistence, normal topology and MTP port/safe-power behavior |
+| Maintenance | Knowledge-aware fail-closed prune with matching dry run; documents backup (space check, unchanged-skip, retry) and Pi export; staging outside export scopes; SQLite-safe recovery; Pi mirror/snapshot pull and units; hermetic round-trip tests | Validate Open WebUI API pagination, real Pi rsync/SSH/WOL, hardlinked snapshots and replacement restore; rerun setup after upgrade (B2); settle idle browser policy; see `OPEN-FINDINGS.md` DEVICE list |
+| SOURCE/BUILD/DEVICE | SOURCE finalized; local preflight/package/scope/guidance gates pass on the final bytes | Blocking CI lint/rpmlint with CI owner, authoritative BUILD and exact RPM DEVICE outstanding |
+
+**Historical matrix (retain for provenance; future-tense 0.20.0-4 claims below are not current instructions):**
 
 | Area | Current state | Next evidence |
 |---|---|---|
