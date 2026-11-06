@@ -61,8 +61,15 @@ if [[ "${CONFIRM_RESTORE:-}" != "YES" ]]; then
 fi
 
 install -d -m 0700 "$ROLLBACK_DIR"
-sqlite3 "$DB" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1 || true
-rm -f -- "$DB-wal" "$DB-shm"
+# A failing or busy checkpoint must never be followed by removal of committed WAL data.
+checkpoint="$(sqlite3 "$DB" 'PRAGMA wal_checkpoint(TRUNCATE);')" || {
+  echo "ERROR: could not checkpoint Open WebUI WAL; refusing identity restore." >&2
+  exit 1
+}
+[[ "${checkpoint%%|*}" == 0 ]] || {
+  echo "ERROR: Open WebUI WAL checkpoint remained busy; refusing identity restore." >&2
+  exit 1
+}
 stamp="$(date +%F_%H%M%S)"
 pre="$ROLLBACK_DIR/webui.db.pre-users-restore-$stamp"
 sqlite3 "$DB" ".timeout 10000" ".backup '$pre'"
@@ -75,7 +82,7 @@ chmod --reference="$DB" "$pre"
 
 rollback_db(){
   echo "Restoring pre-restore snapshot: $pre" >&2
-  rm -f -- "$DB-wal" "$DB-shm"
+  # SQLite backup restores the database safely; do not unlink WAL/SHM files.
   if ! sqlite3 "$pre" ".timeout 10000" ".backup '$DB'"; then
     echo "CRITICAL: automatic database rollback failed. Keep Open WebUI stopped." >&2
     return 1
@@ -137,7 +144,14 @@ if (( new_fk_count > 0 )); then
   rollback_db || true
   exit 1
 fi
-sqlite3 "$DB" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1 || true
+checkpoint="$(sqlite3 "$DB" 'PRAGMA wal_checkpoint(TRUNCATE);')" || {
+  echo "ERROR: restored database could not checkpoint WAL. Keep Open WebUI stopped." >&2
+  exit 1
+}
+[[ "${checkpoint%%|*}" == 0 ]] || {
+  echo "ERROR: restored database WAL checkpoint remained busy. Keep Open WebUI stopped." >&2
+  exit 1
+}
 echo "Integrity: OK"
 echo "Baseline FK violations: $baseline_fk_count"
 echo "New FK violations: 0"

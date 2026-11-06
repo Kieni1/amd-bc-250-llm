@@ -6,19 +6,28 @@ umask 0077
 DATA="${OWUI_DATA:-/var/lib/open-webui}"
 DB="${OWUI_DB:-$DATA/webui.db}"
 OUT_DIR="${CFG_OUT_DIR:-/var/backups/bc250-llm-server/config}"
+EXPORT_USER="${BC250_BACKUP_EXPORT_USER:-bc250-backup-export}"
+EXPORT_GROUP="${BC250_BACKUP_EXPORT_GROUP:-bc250-backup-export}"
 KEEP="${KEEP_CONFIG:-${KEEP:-7}}"
 
 [[ "$KEEP" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: KEEP_CONFIG must be positive." >&2; exit 1; }
 [[ -d "$DATA" && -f "$DB" ]] || { echo "ERROR: Open WebUI data/DB missing." >&2; exit 1; }
 command -v sqlite3 >/dev/null || { echo "ERROR: install sqlite." >&2; exit 1; }
 
-if getent group bc250-backup-export >/dev/null 2>&1; then
-  install -d -m 0750 -o root -g bc250-backup-export "$OUT_DIR"
+if getent group "$EXPORT_GROUP" >/dev/null 2>&1; then
+  install -d -m 0750 -o root -g "$EXPORT_GROUP" "$OUT_DIR"
 else
   # Source-tree/direct execution fallback before package sysusers has created the reserved group.
   install -d -m 0700 "$OUT_DIR"
 fi
-tmpdir="$(mktemp -d)"
+# N3: stage beside, not inside, the read-only export scope (same filesystem, so
+# publication stays an atomic rename). Remove stages left by a killed run.
+STAGE_ROOT="${BC250_BACKUP_STAGE_DIR:-$(dirname -- "$OUT_DIR")/.stage}"
+[[ "$STAGE_ROOT" == /* && "$STAGE_ROOT" != / ]] || { echo "ERROR: unsafe backup stage directory: $STAGE_ROOT" >&2; exit 1; }
+install -d -m 0700 "$STAGE_ROOT"
+find "$STAGE_ROOT" "$OUT_DIR" -mindepth 1 -maxdepth 1 -type d -name '.backup-stage.*' -mmin +1440 \
+  -exec rm -rf -- {} + 2>/dev/null || true
+tmpdir="$(mktemp -d "$STAGE_ROOT/.backup-stage.XXXXXXXX")"
 trap 'rm -rf "$tmpdir"' EXIT
 stage="$tmpdir/stage"
 mkdir -m 0700 "$stage"
@@ -61,12 +70,16 @@ PY_VALIDATE
 
 stamp="$(date +%F_%H%M%S)"
 out="$OUT_DIR/owui-config-$stamp.tar.gz"
-mv "$archive_tmp" "$out"
-( cd "$OUT_DIR" && sha256sum "$(basename "$out")" > "$(basename "$out").sha256" )
-if id bc250-backup-export >/dev/null 2>&1; then
-  chgrp bc250-backup-export -- "$out" "$out.sha256"
-  chmod 0640 -- "$out" "$out.sha256"
+# Publish the archive first and its sidecar last: a Pi pull treats an archive
+# without a sidecar as still in progress and collects it next time.
+digest="$(sha256sum < "$tmpdir/archive.tar.gz" | cut -d' ' -f1)"
+printf '%s  %s\n' "$digest" "$(basename "$out")" > "$tmpdir/archive.tar.gz.sha256"
+if id "$EXPORT_USER" >/dev/null 2>&1; then
+  chgrp "$EXPORT_GROUP" -- "$tmpdir/archive.tar.gz" "$tmpdir/archive.tar.gz.sha256"
+  chmod 0640 -- "$tmpdir/archive.tar.gz" "$tmpdir/archive.tar.gz.sha256"
 fi
+mv -- "$tmpdir/archive.tar.gz" "$out"
+mv -- "$tmpdir/archive.tar.gz.sha256" "$out.sha256"
 mapfile -t old < <(ls -1t "$OUT_DIR"/owui-config-*.tar.gz 2>/dev/null | tail -n "+$((KEEP+1))")
 for f in "${old[@]}"; do rm -f -- "$f" "$f.sha256"; done
 printf 'Wrote and verified %s (%s)\n' "$out" "$(du -h "$out" | cut -f1)"

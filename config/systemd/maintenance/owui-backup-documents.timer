@@ -1,0 +1,10 @@
+[Unit]
+Description=Back up the BC-250 managed document library daily
+
+[Timer]
+OnCalendar=*-*-* 18:05:00
+Persistent=true
+Unit=owui-maintenance@backup-documents.service
+
+[Install]
+WantedBy=timers.target

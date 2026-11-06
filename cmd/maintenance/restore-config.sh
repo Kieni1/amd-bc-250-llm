@@ -5,10 +5,18 @@ set -Eeuo pipefail
 umask 0077
 DATA="${OWUI_DATA:-/var/lib/open-webui}"
 DB="${OWUI_DB:-$DATA/webui.db}"
-SRC="${1:?Usage: restore-config.sh <owui-config-*.tar.gz>}"
+SRC=""
 ROLLBACK_DIR="${CFG_ROLLBACK_DIR:-/var/backups/bc250-llm-server/rollback/config}"
 
-[[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; exit 1; }
+require_root() {
+  [[ ${EUID} -eq 0 ]] || { echo "ERROR: run with sudo." >&2; return 1; }
+}
+
+# Sourceable like restore-users.sh so the round trip can be tested hermetically.
+main() {
+[[ $# -eq 1 ]] || { echo "Usage: restore-config.sh <owui-config-*.tar.gz>" >&2; return 2; }
+SRC="$1"
+require_root || return $?
 [[ -d "$DATA" && "$DATA" != / ]] || { echo "ERROR: unsafe or missing OWUI_DATA: $DATA" >&2; exit 1; }
 [[ -r "$SRC" ]] || { echo "ERROR: backup not readable: $SRC" >&2; exit 1; }
 for cmd in sqlite3 tar python3 sha256sum; do
@@ -27,7 +35,8 @@ elif [[ "${ALLOW_UNVERIFIED_BACKUP:-0}" != 1 ]]; then
 fi
 tar -tzf "$SRC" >/dev/null
 
-tmpdir="$(mktemp -d)"
+install -d -m 0700 "$ROLLBACK_DIR"
+tmpdir="$(mktemp -d "$ROLLBACK_DIR/.restore-stage.XXXXXXXX")"
 trap 'rm -rf "$tmpdir"' EXIT
 stage="$tmpdir/stage"
 mkdir -m 0700 "$stage"
@@ -102,3 +111,8 @@ fi
 echo "Configuration restored. Preserved uploads/vector/cache. Rollback archive: $rollback"
 echo "Do not run restorecon on $DATA; the Podman :Z mount restores its private container label."
 echo "Start Open WebUI and verify administrator login, files, and RAG before deleting rollback data."
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi
