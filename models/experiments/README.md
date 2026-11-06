@@ -16,10 +16,15 @@ bc250 advanced benchmark
 ```
 
 Normal packaged discovery comes from `models/model-catalog.json`; each catalog entry points to a runtime-only `models/modelfiles/exp-*.Modelfile` template. Candidates that no
-longer have a plausible promotion path move to `models/modelfiles-retired/`; that
-directory is source-only and is not installed or discovered. In particular, the retired task candidate `exp-qwen38-4b-distill-empero-q6-k` and the later
+longer have a plausible promotion path are removed from active Modelfiles and entered in
+`models/retired-models.json`. `models/modelfiles-retired/` is an older, frozen source-only
+archive and is not installed, discovered or extended automatically. In particular, the retired task candidate `exp-qwen38-4b-distill-empero-q6-k` and the later
 `exp-qwen38-4b-empero-q6-k` general comparison are both retired now, but for different recorded
-reasons. Current compact general controls are Qwen3.5 4B, LFM3, Granite and Spark-X2.6.
+reasons. The remaining compact general wildcard is official Spark-X2.6. LFM3 is now a dedicated task-lane challenger; Qwen3.5 4B and Granite are retired from current experiments.
+
+For the current 10-model shortlist and exact role-specific DEVICE funnel, see the
+2026-11-05 OPEN WIP section of `MODELS.md`. Both Heretic models are admin-only; the
+Index-Translate 2B comparison is conditional on a 9B win.
 
 For new comparisons, use the current scripts documented in
 `docs/QUALITY-CHECKS.md`. Installation success is never promotion evidence: compare

@@ -46,6 +46,7 @@
       "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
+      "output_token_expectation": 3072,
       "owui_testing_exposure": "forbidden",
       "product_context_default": null,
       "profile_class": "agentic-experimental",
@@ -53,13 +54,13 @@
       "reasoning_request_policy": "agent-role-defined",
       "recommended": false,
       "residency_policy": "agent-mode-only",
-      "specialized": true,
-      "output_token_expectation": 3072
+      "specialized": true
     },
     "agentic-neohorse1-9b-uncensored-mradermacher-q4-k-m": {
       "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "uncensored-agentic-challenger",
+      "output_token_expectation": 3072,
       "owui_testing_exposure": "forbidden",
       "product_context_default": null,
       "profile_class": "agentic-experimental",
@@ -67,8 +68,7 @@
       "reasoning_request_policy": "agent-role-defined",
       "recommended": false,
       "residency_policy": "agent-mode-only",
-      "specialized": true,
-      "output_token_expectation": 3072
+      "specialized": true
     },
     "agentic-ornith15-9b-ornith-q5-k-m": {
       "agent_validation": "static-output-contract",
@@ -85,19 +85,6 @@
       "specialized": true
     },
     "agentic-qwable9b-empero-q6-k": {
-      "agent_validation": "static-output-contract",
-      "comparison_role": "agent",
-      "intended_role": "agentic-challenger",
-      "owui_testing_exposure": "forbidden",
-      "product_context_default": null,
-      "profile_class": "agentic-experimental",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "agent-role-defined",
-      "recommended": false,
-      "residency_policy": "agent-mode-only",
-      "specialized": true
-    },
-    "agentic-qwen25-coder7b-unsloth-q5-k-m": {
       "agent_validation": "static-output-contract",
       "comparison_role": "agent",
       "intended_role": "agentic-challenger",
@@ -136,7 +123,7 @@
       "residency_policy": "embedding-lane",
       "specialized": true
     },
-    "exp-gemma4-12b-google-qat-q4-0": {
+    "exp-gemma4-12b-unsloth-qat-ud-q4-k-xl": {
       "agent_validation": "not-applicable",
       "comparison_role": "documents-quality",
       "intended_role": "office-document-quality-challenger",
@@ -145,6 +132,19 @@
       "profile_class": "experimental-quality",
       "qualified_context_target": 16384,
       "reasoning_request_policy": "neutral-default",
+      "recommended": false,
+      "residency_policy": "experimental",
+      "specialized": false
+    },
+    "exp-gemma4-e4b-sc117-heretic-qat-q4-k-xl": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "office-generalist",
+      "intended_role": "uncensored-generalist-control",
+      "owui_testing_exposure": "forbidden",
+      "product_context_default": null,
+      "profile_class": "experimental-quality",
+      "qualified_context_target": 16384,
+      "reasoning_request_policy": "request-think-false",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": false
@@ -162,23 +162,11 @@
       "residency_policy": "experimental",
       "specialized": true
     },
-    "exp-granite42-3b-ibm-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "office-standard",
-      "intended_role": "general-office-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
     "exp-index-translate-2b-indexteam-q4-k-m": {
       "agent_validation": "not-applicable",
       "comparison_role": "translation-de-fr",
       "intended_role": "translation-efficiency-challenger",
+      "output_token_expectation": 2048,
       "owui_testing_exposure": "testing",
       "product_context_default": null,
       "profile_class": "translation-experimental",
@@ -186,13 +174,13 @@
       "reasoning_request_policy": "request-think-false",
       "recommended": false,
       "residency_policy": "experimental",
-      "specialized": true,
-      "output_token_expectation": 2048
+      "specialized": true
     },
     "exp-index-translate-9b-indexteam-q4-k-m": {
       "agent_validation": "not-applicable",
       "comparison_role": "translation-de-fr",
       "intended_role": "translation-quality-challenger",
+      "output_token_expectation": 2048,
       "owui_testing_exposure": "testing",
       "product_context_default": null,
       "profile_class": "translation-experimental",
@@ -200,73 +188,7 @@
       "reasoning_request_policy": "request-think-false",
       "recommended": false,
       "residency_policy": "experimental",
-      "specialized": true,
-      "output_token_expectation": 2048
-    },
-    "exp-lfm3-1.7b-atomicchat-uncensored-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "office-standard",
-      "intended_role": "uncensored-fast-office-control",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-lfm3-1.7b-liquidai-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "office-standard",
-      "intended_role": "fast-office-task-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-lfm3-vl-2b-liquidai-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "ocr-vision",
-      "intended_role": "document-vision-ocr-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "specialized-vision",
-      "qualified_context_target": 8192,
-      "reasoning_request_policy": "specialized",
-      "recommended": false,
-      "residency_policy": "experimental",
       "specialized": true
-    },
-    "exp-minicpm-v47-1b-openbmb-q4-k-m": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "ocr-vision",
-      "intended_role": "document-vision-ocr-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "specialized-vision",
-      "qualified_context_target": 8192,
-      "reasoning_request_policy": "specialized",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": true
-    },
-    "exp-nemotron35-bolt-e4b-nvidia-q4-k-m": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "documents-rag",
-      "intended_role": "documents-grounding-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "benchmark-think-on-off",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
     },
     "exp-ovisocr2-abiray-q8-0": {
       "agent_validation": "not-applicable",
@@ -281,55 +203,15 @@
       "residency_policy": "experimental",
       "specialized": true
     },
-    "exp-qwen35-4b-unsloth-q6-k": {
+    "exp-qwen35-9b-llmfan46-heretic-q6-k": {
       "agent_validation": "not-applicable",
-      "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning-challenger",
-      "owui_testing_exposure": "testing",
+      "comparison_role": "advanced-reasoning",
+      "intended_role": "uncensored-advanced-control",
+      "owui_testing_exposure": "forbidden",
       "product_context_default": null,
       "profile_class": "experimental-quality",
       "qualified_context_target": 32768,
       "reasoning_request_policy": "request-think-false",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-qwen35-9b-davidau-defiant-fable-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "advanced-reasoning",
-      "intended_role": "community-uncensored-advanced-control",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "benchmark-think-on-off",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-qwen35-9b-hauhaucs-uncensored-q6-k": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning-challenger",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "neutral-default",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-qwen38-27b-ista-gsq-rco-iq3-s": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "general-reasoning",
-      "intended_role": "general-reasoning",
-      "output_token_expectation": 3072,
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 8192,
-      "reasoning_request_policy": "request-think-true-quality-profile",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": false
@@ -344,19 +226,6 @@
       "profile_class": "experimental-deployability",
       "qualified_context_target": 8192,
       "reasoning_request_policy": "request-think-false",
-      "recommended": false,
-      "residency_policy": "experimental",
-      "specialized": false
-    },
-    "exp-spark-x26-4b-abenzerps-uncensored-iq3-m": {
-      "agent_validation": "not-applicable",
-      "comparison_role": "general-reasoning",
-      "intended_role": "community-uncensored-reasoning-wildcard",
-      "owui_testing_exposure": "testing",
-      "product_context_default": null,
-      "profile_class": "experimental-quality",
-      "qualified_context_target": 32768,
-      "reasoning_request_policy": "benchmark-thinking",
       "recommended": false,
       "residency_policy": "experimental",
       "specialized": false
@@ -430,6 +299,7 @@
       "agent_validation": "not-applicable",
       "comparison_role": "generalist",
       "intended_role": "office-generalist-implementation",
+      "output_token_expectation": 4096,
       "owui_testing_exposure": "curated",
       "product_context_default": 32768,
       "profile_class": "production-candidate",
@@ -437,8 +307,7 @@
       "reasoning_request_policy": "request-think-false-bounded-4096",
       "recommended": true,
       "residency_policy": "default",
-      "specialized": false,
-      "output_token_expectation": 4096
+      "specialized": false
     },
     "prod-qwen35-9b-unsloth-q6-k": {
       "agent_validation": "not-applicable",
@@ -520,6 +389,19 @@
       "recommended": true,
       "residency_policy": "task-lane",
       "specialized": true
+    },
+    "task-lfm3-1.7b-liquidai-q6-k": {
+      "agent_validation": "not-applicable",
+      "comparison_role": "openwebui-task",
+      "intended_role": "openwebui-task-challenger",
+      "owui_testing_exposure": "forbidden",
+      "product_context_default": null,
+      "profile_class": "experimental-task",
+      "qualified_context_target": 4096,
+      "reasoning_request_policy": "request-think-false",
+      "recommended": false,
+      "residency_policy": "task-lane-experimental",
+      "specialized": false
     }
   },
   "schema": 2

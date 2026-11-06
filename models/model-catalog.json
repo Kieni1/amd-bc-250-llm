@@ -290,47 +290,6 @@
         "revision": "latest"
       }
     },
-    "agentic-qwen25-coder7b-unsloth-q5-k-m": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation",
-          "agent"
-        ],
-        "features": [
-          "text-generation",
-          "tools"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": true
-      },
-      "category": "agentic",
-      "enabled": true,
-      "native_context_max": null,
-      "ownership": {
-        "registration": "bc250",
-        "source": "bc250",
-        "state": "bc250"
-      },
-      "provider": "ollama",
-      "runtime": {
-        "agent_prepare_required": true,
-        "lane": "agent",
-        "modelfile": "agentic-qwen25-coder7b-unsloth-q5-k-m.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf",
-        "local_path": "/var/lib/bc250-llm-server/gguf/agent/Qwen2.5-Coder-7B-Instruct-Q5_K_M.gguf",
-        "policy": "tracking",
-        "repository": "unsloth/Qwen2.5-Coder-7B-Instruct-GGUF",
-        "reproducibility": "tracking-ref",
-        "revision": "latest"
-      }
-    },
     "embed-jina-v5-small-retrieval-q4-k-m": {
       "capabilities": {
         "benchmark_kinds": [
@@ -349,6 +308,10 @@
       },
       "category": "embedding",
       "enabled": true,
+      "license": {
+        "id": "CC-BY-NC-4.0",
+        "use_note": "Non-commercial usage; commercial deployment requires separate Jina permission/license. Do not auto-promote Qwen: reindex and qualify first."
+      },
       "native_context_max": null,
       "ownership": {
         "registration": "bc250",
@@ -389,6 +352,10 @@
       },
       "category": "embedding",
       "enabled": true,
+      "license": {
+        "id": "Apache-2.0",
+        "use_note": "Commercial-license alternative to Jina; reindex and compare retrieval before switching."
+      },
       "native_context_max": null,
       "ownership": {
         "registration": "bc250",
@@ -411,7 +378,7 @@
         "revision": "latest"
       }
     },
-    "exp-gemma4-12b-google-qat-q4-0": {
+    "exp-gemma4-12b-unsloth-qat-ud-q4-k-xl": {
       "capabilities": {
         "benchmark_kinds": [
           "generation"
@@ -428,6 +395,10 @@
       },
       "category": "experiments",
       "enabled": true,
+      "license": {
+        "id": "Apache-2.0",
+        "use_note": "Unsloth QAT UD 12B GGUF; requires 16GB-appliance DEVICE memory/RAG qualification."
+      },
       "native_context_max": null,
       "ownership": {
         "registration": "bc250",
@@ -438,15 +409,58 @@
       "runtime": {
         "agent_prepare_required": false,
         "lane": "main",
-        "modelfile": "exp-gemma4-12b-google-qat-q4-0.Modelfile"
+        "modelfile": "exp-gemma4-12b-unsloth-qat-ud-q4-k-xl.Modelfile"
       },
       "source": {
         "expected_sha256": "",
-        "filename": "gemma-4-12b-it-qat-q4_0.gguf",
-        "local_path": "/var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-12b-google-qat-q4-0/gemma-4-12b-it-qat-q4_0.gguf",
+        "filename": "gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
+        "local_path": "/var/lib/bc250-llm-server/gguf/experiments/exp-gemma4-12b-unsloth-qat-ud-q4-k-xl/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf",
         "policy": "tracking",
-        "repository": "google/gemma-4-12B-it-qat-q4_0-gguf",
+        "repository": "unsloth/gemma-4-12B-it-qat-GGUF",
         "reproducibility": "tracking-ref",
+        "revision": "latest"
+      }
+    },
+    "exp-gemma4-e4b-sc117-heretic-qat-q4-k-xl": {
+      "capabilities": {
+        "benchmark_kinds": [
+          "generation"
+        ],
+        "features": [
+          "text-generation"
+        ],
+        "modalities": [
+          "text"
+        ],
+        "ocr": false,
+        "reasoning": "unsupported",
+        "tools": false
+      },
+      "category": "experiments",
+      "enabled": true,
+      "license": {
+        "id": "Apache-2.0",
+        "use_note": "Community Heretic-derived weights; validate source-card terms, provenance, safety and office accuracy before deployment."
+      },
+      "native_context_max": 131072,
+      "ownership": {
+        "registration": "bc250",
+        "source": "ollama",
+        "state": "provider"
+      },
+      "provider": "ollama-hf",
+      "runtime": {
+        "agent_prepare_required": false,
+        "lane": "main",
+        "modelfile": "exp-gemma4-e4b-sc117-heretic-qat-q4-k-xl.Modelfile"
+      },
+      "source": {
+        "expected_sha256": "",
+        "filename": "gemma-4-E4B-it-heretic-QAT-UD-Q4_K_XL.gguf",
+        "policy": "tracking",
+        "provider_ref": "hf.co/SC117/gemma-4-E4B-it-heretic-QAT-GGUF:UD-Q4_K_XL",
+        "repository": "SC117/gemma-4-E4B-it-heretic-QAT-GGUF",
+        "reproducibility": "provider-managed-tracking",
         "revision": "latest"
       }
     },
@@ -492,45 +506,6 @@
         "repository": "ggml-org/GLM-OCR-GGUF",
         "reproducibility": "provider-managed-tracking",
         "revision": "main"
-      }
-    },
-    "exp-granite42-3b-ibm-q6-k": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": null,
-      "ownership": {
-        "registration": "bc250",
-        "source": "bc250",
-        "state": "bc250"
-      },
-      "provider": "ollama",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-granite42-3b-ibm-q6-k.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "granite-4.2-3b-Q6_K.gguf",
-        "local_path": "/var/lib/bc250-llm-server/gguf/experiments/exp-granite42-3b-ibm-q6-k/granite-4.2-3b-Q6_K.gguf",
-        "policy": "tracking",
-        "repository": "ibm-granite/granite-4.2-3b-GGUF",
-        "reproducibility": "tracking-ref",
-        "revision": "latest"
       }
     },
     "exp-index-translate-2b-indexteam-q4-k-m": {
@@ -613,213 +588,6 @@
         "revision": "latest"
       }
     },
-    "exp-lfm3-1.7b-atomicchat-uncensored-q6-k": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": 262144,
-      "ownership": {
-        "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
-      },
-      "provider": "ollama-hf",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-lfm3-1.7b-atomicchat-uncensored-q6-k.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "LFM3-1.7B-Uncensored-AD-Q6_K.gguf",
-        "policy": "tracking",
-        "provider_ref": "hf.co/AtomicChat/LFM3-1.7B-Uncensored-GGUF:AD-Q6_K",
-        "repository": "AtomicChat/LFM3-1.7B-Uncensored-GGUF",
-        "reproducibility": "provider-managed-tracking",
-        "revision": "latest"
-      }
-    },
-    "exp-lfm3-1.7b-liquidai-q6-k": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": 262144,
-      "ownership": {
-        "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
-      },
-      "provider": "ollama-hf",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-lfm3-1.7b-liquidai-q6-k.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "LFM3-1.7B-Q6_K.gguf",
-        "policy": "tracking",
-        "provider_ref": "hf.co/LiquidAI/LFM3-1.7B-GGUF:Q6_K",
-        "repository": "LiquidAI/LFM3-1.7B-GGUF",
-        "reproducibility": "provider-managed-tracking",
-        "revision": "latest"
-      }
-    },
-    "exp-lfm3-vl-2b-liquidai-q6-k": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation",
-          "ocr"
-        ],
-        "features": [
-          "text-generation",
-          "vision",
-          "ocr"
-        ],
-        "modalities": [
-          "text",
-          "image"
-        ],
-        "ocr": true,
-        "ocr_profile": "lfm3-vl",
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": 131072,
-      "ownership": {
-        "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
-      },
-      "provider": "ollama-hf",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-lfm3-vl-2b-liquidai-q6-k.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "LFM3-VL-2B-Q6_K.gguf",
-        "policy": "tracking",
-        "provider_ref": "hf.co/LiquidAI/LFM3-VL-2B-GGUF:Q6_K",
-        "repository": "LiquidAI/LFM3-VL-2B-GGUF",
-        "reproducibility": "provider-managed-tracking",
-        "revision": "latest"
-      }
-    },
-    "exp-minicpm-v47-1b-openbmb-q4-k-m": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation",
-          "ocr"
-        ],
-        "features": [
-          "text-generation",
-          "vision",
-          "ocr"
-        ],
-        "modalities": [
-          "text",
-          "image"
-        ],
-        "ocr": true,
-        "ocr_profile": "minicpm",
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": null,
-      "ownership": {
-        "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
-      },
-      "provider": "ollama-hf",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-minicpm-v47-1b-openbmb-q4-k-m.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "MiniCPM-V-4_7-1B-Q4_K_M.gguf",
-        "policy": "tracking",
-        "provider_ref": "hf.co/openbmb/MiniCPM-V-4.7-1B-gguf:Q4_K_M",
-        "repository": "openbmb/MiniCPM-V-4.7-1B-gguf",
-        "reproducibility": "provider-managed-tracking",
-        "revision": "latest"
-      }
-    },
-    "exp-nemotron35-bolt-e4b-nvidia-q4-k-m": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation",
-          "reasoning",
-          "tools"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": true
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": 65536,
-      "ownership": {
-        "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
-      },
-      "provider": "ollama-hf",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-nemotron35-bolt-e4b-nvidia-q4-k-m.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "Nemotron-3.5-Bolt-E4B-Q4_K_M.gguf",
-        "policy": "tracking",
-        "provider_ref": "hf.co/nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB:Q4_K_M",
-        "repository": "nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB",
-        "reproducibility": "provider-managed-tracking",
-        "revision": "latest"
-      }
-    },
     "exp-ovisocr2-abiray-q8-0": {
       "capabilities": {
         "benchmark_kinds": [
@@ -864,7 +632,7 @@
         "revision": "main"
       }
     },
-    "exp-qwen35-4b-unsloth-q6-k": {
+    "exp-qwen35-9b-llmfan46-heretic-q6-k": {
       "capabilities": {
         "benchmark_kinds": [
           "generation"
@@ -881,46 +649,10 @@
       },
       "category": "experiments",
       "enabled": true,
-      "native_context_max": null,
-      "ownership": {
-        "registration": "bc250",
-        "source": "bc250",
-        "state": "bc250"
+      "license": {
+        "id": "Apache-2.0",
+        "use_note": "Community Heretic-derived weights; validate source-card terms, provenance, safety and office accuracy before deployment."
       },
-      "provider": "ollama",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-qwen35-4b-unsloth-q6-k.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "Qwen3.5-4B-Q6_K.gguf",
-        "local_path": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-4b-unsloth-q6-k/Qwen3.5-4B-Q6_K.gguf",
-        "policy": "tracking",
-        "repository": "unsloth/Qwen3.5-4B-GGUF",
-        "reproducibility": "tracking-ref",
-        "revision": "latest"
-      }
-    },
-    "exp-qwen35-9b-davidau-defiant-fable-q6-k": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation",
-          "reasoning"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
       "native_context_max": 262144,
       "ownership": {
         "registration": "bc250",
@@ -931,93 +663,15 @@
       "runtime": {
         "agent_prepare_required": false,
         "lane": "main",
-        "modelfile": "exp-qwen35-9b-davidau-defiant-fable-q6-k.Modelfile"
+        "modelfile": "exp-qwen35-9b-llmfan46-heretic-q6-k.Modelfile"
       },
       "source": {
         "expected_sha256": "",
-        "filename": "Qwen3.5-9B-The-Defiant-Fable-Uncnr-Heretic-NEO-MAX-Q6_K.gguf",
+        "filename": "Qwen3.5-9B-ultra-uncensored-heretic-v2-Q6_K.gguf",
         "policy": "tracking",
-        "provider_ref": "hf.co/DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP-GGUF:Q6_K",
-        "repository": "DavidAU/Qwen3.5-9B-The-Defiant-Fable-Uncensored-Heretic-NEO-IMATRIX-MAX-MTP-GGUF",
+        "provider_ref": "hf.co/llmfan46/Qwen3.5-9B-ultra-uncensored-heretic-v2-GGUF:Q6_K",
+        "repository": "llmfan46/Qwen3.5-9B-ultra-uncensored-heretic-v2-GGUF",
         "reproducibility": "provider-managed-tracking",
-        "revision": "latest"
-      }
-    },
-    "exp-qwen35-9b-hauhaucs-uncensored-q6-k": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": null,
-      "ownership": {
-        "registration": "bc250",
-        "source": "bc250",
-        "state": "bc250"
-      },
-      "provider": "ollama",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-qwen35-9b-hauhaucs-uncensored-q6-k.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf",
-        "local_path": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen35-9b-hauhaucs-uncensored-q6-k/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive-Q6_K.gguf",
-        "policy": "tracking",
-        "repository": "HauhauCS/Qwen3.5-9B-Uncensored-HauhauCS-Aggressive",
-        "reproducibility": "tracking-ref",
-        "revision": "latest"
-      }
-    },
-    "exp-qwen38-27b-ista-gsq-rco-iq3-s": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": null,
-      "ownership": {
-        "registration": "bc250",
-        "source": "bc250",
-        "state": "bc250"
-      },
-      "provider": "ollama",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-qwen38-27b-ista-gsq-rco-iq3-s.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf",
-        "local_path": "/var/lib/bc250-llm-server/gguf/experiments/exp-qwen38-27b-ista-gsq-rco-iq3-s/Qwen3.8-27B-GSQ-RCO-IQ3_S.gguf",
-        "policy": "tracking",
-        "repository": "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF",
-        "reproducibility": "tracking-ref",
         "revision": "latest"
       }
     },
@@ -1057,46 +711,6 @@
         "policy": "tracking",
         "repository": "ISTA-DASLab/Qwen3.8-27B-GSQ-RCO-GGUF",
         "reproducibility": "tracking-ref",
-        "revision": "latest"
-      }
-    },
-    "exp-spark-x26-4b-abenzerps-uncensored-iq3-m": {
-      "capabilities": {
-        "benchmark_kinds": [
-          "generation"
-        ],
-        "features": [
-          "text-generation",
-          "reasoning"
-        ],
-        "modalities": [
-          "text"
-        ],
-        "ocr": false,
-        "reasoning": "candidate",
-        "tools": false
-      },
-      "category": "experiments",
-      "enabled": true,
-      "native_context_max": 1048576,
-      "ownership": {
-        "registration": "bc250",
-        "source": "ollama",
-        "state": "provider"
-      },
-      "provider": "ollama-hf",
-      "runtime": {
-        "agent_prepare_required": false,
-        "lane": "main",
-        "modelfile": "exp-spark-x26-4b-abenzerps-uncensored-iq3-m.Modelfile"
-      },
-      "source": {
-        "expected_sha256": "",
-        "filename": "Spark-X2.6-4B-GSQ-RCO-IQ3_M.gguf",
-        "policy": "tracking",
-        "provider_ref": "hf.co/abenzerps/Spark-X2.6-4B-Uncensored-GSQ-RCO-GGUF:IQ3_M",
-        "repository": "abenzerps/Spark-X2.6-4B-Uncensored-GSQ-RCO-GGUF",
-        "reproducibility": "provider-managed-tracking",
         "revision": "latest"
       }
     },
@@ -1316,6 +930,10 @@
       },
       "category": "production",
       "enabled": true,
+      "license": {
+        "id": "OpenMDW",
+        "use_note": "Check derivative model card and inherited license; DEVICE quality still required."
+      },
       "native_context_max": 65536,
       "ownership": {
         "registration": "bc250",
@@ -1436,6 +1054,10 @@
       },
       "category": "task",
       "enabled": true,
+      "license": {
+        "id": "LFM Open License v1.0",
+        "use_note": "Review LFM terms for commercial use. Product/task model remains selected."
+      },
       "native_context_max": null,
       "ownership": {
         "registration": "bc250",
@@ -1456,6 +1078,49 @@
         "repository": "LiquidAI/LFM2.5-1.2B-Instruct-GGUF",
         "reproducibility": "tracking-ref",
         "revision": "main"
+      }
+    },
+    "task-lfm3-1.7b-liquidai-q6-k": {
+      "capabilities": {
+        "benchmark_kinds": [
+          "generation"
+        ],
+        "features": [
+          "text-generation"
+        ],
+        "modalities": [
+          "text"
+        ],
+        "ocr": false,
+        "reasoning": "candidate",
+        "tools": false
+      },
+      "category": "task",
+      "enabled": true,
+      "license": {
+        "id": "LFM Open License v1.0",
+        "use_note": "Review LFM terms for commercial use; no automatic production promotion."
+      },
+      "native_context_max": 262144,
+      "ownership": {
+        "registration": "bc250",
+        "source": "ollama",
+        "state": "provider"
+      },
+      "provider": "ollama-hf",
+      "runtime": {
+        "agent_prepare_required": false,
+        "lane": "task",
+        "modelfile": "task-lfm3-1.7b-liquidai-q6-k.Modelfile"
+      },
+      "source": {
+        "expected_sha256": "",
+        "filename": "LFM3-1.7B-Q6_K.gguf",
+        "policy": "tracking",
+        "provider_ref": "hf.co/LiquidAI/LFM3-1.7B-GGUF:Q6_K",
+        "repository": "LiquidAI/LFM3-1.7B-GGUF",
+        "reproducibility": "provider-managed-tracking",
+        "revision": "latest"
       }
     }
   },

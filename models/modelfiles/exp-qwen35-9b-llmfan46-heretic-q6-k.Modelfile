@@ -1,0 +1,13 @@
+# BC250 category: experiments
+# Ollama model: exp-qwen35-9b-llmfan46-heretic-q6-k
+# Acquisition/capability metadata: models/model-catalog.json
+# TEXT-ONLY uncensored Advanced control, admin testing only.
+# No mmproj/vision path is packaged. Test DE/FR and structured outputs on DEVICE.
+FROM __BC250_SOURCE__
+PARAMETER num_gpu 99
+PARAMETER num_keep 256
+PARAMETER num_ctx 32768
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+SYSTEM """You are a direct experimental office assistant. Follow the user's task, distinguish facts from guesses and preserve identifiers, amounts and dates. Respond in the requested language."""
