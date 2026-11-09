@@ -2,7 +2,20 @@
 
 The Ollama binary is reconciled from the pinned upstream release by `bc250 install`, while the RPM owns all four systemd lane definitions.
 
-Package standard: **Ollama v0.40.13**. The helper installs this version unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. The accepted 1.13 package did not promote LFM3; the 0.20.0 line adds explicit LFM3/LFM3-VL candidates while retaining Ollama 0.40.13. Interim 0.20.0-2 DEVICE testing proved normal convergence for the corrected Generalist acquisition and the unchanged four-lane runtime. The frozen 0.20.0-4 SOURCE and the finalized 0.20.0-5 SOURCE retain the 0.20.0-3 DEVICE-accepted Ollama 0.40.13 pin and four-lane architecture. The 0.20.0-5 workbench adds Agent-safe warmup/profile behavior; those changes are not DEVICE-qualified until an exact future RPM is built and tested.
+`0.20.0-6` SOURCE package pin: **Ollama v0.40.15**. The last fully
+DEVICE-accepted baseline uses 0.40.13; provisional 0.20.0-5 DEVICE observations
+remain separate. The v0.40.15 target is pinned to the official Linux AMD64
+payload and published SHA-256, and is **not** DEVICE-qualified on the BC-250 Vulkan hardware.
+
+In 0.40.15, upstream adds recurrent/vision multi-request serving and llama.cpp
+updates, but BC-250 still enforces one request per lane, one loaded model per
+lane, the same Vulkan/iGPU selection and the same q8/q4 KV and reasoning
+policies. Check cold loads and real output/embeddings after upgrade. Do not
+assume the later unreleased Vulkan/KV patches or `/v1/responses` truncation fix
+are included in this tagged release. The upstream full rollback procedure must
+preserve the preceding exact binary and the installed Open WebUI database.
+
+Historical accepted package standard: **Ollama v0.40.13**. The finalized 0.20.0-5 helper installs that version; the `0.20.0-6` helper now pins **v0.40.15** unless `OLLAMA_VERSION` is deliberately overridden. Release 1.12 refreshed and DEVICE-qualified the runtime bytes without changing the four-lane service topology, context/KV-cache profiles, Vulkan/iGPU selection, keep-alive policy or model set; release 1.13 carries that accepted runtime baseline unchanged. Ollama 0.40.9 improved failure reporting for streamed OpenAI/Anthropic-compatible generation, 0.40.12 updated llama.cpp, and 0.40.13 adds Linux/Windows LFM3 runtime support. The accepted 1.13 package did not promote LFM3; the 0.20.0 line adds explicit LFM3/LFM3-VL candidates while retaining Ollama 0.40.13. Interim 0.20.0-2 DEVICE testing proved normal convergence for the corrected Generalist acquisition and the unchanged four-lane runtime. The frozen 0.20.0-4 SOURCE and the finalized 0.20.0-5 SOURCE retain the 0.20.0-3 DEVICE-accepted Ollama 0.40.13 pin and four-lane architecture. The 0.20.0-5 workbench adds Agent-safe warmup/profile behavior; those changes are not DEVICE-qualified until an exact future RPM is built and tested.
 
 ## Install and verify
 
@@ -57,7 +70,7 @@ retired from active discovery in the 0.20.0 source line because current Qwen3.5/
 qualification; re-run it when a package/runtime change could affect residency or UMA
 headroom.
 
-## 0.40.13 settings audit
+## 0.40.15 SOURCE settings review (0.40.13 accepted baseline)
 
 The 0.40.13 source still exposes the package's existing lane controls directly: `OLLAMA_VULKAN`,
 `OLLAMA_IGPU_ENABLE`, `GGML_VK_VISIBLE_DEVICES`, `OLLAMA_CONTEXT_LENGTH`,
@@ -71,9 +84,9 @@ parallelism improves this UMA appliance, and pre-emptively pinning them would tu
 into an unrelated scheduler policy change. Recheck model placement, UMA headroom and load behavior on
 the exact 0.40.13 DEVICE build before promoting any such tuning.
 
-## 0.40.13 runtime and prior device baseline
+## 0.40.13 accepted runtime and prior DEVICE baseline
 
-Ollama 0.40.13 is the package-pinned runtime. The exact 1.4 device campaign on 0.40.6 proved package-created registrations remained unique and usable before and after supported restart, with no unexpected `llamacpp:` shadow name for the main package-owned registration. Keep those invariants for 0.40.13, and additionally record the 0.40.7+ `renderer`, `parser` and `template_source` fields from `/api/show` as semantic diagnostics. Do not delete or rewrite model-store state merely to make a check pass.
+Ollama 0.40.13 is the last fully DEVICE-accepted runtime; 0.40.15 is pinned in the finalized `0.20.0-6` SOURCE and is still DEVICE-unqualified. The exact 1.4 device campaign on 0.40.6 proved package-created registrations remained unique and usable before and after supported restart, with no unexpected `llamacpp:` shadow name for the main package-owned registration. Keep those invariants for 0.40.13, and additionally record the 0.40.7+ `renderer`, `parser` and `template_source` fields from `/api/show` as semantic diagnostics. Do not delete or rewrite model-store state merely to make a check pass.
 Main generation, task generation, Jina embedding, 8192-context recall, bounded long generation, Deep-to-task
 transition and Open WebUI Documents/RAG all passed without kernel/GPU/OOM regression. Most measured workloads
 were flat or modestly faster; GPT-OSS decode was about 5% slower but remained within the accepted appliance
@@ -128,7 +141,7 @@ sudo bc250 advanced ollama-profile reset
 
 ## Benchmark API baseline
 
-`bc250 advanced benchmark` targets the package-pinned Ollama **0.40.13** request schema. Neutral generation
+`bc250 advanced benchmark` previously targeted the DEVICE-accepted Ollama **0.40.13** request schema; this WIP must qualify **0.40.15** against the same contracts. Neutral generation
 uses the top-level `/api/generate` `system` override without `raw=true`; production
 mode omits the override. `think` may be omitted, boolean, or
 `low`/`medium`/`high`/`max` where supported by the pinned runtime/model. Embedding tests use `/api/embed` with `truncate=false` on the dedicated 11437
@@ -154,7 +167,7 @@ ss -ltnp | grep -E ':(11434|11435|11436|11437)\b'
 
 ## Updating safely
 
-Treat **0.40.13** as the package-standard runtime for this release. Before accepting the selected RPM, review
+Treat **0.40.15** as the `0.20.0-6` SOURCE-pinned candidate; 0.40.13 remains the previous DEVICE baseline. Before accepting the selected RPM, review
 release notes and smoke-test each Vulkan update with:
 
 1. a small known-good model;

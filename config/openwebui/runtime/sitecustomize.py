@@ -1,6 +1,6 @@
 """BC-250 runtime compatibility guard for the pinned Open WebUI/Tika path.
 
-Open WebUI 0.12.5's Tika 4 loader treats an HTTP 2xx response without a usable
+Open WebUI 0.13.3's Tika 4 loader still treats an HTTP 2xx response without a usable
 ``tk:content`` field as the literal placeholder ``<No text content found>``.
 That placeholder is then non-empty and can be stored/indexed as if extraction
 succeeded.  BC-250 keeps the upstream image immutable and applies this narrow
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any
 
-SUPPORTED_OPENWEBUI_VERSION = "0.12.5"
+SUPPORTED_OPENWEBUI_VERSION = "0.13.3"
 SUPPORTED_TIKA_VERSION = "4.2.0-full"
 TIKA4_MARKDOWN_SUFFIX = "/tika/json/md"
 NO_TEXT_PLACEHOLDER = "<No text content found>"

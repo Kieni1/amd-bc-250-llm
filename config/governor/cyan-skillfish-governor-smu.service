@@ -1,6 +1,9 @@
 [Unit]
 Description=Cyan Skillfish GPU Governor (SMU)
 Conflicts=cyan-skillfish-governor.service cyan-skillfish-governor-tt.service oberon-governor.service
+# An AMD GPU render node (1002:13fe) is tagged by the packaged udev rule.
+BindsTo=dev-cyan_skillfish_gpu.device
+After=dev-cyan_skillfish_gpu.device
 
 [Service]
 ExecStart=/usr/bin/cyan-skillfish-governor-smu /etc/cyan-skillfish-governor-smu/config.toml

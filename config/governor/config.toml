@@ -1,4 +1,5 @@
-# Based on filippor/cyan-skillfish-governor v0.4.14 default-config.toml.
+# BC-250 reviewed governor policy originally based on the v0.4.14 default config.
+# Retained unchanged with v0.4.15 WIP: no new voltage, frequency or CPU governor policy.
 # Microseconds.
 [timing.intervals]
 sample = 250

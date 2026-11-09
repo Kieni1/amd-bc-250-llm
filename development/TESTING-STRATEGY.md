@@ -26,7 +26,7 @@ When the user asks to **start working on the next release**, change source/tests
 - affected contract/schema tests;
 - a scope/integrity check only when the change actually touches a governed/frozen boundary.
 
-Do not infer a version/release bump, release preparation, full source archive, cumulative patch regeneration or final artifact verification from “start working”, “next RPM”, or similar WIP language. Intermediate snapshots are development conveniences, not release authority.
+For this project, a new WIP **targets the next natural RPM Release increment** by default (for example 0.20.0-5 → 0.20.0-6), but the spec/contract bump, release preparation, full source archive and final artifact checks still occur only on an explicit prepare/finalize request. Intermediate snapshots are development conveniences, not release authority.
 
 ### Prepare release
 

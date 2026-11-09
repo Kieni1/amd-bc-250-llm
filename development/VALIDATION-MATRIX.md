@@ -1,6 +1,20 @@
+> **2026-11-09, current candidate:** `0.20.0-6` SOURCE selected/finalized for GitHub/Fedora 44 BUILD. New runtime pins: Open WebUI 0.13.3, Ollama 0.40.15, governor 0.4.15. Admin-private DE/FR RAG testing recipes are examples only; no production roles, retrieval defaults or corpus contents are changed. **Authoritative BUILD and exact-RPM DEVICE acceptance: pending.** The installed `0.20.0-5` has bounded provisional DEVICE checks, not full acceptance; `0.20.0-3` remains last fully accepted DEVICE release. The preceding 0.20.0-5/0.20.0-4 matrix entries are historical to those bytes.
+
+| 0.20.0-6 requirement | SOURCE status | BUILD / DEVICE gate |
+|---|---|---|
+| Release identity | `Version: 0.20.0`, `Release: 6`; selected exact SOURCE bytes | Selected GitHub `workflow_dispatch`, frozen Source0/spec and RPM hashes; install exact artifact |
+| Open WebUI 0.13.3 | Immutable OCI digest and migration guard retained; upstream grep patch carried by tagged image | Stopped-state database migration/rollback, real `Art. 40` / `Art\. 40` retrieval, UUID view, final citation and cross-collection scope |
+| Translation attachment C3 | Source filter still rejects visible file/source metadata; Block 33 r1 API request was accepted under 0.12.5, root cause unknown | Repeat with actual 0.13.3 filter wiring and API/UI paths using synthetic files; no content-leak inference |
+| DE/FR test presets | Administrator-private opt-in recipes, identical existing Gemma E4B base, no collections baked into RPM | GUI binding and **effective** per-language live-chat scope, direct retrieval + final language/citations; FR independently verified |
+| Ollama 0.40.15 | SHA-pinned Linux payload; four-lane topology and inference policy unchanged | Vulkan cold-load/embedding/Agent/Deep, cancel/recover, memory and privacy checks |
+| Governor 0.4.15 | Tagged source, packaged udev alias and service dependency; no kernel pin | Cold boot/device binding and thermals/power; stock fallback retained |
+| Qualification | Focused SOURCE and package checks required for exact bytes | CI lint/RPM `%check`/rpmlint, then exact DEVICE convergence, reboot, maintenance and restore reviews |
+
+> **Historical 2026-11-09 prior runtime WIP (superseded by current 0.20.0-6 SOURCE above):** OWUI 0.13.3, Ollama 0.40.15 and governor 0.4.15 were staged before selecting Release 6; Fedora BUILD and DEVICE qualification remain pending. Provisional 0.20.0-5 K6 configuration/direct retrieval observations remain separate. Legacy validation entries below are historical to their named source and RPM identities.
+
 # BC-250 validation matrix — accepted 0.20.0-3, frozen 0.20.0-4 SOURCE, finalized 0.20.0-5 SOURCE
 
-Current release identity: `bc250-llm-server-0.20.0-5` — **SOURCE finalized** (DEC-054) and recorded in VERSION/spec/release-contract/WORKBENCH-STATE. It is not yet built, selected or DEVICE-accepted. The earlier `0.20.0-4` SOURCE is frozen and superseded without BUILD/DEVICE acceptance.
+Current release identity: `bc250-llm-server-0.20.0-6` — **SOURCE selected/finalized** (DEC-055) and recorded in VERSION/spec/release-contract/WORKBENCH-STATE. It is not yet built, selected or DEVICE-accepted. The earlier `0.20.0-4` SOURCE is frozen and superseded without BUILD/DEVICE acceptance.
 
 The exact `0.20.0-3` predecessor is SOURCE/BUILD/DEVICE accepted. Its acceptance established upgrade from accepted 1.13, first and second convergence, reboot persistence, health/verify (62 OK, 0 WARN/FAIL), canonical topology and normal-operator Tika smoke. No replay of historical 1.13→0.20.0-3 qualification is required. A changed candidate requires new BUILD/DEVICE evidence.
 

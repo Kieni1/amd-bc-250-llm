@@ -1,5 +1,5 @@
-%global governor_version 0.4.14
-%global governor_commit 7b08fdcf542d1edd82f3a9077c902038019c9842
+%global governor_version 0.4.15
+%global governor_commit 34cea69cdf617d1ad05edc71c4c61df501a13c8e
 %global live_manager_commit a929085d791f126ce76a60eb609610820fb08066
 %global source_date_epoch_from_changelog 1
 %global project_libexec %{_libexecdir}/bc250-llm-server
@@ -10,12 +10,12 @@
 
 Name:           bc250-llm-server
 Version:        0.20.0
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Local LLM server integration for AMD BC-250 hardware
 License:        GPL-2.0-only AND MIT
 URL:            https://github.com/Kieni1/amd-bc-250-llm
 Source0:        %{name}-%{version}.tar.gz
-# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.14
+# filippor/cyan-skillfish-governor, SMU branch, pinned release v0.4.15
 Source1:        cyan-skillfish-governor-%{governor_commit}.tar.gz
 Source2:        cyan-skillfish-governor-vendor-%{governor_commit}.tar.xz
 # WinnieLV/bc250-cu-live-manager, pinned revision; upstream has no license file
@@ -62,6 +62,7 @@ Requires:       python3
 Requires:       python3-huggingface-hub
 Requires:       sqlite
 Requires:       systemd
+Requires:       systemd-udev
 Requires:       tar
 Requires:       util-linux
 Requires:       util-linux-script
@@ -385,6 +386,13 @@ PY_OWUI_WRITE
 fi
 
 %post
+# Upstream governor v0.4.15 depends on a device alias created by the packaged
+# udev rule. Register it for an already-present GPU before starting services.
+if command -v udevadm >/dev/null 2>&1 && [ -d /run/udev ]; then
+  udevadm control --reload-rules >/dev/null 2>&1 || :
+  udevadm trigger --action=change --subsystem-match=drm >/dev/null 2>&1 || :
+  udevadm settle --timeout=30 >/dev/null 2>&1 || :
+fi
 %systemd_post %{bc250_units}
 %tmpfiles_create bc250-llm-server.conf
 secret_env=/var/lib/bc250-llm-server/secrets/open-webui.env
@@ -498,6 +506,11 @@ fi
 %ghost %dir %attr(0700,root,root) /var/backups/bc250-llm-server/rollback/openwebui
 
 %changelog
+* Mon Nov 09 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-6
+- Pin Open WebUI 0.13.3 including the upstream escaped Knowledge grep fix, Ollama 0.40.15 and Cyan Skillfish governor 0.4.15 with its udev/device service binding; preserve kernel and production role policies.
+- Keep Open WebUI Automations and Calendar disabled at bootstrap and in persisted desired state.
+- Include opt-in, administrator-private German and French Documents/RAG testing recipes using the same Gemma E4B model, without bundled corpus data or automatic Knowledge associations.
+- Track the provisional DEVICE translation-attachment API failure and effective Knowledge scope as pending exact-RPM regressions; no DEVICE acceptance is inferred.
 * Fri Nov 06 2026 Kieni1 <213498859+Kieni1@users.noreply.github.com> - 0.20.0-5
 - Carry the 0.20.0-4 K6 Documents/RAG and evaluator changes forward with translation-integrity, managed-document lifecycle, model-workflow and Agent/warmup/safe-power corrections; production model roles and runtime pins are unchanged.
 - Prune redundant experiment identities without deleting installed weights and stage optional role-specific challengers; nothing is promoted without DEVICE evidence.

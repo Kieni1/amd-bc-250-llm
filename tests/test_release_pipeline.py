@@ -48,8 +48,8 @@ class ReleasePipelineTests(unittest.TestCase):
         self.assertRegex(spec, rf"(?m)^Version:\s+{re.escape(version)}$")
         self.assertRegex(spec, rf"(?m)^Release:\s+{re.escape(contract['package']['rpm_release'])}%")
         self.assertNotIn("runtime", contract)
-        self.assertIn("BC250_OLLAMA_VERSION=0.40.13", runtime)
-        self.assertIn("BC250_OPEN_WEBUI_VERSION=0.12.5", runtime)
+        self.assertIn("BC250_OLLAMA_VERSION=0.40.15", runtime)
+        self.assertIn("BC250_OPEN_WEBUI_VERSION=0.13.3", runtime)
 
     def test_workflow_runs_primary_gate_as_unprivileged_builder(self) -> None:
         workflow = (ROOT / ".github/workflows/build-rpm.yml").read_text(encoding="utf-8")

@@ -1,5 +1,8 @@
 # RPM packaging and release maintenance
 
+> **2026-11-09 SOURCE candidate:** `0.20.0-6` pins Ollama 0.40.15, Open WebUI 0.13.3 and governor v0.4.15 with its udev alias/rule. It includes opt-in private DE/FR RAG testing recipes, not new production roles. Full GitHub/Fedora BUILD and exact-RPM DEVICE qualification remain required.
+
+
 This is maintainer documentation. **GitHub is the authoritative RPM/package build
 path for this project.** Do not ask the appliance operator to build RPMs locally.
 Developer environments may run the checks they actually provide; hardware/runtime
@@ -29,7 +32,7 @@ instead of creating a general packaging language.
 
 ## RPM version and release naming
 
-Use normal RPM `Version` / `Release` identity. Product milestones advance `Version`; each new product version starts at `Release: 1`. Packaging-only rebuilds/fixes increment `Release` (`0.20.0-2`, `0.20.0-3`), product bugfixes increment the patch version (`0.20.1-1`), and later feature milestones increment the minor version (`0.21.0-1`). Do not move backward in RPM version ordering and do not introduce an `Epoch` merely to rename pre-1.0 milestones. Exact `0.20.0-3` is the latest DEVICE-accepted predecessor. The repository release identity is `0.20.0-5` (SOURCE finalized, not yet built); the earlier `0.20.0-4` SOURCE is frozen and superseded. Update spec, `release-contract.json`, `WORKBENCH-STATE.json`, guidance and evidence identity together only during governed release preparation. Never publish different bytes under an existing NVR.
+Use normal RPM `Version` / `Release` identity. Product milestones advance `Version`; each new product version starts at `Release: 1`. Packaging-only rebuilds/fixes increment `Release` (`0.20.0-2`, `0.20.0-3`), product bugfixes increment the patch version (`0.20.1-1`), and later feature milestones increment the minor version (`0.21.0-1`). Do not move backward in RPM version ordering and do not introduce an `Epoch` merely to rename pre-1.0 milestones. Exact `0.20.0-3` is the latest DEVICE-accepted predecessor. The repository release identity is `0.20.0-6` (SOURCE candidate; BUILD and DEVICE pending); `0.20.0-5` remains a separately finalized, provisionally tested installed predecessor and the earlier `0.20.0-4` SOURCE remains historical. Update spec, `release-contract.json`, `WORKBENCH-STATE.json`, guidance and evidence identity together only during governed release preparation. Never publish different bytes under an existing NVR.
 
 ## Validation and build boundary
 

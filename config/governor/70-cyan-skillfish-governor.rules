@@ -1,0 +1,3 @@
+# Device-to-systemd alias shipped with upstream governor v0.4.15 (34cea69).
+# The GPU governor must not race the amdgpu render-node registration.
+SUBSYSTEM=="drm", KERNEL=="renderD*", ATTRS{vendor}=="0x1002", ATTRS{device}=="0x13fe", TAG+="systemd", ENV{SYSTEMD_ALIAS}+="/dev/cyan_skillfish_gpu"

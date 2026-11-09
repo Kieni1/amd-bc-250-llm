@@ -1296,3 +1296,23 @@ separate gates. This decision does not thaw MTP or maintenance components.
 - `coding-agent`, `mtp` and `ocr` stay frozen and unchanged.
 - `0.20.0-3` remains the last DEVICE-accepted package.
 
+
+## DEC-055 — Finalize 0.20.0-6 SOURCE with pinned runtime refresh and private language-scoped RAG testing choices (2026-11-09)
+
+**Status:** SOURCE FINALIZED / BUILD and DEVICE PENDING.
+
+**Decision:** Assign the next natural RPM identity `0.20.0-6` to the already-staged
+Open WebUI 0.13.3, Ollama 0.40.15 and governor 0.4.15 runtime refresh.
+The upstream Open WebUI escaped-punctuation fix is part of the tagged image,
+not a hand-edited running container. Introduce two inert, opt-in administrator-
+private DE/FR Documents/RAG testing recipes sharing the current Gemma E4B base,
+with neither uploaded corpus content nor fixed Knowledge collection IDs in source.
+Only actual UI-bound live-chat tests establish collection isolation; API metadata
+readback alone is insufficient. Preserve the production Documents role and K6.
+
+**Evidence separation:** Block 33 r1 under the previous 0.12.5 runtime exposed
+a translation-role API attachment rejection failure, without proving content
+was supplied to the model. Recheck 0.13.3 API and browser routing before
+claiming remediation; do not infer a security incident or DEVICE acceptance.
+The installed 0.20.0-5 DEVICE evidence is provisional. GitHub build selection,
+new-runtime tests, rollbacks and reboot are future gates for 0.20.0-6.

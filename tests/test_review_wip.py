@@ -59,10 +59,24 @@ class ReviewRegressions(unittest.TestCase):
         for role in roles:
             if role["id"] in translator.WRAPPERS:
                 self.assertFalse(role["meta"]["capabilities"]["file_context"])
-        body = {"model": translator.DE_FR_MODEL, "files": [{"id": "doc"}],
-                "messages": [{"role": "user", "content": "Bitte Datei übersetzen"}]}
-        with self.assertRaisesRegex(ValueError, "attachment|file context"):
-            asyncio.run(translator.Filter().inlet(body))
+        for location, body in (
+            (
+                "top-level files",
+                {"model": translator.DE_FR_MODEL, "files": [{"id": "synthetic"}],
+                 "messages": [{"role": "user", "content": "Bitte Datei übersetzen"}]},
+            ),
+            (
+                "message files as observed in DEVICE Block 33",
+                {"model": translator.DE_FR_MODEL,
+                 "messages": [{"role": "user", "content": "Bitte Datei übersetzen",
+                               "files": [{"id": "synthetic"}]}]},
+            ),
+        ):
+            with (
+                self.subTest(location=location),
+                self.assertRaisesRegex(ValueError, "attachment|file context"),
+            ):
+                asyncio.run(translator.Filter().inlet(body))
 
     def test_h2_ghost_secrets_survive_erase(self):
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text()

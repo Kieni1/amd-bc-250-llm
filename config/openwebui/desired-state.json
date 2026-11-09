@@ -104,6 +104,8 @@
     "channels.encryption.enable": false,
     "apps.enable": false,
     "subagents.enable": false,
+    "automations.enable": false,
+    "calendar.enable": false,
     "chat.tool_search.enable": false,
     "audio.realtime.enabled": false,
     "web.search.enable": false,

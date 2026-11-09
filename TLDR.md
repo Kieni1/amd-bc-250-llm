@@ -3,9 +3,16 @@
 This is the common-path operator sheet. Use [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 for the complete command reference and the topic docs for rationale/recovery details.
 
-Current accepted DEVICE package: **`bc250-llm-server-0.20.0-3`**. The earlier `bc250-llm-server-0.20.0-4` SOURCE is frozen and superseded, not DEVICE-accepted. **`bc250-llm-server-0.20.0-5` SOURCE is finalized**; it carries K6 dense Documents/RAG and evaluator fixes plus model-catalog, translation, managed-document, topology and maintenance/backup/Pi updates. Production roles and upstream runtime pins are not promoted. Authoritative GitHub BUILD and exact-RPM DEVICE qualification are still pending. After upgrading, rerun `sudo bc250 maintenance setup` to enable the new documents backup timer.
+Current accepted DEVICE package: **`bc250-llm-server-0.20.0-3`**. The earlier `bc250-llm-server-0.20.0-4` SOURCE is frozen and superseded, not DEVICE-accepted. **`bc250-llm-server-0.20.0-5` SOURCE is finalized** and provisionally installed on DEVICE; it carries K6 dense Documents/RAG and evaluator fixes plus model-catalog, translation, managed-document, topology and maintenance/backup/Pi updates. Production roles and upstream runtime pins are not promoted. Selected GitHub BUILD provenance and complete exact-RPM DEVICE qualification remain pending. After upgrading, rerun `sudo bc250 maintenance setup` to enable the new documents backup timer.
 
 Release 1.13 keeps the accepted 1.12 runtime/model/RAG baseline unchanged and adds bounded package hardening/UX: fail no-usable-text ingestion clearly, retain knowable rollback provenance, distinguish proven package Modelfile updates from local drift, and clarify duplicate/optional-model reconciliation behavior.
+
+**`bc250-llm-server-0.20.0-6` SOURCE candidate (9 Nov 2026):** Open WebUI 0.13.3 +
+Ollama 0.40.15 + governor 0.4.15 are pinned for the next GitHub RPM build.
+Two separate private DE/FR RAG testing recipes are provided in
+`examples/openwebui/`, not auto-installed as production models. No kernel
+pin, role promotion, K6 change or automatic GPU power-policy change.
+BUILD and DEVICE qualification remain outstanding.
 
 ## Normal day-to-day use
 

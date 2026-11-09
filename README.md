@@ -6,13 +6,29 @@ hardware profiles, diagnostics and optional specialist tools.
 
 Current accepted DEVICE baseline: **`bc250-llm-server-0.20.0-3`**. Its SOURCE, Fedora 44 GitHub BUILD and exact DEVICE upgrade/convergence/reboot/Tika acceptance are closed. The runtime stack remains Ollama 0.40.13, Open WebUI 0.12.5, Tika 4.2.0-full and governor 0.4.14.
 
-The **`bc250-llm-server-0.20.0-4` SOURCE is frozen** as an earlier unaccepted candidate. The **`bc250-llm-server-0.20.0-5` SOURCE is finalized**: the original K6 Documents/RAG and evaluator changes are carried forward with translation-integrity safeguards, managed-document lifecycle corrections, experimental-model pruning, model workflow/Agent topology protections, and maintenance/backup/Pi companion fixes. Production role assignments and pinned upstream runtime remain unchanged. Authoritative Fedora 44 GitHub BUILD and exact-RPM DEVICE acceptance are still future independent gates. After upgrading, rerun `sudo bc250 maintenance setup` to enable the documents backup timer.
+The **`bc250-llm-server-0.20.0-4` SOURCE is frozen** as an earlier unaccepted candidate. The **`bc250-llm-server-0.20.0-5` SOURCE is finalized** and an RPM is reported installed provisionally (full DEVICE acceptance and authoritative build-selection provenance remain open): the original K6 Documents/RAG and evaluator changes are carried forward with translation-integrity safeguards, managed-document lifecycle corrections, experimental-model pruning, model workflow/Agent topology protections, and maintenance/backup/Pi companion fixes. Production role assignments and pinned upstream runtime remain unchanged. Selected GitHub BUILD provenance and full exact-RPM DEVICE acceptance remain independent open gates. After upgrading, rerun `sudo bc250 maintenance setup` to enable the documents backup timer.
 
 This is a pre-production project for a trusted office LAN. It prioritizes
 repeatable model comparisons, local data processing and understandable
 operator controls. It is not an Internet-facing appliance, and neither model
 outputs nor experimental hardware settings should be treated as production
 assurances.
+
+### Runtime refresh selected for `0.20.0-6` (9 November 2026; SOURCE only)
+
+The **`bc250-llm-server-0.20.0-6` SOURCE candidate** pins Open WebUI **0.13.3** (upstream
+Knowledge escaped-punctuation fix #33936), Ollama **0.40.15** and Cyan
+Skillfish governor **v0.4.15**. The image/payload are digest-pinned, and
+the governor's upstream udev device-alias rule is packaged with its
+`BindsTo=` service ordering. These changes do **not** change the kernel, Mesa,
+CU layout, device governor frequency/voltage policy, K6, models or role
+assignments. They are not part of the finalized 0.20.0-5 bytes and have
+not completed Fedora BUILD or DEVICE qualification. The `0.20.0-6` SOURCE also
+ships **opt-in private DE/FR RAG testing recipes** (see
+`examples/openwebui/README.md`), not automatically published roles.
+The 0.20.0-5 provisional DEVICE translation attachment API failure remains
+a separate exact-candidate DEVICE regression; no security exposure is assumed. See `docs/OPENWEBUI.md`,
+`docs/OLLAMA.md` and `development/OPEN-FINDINGS.md`.
 
 ## What this appliance is for
 
@@ -185,9 +201,9 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 | Component | Purpose |
 |---|---|
-| Cyan Skillfish governor v0.4.14 | BC-250 SMU governor; fresh-install range 350–1850 MHz |
-| Ollama v0.40.13 | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
-| Open WebUI v0.12.5 and Tika v4.2.0-full | 1.12 DEVICE-accepted runtime baseline; 1.13 adds no-text/duplicate ingestion UX hardening without changing the dependency pins |
+| Cyan Skillfish governor v0.4.15 **SOURCE** (v0.4.14 DEVICE accepted) | BC-250 SMU governor; unchanged fresh-install range 350–1850 MHz; new GPU udev ordering |
+| Ollama v0.40.15 **SOURCE** (v0.40.13 DEVICE accepted) | Vulkan runtime with normal main/task/embedding lanes and exclusive agent mode |
+| Open WebUI v0.13.3 **SOURCE** (v0.12.5 DEVICE accepted) and Tika v4.2.0-full | Escaped-punctuation Knowledge search fix; bootstrap and persisted Automations/Calendar disabled; Tika shim retained pending DEVICE check |
 | nginx | Trusted-LAN HTTP entry point |
 | Model manager | Strict Modelfile discovery, GGUF download/registration, OCR experiments and cleanup |
 | Document lifecycle | Local DE/FR/bilingual preparation, human review, provenance validation and Open WebUI knowledge sync |
@@ -196,7 +212,7 @@ reset and maintenance internals out of the normal daily path. Their complete syn
 
 Release 0.14.1-1.12 is the accepted runtime/dependency DEVICE baseline. It updated Ollama to 0.40.13, Open WebUI to 0.12.5 and Apache Tika to 4.2.0-full while retaining the four-lane Vulkan/iGPU topology, model set and retrieval tuning; the completed DEVICE campaign also covered malformed-input containment, broad Tika formats, RAG endurance, parallel ingestion, restart persistence and full authenticated revalidation.
 
-Release 0.14.1-1.13 was a historical DEVICE-accepted baseline. Release 0.20.0-3 is now the current accepted package and carries the subsequent quality-campaign/model work, Tika operator-boundary and translation-oracle corrections. The frozen 0.20.0-4 SOURCE proposed K6 and bounded evaluator fixes but never gained transferable BUILD/DEVICE acceptance. Those changes are carried into the finalized 0.20.0-5 SOURCE with subsequent corrections; its authoritative BUILD and DEVICE acceptance have not happened.
+Release 0.14.1-1.13 was a historical DEVICE-accepted baseline. Release 0.20.0-3 is now the current accepted package and carries the subsequent quality-campaign/model work, Tika operator-boundary and translation-oracle corrections. The frozen 0.20.0-4 SOURCE proposed K6 and bounded evaluator fixes but never gained transferable BUILD/DEVICE acceptance. Those changes are carried into the finalized 0.20.0-5 SOURCE with subsequent corrections; its BUILD selection provenance and complete DEVICE acceptance have not been established.
 
 Release 0.14.1-1.9 remains an older broad device baseline: it combined the bounded model-management UX update with focused Managed Documents corrections from 1.8 device acceptance. Standalone MTP candidates appear in the same indexed interactive model overview as Ollama models, while explicit MTP selection remains prepare-only and broad convergence excludes MTP. Multi-chunk document normalization fails closed on missing chunk identity, duplicate output or dropped critical identifiers, Agent-mode cleanup covers the readiness-failure window, and review output exposes explicit readiness state.
 Runtime updates remain deliberately pinned rather than following upstream automatically.
@@ -279,3 +295,5 @@ Repository integration code and documentation are GPL-2.0-only. Pinned sources
 and model weights retain their own licenses.
 
 The Ollama services set `OLLAMA_NO_CLOUD=1`; this appliance intentionally uses local inference only.
+
+The `0.20.0-6` SOURCE Open WebUI 0.13.3 pin disables the upstream-default Automations and Calendar surfaces in both bootstrap and persisted desired state; these are not yet qualified BC-250 product features.

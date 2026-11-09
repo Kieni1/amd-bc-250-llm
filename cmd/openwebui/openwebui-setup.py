@@ -816,7 +816,7 @@ def model_view_map(
 def load_live_model_views(
     client: Client,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
-    # Open WebUI v0.12.5 represents curated presets and raw-model overrides in
+    # Open WebUI v0.13.3 represents curated presets and raw-model overrides in
     # separate API views. Keep this explicit so a future pin change fails as an
     # inspection-compatibility issue instead of looking like mass desired-state drift.
     presets = model_view_map(

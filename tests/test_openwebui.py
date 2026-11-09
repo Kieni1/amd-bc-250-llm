@@ -282,6 +282,8 @@ class OpenWebUIStatusTests(unittest.TestCase):
                 "channels.encryption.enable": False,
                 "apps.enable": False,
                 "subagents.enable": False,
+                "automations.enable": False,
+                "calendar.enable": False,
                 "chat.tool_search.enable": False,
                 "audio.realtime.enabled": False,
                 "web.search.enable": False,

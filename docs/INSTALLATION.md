@@ -1,5 +1,8 @@
 # Installation and deployment
 
+> **2026-11-09 runtime WIP:** The new runtime WIP pins Open WebUI 0.13.3 and Ollama 0.40.15; a versioned, stopped-state Open WebUI database rollback snapshot must be proven before convergence. The governor 0.4.15 udev device alias must exist before its service starts. No production kernel pin is introduced.
+
+
 This is the canonical installation/deployment guide for the BC-250 LLM appliance. It combines the service/persistence deployment notes with the reviewed kernel-command-line profile so setup details have one operator-facing home.
 
 ## Deployment and service layout

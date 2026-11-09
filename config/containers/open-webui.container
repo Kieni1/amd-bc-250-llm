@@ -7,13 +7,13 @@ Wants=network-online.target tika.service
 
 [Container]
 ContainerName=open-webui
-# v0.12.5, pinned OCI index digest.
-Image=ghcr.io/open-webui/open-webui@sha256:03443b8de6b617da9d900edd09b4bf1cb0ddbfdcba6afb42c548336a0b821ded
+# v0.13.3, pinned OCI index digest.
+Image=ghcr.io/open-webui/open-webui@sha256:46b59158e6558eeb980bc828e0f1b30238ad24d82ed84d5e5eda1dab2a082f14
 Network=llm.network
 NetworkAlias=open-webui
 PublishPort=127.0.0.1:3000:8080
 Volume=/var/lib/open-webui:/app/backend/data:Z,U
-# BC-250 compatibility guard for the pinned Open WebUI 0.12.5/Tika 4 loader.
+# BC-250 compatibility guard for the pinned Open WebUI 0.13.3/Tika 4 loader.
 # Keep the upstream image immutable; the guard only rejects semantically empty
 # Tika extraction responses that upstream would otherwise store as placeholder text.
 Volume=/var/lib/bc250-llm-server/openwebui-runtime:/opt/bc250-openwebui-shim:ro,Z
@@ -46,7 +46,7 @@ Environment=ENABLE_CODE_EXECUTION=false
 Environment=ENABLE_CODE_INTERPRETER=false
 Environment=ENABLE_MEMORIES=false
 Environment=ENABLE_DIRECT_CONNECTIONS=false
-# Open WebUI 0.12 adds several network/tool surfaces. Keep them explicit and
+# Open WebUI 0.13 retains network/tool/agent surfaces. Keep them explicit and
 # fail-closed until the appliance deliberately adopts and qualifies them.
 Environment=ENABLE_DIRECT_INTEGRATIONS=false
 Environment=ENABLE_TOOL_SERVERS=false
@@ -55,6 +55,9 @@ Environment=ENABLE_CHANNELS=false
 Environment=ENABLE_ENCRYPTED_CHANNELS=false
 Environment=ENABLE_APPS=false
 Environment=ENABLE_SUBAGENTS=false
+# 0.13.3 introduces default-on scheduled/AI event surfaces; package does not qualify them.
+Environment=ENABLE_AUTOMATIONS=false
+Environment=ENABLE_CALENDAR=false
 Environment=AUDIO_REALTIME_ENABLED=false
 Environment=ENABLE_WEB_SEARCH=false
 Environment=ENABLE_GOOGLE_DRIVE_INTEGRATION=false

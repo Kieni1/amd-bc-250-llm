@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.20.0-6 - 2026-11-09 (SOURCE finalized; BUILD/DEVICE pending)
+
+- Stage Open WebUI 0.13.3 (OCI index digest pinned), including the upstream
+  escaped-punctuation `grep_knowledge_files` fix (#33936, `ad95407`). Retain
+  the Tika 4 extraction shim after confirming the pinned tagged loader still
+  returns placeholder text on semantically empty extraction; live verification
+  of Knowledge scope, indexed document retrieval and upgrade migration remains.
+- Stage Ollama 0.40.15 (exact upstream AMD64 `.tar.zst` SHA-256) with the
+  existing four-lane Vulkan, parallelism, KV-cache and keepalive policies.
+  Newly tagged runtime behavior needs an exact-device smoke; post-release
+  unreleased llama.cpp fixes are not included or presumed effective.
+- Stage tagged Cyan Skillfish governor 0.4.15 with the upstream render-node
+  udev alias and matching unit device dependency, preserving 350–1850 MHz,
+  voltage, thermal and normal boot policy. Add RPM udev rules reload/trigger.
+- These are new `0.20.0-6` SOURCE bytes; no BUILD/DEVICE gate is transferred
+  from 0.20.0-5. The spec and release contract now select Release 6.
+- Ship two opt-in, administrator-private DE/FR Documents/RAG testing recipes with
+  the same packaged Gemma E4B base and no bundled Knowledge IDs or corpora.
+  Operator GUI binding and actual live chat-level isolation must be tested.
+- Carry the provisional Block 33 r1 C3 translation attachment API rejection
+  failure as a DEVICE regression, not an assumed 0.13.3 fix.
+- Keep kernel selection dynamic (`uname -r` for patch rebuilds); kernel/ROCm,
+  Mesa testing upgrades, MTP parallelism and CUDA/CPU-core unlocks are not promoted.
+
+
 ## 0.20.0-5 - 2026-11-06
 
 - Carry forward the frozen 0.20.0-4 K6 Documents/RAG and evaluator changes without retroactively treating that candidate as BUILD/DEVICE accepted. `0.20.0-3` remains the accepted DEVICE predecessor.

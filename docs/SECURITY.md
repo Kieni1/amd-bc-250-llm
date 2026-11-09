@@ -127,3 +127,5 @@ Keep firewalld/nginx policy authoritative. `bc250 advanced openwebui` may use an
 temporary administrator credential for one invocation, while `init`/package automation can establish
 the protected root-only credential documented above. Neither mechanism changes the network boundary.
 Agent/coding mode is exclusive and the agent service remains disabled at boot.
+
+`0.20.0-6` SOURCE runtime: Open WebUI 0.13.3 defaults Automations and Calendar to enabled. Both are disabled in the Quadlet and in package-owned persisted `application` desired state (`automations.enable` and `calendar.enable`). Validate the effective controls on DEVICE before promoting the runtime.

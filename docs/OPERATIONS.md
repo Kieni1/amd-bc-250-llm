@@ -1,5 +1,8 @@
 # Operations and maintenance
 
+> **2026-11-09 `0.20.0-6` SOURCE candidate:** before the first Open WebUI 0.13.3 start, verify the stopped-state database rollback snapshot and protected secret retention. After Ollama 0.40.15 convergence, verify all lanes and exact models; keep any Pi/maintenance or full device acceptance evidence separate.
+
+
 This is the canonical operator reference for day-to-day administration. It combines the public command reference, maintenance procedures and the companion interface contract.
 
 ## Command reference
@@ -701,7 +704,7 @@ obtain the complete paginated Knowledge-base/file inventory from the installed
 Open WebUI API first. They exclude all linked file IDs, so the dry-run plan matches what a real
 run would delete. A real run fails closed without DELETE requests if the API is unavailable or changes while
 listing. A dry run reports that case as a warning and plans no candidates. This inventory
-path must be checked on the installed Open WebUI 0.12.5 before enabling destructive
+path must be checked on the installed Open WebUI 0.13.3 candidate (0.12.5 previously accepted) before enabling destructive
 pruning. An unindexed attachment is eligible only under the configured age/size rules.
 An idle browser tab currently counts as activity for safe shutdown, as does an active
 Agent session or MTP traffic on 8090. No idle-browser timeout has been introduced. A

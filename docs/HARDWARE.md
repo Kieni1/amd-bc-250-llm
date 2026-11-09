@@ -1,5 +1,8 @@
 # BC-250 hardware and platform
 
+> **2026-11-09 `0.20.0-6` SOURCE:** The governor v0.4.15 pin adds a render-node systemd device dependency and packaged udev rule. Test GPU discovery and a safe governor start after both cold boot and upgrade; retain the installed/stock fallback kernel and rebuild patched modules for the actually installed `uname -r`. No Fedora kernel version is selected by this RPM release.
+
+
 This is the canonical hardware/runtime guide. It combines memory policy, sensors, governor behavior and live CU routing. The normal CU workflow is intentionally small: configure with `sudo bc250-cu-live-manager` and verify with `sudo bc250-40cu status`.
 
 ## Memory profile
@@ -107,8 +110,8 @@ journalctl -u cyan-skillfish-governor-smu.service -b
 sudo bc250 verify
 ```
 
-The RPM pins `filippor/cyan-skillfish-governor` v0.4.14 at commit
-`7b08fdcf542d1edd82f3a9077c902038019c9842`. Fresh installations use a
+The finalized `0.20.0-5` RPM pins `filippor/cyan-skillfish-governor` v0.4.14 at commit
+`7b08fdcf542d1edd82f3a9077c902038019c9842`. The `0.20.0-6` SOURCE now pins **v0.4.15** at commit `34cea69cdf617d1ad05edc71c4c61df501a13c8e`, with a packaged udev GPU alias and systemd device binding, not a kernel change. Fresh installations use a
 350–1850 MHz range. The 2000 MHz / 960 mV point remains in the curve only for
 deliberate operator testing. `%config(noreplace)` preserves local tuning on
 upgrades.

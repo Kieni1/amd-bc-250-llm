@@ -1,5 +1,8 @@
 # Managed office documents and RAG
 
+> **2026-11-09 `0.20.0-6` SOURCE:** Open WebUI 0.13.3 is pinned, including the fix for escaped-punctuation Knowledge searches (`Art\. 40`), without changing K6/1500/200/Jina. DEVICE acceptance needs effective chat-level Knowledge scoping and direct/automatic DE/FR lookup checks; upstream fix presence is not a RAG-quality PASS.
+
+
 This guide covers the appliance's **local, privacy-oriented managed document workflow** and the RAG
 (retrieval-augmented generation) path that makes reviewed office documents searchable in Open WebUI.
 For the current managed corpus, German sources are authoritative, French documents are reviewed
@@ -8,7 +11,7 @@ and Tika services, the main answer lane on `11434`, and the dedicated embedding 
 Open WebUI to use its Tika-4 API contract. Exact-device testing with genuine LibreOffice DOCX files confirms that Tika 4 emits real Word bullets as `· item` rather than canonical Markdown `- item`; heading structure, table Markdown, list text/order and retrieved bullet/table facts remain intact, so the package intentionally does not rewrite those markers. It adds no separate vector service or
 RAG daemon; document synchronization remains an explicit operator action.
 
-For the pinned Open WebUI 0.12.5/Tika 4 combination, BC-250 includes a narrow runtime guard for
+For the Open WebUI 0.13.3 WIP/Tika 4 combination (retained from the 0.12.5 baseline), BC-250 includes a narrow runtime guard for
 semantically empty extraction: a Tika HTTP-success response with missing/blank `tk:content` or the literal
 `<No text content found>` placeholder is converted into an ingestion failure instead of being stored and
 indexed as document text. The user-facing reason states that no usable text was found and notes that the
@@ -18,7 +21,7 @@ usable extracted text unless OCR is deliberately used through the separate OCR w
 compatibility guard whenever the Open WebUI or Tika extraction contract changes.
 
 Open WebUI's duplicate-content protection is an expected Knowledge policy, not an extraction failure. For
-the pinned 0.12.5 backend BC-250 presents it as: `Duplicate document content — this content is already present
+the pinned 0.13.3 WIP backend BC-250 intends to present it as: `Duplicate document content — this content is already present
 in the knowledge collection.` The original indexed document remains the authoritative copy; regression
 harnesses treat this condition as an expected duplicate rejection and should retain the failed upload ID
 where possible so cleanup/orphan behavior can be checked separately.
@@ -109,7 +112,7 @@ Query prefix:   "Query: "
 Content prefix: "Document: "
 ```
 
-Open WebUI 0.12.5 persists these fields through the retrieval API. BC-250 converges them explicitly so an upgraded database cannot silently retain a prefix scheme that no longer matches the package embedding model. The same values remain in the Quadlet as conservative fresh-database bootstrap defaults.
+The previously accepted Open WebUI 0.12.5 persisted these fields through the retrieval API; 0.13.3 needs a DEVICE read-back. BC-250 converges them explicitly so an upgraded database cannot silently retain a prefix scheme that no longer matches the package embedding model. The same values remain in the Quadlet as conservative fresh-database bootstrap defaults.
 
 For Qwen3 Embedding, use an English query instruction and leave the content
 prefix empty:
@@ -192,7 +195,7 @@ and hybrid-without-reranker results have been measured.
 
 ### Measured tuning candidates, not fresh-install defaults
 
-Open WebUI 0.12.5 exposes settings that are relevant to this appliance but
+Open WebUI 0.12.5 introduced settings retained in the 0.13.3 WIP that are relevant to this appliance but
 remain conservative in the packaged Quadlet:
 
 - `RAG_SYSTEM_CONTEXT=false`: enabling it moves retrieved context to a stable
@@ -204,7 +207,7 @@ remain conservative in the packaged Quadlet:
 - `RAG_EMBEDDING_BATCH_SIZE=1`: Ollama accepts batched embedding inputs, but larger
   batches can increase memory pressure. Compare `1`, `4`, `8` and `16` on the real
   BC-250 before changing the default.
-- `RAG_EMBEDDING_BUFFER_SIZE=1000`: Open WebUI 0.12.5 saves very large document embeddings in bounded 1000-chunk buffers. This is separate from the request batch size; keep the upstream 1000-chunk default explicit unless real BC-250 ingestion evidence justifies a different memory/throughput tradeoff.
+- `RAG_EMBEDDING_BUFFER_SIZE=1000`: The Open WebUI 0.12.5 baseline saves very large document embeddings in bounded 1000-chunk buffers. This is separate from the request batch size; keep the upstream 1000-chunk default explicit unless real BC-250 ingestion evidence justifies a different memory/throughput tradeoff.
 
 Changing chunking or the embedding model requires reindexing affected Knowledge
 documents. `RAG_SYSTEM_CONTEXT` changes prompt placement rather than stored
@@ -529,7 +532,7 @@ Multimodal OCR GGUFs require their matching image/projector path where applicabl
 used for ad-hoc visual A/B tests, but its chat output should not become the
 canonical RAG source without the same review/cleanup step.
 
-## 7. Retrieval mode: packaged Open WebUI 0.12.5 behavior
+## 7. Retrieval mode: Open WebUI 0.12.5 baseline; 0.13.3 WIP requires DEVICE checks
 
 Use the package-owned **`Office - Documents / RAG`** preset for ordinary document questions.
 It is based on `prod-gemma4-e4b-unsloth-qat-ud-q4-k-xl`, keeps File Context available, and
@@ -690,3 +693,16 @@ request/chat and allowlists common office/text/document formats through
 for curated bulk content and has its own lifecycle. `RAG_EMBEDDING_BATCH_SIZE`
 remains 1 until the BC-250 embedding benchmark demonstrates that larger Ollama
 batches improve throughput without memory or compatibility regressions.
+
+For the 0.13.3 runtime candidate, recheck Knowledge API pagination and membership read-back before allowing destructive upload pruning; the existing fail-closed inventory was verified against the older 0.12.5 API and its source file is frozen in this WIP. This is an installed-runtime compatibility gate, not permission to enable destructive pruning during tests.
+
+### DE / FR private test-role configuration (0.20.0-6)
+
+The product Documents role remains one combined DE/FR retrieval role. The RPM
+adds **two optional admin-only test recipes** under `examples/openwebui/` for
+separate DE and FR Knowledge scopes with the same Gemma E4B weights. They do
+not install weights, index corpora, create Open WebUI presets or set collection
+IDs automatically. Follow the recipe README to bind one private Knowledge
+collection per language through the UI, then verify effective chat-level scope
+and citations (the FR test must not inherit the German result). Retain K6,
+1500/200, hybrid off, threshold zero and Jina embedding unchanged.

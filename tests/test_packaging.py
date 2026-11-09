@@ -480,7 +480,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('source "$runtime_env"', installer)
         self.assertNotIn('BC250_OLLAMA_VERSION="0.34.0"', installer)
         self.assertIn('requested="$BC250_OLLAMA_VERSION"', installer)
-        self.assertIn("BC250_OLLAMA_VERSION=0.40.13", (ROOT / "config/runtime.env").read_text())
+        self.assertIn("BC250_OLLAMA_VERSION=0.40.15", (ROOT / "config/runtime.env").read_text())
         self.assertIn("package standard $BC250_OLLAMA_VERSION", verify)
 
     def test_ollama_topology_is_statically_packaged_and_local_only(self) -> None:
@@ -560,14 +560,14 @@ class PackagingTests(unittest.TestCase):
             r"(?ms)^\[frequency-range\]\s*$.*?^min = 350\s*$.*?^max = 1850\s*$",
         )
 
-    def test_governor_v0414_pin_keeps_conservative_usage_defaults(self) -> None:
-        commit = "7b08fdcf542d1edd82f3a9077c902038019c9842"
+    def test_governor_v0415_pin_keeps_conservative_usage_defaults(self) -> None:
+        commit = "34cea69cdf617d1ad05edc71c4c61df501a13c8e"
         upstreams = (ROOT / "packaging/upstreams.toml").read_text(encoding="utf-8")
         spec = (ROOT / "packaging/bc250-llm-server.spec").read_text(encoding="utf-8")
         config = (ROOT / "config/governor/config.toml").read_text(encoding="utf-8")
-        self.assertIn('version = "0.4.14"', upstreams)
+        self.assertIn('version = "0.4.15"', upstreams)
         self.assertIn(f'commit = "{commit}"', upstreams)
-        self.assertIn("%global governor_version 0.4.14", spec)
+        self.assertIn("%global governor_version 0.4.15", spec)
         self.assertIn(f"%global governor_commit {commit}", spec)
         self.assertRegex(
             config,
@@ -575,14 +575,14 @@ class PackagingTests(unittest.TestCase):
         )
         self.assertIn('temp-read = "sysfs"', config)
 
-    def test_open_webui_v0123_is_digest_pinned(self) -> None:
+    def test_open_webui_v0133_is_digest_pinned(self) -> None:
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(
             encoding="utf-8"
         )
-        self.assertIn("# v0.12.5, pinned OCI index digest.", quadlet)
+        self.assertIn("# v0.13.3, pinned OCI index digest.", quadlet)
         self.assertIn(
             "Image=ghcr.io/open-webui/open-webui@sha256:"
-            "03443b8de6b617da9d900edd09b4bf1cb0ddbfdcba6afb42c548336a0b821ded",
+            "46b59158e6558eeb980bc828e0f1b30238ad24d82ed84d5e5eda1dab2a082f14",
             quadlet,
         )
         self.assertNotRegex(quadlet, r"(?m)^Image=.*:(?:latest|v0\.12\.3)$")
@@ -616,6 +616,8 @@ class PackagingTests(unittest.TestCase):
                 "channels.encryption.enable": False,
                 "apps.enable": False,
                 "subagents.enable": False,
+                "automations.enable": False,
+                "calendar.enable": False,
                 "chat.tool_search.enable": False,
                 "audio.realtime.enabled": False,
                 "web.search.enable": False,
@@ -934,19 +936,19 @@ class PackagingTests(unittest.TestCase):
                 values[key] = value
         quadlet = (ROOT / "config/containers/open-webui.container").read_text(encoding="utf-8")
         tika = (ROOT / "config/containers/tika.container").read_text(encoding="utf-8")
-        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.40.13")
+        self.assertEqual(values["BC250_OLLAMA_VERSION"], "0.40.15")
         self.assertEqual(
             values["BC250_OLLAMA_PAYLOAD_URL"],
-            "https://github.com/ollama/ollama/releases/download/v0.40.13/ollama-linux-amd64.tar.zst",
+            "https://github.com/ollama/ollama/releases/download/v0.40.15/ollama-linux-amd64.tar.zst",
         )
         self.assertEqual(
             values["BC250_OLLAMA_PAYLOAD_SHA256"],
-            "c9490e0f520be21271d969e6703f012268b1d39f8b70dd58854e5bfef7a75bb6",
+            "628c018404a4206493efd38e46251c154ede5141b8b8dc85c659b3b027c47379",
         )
-        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.12.5")
+        self.assertEqual(values["BC250_OPEN_WEBUI_VERSION"], "0.13.3")
         self.assertEqual(values["BC250_TIKA_VERSION"], "4.2.0-full")
-        self.assertEqual(values["BC250_GOVERNOR_VERSION"], "0.4.14")
-        self.assertEqual(values["BC250_GOVERNOR_COMMIT"], "7b08fdcf542d1edd82f3a9077c902038019c9842")
+        self.assertEqual(values["BC250_GOVERNOR_VERSION"], "0.4.15")
+        self.assertEqual(values["BC250_GOVERNOR_COMMIT"], "34cea69cdf617d1ad05edc71c4c61df501a13c8e")
         self.assertEqual(
             values["BC250_TIKA_IMAGE_DIGEST"],
             "sha256:4774eaac44f86cdf648ae7b5a367016eaf6f9052adec31e5cff07cff1a0c6e24",

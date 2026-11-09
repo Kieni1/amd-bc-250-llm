@@ -1,7 +1,18 @@
 # Open WebUI
 
-Current DEVICE-accepted 0.20.0-3 package (retaining the 1.12-qualified runtime stack): **Open WebUI v0.12.5** with **Ollama v0.40.13** and **Apache Tika v4.2.0-full**. Runtime pins
-are recorded in `/usr/share/bc250-llm-server/runtime.env`.
+The last fully DEVICE-accepted baseline, `0.20.0-3`, uses **Open WebUI 0.12.5**,
+**Ollama 0.40.13** and **Apache Tika 4.2.0-full**. A provisional 2026-11-08
+DEVICE handover reports 0.20.0-5 installed with effective K6, but **does not
+close full DEVICE acceptance**.
+
+**`0.20.0-6` SOURCE candidate (2026-11-09):** the source pins **Open WebUI 0.13.3**
+and **Ollama 0.40.15**, while retaining Tika 4.2.0-full. These are candidates,
+not a newly accepted RPM. The package runtime source of truth is
+`config/runtime.env` (installed as `/usr/share/bc250-llm-server/runtime.env`).
+Open WebUI 0.13.3 contains upstream fix `ad95407` for escaped punctuation in
+`grep_knowledge_files`. After upgrade, verify actual chat-level Knowledge
+attachment/isolation, the `Art\. 40` and `Art. 40` searches and UUID-based file
+viewing. Upstream inclusion is not DEVICE confirmation.
 
 The package uses two layers deliberately:
 
@@ -16,7 +27,7 @@ The frozen `0.20.0-4` SOURCE introduced, and the `0.20.0-5` SOURCE carries forwa
 **dense Jina v5 small / token chunks 1500 with 200 overlap / TOP_K=6 /
 threshold 0**, with Gemma still generating answers. `TOP_K` is a retrieval
 limit, not a guarantee that every question returns six chunks. The accepted
-`0.20.0-3` RPM retains K4; the K6 setting is **not installed by updating these docs**. It becomes the installed package default only after a finalized `0.20.0-5` RPM is selected, installed and qualified. `bc250 advanced openwebui apply` converges the
+`0.20.0-3` RPM retains K4; the K6 setting is **not installed by updating these docs**. The installed `0.20.0-5` provisional DEVICE evidence observes effective K6, but complete release acceptance is still pending; the new `0.20.0-6` RPM requires its own effective K6 readback. `bc250 advanced openwebui apply` converges the
 package-owned retrieval settings, including TOP_K; changing those values
 only in the Open WebUI administrator UI is reported as drift, not a persistent
 package exception. A deliberately supplied `BC250_OWUI_DESIRED_STATE` file
@@ -67,19 +78,20 @@ reset it. Verbose status also renders effective nested `params.custom_params` fo
 policy and, when the pinned API exports it, reports the administrator-owned multi-model-chat
 permission without converging that permission.
 
-Open WebUI 0.12.5 also has one package-owned, version-scoped compatibility guard mounted read-only
+Open WebUI 0.13.3 still needs the version-scoped compatibility guard mounted read-only
 into the container. For the Tika 4 Markdown endpoint only, BC-250 rejects HTTP-success responses whose
 `tk:content` is missing, blank, or the literal upstream placeholder `<No text content found>`. The resulting
 processing failure explicitly says that no usable text was found and notes that the file may be empty,
 corrupted, image-only or unsupported; a textless/image-only file is not mislabeled as corruption. The same
 pinned-version shim makes duplicate-content rejection explicit: the content is already present in the
-Knowledge collection. Recoverable Tika extraction remains successful. The guard is deliberately tied to
-the pinned Open WebUI 0.12.5 behavior and must be revalidated or removed when the Open WebUI pin changes.
+Knowledge collection. Recoverable Tika extraction remains successful. The guard has been reviewed against
+the tagged Open WebUI 0.13.3 `TikaLoader` (`/tika/json/md`, `tk:content`) and must be revalidated or removed on the next pin change.
+A tagged-source inspection does not replace a Tika extraction DEVICE test.
 
 The projected runtime hook under `/var/lib/bc250-llm-server/openwebui-runtime/` is **RPM-owned runtime
 injection**, not mutable Open WebUI/operator state. Its source authority remains the packaged
 `config/openwebui/runtime/` tree; the `/var/lib` projection exists only because the file must be bind-mounted
-into the container. Source tests bind the compatibility contract to Open WebUI 0.12.5 and Tika 4.2.0-full so
+into the container. Source tests bind the compatibility contract to Open WebUI 0.13.3 and Tika 4.2.0-full so
 a dependency change requires explicit review instead of silently carrying the shim forward.
 
 Open WebUI is a Podman Quadlet. Its generated `open-webui.service` is transient and is not directly
@@ -134,9 +146,9 @@ therefore never interpreted as an empty lane. Administrator-created records and 
 preserved. This is a testing surface, not a promise that every raw model remains user-facing for v1.
 
 
-## Open WebUI 0.12.5 settings audit
+## Open WebUI 0.13.3 SOURCE settings audit (DEVICE pending)
 
-The 0.12.5 refresh keeps BC-250 deliberately local and fail-closed. In addition to the
+The 0.13.3 WIP retains the 0.12.5 BC-250 local/offline settings contract, adding explicit persisted disablement of Automations and Calendar. In addition to the
 persisted application policy above, the Quadlet explicitly disables administrator cross-user
 chat browsing and the in-product administrator export surface, OpenAI catch-all passthrough,
 upstream version checks, runtime pip installation from Function/Tool frontmatter, remote-code
@@ -145,7 +157,7 @@ integrations, realtime audio and web search. Authentication remains enabled. The
 bootstrap/runtime policy controls rather than a claim that an operating-system administrator is
 cryptographically isolated from local data.
 
-Open WebUI 0.12.5 makes the embedding query/content prefixes editable persisted settings. BC-250
+Open WebUI 0.12.5 introduced editable persisted embedding query/content prefixes; 0.13.3 needs an exact API read-back check. BC-250
 therefore owns `Query: ` and `Document: ` through the supported retrieval API as well as fresh-DB
 bootstrap environment values. The new embedding save buffer is pinned explicitly at the upstream
 `1000`-chunk default. Batch size remains `1`, asynchronous embedding remains off and concurrency
@@ -434,3 +446,33 @@ Keep these as explicit benchmark candidates, not packaged defaults:
 - nonzero `CHUNK_MIN_SIZE_TARGET`;
 - any additional Open WebUI tools/subagent fan-out that would increase model
   concurrency or memory pressure.
+
+### New Open WebUI 0.13.3 scheduled features (SOURCE selected; DEVICE pending)
+
+Automations and Calendar are disabled at container startup **and** converged to `automations.enable=false` and `calendar.enable=false` through the authenticated application desired-state import. Upstream enables both by default; Open WebUI ConfigVar settings persist in the database, so container environment flags alone are insufficient on an upgraded appliance. BC-250 has not qualified scheduled or model-driven tasks. After migration verify the authenticated status has no desired-state drift and that neither API/tool is available. Do not globally turn off Open WebUI persistent configuration to force an environment value: that would affect operator-owned settings.
+
+### Two private, opt-in DE/FR Documents/RAG testing choices (0.20.0-6)
+
+`examples/openwebui/de-fr-rag-testing-recipes.json` and its README are included
+in the RPM share examples, **not** in package-managed `models.json`. The two
+recipes define administrator-private `BC250 TEST - Documents DE` and
+`BC250 TEST - Documents FR` presets using the existing Gemma E4B base without
+additional weights. They require two distinct operator-owned, private DE/FR
+Knowledge collections and a deliberate Workspace → Models GUI binding. No
+collection IDs, file IDs, corpus files, prompts or answers from DEVICE tests
+are packaged. The production Documents/RAG role is unchanged.
+
+A stored model `meta.knowledge` value alone did **not** enforce effective live
+chat scope on the previous runtime; remove/re-attach the one intended
+collection through the model editor and confirm the actual tool calls from a
+fresh chat. Verify DE and FR independently, including final answer language
+and real citations. This remains testing-only, not a quality promotion.
+
+The prior Open WebUI 0.12.5 Block 33 r1 observed a **translation-role API
+attachment rejection failure** for `messages[].files` with a temporary
+`process=false` upload. It did **not** prove file contents reached the model.
+Source `Filter.inlet` rejects visible `files`/`sources` references and role
+metadata disables file context, but an API may normalize/drop these fields
+before the filter executes. Device tests on 0.13.3 must independently verify
+filter installation/invocation, real API and browser attachment paths, cleanup
+and text-only recovery; do not claim this fixed merely from the version bump.

@@ -6,7 +6,7 @@
     "selection_record": "release-selection.json",
     "workflow": ".github/workflows/build-rpm.yml"
   },
-  "current_batch": "0.20.0-5 SOURCE finalized: cumulative K6 Documents/RAG and evaluator changes carried from frozen 0.20.0-4, translation-integrity and managed-document corrections, model-catalog pruning with optional challengers, Agent/warmup/safe-power topology fixes, and maintenance/backup/Pi companion work including the 0.20.0-5 review fixes (DEC-054). 0.20.0-3 remains accepted SOURCE/BUILD/DEVICE; authoritative 0.20.0-5 GitHub BUILD and exact DEVICE qualification are pending.",
+  "current_batch": "0.20.0-6 SOURCE finalization 2026-11-09: pin OWUI 0.13.3, Ollama 0.40.15, governor 0.4.15; add administrator-private DE/FR test RAG recipes without collection identities; defer genuine API/GUI C3 and chat-level Knowledge isolation to exact-RPM DEVICE.",
   "history": {
     "note": "Detailed reconstruction/GFX history is intentionally not active state. Compact rationale is retained under development/handovers/archive and Git history."
   },
@@ -17,27 +17,29 @@
     "testing": "retain behavior coverage and exact regressions; block predictable Ruff/ShellCheck/rpmlint defects in the release candidate gate, keep the broad behavioral suite module-isolated/advisory, and bind device acceptance to the exact selected GitHub RPM"
   },
   "next_work": {
-    "current_batch": "0.20.0-5 SOURCE: K6 RAG default carried forward, guarded translation, managed-document supersession, catalog pruning with optional LFM3/Gemma QAT/Heretic challengers, Agent-safe topology and verified maintenance/backup/Pi companion paths; no production model, request sampler, dependency or hardware change. 0.20.0-3 is the accepted upgrade predecessor.",
+    "current_batch": "0.20.0-6 SOURCE complete: pinned OWUI/Ollama/governor, opt-in DE/FR testing recipes only, no production model or K6 change.",
     "integration": "Retain accepted Standard/Documents/Deep/Translation/task/embedding controls, corrected manager-owned AtomicChat Generalist acquisition, Ornith Agent policy and Qwen think=true Advanced control. Maintenance now reuses the protected package Open WebUI credential instead of creating a second inline key; MTP/OCR remain specialist opt-in paths.",
-    "next_batch": "Select the authoritative GitHub/Fedora 44 BUILD from finalized 0.20.0-5 SOURCE via workflow_dispatch. The sidechat then tests exact 0.20.0-3→0.20.0-5 candidate upgrade/convergence/idempotence/reboot, effective K6, translation guard, prune dry run against the real Knowledge API, backup staging/skip, Pi pull snapshots and the DEVICE list in development/OPEN-FINDINGS.md. Rerun maintenance setup after upgrade (B2). Broad Phase-C office research remains non-blocking."
+    "next_batch": "Authoritative Fedora 44 GitHub selected workflow_dispatch BUILD, then exact-RPM DEVICE: 0.12.5->0.13.3 database migration/rollback, escaped punctuation and per-language live Knowledge scope, C3 translation API+browser attachment refusal, K6, Ollama Vulkan/embedding cold loads and governor service device alias; keep private corpus outside source."
   },
   "release": {
+    "baseline_nvr": "bc250-llm-server-0.20.0-5",
+    "candidate_nvr": "bc250-llm-server-0.20.0-6",
     "fedora": "44",
     "name": "bc250-llm-server",
-    "nvr": "bc250-llm-server-0.20.0-5",
-    "rpm_release": "5",
-    "state": "source-finalized-awaiting-authoritative-build-and-device",
+    "nvr": "bc250-llm-server-0.20.0-6",
+    "rpm_release": "6",
+    "state": "source-finalized-build-device-pending",
     "version": "0.20.0"
   },
   "schema": 2,
   "validation": {
-    "device_acceptance": "Exact 0.20.0-3 DEVICE-accepted; historical Exact 0.14.1-1.13 also accepted as a predecessor. Exact 0.20.0-4 was never BUILD/DEVICE accepted. Exact 0.20.0-5 DEVICE NOT_TESTED until the selected GitHub RPM is installed and qualified.",
+    "device_acceptance": "0.20.0-3 remains last fully DEVICE-accepted release; 0.20.0-5 installed provisionally with bounded K6/Agent/document checks and Block 33 C3 API FAIL; 0.20.0-6 DEVICE NOT_TESTED.",
     "device_baseline": "Exact 0.20.0-3 is accepted SOURCE/BUILD/DEVICE: 0.14.1-1.13 upgrade predecessor proved, repeated convergence/idempotence, reboot persistence, 62 OK / 0 WARN / 0 FAIL, Tika normal operator, canonical topology. New 0.20.0-5 DEVICE acceptance pending.",
-    "package_critical": "0.20.0-5 source scope: K6 RAG, translation guard, managed-document lifecycle, model catalog/workflow, topology and maintenance/backup/Pi changes. SOURCE critical tests must pass for these exact bytes; GitHub/Fedora 44 %check remains authoritative BUILD.",
-    "release_preflight": "0.20.0-3 SOURCE/BUILD/DEVICE closed. 0.20.0-4 SOURCE frozen and superseded. 0.20.0-5 SOURCE finalized for GitHub authority build, pending proof by final validation artifacts; exact binary DEVICE acceptance remains untested.",
-    "rpm_package_check": "Exact 0.20.0-5 SOURCE candidate is not a built RPM. Selected GitHub/Fedora 44 SRPM→RPM rebuild, payload, rpmlint and release-selection evidence remain required.",
-    "source0_smoke": "0.20.0-5 SOURCE is finalized as a candidate for GitHub build; Source0/spec freeze must bind to the exact candidate commit during authoritative BUILD.",
-    "source_checks": "Cumulative 0.20.0-5 SOURCE contracts aligned; hermetic behaviour tests cover config backup/restore, Pi pull, corpus backup, prune dry-run fidelity, installer baseline equivalence and timer-list agreement; maintenance-companion refrozen, coding-agent/mtp/ocr unchanged.",
+    "package_critical": "0.20.0-6 source package critical checks verified at module level, composite final rerun interrupted before its last module; independently retested qualification module PASS.",
+    "release_preflight": "0.20.0-6 local release-critical preflight 27 PASS; GitHub/Fedora authoritative BUILD requires separate frozen commit and blocking CI lint.",
+    "rpm_package_check": "0.20.0-6 is a distinct SOURCE candidate; do not reuse 0.20.0-5 GitHub/DEVICE evidence or publish altered 0.20.0-5 RPM bytes.",
+    "source0_smoke": "0.20.0-6 SOURCE finalized as archive for GitHub Source0/spec freeze; actual selected Git commit, SRPM rebuild and BUILD artifact provenance not established.",
+    "source_checks": "0.20.0-6 exact-source local preflight: 27/27 PASS. Package-critical: earlier complete 169/169 PASS before final documentation edit; final composite rerun passed seven modules and stalled at the last module under runner limit; qualification module separately 17/17 PASS. Changed-surface review/recipe 31 PASS, documentation/Open WebUI/recipe 79 PASS before final wording correction. No CI lint/Fedora BUILD/DEVICE evidence claimed.",
     "static_lint": "Ruff/ShellCheck are blocking release-candidate checks and must be executed for the finalized exact source in an appropriate environment. Prior-run test results do not transfer."
   }
 }

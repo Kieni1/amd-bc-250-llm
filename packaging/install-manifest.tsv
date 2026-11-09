@@ -8,6 +8,9 @@ file	0644	VERSION	{share}/VERSION
 file	0644	config/runtime.env	{share}/runtime.env
 dir	0755	-	{share}/cu-live-manager
 dir	0755	-	{share}/examples
+dir	0755	-	{share}/examples/openwebui
+file	0644	examples/openwebui/de-fr-rag-testing-recipes.json	{share}/examples/openwebui/de-fr-rag-testing-recipes.json
+file	0644	examples/openwebui/README.md	{share}/examples/openwebui/README.md
 dir	0755	-	{share}/examples/coding-agent
 dir	0755	-	{share}/examples/raspi-wol
 dir	0755	-	{share}/examples/document
@@ -33,6 +36,7 @@ dir	0755	-	{docdir}/models/coding-agent
 file	0755	governor-src/target/release/cyan-skillfish-governor-smu	{bindir}/cyan-skillfish-governor-smu
 file	0755	governor-src/scripts/cyan-skillfish-performance-mode	{bindir}/cyan-skillfish-performance-mode
 file	0644	config/governor/cyan-skillfish-governor-smu.service	{unitdir}/cyan-skillfish-governor-smu.service
+file	0644	config/governor/70-cyan-skillfish-governor.rules	/usr/lib/udev/rules.d/70-cyan-skillfish-governor.rules
 config	0644	config/governor/config.toml	{sysconfdir}/cyan-skillfish-governor-smu/config.toml
 file	0644	config/governor/com.cyanskillfish.Governor.conf	{dbusdir}/com.cyanskillfish.Governor.conf
 
